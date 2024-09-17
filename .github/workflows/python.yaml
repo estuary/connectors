@@ -27,6 +27,7 @@ on:
       - "source-jira-native/**"
       - "source-mixpanel-native/**"
       - "source-brevo/**"
+      - "source-impact-native/**"
 
   pull_request:
     branches: [main]
@@ -57,6 +58,7 @@ on:
       - "source-jira-native/**"
       - "source-mixpanel-native/**"
       - "source-brevo/**"
+      - "source-impact-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -159,6 +161,10 @@ jobs:
           - name: source-brevo
             type: capture
             version: v1
+            usage_rate: "1.0"
+          - name: source-impact-native
+            type: capture
+            version: v2
             usage_rate: "1.0"
 
     steps:

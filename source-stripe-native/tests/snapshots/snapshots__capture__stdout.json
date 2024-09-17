@@ -773,7 +773,7 @@
         "some-interesting": "piece-of-information"
       },
       "name": "My Cool Customer",
-      "next_invoice_sequence": 66,
+      "next_invoice_sequence": 70,
       "object": "customer",
       "phone": null,
       "preferred_locales": [],
@@ -815,7 +815,7 @@
       "livemode": false,
       "metadata": {},
       "name": "TestCostumer4",
-      "next_invoice_sequence": 4,
+      "next_invoice_sequence": 1,
       "object": "customer",
       "phone": "+55000000000",
       "preferred_locales": [
@@ -877,7 +877,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PDXrqLzZ0uyKPmd1ykWN7T1",
-      "invoice": "in_1PDXrqLzZ0uyKPmdT2P1KFcv",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -897,6 +897,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -989,7 +990,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PDvJ5LzZ0uyKPmd0MFObctU",
-      "invoice": "in_1PDuMFLzZ0uyKPmd9AJ2IBWg",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -1009,6 +1010,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1121,6 +1123,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 23000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1233,6 +1236,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 4500,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1345,6 +1349,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": null,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1457,6 +1462,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": null,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1569,6 +1575,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": null,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1682,6 +1689,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": null,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1795,6 +1803,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": null,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -1907,6 +1916,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 300,
+          "authorization_code": null,
           "brand": "visa",
           "capture_before": 1715779408,
           "checks": {
@@ -2020,6 +2030,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1200,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2132,6 +2143,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1200,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2244,6 +2256,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 3400,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2336,7 +2349,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PEeLHLzZ0uyKPmd038rL1eX",
-      "invoice": "in_1PEdKFLzZ0uyKPmd1hIqmMtw",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -2356,6 +2369,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2448,7 +2462,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PF0mTLzZ0uyKPmd0mqJ2BBR",
-      "invoice": "in_1PEzmWLzZ0uyKPmdbw1iDMnP",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -2468,6 +2482,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2560,7 +2575,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PFNGYLzZ0uyKPmd1iCQNi4O",
-      "invoice": "in_1PFMGDLzZ0uyKPmdTzJYjFnv",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -2580,6 +2595,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2672,7 +2688,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PFjodLzZ0uyKPmd1FRKWHh5",
-      "invoice": "in_1PFikwLzZ0uyKPmdopPv2iyM",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -2692,6 +2708,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2784,7 +2801,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PG6E4LzZ0uyKPmd0WIEqM7f",
-      "invoice": "in_1PG5DHLzZ0uyKPmdEEw9P5DC",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -2804,6 +2821,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -2896,7 +2914,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PGScsLzZ0uyKPmd1bhLOPfF",
-      "invoice": "in_1PGRgeLzZ0uyKPmdhPFG8oZO",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -2916,6 +2934,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3008,7 +3027,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PGp9ELzZ0uyKPmd0ZrKpDzn",
-      "invoice": "in_1PGo9oLzZ0uyKPmdG0gfXtpE",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3028,6 +3047,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3120,7 +3140,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PHBbDLzZ0uyKPmd1MRYu16V",
-      "invoice": "in_1PHAeELzZ0uyKPmd8isYi7wW",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3140,6 +3160,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3232,7 +3253,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PHY4bLzZ0uyKPmd1sGDcuXB",
-      "invoice": "in_1PHX6zLzZ0uyKPmdmoCmCVCS",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3252,6 +3273,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3344,7 +3366,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PHuYcLzZ0uyKPmd151kgcVg",
-      "invoice": "in_1PHtbtLzZ0uyKPmdigs0QEXJ",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3364,6 +3386,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3456,7 +3479,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PIH1xLzZ0uyKPmd0mAHO7lY",
-      "invoice": "in_1PIG4qLzZ0uyKPmdZ39nabHw",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3476,6 +3499,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3568,7 +3592,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PIdVULzZ0uyKPmd1nm7RvtQ",
-      "invoice": "in_1PIcYcLzZ0uyKPmdz1jXdM4y",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3588,6 +3612,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3680,7 +3705,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PIzyKLzZ0uyKPmd11nyd5nu",
-      "invoice": "in_1PIz1jLzZ0uyKPmdXjGuUwon",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3700,6 +3725,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3792,7 +3818,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PJMSyLzZ0uyKPmd1tnQFH4i",
-      "invoice": "in_1PJLVqLzZ0uyKPmdOfoGmIxp",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3812,6 +3838,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -3904,7 +3931,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PJivKLzZ0uyKPmd0PY44qae",
-      "invoice": "in_1PJhyNLzZ0uyKPmdTYv4n2ba",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -3924,6 +3951,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4016,7 +4044,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PK5P3LzZ0uyKPmd07QCBOMC",
-      "invoice": "in_1PK4StLzZ0uyKPmdQDsKPFwY",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4036,6 +4064,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4128,7 +4157,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PKRsnLzZ0uyKPmd0bWGqETo",
-      "invoice": "in_1PKQveLzZ0uyKPmdePped3ue",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4148,6 +4177,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4240,7 +4270,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PKoMvLzZ0uyKPmd1kdr1jet",
-      "invoice": "in_1PKnPwLzZ0uyKPmdr2o30uua",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4260,6 +4290,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4352,7 +4383,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PLApRLzZ0uyKPmd09W4ZAd3",
-      "invoice": "in_1PL9sqLzZ0uyKPmddjY7Bf3m",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4372,6 +4403,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4464,7 +4496,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PLXIlLzZ0uyKPmd1ovAWeiZ",
-      "invoice": "in_1PLWMALzZ0uyKPmdpuDVZIqM",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4484,6 +4516,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4576,7 +4609,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PLtmYLzZ0uyKPmd1ZNMMgm1",
-      "invoice": "in_1PLspWLzZ0uyKPmdC9tCYNdm",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4596,6 +4629,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4688,7 +4722,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PMGFpLzZ0uyKPmd0HXQ09a6",
-      "invoice": "in_1PMFJeLzZ0uyKPmddKXocdcO",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4708,6 +4742,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4800,7 +4835,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PMcjTLzZ0uyKPmd1jON5Pbl",
-      "invoice": "in_1PMbmvLzZ0uyKPmdtOLZDYeg",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4820,6 +4855,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -4912,7 +4948,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PMzETLzZ0uyKPmd1q1m9KTt",
-      "invoice": "in_1PMyHQLzZ0uyKPmdZ1MkPdmT",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -4932,6 +4968,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -5024,7 +5061,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PNLi4LzZ0uyKPmd0YPenpB2",
-      "invoice": "in_1PNKlELzZ0uyKPmdjfAc15OJ",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -5044,6 +5081,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -5136,7 +5174,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PNiB4LzZ0uyKPmd1745y1XQ",
-      "invoice": "in_1PNhERLzZ0uyKPmdgojPXjhO",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -5156,6 +5194,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -5248,7 +5287,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PO4euLzZ0uyKPmd0wWv17FT",
-      "invoice": "in_1PO3i5LzZ0uyKPmdLEIoVMZf",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -5268,6 +5307,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -5360,7 +5400,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3POR8HLzZ0uyKPmd0wryZWQR",
-      "invoice": "in_1POQBZLzZ0uyKPmdBZjVv5Kd",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -5380,6 +5420,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -5472,7 +5513,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3POnbgLzZ0uyKPmd04LXMxRa",
-      "invoice": "in_1POmenLzZ0uyKPmdAsogidgM",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -5492,6 +5533,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -5584,7 +5626,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PPA56LzZ0uyKPmd043XdIE4",
-      "invoice": "in_1PP98hLzZ0uyKPmdrjDVMldq",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -5604,6 +5646,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,
@@ -5696,7 +5739,7 @@
       "failure_message": null,
       "fraud_details": {},
       "id": "ch_3PPWXjLzZ0uyKPmd1fgeFMIn",
-      "invoice": "in_1PPVbKLzZ0uyKPmdqN9HouOO",
+      "invoice": null,
       "livemode": false,
       "metadata": {},
       "object": "charge",
@@ -5716,6 +5759,7 @@
       "payment_method_details": {
         "card": {
           "amount_authorized": 1000,
+          "authorization_code": null,
           "brand": "visa",
           "checks": {
             "address_line1_check": null,

@@ -7,7 +7,7 @@ edition = "2021"
 [dependencies]
 doc = { git = "https://github.com/estuary/flow" }
 json = { git = "https://github.com/estuary/flow" }
-proto-flow = { git = "https://github.com/estuary/flow" }
+proto-flow = { git = "https://github.com/estuary/flow", features = ["generate"] }
 
 anyhow = "1.0"
 async-trait = "0.1"
@@ -18,7 +18,7 @@ schemars = "0.8"
 serde = "1.0"
 serde_json = { version = "1.0", features = [
     "raw_value",
-    "arbitrary_precision",
+    "float_roundtrip"
 ] }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
@@ -33,7 +33,7 @@ utoipa-swagger-ui = { version = "7.1", features = ["axum"] }
 time = { version = "0.3", features = ["formatting"] }
 uuid = { version = "1.7", features = ["v4"] }
 lazy_static = "1.4"
-tower-http = { version = "0.5", features = ["decompression-full"] }
+tower-http = { version = "0.5", features = ["decompression-full", "trace"] }
 tower = "0.4"
 
 [dev-dependencies]
