@@ -2,139 +2,111 @@ from datetime import datetime, UTC, timedelta
 from typing import AsyncGenerator, Awaitable, Iterable
 from logging import Logger
 import functools
+import re
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import Resource, LogCursor, PageCursor, open_binding, ResourceConfig, ResourceState
-from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
+from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource, HTTPError
 
-from .api import (fetch_incremental,
-                  fetch_backfill,
-                  fetch_incremental_substreams,
-                  fetch_backfill_substreams,
-                  fetch_incremental_no_events,
-                  fetch_backfill_usage_records,
-                  fetch_incremental_usage_records,
-                  )
+from .api import (
+    API,
+    fetch_incremental,
+    fetch_backfill,
+    fetch_incremental_substreams,
+    fetch_backfill_substreams,
+    fetch_incremental_no_events,
+    fetch_backfill_usage_records,
+    fetch_incremental_usage_records,
+)
 
 from .models import (
-    Accounts,
-    Authorizations,
-    Bank_Accounts,
-    BalanceTransactions,
-    Cards,
-    CardHolders,
-    Coupons,
-    Customers,
-    CustomerBalanceTransaction,
-    Charges,
-    CheckoutSessions,
-    CheckoutSessionsLine,
-    CreditNotes,
-    CreditNotesLines,
-    Disputes,
-    EarlyFraudWarning,
-    Persons,
-    Invoices,
-    InvoiceItems,
-    InvoiceLineItems,
-    ExternalAccountCards,
-    ExternalBankAccount,
-    ApplicationFees,
-    ApplicationFeesRefunds,
-    Bank_Accounts,
-    PaymentMethods,
-    PaymentIntent,
-    Payouts,
-    Plans,
-    Products,
-    PromotionCode,
-    Refunds,
-    Reviews,
-    SetupAttempts,
-    SetupIntents,
-    Subscriptions,
-    SubscriptionsSchedule,
-    SubscriptionItems,
-    TopUps,
-    Transactions,
-    Transfers,
-    TransferReversals,
-    UsageRecords,
-    Files,
-    FilesLink,
     EndpointConfig,
-    EventResult,
-    )
+    STREAMS,
+    REGIONAL_STREAMS,
+)
+
+DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
+
+async def check_accessibility(
+    http: HTTPMixin, log: Logger, url: str,
+) -> bool:
+    """
+    Returns a boolean representing whether the provided stream is accessible (True if accessible, False if inaccessible).
+
+    If a stream is inaccessible due to API key permissions, the Stripe API response has a status code of:
+    - 401 (live Stripe accounts)
+    - 403 (test Stripe accounts)
+    
+    There are also some streams (like Authorizations, one of the Issuing streams) that can be enabled/disabled separately from API key permissions.
+    These streams return a 400 status code & message that contains "Your account is not set up to use X."
+    """
+    is_accessible = True
+
+    try:
+        await http.request(log, url)
+    except HTTPError as err:
+        is_permission_blocked = err.code == 401 or err.code == 403
+        is_disabled = err.code == 400 and bool(re.search(DISABLED_MESSAGE_REGEX, err.message))
+        is_accessible = not is_permission_blocked and not is_disabled
+
+    return is_accessible
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+    is_restricted_api_key = config.credentials.access_token.startswith("rk_")
+    all_streams: list[Resource] = []
 
-    all_streams = [
-        base_object(Accounts, http, config.stop_date),
-        base_object(ApplicationFees, http, config.stop_date),
-        base_object(Customers, http, config.stop_date),
-        base_object(Charges, http, config.stop_date),
-        base_object(CheckoutSessions, http, config.stop_date),
-        base_object(Coupons, http, config.stop_date),
-        base_object(CreditNotes, http, config.stop_date),
-        base_object(Disputes, http, config.stop_date),
-        base_object(EarlyFraudWarning, http, config.stop_date),
-        base_object(InvoiceItems, http, config.stop_date),
-        base_object(Invoices, http, config.stop_date),
-        base_object(PaymentIntent, http, config.stop_date),
-        base_object(Payouts, http, config.stop_date),
-        base_object(Plans, http, config.stop_date),
-        base_object(Products, http, config.stop_date),
-        base_object(PromotionCode, http, config.stop_date),
-        base_object(Refunds, http, config.stop_date),
-        base_object(Reviews, http, config.stop_date),
-        base_object(SetupIntents, http, config.stop_date),
-        base_object(Subscriptions, http, config.stop_date),
-        base_object(SubscriptionsSchedule, http, config.stop_date),
-        base_object(TopUps, http, config.stop_date),
-        base_object(Transfers, http, config.stop_date),
-        base_object(SubscriptionItems, http, config.stop_date),
-        no_events_object(Files, http, config.stop_date),
-        no_events_object(FilesLink, http, config.stop_date),
-        no_events_object(BalanceTransactions, http, config.stop_date),
-        child_object(Accounts, Persons, http, config.stop_date),
-        child_object(Accounts, ExternalAccountCards, http, config.stop_date),
-        child_object(Accounts, ExternalBankAccount, http, config.stop_date),
-        child_object(ApplicationFees, ApplicationFeesRefunds, http, config.stop_date),
-        child_object(Customers, Cards, http, config.stop_date),
-        child_object(Customers, Bank_Accounts, http, config.stop_date),
-        child_object(Customers, PaymentMethods, http, config.stop_date),
-        child_object(Customers, CustomerBalanceTransaction, http, config.stop_date),
-        child_object(CheckoutSessions, CheckoutSessionsLine, http, config.stop_date),
-        child_object(CreditNotes, CreditNotesLines, http, config.stop_date),
-        child_object(Invoices, InvoiceLineItems, http, config.stop_date),
-        child_object(Transfers, TransferReversals, http, config.stop_date),
-        child_object(SetupIntents, SetupAttempts, http, config.stop_date),
-        usage_records(SubscriptionItems, UsageRecords, http, config.stop_date),
-    ]
+    # If a restricted API key was provided, we have to ensure the /events endpoint is accessible.
+    # Almost all streams use this endpoint for incremental replication, so we must be able to access it.
+    if is_restricted_api_key:
+        events_url = f"{API}/events"
+        if not await check_accessibility(http, log, events_url):
+            raise RuntimeError(f"/events endpoint is not accessible, preventing incremental replication.\nPlease update your restricted API key to have read permissions for Events.")
 
-    # Stripe 'Issuing' is only available in certain countries and 
-    # accounts. Checking to see if user has permission to access 'Issuing' endpoints.
-    try:
-        #Using Authorizations stream for testing
-        url = f"https://api.stripe.com/v1/{Authorizations.SEARCH_NAME}"
-        result = EventResult.model_validate_json(
-                await http.request(log, url, method="GET")
-            )
-        issuing_list = [
-            issuing_object(Authorizations, http, config.stop_date),
-            issuing_object(CardHolders, http, config.stop_date),
-            issuing_object(Transactions, http, config.stop_date),
-        ]
-        all_streams += issuing_list
-    except:
-        # User does not have permission
-        log.info("Permission Denied for Issuing Endpoints. "
-                 "Removing 'Issuing' streams")
+    for element in STREAMS:
+        is_accessible_stream = True
+        base_stream = element.get("stream")
+
+        # If we have a restricted API key, we have to check if we can access each stream.
+        if is_restricted_api_key:
+            url = f"{API}/{base_stream.SEARCH_NAME}"
+            is_accessible_stream = await check_accessibility(http, log, url)
+
+        if is_accessible_stream:
+            # If the stream class does not have a TYPES attribute, then it does not have any associated events.
+            resource = base_object(base_stream, http, config.stop_date) if hasattr(base_stream, "TYPES") else no_events_object(base_stream, http, config.stop_date)
+            all_streams.append(resource)
+
+            children = element.get("children", [])
+            for child in children:
+                is_accessible_child = True
+                child_stream = child.get("stream")
+                # If the child stream has a discoverPath specified, then it's accessibility can be different from its parent.
+                if child.get("discoverPath", None):
+                    url = f"{API}/{child.get("discoverPath")}"
+                    is_accessible_child = await check_accessibility(http, log, url)
+
+                if is_accessible_child:
+                    match child_stream.NAME:
+                        case "UsageRecords":
+                            all_streams.append(usage_records(base_stream, child_stream, http, config.stop_date))
+                        case _:
+                            all_streams.append(child_object(base_stream, child_stream, http, config.stop_date))
+
+    # Regional streams are only available in certain countries, so we always have
+    # check if they accessible regardless of the API key provided.
+    for stream in REGIONAL_STREAMS:
+        url = f"{API}/{stream.SEARCH_NAME}"
+        if await check_accessibility(http, log, url):
+            resource = base_object(stream, http, config.stop_date)
+            all_streams.append(resource)
 
     return all_streams
+
 
 def base_object(
     cls, http: HTTPSession, stop_date: datetime
@@ -274,44 +246,6 @@ def no_events_object(
             state,
             task,
             fetch_changes=functools.partial(fetch_incremental_no_events, cls, http),
-            fetch_page=functools.partial(fetch_backfill, cls, stop_date, http),
-        )
-
-    started_at = datetime.now(tz=UTC)
-
-    return Resource(
-        name=cls.NAME,
-        key=["/id"],
-        model=cls,
-        open=open,
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
-        ),
-        initial_config=ResourceConfig(name=cls.NAME),
-        schema_inference=True,
-    )
-
-def issuing_object(
-        cls, http: HTTPSession, stop_date: datetime
-) -> Resource:
-
-    """ Issuing Object works similar to Base Objects, but only handles "issuing" endpoint
-    streams.
-    """
-    def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings
-    ):
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=functools.partial(fetch_incremental, cls, http),
             fetch_page=functools.partial(fetch_backfill, cls, stop_date, http),
         )
 
