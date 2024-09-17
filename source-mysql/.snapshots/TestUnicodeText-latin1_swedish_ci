@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/test_unicodetext_latin1_swedish_ci_78412948_00": 6 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_latin1_swedish_ci_78412948_00","cursor":"backfill:0"}},"data":"Sphinx of black quartz, judge my vow","id":100}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_latin1_swedish_ci_78412948_00","cursor":"backfill:1"}},"data":"Le cœur déçu mais l'âme plutôt naïve","id":101}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_latin1_swedish_ci_78412948_00","cursor":"backfill:2"}},"data":"Heizölrückstoßabdämpfung","id":102}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_latin1_swedish_ci_78412948_00","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Sphinx of black quartz, judge my vow","id":200}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_latin1_swedish_ci_78412948_00","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Le c\ufffdur d\ufffd\ufffdu mais l'\ufffdme plut\ufffdt na\ufffdve","id":201}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_latin1_swedish_ci_78412948_00","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Heiz\ufffdlr\ufffdcksto\ufffdabd\ufffdmpfung","id":202}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FUnicodeText_latin1_swedish_ci_78412948_00":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

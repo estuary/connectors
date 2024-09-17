@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 
+	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
@@ -319,4 +321,63 @@ func TestPartialRowImages(t *testing.T) {
 
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 2", tableName))
 	t.Run("delete", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestUnicodeText(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	var latinTestStrings = []string{
+		"Sphinx of black quartz, judge my vow",
+		"Le cœur déçu mais l'âme plutôt naïve",
+		"Heizölrückstoßabdämpfung",
+	}
+	var otherTestStrings = []string{
+		"Γαζέες καὶ μυρτιὲς δὲν θὰ βρῶ πιὰ στὸ χρυσαφὶ ξέφωτο",
+		"Árvíztűrő tükörfúrógép",
+		"いろはにほへとちりぬるを",
+		"ולפתע מצא",
+		"\u0432 чащах юга жил бы цитрус",
+		"次常用字",
+	}
+
+	for idx, tc := range []struct {
+		Name    string
+		Options string
+		Inputs  []string
+	}{
+		{"latin1_swedish_ci", "COLLATE latin1_swedish_ci", latinTestStrings},                                    // Default in older MySQL and MariaDB releases
+		{"utf8mb4_0900_ai_ci", "COLLATE utf8mb4_0900_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in modern MySQL releases
+		{"utf8mb4_general_ci", "COLLATE utf8mb4_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in Debian MariaDB
+		{"utf8mb3_general_ci", "COLLATE utf8mb3_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Testing 3-byte UTF-8 for completeness
+		{"ucs2_general_ci", "COLLATE ucs2_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},       // Testing UCS-2 for completeness
+
+		// Testing binary charset/collation for completeness. Apparently what happens when you declare
+		// a column as `TEXT COLLATE binary` is that MySQL just gives you a `BLOB` column and then the
+		// bytes are the correct UTF-8 representation of the input text for both backfill and replication.
+		{"binary", "COLLATE binary", slices.Concat(latinTestStrings, otherTestStrings)},
+
+		// Default in MariaDB after v11.6.0. Cannot be tested against MySQL 8.4 but we have two other utf8mb4 charsets so that's okay.
+		// {"utf8mb4_uca1400_ai_ci", "COLLATE utf8mb4_uca1400_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)},
+	} {
+		t.Run(tc.Name, func(t *testing.T) {
+			var uniqueID = fmt.Sprintf("78412948_%02d", idx)
+			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id INTEGER PRIMARY KEY, data TEXT %s)", tc.Options))
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+			cs.Validator = &st.OrderedCaptureValidator{}
+
+			// Insert various test values and then capture them via both backfill and replication
+			var backfillInputs, replicationInputs [][]any
+			for idx, str := range tc.Inputs {
+				backfillInputs = append(backfillInputs, []any{100 + idx, str})
+				replicationInputs = append(replicationInputs, []any{200 + idx, str})
+			}
+			tb.Insert(ctx, t, tableName, backfillInputs)
+			cs.Capture(ctx, t, nil)
+			tb.Insert(ctx, t, tableName, replicationInputs)
+			cs.Capture(ctx, t, nil)
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
 }
