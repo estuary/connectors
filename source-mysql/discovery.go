@@ -447,8 +447,7 @@ func normalizeMySQLTimestamp(ts string) string {
 const queryDiscoverTables = `
   SELECT table_schema, table_name, table_type, engine
   FROM information_schema.tables
-  WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
-    AND table_schema != 'mysql' AND table_schema != 'sys';`
+  WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys');`
 
 func getTables(_ context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInfo, error) {
 	var results, err = conn.Execute(queryDiscoverTables)
@@ -478,6 +477,7 @@ type mysqlTableDiscoveryDetails struct {
 const queryDiscoverColumns = `
   SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type
   FROM information_schema.columns
+  WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
   ORDER BY table_schema, table_name, ordinal_position;`
 
 func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, error) {
@@ -492,14 +492,13 @@ func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, 
 		var tableSchema, tableName = string(row[0].AsString()), string(row[1].AsString())
 		var columnName = string(row[3].AsString())
 		var dataType, fullColumnType = string(row[5].AsString()), string(row[6].AsString())
-		if dataType == "enum" {
-			logrus.WithFields(logrus.Fields{
-				"schema": tableSchema,
-				"table":  tableName,
-				"column": columnName,
-				"type":   fullColumnType,
-			}).Debug("parsing enum type")
-		}
+		logrus.WithFields(logrus.Fields{
+			"schema":     tableSchema,
+			"table":      tableName,
+			"column":     columnName,
+			"dataType":   dataType,
+			"columnType": fullColumnType,
+		}).Debug("discovered column")
 		columns = append(columns, sqlcapture.ColumnInfo{
 			TableSchema: tableSchema,
 			TableName:   tableName,
@@ -679,6 +678,7 @@ const queryDiscoverPrimaryKeys = `
 SELECT table_schema, table_name, column_name, seq_in_index
   FROM information_schema.statistics
   WHERE index_name = 'primary'
+    AND table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
   ORDER BY table_schema, table_name, seq_in_index;
 `
 
