@@ -475,7 +475,7 @@ type mysqlTableDiscoveryDetails struct {
 }
 
 const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type
+  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name
   FROM information_schema.columns
   WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
   ORDER BY table_schema, table_name, ordinal_position;`
@@ -492,12 +492,14 @@ func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, 
 		var tableSchema, tableName = string(row[0].AsString()), string(row[1].AsString())
 		var columnName = string(row[3].AsString())
 		var dataType, fullColumnType = string(row[5].AsString()), string(row[6].AsString())
+		var charsetName = string(row[7].AsString())
 		logrus.WithFields(logrus.Fields{
 			"schema":     tableSchema,
 			"table":      tableName,
 			"column":     columnName,
 			"dataType":   dataType,
 			"columnType": fullColumnType,
+			"charset":    charsetName,
 		}).Debug("discovered column")
 		columns = append(columns, sqlcapture.ColumnInfo{
 			TableSchema: tableSchema,
@@ -505,13 +507,13 @@ func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, 
 			Index:       int(row[2].AsInt64()),
 			Name:        columnName,
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    parseDataType(dataType, fullColumnType),
+			DataType:    parseDataType(dataType, fullColumnType, charsetName),
 		})
 	}
 	return columns, err
 }
 
-func parseDataType(typeName, fullColumnType string) any {
+func parseDataType(typeName, fullColumnType, charset string) any {
 	switch typeName {
 	case "enum":
 		// Illegal values are represented internally by MySQL as the integer 0. Adding
@@ -521,6 +523,8 @@ func parseDataType(typeName, fullColumnType string) any {
 		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}
+	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
+		return &mysqlColumnType{Type: typeName, Charset: charset}
 	}
 	return typeName
 }
@@ -529,11 +533,15 @@ type mysqlColumnType struct {
 	Type       string   `json:"type" mapstructure:"type"`                   // The basic name of the column type.
 	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"`         // The list of values which an enum (or set) column can contain.
 	Unsigned   bool     `json:"unsigned,omitempty" mapstructure:"unsigned"` // True IFF an integer type is unsigned
+	Charset    string   `json:"charset,omitempty" mapstructure:"charset"`   // The character set of a text column.
 }
 
 func (t *mysqlColumnType) String() string {
 	if t.Unsigned {
 		return t.Type + " unsigned"
+	}
+	if t.Charset != "utf8mb4" {
+		return t.Type + " with charset " + t.Charset
 	}
 	return t.Type
 }
@@ -598,6 +606,13 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 			return uint64(sval), nil
 		}
 		return val, nil
+	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
+		if val, ok := val.([]byte); ok {
+			return decodeBytesToString(t.Charset, val)
+		} else if val == nil {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
 	}
 	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
 }
@@ -614,8 +629,42 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 		return val, nil
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return val, nil
+	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
+		if val, ok := val.([]byte); ok {
+			return decodeBytesToString(t.Charset, val)
+		} else if val == nil {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
 	}
 	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)
+}
+
+func decodeBytesToString(charset string, bs []byte) (string, error) {
+	if charset == "" {
+		// Assume an unknown charset is UTF-8 to preserve existing behavior
+		// for tasks with old metadata.
+		charset = "utf8mb4"
+	}
+
+	// TODO(wgd): Right here we need to apply an actual lookup table of some sort to
+	// figure out the charset-appropriate decode function, or to error out if we don't
+	// know this character set.
+	var str = string(bs)
+
+	// If the string is short enough then we're done, otherwise we need to apply
+	// a Unicode-aware truncation to the string contents.
+	if len(str) <= truncateColumnThreshold {
+		return str, nil
+	}
+	var buf = new(strings.Builder)
+	for _, r := range str {
+		buf.WriteRune(r)
+		if buf.Len() > truncateColumnThreshold {
+			break
+		}
+	}
+	return buf.String(), nil
 }
 
 // enumValuesRegexp matches a MySQL-format single-quoted string followed by
