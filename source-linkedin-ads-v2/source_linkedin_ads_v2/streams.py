@@ -349,7 +349,7 @@ class Campaigns(LinkedInAdsStreamSlicing):
         return urlencode(params, safe="():,%")
 
 
-class Creatives(LinkedInAdsStreamSlicing):
+class Creatives(IncrementalLinkedinAdsStream, ABC):
     """
     Get Creatives data using `campaign_id` slicing.
     More info about LinkedIn Ads / Creatives:
@@ -358,9 +358,11 @@ class Creatives(LinkedInAdsStreamSlicing):
 
     endpoint = "creatives"
     parent_stream = Accounts
+    parent_values_map = {"account_id": "id"}
     cursor_field = "lastModifiedAt"
     # standard records_limit=500 returns error 400: Request would return too many entities; https://github.com/airbytehq/oncall/issues/2159
     records_limit = 100
+    state_checkpoint_interval = None
 
     def path(
         self,
@@ -395,6 +397,35 @@ class Creatives(LinkedInAdsStreamSlicing):
             else current_stream_state
         )
         return {self.cursor_field: max(latest_record.get(self.cursor_field), int(current_stream_state.get(self.cursor_field)))}
+    
+
+    def read_records(
+        self, stream_state: Mapping[str, Any] = None, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+    ) -> Iterable[Mapping[str, Any]]:
+        stream_state = stream_state or {}
+        parent_stream = self.parent_stream(config=self.config)
+        for record in parent_stream.read_records(**kwargs):
+            child_stream_slice = super().read_records(stream_slice=get_parent_stream_values(record, self.parent_values_map), **kwargs)
+            for child_records in child_stream_slice:
+                try:
+                    account_id = child_records.get('account').split(":")[-1]
+                    url_creative = f"https://api.linkedin.com/rest/adAccounts/{account_id}/creatives/{child_records['id']}"
+                    headers = super().request_headers(stream_state)
+                    headers.update({"Authorization": f"Bearer {self.config['authenticator']._access_token}"})
+                    response_creative = requests.get(url=url_creative,headers=headers).json()
+                    if response_creative["content"].get("textAd"):
+                        child_records["creative_name"] = response_creative["content"]["textAd"].get("headline")
+                    if stream_state:
+                        if child_records[self.cursor_field] >= stream_state.get(self.cursor_field):
+                            yield child_records
+                        else:
+                            continue
+                    else:
+                        yield child_records
+                except Exception as e:
+                    self.logger.error(f"{e}")
+                    continue
+
 
 
 class Conversions(OffsetPaginationMixin, LinkedInAdsStreamSlicing):
