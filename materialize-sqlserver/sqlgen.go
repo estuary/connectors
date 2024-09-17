@@ -32,7 +32,7 @@ var strToInt sql.ElementConverter = sql.StringCastConverter(func(str string) (in
 	return out, nil
 })
 
-var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
+var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect {
 	var stringType = "varchar"
 	// If the collation does not support UTF8, we fallback to using nvarchar
 	// for string columns
@@ -86,9 +86,13 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
-			return sql.InfoTableLocation{
-				TableSchema: schemaName,
-				TableName:   path[0],
+			if len(path) == 1 {
+				// A schema isn't required to be set on the endpoint or any
+				// resource, and if its empty the default schema for the
+				// configured user will implicitly be used.
+				return sql.InfoTableLocation{TableSchema: defaultSchema, TableName: path[0]}
+			} else {
+				return sql.InfoTableLocation{TableSchema: path[0], TableName: path[1]}
 			}
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
