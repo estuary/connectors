@@ -1,0 +1,26 @@
+# ================================
+# Collection "acmeCo/test/test_unicodetext_utf8mb4_0900_ai_ci_78412948_01": 18 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:0"}},"data":"Sphinx of black quartz, judge my vow","id":100}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:1"}},"data":"Le cœur déçu mais l'âme plutôt naïve","id":101}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:2"}},"data":"Heizölrückstoßabdämpfung","id":102}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:3"}},"data":"Γαζέες καὶ μυρτιὲς δὲν θὰ βρῶ πιὰ στὸ χρυσαφὶ ξέφωτο","id":103}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:4"}},"data":"Árvíztűrő tükörfúrógép","id":104}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:5"}},"data":"いろはにほへとちりぬるを","id":105}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:6"}},"data":"ולפתע מצא","id":106}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:7"}},"data":"в чащах юга жил бы цитрус","id":107}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"backfill:8"}},"data":"次常用字","id":108}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Sphinx of black quartz, judge my vow","id":200}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Le cœur déçu mais l'âme plutôt naïve","id":201}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Heizölrückstoßabdämpfung","id":202}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Γαζέες καὶ μυρτιὲς δὲν θὰ βρῶ πιὰ στὸ χρυσαφὶ ξέφωτο","id":203}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Árvíztűrő tükörfúrógép","id":204}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"いろはにほへとちりぬるを","id":205}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ולפתע מצא","id":206}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"в чащах юга жил бы цитрус","id":207}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_utf8mb4_0900_ai_ci_78412948_01","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"次常用字","id":208}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FUnicodeText_utf8mb4_0900_ai_ci_78412948_01":{"backfilled":9,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

@@ -1,0 +1,26 @@
+# ================================
+# Collection "acmeCo/test/test_unicodetext_binary_78412948_05": 18 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:0"}},"data":"U3BoaW54IG9mIGJsYWNrIHF1YXJ0eiwganVkZ2UgbXkgdm93","id":100}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:1"}},"data":"TGUgY8WTdXIgZMOpw6d1IG1haXMgbCfDom1lIHBsdXTDtHQgbmHDr3Zl","id":101}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:2"}},"data":"SGVpesO2bHLDvGNrc3Rvw59hYmTDpG1wZnVuZw==","id":102}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:3"}},"data":"zpPOsc62zq3Otc+CIM66zrHhvbYgzrzPhc+Bz4TOueG9ss+CIM604b2yzr0gzrjhvbAgzrLPgeG/tiDPgM654b2wIM+Dz4Thvbggz4fPgc+Fz4POsc+G4b22IM6+zq3Phs+Jz4TOvw==","id":103}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:4"}},"data":"w4FydsOtenTFsXLFkSB0w7xrw7ZyZsO6csOzZ8OpcA==","id":104}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:5"}},"data":"44GE44KN44Gv44Gr44G744G444Go44Gh44KK44Gs44KL44KS","id":105}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:6"}},"data":"15XXnNek16rXoiDXntem15A=","id":106}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:7"}},"data":"0LIg0YfQsNGJ0LDRhSDRjtCz0LAg0LbQuNC7INCx0Ysg0YbQuNGC0YDRg9GB","id":107}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:8"}},"data":"5qyh5bi455So5a2X","id":108}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"U3BoaW54IG9mIGJsYWNrIHF1YXJ0eiwganVkZ2UgbXkgdm93","id":200}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"TGUgY8WTdXIgZMOpw6d1IG1haXMgbCfDom1lIHBsdXTDtHQgbmHDr3Zl","id":201}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"SGVpesO2bHLDvGNrc3Rvw59hYmTDpG1wZnVuZw==","id":202}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"zpPOsc62zq3Otc+CIM66zrHhvbYgzrzPhc+Bz4TOueG9ss+CIM604b2yzr0gzrjhvbAgzrLPgeG/tiDPgM654b2wIM+Dz4Thvbggz4fPgc+Fz4POsc+G4b22IM6+zq3Phs+Jz4TOvw==","id":203}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"w4FydsOtenTFsXLFkSB0w7xrw7ZyZsO6csOzZ8OpcA==","id":204}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"44GE44KN44Gv44Gr44G744G444Go44Gh44KK44Gs44KL44KS","id":205}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"15XXnNek16rXoiDXntem15A=","id":206}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"0LIg0YfQsNGJ0LDRhSDRjtCz0LAg0LbQuNC7INCx0Ysg0YbQuNGC0YDRg9GB","id":207}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"UnicodeText_binary_78412948_05","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"5qyh5bi455So5a2X","id":208}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FUnicodeText_binary_78412948_05":{"backfilled":9,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"blob","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
