@@ -15,12 +15,15 @@ use tokio::{
 
 pub struct Acknowledgements(io::BufReader<io::Stdin>);
 impl Acknowledgements {
-    pub async fn next_ack(&mut self) -> anyhow::Result<anyhow::Result<()>> {
+    pub async fn next_ack(&mut self) -> anyhow::Result<u32> {
         let req = read_capture_request(&mut self.0).await?;
-        if req.acknowledge.is_none() {
+        let Some(ack) = req.acknowledge else {
             anyhow::bail!("expected Acknowledge message, got: {:?}", req);
         };
-        Ok(Ok(()))
+        if ack.checkpoints == 0 {
+            anyhow::bail!("expected Acknowledge.checkpoints to be > 0, got: {ack:?}");
+        };
+        Ok(ack.checkpoints)
     }
 }
 
@@ -86,8 +89,18 @@ impl Transactor {
         let (client_tx, client_rx) = mpsc::channel(pipeline_limit);
         let (inner_tx, inner_rx) = mpsc::channel(pipeline_limit);
 
-        tokio::task::spawn(transactor_loop(emitter, client_rx, inner_tx));
-        tokio::task::spawn(ack_loop(acks, inner_rx));
+        tokio::task::spawn(async move {
+            match transactor_loop(emitter, client_rx, inner_tx).await {
+                Ok(()) => tracing::info!("transactor loop exited normally"),
+                Err(err) => tracing::error!(error = ?err, "transactor loop exited with error"),
+            }
+        });
+        tokio::task::spawn(async move {
+            match ack_loop(acks, inner_rx).await {
+                Ok(()) => tracing::info!("ack loop exited normally"),
+                Err(err) => tracing::error!(error = ?err, "ack loop exited with error"),
+            }
+        });
 
         Transactor { client_tx }
     }
@@ -113,15 +126,23 @@ async fn ack_loop(
     mut acks: Acknowledgements,
     mut pub_rx: mpsc::Receiver<Transaction>,
 ) -> anyhow::Result<()> {
-    while let Some(txn) = pub_rx.recv().await {
-        // some documents have been published! Let's wait for the acknowledgement.
-        let result = acks.next_ack().await;
-        if let Ok(_) = result {
-            // TODO: should probs logs this
-            let _ = txn.completion_tx.send(());
+    // Counter of checkpoints that have been acknowledged already.
+    let mut ack_count: u32 = 0;
+    while let Some(Transaction {
+        completion_tx,
+        docs,
+    }) = pub_rx.recv().await
+    {
+        std::mem::drop(docs); // free the memory while we wait
+
+        // Do we need to wait for an acknowledgement?
+        if ack_count == 0 {
+            ack_count = acks.next_ack().await.context("awaiting acknowledgement")?;
+            tracing::debug!(checkpoint_count = ack_count, "received ACK");
         }
+        let _ = completion_tx.send(());
+        ack_count -= 1;
     }
-    tracing::debug!("ack loop completed normally");
     Ok(())
 }
 
@@ -129,14 +150,11 @@ async fn transactor_loop(
     mut emitter: Emitter,
     mut client_rx: mpsc::Receiver<Transaction>,
     mut acks_tx: mpsc::Sender<Transaction>,
-) {
+) -> anyhow::Result<()> {
     while let Some(txn) = client_rx.recv().await {
-        if let Err(err) = try_handle_txn(txn, &mut emitter, &mut acks_tx).await {
-            tracing::error!(error = ?err, "failed to puslish documents");
-            return;
-        }
+        try_handle_txn(txn, &mut emitter, &mut acks_tx).await?;
     }
-    tracing::debug!("transactor loop completed without error");
+    Ok(())
 }
 
 async fn try_handle_txn(
