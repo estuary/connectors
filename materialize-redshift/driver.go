@@ -376,6 +376,18 @@ type binding struct {
 	copyIntoMergeTableSQL   string
 	copyIntoDeleteTableSQL  string
 	copyIntoTargetTableSQL  string
+
+	// A reference of all staged file cleanup operations that should be run once
+	// the commit has completed. Will be empty if not data was processed for
+	// this binding. Applies to the Store phase only.
+	cleanupFiles []func(context.Context)
+	// If any deletions must be done for the Store data processed by this binding.
+	hasDeletes bool
+	// If any non-deletion Store requests were received for this binding.
+	hasStores bool
+	// If a merge operation must be done, or if a more efficient COPY INTO can
+	// be used to store the data for the transaction.
+	mustMerge bool
 }
 
 // varcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
@@ -626,25 +638,48 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	// hasUpdates is used to track if a given binding includes only insertions for this store round
-	// or if it includes any updates. If it is only insertions a more efficient direct copy from S3
-	// can be performed into the target table rather than copying into a staging table and merging
-	// into the target table.
-	hasUpdates := make([]bool, len(d.bindings))
-
 	// varcharColumnUpdates records any VARCHAR columns that need their lengths increased. The keys
 	// are table identifiers, and the values are a list of column identifiers that need altered.
 	// Columns will only ever be to altered it to VARCHAR(MAX).
 	varcharColumnUpdates := make(map[string][]string)
 
+	flushStagedFile := func(ctx context.Context, b *binding) error {
+		if b.storeFile.started {
+			cleanup, err := b.storeFile.flush(ctx)
+			if err != nil {
+				return fmt.Errorf("flushing store file: %w", err)
+			}
+			b.cleanupFiles = append(b.cleanupFiles, cleanup)
+		}
+		if b.deleteFile.started {
+			cleanup, err := b.deleteFile.flush(ctx)
+			if err != nil {
+				return fmt.Errorf("flushing delete file: %w", err)
+			}
+			b.cleanupFiles = append(b.cleanupFiles, cleanup)
+		}
+		return nil
+	}
+
 	log.Info("store: starting encoding and uploading of files")
+	var lastBinding = -1
 	for it.Next() {
+		if lastBinding == -1 {
+			lastBinding = it.Binding
+		}
+
+		if lastBinding != it.Binding {
+			// Flush the staged file(s) for the binding now that it's stores are
+			// fully processed.
+			var b = d.bindings[lastBinding]
+			if err := flushStagedFile(ctx, b); err != nil {
+				return nil, fmt.Errorf("flushing staged files for collection %q: %w", b.target.Source.String(), err)
+			}
+			lastBinding = it.Binding
+		}
+
 		var b = d.bindings[it.Binding]
 		var file *stagedFile
-
-		if it.Exists {
-			hasUpdates[it.Binding] = true
-		}
 
 		var err error
 		var converted []any
@@ -655,6 +690,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if d.cfg.HardDelete && it.Delete {
 			if it.Exists {
 				file = b.deleteFile
+				b.hasDeletes = true
 
 				converted, err = b.target.ConvertKey(it.Key)
 				if err != nil {
@@ -665,6 +701,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				continue
 			}
 		} else {
+			b.hasStores = true
+			if it.Exists {
+				b.mustMerge = true
+			}
+
 			file = b.storeFile
 
 			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
@@ -713,6 +754,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
+	// Flush the final binding.
+	if lastBinding != -1 {
+		var b = d.bindings[lastBinding]
+		if err := flushStagedFile(ctx, b); err != nil {
+			return nil, fmt.Errorf("final binding flushing staged files for collection %q: %w", b.target.Source.String(), err)
+		}
+	}
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		log.Info("store: starting commit phase")
 		var err error
@@ -725,11 +774,31 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates) })
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), varcharColumnUpdates) })
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates []bool, varcharColumnUpdates map[string][]string) error {
+func (d *transactor) commit(
+	ctx context.Context,
+	fenceUpdate string,
+	varcharColumnUpdates map[string][]string,
+) error {
+	defer func() {
+		for _, b := range d.bindings {
+			// Arrange to clean up any staged files once this commit attempt is
+			// done.
+			for _, cleanupFn := range b.cleanupFiles {
+				cleanupFn(ctx)
+			}
+
+			// Reset per-transaction properties for the next round.
+			b.cleanupFiles = nil
+			b.hasDeletes = false
+			b.hasStores = false
+			b.mustMerge = false
+		}
+	}()
+
 	conn, err := pgx.Connect(ctx, d.cfg.toURI())
 	if err != nil {
 		return fmt.Errorf("store pgx.Connect: %w", err)
@@ -793,14 +862,8 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	}
 
 	log.Info("store: starting copying of files into tables")
-	for idx, b := range d.bindings {
-		if b.deleteFile.started {
-			deleteDeleted, err := b.deleteFile.flush(ctx)
-			if err != nil {
-				return fmt.Errorf("flushing delete file for binding[%d]: %w", idx, err)
-			}
-			defer deleteDeleted(ctx)
-
+	for _, b := range d.bindings {
+		if b.hasDeletes {
 			// Create the temporary table for staging values to delete from the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
@@ -818,17 +881,11 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 			log.WithField("table", b.target.Identifier).Info("store: finished deleting from table")
 		}
 
-		if !b.storeFile.started {
+		if !b.hasStores {
 			continue
 		}
 
-		deleteStored, err := b.storeFile.flush(ctx)
-		if err != nil {
-			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
-		}
-		defer deleteStored(ctx)
-
-		if hasUpdates[idx] {
+		if b.mustMerge {
 			// Create the temporary table for staging values to merge into the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.

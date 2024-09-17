@@ -89,7 +89,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "set('a', 'b', 'c')", ExpectType: `{"type":["string","null"]}`, InputValue: "a,c", ExpectValue: `"a,c"`},
 
 		{ColumnType: "date", ExpectType: `{"type":["string","null"]}`, InputValue: "1991-08-31", ExpectValue: `"1991-08-31"`},
-		{ColumnType: "date", ExpectType: `{"type":["string","null"]}`, InputValue: "0000-00-00", ExpectValue: `"0000-00-00"`},
+		{ColumnType: "date", ExpectType: `{"type":["string","null"]}`, InputValue: "0000-00-00", ExpectValue: `"0001-01-01"`},
 		{ColumnType: "time", ExpectType: `{"type":["string","null"]}`, InputValue: "765:43:21", ExpectValue: `"765:43:21"`},
 		{ColumnType: "time", ExpectType: `{"type":["string","null"]}`, InputValue: "00:00:00", ExpectValue: `"00:00:00"`},
 		{ColumnType: "year", ExpectType: `{"type":["integer","null"]}`, InputValue: "2003", ExpectValue: `2003`},

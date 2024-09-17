@@ -389,6 +389,15 @@ func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interf
 					return nil, fmt.Errorf("error parsing datetime %q: %w", inputTimestamp, err)
 				}
 				return t.UTC().Format(time.RFC3339Nano), nil
+			case "date":
+				// See note above in the "timestamp" case about replacing the zero value with one
+				// which is valid according to the RFC3339 'full-time' rule / the 'date' format in
+				// a JSON schema.
+				if string(val) == "0000-00-00" {
+					return "0001-01-01", nil
+				}
+				return string(val), nil
+
 			}
 		}
 		if len(val) > truncateColumnThreshold {
@@ -800,7 +809,20 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"enum": {jsonType: "string"},
 	"set":  {jsonType: "string"},
 
-	"date":      {jsonType: "string"},
+	// NOTE(2024-09-13): We deliberately don't translate 'date' columns to a JSON schema
+	// with 'format: date'. This is because originally these values were just emitted as
+	// strings and so the MySQL zero value of '0000-00-00' exists in an unknown number
+	// of collections and materialized destinations.
+	//
+	// As of September 2024 we've changed the serialization logic so that the zero date
+	// is now translated to '0001-01-01' which satisfies 'format: date' validation, but
+	// the schema can't change unless/until we're confident that nothing we care about
+	// will be broken by that change.
+	//
+	// Until then, users who want these columns materialized with a destination-specific
+	// date type can modify their read schema to specify 'format: date' as needed.
+	"date": {jsonType: "string"},
+
 	"datetime":  {jsonType: "string", format: "date-time"},
 	"timestamp": {jsonType: "string", format: "date-time"},
 	"time":      {jsonType: "string"},

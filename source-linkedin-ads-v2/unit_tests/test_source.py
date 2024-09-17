@@ -250,13 +250,11 @@ class TestLinkedInAdsStreamSlicing:
             (AccountUsers, {"lastModified": 1}, [{"lastModified": 2}], [{"lastModified": 2}]),
             (CampaignGroups, {"lastModified": 3}, [{"lastModified": 3}], [{"lastModified": 3}]),
             (Campaigns, {}, [], []),
-            (Creatives, {}, [], []),
         ],
         ids=[
             "AccountUsers",
             "CampaignGroups",
             "Campaigns",
-            "Creatives",
         ],
     )
     def test_filter_records_newer_than_state(self, stream_cls, state, records_slice, expected):

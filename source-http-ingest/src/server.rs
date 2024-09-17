@@ -43,6 +43,26 @@ pub async fn run_server(
         // This layer applies to all routes defined _before_ it, so the max body size is
         // the size after decompression.
         .layer(RequestDecompressionLayer::new())
+        .route_layer(
+            tower_http::trace::TraceLayer::new_for_http()
+                .make_span_with(|req: &http::Request<_>| {
+                    tracing::debug_span!(
+                        "http-request",
+                        path = req.uri().path(),
+                        status_code = tracing::field::Empty,
+                        published = tracing::field::Empty,
+                        handler_time_ms = tracing::field::Empty,
+                    )
+                })
+                .on_response(
+                    |response: &http::Response<_>,
+                     latency: std::time::Duration,
+                     span: &tracing::Span| {
+                        span.record("status_code", &tracing::field::display(response.status()));
+                        span.record("handler_time_ms", latency.as_millis());
+                    },
+                ),
+        )
         .with_state(Arc::new(handler));
 
     let address = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen_on_port()));
@@ -56,12 +76,6 @@ pub async fn run_server(
     Ok(())
 }
 
-// If you turn on debug logging, you get a pretty decent request handling log from just this attribute :)
-#[tracing::instrument(
-    level = "debug",
-    skip(handler, request_headers, body, query_params),
-    fields(response_status)
-)]
 async fn handle_webhook(
     State(handler): State<Arc<Handler>>,
     request_headers: axum::http::header::HeaderMap,
@@ -69,7 +83,7 @@ async fn handle_webhook(
     Query(query_params): Query<serde_json::Map<String, serde_json::Value>>,
     body: Bytes,
 ) -> (StatusCode, Json<Value>) {
-    let resp = match handler
+    match handler
         .handle_webhook(path, request_headers, query_params, body)
         .await
     {
@@ -79,9 +93,7 @@ async fn handle_webhook(
             let body = serde_json::json!({ "error": err.to_string() });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(body))
         }
-    };
-    tracing::Span::current().record("response_status", resp.0.as_str());
-    resp
+    }
 }
 
 struct CollectionHandler {
@@ -379,7 +391,7 @@ impl Handler {
         let n_docs = enhanced_docs.len();
         tracing::debug!(%n_docs, elapsed_ms = %start.elapsed().as_millis(), "documents are valid and ready to publish");
         self.io.publish(enhanced_docs).await?;
-        tracing::debug!(%n_docs, elapsed_ms = %start.elapsed().as_millis(), "documents published successfully");
+        tracing::Span::current().record("published", n_docs);
         Ok((
             StatusCode::OK,
             Json(serde_json::json!({ "published": n_docs })),
