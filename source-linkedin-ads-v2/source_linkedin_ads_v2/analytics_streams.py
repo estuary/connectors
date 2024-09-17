@@ -134,7 +134,6 @@ class LinkedInAdsAnalyticsStream(IncrementalLinkedinAdsStream, ABC):
 
     def get_json_schema(self) -> Mapping[str, Any]:
         schema = ResourceSchemaLoader(package_name_from_class(self.__class__)).get_schema("ad_analytics")
-        schema["properties"].update({self.search_param_value: {"type": ["null", "string"]}})
         return schema
 
     def __init__(self, name: str = None, pivot_by: str = None, time_granularity: str = None, **kwargs):
