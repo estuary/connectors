@@ -4,7 +4,7 @@ bucket: whb-test-bucket
 database: test_db
 region: us-east-2
 schema: main
-token_sops: ENC[AES256_GCM,data:jzZeBqb9vCjlmLfcys35Zxf1gLZiqI7Jv/EvX1yQL5RoDsdzDg3v/TX5osvBv1kbtljbaFkXqEBt4mHnwuIJnf5pkXwz+6TgcVHEs0cuACPrbb+9SVSVcjTvuG6sx4zgPjrVHqvnFh2L1brgIg1IBNGKdxTaNFcE2l65W1GuIYIJFlpN1xo6uYszj3BDG5CPLN0ZiIB80H73x46U/d4eXMEyKmx0fmxl8AbM0vgt935DKra4X01s7PVTUugvwlkz5ROHLuiTStSdCjjXxzLCQqY0effZC5xATem83VNugHSRrBFX7J46OhGIiBlZNn4fq2nY9GYjJf3QUU55f0q5gezaCiz16lHtvW/pJ3pvDhw=,iv:fZptEdanrofwZFWgtzKxDyV5fdnC2VdtctMdzLrqcUQ=,tag:uuFtIGz0EOZYtGdxIC6euQ==,type:str]
+token_sops: ENC[AES256_GCM,data:zJKezW9wWrmo5uZHt3BK/P5AWm6dIWnskg3KTh38q9v5O/w/LsVaSH+WVP+hT92zBF8wl83Q02reRcz3VUK1ma0bNkONkj9u2VPQb16TdlRp0f2lG1SOPcDP/1VhSpnoeRo9DFxsejg3+AwfMbkkTX2iCIZL59+yzFEX6PwRNsih1rtxR66MsjuPyFfspIKaxN1MXDpAUi1ESi1CvSB2N7bUtghLQ6n+87fIJ04FcVFwRUfuOPkdxC9ONNoJi/evha5cvfncZ8jOap8fwC1AjNY/5b13E5kEixmIAryWcnhydg5sgufFGsi6WMTMhMzb+4qkZGcuTd953KF3jGtf5qo6vcku8lYN8KUtTlTZb3WldILNO6Lu0/10s718BxR3n71qKGYmThFWwaeguFHbT79fS+/ffFeenx4ReoffAM+GS4DrWH5B/h7VmjqyHtvU3lOi,iv:u2LmumgY2AOqDd57vagcSbRPc13R6UfQyopX+kK/QHI=,tag:PHuliexX5UNKzcOCVvsuJg==,type:str]
 hardDelete: true
 sops:
     kms: []
@@ -15,8 +15,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-07-08T20:38:16Z"
-    mac: ENC[AES256_GCM,data:D6mtnozawMbxN+MZ1R4YPFy/uilIvPJ/VCRx7M2UFwLAVm6WdqALMHyBAp9r117dptKQmipD0LGpUmvXzTjRx+Uln2LGkVppLwdS+8TYVZ0Ccc1uDbKw0Zzyunpd1ny51waEm6bL/2jJOKbtHKQ6db3pBTWPMxkjvTuABBGxEYA=,iv:cExgO1FUbyrdCfMJNL+lX76ItJ9Cg/ylM4/bpY+hNBg=,tag:OfNkEG4VHdpbClIHDZmGdg==,type:str]
+    lastmodified: "2024-09-17T21:33:05Z"
+    mac: ENC[AES256_GCM,data:q5ySBAKHL2oJtMhrpR0yTs9Ie1uNeQvhYBoe7Qd23avx2zHLlMw1QkZBnU9oKuFuWIiuagJw8ctw6Wp6OjQYc5NCnQOPxk1epXmN7VuKo6uymWNnaIp28mqASD5xh6/N2X9Wyg7oqddWT4azcah7/Kweydxn+XK9FC3Tjds3jCg=,iv:qnRbe1KzXdPdHhYdAWta0JbjfIoJVOx3Bst0gmLSkEc=,tag:mM5Cnl9CO4wf1kIpRCnbUA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
