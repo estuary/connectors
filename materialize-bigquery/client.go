@@ -38,6 +38,69 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+	// First check if there are any interrupted column migrations which must be resumed, before we
+	// construct the InfoSchema
+	var migrationsTable = bqDialect.Identifier(c.cfg.ProjectID, c.cfg.Dataset, "flow_migrations")
+	// We check for existence of the table by requesting metadata, this is the recommended approach by BigQuery docs
+	// see https://pkg.go.dev/cloud.google.com/go/bigquery#Dataset.Table
+	_, err := c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, c.cfg.Dataset).Table("flow_migrations").Metadata(ctx)
+	if err == nil {
+		job, err := c.query(ctx, fmt.Sprintf("SELECT table, step, col_identifier, col_field, col_ddl FROM %s", migrationsTable))
+		if err != nil {
+			return nil, fmt.Errorf("finding flow_migrations job: %w", err)
+		}
+		it, err := job.Read(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("finding flow_migrations: %w", err)
+		}
+		type migration struct {
+			TableIdentifier string `bigquery:"table"`
+			Step            int    `bigquery:"step"`
+			ColIdentifier   string `bigquery:"col_identifier"`
+			ColField        string `bigquery:"col_field"`
+			DDL             string `bigquery:"col_ddl"`
+		}
+		for {
+			var stmts [][]string
+			var m migration
+			if err := it.Next(&m); err == iterator.Done {
+				break
+			} else if err != nil {
+				return nil, fmt.Errorf("reading flow_migrations row: %w", err)
+			}
+
+			var steps, acceptableErrors = c.columnChangeSteps(m.TableIdentifier, m.ColField, m.ColIdentifier, m.DDL)
+
+			for s := m.Step; s < len(steps); s++ {
+				stmts = append(stmts, []string{steps[s], acceptableErrors[s]})
+				stmts = append(stmts, []string{fmt.Sprintf("UPDATE %s SET step = %d WHERE table='%s';", migrationsTable, s+1, m.TableIdentifier)})
+			}
+
+			stmts = append(stmts, []string{fmt.Sprintf("DELETE FROM %s WHERE table='%s';", migrationsTable, m.TableIdentifier)})
+
+			for _, stmt := range stmts {
+				query := stmt[0]
+				var acceptableError string
+				if len(stmt) > 1 {
+					acceptableError = stmt[1]
+				}
+
+				log.WithField("q", query).WithField("acceptableError", acceptableError).Info("migration")
+				if _, err := c.query(ctx, query); err != nil {
+					if acceptableError != "" && strings.Contains(err.Error(), acceptableError) {
+						// This is an acceptable error for this step, so we do not throw an error
+					} else {
+						return nil, err
+					}
+				}
+			}
+
+			if _, err := c.query(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", migrationsTable)); err != nil {
+				return nil, fmt.Errorf("dropping flow_migrations: %w", err)
+			}
+		}
+	}
+
 	is := boilerplate.NewInfoSchema(
 		sql.ToLocatePathFn(bqDialect.TableLocator),
 		bqDialect.ColumnLocator,
@@ -132,6 +195,51 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
+func (c *client) columnChangeSteps(tableIdentifier, colField, colIdentifier, DDL string) ([]string, []string) {
+	var tempColumnName = fmt.Sprintf("%s_flowtmp1", colField)
+	var tempColumnIdentifier = bqDialect.Identifier(tempColumnName)
+	var tempOriginalRename = fmt.Sprintf("%s_flowtmp2", colField)
+	var tempOriginalRenameIdentifier = bqDialect.Identifier(tempOriginalRename)
+	return []string{
+			fmt.Sprintf(
+				"ALTER TABLE %s ADD COLUMN %s %s;",
+				tableIdentifier,
+				tempColumnIdentifier,
+				DDL,
+			),
+			fmt.Sprintf(
+				"UPDATE %s SET %s = CAST(%s AS %s) WHERE true;",
+				tableIdentifier,
+				tempColumnIdentifier,
+				colIdentifier,
+				DDL,
+			),
+			fmt.Sprintf(
+				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+				tableIdentifier,
+				colIdentifier,
+				tempOriginalRenameIdentifier,
+			),
+			fmt.Sprintf(
+				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+				tableIdentifier,
+				tempColumnIdentifier,
+				colIdentifier,
+			),
+			fmt.Sprintf(
+				"ALTER TABLE %s DROP COLUMN %s;",
+				tableIdentifier,
+				tempOriginalRenameIdentifier,
+			),
+		}, []string{
+			fmt.Sprintf("Column already exists: %s", tempColumnName),
+			"",
+			fmt.Sprintf("Column already exists: %s", tempOriginalRename),
+			fmt.Sprintf("Column already exists: %s", colField),
+			fmt.Sprintf("Column not found: %s", tempOriginalRename),
+		}
+}
+
 // TODO(whb): In display of needless cruelty, BigQuery will throw an error if you try to use an
 // ALTER TABLE sql statement to add columns to a table with no pre-existing columns, claiming that
 // it does not have a schema. I believe the client API would allow us to set the schema, but this
@@ -140,15 +248,50 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 // columns exist, we'll at least get a coherent error message when this happens and can know that
 // the workaround is to re-backfill the table so it gets created fresh with the needed columns.
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	var stmts []string
 	var alterColumnStmtBuilder strings.Builder
 	if err := tplAlterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 		return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 	}
 	alterColumnStmt := alterColumnStmtBuilder.String()
+	if len(strings.Trim(alterColumnStmt, "\n")) > 0 {
+		stmts = append(stmts, alterColumnStmt)
+	}
 
-	return alterColumnStmt, func(ctx context.Context) error {
-		_, err := c.query(ctx, alterColumnStmt)
-		return err
+	if len(ta.ColumnTypeChanges) > 0 {
+		var migrationsTable = bqDialect.Identifier(c.cfg.ProjectID, c.cfg.Dataset, "flow_migrations")
+		stmts = append(stmts, fmt.Sprintf("CREATE OR REPLACE TABLE %s(table STRING, step INTEGER, col_identifier STRING, col_field STRING, col_ddl STRING);", migrationsTable))
+
+		for _, ch := range ta.ColumnTypeChanges {
+			stmts = append(stmts, fmt.Sprintf(
+				"INSERT INTO %s(table, step, col_identifier, col_field, col_ddl) VALUES ('%s', 0, '%s', '%s', '%s');",
+				migrationsTable,
+				ta.Identifier,
+				ch.Identifier,
+				ch.Field,
+				ch.DDL,
+			))
+		}
+
+		for _, ch := range ta.ColumnTypeChanges {
+			var steps, _ = c.columnChangeSteps(ta.Identifier, ch.Field, ch.Identifier, ch.DDL)
+
+			for s := 0; s < len(steps); s++ {
+				stmts = append(stmts, steps[s])
+				stmts = append(stmts, fmt.Sprintf("UPDATE %s SET STEP=%d WHERE table='%s';", migrationsTable, s+1, ta.Identifier))
+			}
+		}
+
+		stmts = append(stmts, fmt.Sprintf("DROP TABLE %s;", migrationsTable))
+	}
+
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		for _, stmt := range stmts {
+			if _, err := c.query(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return nil
 	}, nil
 }
 

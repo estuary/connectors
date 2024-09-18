@@ -127,6 +127,146 @@ func TestValidateAndApply(t *testing.T) {
 	)
 }
 
+func TestValidateAndApplyMigrations(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:     "target",
+		Dataset:   cfg.Dataset,
+		projectID: cfg.ProjectID,
+	}
+
+	client, err := cfg.client(ctx)
+	require.NoError(t, err)
+	defer client.Close()
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newBigQueryDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			job, err := client.query(ctx, fmt.Sprintf(
+				"select column_name, is_nullable, data_type from %s where table_name = %s;",
+				bqDialect.Identifier(cfg.Dataset, "INFORMATION_SCHEMA", "COLUMNS"),
+				bqDialect.Literal(resourceConfig.Table),
+			))
+			require.NoError(t, err)
+
+			it, err := job.Read(ctx)
+			require.NoError(t, err)
+
+			type foundColumn struct {
+				Name     string `bigquery:"column_name"`
+				Nullable string `bigquery:"is_nullable"`
+				Type     string `bigquery:"data_Type"`
+			}
+
+			cols := []foundColumn{}
+			for {
+				var c foundColumn
+				if err = it.Next(&c); err == iterator.Done {
+					break
+				} else if err != nil {
+					require.NoError(t, err)
+				}
+				cols = append(cols, c)
+			}
+
+			slices.SortFunc(cols, func(a, b foundColumn) int {
+				return strings.Compare(a.Name, b.Name)
+			})
+
+			var out strings.Builder
+			enc := json.NewEncoder(&out)
+			for _, c := range cols {
+				require.NoError(t, enc.Encode(c))
+			}
+
+			return out.String()
+		},
+		func(t *testing.T, cols []string, values []string) {
+			t.Helper()
+
+			var keys = make([]string, len(cols))
+			for i, col := range cols {
+				keys[i] = bqDialect.Identifier(col)
+			}
+			keys = append(keys, bqDialect.Identifier("_meta/flow_truncated"))
+			values = append(values, "false")
+			keys = append(keys, bqDialect.Identifier("flow_published_at"))
+			values = append(values, "'2024-09-13 01:01:01'")
+			keys = append(keys, bqDialect.Identifier("flow_document"))
+			values = append(values, "'{}'")
+			_, err = client.query(ctx, fmt.Sprintf(
+				"insert into %s (%s) VALUES (%s);",
+				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","),
+			))
+
+			require.NoError(t, err)
+		},
+		func(t *testing.T) string {
+			t.Helper()
+			var b strings.Builder
+
+			var sql = fmt.Sprintf("select * from %s order by %s asc;", bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), bqDialect.Identifier("key"))
+
+			job, err := client.query(ctx, sql)
+			require.NoError(t, err)
+
+			it, err := job.Read(ctx)
+			require.NoError(t, err)
+
+			var values []bigquery.Value
+			var firstResult = true
+			for {
+				if err = it.Next(&values); err == iterator.Done {
+					break
+				} else if err != nil {
+					require.NoError(t, err)
+				}
+
+				if firstResult {
+					for i, col := range it.Schema {
+						if i > 0 {
+							b.WriteString(", ")
+						}
+						b.WriteString(col.Name)
+						b.WriteString(" (" + string(col.Type) + ")")
+					}
+					b.WriteString("\n")
+
+					firstResult = false
+				}
+
+				for i, v := range values {
+					if i > 0 {
+						b.WriteString(", ")
+					}
+					b.WriteString(fmt.Sprintf("%v", v))
+				}
+			}
+
+			return b.String()
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = client.query(ctx, fmt.Sprintf(
+				"drop table %s;",
+				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
+			))
+
+			_, _ = client.query(ctx, fmt.Sprintf(
+				"delete from %s where materialization = 'test/sqlite'",
+				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, sql.DefaultFlowMaterializations),
+			))
+		},
+	)
+}
+
 func TestFencingCases(t *testing.T) {
 	// Because of the number of round-trips to bigquery required for this test to run it is not run
 	// normally. Enable it via the RUN_FENCE_TESTS environment variable. It will take several
