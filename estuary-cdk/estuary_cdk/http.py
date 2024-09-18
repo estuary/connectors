@@ -13,6 +13,16 @@ from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec, BasicAuth
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 
+class HTTPError(RuntimeError):
+    """
+    HTTPError is an custom error class that provides the HTTP status code 
+    as a distinct attribute.
+    """
+    def __init__(self, message: str, code: int):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+
 class HTTPSession(abc.ABC):
     """
     HTTPSession is an abstract base class for an HTTP client implementation.
@@ -276,8 +286,9 @@ class HTTPMixin(Mixin, HTTPSession):
                     )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
-                    raise RuntimeError(
-                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {url}\nResponse:\n{body.decode('utf-8')}"
+                    raise HTTPError(
+                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
+                        resp.status
                     )
                 else:
                     resp.raise_for_status()
