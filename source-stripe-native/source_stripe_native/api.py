@@ -40,22 +40,30 @@ async def fetch_incremental(
     _cls: Any = cls  # Silence mypy false-positive
 
     while iterating:
-        result = EventResult.model_validate_json(
-        await http.request(log, url, method="GET", params=parameters)
-    )
-        for results in result.data:
-            if _s_to_dt(results.created) > log_cursor:
-                max_ts = _s_to_dt(results.created)
-                doc = _cls.model_validate(results.data.object)
+        events = EventResult.model_validate_json(
+            await http.request(log, url, method="GET", params=parameters)
+        )
+
+        for event in events.data:
+            event_ts = _s_to_dt(event.created)
+
+            # Update the most recent timestamp seen.
+            if event_ts > max_ts:
+                max_ts = event_ts
+
+            # Emit documents if we haven't seen them.
+            if event_ts >= log_cursor:
+                doc = _cls.model_validate(event.data.object)
                 yield doc
-        
-            elif _s_to_dt(results.created) < log_cursor:
+            elif event_ts < log_cursor:
                 iterating = False
                 break
-        if result.has_more is True:
-            parameters["starting_after"] = result.data[-1].id
+
+        if events.has_more is True:
+            parameters["starting_after"] = events.data[-1].id
         else:
             break
+
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
@@ -135,14 +143,20 @@ async def fetch_incremental_substreams(
     _cls: Any = cls  # Silence mypy false-positive
 
     while iterating:
-        result = EventResult.model_validate_json(
-        await http.request(log, url, method="GET", params=parameters)
-    )
-        for results in result.data:
-            if _s_to_dt(results.created) > log_cursor:
-                max_ts = _s_to_dt(results.created)
+        events = EventResult.model_validate_json(
+            await http.request(log, url, method="GET", params=parameters)
+        )
 
-                parent_data = _cls.model_validate(results.data.object)
+        for event in events.data:
+            event_ts = _s_to_dt(event.created)
+
+            # Update the most recent timestamp seen.
+            if event_ts > max_ts:
+                max_ts = event_ts
+
+            # Emit documents if we haven't seen them.
+            if event_ts >= log_cursor:
+                parent_data = _cls.model_validate(event.data.object)
                 search_name = _cls.SEARCH_NAME
                 id = parent_data.id
                 child_data = _capture_substreams(
@@ -160,11 +174,11 @@ async def fetch_incremental_substreams(
                     doc.meta_ = cls_child.Meta(op="u")
                     yield doc 
         
-            elif _s_to_dt(results.created) < log_cursor:
+            elif event_ts < log_cursor:
                 iterating = False
                 break
-        if result.has_more is True:
-            parameters["starting_after"] = result.data[-1].id
+        if events.has_more is True:
+            parameters["starting_after"] = events.data[-1].id
         else:
             break
     if max_ts != log_cursor:
@@ -319,22 +333,30 @@ async def fetch_incremental_no_events(
     _cls: Any = cls  # Silence mypy false-positive
 
     while iterating:
-        result = ListResult[_cls].model_validate_json(
-        await http.request(log, url, method="GET", params=parameters)
-    )
-        for results in result.data:
-            if _s_to_dt(results.created) > log_cursor:
-                max_ts = _s_to_dt(results.created)
-                doc = _cls.model_validate(results)
+        resources = ListResult[_cls].model_validate_json(
+            await http.request(log, url, method="GET", params=parameters)
+        )
+
+        for resource in resources.data:
+            resource_ts = _s_to_dt(resource.created)
+
+            # Update the most recent timestamp seen.
+            if resource_ts > max_ts:
+                max_ts = resource_ts
+
+            # Emit documents if we haven't seen them yet.
+            if resource_ts >= log_cursor:
+                doc = _cls.model_validate(resource)
                 yield doc
-        
-            elif _s_to_dt(results.created) < log_cursor:
+            elif resource_ts < log_cursor:
                 iterating = False
                 break
-        if result.has_more is True:
-            parameters["starting_after"] = result.data[-1].id
+
+        if resources.has_more is True:
+            parameters["starting_after"] = resources.data[-1].id
         else:
             break
+
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
@@ -362,14 +384,20 @@ async def fetch_incremental_usage_records(
     _cls: Any = cls  # Silence mypy false-positive
 
     while iterating:
-        result = EventResult.model_validate_json(
-        await http.request(log, url, method="GET", params=parameters)
-    )
-        for results in result.data:
-            if _s_to_dt(results.created) > log_cursor:
-                max_ts = _s_to_dt(results.created)
+        events = EventResult.model_validate_json(
+            await http.request(log, url, method="GET", params=parameters)
+        )
 
-                parent_data = _cls.model_validate(results.data.object)
+        for event in events.data:
+            event_ts = _s_to_dt(event.created)
+
+            # Update the most recent timestamp seen.
+            if event_ts > max_ts:
+                max_ts = event_ts
+
+            # Emit documents if we haven't seen them.
+            if event_ts >= log_cursor:
+                parent_data = _cls.model_validate(event.data.object)
                 search_name = _cls.SEARCH_NAME
                 for item in parent_data.items.data:
                     id = item.id
@@ -388,14 +416,15 @@ async def fetch_incremental_usage_records(
                         doc.meta_ = cls_child.Meta(op="u")
                         yield doc 
 
-        
-            elif _s_to_dt(results.created) < log_cursor:
+            elif event_ts < log_cursor:
                 iterating = False
                 break
-        if result.has_more is True:
-            parameters["starting_after"] = result.data[-1].id
+
+        if events.has_more is True:
+            parameters["starting_after"] = events.data[-1].id
         else:
             break
+
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
