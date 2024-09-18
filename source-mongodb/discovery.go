@@ -168,7 +168,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		return &pc.Response_Discovered{Bindings: bindings}, nil
 	}
 
-	serverInfo, err := getServerInfo(ctx, client, databaseNames[0])
+	serverInfo, err := getServerInfo(ctx, cfg, client, databaseNames[0])
 	if err != nil {
 		return nil, fmt.Errorf("getting server info: %w", err)
 	}
