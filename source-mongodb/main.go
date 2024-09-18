@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -25,6 +28,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	mongoDriver "go.mongodb.org/mongo-driver/x/mongo/driver"
 )
+
+// Downloads TLS certificates for connecting to AWS DocumentDB. This is used in
+// `documentDBTLSConfig()` if the configured address is for AWS DocumentDB.
+//go:generate wget -O global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
+//go:embed global-bundle.pem
+var documentDBTLSCerts embed.FS
 
 type captureMode string
 
@@ -171,6 +181,15 @@ func (c *config) ToURI() string {
 
 type driver struct{}
 
+func isDocumentDB(address string) (bool, error) {
+	uri, err := url.Parse(address)
+	if err != nil {
+		return false, fmt.Errorf("parsing address: %w", err)
+	}
+
+	return strings.HasSuffix(uri.Hostname(), ".docdb.amazonaws.com"), nil
+}
+
 func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// Mongodb atlas offers an "online-archive" service, which does not work
 	// with this connector because it doesn't support change streams. Their UI
@@ -185,6 +204,11 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// connector doesn't work with that either.
 	if strings.HasPrefix(cfg.Address, "mongodb://atlas-sql") {
 		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas SQL Interface', which is not supported by this connector. Please use the regular cluster URL instead")
+	}
+
+	isDocDB, err := isDocumentDB(cfg.Address)
+	if err != nil {
+		return nil, err
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
@@ -206,6 +230,8 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		if err := tunnel.Start(); err != nil {
 			return nil, fmt.Errorf("error starting network tunnel: %w", err)
 		}
+	} else if isDocDB {
+		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", cfg.Address)
 	}
 
 	// Create a new client and connect to the server. "Majority" read concern is set to avoid
@@ -219,6 +245,17 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// being completely disabled. We could re-evaluate this priority after
 	// https://github.com/mongodb/mongo-go-driver/pull/1577 is merged and released.
 	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zlib", "snappy", "zstd"}).SetReadConcern(readconcern.Majority())
+	if isDocDB {
+		tlsConfig, err := documentDBTLSConfig()
+		if err != nil {
+			return nil, fmt.Errorf("tlsConfig for documentDB: %w", err)
+		}
+		// In addition to the TLS configuration, DocumentDB doesn't support
+		// connecting in replica set mode through an SSH tunnel, so the
+		// directConnection query parameter is required.
+		opts = opts.SetTLSConfig(tlsConfig).SetDirect(true)
+	}
+
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -255,6 +292,20 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	}
 
 	return client, nil
+}
+
+func documentDBTLSConfig() (*tls.Config, error) {
+	var tlsConfig = new(tls.Config)
+	tlsConfig.InsecureSkipVerify = true // for connecting to `localhost` via SSH tunnel
+	tlsConfig.RootCAs = x509.NewCertPool()
+
+	if certs, err := documentDBTLSCerts.ReadFile("global-bundle.pem"); err != nil {
+		return nil, fmt.Errorf("failed to open global-bundle.pem: %w", err)
+	} else if ok := tlsConfig.RootCAs.AppendCertsFromPEM(certs); !ok {
+		return nil, fmt.Errorf("failed parsing pem file")
+	}
+
+	return tlsConfig, nil
 }
 
 func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
@@ -322,7 +373,7 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		}
 
 		if servInf == nil {
-			servInf, err = getServerInfo(ctx, client, res.Database)
+			servInf, err = getServerInfo(ctx, cfg, client, res.Database)
 			if err != nil {
 				return nil, fmt.Errorf("getting server info: %w", err)
 			}
