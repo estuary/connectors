@@ -142,7 +142,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return nil
 	}
 
-	serverInfo, err := getServerInfo(ctx, client, allBindings[0].resource.Database)
+	serverInfo, err := getServerInfo(ctx, cfg, client, allBindings[0].resource.Database)
 	if err != nil {
 		return fmt.Errorf("checking server info: %w", err)
 	}
@@ -403,12 +403,30 @@ type buildInfo struct {
 	VersionArray []int  `bson:"versionArray"`
 }
 
-func getServerInfo(ctx context.Context, client *mongo.Client, database string) (*serverInfo, error) {
+func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, database string) (*serverInfo, error) {
 	var buildInfo buildInfo
 	if res := client.Database("admin").RunCommand(ctx, bson.D{{Key: "buildInfo", Value: 1}}); res.Err() != nil {
 		return nil, fmt.Errorf("running 'buildInfo' command: %w", res.Err())
 	} else if err := res.Decode(&buildInfo); err != nil {
 		return nil, fmt.Errorf("decoding buildInfo: %w", err)
+	}
+
+	if isDocDB, err := isDocumentDB(cfg.Address); err != nil {
+		return nil, err
+	} else if isDocDB {
+		// DocumentDB supports change streams sort-of. The main limitation is
+		// that they don't currently produce a post-batch resume token, so
+		// there's really no way for us to make sure that the most recently
+		// obtained token doesn't expire before new events are added to the
+		// change stream. This makes them basically unusable if the desire is to
+		// maintain 100% data consistency with the source, short of some more
+		// sophisticated strategy like watermarking that we aren't going to do
+		// right now.
+		return &serverInfo{
+			version:               buildInfo.Version,
+			supportsPreImages:     false,
+			supportsChangeStreams: false,
+		}, nil
 	}
 
 	changeStreams, err := supportsChangeStreams(ctx, client, database)
