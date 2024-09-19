@@ -69,7 +69,7 @@ async def fetch_incremental(
 
 async def fetch_backfill(
     cls,
-    stop_date,
+    start_date,
     http: HTTPSession,
     log: Logger,
     page: str | None,
@@ -83,7 +83,7 @@ async def fetch_backfill(
     It works by calling each individual stream endpoint and parsing each result,
     created before the cutoff, with its model.
 
-    If a document is equal-to or older-than the stop_date, this means we've reached the limit
+    If a document is equal-to or older-than the start_date, this means we've reached the limit
     set by the user, and the stream halts. 
 
     """
@@ -103,11 +103,11 @@ async def fetch_backfill(
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) == stop_date:
+        if _s_to_dt(doc.created) == start_date:
             # Yield final document for reference
             yield doc
             return
-        elif _s_to_dt(doc.created) < stop_date:
+        elif _s_to_dt(doc.created) < start_date:
             return
         elif _s_to_dt(doc.created) < cutoff:
             yield doc
@@ -187,7 +187,7 @@ async def fetch_incremental_substreams(
 async def fetch_backfill_substreams(
     cls,
     cls_child,
-    stop_date,
+    start_date,
     http: HTTPSession,
     log: Logger,
     page: str | None,
@@ -220,7 +220,7 @@ async def fetch_backfill_substreams(
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) == stop_date:
+        if _s_to_dt(doc.created) == start_date:
             parent_data = doc
             id = parent_data.id
 
@@ -240,7 +240,7 @@ async def fetch_backfill_substreams(
                 yield doc 
             return
 
-        elif _s_to_dt(doc.created) < stop_date:
+        elif _s_to_dt(doc.created) < start_date:
             return
 
         elif _s_to_dt(doc.created) < cutoff:
@@ -431,7 +431,7 @@ async def fetch_incremental_usage_records(
 async def fetch_backfill_usage_records(
     cls,
     cls_child,
-    stop_date,
+    start_date,
     http: HTTPSession,
     log: Logger,
     page: str | None,
@@ -462,7 +462,7 @@ async def fetch_backfill_usage_records(
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) == stop_date:
+        if _s_to_dt(doc.created) == start_date:
             parent_data = doc
             for item in parent_data.items.data:
                 id = item.id
@@ -482,7 +482,7 @@ async def fetch_backfill_usage_records(
                     yield doc 
             return
 
-        elif _s_to_dt(doc.created) < stop_date:
+        elif _s_to_dt(doc.created) < start_date:
             return
 
         elif _s_to_dt(doc.created) < cutoff:

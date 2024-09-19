@@ -78,7 +78,7 @@ async def all_resources(
 
         if is_accessible_stream:
             # If the stream class does not have a TYPES attribute, then it does not have any associated events.
-            resource = base_object(base_stream, http, config.stop_date) if hasattr(base_stream, "TYPES") else no_events_object(base_stream, http, config.stop_date)
+            resource = base_object(base_stream, http, config.start_date) if hasattr(base_stream, "TYPES") else no_events_object(base_stream, http, config.start_date)
             all_streams.append(resource)
 
             children = element.get("children", [])
@@ -93,23 +93,23 @@ async def all_resources(
                 if is_accessible_child:
                     match child_stream.NAME:
                         case "UsageRecords":
-                            all_streams.append(usage_records(base_stream, child_stream, http, config.stop_date))
+                            all_streams.append(usage_records(base_stream, child_stream, http, config.start_date))
                         case _:
-                            all_streams.append(child_object(base_stream, child_stream, http, config.stop_date))
+                            all_streams.append(child_object(base_stream, child_stream, http, config.start_date))
 
     # Regional streams are only available in certain countries, so we always have
     # check if they accessible regardless of the API key provided.
     for stream in REGIONAL_STREAMS:
         url = f"{API}/{stream.SEARCH_NAME}"
         if await check_accessibility(http, log, url):
-            resource = base_object(stream, http, config.stop_date)
+            resource = base_object(stream, http, config.start_date)
             all_streams.append(resource)
 
     return all_streams
 
 
 def base_object(
-    cls, http: HTTPSession, stop_date: datetime
+    cls, http: HTTPSession, start_date: datetime
 ) -> Resource:
     """Base Object handles the default case from source-stripe-native
     It requires a single, parent stream with a valid Event API Type
@@ -128,10 +128,10 @@ def base_object(
             state,
             task,
             fetch_changes=functools.partial(fetch_incremental, cls, http),
-            fetch_page=functools.partial(fetch_backfill, cls, stop_date, http),
+            fetch_page=functools.partial(fetch_backfill, cls, start_date, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=cls.NAME,
@@ -139,15 +139,15 @@ def base_object(
         model=cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=ResourceConfig(name=cls.NAME),
         schema_inference=True,
     )
 
 def child_object(
-    cls, child_cls, http: HTTPSession, stop_date: datetime
+    cls, child_cls, http: HTTPSession, start_date: datetime
 ) -> Resource:
     """Child Object handles the default child case from source-stripe-native
     It requires both the parent and child stream, with the parent stream having
@@ -167,10 +167,10 @@ def child_object(
             state,
             task,
             fetch_changes=functools.partial(fetch_incremental_substreams, cls, child_cls, http),
-            fetch_page=functools.partial(fetch_backfill_substreams, cls, child_cls, stop_date, http),
+            fetch_page=functools.partial(fetch_backfill_substreams, cls, child_cls, start_date, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=child_cls.NAME,
@@ -178,15 +178,15 @@ def child_object(
         model=child_cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=ResourceConfig(name=child_cls.NAME),
         schema_inference=True,
     )
 
 def usage_records(
-    cls, child_cls, http: HTTPSession, stop_date: datetime
+    cls, child_cls, http: HTTPSession, start_date: datetime
 ) -> Resource:
     """ Usage Records handles a specific stream (UsageRecords).
     This is required since Usage Records is a child stream from SubscriptionItem
@@ -206,10 +206,10 @@ def usage_records(
             state,
             task,
             fetch_changes=functools.partial(fetch_incremental_usage_records, cls, child_cls, http),
-            fetch_page=functools.partial(fetch_backfill_usage_records, cls, child_cls, stop_date, http),
+            fetch_page=functools.partial(fetch_backfill_usage_records, cls, child_cls, start_date, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=child_cls.NAME,
@@ -217,15 +217,15 @@ def usage_records(
         model=child_cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=ResourceConfig(name=child_cls.NAME),
         schema_inference=True,
     )
 
 def no_events_object(
-    cls, http: HTTPSession, stop_date: datetime
+    cls, http: HTTPSession, start_date: datetime
 ) -> Resource:
     """No Events Object handles a edge-case from source-stripe-native,
     where the given parent stream does not contain a valid Events API type.
@@ -246,10 +246,10 @@ def no_events_object(
             state,
             task,
             fetch_changes=functools.partial(fetch_incremental_no_events, cls, http),
-            fetch_page=functools.partial(fetch_backfill, cls, stop_date, http),
+            fetch_page=functools.partial(fetch_backfill, cls, start_date, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=cls.NAME,
@@ -257,8 +257,8 @@ def no_events_object(
         model=cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
         initial_config=ResourceConfig(name=cls.NAME),
         schema_inference=True,
