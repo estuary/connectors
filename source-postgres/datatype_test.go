@@ -29,6 +29,8 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `serial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},      // non-nullable
 		{ColumnType: `smallserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`}, // non-nullable
 		{ColumnType: `bigserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},   // non-nullable
+		{ColumnType: `oid not null`, ExpectType: `{"type":"integer"}`, InputValue: `54321`, ExpectValue: `54321`},
+		{ColumnType: `oid`, ExpectType: `{"type":["integer","null"]}`, InputValue: `54321`, ExpectValue: `54321`},
 		{ColumnType: `real`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `123.456`},
 		{ColumnType: `double precision`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `123.456`},
 		{ColumnType: `real`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `NaN`, ExpectValue: `"NaN"`},
@@ -194,6 +196,7 @@ func TestScanKeyTypes(t *testing.T) {
 		{"UUID", "UUID", []any{"66b968a7-aeca-4401-8239-5d57958d1572", "4ab4044a-9aab-415c-96c6-17fa338060fa", "c32fb585-fc7f-4347-8fe2-97448f4e93cd"}},
 		{"MAC6", "macaddr", []any{"47:7a:51:62:c3:aa", "6f:cf:f3:49:e0:b1", "65:d0:73:5a:5a:c9", "88:61:08:5b:ae:54"}},
 		{"MAC8", "macaddr8", []any{"5f:99:67:ac:0d:df:88:3a ", "70:26:74:4c:ac:2c:38:59", "e3:70:99:89:b9:d8:e8:21 ", "a5:35:55:da:06:38:39:43"}},
+		{"OID", "oid", []any{12345, 12344, 12346, 54321, 54323, 54322}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("2804%04d", idx)
