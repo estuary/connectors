@@ -27,6 +27,7 @@ on:
       - "source-jira-native/**"
       - "source-mixpanel-native/**"
       - "source-impact-native/**"
+      - "source-github/**"
 
   pull_request:
     branches: [main]
@@ -57,6 +58,7 @@ on:
       - "source-jira-native/**"
       - "source-mixpanel-native/**"
       - "source-impact-native/**"
+      - "source-github/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -157,6 +159,10 @@ jobs:
             version: v2
             usage_rate: "1.0"
           - name: source-impact-native
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-github
             type: capture
             version: v2
             usage_rate: "1.0"
