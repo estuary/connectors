@@ -69,344 +69,305 @@ class BackfillResult(BaseModel, Generic[Item], extra="allow"):
     data: List[Item]
 
 
-class Files(BaseDocument, extra="allow"):
+class BaseStripeObject(BaseDocument, extra="allow"):
+    """
+    Shared properties between all Stripe objects.
+    """
+    NAME: ClassVar[str]
+    SEARCH_NAME: ClassVar[str]
+
+    id: str
+
+
+class BaseStripeObjectNoEvents(BaseStripeObject):
+    """
+    Stream that does not have any corresponding events 
+    generated at the /events endpoint.
+    """
+    created: int
+
+
+class BaseStripeObjectWithEvents(BaseStripeObject):
+    """
+    Stream that has corresponding events
+    generated at the /events endpoint.
+    """
+    TYPES: ClassVar[str]
+
+    created: int
+
+
+# Note: BaseStripeChildObject is prepositioning for later when we have separate 
+# TYPES class attributes for parent and child classes.
+class BaseStripeChildObject(BaseStripeObject):
+    """
+    Child stream that can only be accessed by using an
+    ID from a parent stream.
+    """
+    pass
+
+
+StripeObject = TypeVar("StripeObject", bound=BaseStripeObject)
+StripeObjectNoEvents = TypeVar("StripeObjectNoEvents", bound=BaseStripeObjectNoEvents)
+StripeObjectWithEvents = TypeVar("StripeObjectWithEvents", bound=BaseStripeObjectWithEvents)
+StripeChildObject = TypeVar("StripeChildObject", bound=BaseStripeChildObject)
+
+
+class Files(BaseStripeObjectNoEvents):
     """
     Incremental stream with no Events
     """
     NAME: ClassVar[str] = "Files"
     SEARCH_NAME: ClassVar[str] = "files"
 
-    id: str
 
-
-class FilesLink(BaseDocument, extra="allow"):
+class FilesLink(BaseStripeObjectNoEvents):
     """
     Incremental stream with no Events
     """
     NAME: ClassVar[str] = "FilesLink"
     SEARCH_NAME: ClassVar[str] = "file_links"
 
-    id: str
 
-
-class BalanceTransactions(BaseDocument, extra="allow"):
+class BalanceTransactions(BaseStripeObjectNoEvents):
     """
     Incremental stream with no Events
     """
     NAME: ClassVar[str] = "BalanceTransactions"
     SEARCH_NAME: ClassVar[str] = "balance_transactions"
 
-    id: str
 
-
-class Accounts(BaseDocument, extra="allow"):
+class Accounts(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Accounts"
     TYPES: ClassVar[str] =  "accounts.updated"
     SEARCH_NAME: ClassVar[str] = "accounts"
 
-    id: str
 
-class Persons(BaseDocument, extra="allow"):
+class Persons(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Accounts
     """
     NAME: ClassVar[str] = "Persons"
     SEARCH_NAME: ClassVar[str] = "persons"
 
-    id: str
 
-
-class ExternalAccountCards(BaseDocument, extra="allow"):
+class ExternalAccountCards(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Accounts
     """
     NAME: ClassVar[str] = "ExternalAccountCards"
     SEARCH_NAME: ClassVar[str] = "external_accounts"
 
-    id: str
 
-
-class ExternalBankAccount(BaseDocument, extra="allow"):
+class ExternalBankAccount(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Accounts
     """
     NAME: ClassVar[str] = "ExternalBankAccount"
     SEARCH_NAME: ClassVar[str] = "external_accounts"
 
-    id: str
 
-
-class ApplicationFees(BaseDocument, extra="allow"):
+class ApplicationFees(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "ApplicationFees"
     TYPES: ClassVar[str] =  "application_fee.refunded"
     SEARCH_NAME: ClassVar[str] = "application_fees"
 
-    id: str
 
-
-class ApplicationFeesRefunds(BaseDocument, extra="allow"):
+class ApplicationFeesRefunds(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: ApplicationFees
     """
     NAME: ClassVar[str] = "ApplicationFeesRefunds"
     SEARCH_NAME: ClassVar[str] = "refunds"
 
-    id: str
 
-
-class Authorizations(BaseDocument, extra="allow"):
+class Authorizations(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Authorizations"
     TYPES: ClassVar[str] =  "issuing_authorization.updated"
     SEARCH_NAME: ClassVar[str] = "issuing/authorizations"
 
-    id: str
 
-
-class Customers(BaseDocument, extra="allow"):
+class Customers(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Customers"
     TYPES: ClassVar[str] =  "customer.updated"
     SEARCH_NAME: ClassVar[str] = "customers"
 
-    id: str
 
-
-class Cards(BaseDocument, extra="allow"):
+class Cards(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Customers
     """
     NAME: ClassVar[str] = "Cards"
     SEARCH_NAME: ClassVar[str] = "cards"
 
-    id: str
 
-
-class Bank_Accounts(BaseDocument, extra="allow"):
+class Bank_Accounts(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Customers
     """
     NAME: ClassVar[str] = "BankAccounts"
     SEARCH_NAME: ClassVar[str] = "bank_accounts"
 
-    id: str
 
-
-class CustomerBalanceTransaction(BaseDocument, extra="allow"):
+class CustomerBalanceTransaction(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Customers
     """
     NAME: ClassVar[str] = "CustomerBalanceTransaction"
     SEARCH_NAME: ClassVar[str] = "balance_transactions"
 
-    id: str
 
-
-class PaymentMethods(BaseDocument, extra="allow"):
+class PaymentMethods(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Customers
     """
     NAME: ClassVar[str] = "PaymentMethods"
     SEARCH_NAME: ClassVar[str] = "payment_methods"
 
-    id: str
 
-
-class CardHolders(BaseDocument, extra="allow"):
+class CardHolders(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "CardHolders"
     TYPES: ClassVar[str] =  "issuing_cardholder.updated"
     SEARCH_NAME: ClassVar[str] = "issuing/cardholders"
 
-    id: str
 
-
-class Charges(BaseDocument, extra="allow"):
+class Charges(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Charges"
     TYPES: ClassVar[str] =  "charge.updated"
     SEARCH_NAME: ClassVar[str] = "charges"
 
-    id: str
 
-
-class CheckoutSessions(BaseDocument, extra="allow"):
+class CheckoutSessions(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "CheckoutSessions"
     TYPES: ClassVar[str] =  "checkout.session.*"
     SEARCH_NAME: ClassVar[str] = "checkout/sessions"
 
-    id: str
 
-
-class CheckoutSessionsLine(BaseDocument, extra="allow"):
+class CheckoutSessionsLine(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: CheckoutSessions
     """
     NAME: ClassVar[str] = "CheckoutSessionsLine"
     SEARCH_NAME: ClassVar[str] = "line_items"
 
-    id: str
 
-
-class Coupons(BaseDocument, extra="allow"):
+class Coupons(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Coupons"
     TYPES: ClassVar[str] =  "coupon.updated"
     SEARCH_NAME: ClassVar[str] = "coupons"
 
-    id: str
 
-
-class CreditNotes(BaseDocument, extra="allow"):
+class CreditNotes(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "CreditNotes"
     TYPES: ClassVar[str] =  "credit_note.updated"
     SEARCH_NAME: ClassVar[str] = "credit_notes"
 
-    id: str
 
-
-class CreditNotesLines(BaseDocument, extra="allow"):
+class CreditNotesLines(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: CreditNotes
     """
     NAME: ClassVar[str] = "CreditNotesLines"
     SEARCH_NAME: ClassVar[str] = "lines"
 
-    id: str
 
-
-class Disputes(BaseDocument, extra="allow"):
+class Disputes(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Disputes"
     TYPES: ClassVar[str] =  "charge.dispute.updated"
     SEARCH_NAME: ClassVar[str] = "disputes"
 
-    id: str
 
-
-class EarlyFraudWarning(BaseDocument, extra="allow"):
+class EarlyFraudWarning(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "EarlyFraudWarning"
     TYPES: ClassVar[str] =  "radar.early_fraud_warning.*"
     SEARCH_NAME: ClassVar[str] = "radar/early_fraud_warnings"
 
-    id: str
 
-
-class InvoiceItems(BaseDocument, extra="allow"):
+class InvoiceItems(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "InvoiceItems"
     TYPES: ClassVar[str] =  "invoiceitem.*"
     SEARCH_NAME: ClassVar[str] = "invoiceitems"
-    
-    id: str
+
     created: int = Field(validation_alias=AliasChoices('date'))
 
 
-class Invoices(BaseDocument, extra="allow"):
+class Invoices(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Invoices"
     TYPES: ClassVar[str] =  "invoice.updated"
     SEARCH_NAME: ClassVar[str] = "invoices"
 
-    id: str
 
-
-class InvoiceLineItems(BaseDocument, extra="allow"):
+class InvoiceLineItems(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Invoices
     """
     NAME: ClassVar[str] = "InvoiceLineItems"
     SEARCH_NAME: ClassVar[str] = "lines"
 
-    id: str
 
-
-class PaymentIntent(BaseDocument, extra="allow"):
+class PaymentIntent(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "PaymentIntents"
     TYPES: ClassVar[str] =  "payment_intent.*"
     SEARCH_NAME: ClassVar[str] = "payment_intents"
 
-    id: str
 
-
-class Payouts(BaseDocument, extra="allow"):
+class Payouts(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Payouts"
     TYPES: ClassVar[str] =  "payout.updated"
     SEARCH_NAME: ClassVar[str] = "payouts"
 
-    id: str
 
-
-class Plans(BaseDocument, extra="allow"):
+class Plans(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Plans"
     TYPES: ClassVar[str] =  "plan.updated"
     SEARCH_NAME: ClassVar[str] = "plans"
 
-    id: str
 
-class Products(BaseDocument, extra="allow"):
+class Products(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Products"
     TYPES: ClassVar[str] =  "product.updated"
     SEARCH_NAME: ClassVar[str] = "products"
 
-    id: str
 
-
-class PromotionCode(BaseDocument, extra="allow"):
+class PromotionCode(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "PromotionCode"
     TYPES: ClassVar[str] =  "promotion_code.updated"
     SEARCH_NAME: ClassVar[str] = "promotion_codes"
 
-    id: str
 
-
-class Refunds(BaseDocument, extra="allow"):
+class Refunds(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Refunds"
     TYPES: ClassVar[str] =  "refund.updated"
     SEARCH_NAME: ClassVar[str] = "refunds"
 
-    id: str
 
-
-class Reviews(BaseDocument, extra="allow"):
+class Reviews(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Reviews"
     TYPES: ClassVar[str] =  "review.*"
     SEARCH_NAME: ClassVar[str] = "reviews"
 
-    id: str
 
-
-class SetupIntents(BaseDocument, extra="allow"):
+class SetupIntents(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "SetupIntents"
     TYPES: ClassVar[str] =  "setup_intent.*"
     SEARCH_NAME: ClassVar[str] = "setup_intents"
 
-    id: str
 
-
-class SetupAttempts(BaseDocument, extra="allow"):
+class SetupAttempts(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: SetupIntents
     """
     NAME: ClassVar[str] = "SetupAttempts"
     SEARCH_NAME: ClassVar[str] = "setup_attempts"
 
-    id: str
 
-
-class Subscriptions(BaseDocument, extra="allow"):
+class Subscriptions(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Subscriptions"
     TYPES: ClassVar[str] =  "customer.subscription.*"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
 
-    id: str
 
-
-class SubscriptionItems(BaseDocument, extra="allow"):
+class SubscriptionItems(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "SubscriptionItems"
     TYPES: ClassVar[str] =  "customer.subscription.*"
     SEARCH_NAME: ClassVar[str] = "subscriptions"
@@ -417,63 +378,50 @@ class SubscriptionItems(BaseDocument, extra="allow"):
 
         data: list[Values]
 
-    id: str
     items: Items
 
 
-class UsageRecords(BaseDocument, extra="allow"):
+class UsageRecords(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: SubscriptionItems
     """
     NAME: ClassVar[str] = "UsageRecords"
     SEARCH_NAME: ClassVar[str] = "usage_record_summaries"
 
-    id: str
     subscription_item: str
 
 
-class SubscriptionsSchedule(BaseDocument, extra="allow"):
+class SubscriptionsSchedule(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "SubscriptionSchedule"
     TYPES: ClassVar[str] =  "subscription_schedule.updated"
     SEARCH_NAME: ClassVar[str] = "subscription_schedules"
 
-    id: str
 
-
-class TopUps(BaseDocument, extra="allow"):
+class TopUps(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "TopUps"
     TYPES: ClassVar[str] =  "topup.*"
     SEARCH_NAME: ClassVar[str] = "topups"
 
-    id: str
 
-
-class Transactions(BaseDocument, extra="allow"):
+class Transactions(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Transactions"
     TYPES: ClassVar[str] =  "issuing_transaction.updated"
     SEARCH_NAME: ClassVar[str] = "issuing/transactions"
 
-    id: str
 
-
-class Transfers(BaseDocument, extra="allow"):
+class Transfers(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Transfers"
     TYPES: ClassVar[str] =  "transfer.updated"
     SEARCH_NAME: ClassVar[str] = "transfers"
 
-    id: str
 
-
-class TransferReversals(BaseDocument, extra="allow"):
+class TransferReversals(BaseStripeChildObject):
     """
-    Child Stream
     Parent Stream: Transfers
     """
     NAME: ClassVar[str] = "TransferReversals"
     SEARCH_NAME: ClassVar[str] = "reversals"
 
-    id: str
 
 # Streams can have 0 or more children. In most cases, child streams are accessible if their parent stream is accessible,
 # and they are inaccessible if their parent is inaccessible. 
