@@ -94,6 +94,87 @@ func TestValidateAndApply(t *testing.T) {
 	)
 }
 
+func TestValidateAndApplyMigrations(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:    "target",
+		Schema:   cfg.Schema,
+		Delta:    true,
+		database: cfg.Database,
+	}
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newDuckDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			db, err := cfg.db(ctx)
+			require.NoError(t, err)
+			defer db.Close()
+
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, cols []string, values []string) {
+			t.Helper()
+			db, err := cfg.db(ctx)
+			require.NoError(t, err)
+
+			var keys = make([]string, len(cols))
+			for i, col := range cols {
+				keys[i] = duckDialect.Identifier(col)
+			}
+			keys = append(keys, duckDialect.Identifier("_meta/flow_truncated"))
+			values = append(values, "FALSE")
+			keys = append(keys, duckDialect.Identifier("flow_published_at"))
+			values = append(values, "'2024-09-13 01:01:01'")
+			keys = append(keys, duckDialect.Identifier("flow_document"))
+			values = append(values, "'{}'")
+			keys = append(keys, duckDialect.Identifier("second_root"))
+			values = append(values, "'{}'")
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			_, err = db.ExecContext(ctx, q)
+
+			require.NoError(t, err)
+		},
+		func(t *testing.T) string {
+			t.Helper()
+
+			db, err := cfg.db(ctx)
+			require.NoError(t, err)
+
+			rows, err := sql.DumpTestTable(t, db, duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table), duckDialect.Identifier("key"))
+
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			db, err := cfg.db(ctx)
+			require.NoError(t, err)
+			defer db.Close()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				duckDialect.Identifier(cfg.Database, cfg.Schema, sql.DefaultFlowMaterializations),
+				duckDialect.Literal(materialization.String()),
+			))
+		},
+	)
+}
+
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 
