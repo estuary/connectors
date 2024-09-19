@@ -25,6 +25,19 @@ definitions:
           extractor:
             type: DpathExtractor
             field_path: [contacts]
+      paginator:
+          type: DefaultPaginator
+          page_token_option:
+            type: RequestOption
+            inject_into: request_parameter
+            field_name: offset
+          page_size_option:
+            type: RequestOption
+            inject_into: request_parameter
+            field_name: limit
+          pagination_strategy:
+            type: OffsetIncrement
+            page_size: 1000
       incremental_sync:
         type: DatetimeBasedCursor
         cursor_field: createdSince
