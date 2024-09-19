@@ -1,5 +1,6 @@
 credentials:
     access_token_sops: ENC[AES256_GCM,data:dLvs/aZ6E/HvgdgPfLVPRlZAiHnCPs/RpuVrtyL0ytaDWRTZdGTB/5UMiFctVfpLlWQaG3hPq4hsHLdYMlZ8B2P6XMEqrwtOtmx6yAXvtPrY1H3rRathTdbEDb+kFizUc0SayWFJAPeyhgQ=,iv:rtL4yTQMDJjiwnBbLrA1LtrlJAixUdu/vzWwUdk7weU=,tag:PCDBilsBpOBvdEyB95AGGg==,type:str]
+start_date: "2010-01-01T00:00:00+00:00"
 sops:
     kms: []
     gcp_kms:
@@ -9,8 +10,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-05-16T13:02:22Z"
-    mac: ENC[AES256_GCM,data:DzVmmV8DF3lqBgrzTNNfPdZAO+SylDOfp7J7lVpnARvGcA3bNUjqn0zSu9hzS5OVvLlWvCoZ9hivR6q9kEzvQnVqkXZf9lJQNPH9jOh3l7xAc3tnIQt6ltcBojYYCMBpL+XkiDlS+xPw+4UKKPrvpPRI7/wP9XItLhVf2FSjRXY=,iv:jhXTxBs/vFiBweU7aNXq3OQbWi18fTRB0swVcM51Vi0=,tag:HX4faTrnxh4h8eu0uFgKtA==,type:str]
+    lastmodified: "2024-09-19T19:05:15Z"
+    mac: ENC[AES256_GCM,data:eQg0lkQQMIELna+yoZUtO0lu+T2y8dWfgFr1J+8T6/N+9NpuNRzltvCRNUIySAm3fBTJ8UdXnuXLtylyp9znpPWRBxEqlcO/Z/uIlhqZTux1uOMGlK+DXb6qF2HECgx4JMzTKIj+/XrGLrFKcNwZr2L8GNTAMJ6P5bMHO12+YZY=,iv:8vw+KoZBfPrAwHemvX9CorGSz/rZyqwQjNaht5xEeQE=,tag:DHbKd8D4yvZEh6MIE8TIzg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

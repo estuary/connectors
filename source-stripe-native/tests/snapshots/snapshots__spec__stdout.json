@@ -36,11 +36,10 @@
           ],
           "title": "API Key"
         },
-        "stop_date": {
-          "default": "2010-01-01T00:00:00Z",
-          "description": "Replication Stop Date. Records will only be considered for backfilling before the stop_date, similar to a start date",
+        "start_date": {
+          "description": "UTC data and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present date. ",
           "format": "date-time",
-          "title": "Stop Date",
+          "title": "Start Date",
           "type": "string"
         }
       },

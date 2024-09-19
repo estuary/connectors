@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from enum import StrEnum, auto
 from pydantic import BaseModel, Field, AwareDatetime, model_validator, AliasChoices
 from typing import Literal, Generic, TypeVar, Annotated, ClassVar, TYPE_CHECKING, Dict, List
@@ -15,13 +15,17 @@ from estuary_cdk.capture.common import (
 )
 
 
+def default_start_date():
+    dt = datetime.now(timezone.utc) - timedelta(days=30)
+    return dt
+
 class EndpointConfig(BaseModel):
     credentials: AccessToken = Field(
-        title="API Key"        )
-    stop_date: AwareDatetime = Field(
-        description="Replication Stop Date. Records will only be considered for backfilling "\
-                    "before the stop_date, similar to a start date",
-        default=datetime.fromisoformat("2010-01-01T00:00:00Z".replace('Z', '+00:00'))
+        title="API Key"
+    )
+    start_date: AwareDatetime = Field(
+        description="UTC data and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present date. ",
+        default_factory=default_start_date,
     )
 
 
