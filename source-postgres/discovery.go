@@ -302,6 +302,7 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"int2": {jsonTypes: []string{"integer"}},
 	"int4": {jsonTypes: []string{"integer"}},
 	"int8": {jsonTypes: []string{"integer"}},
+	"oid":  {jsonTypes: []string{"integer"}},
 
 	"numeric": {jsonTypes: []string{"string"}, format: "number"},
 	"float4":  {jsonTypes: []string{"number", "string"}, format: "number"},
