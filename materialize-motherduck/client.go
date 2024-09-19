@@ -88,6 +88,15 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		))
 	}
 
+	for _, f := range ta.ColumnTypeChanges {
+		stmts = append(stmts, fmt.Sprintf(
+			"ALTER TABLE %s ALTER COLUMN %s TYPE %s;",
+			ta.Identifier,
+			f.Identifier,
+			f.DDL,
+		))
+	}
+
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
 		for _, stmt := range stmts {
 			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
