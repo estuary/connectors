@@ -1,0 +1,73 @@
+Base Initial Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
+
+Base Re-validated Constraints:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
+{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
+
+Migratable Changes Before Apply Schema:
+{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
+{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
+{"Name":"MULTIPLE","Nullable":"YES","Type":"VARIANT"}
+{"Name":"NONSCALARVALUE","Nullable":"YES","Type":"VARIANT"}
+{"Name":"NUMERICSTRING","Nullable":"YES","Type":"NUMBER"}
+{"Name":"OPTIONAL","Nullable":"YES","Type":"VARIANT"}
+{"Name":"SCALARVALUE","Nullable":"NO","Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+
+
+Migratable Changes Before Apply Data:
+KEY (TEXT), _meta/flow_truncated (BOOLEAN), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), NUMERICSTRING (FIXED), OPTIONAL (VARIANT), SCALARVALUE (TEXT), FLOW_DOCUMENT (VARIANT)
+
+1, 0, 2024-09-13 01:01:01 -0700 PDT, <nil>, <nil>, 123, <nil>, test, {}
+
+Migratable Changes Constraints:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
+{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
+
+Migratable Changes Applied Schema:
+{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
+{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
+{"Name":"MULTIPLE","Nullable":"YES","Type":"VARIANT"}
+{"Name":"NONSCALARVALUE","Nullable":"YES","Type":"VARIANT"}
+{"Name":"NUMERICSTRING","Nullable":"YES","Type":"TEXT"}
+{"Name":"OPTIONAL","Nullable":"YES","Type":"VARIANT"}
+{"Name":"SCALARVALUE","Nullable":"NO","Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+
+
+Migratable Changes Applied Data:
+KEY (TEXT), _meta/flow_truncated (BOOLEAN), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), OPTIONAL (VARIANT), SCALARVALUE (TEXT), FLOW_DOCUMENT (VARIANT), NUMERICSTRING (TEXT)
+
+1, 0, 2024-09-13 01:01:01 -0700 PDT, <nil>, <nil>, <nil>, test, {}, 123
+
