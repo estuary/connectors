@@ -6,24 +6,34 @@ from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
 import json
 
 from estuary_cdk.capture.common import (
+    BaseDocument,
     PageCursor,
     LogCursor,
 )
 
 
-from .models import EventResult, BackfillResult, ListResult
+from .models import (
+    EventResult,
+    BackfillResult,
+    ListResult,
+    StripeChildObject,
+    StripeObjectNoEvents,
+    StripeObjectWithEvents,
+    SubscriptionItems,
+)
 
 
 API = "https://api.stripe.com/v1"
 MAX_PAGE_LIMIT = 100
 
 async def fetch_incremental(
-    cls,
+    cls: type[StripeObjectWithEvents],
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator:
-    """ Note: Stripe's data is always served in reverse-chronological order.
+) -> AsyncGenerator[StripeObjectWithEvents | LogCursor, None]:
+    """
+    Note: Stripe's data is always served in reverse-chronological order.
     fetch_incremental works by accessing stripe's Events API
     Each Resource that contains a valid Event Type is passed here.
     It works by calling the Events API, parsing the Events result
@@ -31,13 +41,13 @@ async def fetch_incremental(
     If the document was created after the last log_cursor, 
     yield this document and later yield the newest log_cursor.
     """
+    assert isinstance(log_cursor, datetime)
+
     iterating = True
 
     url = f"{API}/events"
     parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
-
-    _cls: Any = cls  # Silence mypy false-positive
 
     while iterating:
         events = EventResult.model_validate_json(
@@ -53,7 +63,7 @@ async def fetch_incremental(
 
             # Emit documents if we haven't seen them.
             if event_ts >= log_cursor:
-                doc = _cls.model_validate(event.data.object)
+                doc = cls.model_validate(event.data.object)
                 yield doc
             elif event_ts < log_cursor:
                 iterating = False
@@ -68,14 +78,15 @@ async def fetch_incremental(
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_backfill(
-    cls,
-    start_date,
+    cls: type[StripeObjectWithEvents],
+    start_date: datetime,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
-)-> AsyncGenerator:
-    """ Note: Stripe's data is always served in reverse-chronological order.
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[StripeObjectWithEvents | str, None]:
+    """
+    Note: Stripe's data is always served in reverse-chronological order.
     fetch_backfill works by accessing the stream own data API
     provided by stripe. These API's endpoints works by using pagination,
     with the response schema being the same on most cases (some edge-cases
@@ -85,8 +96,8 @@ async def fetch_backfill(
 
     If a document is equal-to or older-than the start_date, this means we've reached the limit
     set by the user, and the stream halts. 
-
     """
+    assert isinstance(cutoff, datetime)
 
     url = f"{API}/{cls.SEARCH_NAME}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
@@ -97,19 +108,19 @@ async def fetch_backfill(
     if cls.NAME == "Subscriptions" or cls.NAME == "SubscriptionItems":
         parameters["status"] = "all"
 
-    _cls: Any = cls  # Silence mypy false-positive
-    result = BackfillResult[_cls].model_validate_json(
+    result = BackfillResult[cls].model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) == start_date:
+        doc_ts = _s_to_dt(doc.created)
+        if doc_ts == start_date:
             # Yield final document for reference
             yield doc
             return
-        elif _s_to_dt(doc.created) < start_date:
+        elif doc_ts < start_date:
             return
-        elif _s_to_dt(doc.created) < cutoff:
+        elif doc_ts < cutoff:
             yield doc
 
     if result.has_more:
@@ -118,29 +129,26 @@ async def fetch_backfill(
         return
 
 async def fetch_incremental_substreams(
-    cls,
-    cls_child,
+    cls: type[StripeObjectWithEvents],
+    cls_child: type[StripeChildObject],
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator:
-
-    """Note: Stripe's data is always served in reverse-chronological order.
+) -> AsyncGenerator[StripeChildObject | LogCursor, None]:
+    """
+    Note: Stripe's data is always served in reverse-chronological order.
     fetch_incremental_substreams works very similar to
     fetch_incremental method. The only variation is that 
     the resulting data serves has the search object for the next
     stream (child stream). With that, a new iteration happens inside
     this method exclusively for the child stream.
     """
-
+    assert isinstance(log_cursor, datetime)
     iterating = True
 
     url = f"{API}/events"
     parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
-
-
-    _cls: Any = cls  # Silence mypy false-positive
 
     while iterating:
         events = EventResult.model_validate_json(
@@ -156,8 +164,8 @@ async def fetch_incremental_substreams(
 
             # Emit documents if we haven't seen them.
             if event_ts >= log_cursor:
-                parent_data = _cls.model_validate(event.data.object)
-                search_name = _cls.SEARCH_NAME
+                parent_data = cls.model_validate(event.data.object)
+                search_name = cls.SEARCH_NAME
                 id = parent_data.id
                 child_data = _capture_substreams(
                                     cls_child,
@@ -185,42 +193,40 @@ async def fetch_incremental_substreams(
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_backfill_substreams(
-    cls,
-    cls_child,
-    start_date,
+    cls: type[StripeObjectWithEvents],
+    cls_child: type[StripeChildObject],
+    start_date: datetime,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
-)-> AsyncGenerator:
-    """Note: Stripe's data is always served in reverse-chronological order.
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[StripeChildObject | str, None]:
+    """
+    Note: Stripe's data is always served in reverse-chronological order.
     fetch_backfill_substreams works similar to fetch_backfill. The only variation is that 
     the resulting data serves has the search object for the next
     stream (child stream). With that, a new iteration happens inside
     this method exclusively for the child stream.
     """
+    assert isinstance(cutoff, datetime)
 
-    _cls: Any = cls  # Silence mypy false-positive
-
-    url = f"{API}/{_cls.SEARCH_NAME}"
+    search_name = cls.SEARCH_NAME
+    url = f"{API}/{search_name}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
-
-    search_name = _cls.SEARCH_NAME
-
 
     if page:
         parameters["starting_after"] = page
     
-    if _cls.NAME == "Subscriptions" or cls.NAME == "SubscriptionItems":
+    if cls.NAME == "Subscriptions" or cls.NAME == "SubscriptionItems":
         parameters["status"] = "all"
 
-
-    result = BackfillResult[_cls].model_validate_json(
+    result = BackfillResult[cls].model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) == start_date:
+        doc_ts = _s_to_dt(doc.created)
+        if doc_ts == start_date:
             parent_data = doc
             id = parent_data.id
 
@@ -240,10 +246,10 @@ async def fetch_backfill_substreams(
                 yield doc 
             return
 
-        elif _s_to_dt(doc.created) < start_date:
+        elif doc_ts < start_date:
             return
 
-        elif _s_to_dt(doc.created) < cutoff:
+        elif doc_ts < cutoff:
             parent_data = doc
             id = parent_data.id
             child_data = _capture_substreams(
@@ -267,15 +273,16 @@ async def fetch_backfill_substreams(
         return
 
 async def _capture_substreams(
-    cls_child,
-    search_name,
-    id,
+    cls_child: type[StripeChildObject],
+    search_name: str,
+    id: str,
     parent_data,
-    http,
-    log
+    http: HTTPSession,
+    log: Logger,
 ):
-    """_capture_substreams works by handling the child_stream query and pagination.
-    it requires the parent stream data, along with the item id and the parent search name.
+    """
+    _capture_substreams works by handling the child_stream query and pagination.
+    It requires the parent stream data, along with the item id and the parent search name.
     """
 
     child_url = f"{API}/{search_name}/{id}/{cls_child.SEARCH_NAME}"
@@ -309,31 +316,29 @@ async def _capture_substreams(
         else:
             break
 
-
 async def fetch_incremental_no_events(
-    cls,
+    cls: type[StripeObjectNoEvents],
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator:
-    """ Note: Stripe's data is always served in reverse-chronological order.
+) -> AsyncGenerator[StripeObjectNoEvents | LogCursor, None]:
+    """
+    Note: Stripe's data is always served in reverse-chronological order.
     fetch_incremental_no_events works very similar to fetch_backfilling. This method
     handles streams that do not have valid Event Types.
     It works by calling each individual stream endpoint and parsing each result,
     created after the last log_cursor, with its model.
     """
+    assert isinstance(log_cursor, datetime)
 
     iterating = True
 
     url = f"{API}/{cls.SEARCH_NAME}"
-    parameters = {"limit": MAX_PAGE_LIMIT}
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
 
-
-    _cls: Any = cls  # Silence mypy false-positive
-
     while iterating:
-        resources = ListResult[_cls].model_validate_json(
+        resources = ListResult[cls].model_validate_json(
             await http.request(log, url, method="GET", params=parameters)
         )
 
@@ -346,7 +351,7 @@ async def fetch_incremental_no_events(
 
             # Emit documents if we haven't seen them yet.
             if resource_ts >= log_cursor:
-                doc = _cls.model_validate(resource)
+                doc = cls.model_validate(resource)
                 yield doc
             elif resource_ts < log_cursor:
                 iterating = False
@@ -361,27 +366,25 @@ async def fetch_incremental_no_events(
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_incremental_usage_records(
-    cls,
-    cls_child,
+    cls: SubscriptionItems,
+    cls_child: type[StripeChildObject],
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator:
-
-    """Note: Stripe's data is always served in reverse-chronological order.
+) -> AsyncGenerator[StripeChildObject | LogCursor, None]:
+    """
+    Note: Stripe's data is always served in reverse-chronological order.
     fetch_incremental_usage_records works similar to fetch_incremental_substreams. 
     The only variation is that the resulting data from the child stream
     needs aditional processing
     """
+    assert isinstance(log_cursor, datetime)
 
     iterating = True
 
     url = f"{API}/events"
     parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
-
-
-    _cls: Any = cls  # Silence mypy false-positive
 
     while iterating:
         events = EventResult.model_validate_json(
@@ -397,8 +400,8 @@ async def fetch_incremental_usage_records(
 
             # Emit documents if we haven't seen them.
             if event_ts >= log_cursor:
-                parent_data = _cls.model_validate(event.data.object)
-                search_name = _cls.SEARCH_NAME
+                parent_data = cls.model_validate(event.data.object)
+                search_name = cls.SEARCH_NAME
                 for item in parent_data.items.data:
                     id = item.id
                     child_data = _capture_substreams(
@@ -429,40 +432,39 @@ async def fetch_incremental_usage_records(
         yield max_ts + timedelta(milliseconds=1) # startTimestamp is inclusive.
 
 async def fetch_backfill_usage_records(
-    cls,
-    cls_child,
-    start_date,
+    cls: SubscriptionItems,
+    cls_child: type[StripeChildObject],
+    start_date: datetime,
     http: HTTPSession,
     log: Logger,
-    page: str | None,
-    cutoff: datetime,
-)-> AsyncGenerator:
-
-    """Note: Stripe's data is always served in reverse-chronological order.
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[StripeChildObject | str, None]:
+    """
+    Note: Stripe's data is always served in reverse-chronological order.
     fetch_backfill_usage_records works similar to fetch_backfill_substreams. 
     The only variation is that the resulting data from the child stream
     needs aditional processing
     """
+    assert isinstance(cutoff, datetime)
 
-    _cls: Any = cls  # Silence mypy false-positive
-
-    url = f"{API}/{_cls.SEARCH_NAME}"
+    search_name = cls.SEARCH_NAME
+    url = f"{API}/{search_name}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
-
-    search_name = _cls.SEARCH_NAME
 
     if page:
         parameters["starting_after"] = page
     
-    if _cls.NAME == "SubscriptionItems":
+    if cls.NAME == "SubscriptionItems":
         parameters["status"] = "all"
 
-    result = BackfillResult[_cls].model_validate_json(
+    result = BackfillResult[cls].model_validate_json(
         await http.request(log, url, method="GET", params=parameters)
     )
 
     for doc in result.data:
-        if _s_to_dt(doc.created) == start_date:
+        doc_ts = _s_to_dt(doc.created)
+        if doc_ts == start_date:
             parent_data = doc
             for item in parent_data.items.data:
                 id = item.id
@@ -482,10 +484,10 @@ async def fetch_backfill_usage_records(
                     yield doc 
             return
 
-        elif _s_to_dt(doc.created) < start_date:
+        elif doc_ts < start_date:
             return
 
-        elif _s_to_dt(doc.created) < cutoff:
+        elif doc_ts < cutoff:
             parent_data = doc
             for item in parent_data.items.data:
                 id = item.id
