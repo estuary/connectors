@@ -43,7 +43,6 @@ on:
       - "source-hubspot/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
-      - "source-stripe-native/**"
       - "source-linkedin-ads-v2/**"
       - "source-oracle-flashback/**"
       - "source-recharge/**"
