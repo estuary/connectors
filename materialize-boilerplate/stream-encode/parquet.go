@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/apache/arrow/go/v17/parquet"
@@ -550,6 +551,15 @@ func getIntVal(val any) (got int64, err error) {
 	case int:
 		got = int64(v)
 	case string:
+		// Strings ending in a 0 decimal part like "1.0" or "3.00" are
+		// considered valid as integers per JSON specification so we must handle
+		// this possibility here. Anything after the decimal is discarded on the
+		// assumption that Flow has validated the data and verified that the
+		// decimal component is all 0's.
+		if idx := strings.Index(v, "."); idx != -1 {
+			v = v[:idx]
+		}
+
 		if p, parseErr := strconv.Atoi(v); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as integer: %w", v, parseErr)
 		} else {
