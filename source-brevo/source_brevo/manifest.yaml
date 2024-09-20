@@ -1,4 +1,4 @@
-version: 4.4.2
+version: 4.6.2
 
 type: DeclarativeSource
 
@@ -25,22 +25,22 @@ definitions:
           extractor:
             type: DpathExtractor
             field_path: [contacts]
-      paginator:
-          type: DefaultPaginator
-          page_token_option:
-            type: RequestOption
-            inject_into: request_parameter
-            field_name: offset
-          page_size_option:
-            type: RequestOption
-            inject_into: request_parameter
-            field_name: limit
-          pagination_strategy:
-            type: OffsetIncrement
-            page_size: 1000
+        paginator:
+            type: DefaultPaginator
+            page_token_option:
+              type: RequestOption
+              inject_into: request_parameter
+              field_name: offset
+            page_size_option:
+              type: RequestOption
+              inject_into: request_parameter
+              field_name: limit
+            pagination_strategy:
+              type: OffsetIncrement
+              page_size: 1000
       incremental_sync:
         type: DatetimeBasedCursor
-        cursor_field: createdSince
+        cursor_field: modifiedSince
         cursor_datetime_formats:
           - "%Y-%m-%dT%H:%M:%S.%fZ"
         datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
