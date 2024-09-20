@@ -9,14 +9,14 @@ import (
 
 func TestConfigURI(t *testing.T) {
 	for name, cfg := range map[string]config{
-		"v2 User & Password Authentication": {
+		"User & Password Authentication": {
 			Host:     "orgname-accountname.snowflakecomputing.com",
 			Database: "mydb",
 			Schema:   "myschema",
 			Credentials: credentialConfig{
 				UserPass,
 				"will",
-				"password",
+				"some+complex/password",
 				"non-existant-jwt",
 			},
 		},

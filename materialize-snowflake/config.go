@@ -69,8 +69,9 @@ func (c *config) toURI(tenant string) (string, error) {
 	}
 
 	// Authentication
+	var user string
 	if c.Credentials.AuthType == UserPass {
-		uri.User = url.UserPassword(c.Credentials.User, c.Credentials.Password)
+		user = url.QueryEscape(c.Credentials.User) + ":" + url.QueryEscape(c.Credentials.Password)
 	} else if c.Credentials.AuthType == JWT {
 		// We run this as part of validate to ensure that there is no error, so
 		// this is not expected to error here.
@@ -83,12 +84,12 @@ func (c *config) toURI(tenant string) (string, error) {
 			queryParams.Add("privateKey", privateKeyString)
 			queryParams.Add("authenticator", strings.ToLower(sf.AuthTypeJwt.String()))
 		}
-		uri.User = url.User(c.Credentials.User)
+		user = url.QueryEscape(c.Credentials.User)
 	} else {
 		return "", fmt.Errorf("unknown auth type: %s", c.Credentials.AuthType)
 	}
 
-	dsn := uri.User.String() + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
+	dsn := user + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
 	return dsn, nil
 }
 
