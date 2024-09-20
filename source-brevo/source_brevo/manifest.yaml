@@ -38,6 +38,7 @@ definitions:
             pagination_strategy:
               type: OffsetIncrement
               page_size: 1000
+              inject_on_first_request: true
       incremental_sync:
         type: DatetimeBasedCursor
         cursor_field: modifiedSince
@@ -46,16 +47,20 @@ definitions:
         datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
         start_datetime:
           type: MinMaxDatetime
-          datetime: '{{ config["start_date"] }}'
-          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
+          datetime: "{{ config[\"start_date\"] }}"
+          datetime_format: "%Y-%m-%dT%H:%M:%SZ"
+        start_time_option:
+          type: RequestOption
+          inject_into: request_parameter
+          field_name: modifiedSince
+        end_time_option:
+          type: RequestOption
+          inject_into: request_parameter
+          field_name: modifiedSince
         end_datetime:
           type: MinMaxDatetime
-          datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%S.%fZ') }}"
-          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"  
-      schema_loader:
-        type: InlineSchemaLoader
-        schema:
-          $ref: "#/schemas/Contacts"
+          datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+          datetime_format: "%Y-%m-%dT%H:%M:%SZ"
     ContactsAttributes:
       type: DeclarativeStream
       name: ContactsAttributes

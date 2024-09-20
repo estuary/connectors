@@ -9,13 +9,7 @@
       ]
     },
     "documentSchema": {
-      "type": "object",
-      "$schema": "http://json-schema.org/schema#",
       "properties": {
-        "id": {
-          "type": "integer",
-          "description": "The unique id of a contact"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -28,7 +22,6 @@
           ]
         }
       },
-      "additionalProperties": true,
       "x-infer-schema": true
     },
     "key": [
