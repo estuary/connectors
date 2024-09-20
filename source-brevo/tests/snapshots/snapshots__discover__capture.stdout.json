@@ -5,7 +5,7 @@
       "stream": "Contacts",
       "syncMode": "incremental",
       "cursorField": [
-        "createdSince"
+        "modifiedSince"
       ]
     },
     "documentSchema": {
