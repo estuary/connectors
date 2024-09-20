@@ -178,7 +178,7 @@ def snapshot_object(
             state,
             task,
             fetch_snapshot=functools.partial(fetch_snapshot, cls, account_sid, http),
-            tombstone=cls.PRIMARY_KEY,
+            tombstone=cls(_meta=cls.Meta(op="d")),
         )
 
     return Resource(
@@ -250,7 +250,7 @@ def media_groups_object(
             state,
             task,
             fetch_snapshot=functools.partial(fetch_snapshot_child, cls_parent, cls, account_sid, http),
-            tombstone=cls.PRIMARY_KEY,
+            tombstone=cls(_meta=cls.Meta(op="d")),
         )
 
     return Resource(
