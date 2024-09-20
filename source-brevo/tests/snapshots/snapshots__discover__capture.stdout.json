@@ -1,7 +1,13 @@
 [
   {
     "recommendedName": "Contacts",
-    "resourceConfig": {},
+    "resourceConfig": {
+      "stream": "Contacts",
+      "syncMode": "incremental",
+      "cursorField": [
+        "createdSince"
+      ]
+    },
     "documentSchema": {
       "type": "object",
       "$schema": "http://json-schema.org/schema#",
@@ -31,7 +37,10 @@
   },
   {
     "recommendedName": "ContactsAttributes",
-    "resourceConfig": {},
+    "resourceConfig": {
+      "stream": "ContactsAttributes",
+      "syncMode": "full_refresh"
+    },
     "documentSchema": {
       "type": "object",
       "$schema": "http://json-schema.org/schema#",
@@ -61,7 +70,10 @@
   },
   {
     "recommendedName": "ContactsLists",
-    "resourceConfig": {},
+    "resourceConfig": {
+      "stream": "ContactsLists",
+      "syncMode": "full_refresh"
+    },
     "documentSchema": {
       "type": "object",
       "$schema": "http://json-schema.org/schema#",
