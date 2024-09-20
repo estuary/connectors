@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test_noncommitfinalquery_82446880": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"NonCommitFinalQuery_82446880","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ccc","id":2}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"NonCommitFinalQuery_82446880","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"ddd","id":3}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FNonCommitFinalQuery_82446880":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":"text","extra":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

@@ -56,7 +56,9 @@ func TestDiscover(t *testing.T) {
 		Checkpoint:   []byte("{}"),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   commonSanitizers(),
-		Bindings:     bindings(t, database, col1),
+		Bindings: []*flow.CaptureSpec_Binding{
+			makeBinding(t, database, col1),
+		},
 	}
 
 	cs.VerifyDiscover(ctx, t, nil...)
@@ -105,7 +107,7 @@ func TestDiscoverMultipleDatabases(t *testing.T) {
 		addTestTableData(ctx, t, client, d, col1, 5, 0, stringPkVals, "onlyColumn")
 		addTestTableData(ctx, t, client, d, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
 
-		bs = append(bs, bindings(t, d, col1)...)
+		bs = append(bs, makeBinding(t, d, col1))
 	}
 
 	cfg.Database = " foo, bar "
@@ -165,7 +167,7 @@ func TestDiscoverAllDatabases(t *testing.T) {
 		addTestTableData(ctx, t, client, d, col1, 5, 0, stringPkVals, "onlyColumn")
 		addTestTableData(ctx, t, client, d, col2, 5, 0, numberPkVals, "firstColumn", "secondColumn")
 
-		bs = append(bs, bindings(t, d, col1)...)
+		bs = append(bs, makeBinding(t, d, col1))
 	}
 
 	cfg.Database = ""

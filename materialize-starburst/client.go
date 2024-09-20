@@ -12,6 +12,8 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
 	db        *stdsql.DB
 	cfg       *config
@@ -163,12 +165,24 @@ func (c *client) AlterTable(_ context.Context, ta sql.TableAlter) (string, boile
 	}, nil
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	return sql.StdListSchemas(ctx, c.db)
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
+}
+
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
-	err := c.db.PingContext(ctx)
-	if err != nil {
+
+	cfg := conf.(*config)
+	if db, err := openDB(cfg.ToURI()); err != nil {
+		errs.Err(err)
+	} else if err := db.PingContext(ctx); err != nil {
 		errs.Err(err)
 	}
+
 	return errs
 }
 

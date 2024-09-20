@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.21-bullseye as builder
+FROM golang:1.22-bullseye as builder
 
 WORKDIR /builder
 
@@ -16,7 +16,7 @@ COPY source-boilerplate ./source-boilerplate
 
 RUN go install -v ./go/...
 RUN go install -v ./source-boilerplate/...
-RUN go install -v github.com/jackc/pgx/v4
+RUN go install -v github.com/jackc/pgx/v5
 
 # Run tests and build the connector
 COPY source-postgres-batch ./source-postgres-batch

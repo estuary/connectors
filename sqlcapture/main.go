@@ -2,6 +2,7 @@ package sqlcapture
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -186,6 +187,28 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, err
 	}
 
+	// Extract information about the previous state of various table bindings, so that we
+	// can more easily compare to the incoming to-be-validated state.
+	type previousBindingInfo struct {
+		Resource Resource
+		Backfill uint32
+	}
+	var previousBindings = make(map[StreamID]previousBindingInfo)
+	if req.LastCapture != nil {
+		for _, binding := range req.LastCapture.Bindings {
+			var res Resource
+			if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+				return nil, fmt.Errorf("error parsing resource config: %w", err)
+			}
+			res.SetDefaults()
+			var streamID = JoinStreamID(res.Namespace, res.Stream)
+			previousBindings[streamID] = previousBindingInfo{
+				Resource: res,
+				Backfill: binding.Backfill,
+			}
+		}
+	}
+
 	var errs = db.SetupPrerequisites(ctx)
 	var out []*pc.Response_Validated_Binding
 	for _, binding := range req.Bindings {
@@ -194,6 +217,13 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 		res.SetDefaults()
+
+		// If we have previous information about a resource and the backfill mode changes without
+		// a corresponding backfill counter increment, that's an error.
+		var streamID = JoinStreamID(res.Namespace, res.Stream)
+		if prevBinding, ok := previousBindings[streamID]; ok && res.Mode != prevBinding.Resource.Mode && binding.Backfill <= prevBinding.Backfill {
+			errs = append(errs, fmt.Errorf("must re-backfill when changing backfill mode: table %q changed from %q to %q", streamID, prevBinding.Resource.Mode, res.Mode))
+		}
 
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
 			errs = append(errs, err)
@@ -224,15 +254,10 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		return nil, err
 	}
 
-	// Filter well-known flow created tables out of the discovered catalog before output. These
-	// include the watermarks table that this capture would create as-configured as well as
-	// materialization metadata tables. They are basically never useful to capture so we shouldn't
-	// suggest them.
-
-	// The materialization metadata table names "flow_materializations_v2" and "flow_checkpoints_v1"
+	// Filter Flow materialization metadata tables out of the discovered catalog before output.
+	// The materialization table names "flow_materializations_v2" and "flow_checkpoints_v1"
 	// are expected to remain stable and may exist in any schema, depending on how the
 	// materialization is configured.
-	var watermarkStreamID = db.WatermarksTable()
 	var filteredBindings = []*pc.Response_Discovered_Binding{} // Empty discovery must result in `[]` rather than `null`
 	for _, binding := range discoveredBindings {
 		var res Resource
@@ -240,12 +265,12 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 		res.SetDefaults()
-		var streamID = JoinStreamID(res.Namespace, res.Stream)
-		if streamID != watermarkStreamID && res.Stream != "flow_materializations_v2" && res.Stream != "flow_checkpoints_v1" {
+		if res.Stream != "flow_materializations_v2" && res.Stream != "flow_checkpoints_v1" {
 			filteredBindings = append(filteredBindings, binding)
 		} else {
 			log.WithFields(log.Fields{
-				"filtered": streamID,
+				"schema": res.Namespace,
+				"table":  res.Stream,
 			}).Debug("filtered well-known table from discovery")
 		}
 	}
@@ -265,9 +290,35 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 
-	migrated, err := migrateState(&state, open.Capture.Bindings)
-	if err != nil {
-		return fmt.Errorf("migrating state: %w", err)
+	// This is a very hacky feature. Occasionally, connector bugs allow a capture task
+	// to get into a bad state which would be easy to fix if we could issue some sort
+	// of `flowctl secret edit-checkpoint <task>` command to manually edit the state
+	// checkpoint, but which is very difficult to fix without such an ability.
+	//
+	// This bit of logic here allows us to simulate that sort of ability in extraordinary
+	// cases, by adding an entry to this table of replacements and then doing a connector
+	// release. The table is keyed by a hash of the task name and by the binlog cursor
+	// value at which the replacement should occur, so the replacements are very narrowly
+	// scoped.
+	var hackyCursorReplacements = map[string]map[string]string{
+		"TASKHASH415b69936fe1324600d67943e50235fc57fb7e0196b8f5f0TASKHASH": {"binlog.000123:456789": "binlog.000123:456789"}, // Example
+	}
+	var hasher = sha256.New()
+	hasher.Write([]byte(open.Capture.Name))
+	var nameHash = fmt.Sprintf("%x", hasher.Sum(nil))
+	log.WithFields(log.Fields{
+		"namehash": nameHash,
+		"cursor":   state.Cursor,
+	}).Debug("checking for cursor replacements")
+	if replacementsForTask, ok := hackyCursorReplacements[nameHash]; ok {
+		if replacementForCursor, ok := replacementsForTask[state.Cursor]; ok {
+			log.WithFields(log.Fields{
+				"namehash":  nameHash,
+				"oldCursor": state.Cursor,
+				"newCursor": replacementForCursor,
+			}).Warn("cursor replacement triggered")
+			state.Cursor = replacementForCursor
+		}
 	}
 
 	var ctx = stream.Context()
@@ -328,26 +379,8 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return err
 	}
 
-	if migrated {
-		// Write out a new state if the state was migrated.
-		if cp, err := json.Marshal(state); err != nil {
-			return fmt.Errorf("marshalling checkpoint: %w", err)
-		} else if err = c.Output.Checkpoint(cp, false); err != nil {
-			return fmt.Errorf("outputting checkpoint: %w", err)
-		}
-
-		// Read the acknowledgement of the migration state update.
-		if request, err := stream.Recv(); err != nil {
-			return fmt.Errorf("receiving ack for migration state update: %w", err)
-		} else if err = request.Validate_(); err != nil {
-			return fmt.Errorf("validating request for migration state update: %w", err)
-		} else if request.Acknowledge == nil {
-			return fmt.Errorf("unexpected message when receiving ack for migration state update %#v", request)
-		}
-	}
-
 	err = c.Run(ctx)
-	if errors.Is(err, errWatermarkNotReached) {
+	if errors.Is(err, ErrFenceNotReached) {
 		log.Warn("replication stream closed unexpectedly")
 		return nil
 	}

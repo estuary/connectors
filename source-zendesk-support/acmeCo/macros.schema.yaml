@@ -1,0 +1,84 @@
+---
+properties:
+  id:
+    type: integer
+  position:
+    type:
+      - "null"
+      - integer
+  restriction:
+    properties:
+      id:
+        type:
+          - "null"
+          - integer
+      ids:
+        items:
+          type:
+            - "null"
+            - integer
+        type:
+          - "null"
+          - array
+      type:
+        type:
+          - "null"
+          - string
+    type:
+      - "null"
+      - object
+  title:
+    type:
+      - "null"
+      - string
+  created_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  url:
+    type:
+      - "null"
+      - string
+  description:
+    type:
+      - "null"
+      - string
+  updated_at:
+    type:
+      - "null"
+      - string
+    format: date-time
+  active:
+    type:
+      - "null"
+      - boolean
+  actions:
+    items:
+      properties:
+        field:
+          type:
+            - "null"
+            - string
+        value:
+          type:
+            - "null"
+            - string
+      type:
+        - "null"
+        - object
+    type:
+      - "null"
+      - array
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
+type:
+  - object
+required:
+  - id
+x-infer-schema: true

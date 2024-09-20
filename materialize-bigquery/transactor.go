@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
-	"time"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -22,13 +24,14 @@ var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
 	fence *sql.Fence
+	cfg   *config
 
 	client     *client
 	bucketPath string
 	bucket     string
 
-	bindings    []*binding
-	updateDelay time.Duration
+	bindings []*binding
+	sched    schedule.Schedule
 }
 
 func newTransactor(
@@ -46,14 +49,17 @@ func newTransactor(
 	}
 
 	t := &transactor{
+		cfg:        cfg,
 		fence:      &fence,
 		client:     client,
 		bucketPath: cfg.BucketPath,
 		bucket:     cfg.Bucket,
 	}
 
-	if t.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.ProjectID+cfg.Dataset)); err != nil {
 		return nil, err
+	} else if useSched {
+		t.sched = sched
 	}
 
 	for _, binding := range bindings {
@@ -87,7 +93,7 @@ func newTransactor(
 			fieldSchemas[f.Name] = f
 		}
 
-		if err = t.addBinding(ctx, binding, fieldSchemas); err != nil {
+		if err = t.addBinding(binding, fieldSchemas); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -95,7 +101,7 @@ func newTransactor(
 	return t, nil
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema) error {
+func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema) error {
 	loadSchema, err := schemaForCols(target.KeyPtrs(), fieldSchemas)
 	if err != nil {
 		return err
@@ -152,8 +158,11 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	return s, nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -193,7 +202,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		subqueries = append(subqueries, b.loadQuerySQL)
 
-		delete, err := b.loadFile.flush(ctx)
+		delete, err := b.loadFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
 		}
@@ -208,16 +217,20 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Build the query across all tables.
-	query := t.client.newQuery(strings.Join(subqueries, "\nUNION ALL\n") + ";")
+	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	query := t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
+	ll := log.WithField("query", queryStr)
 
 	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
+		ll.WithError(err).Error("client runQuery failed")
 		return fmt.Errorf("load query: %w", err)
 	}
 
 	bqit, err := job.Read(ctx)
 	if err != nil {
+		ll.WithError(err).Error("job read failed")
 		return fmt.Errorf("load job read: %w", err)
 	}
 
@@ -226,6 +239,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err = bqit.Next(&bd); err == iterator.Done {
 			break
 		} else if err != nil {
+			ll.WithError(err).Error("query results iterator failed")
 			return fmt.Errorf("load row read: %w", err)
 		}
 
@@ -245,9 +259,20 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = t.bindings[it.Binding]
+
+		var flowDocument = it.RawJSON
+		if t.cfg.HardDelete && it.Delete {
+			if it.Exists {
+				flowDocument = json.RawMessage(`"delete"`)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
+		}
+
 		b.storeFile.start()
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
@@ -293,7 +318,7 @@ func (t *transactor) commit(ctx context.Context) error {
 			continue
 		}
 
-		delete, err := b.storeFile.flush(ctx)
+		delete, err := b.storeFile.flush()
 		if err != nil {
 			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
 		}
@@ -317,13 +342,23 @@ func (t *transactor) commit(ctx context.Context) error {
 	`)
 
 	// Build the bigquery query of the combined subqueries.
-	query := t.client.newQuery(strings.Join(subqueries, "\n"))
+	queryString := strings.Join(subqueries, "\n")
+	query := t.client.newQuery(queryString)
 	query.TableDefinitions = edcTableDefs // Tell the query where to get the external references in gcs.
 
 	// This returns a single row with the error status of the query.
 	if _, err := t.client.runQuery(ctx, query); err != nil {
+		log.WithField("query", queryString).Error("query failed")
 		return fmt.Errorf("commit query: %w", err)
 	}
+
+	if t.cfg.DBTJobTrigger.Enabled() {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(t.cfg.DBTJobTrigger); err != nil {
+			return fmt.Errorf("triggering dbt job: %w", err)
+		}
+	}
+
 	log.Info("store: finished commit")
 
 	return nil

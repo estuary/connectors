@@ -2,14 +2,14 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.21-bullseye as builder
+FROM golang:1.22-bullseye as builder
 
 WORKDIR /builder
 
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
 COPY go.* ./
-# RUN go mod download
+RUN go mod download
 
 COPY go                  ./go
 COPY source-boilerplate  ./source-boilerplate
@@ -23,7 +23,7 @@ ENV PATH="/builder/bin:$PATH"
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-# RUN go test -short -v ./source-postgres/... --db_address=localhost:5432
+RUN go test -short -failfast -v ./source-postgres/... --db_address=localhost:5432
 
 # Build the connector.
 RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \

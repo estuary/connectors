@@ -66,27 +66,113 @@
         "description": "A prefix that will be used to store objects in S3.",
         "order": 9
       },
-      "advanced": {
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 10
+      },
+      "syncSchedule": {
         "properties": {
-          "updateDelay": {
+          "syncFrequency": {
             "type": "string",
             "enum": [
               "0s",
+              "30s",
+              "5m",
               "15m",
               "30m",
               "1h",
               "2h",
               "4h"
             ],
-            "title": "Update Delay",
-            "description": "Potentially reduce active cluster time by increasing the delay between updates. Defaults to 30 minutes if unset."
+            "title": "Sync Frequency",
+            "description": "Frequency at which transactions are executed when the materialization is fully caught up and streaming changes. May be enabled only for certain time periods and days of the week if configured below; otherwise it is effective 24/7. Defaults to 30 minutes if unset.",
+            "order": 0
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "Timezone applicable to sync time windows and active days. Must be a valid IANA time zone name or +HH:MM offset.",
+            "order": 1
+          },
+          "fastSyncStartTime": {
+            "type": "string",
+            "title": "Fast Sync Start Time",
+            "description": "Time of day that transactions begin executing at the configured Sync Frequency. Prior to this time transactions will be executed more slowly. Must be in the form of '09:00'.",
+            "order": 2,
+            "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "fastSyncStopTime": {
+            "type": "string",
+            "title": "Fast Sync Stop Time",
+            "description": "Time of day that transactions stop executing at the configured Sync Frequency. After this time transactions will be executed more slowly. Must be in the form of '17:00'.",
+            "order": 3,
+            "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "fastSyncEnabledDays": {
+            "type": "string",
+            "title": "Fast Sync Enabled Days",
+            "description": "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Tuesday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset.",
+            "order": 4
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "Advanced Options",
-        "description": "Options for advanced users. You should not typically need to modify these.",
-        "advanced": true
+        "title": "Sync Schedule",
+        "description": "Configure schedule of transactions for the materialization."
+      },
+      "dbt_job_trigger": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job ID",
+            "description": "DBT job ID"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account ID",
+            "description": "DBT account ID"
+          },
+          "account_prefix": {
+            "type": "string",
+            "title": "Account Prefix",
+            "description": "DBT account prefix"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "API Key",
+            "description": "DBT API Key",
+            "secret": true
+          },
+          "cause": {
+            "type": "string",
+            "title": "Cause Message",
+            "description": "You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary Flow'."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "replace",
+              "ignore"
+            ],
+            "title": "Job Trigger Mode",
+            "description": "Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.",
+            "default": "skip"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "account_id",
+          "account_prefix",
+          "api_key"
+        ],
+        "title": "DBT Job Trigger",
+        "description": "Trigger a DBT Job when new data is available"
       },
       "networkTunnel": {
         "properties": {
@@ -146,13 +232,15 @@
       "schema": {
         "type": "string",
         "title": "Alternative Schema",
-        "description": "Alternative schema for this table (optional)."
+        "description": "Alternative schema for this table (optional).",
+        "x-schema-name": true
       },
       "delta_updates": {
         "type": "boolean",
         "title": "Delta Update",
         "description": "Should updates to this table be done via delta updates. Default is false.",
-        "default": false
+        "default": false,
+        "x-delta-updates": true
       }
     },
     "type": "object",

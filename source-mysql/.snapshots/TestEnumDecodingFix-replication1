@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FEnumDecodingFix_32314857":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","category"],"types":{"category":{"enum":["","A","C","B","D"],"type":"enum"},"id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FEnumDecodingFix_32314857":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","category"],"types":{"category":{"enum":["","A","C","B","D"],"type":"enum"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

@@ -11,35 +11,25 @@ import (
 )
 
 func newTestDialect() Dialect {
-	var mapper TypeMapper = ProjectionTypeMapper{
-		INTEGER:  NewStaticMapper("BIGINT"),
-		NUMBER:   NewStaticMapper("DOUBLE PRECISION"),
-		BOOLEAN:  NewStaticMapper("BOOLEAN"),
-		OBJECT:   NewStaticMapper("JSON"),
-		ARRAY:    NewStaticMapper("JSON"),
-		BINARY:   NewStaticMapper("BYTEA"),
-		MULTIPLE: NewStaticMapper("JSON"),
-		STRING: StringTypeMapper{
-			Fallback: NewStaticMapper("TEXT"),
-			WithFormat: map[string]TypeMapper{
-				"integer":   NewStaticMapper("NUMERIC"),
-				"number":    NewStaticMapper("DECIMAL"),
-				"date-time": NewStaticMapper("TIMESTAMPTZ"),
-			},
+	mapper := NewDDLMapper(
+		FlatTypeMappings{
+			ARRAY:          MapStatic("JSON"),
+			BINARY:         MapStatic("BYTEA"),
+			BOOLEAN:        MapStatic("BOOLEAN"),
+			INTEGER:        MapStatic("BIGINT"),
+			MULTIPLE:       MapStatic("JSON"),
+			NUMBER:         MapStatic("DOUBLE PRECISION"),
+			OBJECT:         MapStatic("JSON"),
+			STRING_INTEGER: MapStatic("NUMERIC"),
+			STRING_NUMBER:  MapStatic("DECIMAL"),
+			STRING: MapString(StringMappings{
+				Fallback: MapStatic("TEXT"),
+				WithFormat: map[string]MapProjectionFn{
+					"date-time": MapStatic("TIMESTAMPTZ"),
+				},
+			}),
 		},
-	}
-	mapper = NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
-
-	cv := NewColumnValidator(
-		ColValidation{Types: []string{"json"}, Validate: JsonCompatible},
-		ColValidation{Types: []string{"boolean"}, Validate: BooleanCompatible},
-		ColValidation{Types: []string{"bigint", "numeric"}, Validate: IntegerCompatible},
-		ColValidation{Types: []string{"double precision", "decimal"}, Validate: NumberCompatible},
-		ColValidation{Types: []string{"date-time"}, Validate: DateTimeCompatible},
-		ColValidation{Types: []string{"text"}, Validate: StringCompatible},
+		WithNotNullText("NOT NULL"),
 	)
 
 	return Dialect{
@@ -58,8 +48,7 @@ func newTestDialect() Dialect {
 		Placeholderer: PlaceholderFn(func(index int) string {
 			return fmt.Sprintf("$%d", index+1)
 		}),
-		TypeMapper:      mapper,
-		ColumnValidator: cv,
+		TypeMapper: mapper,
 	}
 }
 

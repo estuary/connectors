@@ -87,6 +87,3 @@ materializations:
         resource: { table: key_value }
         fields:
           recommended: true
-
-storageMappings:
-  "": { stores: [{ provider: S3, bucket: a-bucket }] }

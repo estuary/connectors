@@ -2,7 +2,7 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM golang:1.21-bullseye as builder
+FROM golang:1.22-bullseye as builder
 
 WORKDIR /builder
 
@@ -20,7 +20,7 @@ COPY source-mysql        ./source-mysql
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-RUN go test -short -v ./source-mysql/...
+RUN go test -short -failfast -v ./source-mysql/...
 
 # Build the connector.
 RUN go build -o ./connector -v ./source-mysql/...

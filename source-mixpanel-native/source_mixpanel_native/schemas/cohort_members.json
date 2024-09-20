@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["distinct_id"],
+  "properties": {
+    "cohort_id": {
+      "description": "The unique identifier of the cohort to which the member belongs",
+      "type": ["null", "integer"]
+    },
+    "distinct_id": {
+      "description": "The distinct identifier of the cohort member",
+      "type": "string"
+    },
+    "id": {
+        "description": "The unique identifier of the cohort member",
+        "type": "string"
+      }
+  }
+}

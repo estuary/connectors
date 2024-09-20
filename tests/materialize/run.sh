@@ -46,6 +46,13 @@ export TEST_COLLECTION_FORMATTED_STRINGS="tests/formatted-strings"
 export TEST_COLLECTION_LONG_STRING="tests/long-string"
 export TEST_COLLECTION_COMPOUND_KEY="tests/compound-key"
 export TEST_COLLECTION_SYMBOLS="tests/symbols"
+export TEST_COLLECTION_UNSIGNED_BIGINT="tests/unsigned-bigint"
+export TEST_COLLECTION_DELETIONS="tests/deletions"
+
+
+function decrypt_config {
+  sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 
+}
 
 source ${TEST_DIR}/${CONNECTOR}/setup.sh || bail "setup failed"
 
@@ -69,42 +76,20 @@ function drive_connector {
     local source=$1;
     local fixture=$2;
 
-    # Build source into a build DB. We must go through flowctl-go because flowctl
-    # hasn't implemented validation of connector images yet.
-    flowctl-go api build \
-        --build-id build-id \
-        --build-db ${TEMP_DIR}/build.db \
-        --network flow-test \
-        --source ${source} \
-        --log.level info \
-        || bail "building catalog failed"
-
-    # Pluck out the protobuf-encoded materialization.
-    sqlite3 ${TEMP_DIR}/build.db "select writefile('${TEMP_DIR}/spec.proto', spec) from built_materializations;"
-
     # Drive the connector, writing its output into the snapshot.
-    # The first jq command orders all object keys and sanitizes base64-encoded
-    # checkpoints and specifications, having one line per message output.
-    # We sort all Response.Loaded responses in ascending lexicographic order,
-    # and then snapshot the pretty-printed result. This allows connectors to
-    # output loads in any overall order and with any inter-document structure,
-    # while still having a stable snapshot result.
-    flowctl raw materialize-fixture --source ${TEMP_DIR}/spec.proto --fixture ${fixture} | \
-        docker run --rm -i -e FLOW_RUNTIME_CODEC=json --network flow-test ${CONNECTOR_IMAGE} | \
-        jq -Sc 'if .applied.actionDescription != null then .applied.actionDescription |= sub("[A-Za-z0-9+/=]{100,}"; "(a-base64-encoded-value)") else . end' | \
-        go run ${TEST_DIR}/sort-loaded.go | \
-        jq '.' >> ${SNAPSHOT} \
-        || bail "connector invocation failed"
+    RUST_LOG=info flowctl preview --source ${source} --fixture ${fixture} --output-state --output-apply --network flow-test \
+      | jq '.' >> ${SNAPSHOT} \
+      || bail "connector invocation failed"
 }
 
 # Drive the connector with the fixture.
-drive_connector ${TEMP_DIR}/flow.json ${TEST_DIR}/fixture.yaml
+drive_connector ${TEMP_DIR}/flow.json ${TEST_DIR}/fixture.json
 
 # Extend the snapshot with additional fetched content for this connector.
 source ${TEST_DIR}/${CONNECTOR}/fetch.sh | jq -S '.' >> ${SNAPSHOT} || bail "fetching results failed"
 
 # Drive it again to excercise any cleanup behavior when bindings are removed.
-drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.yaml
+drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.json
 
 if [[ -f "${TEST_DIR}/${CONNECTOR}/checks.sh" ]]; then
   # Run connector-specific checks

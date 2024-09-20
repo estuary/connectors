@@ -50,6 +50,7 @@ def sheet(http: HTTPSession, spreadsheet_id: str, sheet: Sheet):
         binding_index: int,
         state: ResourceState,
         task: Task,
+        all_bindings
     ):
         common.open_binding(
             binding,

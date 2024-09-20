@@ -30,14 +30,14 @@
         "description": "Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX).",
         "order": 3
       },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": false,
+        "order": 4
+      },
       "advanced": {
         "properties": {
-          "watermarks_table": {
-            "type": "string",
-            "title": "Watermarks Table Name",
-            "description": "The name of the table used for watermark writes. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
-            "default": "flow.watermarks"
-          },
           "dbname": {
             "type": "string",
             "title": "Database Name",
@@ -65,6 +65,19 @@
             "title": "Backfill Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
             "default": 50000
+          },
+          "watermarks_table": {
+            "type": "string",
+            "title": "Watermarks Table Name",
+            "description": "This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present.",
+            "default": "flow.watermarks"
+          },
+          "heartbeat_interval": {
+            "type": "string",
+            "title": "Heartbeat Interval",
+            "description": "This property is deprecated and will be removed in the near future. Has no effect.",
+            "default": "60s",
+            "pattern": "^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$"
           }
         },
         "additionalProperties": false,
@@ -109,7 +122,8 @@
     "required": [
       "address",
       "user",
-      "password"
+      "password",
+      "historyMode"
     ],
     "title": "MySQL Connection"
   },

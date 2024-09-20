@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["key"],
+  "properties": {
+    "key": {
+      "description": "The key identifier of the application role.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": true,
+  "description": "Details of an application role."
+}

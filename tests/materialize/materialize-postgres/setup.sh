@@ -20,7 +20,8 @@ config_json_template='{
    "database": "$PGDATABASE",
    "password": "$PGPASSWORD",
    "user":     "$PGUSER",
-   "schema":   "public"
+   "schema":   "public",
+   "hardDelete": true
 }'
 
 resources_json_template='[
@@ -79,6 +80,18 @@ resources_json_template='[
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "unsigned_bigint"
+    },
+    "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 

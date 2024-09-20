@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -13,6 +14,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 )
 
@@ -23,8 +25,17 @@ type Driver struct {
 	EndpointSpecType interface{}
 	// Instance of the type into which resource specifications are parsed.
 	ResourceSpecType Resource
+	// StartTunnel starts up an SSH tunnel if one is configured prior to running
+	// any operations that require connectivity to the database.
+	StartTunnel func(ctx context.Context, conf any) error
 	// NewEndpoint returns an *Endpoint which will be used to handle interactions with the database.
 	NewEndpoint func(_ context.Context, endpointConfig json.RawMessage, tenant string) (*Endpoint, error)
+	// PreReqs performs verification checks that the provided configuration can
+	// be used to interact with the endpoint to the degree required by the
+	// connector, to as much of an extent as possible. The returned PrereqErr
+	// can include multiple separate errors if it possible to determine that
+	// there is more than one issue that needs corrected.
+	PreReqs func(ctx context.Context, conf any, tenant string) *PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver{}
@@ -41,7 +52,6 @@ func docsUrlFromEnv(providedURL string) string {
 	return providedURL
 }
 
-// Spec implements the DriverServer interface.
 func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	var endpoint, resource []byte
 
@@ -60,7 +70,6 @@ func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_S
 	}, nil
 }
 
-// Validate implements the DriverServer interface.
 func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var (
 		err        error
@@ -68,10 +77,17 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		client     Client
 		loadedSpec *pf.MaterializationSpec
 		resp       = new(pm.Response_Validated)
+		conf       = d.EndpointSpecType
 	)
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
+	} else if err := json.Unmarshal(req.ConfigJson, conf); err != nil {
+		return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+	} else if err := d.StartTunnel(ctx, conf); err != nil {
+		return nil, fmt.Errorf("starting network tunnel: %w", err)
+	} else if prereqErrs := d.PreReqs(ctx, conf, mustGetTenantNameFromTaskName(req.Name.String())); prereqErrs.Len() != 0 {
+		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
 	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
@@ -79,9 +95,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 	defer client.Close()
 
-	if prereqErrs := client.PreReqs(ctx); prereqErrs.Len() != 0 {
-		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
-	} else if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
+	if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
 		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
 	}
 
@@ -94,6 +108,12 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		}
 		resources = append(resources, res)
 		resourcePaths = append(resourcePaths, res.Path())
+	}
+	if endpoint.MetaSpecs != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
+	}
+	if endpoint.MetaCheckpoints != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
 	}
 
 	is, err := client.InfoSchema(ctx, resourcePaths)
@@ -143,16 +163,20 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	return resp, nil
 }
 
-// ApplyUpsert implements the DriverServer interface.
 func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
 	var (
 		endpoint *Endpoint
 		client   Client
 		err      error
+		conf     = d.EndpointSpecType
 	)
 
 	if err = req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
+	} else if err := json.Unmarshal(req.Materialization.ConfigJson, conf); err != nil {
+		return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+	} else if err := d.StartTunnel(ctx, conf); err != nil {
+		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson, mustGetTenantNameFromTaskName(req.Materialization.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
@@ -164,10 +188,38 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	for _, b := range req.Materialization.Bindings {
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 	}
+	if endpoint.MetaSpecs != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
+	}
+	if endpoint.MetaCheckpoints != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
+	}
 
 	is, err := client.InfoSchema(ctx, resourcePaths)
 	if err != nil {
 		return nil, err
+	}
+
+	if sm, ok := client.(SchemaManager); ok {
+		// Create any schemas that don't already exist, if the endpoint supports schemas.
+		existingSchemas, err := sm.ListSchemas(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("getting schema list from client: %w", err)
+		}
+
+		requiredSchemas := make(map[string]struct{})
+		for _, p := range resourcePaths {
+			requiredSchemas[endpoint.Dialect.TableLocator(p).TableSchema] = struct{}{}
+		}
+
+		for r := range requiredSchemas {
+			if !slices.Contains(existingSchemas, r) {
+				if err := sm.CreateSchema(ctx, r); err != nil {
+					return nil, fmt.Errorf("client creating schema '%s': %w", r, err)
+				}
+				log.WithField("schema", r).Info("created schema")
+			}
+		}
 	}
 
 	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint), is, endpoint.ConcurrentApply)
@@ -175,6 +227,13 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
 	var loadedVersion string
+	var conf = d.EndpointSpecType
+
+	if err := json.Unmarshal(open.Materialization.ConfigJson, conf); err != nil {
+		return nil, nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+	} else if err := d.StartTunnel(ctx, conf); err != nil {
+		return nil, nil, fmt.Errorf("starting network tunnel: %w", err)
+	}
 
 	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.Name.String()))
 	if err != nil {

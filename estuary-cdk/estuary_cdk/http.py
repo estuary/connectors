@@ -11,6 +11,17 @@ import time
 from . import Mixin
 from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec, BasicAuth
 
+DEFAULT_AUTHORIZATION_HEADER = "Authorization"
+
+class HTTPError(RuntimeError):
+    """
+    HTTPError is an custom error class that provides the HTTP status code 
+    as a distinct attribute.
+    """
+    def __init__(self, message: str, code: int):
+        super().__init__(message)
+        self.code = code
+        self.message = message
 
 class HTTPSession(abc.ABC):
     """
@@ -38,12 +49,13 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         _with_token: bool = True,  # Unstable internal API.
+        headers: dict[str, Any] = {}
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
         chunks: list[bytes] = []
         async for chunk in self._request_stream(
-            log, url, method, params, json, form, _with_token
+            log, url, method, params, json, form, _with_token, headers
         ):
             chunks.append(chunk)
 
@@ -90,6 +102,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
         _with_token: bool,
+        headers: dict[str, Any] = {}
     ) -> AsyncGenerator[bytes, None]: ...
 
     # TODO(johnny): This is an unstable API.
@@ -109,6 +122,7 @@ class TokenSource:
 
     oauth_spec: OAuth2Spec | None
     credentials: BaseOAuth2Credentials | AccessToken | BasicAuth
+    authorization_header: str = DEFAULT_AUTHORIZATION_HEADER
     _access_token: AccessTokenResponse | None = None
     _fetched_at: int = 0
 
@@ -230,16 +244,17 @@ class HTTPMixin(Mixin, HTTPSession):
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
         _with_token: bool,
+        headers: dict[str, Any] = {},
     ) -> AsyncGenerator[bytes, None]:
         while True:
 
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
 
-            headers = {}
             if _with_token and self.token_source is not None:
                 token_type, token = await self.token_source.fetch_token(log, self)
-                headers["Authorization"] = f"{token_type} {token}"
+                header_value = f"{token_type} {token}" if self.token_source.authorization_header == DEFAULT_AUTHORIZATION_HEADER else f"{token}"
+                headers[self.token_source.authorization_header] = header_value
 
             async with self.inner.request(
                 headers=headers,
@@ -271,8 +286,9 @@ class HTTPMixin(Mixin, HTTPSession):
                     )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
-                    raise RuntimeError(
-                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {url}\nResponse:\n{body.decode('utf-8')}"
+                    raise HTTPError(
+                        f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
+                        resp.status
                     )
                 else:
                     resp.raise_for_status()

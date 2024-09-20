@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/test_partialrowimages_16824726": 3 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PartialRowImages_16824726","cursor":"backfill:0"}},"a":0,"b":0,"c":0,"id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PartialRowImages_16824726","cursor":"backfill:1"}},"a":1,"b":1,"c":1,"id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PartialRowImages_16824726","cursor":"backfill:2"}},"a":2,"b":2,"c":2,"id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FPartialRowImages_16824726":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","a","b","c"],"types":{"a":{"type":"int"},"b":{"type":"int"},"c":{"type":"int"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

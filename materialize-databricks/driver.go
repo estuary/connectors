@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
-	"time"
 
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -32,8 +32,8 @@ const volumeName = "flow_staging"
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides" jsonschema_extras:"x-schema-name=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
@@ -75,6 +75,7 @@ func newDatabricksDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
@@ -103,40 +104,24 @@ func newDatabricksDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
-	cfg *config
-
-	cp checkpoint
-	// is this checkpoint a recovered checkpoint?
-	cpRecovery bool
-	// Guard for concurrent access for cp.
-	mu sync.Mutex
-
-	wsClient *databricks.WorkspaceClient
-
+	cfg              *config
+	cp               checkpoint
+	cpRecovery       bool // is this checkpoint a recovered checkpoint?
+	wsClient         *databricks.WorkspaceClient
 	localStagingPath string
-
-	bindings []*binding
-
-	updateDelay time.Duration
+	bindings         []*binding
+	sched            schedule.Schedule
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
-	// A connector running on the "old" state may not have emitted an ack yet. We don't support
-	// migrating states so hopefully this is nothing but an empty checkpoint.
-	var oldCp oldCheckpoint
-	if err := json.Unmarshal(state, &oldCp); err != nil {
-		log.WithField("oldCheckpoint", oldCp).WithError(err).Warn("failed to unmarshal state into oldCheckpoint")
-	} else if len(oldCp.Queries) > 0 || len(oldCp.ToDelete) > 0 {
-		return fmt.Errorf("UnmarshalState application logic error: oldCp was not empty: %#v", oldCp)
-	}
-
-	if err := json.Unmarshal(state, &d.cp); err != nil {
+	if err := pf.UnmarshalStrict(state, &d.cp); err != nil {
 		return err
 	}
 	d.cpRecovery = true
@@ -165,21 +150,13 @@ func newTransactor(
 
 	var d = &transactor{cfg: cfg, wsClient: wsClient}
 
-	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
-		return nil, err
-	}
-
-	// If the warehouse has auto-stop configured to be longer than 15 minutes, disable update delay
 	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
-	if res, err := wsClient.Warehouses.GetById(ctx, warehouseId); err != nil {
-		return nil, fmt.Errorf("get warehouse %q details: %w", warehouseId, err)
-	} else {
-		if res.AutoStopMins >= 15 && d.updateDelay.Minutes() > 0 {
-			log.Info(fmt.Sprintf("Auto-stop is configured to be %d minutes for this warehouse, disabling update delay. To save costs you can reduce the auto-stop idle configuration and tune the update delay config of this connector. See docs for more information: https://go.estuary.dev/materialize-databricks", res.AutoStopMins))
 
-			d.updateDelay, _ = time.ParseDuration("0s")
-		}
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(warehouseId)); err != nil {
+		return nil, err
+	} else if useSched {
+		d.sched = sched
 	}
 
 	db, err := stdsql.Open("databricks", d.cfg.ToURI())
@@ -188,15 +165,24 @@ func newTransactor(
 	}
 	defer db.Close()
 
+	schemas := map[string]struct{}{cfg.SchemaName: {}}
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding, open.Range); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
+
+		schemas[binding.Path[0]] = struct{}{}
 	}
 
-	// Create volume for storing staged files
-	if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", cfg.SchemaName, volumeName)); err != nil {
-		return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS %s;): %w", volumeName, err)
+	// Create a volume for storing staged files for all schemas in the scope of the materialization.
+	for sch := range schemas {
+		log.WithFields(log.Fields{
+			"schema":     sch,
+			"volumeName": volumeName,
+		}).Debug("creating volume for schema if it doesn't already exist")
+		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", sch, volumeName)); err != nil {
+			return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
+		}
 	}
 
 	if tempDir, err := os.MkdirTemp("", "staging"); err != nil {
@@ -222,10 +208,6 @@ type binding struct {
 	// into the target table. Note that in case of delta updates, "needsMerge"
 	// will always be false
 	needsMerge bool
-
-	mergeInto string
-
-	copyIntoDirect string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *pf.RangeSpec) error {
@@ -249,8 +231,11 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 	return nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
@@ -260,7 +245,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		b.loadFile.start(ctx)
+		if err := b.loadFile.start(ctx); err != nil {
+			return fmt.Errorf("starting load file: %w", err)
+		}
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
@@ -339,18 +326,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 type checkpointItem struct {
-	Query    string
+	Query    string   `json:",omitempty"` // deprecated, kept for backward compatibility
+	Queries  []string `json:",omitempty"`
 	ToDelete []string
 }
 
 type checkpoint map[string]*checkpointItem
 
-// TODO: Remove once all tasks have migrated to using the new checkpoint.
-type oldCheckpoint struct {
-	Queries []string
-
-	// List of files to cleanup after committing the queries
-	ToDelete []string
+func (c *checkpoint) Validate() error {
+	return nil
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
@@ -364,6 +348,8 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) {
 	}
 }
 
+const queryBatchSize = 128
+
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 
@@ -371,9 +357,19 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
+		var flowDocument = it.RawJSON
+		if d.cfg.HardDelete && it.Delete {
+			if it.Exists {
+				flowDocument = json.RawMessage(`"delete"`)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
+		}
+
 		if err := b.storeFile.start(ctx); err != nil {
 			return nil, err
-		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := b.storeFile.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
@@ -402,24 +398,42 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toCopy)
 
-		var query string
+		var queries []string
 		// In case of delta updates or if there are no existing keys being stored
 		// we directly copy from staged files into the target table. Note that this is retriable
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
 		if b.target.DeltaUpdates || !b.needsMerge {
-			if query, err = RenderTableWithFiles(b.target, toCopy, b.rootStagingPath, tplCopyIntoDirect); err != nil {
-				return nil, fmt.Errorf("copyIntoDirect template: %w", err)
+			// TODO: switch to slices.Chunk once we switch to go1.23
+			for i := 0; i < len(toCopy); i += queryBatchSize {
+				end := i + queryBatchSize
+				if end > len(toCopy) {
+					end = len(toCopy)
+				}
+
+				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, tplCopyIntoDirect); err != nil {
+					return nil, fmt.Errorf("copyIntoDirect template: %w", err)
+				} else {
+					queries = append(queries, query)
+				}
 			}
 		} else {
-			if query, err = RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplMergeInto); err != nil {
-				return nil, fmt.Errorf("mergeInto template: %w", err)
+			for i := 0; i < len(toCopy); i += queryBatchSize {
+				end := i + queryBatchSize
+				if end > len(toCopy) {
+					end = len(toCopy)
+				}
+				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, tplMergeInto); err != nil {
+					return nil, fmt.Errorf("mergeInto template: %w", err)
+				} else {
+					queries = append(queries, query)
+				}
 			}
 		}
 
 		d.cp[b.target.StateKey] = &checkpointItem{
-			Query:    query,
+			Queries:  queries,
 			ToDelete: fullPaths,
 		}
 	}
@@ -458,15 +472,24 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
-		if _, err := db.ExecContext(ctx, item.Query); err != nil {
-			// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
-			// it is okay to skip them in this case
-			if d.cpRecovery {
-				if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
-					continue
-				}
+		var queries = item.Queries
+		if item.Query != "" {
+			if len(queries) != 0 {
+				return nil, fmt.Errorf("checkpoint has both query and queries, this is unexpected")
 			}
-			return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
+			queries = []string{item.Query}
+		}
+		for _, query := range queries {
+			if _, err := db.ExecContext(ctx, query); err != nil {
+				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
+				// it is okay to skip them in this case
+				if d.cpRecovery {
+					if strings.Contains(err.Error(), "PATH_NOT_FOUND") || strings.Contains(err.Error(), "Path does not exist") || strings.Contains(err.Error(), "Table doesn't exist") || strings.Contains(err.Error(), "TABLE_OR_VIEW_NOT_FOUND") {
+						continue
+					}
+				}
+				return nil, fmt.Errorf("query %q failed: %w", query, err)
+			}
 		}
 
 		// Cleanup files.
@@ -474,6 +497,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 
 	d.cpRecovery = false
+
+	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+			return nil, fmt.Errorf("triggering dbt job: %w", err)
+		}
+	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again

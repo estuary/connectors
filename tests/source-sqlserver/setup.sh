@@ -30,7 +30,7 @@ function sql {
     echo "sql> " $@
     echo -e "$@\nGO\n" | docker exec -i \
       ${CONTAINER_NAME} \
-      /opt/mssql-tools/bin/sqlcmd \
+      /opt/mssql-tools18/bin/sqlcmd -C \
       -U ${SQLSERVER_USER} \
       -P ${SQLSERVER_PASSWORD}
 }

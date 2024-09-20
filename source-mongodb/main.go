@@ -20,15 +20,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readconcern"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	mongoDriver "go.mongodb.org/mongo-driver/x/mongo/driver"
-)
-
-const (
-	// Minimum oplog time difference: see the comment on OplogTimeDifference in
-	// oplog.go
-	minOplogTimediffHours   = 24
-	minOplogTimediffSeconds = minOplogTimediffHours * 60 * 60 // 24 hours, in seconds
 )
 
 type resource struct {
@@ -59,17 +53,13 @@ type config struct {
 	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the instance." jsonschema_extras:"order=3"`
 
-	// We still don't have any exposed advanced configurations
-	Advanced      advancedConfig `json:"advanced" jsonschema:"-"`
-	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network." jsonschema_extras:"order=4"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=5"`
 }
 
 type advancedConfig struct {
-	// The default value of -5m is useful for production use cases, but when
-	// running our test suite we don't want to wait 5 minutes, so we use this
-	// configuration in our test suite to disable oplog safety buffer. Note that
-	// this is not exposed to users using the `jsonschema:"-"` stanza.
-	OplogSafetyBuffer string `json:"oplogSafetyBuffer" jsonschema:"-"`
+	ExclusiveCollectionFilter bool `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."`
 }
 
 func (c *config) Validate() error {
@@ -126,7 +116,13 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// a more helpful error message in the event that someone tries to use the
 	// online-archive url instead of the regular mongodb url.
 	if strings.Contains(cfg.Address, "atlas-online-archive") {
-		return nil, fmt.Errorf("The provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+	}
+
+	// Similarly, MongoDB "Atlas SQL" does not support change streams, so our
+	// connector doesn't work with that either.
+	if strings.HasPrefix(cfg.Address, "mongodb://atlas-sql") {
+		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas SQL Interface', which is not supported by this connector. Please use the regular cluster URL instead")
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
@@ -150,8 +146,17 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		}
 	}
 
-	// Create a new client and connect to the server
-	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zstd", "zlib", "snappy"})
+	// Create a new client and connect to the server. "Majority" read concern is set to avoid
+	// reading data during backfills that may be rolled back in uncommon situations. This matches
+	// the behavior of change streams, which only represent data that has been majority committed.
+	// This read concern will overwrite any that is set in the connection string parameter
+	// "readConcernLevel".
+	// TODO(whb): "zstd" is the last option for compression, since it currently results in quite a
+	// bit of memory usage, see https://jira.mongodb.org/browse/GODRIVER-3132. It uses about 1.5x as
+	// much memory as "zlib" or "snappy", but generally shouldn't OOM the connector so it isn't
+	// being completely disabled. We could re-evaluate this priority after
+	// https://github.com/mongodb/mongo-go-driver/pull/1577 is merged and released.
+	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zlib", "snappy", "zstd"}).SetReadConcern(readconcern.Majority())
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -226,10 +231,6 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		}
 	}()
 
-	if _, err = checkOplog(ctx, client); err != nil {
-		return nil, err
-	}
-
 	existingDatabases, err := client.ListDatabaseNames(ctx, bson.D{})
 	if err != nil {
 		return nil, fmt.Errorf("getting list of databases: %w", err)
@@ -279,7 +280,6 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	return &pc.Response_Validated{Bindings: bindings}, nil
 }
 
-// ApplyUpsert applies a new or updated capture to the store.
 func (d *driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }

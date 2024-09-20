@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -104,6 +105,26 @@ func TestSimpleCapture(t *testing.T) {
 }
 
 func TestDeletions(t *testing.T) {
+	// TODO(wgd): We should investigate this further at some point. I have
+	// trouble believing that deletion events straight-up Don't Work, but
+	// I have poked at this for more than an entire work day at this point
+	// and as far as I can tell we're doing things correctly and just not
+	// ever being informed about deletions.
+	//
+	// (Just to be clear since this was an obvious thing to check: It makes
+	// no difference whether we use read times like we currently do, or the
+	// opaque resume tokens supplied by the server. Either way we just never
+	// seem to receive any deletion events.)
+	//
+	// We should revisit this in the future, ideally once we have support for
+	// collection level 'Truncated' and 'Backfill Complete' signals. Because if
+	// we can't get deletions working reliably in the simplest possible test
+	// here, we should probably consider removing deletion handling from the
+	// change streaming path entirely and instead rely on something like a
+	// "re-backfill collection every <period>" feature to ensure that deletions
+	// are captured eventually.
+	t.Skip("Firestore change streaming is unreliable for document deletion")
+
 	var ctx = testContext(t, 10*time.Second)
 	var capture = simpleCapture(t, "docs")
 	var client = testFirestoreClient(ctx, t)
@@ -140,7 +161,7 @@ func TestAddedBindingSameGroup(t *testing.T) {
 		)
 		verifyCapture(ctx, t, capture)
 	})
-	capture.Bindings = append(capture.Bindings, simpleBindings(t, "groups/*/docs")...)
+	capture.Bindings = append(capture.Bindings, simpleBindings("groups/*/docs")...)
 	t.Run("two", func(t *testing.T) {
 		client.Upsert(ctx, t,
 			"users/1/docs/3", `{"data": 3}`,
@@ -157,21 +178,26 @@ func TestManySmallWrites(t *testing.T) {
 	var capture = simpleCapture(t, "users/*/docs")
 	var client = testFirestoreClient(ctx, t)
 
-	go func(ctx context.Context) {
-		for user := 0; user < 10; user++ {
-			for doc := 0; doc < 5; doc++ {
-				var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
-				var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
-				client.Upsert(ctx, t, docName, docData)
-				time.Sleep(100 * time.Millisecond)
-			}
-			if user == 4 {
-				time.Sleep(1500 * time.Millisecond)
-			}
+	for user := 0; user < 5; user++ {
+		for doc := 0; doc < 5; doc++ {
+			var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
+			var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
+			client.Upsert(ctx, t, docName, docData)
+			time.Sleep(100 * time.Millisecond)
 		}
-	}(ctx)
-
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 5; user < 10; user++ {
+		for doc := 0; doc < 5; doc++ {
+			var docName = fmt.Sprintf("users/%d/docs/%d", user, doc)
+			var docData = fmt.Sprintf(`{"user": %d, "doc": %d}`, user, doc)
+			client.Upsert(ctx, t, docName, docData)
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -180,20 +206,24 @@ func TestMultipleWatches(t *testing.T) {
 	var capture = simpleCapture(t, "users/*/docs", "users/*/notes", "users/*/tasks")
 	var client = testFirestoreClient(ctx, t)
 
-	go func(ctx context.Context) {
-		for user := 0; user < 10; user++ {
-			for item := 0; item < 5; item++ {
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
-				client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
-			}
-			if user == 4 {
-				time.Sleep(1500 * time.Millisecond)
-			}
+	for user := 0; user < 5; user++ {
+		for item := 0; item < 5; item++ {
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
 		}
-	}(ctx)
-
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 5; user < 10; user++ {
+		for item := 0; item < 5; item++ {
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/docs/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/notes/%d`, user, item), `{"data": "placeholder"}`)
+			client.Upsert(ctx, t, fmt.Sprintf(`users/%d/tasks/%d`, user, item), `{"data": "placeholder"}`)
+		}
+	}
+	time.Sleep(2 * time.Second)
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -203,13 +233,13 @@ func TestBindingDeletion(t *testing.T) {
 	for idx := 0; idx < 20; idx++ {
 		client.Upsert(ctx, t, fmt.Sprintf("docs/%d", idx), `{"data": "placeholder"}`)
 	}
-	time.Sleep(1 * time.Second)
+	time.Sleep(2 * time.Second)
 
 	var capture = simpleCapture(t, "docs")
 	t.Run("one", func(t *testing.T) { verifyCapture(ctx, t, capture) })
-	capture.Bindings = simpleBindings(t, "other")
+	capture.Bindings = simpleBindings("other")
 	t.Run("two", func(t *testing.T) { verifyCapture(ctx, t, capture) })
-	capture.Bindings = simpleBindings(t, "docs")
+	capture.Bindings = simpleBindings("docs")
 	t.Run("three", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
@@ -223,7 +253,85 @@ func TestDiscovery(t *testing.T) {
 	client.Upsert(ctx, t, "users/2/docs/3", `{"foo": "baz", "asdf": 789}`)
 	client.Upsert(ctx, t, "users/2/docs/4", `{"foo": "baz", "asdf": 1000}`)
 	time.Sleep(1 * time.Second)
-	simpleCapture(t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
+	var cs = simpleCapture(t)
+	cs.EndpointSpec.(*config).Advanced.ExtraCollections = []string{"flow_source_tests/*/nonexistent/*/extra/*/collection"}
+	cs.VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta("flow_source_tests")))
+}
+
+func TestNestedCollections(t *testing.T) {
+	var ctx = testContext(t, 300*time.Second)
+	var client = testFirestoreClient(ctx, t)
+	var capture = simpleCapture(t, "nested_users", "nested_users/*/docs")
+
+	client.Upsert(ctx, t, "nested_users/B1", `{"name": "Alice"}`)
+	client.Upsert(ctx, t, "nested_users/B2", `{"name": "Bob"}`)
+	client.Upsert(ctx, t, "nested_users/B1/docs/1", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "nested_users/B1/docs/2", `{"foo": "bar", "asdf": 456}`)
+	client.Upsert(ctx, t, "nested_users/B2/docs/3", `{"foo": "baz", "asdf": 789}`)
+	client.Upsert(ctx, t, "nested_users/B2/docs/4", `{"foo": "baz", "asdf": 1000}`)
+	t.Run("init", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	client.Upsert(ctx, t, "nested_users/R3", `{"name": "Carol"}`)
+	client.Upsert(ctx, t, "nested_users/R4", `{"name": "Dave"}`)
+	client.Upsert(ctx, t, "nested_users/R3/docs/5", `{"foo": "bar", "asdf": 123}`)
+	client.Upsert(ctx, t, "nested_users/R3/docs/6", `{"foo": "bar", "asdf": 456}`)
+	client.Upsert(ctx, t, "nested_users/R4/docs/7", `{"foo": "baz", "asdf": 789}`)
+	client.Upsert(ctx, t, "nested_users/R4/docs/8", `{"foo": "baz", "asdf": 1000}`)
+	t.Run("repl", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+}
+
+func TestRestartCursorUpdates(t *testing.T) {
+	var ctx = testContext(t, 120*time.Second)
+	var capture = simpleCapture(t, "users/*/docs")
+	var client = testFirestoreClient(ctx, t)
+
+	var res resource
+	require.NoError(t, json.Unmarshal(capture.Bindings[0].ResourceConfigJson, &res))
+	res.RestartCursorPath = "/monotonic_id"
+	var resJSON, err = json.Marshal(res)
+	require.NoError(t, err)
+	capture.Bindings[0].ResourceConfigJson = resJSON
+
+	restartCursorPendingInterval = 1 * time.Millisecond
+
+	var timestampBase = time.Date(2024, 05, 28, 00, 00, 00, 00, time.UTC)
+	var root = client.Conn.Collection("flow_source_tests").Doc(strings.ReplaceAll(t.Name(), "/", "_"))
+	for user := 1; user < 3; user++ {
+		for doc := 0; doc < 10; doc++ {
+			root.Collection("users").Doc(strconv.Itoa(user)).Collection("docs").Doc(strconv.Itoa(doc)).Create(ctx, map[string]any{
+				"monotonic_id": timestampBase.Add(time.Duration(user*10+doc) * time.Minute),
+				"user":         user,
+				"doc":          doc,
+			})
+		}
+	}
+	time.Sleep(3 * time.Second)
+	t.Run("init", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	for user := 3; user < 10; user++ {
+		for doc := 0; doc < 10; doc++ {
+			root.Collection("users").Doc(strconv.Itoa(user)).Collection("docs").Doc(strconv.Itoa(doc)).Create(ctx, map[string]any{
+				"monotonic_id": timestampBase.Add(time.Duration(user*10+doc) * time.Minute),
+				"user":         user,
+				"doc":          doc,
+			})
+		}
+	}
+	time.Sleep(3 * time.Second)
+	t.Run("repl", func(t *testing.T) { verifyCapture(ctx, t, capture) })
+
+	var checkpoint captureState
+	require.NoError(t, json.Unmarshal(capture.Checkpoint, &checkpoint))
+	for _, resourceState := range checkpoint.Resources {
+		resourceState.Inconsistent = true
+		resourceState.RestartCursorValue = "2024-05-28T00:49:00Z"
+		resourceState.Backfill.StartAfter = time.Now().Add(100 * time.Millisecond)
+	}
+	checkpointJSON, err := json.Marshal(&checkpoint)
+	require.NoError(t, err)
+	capture.Checkpoint = checkpointJSON
+
+	t.Run("restart", func(t *testing.T) { verifyCapture(ctx, t, capture) })
 }
 
 func testContext(t testing.TB, duration time.Duration) context.Context {
@@ -255,13 +363,13 @@ func simpleCapture(t testing.TB, names ...string) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       new(driver),
 		EndpointSpec: endpointSpec,
-		Bindings:     simpleBindings(t, names...),
+		Bindings:     simpleBindings(names...),
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   DefaultSanitizers,
 	}
 }
 
-func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
+func simpleBindings(names ...string) []*flow.CaptureSpec_Binding {
 	var bindings []*flow.CaptureSpec_Binding
 	for _, name := range names {
 		var path = "flow_source_tests/*/" + name
@@ -281,7 +389,7 @@ func simpleBindings(t testing.TB, names ...string) []*flow.CaptureSpec_Binding {
 func verifyCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
 	var captureCtx, cancelCapture = context.WithCancel(ctx)
-	const shutdownDelay = 1000 * time.Millisecond
+	const shutdownDelay = 2000 * time.Millisecond
 	var shutdownWatchdog *time.Timer
 	cs.Capture(captureCtx, t, func(data json.RawMessage) {
 		if shutdownWatchdog == nil {
@@ -297,8 +405,8 @@ func verifyCapture(ctx context.Context, t testing.TB, cs *st.CaptureSpec) {
 }
 
 type firestoreClient struct {
-	inner  *firestore.Client
-	prefix string
+	Conn   *firestore.Client
+	Prefix string
 }
 
 func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
@@ -316,14 +424,14 @@ func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 
 	var prefix = fmt.Sprintf("flow_source_tests/%s", strings.ReplaceAll(t.Name(), "/", "_"))
 	var tfc = &firestoreClient{
-		inner:  client,
-		prefix: prefix + "/",
+		Conn:   client,
+		Prefix: prefix + "/",
 	}
 	t.Cleanup(func() {
-		tfc.deleteCollectionRecursive(context.Background(), t, tfc.inner.Collection("flow_source_tests"))
-		tfc.inner.Close()
+		tfc.deleteCollectionRecursive(context.Background(), t, tfc.Conn.Collection("flow_source_tests"))
+		tfc.Conn.Close()
 	})
-	tfc.deleteCollectionRecursive(ctx, t, tfc.inner.Collection("flow_source_tests"))
+	tfc.deleteCollectionRecursive(ctx, t, tfc.Conn.Collection("flow_source_tests"))
 
 	_, err = client.Batch().Set(client.Doc(prefix), map[string]interface{}{"testName": t.Name()}).Commit(ctx)
 	require.NoError(t, err)
@@ -333,7 +441,7 @@ func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 
 func (c *firestoreClient) DeleteCollection(ctx context.Context, t testing.TB, collection string) {
 	t.Helper()
-	c.deleteCollectionRecursive(ctx, t, c.inner.Collection(c.prefix+collection))
+	c.deleteCollectionRecursive(ctx, t, c.Conn.Collection(c.Prefix+collection))
 }
 
 func (c *firestoreClient) deleteCollectionRecursive(ctx context.Context, t testing.TB, ref *firestore.CollectionRef) {
@@ -368,12 +476,12 @@ func (c *firestoreClient) Upsert(ctx context.Context, t testing.TB, docKVs ...st
 	}
 	log.WithField("count", len(names)).Trace("upserting test documents")
 
-	var wb = c.inner.Batch()
+	var wb = c.Conn.Batch()
 	for idx := range values {
 		var fields = make(map[string]interface{})
 		var err = json.Unmarshal(json.RawMessage(values[idx]), &fields)
 		require.NoError(t, err)
-		wb = wb.Set(c.inner.Doc(c.prefix+names[idx]), fields, firestore.MergeAll)
+		wb = wb.Set(c.Conn.Doc(c.Prefix+names[idx]), fields, firestore.MergeAll)
 	}
 	var _, err = wb.Commit(ctx)
 	require.NoError(t, err)
@@ -383,9 +491,9 @@ func (c *firestoreClient) Delete(ctx context.Context, t testing.TB, names ...str
 	t.Helper()
 	log.WithField("count", len(names)).Debug("deleting test documents")
 
-	var wb = c.inner.Batch()
+	var wb = c.Conn.Batch()
 	for _, docName := range names {
-		wb = wb.Delete(c.inner.Doc(c.prefix + docName))
+		wb = wb.Delete(c.Conn.Doc(c.Prefix + docName))
 	}
 	var _, err = wb.Commit(ctx)
 	require.NoError(t, err)

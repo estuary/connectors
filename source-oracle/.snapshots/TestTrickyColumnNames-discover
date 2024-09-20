@@ -1,0 +1,265 @@
+Binding 0:
+{
+    "recommended_name": "flow_test_logminer_t39256824",
+    "resource_config_json": {
+      "namespace": "FLOW_TEST_LOGMINER",
+      "stream": "T39256824"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "FLOW_TEST_LOGMINERT39256824": {
+          "type": "object",
+          "required": [
+            "`Meta/'wtf'~ID`"
+          ],
+          "$anchor": "FLOW_TEST_LOGMINERT39256824",
+          "properties": {
+            "DATA": {
+              "description": "(source type: VARCHAR2)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "`Meta/'wtf'~ID`": {
+              "type": "string",
+              "format": "integer",
+              "description": "(source type: non-nullable NUMBER)"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#FLOW_TEST_LOGMINERT39256824",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-oracle/oracle-source",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "scn": {
+                      "type": "integer",
+                      "description": "SCN of this event"
+                    },
+                    "row_id": {
+                      "type": "string",
+                      "description": "ROWID of the document"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table",
+                    "row_id"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#FLOW_TEST_LOGMINERT39256824"
+        }
+      ]
+    },
+    "key": [
+      "/`Meta~1'wtf'~0ID`"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "flow_test_logminer_t42531495",
+    "resource_config_json": {
+      "namespace": "FLOW_TEST_LOGMINER",
+      "stream": "T42531495"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "FLOW_TEST_LOGMINERT42531495": {
+          "type": "object",
+          "required": [
+            "table"
+          ],
+          "$anchor": "FLOW_TEST_LOGMINERT42531495",
+          "properties": {
+            "DATA": {
+              "description": "(source type: VARCHAR2)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "table": {
+              "type": "string",
+              "format": "integer",
+              "description": "(source type: non-nullable NUMBER)"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#FLOW_TEST_LOGMINERT42531495",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-oracle/oracle-source",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "scn": {
+                      "type": "integer",
+                      "description": "SCN of this event"
+                    },
+                    "row_id": {
+                      "type": "string",
+                      "description": "ROWID of the document"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table",
+                    "row_id"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#FLOW_TEST_LOGMINERT42531495"
+        }
+      ]
+    },
+    "key": [
+      "/table"
+    ]
+  }
+

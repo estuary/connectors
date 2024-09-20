@@ -230,13 +230,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(*cfg)
-
-			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
-			require.NoError(t, err)
-			defer client.Close()
-
-			var actual = client.PreReqs(ctx).Unwrap()
+			var actual = preReqs(ctx, tt.cfg(*cfg), "").Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

@@ -1,0 +1,81 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "enum": [
+                "Private App Credentials"
+              ],
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "title": "API Key"
+        },
+        "stop_date": {
+          "default": "2010-01-01T00:00:00Z",
+          "description": "Replication Stop Date. Records will only be considered for backfilling before the stop_date, similar to a start date",
+          "format": "date-time",
+          "title": "Stop Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

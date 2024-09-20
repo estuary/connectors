@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -21,12 +22,6 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		return nil, err
 	}
 
-	// If there are zero tables (or there's one table but it's the watermarks table) log a warning.
-	var _, watermarksPresent = tables[db.WatermarksTable()]
-	if len(tables) == 0 || len(tables) == 1 && watermarksPresent {
-		logrus.Warn("no tables discovered; note that tables in system schemas will not be discovered and must be added manually if desired")
-	}
-
 	// Shared schema of the embedded "source" property.
 	var sourceSchema = (&jsonschema.Reflector{
 		ExpandedStruct:            true,
@@ -34,6 +29,15 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		AllowAdditionalProperties: true,
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
+
+	if db.HistoryMode() {
+		sourceSchema.Extras = map[string]interface{}{
+			"reduce": map[string]interface{}{
+				"strategy":    "lastWriteWins",
+				"associative": false,
+			},
+		}
+	}
 
 	var catalog []*pc.Response_Discovered_Binding
 	for _, table := range tables {
@@ -61,7 +65,18 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			continue
 		}
 
+		// Don't discover materialized tables, since that is almost never what is intended, and
+		// causes problems with synthetic projection names. A column of "flow_published_at" is used
+		// as a sentinel for guessing if the table is from a materialization or not. Although not
+		// 100% accurate (the user could exclude this field), it will work in the vast majority of
+		// cases.
+		if slices.Contains(table.ColumnNames, "flow_published_at") {
+			logEntry.Info("excluding table from catalog discovery because it contains the column 'flow_published_at' and is likely a materialized table")
+			continue
+		}
+
 		// The anchor by which we'll reference the table schema.
+		//lint:ignore SA1019 We don't need the title-casing to handle punctuation properly so strings.Title() is sufficient
 		var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
 
 		// Build `properties` schemas for each table column.
@@ -75,12 +90,19 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 					"error": err,
 					"type":  column.DataType,
 				}).Debug("error translating column type to JSON schema")
-				properties[column.Name] = &jsonschema.Schema{
-					Description: fmt.Sprintf("using catch-all schema: %v", err),
+				jsonType = &jsonschema.Schema{
+					Description: fmt.Sprintf("using catch-all schema (%v)", err),
 				}
-			} else {
-				properties[column.Name] = jsonType
 			}
+			if jsonType.Description != "" {
+				jsonType.Description += " "
+			}
+			var nullabilityDescription = ""
+			if !column.IsNullable {
+				nullabilityDescription = "non-nullable "
+			}
+			jsonType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, column.DataType)
+			properties[column.Name] = jsonType
 		}
 
 		// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline
@@ -206,6 +228,11 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		})
 
 	}
+
+	if len(catalog) == 0 {
+		logrus.Warn("no tables discovered; note that tables in system schemas will not be discovered and must be added manually if desired")
+	}
+
 	return catalog, err
 }
 

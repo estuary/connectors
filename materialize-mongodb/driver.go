@@ -206,6 +206,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	}
 
 	return &transactor{
+		cfg:      &cfg,
 		client:   client,
 		bindings: bindings,
 	}, &pm.Response_Opened{}, nil

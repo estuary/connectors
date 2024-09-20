@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Issue Transitions",
+  "type": "object",
+  "required": ["id", "issueId"],
+  "properties": {
+    "id": {
+      "description": "Unique identifier for the issue transition",
+      "type": ["string"]
+    },
+    "issueId": {
+      "description": "Identifier of the issue associated with the transition",
+      "type": ["string"]
+    }
+  },
+  "additionalProperties": true
+}

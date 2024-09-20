@@ -13,28 +13,54 @@ Binding 0:
           "$anchor": "TestSecondaryindexdiscovery_nonunique_index_g22906",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "k1": {
+              "description": "(source type: int4)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "k2": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "k3": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -106,9 +132,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

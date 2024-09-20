@@ -246,13 +246,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(cfg)
-
-			client, err := cfg.client(context.Background())
-			require.NoError(t, err)
-			defer client.Close()
-
-			require.Equal(t, tt.want, client.PreReqs(context.Background()).Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(cfg), "testing").Unwrap())
 		})
 	}
 }

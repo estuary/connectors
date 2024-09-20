@@ -28,6 +28,12 @@
         "default": "postgres",
         "order": 3
       },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": false,
+        "order": 4
+      },
       "advanced": {
         "properties": {
           "publicationName": {
@@ -76,6 +82,12 @@
             "type": "array",
             "title": "Discovery Schema Selection",
             "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
+          },
+          "min_backfill_xid": {
+            "type": "string",
+            "title": "Minimum Backfill XID",
+            "description": "Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases.",
+            "pattern": "^[0-9]+$"
           }
         },
         "additionalProperties": false,
@@ -121,7 +133,8 @@
       "address",
       "user",
       "password",
-      "database"
+      "database",
+      "historyMode"
     ],
     "title": "PostgreSQL Connection"
   },
@@ -145,12 +158,14 @@
       "namespace": {
         "type": "string",
         "title": "Schema",
-        "description": "The schema (namespace) in which the table resides."
+        "description": "The schema (namespace) in which the table resides.",
+        "readOnly": true
       },
       "stream": {
         "type": "string",
         "title": "Table Name",
-        "description": "The name of the table to be captured."
+        "description": "The name of the table to be captured.",
+        "readOnly": true
       }
     },
     "type": "object",

@@ -4,38 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export SNOWFLAKE_HOST="${SNOWFLAKE_HOST}"
-export SNOWFLAKE_ACCOUNT="${SNOWFLAKE_ACCOUNT}"
-export SNOWFLAKE_DATABASE="${SNOWFLAKE_DATABASE}"
-export SNOWFLAKE_SCHEMA="${SNOWFLAKE_SCHEMA}"
-export SNOWFLAKE_WAREHOUSE="${SNOWFLAKE_WAREHOUSE}"
-
-export SNOWFLAKE_AUTH_TYPE="${SNOWFLAKE_AUTH_TYPE}"
-# if auth type is user_password
-export SNOWFLAKE_USER="${SNOWFLAKE_USER:-}"
-export SNOWFLAKE_PASSWORD="${SNOWFLAKE_PASSWORD:-}"
-if [ -n "${SNOWFLAKE_PRIVATE_KEY:-}" ]; then 
-  # if auth type is jwt
-  export SNOWFLAKE_PRIVATE_KEY="$(cat ${SNOWFLAKE_PRIVATE_KEY:-} | jq -sR . | sed -e 's/^"//' -e 's/"$//')"
-fi
-
-config_json_template='{
-   "host":      "$SNOWFLAKE_HOST",
-   "account":   "$SNOWFLAKE_ACCOUNT",
-   "database":  "$SNOWFLAKE_DATABASE",
-   "schema":    "$SNOWFLAKE_SCHEMA",
-   "warehouse": "$SNOWFLAKE_WAREHOUSE",
-   "credentials": {
-     "auth_type": "$SNOWFLAKE_AUTH_TYPE",
-     "user": "$SNOWFLAKE_USER",
-     "password": "$SNOWFLAKE_PASSWORD",
-     "private_key": "$SNOWFLAKE_PRIVATE_KEY"
-   },
-   "advanced": {
-      "updateDelay": "0s"
-    }
-}'
-
 resources_json_template='[
   {
     "resource": {
@@ -101,8 +69,36 @@ resources_json_template='[
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "unsigned_bigint"
+    },
+    "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
-export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export SNOWFLAKE_HOST="$(echo $CONNECTOR_CONFIG | jq -r .host)"
+export SNOWFLAKE_ACCOUNT="$(echo $CONNECTOR_CONFIG | jq -r .account)"
+export SNOWFLAKE_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
+export SNOWFLAKE_SCHEMA="$(echo $CONNECTOR_CONFIG | jq -r .schema)"
+export SNOWFLAKE_WAREHOUSE="$(echo $CONNECTOR_CONFIG | jq -r .warehouse)"
+
+export SNOWFLAKE_AUTH_TYPE="$(echo $CONNECTOR_CONFIG | jq -r .credentials.auth_type)"
+# if auth type is user_password
+export SNOWFLAKE_USER="$(echo $CONNECTOR_CONFIG | jq -r .credentials.user)"
+if [ "$SNOWFLAKE_AUTH_TYPE" == "jwt" ]; then 
+  # if auth type is jwt
+  export SNOWFLAKE_PRIVATE_KEY="$(echo $CONNECTOR_CONFIG | jq -r .credentials.private_key)"
+else
+  export SNOWFLAKE_PASSWORD="$(echo $CONNECTOR_CONFIG | jq -r .credentials.password)"
+fi
+
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"

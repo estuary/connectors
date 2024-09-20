@@ -15,16 +15,40 @@ Binding 0:
           "$anchor": "TestUSERS",
           "properties": {
             "data": {
-              "type": "string"
+              "type": "string",
+              "description": "(source type: non-nullable text)"
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -96,9 +120,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

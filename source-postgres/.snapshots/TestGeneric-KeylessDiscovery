@@ -13,21 +13,29 @@ Binding 0:
           "$anchor": "TestGeneric_keylessdiscovery_t32386",
           "properties": {
             "a": {
+              "description": "(source type: int4)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "b": {
+              "description": "(source type: varchar)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "c": {
-              "type": "number"
+              "format": "number",
+              "description": "(source type: non-nullable float4)",
+              "type": [
+                "number",
+                "string"
+              ]
             },
             "d": {
+              "description": "(source type: varchar)",
               "type": [
                 "string",
                 "null"
@@ -38,6 +46,28 @@ Binding 0:
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -109,9 +139,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

@@ -82,21 +82,21 @@ Big Schema Changed Types Constraints:
 {"Field":"boolField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BOOLEAN' but endpoint type 'INTEGER' is required by its schema '{ type: [integer] }'"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"intField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'intField' is already being materialized as endpoint type 'NUMBER' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"intField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'intField' is already being materialized as endpoint type 'NUMBER' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"numField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'numField' is already being materialized as endpoint type 'FLOAT' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
-{"Field":"objField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'objField' is already being materialized as endpoint type 'VARIANT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
-{"Field":"stringDateField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateField' is already being materialized as endpoint type 'DATE' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
-{"Field":"stringDateTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'TIMESTAMP_NTZ' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"objField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'objField' is already being materialized as endpoint type 'VARIANT' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateField' is already being materialized as endpoint type 'DATE' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'TIMESTAMP_LTZ' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'TEXT' but endpoint type 'INTEGER' is required by its schema '{ type: [integer] }'"}
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringIntegerField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIntegerField' is already being materialized as endpoint type 'NUMBER' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringIntegerField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIntegerField' is already being materialized as endpoint type 'NUMBER' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -104,12 +104,12 @@ Big Schema Changed Types Constraints:
 {"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringNumberField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'FLOAT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringNumberField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'FLOAT' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUint32Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'NUMBER' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
-{"Field":"stringUint64Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'NUMBER' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUint32Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'NUMBER' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUint64Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'NUMBER' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -119,14 +119,14 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"ARRAYFIELD","Nullable":"NO","Type":"VARIANT"}
 {"Name":"BOOLFIELD","Nullable":"NO","Type":"BOOLEAN"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"INTFIELD","Nullable":"NO","Type":"NUMBER"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
 {"Name":"MULTIPLEFIELD","Nullable":"NO","Type":"VARIANT"}
 {"Name":"NUMFIELD","Nullable":"NO","Type":"FLOAT"}
 {"Name":"OBJFIELD","Nullable":"NO","Type":"VARIANT"}
 {"Name":"STRINGDATEFIELD","Nullable":"NO","Type":"DATE"}
-{"Name":"STRINGDATETIMEFIELD","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"STRINGDATETIMEFIELD","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"STRINGDURATIONFIELD","Nullable":"NO","Type":"TEXT"}
 {"Name":"STRINGEMAILFIELD","Nullable":"NO","Type":"TEXT"}
 {"Name":"STRINGFIELD","Nullable":"NO","Type":"TEXT"}
@@ -157,14 +157,14 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"ARRAYFIELD","Nullable":"YES","Type":"VARIANT"}
 {"Name":"BOOLFIELD","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"INTFIELD","Nullable":"YES","Type":"NUMBER"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
 {"Name":"MULTIPLEFIELD","Nullable":"YES","Type":"VARIANT"}
 {"Name":"NUMFIELD","Nullable":"YES","Type":"FLOAT"}
 {"Name":"OBJFIELD","Nullable":"YES","Type":"VARIANT"}
 {"Name":"STRINGDATEFIELD","Nullable":"YES","Type":"DATE"}
-{"Name":"STRINGDATETIMEFIELD","Nullable":"YES","Type":"TIMESTAMP_NTZ"}
+{"Name":"STRINGDATETIMEFIELD","Nullable":"YES","Type":"TIMESTAMP_LTZ"}
 {"Name":"STRINGDURATIONFIELD","Nullable":"YES","Type":"TEXT"}
 {"Name":"STRINGEMAILFIELD","Nullable":"YES","Type":"TEXT"}
 {"Name":"STRINGFIELD","Nullable":"YES","Type":"TEXT"}
@@ -234,7 +234,7 @@ Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 {"Name":"ARRAYFIELD","Nullable":"NO","Type":"VARIANT"}
 {"Name":"BOOLFIELD","Nullable":"NO","Type":"NUMBER"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"INTFIELD","Nullable":"NO","Type":"TEXT"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
 {"Name":"MULTIPLEFIELD","Nullable":"NO","Type":"VARIANT"}
@@ -272,7 +272,7 @@ Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 add a single field:
 {"Name":"ADDEDOPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
@@ -286,7 +286,7 @@ add a single field:
 
 remove a single optional field:
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
@@ -300,7 +300,7 @@ remove a single optional field:
 
 remove a single required field:
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
@@ -316,7 +316,7 @@ add and remove many fields:
 {"Name":"ADDEDOPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
 {"Name":"ADDEDREQUIREDSTRING","Nullable":"YES","Type":"TEXT"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
 {"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
@@ -335,7 +335,7 @@ Challenging Field Names Materialized Columns:
 {"Name":"123","Nullable":"YES","Type":"TEXT"}
 {"Name":"123startsWithDigits","Nullable":"YES","Type":"TEXT"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_NTZ"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"VALUE_WITH_SEPARATED_WORDS","Nullable":"YES","Type":"TEXT"}
 {"Name":"_ID","Nullable":"NO","Type":"TEXT"}
 {"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"TEXT"}

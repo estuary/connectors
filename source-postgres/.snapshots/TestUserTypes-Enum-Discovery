@@ -15,9 +15,11 @@ Binding 0:
           "$anchor": "TestUsertypes_enum_64812435",
           "properties": {
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "value": {
+              "description": "(source type: enum)",
               "type": [
                 "string",
                 "null"
@@ -28,6 +30,28 @@ Binding 0:
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -99,9 +123,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

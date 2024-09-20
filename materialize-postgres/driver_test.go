@@ -14,14 +14,15 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func testConfig() *config {
 	return &config{
 		Address:  "localhost:5432",
-		User:     "postgres",
-		Password: "postgres",
+		User:     "flow",
+		Password: "flow",
+		Database: "flow",
 		Schema:   "public",
 	}
 }
@@ -48,7 +49,7 @@ func TestValidateAndApply(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			sch, err := sql.StdGetSchema(ctx, db, "postgres", resourceConfig.Schema, resourceConfig.Table)
+			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
 			require.NoError(t, err)
 
 			return sch
@@ -139,17 +140,9 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(*cfg)
-
-			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
-			require.NoError(t, err)
-			defer client.Close()
-
-			require.Equal(t, tt.want, client.PreReqs(context.Background()).Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(*cfg), "testing").Unwrap())
 		})
 	}
 }

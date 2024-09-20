@@ -1,0 +1,87 @@
+---
+tap_stream_id: custom_collections
+replication_key: updated_at
+replication_method: INCREMENTAL
+key_properties:
+  - id
+stream: custom_collections
+metadata:
+  - breadcrumb:
+      - properties
+      - body_html
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - handle
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - image
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - published
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - published_at
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - published_scope
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - sort_order
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - template_suffix
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - title
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - updated_at
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - admin_graphql_api_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id
+      valid-replication-keys:
+        - updated_at

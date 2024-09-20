@@ -16,12 +16,9 @@ import (
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/google/uuid"
-	"github.com/jackc/pgconn"
-	"github.com/jackc/pgtype"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sirupsen/logrus"
 )
 
@@ -88,23 +85,25 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Address     string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database    string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
+	Advanced    advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
-	PublicationName   string   `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
-	SlotName          string   `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
-	WatermarksTable   string   `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	SkipBackfills     string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	SSLMode           string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	DiscoverSchemas   []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
+	PublicationName    string   `json:"publicationName,omitempty" jsonschema:"default=flow_publication,description=The name of the PostgreSQL publication to replicate from."`
+	SlotName           string   `json:"slotName,omitempty" jsonschema:"default=flow_slot,description=The name of the PostgreSQL replication slot to replicate from."`
+	WatermarksTable    string   `json:"watermarksTable,omitempty" jsonschema:"default=public.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	SkipBackfills      string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize  int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	SSLMode            string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	DiscoverSchemas    []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
+	MinimumBackfillXID string   `json:"min_backfill_xid,omitempty" jsonschema:"title=Minimum Backfill XID,description=Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases." jsonschema_extras:"pattern=^[0-9]+$"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -118,6 +117,20 @@ func (c *Config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	// Connection poolers like pgbouncer or the Supabase one are not supported. They will silently
+	// ignore the `replication=database` option, meaning that captures can never be successful, and
+	// they can introduce other weird failure modes which aren't worth trying to fix given that core
+	// incompatibility.
+	//
+	// It might be useful to add a generic "are we connected via a pooler" heuristic if we can figure
+	// one out. Until then all we can do is check for specific address patterns that match common ones
+	// we see people trying to use. Even once we have a generic check this is probably still useful,
+	// since it lets us name the specific thing they're using and give instructions for precisely how
+	// to get the correct address instead.
+	if strings.HasSuffix(c.Address, ".pooler.supabase.com:6543") || strings.HasSuffix(c.Address, ".pooler.supabase.com") {
+		return cerrors.NewUserError(nil, fmt.Sprintf("address must be a direct connection: address %q is using the Supabase connection pooler, consult go.estuary.dev/supabase-direct-address for details", c.Address))
 	}
 
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
@@ -205,10 +218,16 @@ func configSchema() json.RawMessage {
 }
 
 type postgresDatabase struct {
-	config       *Config
-	conn         *pgx.Conn
-	explained    map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
-	includeTxIDs map[string]bool     // Tracks which tables should have XID properties in their replication metadata
+	config          *Config
+	conn            *pgx.Conn
+	discovery       map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
+	explained       map[sqlcapture.StreamID]struct{}                  // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	includeTxIDs    map[sqlcapture.StreamID]bool                      // Tracks which tables should have XID properties in their replication metadata
+	tablesPublished map[sqlcapture.StreamID]bool                      // Tracks which tables are part of the configured publication
+}
+
+func (db *postgresDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
 }
 
 func (db *postgresDatabase) connect(ctx context.Context) error {
@@ -244,6 +263,9 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
+	if err := registerDatatypeTweaks(conn.TypeMap()); err != nil {
+		return err
+	}
 	db.conn = conn
 	return nil
 }
@@ -263,36 +285,6 @@ func (db *postgresDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/loc/0", "/_meta/source/loc/1", "/_meta/source/loc/2"}
 }
 
-func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
-	switch key := key.(type) {
-	case [16]uint8:
-		var id, err = uuid.FromBytes(key[:])
-		if err != nil {
-			return nil, fmt.Errorf("error parsing uuid: %w", err)
-		}
-		return id.String(), nil
-	case time.Time:
-		return key.Format(sortableRFC3339Nano), nil
-	case pgtype.Numeric:
-		return encodePgNumericKeyFDB(key)
-	default:
-		return key, nil
-	}
-}
-
-func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
-	switch t := t.(type) {
-	case tuple.Tuple:
-		if d := maybeDecodePgNumericTuple(t); d != nil {
-			return d, nil
-		}
-
-		return nil, errors.New("failed in decoding the fdb tuple")
-	default:
-		return t, nil
-	}
-}
-
 func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
 	if db.config.Advanced.SkipBackfills != "" {
 		// This repeated splitting is a little inefficient, but this check is done at
@@ -308,7 +300,7 @@ func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
 
 func (db *postgresDatabase) RequestTxIDs(schema, table string) {
 	if db.includeTxIDs == nil {
-		db.includeTxIDs = make(map[string]bool)
+		db.includeTxIDs = make(map[sqlcapture.StreamID]bool)
 	}
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }

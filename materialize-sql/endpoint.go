@@ -19,12 +19,6 @@ type Client interface {
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
 
-	// PreReqs performs verification checks that the provided configuration can be used to interact
-	// with the endpoint to the degree required by the connector, to as much of an extent as
-	// possible. The returned PrereqErr can include multiple separate errors if it possible to
-	// determine that there is more than one issue that needs corrected.
-	PreReqs(ctx context.Context) *PrereqErr
-
 	// InfoSchema returns a populated *boilerplate.InfoSchema containing the state of the actual
 	// materialized tables in the schemas referenced by the resourcePaths. It doesn't necessarily
 	// need to include all tables in the entire destination system, but must include all tables in
@@ -48,6 +42,20 @@ type Client interface {
 
 	// Close is called to free up any resources held by the Client.
 	Close()
+}
+
+// SchemaManager is an optional interface that destinations can implement if they support schemas
+// and their automatic creation.
+type SchemaManager interface {
+	// ListSchemas returns a list of all existing schemas, with their names as-reported by the
+	// destination.
+	ListSchemas(ctx context.Context) ([]string, error)
+
+	// Create schema creates a schema. The schemaName will have already had any dialect-specific
+	// transformations applied to it (ex: replacing special characters with underscores) via
+	// TableLocator, but it will not have identifier quoting applied, and identifier quoting must be
+	// handled by the caller if needed.
+	CreateSchema(ctx context.Context, schemaName string) error
 }
 
 // Resource is a driver-provided type which represents the SQL resource

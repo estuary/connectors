@@ -12,7 +12,7 @@ on:
 
 jobs:
   build_base_image:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v2
         with:
@@ -63,7 +63,7 @@ jobs:
           tags: ghcr.io/estuary/base-image:dev,ghcr.io/estuary/base-image:${{ steps.prep.outputs.version }}
 
   build_connectors:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-24.04
     needs: build_base_image
     strategy:
       fail-fast: false
@@ -71,10 +71,12 @@ jobs:
         connector:
           - source-alpaca
           - source-bigquery-batch
+          - source-dropbox
           - source-dynamodb
           - source-firestore
           - source-gcs
           - source-google-drive
+          - source-google-pubsub
           - source-hello-world
           - source-http-file
           - source-http-ingest
@@ -83,6 +85,7 @@ jobs:
           - source-mongodb
           - source-mysql
           - source-mysql-batch
+          - source-oracle
           - source-postgres
           - source-postgres-batch
           - source-redshift-batch
@@ -91,11 +94,14 @@ jobs:
           - source-snowflake
           - source-sqlserver
           - source-test
+          - source-azure-blob-storage
           - materialize-bigquery
           - materialize-databricks
           - materialize-dynamodb
           - materialize-elasticsearch
           - materialize-firebolt
+          - materialize-gcs-csv
+          - materialize-gcs-parquet
           - materialize-google-pubsub
           - materialize-google-sheets
           - materialize-mongodb
@@ -105,6 +111,8 @@ jobs:
           - materialize-postgres
           - materialize-redshift
           - materialize-rockset
+          - materialize-s3-csv
+          - materialize-s3-iceberg
           - materialize-s3-parquet
           - materialize-snowflake
           - materialize-starburst
@@ -140,7 +148,6 @@ jobs:
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
       - name: Set up Cloud SDK
-        if: matrix.connector == 'source-gcs' || matrix.python
         uses: google-github-actions/setup-gcloud@v0
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
@@ -175,6 +182,7 @@ jobs:
             "source-mongodb"
             ]'), matrix.connector)
         run: |
+          set +e # Show logs even if startup fails
           docker compose --file ${{ matrix.connector }}/docker-compose.yaml up --wait
           docker logs ${{ matrix.connector }}-db-1
 
@@ -251,6 +259,12 @@ jobs:
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
+      - name: Install duckdb
+        if: matrix.connector == 'materialize-motherduck' || matrix.connector == 'materialize-s3-iceberg'
+        uses: opt-nc/setup-duckdb-action@v1.0.7
+        with:
+          version: v0.10.3
+
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
@@ -260,17 +274,17 @@ jobs:
               "materialize-pinecone",
               "materialize-postgres",
               "materialize-mysql",
-              "materialize-s3-parquet",
               "materialize-sqlserver",
-              "materialize-mongodb"
+              "materialize-mongodb",
+              "materialize-motherduck",
+              "materialize-snowflake",
+              "materialize-databricks",
+              "materialize-bigquery",
+              "materialize-redshift",
+              "materialize-s3-iceberg"
             ]'), matrix.connector)
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-          PINECONE_API_KEY: ${{ secrets.PINECONE_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          PINECONE_INDEX: ${{ vars.PINECONE_INDEX }}
-          PINECONE_PROJECT_ID: ${{ vars.PINECONE_PROJECT_ID }}
-          PINECONE_ENVIRONMENT: ${{ vars.PINECONE_ENVIRONMENT }}
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 

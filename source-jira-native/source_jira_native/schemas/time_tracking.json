@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "required": ["key"],
+  "type": "object",
+  "properties": {
+    "key": {
+      "description": "The key associated with the time tracking provider.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": true,
+  "description": "Details about the time tracking provider."
+}

@@ -96,7 +96,7 @@ func (a *sqlApplier) CreateMetaTables(ctx context.Context, spec *pf.Materializat
 	return strings.Join(actionDesc, "\n"), func(ctx context.Context) error {
 		for _, c := range creates {
 			if err := a.client.CreateTable(ctx, c); err != nil {
-				return err
+				return fmt.Errorf("creating meta table %s: %w", c.Identifier, err)
 			}
 		}
 		return nil

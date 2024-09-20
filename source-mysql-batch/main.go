@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -13,7 +14,6 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
-	perrors "github.com/pingcap/errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -80,16 +80,23 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	}).Info("connecting to database")
 
 	var conn *client.Conn
-	var err error
-	var withTLS = func(c *client.Conn) { c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true}) }
-	if conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName, withTLS); err == nil {
-		log.WithField("addr", cfg.Address).Debug("connected with TLS")
-	} else if conn, err = client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName); err == nil {
-		log.WithField("addr", cfg.Address).Warn("connected without TLS")
-	} else if err, ok := perrors.Cause(err).(*mysql.MyError); ok && err.Code == mysql.ER_ACCESS_DENIED_ERROR {
-		return nil, cerrors.NewUserError(err, "incorrect username or password")
+	var withTLS = func(c *client.Conn) error {
+		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
+		return nil
+	}
+	if connWithTLS, errWithTLS := client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName, withTLS); errWithTLS == nil {
+		log.WithField("addr", cfg.Address).Info("connected with TLS")
+		conn = connWithTLS
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName); errWithoutTLS == nil {
+		log.WithField("addr", cfg.Address).Info("connected without TLS")
+		conn = connWithoutTLS
 	} else {
-		return nil, fmt.Errorf("unable to connect to database: %w", err)
+		var mysqlErr *mysql.MyError
+		if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+			return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
+		} else {
+			return nil, fmt.Errorf("unable to connect to database: %w", errWithTLS)
+		}
 	}
 
 	if _, err := conn.Execute("SELECT true;"); err != nil {

@@ -6,15 +6,16 @@ import (
 	"crypto/tls"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
@@ -22,10 +23,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
-	perrors "github.com/pingcap/errors"
 	"github.com/sirupsen/logrus"
-
-	mysqlLog "github.com/siddontang/go-log/log"
 
 	_ "time/tzdata"
 )
@@ -48,7 +46,6 @@ var mysqlDriver = &sqlcapture.Driver{
 }
 
 func main() {
-	fixMysqlLogging()
 	boilerplate.RunMain(mysqlDriver)
 }
 
@@ -89,45 +86,29 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 	return db, nil
 }
 
-// fixMysqlLogging works around some unfortunate defaults in the go-log package, which is used by
-// go-mysql. This configures their logger to write to stderr instead of stdout (who does that?) and
-// sets the level filter to match the level used by logrus. Unfortunately, there's no way to configure
-// go-log to log in JSON format, so we'll still end up with interleaved JSON and plain text. But
-// Flow handles that fine, so it's primarily just a visual inconvenience.
-func fixMysqlLogging() {
-	var handler, err = mysqlLog.NewStreamHandler(os.Stderr)
-	// Based on a look at the source code, NewStreamHandler never actually returns an error, so this
-	// is just a bit of future proofing.
-	if err != nil {
-		panic(fmt.Sprintf("failed to intialize mysql logging: %v", err))
-	}
-
-	mysqlLog.SetDefaultLogger(mysqlLog.NewDefault(handler))
-	// Looking at the source code, it seems that the level names pretty much match those used by logrus.
-	// In the event that anything doesn't match, it'll fall back to info level.
-	// Source: https://github.com/siddontang/go-log/blob/1e957dd83bed/log/logger.go#L116
-	mysqlLog.SetLevelByName(logrus.GetLevel().String())
-}
-
 // Config tells the connector how to connect to the source database and
 // capture changes from it.
 type Config struct {
-	Address  string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Timezone string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3"`
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Address     string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string         `json:"user" jsonschema:"title=Login Username,default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Timezone    string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3"`
+	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
+	Advanced    advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
-	WatermarksTable          string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=The name of the table used for watermark writes. Must be fully-qualified in '<schema>.<table>' form."`
 	DBName                   string `json:"dbname,omitempty" jsonschema:"title=Database Name,default=mysql,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
 	SkipBinlogRetentionCheck bool   `json:"skip_binlog_retention_check,omitempty" jsonschema:"title=Skip Binlog Retention Sanity Check,default=false,description=Bypasses the 'dangerously short binlog retention' sanity check at startup. Only do this if you understand the danger and have a specific need."`
 	NodeID                   uint32 `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	SkipBackfills            string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize        int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+
+	// Deprecated config options which no longer do much of anything.
+	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present."`
+	HeartbeatInterval string `json:"heartbeat_interval,omitempty" jsonschema:"title=Heartbeat Interval,default=60s,description=This property is deprecated and will be removed in the near future. Has no effect." jsonschema_extras:"pattern=^[-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+$"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -146,14 +127,11 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("passwords used as part of replication cannot exceed 32 characters in length due to an internal limitation in MySQL: password length of %d characters is too long, please use a shorter password", len(c.Password))
 	}
 	if c.Timezone != "" {
-		if _, err := sqlcapture.ParseTimezone(c.Timezone); err != nil {
+		if _, err := schedule.ParseTimezone(c.Timezone); err != nil {
 			return err
 		}
 	}
 
-	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
-		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
-	}
 	if c.Advanced.SkipBackfills != "" {
 		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
 			if !strings.Contains(skipStreamID, ".") {
@@ -168,9 +146,6 @@ func (c *Config) Validate() error {
 func (c *Config) SetDefaults(name string) {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
-	if c.Advanced.WatermarksTable == "" {
-		c.Advanced.WatermarksTable = "flow.watermarks"
-	}
 	if c.Advanced.DBName == "" {
 		c.Advanced.DBName = "mysql"
 	}
@@ -181,7 +156,7 @@ func (c *Config) SetDefaults(name string) {
 		// derive a default value by hashing the task name.
 		var nameHash = sha256.Sum256([]byte(name))
 		c.Advanced.NodeID = binary.BigEndian.Uint32(nameHash[:])
-		c.Advanced.NodeID &= 0x7FFFFFFF // Clear MSB because watermark writes use the node ID as an integer key
+		c.Advanced.NodeID &= 0x7FFFFFFF // Clear MSB for legacy reasons. Probably not necessary any longer but changing it would change the node ID.
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 50000
@@ -205,14 +180,23 @@ func configSchema() json.RawMessage {
 }
 
 type mysqlDatabase struct {
+	versionString              string // The raw contents of the 'version' system variable
+	versionProduct             string // Usually either "MySQL" or "MariaDB"
+	versionMajor, versionMinor int    // The major/minor version the server is running
+
 	config           *Config
 	conn             *client.Conn
-	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
-	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
-	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
+	discovery        map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
+	explained        map[string]struct{}                               // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
+	datetimeLocation *time.Location                                    // The location in which to interpret DATETIME column values as timestamps.
+	includeTxIDs     map[string]bool                                   // Tracks which tables should have XID properties in their replication metadata.
 }
 
-func (db *mysqlDatabase) connect(ctx context.Context) error {
+func (db *mysqlDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
+}
+
+func (db *mysqlDatabase) connect(_ context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
 		"dbName":   db.config.Advanced.DBName,
@@ -227,34 +211,34 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		address = "localhost:3306"
 	}
 
-	// Normal database connection used for table scanning
-	var conn *client.Conn
-	var err error
-	var withTLS = func(c *client.Conn) {
-		// TODO(wgd): Consider adding an optional 'serverName' config parameter which
-		// if set makes this false and sets 'ServerName' so it will be verified properly.
+	var withTLS = func(c *client.Conn) error {
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
+		return nil
 	}
-	if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); err == nil {
-		logrus.WithField("addr", address).Debug("connected with TLS")
-		db.conn = conn
-	} else if conn, err = client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); err == nil {
-		logrus.WithField("addr", address).Warn("connected without TLS")
-		db.conn = conn
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
+		logrus.WithField("addr", address).Info("connected with TLS")
+		db.conn = connWithTLS
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
+		logrus.WithField("addr", address).Info("connected without TLS")
+		db.conn = connWithoutTLS
 	} else {
-		if err, ok := perrors.Cause(err).(*mysql.MyError); ok {
-			if err.Code == mysql.ER_ACCESS_DENIED_ERROR {
-				return cerrors.NewUserError(err, "incorrect username or password")
-			}
+		var mysqlErr *mysql.MyError
+		if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+			return cerrors.NewUserError(mysqlErr, "incorrect username or password")
+		} else {
+			return fmt.Errorf("unable to connect to database: %w", errWithTLS)
 		}
+	}
 
-		return fmt.Errorf("unable to connect to database: %w", err)
+	// Debug logging hook so we can get the server config variables when needed
+	if err := db.logServerVariables(); err != nil {
+		logrus.WithField("err", err).Warn("failed to log server variables")
 	}
 
 	if db.config.Timezone != "" {
 		// The user-entered timezone value is verified to parse without error in (*Config).Validate,
 		// so this parsing is not expected to fail.
-		loc, err := sqlcapture.ParseTimezone(db.config.Timezone)
+		loc, err := schedule.ParseTimezone(db.config.Timezone)
 		if err != nil {
 			return fmt.Errorf("invalid config timezone: %w", err)
 		}
@@ -267,9 +251,10 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		// Infer the location in which captured DATETIME values will be interpreted from the system
 		// variable 'time_zone' if it is set on the database.
 		var tzName string
-		if tzName, err = queryTimeZone(conn); err == nil {
+		var err error
+		if tzName, err = queryTimeZone(db.conn); err == nil {
 			var loc *time.Location
-			if loc, err = sqlcapture.ParseTimezone(tzName); err == nil {
+			if loc, err = schedule.ParseTimezone(tzName); err == nil {
 				logrus.WithFields(logrus.Fields{
 					"tzName": tzName,
 					"loc":    loc.String(),
@@ -291,6 +276,42 @@ func (db *mysqlDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("error setting session time_zone: %w", err)
 	}
 
+	if err := db.queryDatabaseVersion(); err != nil {
+		logrus.WithField("err", err).Warn("failed to query database version")
+	}
+
+	return nil
+}
+
+func (db *mysqlDatabase) logServerVariables() error {
+	if !logrus.IsLevelEnabled(logrus.DebugLevel) {
+		return nil
+	}
+
+	var results, err = db.conn.Execute("SHOW VARIABLES;")
+	if err != nil {
+		return fmt.Errorf("unable to query server variables: %w", err)
+	}
+	defer results.Close()
+
+	if len(results.Fields) != 2 {
+		var fieldNames []string
+		for _, field := range results.Fields {
+			fieldNames = append(fieldNames, string(field.Name))
+		}
+		return fmt.Errorf("unexpected result columns: got %q", fieldNames)
+	}
+
+	var fields = make(logrus.Fields)
+	for _, row := range results.Values {
+		var key = string(row[0].AsString())
+		var val = row[1].Value()
+		if bs, ok := val.([]byte); ok {
+			val = string(bs)
+		}
+		fields[key] = val
+	}
+	logrus.WithFields(fields).Debug("queried server variables")
 	return nil
 }
 

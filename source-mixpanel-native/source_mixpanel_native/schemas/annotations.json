@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id"],
+  "properties": {
+    "date": {
+      "description": "The date of the annotation in ISO 8601 date-time format.",
+      "type": ["null", "string"]
+    },
+    "id": {
+      "description": "The unique identifier of the annotation.",
+      "type": "integer"
+    },
+    "description": {
+      "description": "The description or notes associated with the annotation.",
+      "type": ["null", "string"]
+    }
+  }
+}

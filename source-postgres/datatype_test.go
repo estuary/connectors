@@ -29,17 +29,18 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `serial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},      // non-nullable
 		{ColumnType: `smallserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`}, // non-nullable
 		{ColumnType: `bigserial`, ExpectType: `{"type":"integer"}`, InputValue: `123`, ExpectValue: `123`},   // non-nullable
-		{ColumnType: `real`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `123.456`},
-		{ColumnType: `double precision`, ExpectType: `{"type":["number","null"]}`, InputValue: `123.456`, ExpectValue: `123.456`},
+		{ColumnType: `oid not null`, ExpectType: `{"type":"integer"}`, InputValue: `54321`, ExpectValue: `54321`},
+		{ColumnType: `oid`, ExpectType: `{"type":["integer","null"]}`, InputValue: `54321`, ExpectValue: `54321`},
+		{ColumnType: `real`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `123.456`},
+		{ColumnType: `double precision`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `123.456`},
+		{ColumnType: `real`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `NaN`, ExpectValue: `"NaN"`},
+		{ColumnType: `double precision`, ExpectType: `{"type":["number","string","null"],"format":"number"}`, InputValue: `NaN`, ExpectValue: `"NaN"`},
 
-		// TODO(wgd): The 'decimal' and 'numeric' types are generally used because precision
-		// and accuracy actually matter. I'm leery of just casting these to a float, so for
-		// now I'm letting the `pgtype.Numeric.EncodeText()` implementation turn them into a
-		// string. Revisit whether this is correct behavior at some point.
-		// TODO(johnny): This will fail schema validation. They need to be output as JSON numbers (doubles).
-		{ColumnType: `decimal`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
-		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123456e-3"`},
-		{ColumnType: `numeric(4,2)`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `12.34`, ExpectValue: `"1234e-2"`},
+		{ColumnType: `decimal`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123.456"`},
+		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `123.456`, ExpectValue: `"123.456"`},
+		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `NaN`, ExpectValue: `"NaN"`},
+		{ColumnType: `numeric`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `-infinity`, ExpectValue: `"-Infinity"`},
+		{ColumnType: `numeric(4,2)`, ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: `12.34`, ExpectValue: `"12.34"`},
 		{ColumnType: `character varying(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
 		{ColumnType: `varchar(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
 		{ColumnType: `varchar`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
@@ -53,9 +54,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `bit varying`, ExpectType: `{"type":["string","null"]}`, InputValue: `1101`, ExpectValue: `"1101"`},
 		{ColumnType: `bit varying(5)`, ExpectType: `{"type":["string","null"]}`, InputValue: `10111`, ExpectValue: `"10111"`},
 
-		// Domain-Specific Data Types
-		{ColumnType: `money`, ExpectType: `{"type":["string","null"]}`, InputValue: 123.45, ExpectValue: `"$123.45"`},
-		{ColumnType: `money`, ExpectType: `{"type":["string","null"]}`, InputValue: `$123.45`, ExpectValue: `"$123.45"`},
+		// Date/Time/Timestamp Types
 		{ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
 		{ColumnType: `timestamp without time zone`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
@@ -64,10 +63,8 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'epoch'`, ExpectValue: `"1970-01-01T00:00:00Z"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'20222-08-31T00:00:00Z'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 99 BC'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
-
-		// TODO(wgd): The 'timestamp with time zone' type produces inconsistent results between
-		// table scanning and replication events. They're both valid timestamps, but they differ.
-		// {ColumnType: `timestamp with time zone`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-07T16:00:00-08:00"`},
+		{ColumnType: `timestamp with time zone`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999 UTC'`, ExpectValue: `"1999-01-07T16:00:00-08:00"`},
+		// For historical reasons, times without time zone are captured as Unix second timestamps. We can change this if we ever do a version bump or otherwise break compatibility.
 		{ColumnType: `time`, ExpectType: `{"type":["integer","null"]}`, InputValue: `'04:05:06 PST'`, ExpectValue: `14706000000`},
 		{ColumnType: `time without time zone`, ExpectType: `{"type":["integer","null"]}`, InputValue: `'04:05:06 PST'`, ExpectValue: `14706000000`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06 PST'`, ExpectValue: `"04:05:06-08:00"`},
@@ -75,14 +72,21 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123 UTC'`, ExpectValue: `"04:05:06.123Z"`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123+0330'`, ExpectValue: `"04:05:06.123+03:30"`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123+03:30:50'`, ExpectValue: `"04:05:06.123+03:30:50"`},
-		{ColumnType: `interval`, ExpectType: `{"type":["string","null"]}`, InputValue: `'2 months 1 day 5 minutes 6 seconds'`, ExpectValue: `"2 mon 1 day 00:05:06.000000"`},
+		{ColumnType: `interval`, ExpectType: `{"type":["string","null"]}`, InputValue: `'2 months 1 day 5 minutes 6 seconds'`, ExpectValue: `"2 mon 1 day 00:05:06"`},
+		{ColumnType: `interval`, ExpectType: `{"type":["string","null"]}`, InputValue: `'2 months 1 day 5 minutes 6 seconds 1 microsecond'`, ExpectValue: `"2 mon 1 day 00:05:06.000001"`},
+
+		// Geometry Types
 		{ColumnType: `point`, ExpectType: `{"type":["string","null"]}`, InputValue: `(1, 2)`, ExpectValue: `"(1,2)"`},
 		{ColumnType: `line`, ExpectType: `{"type":["string","null"]}`, InputValue: `{1, 2, 3}`, ExpectValue: `"{1,2,3}"`},
-		{ColumnType: `lseg`, ExpectType: `{"type":["string","null"]}`, InputValue: `[(1, 2), (3, 4)]`, ExpectValue: `"(1,2),(3,4)"`},
+		{ColumnType: `lseg`, ExpectType: `{"type":["string","null"]}`, InputValue: `[(1, 2), (3, 4)]`, ExpectValue: `"[(1,2),(3,4)]"`},
 		{ColumnType: `box`, ExpectType: `{"type":["string","null"]}`, InputValue: `((1, 2), (3, 4))`, ExpectValue: `"(3,4),(1,2)"`},
 		{ColumnType: `path`, ExpectType: `{"type":["string","null"]}`, InputValue: `[(1, 2), (3, 4), (5, 6)]`, ExpectValue: `"[(1,2),(3,4),(5,6)]"`},
 		{ColumnType: `polygon`, ExpectType: `{"type":["string","null"]}`, InputValue: `((0, 0), (0, 1), (1, 0))`, ExpectValue: `"((0,0),(0,1),(1,0))"`},
 		{ColumnType: `circle`, ExpectType: `{"type":["string","null"]}`, InputValue: `((1, 2), 3)`, ExpectValue: `"\u003c(1,2),3\u003e"`},
+
+		// Miscellaneous domain-specific datatypes
+		{ColumnType: `money`, ExpectType: `{"type":["string","null"]}`, InputValue: 123.45, ExpectValue: `"$123.45"`},
+		{ColumnType: `money`, ExpectType: `{"type":["string","null"]}`, InputValue: `$123.45`, ExpectValue: `"$123.45"`},
 		{ColumnType: `inet`, ExpectType: `{"type":["string","null"]}`, InputValue: `192.168.100.0/24`, ExpectValue: `"192.168.100.0/24"`},
 		{ColumnType: `inet`, ExpectType: `{"type":["string","null"]}`, InputValue: `2001:4f8:3:ba::/64`, ExpectValue: `"2001:4f8:3:ba::/64"`},
 		{ColumnType: `cidr`, ExpectType: `{"type":["string","null"]}`, InputValue: `192.168.100.0/24`, ExpectValue: `"192.168.100.0/24"`},
@@ -93,13 +97,13 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `tsvector`, ExpectType: `{"type":["string","null"]}`, InputValue: `a fat cat`, ExpectValue: `"'a' 'cat' 'fat'"`},
 		{ColumnType: `tsquery`, ExpectType: `{"type":["string","null"]}`, InputValue: `fat & cat`, ExpectValue: `"'fat' \u0026 'cat'"`},
 
-		// TODO(wgd): JSON values read by pgx/pgtype are currently unmarshalled (by the `pgtype.JSON.Get()` method)
-		// into an `interface{}`, which means that the un-normalized JSON text coming from PostgreSQL is getting
-		// normalized in various ways by the JSON -> interface{} -> JSON round-trip. For `jsonb` this is probably
-		// fine since the value has already been decomposed into a binary format within PostgreSQL, but we might
-		// possibly want to try and fix this for `json` at some point?
-		{ColumnType: `json`, ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
-		{ColumnType: `jsonb`, ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
+		// The difference between JSON and JSONB is that JSONB is stored in a binary format internally on
+		// the server while JSON is stored as the raw input text. In both cases we receive JSON from the
+		// server and preserve it as a json.RawMessage, but the final document serialization still does
+		// some whitespace noramlization. Thus both JSON and JSONB have unnecessary spaces removed but
+		// only JSONB has the fields reordered.
+		{ColumnType: `json`, ExpectType: `{}`, InputValue: `{    "type": "hello world", "data": 123}`, ExpectValue: `{"type":"hello world","data":123}`},
+		{ColumnType: `jsonb`, ExpectType: `{}`, InputValue: `{    "type": "hello world", "data": 123}`, ExpectValue: `{"data":123,"type":"hello world"}`},
 		{ColumnType: `jsonpath`, ExpectType: `{"type":["string","null"]}`, InputValue: `$foo`, ExpectValue: `"$\"foo\""`},
 		{ColumnType: `xml`, ExpectType: `{"type":["string","null"]}`, InputValue: `<foo>bar &gt; baz</foo>`, ExpectValue: `"\u003cfoo\u003ebar \u0026gt; baz\u003c/foo\u003e"`},
 
@@ -107,6 +111,7 @@ func TestDatatypes(t *testing.T) {
 		//    [...] declaring the array size or number of dimensions in CREATE TABLE is
 		//    simply documentation; it does not affect run-time behavior.
 		// This set of test cases exercises that expectation.
+		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{}`, ExpectValue: `{"dimensions":[],"elements":[]}`},
 		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{{{{{{1}}}}}}`, ExpectValue: `{"dimensions":[1,1,1,1,1,1],"elements":[1]}`},
 		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{1,2,3,4,5,6}`, ExpectValue: `{"dimensions":[6],"elements":[1,2,3,4,5,6]}`},
 		{ColumnType: `integer[3][3]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: `{{1,2,3},{4,5,6},{7,8,9}}`, ExpectValue: `{"dimensions":[3,3],"elements":[1,2,3,4,5,6,7,8,9]}`},
@@ -120,12 +125,12 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `varchar(12) ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: `{foo, bar}`, ExpectValue: `{"dimensions":[2],"elements":["foo","bar"]}`},
 		{ColumnType: `char(5) ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: `{foo, bar}`, ExpectValue: `{"dimensions":[2],"elements":["foo  ","bar  "]}`},
 		{ColumnType: `cidr ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: `{192.168.100.0/24, 2001:4f8:3:ba::/64}`, ExpectValue: `{"dimensions":[2],"elements":["192.168.100.0/24","2001:4f8:3:ba::/64"]}`},
-		{ColumnType: `date ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"date-time"}`), InputValue: []interface{}{`2022-01-09`, `2022-01-10`}, ExpectValue: `{"dimensions":[2],"elements":["2022-01-09","2022-01-10"]}`},
-		{ColumnType: `double precision ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{1.23, 4.56}, ExpectValue: `{"dimensions":[2],"elements":[1.23,4.56]}`},
+		{ColumnType: `date ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"date-time"}`), InputValue: []interface{}{`2022-01-09`, `2022-01-10`}, ExpectValue: `{"dimensions":[2],"elements":["2022-01-09T00:00:00Z","2022-01-10T00:00:00Z"]}`},
+		{ColumnType: `double precision ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","string","null"],"format":"number"}`), InputValue: []interface{}{1.23, 4.56}, ExpectValue: `{"dimensions":[2],"elements":[1.23,4.56]}`},
 		{ColumnType: `inet ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`192.168.100.0/24`, `2001:4f8:3:ba::/64`}, ExpectValue: `{"dimensions":[2],"elements":["192.168.100.0/24","2001:4f8:3:ba::/64"]}`},
 		{ColumnType: `integer ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{1, 2, nil, 4}, ExpectValue: `{"dimensions":[4],"elements":[1,2,null,4]}`},
-		{ColumnType: `numeric ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"number"}`), InputValue: []interface{}{`123.456`, `-789.0123`}, ExpectValue: `{"dimensions":[2],"elements":["123456e-3","-7890123e-4"]}`},
-		{ColumnType: `real ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","null"]}`), InputValue: []interface{}{123.456, 789.012}, ExpectValue: `{"dimensions":[2],"elements":[123.456,789.012]}`},
+		{ColumnType: `numeric ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"number"}`), InputValue: []interface{}{`123.456`, `-789.0123`}, ExpectValue: `{"dimensions":[2],"elements":["123.456","-789.0123"]}`},
+		{ColumnType: `real ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["number","string","null"],"format":"number"}`), InputValue: []interface{}{123.456, 789.012}, ExpectValue: `{"dimensions":[2],"elements":[123.456,789.012]}`},
 		{ColumnType: `smallint ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["integer","null"]}`), InputValue: []interface{}{123, 456, 789}, ExpectValue: `{"dimensions":[3],"elements":[123,456,789]}`},
 		{ColumnType: `text ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: []interface{}{`Hello, world!`, `asdf`}, ExpectValue: `{"dimensions":[2],"elements":["Hello, world!","asdf"]}`},
 		{ColumnType: `uuid ARRAY`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"],"format":"uuid"}`), InputValue: []interface{}{`a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11`}, ExpectValue: `{"dimensions":[1],"elements":["a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"]}`},
@@ -133,10 +138,10 @@ func TestDatatypes(t *testing.T) {
 		// Built-in range types.
 		{ColumnType: `int4range`, ExpectType: `{"type":["string","null"]}`, InputValue: `[1,5)`, ExpectValue: `"[1,5)"`},
 		{ColumnType: `int8range`, ExpectType: `{"type":["string","null"]}`, InputValue: `[,]`, ExpectValue: `"(,)"`},
-		{ColumnType: `numrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `(1.1,5.5]`, ExpectValue: `"(11e-1,55e-1]"`},
-		{ColumnType: `tsrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30,2010-01-01 15:00)`, ExpectValue: `"[2010-01-01 11:30:00,2010-01-01 15:00:00)"`},
-		{ColumnType: `tstzrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30,2010-01-01 15:00)`, ExpectValue: `"[2010-01-01 11:30:00Z,2010-01-01 15:00:00Z)"`},
-		{ColumnType: `daterange`, ExpectType: `{"type":["string","null"]}`, InputValue: `(2010-01-01,2010-01-02]`, ExpectValue: `"[2010-01-02,2010-01-03)"`},
+		{ColumnType: `numrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `(1.1,5.5]`, ExpectValue: `"(1.1,5.5]"`},
+		{ColumnType: `tsrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30 UTC,2010-01-01 15:00 UTC)`, ExpectValue: `"[2010-01-01T11:30:00Z,2010-01-01T15:00:00Z)"`},
+		{ColumnType: `tstzrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30 UTC,2010-01-01 15:00 UTC)`, ExpectValue: `"[2010-01-01T03:30:00-08:00,2010-01-01T07:00:00-08:00)"`},
+		{ColumnType: `daterange`, ExpectType: `{"type":["string","null"]}`, InputValue: `(2010-01-01,2010-01-02]`, ExpectValue: `"[2010-01-02T00:00:00Z,2010-01-03T00:00:00Z)"`},
 	})
 }
 
@@ -174,21 +179,24 @@ func TestScanKeyTypes(t *testing.T) {
 		ColumnType string
 		Values     []interface{}
 	}{
-		{"Bool", "BOOLEAN", []interface{}{"true", "false"}},
-		{"Integer", "INTEGER", []interface{}{0, -3, 2, 1723}},
-		{"SmallInt", "SMALLINT", []interface{}{0, -3, 2, 1723}},
-		{"BigInt", "BIGINT", []interface{}{0, -3, 2, 1723}},
-		{"Serial", "SERIAL", []interface{}{0, -3, 2, 1723}},
-		{"SmallSerial", "SMALLSERIAL", []interface{}{0, -3, 2, 1723}},
-		{"BigSerial", "BIGSERIAL", []interface{}{0, -3, 2, 1723}},
-		{"Real", "REAL", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"Double", "DOUBLE PRECISION", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"Decimal", "DECIMAL", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"Numeric", "NUMERIC(4,3)", []interface{}{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
-		{"VarChar", "VARCHAR(10)", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
-		{"Char", "CHAR(3)", []interface{}{"   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
-		{"Text", "TEXT", []interface{}{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
-		{"UUID", "UUID", []interface{}{"66b968a7-aeca-4401-8239-5d57958d1572", "4ab4044a-9aab-415c-96c6-17fa338060fa", "c32fb585-fc7f-4347-8fe2-97448f4e93cd"}},
+		{"Bool", "BOOLEAN", []any{"true", "false"}},
+		{"Integer", "INTEGER", []any{0, -3, 2, 1723}},
+		{"SmallInt", "SMALLINT", []any{0, -3, 2, 1723}},
+		{"BigInt", "BIGINT", []any{0, -3, 2, 1723}},
+		{"Serial", "SERIAL", []any{0, -3, 2, 1723}},
+		{"SmallSerial", "SMALLSERIAL", []any{0, -3, 2, 1723}},
+		{"BigSerial", "BIGSERIAL", []any{0, -3, 2, 1723}},
+		{"Real", "REAL", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Double", "DOUBLE PRECISION", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Decimal", "DECIMAL", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"Numeric", "NUMERIC(4,3)", []any{-0.9, -1.0, -1.1, 0.0, 0.9, 1.0, 1.111, 1.222, 1.333, 1.444, 1.555, 1.666, 1.777, 1.888, 1.999, 2.000}},
+		{"VarChar", "VARCHAR(10)", []any{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"Char", "CHAR(3)", []any{"   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"Text", "TEXT", []any{"", "   ", "a", "b", "c", "A", "B", "C", "_a", "_b", "_c"}},
+		{"UUID", "UUID", []any{"66b968a7-aeca-4401-8239-5d57958d1572", "4ab4044a-9aab-415c-96c6-17fa338060fa", "c32fb585-fc7f-4347-8fe2-97448f4e93cd"}},
+		{"MAC6", "macaddr", []any{"47:7a:51:62:c3:aa", "6f:cf:f3:49:e0:b1", "65:d0:73:5a:5a:c9", "88:61:08:5b:ae:54"}},
+		{"MAC8", "macaddr8", []any{"5f:99:67:ac:0d:df:88:3a ", "70:26:74:4c:ac:2c:38:59", "e3:70:99:89:b9:d8:e8:21 ", "a5:35:55:da:06:38:39:43"}},
+		{"OID", "oid", []any{12345, 12344, 12346, 54321, 54323, 54322}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("2804%04d", idx)

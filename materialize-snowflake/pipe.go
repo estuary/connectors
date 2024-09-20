@@ -72,7 +72,11 @@ func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (str
 func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient, error) {
 	httpClient := http.Client{}
 
-	var dsn = cfg.ToURI(tenant, true)
+	var dsn, err = cfg.toURI(tenant)
+	if err != nil {
+		return nil, fmt.Errorf("building snowflake dsn: %w", err)
+	}
+
 	dsnURL, err := url.Parse(fmt.Sprintf("https://%s", dsn))
 	if err != nil {
 		return nil, fmt.Errorf("parsing snowflake dsn: %w", err)
@@ -124,6 +128,16 @@ type InsertFilesResponse struct {
 	RequestId string `json:"requestId"`
 }
 
+type InsertFilesError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Success bool   `json:"success"`
+}
+
+func (e InsertFilesError) Error() string {
+	return fmt.Sprintf("(%s) %s", e.Code, e.Message)
+}
+
 const insertFilesRawTpl = "https://{{ $.Base }}/v1/data/pipes/{{ $.PipeName }}/insertFiles?requestId={{ $.RequestId }}"
 const contentType = "application/json;charset=UTF-8"
 const userAgent = "Estuary Technologies Flow"
@@ -152,10 +166,11 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 		return nil, err
 	}
 
+	var requestId = uuid.New().String()
 	var urlTemplate = insertFilesURLTemplate{
 		Base:      c.base,
 		PipeName:  strings.ToLower(pipeName),
-		RequestId: uuid.New().String(),
+		RequestId: requestId,
 	}
 
 	var reqBody = insertFilesRequest{
@@ -184,14 +199,14 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("insertFiles request: %w", err)
+		return nil, fmt.Errorf("insertFiles request (%s): %w", requestId, err)
 	}
 
 	var respBuf = new(strings.Builder)
 	_, err = io.Copy(respBuf, resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("reading response of insertFiles: %w", err)
+		return nil, fmt.Errorf("reading response of insertFiles (%s): %w", requestId, err)
 	}
 
 	log.WithFields(log.Fields{
@@ -201,12 +216,17 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	}).Debug("pipe client")
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf.String())
+		var errResponse InsertFilesError
+		if err := json.Unmarshal([]byte(respBuf.String()), &errResponse); err != nil {
+			return nil, fmt.Errorf("response error code (%s): %d %s", requestId, resp.StatusCode, respBuf.String())
+		} else {
+			return nil, errResponse
+		}
 	}
 
 	var response InsertFilesResponse
 	if err := json.Unmarshal([]byte(respBuf.String()), &response); err != nil {
-		return nil, fmt.Errorf("parsing response of insertFiles failed: %w", err)
+		return nil, fmt.Errorf("parsing response of insertFiles failed (%s): %w", requestId, err)
 	}
 
 	if response.Status != "SUCCESS" {
@@ -216,7 +236,7 @@ func (c *PipeClient) InsertFiles(pipeName string, files []FileRequest) (*InsertF
 	return &response, nil
 }
 
-const insertReportRawTpl = "https://{{ $.Base }}/v1/data/pipes/{{ $.PipeName }}/insertReport?requestId={{ $.RequestId }}&beginMark={{ $.BeginMark }}"
+const insertReportRawTpl = "https://{{ $.Base }}/v1/data/pipes/{{ $.PipeName }}/insertReport?requestId={{ $.RequestId }}"
 
 type insertReportURLTemplate struct {
 	Base     string
@@ -247,24 +267,20 @@ type fileReport struct {
 }
 
 type InsertReportResponse struct {
-	// completeResult: false means there were events between the supplied beginMark
-	// and the first even that were missed.
-	// see https://docs.snowflake.com/user-guide/data-load-snowpipe-rest-apis
-	CompleteResult bool         `json:"completeResult"`
-	NextBeginMark  string       `json:"nextBeginMark"`
-	Files          []fileReport `json:"files"`
+	NextBeginMark string       `json:"nextBeginMark"`
+	Files         []fileReport `json:"files"`
 }
 
-func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertReportResponse, error) {
+func (c *PipeClient) InsertReport(pipeName string) (*InsertReportResponse, error) {
 	if err := c.refreshJWT(); err != nil {
 		return nil, err
 	}
 
+	var requestId = uuid.New().String()
 	var urlTemplate = insertReportURLTemplate{
 		Base:      c.base,
 		PipeName:  strings.ToLower(pipeName),
-		RequestId: uuid.New().String(),
-		BeginMark: beginMark,
+		RequestId: requestId,
 	}
 
 	var w strings.Builder
@@ -282,23 +298,23 @@ func (c *PipeClient) InsertReport(pipeName string, beginMark string) (*InsertRep
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("insertReport request: %w", err)
+		return nil, fmt.Errorf("insertReport request (%s): %w", requestId, err)
 	}
 
 	var respBuf = new(strings.Builder)
 	_, err = io.Copy(respBuf, resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("reading response of insertReport: %w", err)
+		return nil, fmt.Errorf("reading response of insertReport (%s): %w", requestId, err)
 	}
 
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("response error code %d, %s", resp.StatusCode, respBuf)
+		return nil, fmt.Errorf("response error code (%s): %d %s", requestId, resp.StatusCode, respBuf)
 	}
 
 	var response InsertReportResponse
 	if err := json.Unmarshal([]byte(respBuf.String()), &response); err != nil {
-		return nil, fmt.Errorf("parsing response of insertReport failed: %w", err)
+		return nil, fmt.Errorf("parsing response of insertReport failed (%s): %w", requestId, err)
 	}
 
 	log.WithFields(log.Fields{

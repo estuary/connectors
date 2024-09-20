@@ -81,7 +81,6 @@ properties:
           - string
   id:
     type:
-      - "null"
       - string
   updated_time:
     type:
@@ -2169,4 +2168,5 @@ properties:
         type: integer
     required:
       - row_id
-x-infer-schema: true
+required:
+  - id

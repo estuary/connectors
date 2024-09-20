@@ -15,18 +15,26 @@ Binding 0:
           "$anchor": "TestGeneric_simplediscovery_49210954",
           "properties": {
             "a": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             },
             "b": {
+              "description": "(source type: varchar)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "c": {
-              "type": "number"
+              "format": "number",
+              "description": "(source type: non-nullable float4)",
+              "type": [
+                "number",
+                "string"
+              ]
             },
             "d": {
+              "description": "(source type: varchar)",
               "type": [
                 "string",
                 "null"
@@ -37,6 +45,28 @@ Binding 0:
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -108,9 +138,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

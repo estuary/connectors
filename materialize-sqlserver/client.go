@@ -18,6 +18,8 @@ import (
 	mssqldb "github.com/microsoft/go-mssqldb"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
 	db  *stdsql.DB
 	cfg *config
@@ -39,8 +41,16 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
+
+	cfg := conf.(*config)
+
+	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
@@ -48,7 +58,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := c.db.PingContext(ctx); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var sqlServerErr *mssqldb.Error
 		var netConnErr *net.DNSError
@@ -60,11 +70,11 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
+				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
 		}
 
@@ -75,14 +85,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	// We don't (yet) allow setting a schema for the endpoint or resources, so we need to get the
-	// default schema for the configured user.
-	var schema string
-	if err := c.db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
-		return nil, fmt.Errorf("querying schema for current user: %w", err)
-	}
-
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, schema, resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
@@ -138,6 +141,14 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 		return nil
 	}, nil
+}
+
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	return sql.StdListSchemas(ctx, c.db)
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {

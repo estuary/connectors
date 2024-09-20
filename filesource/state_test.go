@@ -2,98 +2,11 @@ package filesource
 
 import (
 	"encoding/json"
-	"net/url"
 	"testing"
 	"time"
 
-	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
-
-func TestUnmarshalState(t *testing.T) {
-	mustMarshal := func(t *testing.T, in any) json.RawMessage {
-		t.Helper()
-		bytes, err := json.Marshal(in)
-		require.NoError(t, err)
-		return bytes
-	}
-
-	mustParseTime := func(t *testing.T, in string) *time.Time {
-		t.Helper()
-		parsed, err := time.Parse(time.RFC3339Nano, in)
-		require.NoError(t, err)
-		return &parsed
-	}
-
-	easyResource := resource{Stream: "easy"}
-	easyBinding := &pf.CaptureSpec_Binding{
-		ResourceConfigJson: mustMarshal(t, easyResource),
-		ResourcePath:       []string{easyResource.Stream},
-		StateKey:           url.QueryEscape(easyResource.Stream),
-	}
-
-	normalResource := resource{Stream: "/some/path/to/data"}
-	normalBinding := &pf.CaptureSpec_Binding{
-		ResourceConfigJson: mustMarshal(t, normalResource),
-		ResourcePath:       []string{normalResource.Stream},
-		StateKey:           url.QueryEscape(normalResource.Stream),
-	}
-
-	hardResource := resource{Stream: ` Cr@\/z/Y-_-Inp3#t!1! 😼 `}
-	hardBinding := &pf.CaptureSpec_Binding{
-		ResourceConfigJson: mustMarshal(t, hardResource),
-		ResourcePath:       []string{hardResource.Stream},
-		StateKey:           url.QueryEscape(hardResource.Stream),
-	}
-
-	bindings := []*pf.CaptureSpec_Binding{easyBinding, normalBinding, hardBinding}
-
-	originalState := map[string]State{
-		easyResource.Stream: {
-			MinBound: *mustParseTime(t, "2023-02-03T04:05:06Z"),
-			MaxBound: nil,
-			MaxMod:   nil,
-			Path:     "/some/path",
-			Records:  10,
-			Complete: false,
-		},
-		normalResource.Stream: {
-			MinBound: *mustParseTime(t, "2022-02-03T04:05:06Z"),
-			MaxBound: mustParseTime(t, "2023-02-03T07:08:09Z"),
-			MaxMod:   mustParseTime(t, "2023-02-03T07:08:08Z"),
-			Path:     "/another/path",
-			Records:  20,
-			Complete: true,
-		},
-		hardResource.Stream: {
-			MinBound: *mustParseTime(t, "2021-02-03T04:05:06Z"),
-			MaxBound: nil,
-			MaxMod:   nil,
-			Path:     "",
-			Records:  0,
-			Complete: false,
-		},
-	}
-
-	want := CaptureState{
-		States: map[boilerplate.StateKey]State{
-			boilerplate.StateKey(easyBinding.StateKey):   originalState[easyResource.Stream],
-			boilerplate.StateKey(normalBinding.StateKey): originalState[normalResource.Stream],
-			boilerplate.StateKey(hardBinding.StateKey):   originalState[hardResource.Stream],
-		},
-	}
-
-	initial, migrated, err := unmarshalState(mustMarshal(t, originalState), bindings)
-	require.NoError(t, err)
-	require.True(t, migrated)
-	require.Equal(t, want, initial)
-
-	next, migrated, err := unmarshalState(mustMarshal(t, initial), bindings)
-	require.NoError(t, err)
-	require.False(t, migrated)
-	require.Equal(t, want, next)
-}
 
 func TestNoFiles(t *testing.T) {
 	var s State
@@ -105,7 +18,7 @@ func TestNoFiles(t *testing.T) {
 	// File is too new.
 	var skip, reason = s.shouldSkip("aaa", *ts(11))
 	require.True(t, skip)
-	require.Equal(t, "!MaxBound.After(modTime)", reason)
+	require.Equal(t, "!MaxBound.After(modTime): MaxBound 1970-01-01 00:00:10 +0000 UTC vs. modTime 1970-01-01 00:00:11 +0000 UTC", reason)
 
 	s.finishSweep(true)
 	verify(t, State{}, s)
@@ -185,7 +98,7 @@ func TestSuccessfulSweeps(t *testing.T) {
 	// Non-monotonic: This time, aaa @8 is too old to be processed.
 	skip, reason := s1.shouldSkip("aaa", *ts(8))
 	require.True(t, skip)
-	require.Equal(t, reason, "!modTime.After(MinBound)")
+	require.Equal(t, reason, "!modTime.After(MinBound): modTime 1970-01-01 00:00:08 +0000 UTC vs. MinBound 1970-01-01 00:00:08 +0000 UTC")
 
 	// bbb @9 has been modified, and should be.
 	// We detect this even though it's before our previous sweep start,
@@ -294,7 +207,7 @@ func TestSuccessfulSweeps(t *testing.T) {
 	// It skips a modTime that's < 50, but > the recovered MaxBound.
 	skip, reason = s1.shouldSkip("zzz", *ts(45))
 	require.True(t, skip)
-	require.Equal(t, reason, "!MaxBound.After(modTime)")
+	require.Equal(t, reason, "!MaxBound.After(modTime): MaxBound 1970-01-01 00:00:40 +0000 UTC vs. modTime 1970-01-01 00:00:45 +0000 UTC")
 
 	// s1 recovers by re-reading ddd @ 35.
 	require.True(t, s1.startPath("ddd", *ts(35)))
@@ -409,13 +322,13 @@ func TestMonotonicChanges(t *testing.T) {
 	// Still does not re-process files, but now its based on the MinBound.
 	skip, reason = s.shouldSkip("aaa", *ts(5))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:05 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 	skip, reason = s.shouldSkip("ccc", *ts(12))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:12 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 	skip, reason = s.shouldSkip("eee", *ts(23))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:23 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 
 	// Will process newer files.
 	skip, _ = s.shouldSkip("fff", *ts(33))
@@ -449,7 +362,7 @@ func TestMonotonicChanges(t *testing.T) {
 	// since MinBound is retained, even though it is not incremented.
 	skip, reason = s.shouldSkip("ggg", *ts(1))
 	require.True(t, skip)
-	require.Equal(t, "!modTime.After(MinBound)", reason)
+	require.Equal(t, "!modTime.After(MinBound): modTime 1970-01-01 00:00:01 +0000 UTC vs. MinBound 1970-01-01 00:00:23 +0000 UTC", reason)
 }
 
 func ts(i int64) *time.Time {

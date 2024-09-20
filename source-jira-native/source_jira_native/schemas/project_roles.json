@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id"],
+  "description": "Project Roles",
+  "properties": {
+    "id": {
+      "description": "The ID of the project role.",
+      "type": "integer"
+    }
+  },
+  "additionalProperties": true
+}

@@ -4,29 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export REDSHIFT_ADDRESS="${REDSHIFT_ADDRESS}"
-export REDSHIFT_USER="${REDSHIFT_USER}"
-export REDSHIFT_PASSWORD="${REDSHIFT_PASSWORD}"
-export REDSHIFT_DATABASE="${REDSHIFT_DATABASE}"
-export REDSHIFT_BUCKET="${REDSHIFT_BUCKET}"
-export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
-export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
-export AWS_REGION="${AWS_REGION}"
-
-config_json_template='{
-   "address":             "$REDSHIFT_ADDRESS",
-   "database":            "$REDSHIFT_DATABASE",
-   "password":            "$REDSHIFT_PASSWORD",
-   "user":                "$REDSHIFT_USER",
-   "bucket":              "$REDSHIFT_BUCKET",
-   "awsAccessKeyId":      "$AWS_ACCESS_KEY_ID",
-   "awsSecretAccessKey":  "$AWS_SECRET_ACCESS_KEY",
-   "region":              "$AWS_REGION",
-   "advanced": {
-      "updateDelay": "0s"
-    }
-}'
-
 resources_json_template='[
   {
     "resource": {
@@ -89,8 +66,23 @@ resources_json_template='[
       "table": "long_string"
     },
     "source": "${TEST_COLLECTION_LONG_STRING}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
-export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export REDSHIFT_ADDRESS="$(echo $CONNECTOR_CONFIG | jq -r .address)"
+export REDSHIFT_USER="$(echo $CONNECTOR_CONFIG | jq -r .user)"
+export REDSHIFT_PASSWORD="$(echo $CONNECTOR_CONFIG | jq -r .password)"
+export REDSHIFT_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
+export REDSHIFT_BUCKET="$(echo $CONNECTOR_CONFIG | jq -r .bucket)"
+export AWS_ACCESS_KEY_ID="$(echo $CONNECTOR_CONFIG | jq -r .awsAccessKeyId)"
+export AWS_SECRET_ACCESS_KEY="$(echo $CONNECTOR_CONFIG | jq -r .awsSecretAccessKey)"
+export AWS_REGION="$(echo $CONNECTOR_CONFIG | jq -r .region)"
+
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"

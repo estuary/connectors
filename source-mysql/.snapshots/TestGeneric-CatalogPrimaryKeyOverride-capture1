@@ -104,5 +104,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FGeneric_CatalogPrimaryKeyOverride_83617880":{"backfilled":100,"key_columns":["fullname","year"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":"int","state":"varchar","year":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FGeneric_CatalogPrimaryKeyOverride_83617880":{"backfilled":100,"key_columns":["fullname","year"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

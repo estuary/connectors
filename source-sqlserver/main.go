@@ -13,6 +13,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
@@ -36,19 +37,24 @@ const defaultPort = "1433"
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address       string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User          string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password      string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database      string         `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	Timezone      string         `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
-	Advanced      advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
-	WatermarksTable   string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	SkipBackfills     string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	WatermarksTable             string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	SkipBackfills               string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize           int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	AutomaticChangeTableCleanup bool   `json:"change_table_cleanup,omitempty" jsonschema:"title=Automatic Change Table Cleanup,default=false,description=When set the connector will delete CDC change table entries as soon as they are persisted into Flow. Requires DBO permissions to use."`
+	AutomaticCaptureInstances   bool   `json:"capture_instance_management,omitempty" jsonschema:"title=Automatic Capture Instance Management,default=false,description=When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use."`
 }
 
 type tunnelConfig struct {
@@ -75,7 +81,7 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Timezone != "" {
-		if _, err := sqlcapture.ParseTimezone(c.Timezone); err != nil {
+		if _, err := schedule.ParseTimezone(c.Timezone); err != nil {
 			return err
 		}
 	}
@@ -188,7 +194,12 @@ type sqlserverDatabase struct {
 	config *Config
 	conn   *sql.DB
 
-	datetimeLocation *time.Location // The location in which to interpret DATETIME column values as timestamps.
+	discovery        map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
+	datetimeLocation *time.Location                                    // The location in which to interpret DATETIME column values as timestamps.
+}
+
+func (db *sqlserverDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
 }
 
 func (db *sqlserverDatabase) connect(ctx context.Context) error {
@@ -215,7 +226,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	}
 	db.conn = conn
 
-	loc, err := sqlcapture.ParseTimezone(db.config.Timezone)
+	loc, err := schedule.ParseTimezone(db.config.Timezone)
 	if err != nil {
 		return fmt.Errorf("invalid config timezone: %w", err)
 	}

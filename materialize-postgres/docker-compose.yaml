@@ -3,12 +3,19 @@ version: "3.7"
 services:
   postgres:
     image: 'postgres:latest'
-    command: ["postgres"]
-    environment: {"POSTGRES_DB": "flow", "POSTGRES_USER": "flow", "POSTGRES_PASSWORD": "flow"}
+    command: [ "postgres" ]
+    environment:
+      {
+        "POSTGRES_DB": "flow",
+        "POSTGRES_USER": "flow",
+        "POSTGRES_PASSWORD": "flow"
+      }
     networks:
       - flow-test
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
 networks:
   flow-test:

@@ -13,66 +13,31 @@ import (
 	"github.com/segmentio/encoding/json"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
+)
+
+var (
+	// TestShutdownAfterBackfill is a test behavior flag which causes the capture
+	// to shut down after backfilling one chunk from one table. It is always false
+	// in normal operation.
+	TestShutdownAfterBackfill = false
+
+	// TestShutdownAfterCaughtUp is a test behavior flag which causes the capture
+	// to shut down after replication is all caught up and all tables are fully
+	// backfilled. It is always false in normal operation.
+	TestShutdownAfterCaughtUp = false
+
+	// StreamingFenceInterval is a constant controlling how frequently the capture
+	// will establish a new fence during indefinite streaming. It's declared as a
+	// variable so that it can be overridden during tests.
+	StreamingFenceInterval = 60 * time.Second
 )
 
 // PersistentState represents the part of a connector's state which can be serialized
 // and emitted in a state checkpoint, and resumed from after a restart.
 type PersistentState struct {
-	Cursor     string                               `json:"cursor"`                   // The replication cursor of the most recent 'Commit' event
-	Streams    map[boilerplate.StateKey]*TableState `json:"bindingStateV1,omitempty"` // A mapping from runtime-provided state keys to table-specific state.
-	OldStreams map[string]*TableState               `json:"streams,omitempty"`        // TODO(whb): Remove once all captures have migrated.
-}
-
-func migrateState(state *PersistentState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
-	if state.Streams != nil && state.OldStreams != nil {
-		return false, fmt.Errorf("application error: both Streams and OldStreams were non-nil")
-	} else if state.Streams != nil {
-		logrus.Info("skipping state migration since it's already done")
-		return false, nil
-	} else if state.OldStreams == nil {
-		logrus.Info("skipping state migration since there is no old state")
-		return false, nil
-	}
-
-	state.Streams = make(map[boilerplate.StateKey]*TableState)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res Resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return false, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		var streamID = JoinStreamID(res.Namespace, res.Stream)
-
-		ll := logrus.WithFields(logrus.Fields{
-			"stateKey": b.StateKey,
-			"resource": res,
-			"streamID": streamID,
-		})
-
-		stateFromOld, ok := state.OldStreams[streamID]
-		if !ok {
-			// This should only happen if a new binding has been added at the same time as the
-			// connector first restarted for the state migration.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.Streams[boilerplate.StateKey(b.StateKey)] = stateFromOld
-		ll.Info("migrated binding state")
-	}
-
-	state.OldStreams = nil
-
-	return true, nil
+	Cursor  string                               `json:"cursor"`                   // The replication cursor of the most recent 'Commit' event
+	Streams map[boilerplate.StateKey]*TableState `json:"bindingStateV1,omitempty"` // A mapping from runtime-provided state keys to table-specific state.
 }
 
 // Validate performs basic sanity-checking after a state has been parsed from JSON. More
@@ -166,13 +131,13 @@ type Capture struct {
 }
 
 const (
-	heartbeatWatermarkInterval = 60 * time.Second // When streaming indefinitely, write a heartbeat watermark this often
-	streamIdleWarning          = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
-	streamProgressInterval     = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
+	automatedDiagnosticsTimeout = 60 * time.Second // How long to wait *after the point where the fence was requested* before triggering automated diagnostics.
+	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
+	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 )
 
 var (
-	errWatermarkNotReached = fmt.Errorf("replication stream closed before reaching watermark")
+	ErrFenceNotReached = fmt.Errorf("replication stream closed before reaching fence")
 )
 
 // Run is the top level entry point of the capture process.
@@ -209,13 +174,6 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
-	var watermarks = c.Database.WatermarksTable()
-	if c.discovery[watermarks] == nil {
-		return fmt.Errorf("watermarks table %q does not exist", watermarks)
-	}
-	if err := replStream.ActivateTable(ctx, watermarks, c.discovery[watermarks].PrimaryKey, c.discovery[watermarks], nil); err != nil {
-		return fmt.Errorf("error activating table %q: %w", watermarks, err)
-	}
 	if err := replStream.StartReplication(ctx); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
@@ -233,16 +191,12 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	// Perform an initial "catch-up" stream-to-watermark before transitioning
+	// Perform an initial "catch-up" stream-to-fence before transitioning
 	// any "Pending" streams into the "Backfill" state. This helps ensure that
 	// a given stream only ever observes replication events which occur *after*
 	// the connector was started.
-	var watermark = uuid.New().String()
-	if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
-		return fmt.Errorf("error writing next watermark: %w", err)
-	}
-	if err := c.streamCatchup(ctx, replStream, watermark); err != nil {
-		return fmt.Errorf("error streaming until watermark: %w", err)
+	if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
+		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 	for _, binding := range c.BindingsInState(TableModePending) {
 		var streamID = binding.StreamID
@@ -283,7 +237,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		c.State.Streams[stateKey] = state
 
 		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
-			return fmt.Errorf("error activating %q for replication: %w", streamID, err)
+			return fmt.Errorf("error activating replication for table %q: %w", streamID, err)
 		}
 	}
 
@@ -321,38 +275,40 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}
 
-	// Backfill any tables which require it
+	// Backfill any tables which require it.
 	for c.BindingsCurrentlyBackfilling() != nil {
-		var watermark = uuid.New().String()
-		if err := c.Database.WriteWatermark(ctx, watermark); err != nil {
-			return fmt.Errorf("error writing next watermark: %w", err)
-		} else if err := c.streamToWatermark(ctx, replStream, watermark); err != nil {
-			return fmt.Errorf("error streaming until watermark: %w", err)
+		if err := c.backfillStreams(ctx); err != nil {
+			return fmt.Errorf("error performing backfill: %w", err)
+		} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
+			return fmt.Errorf("error streaming until fence: %w", err)
 		} else if err := c.emitState(); err != nil {
 			return err
-		} else if err := c.backfillStreams(ctx); err != nil {
-			return fmt.Errorf("error performing backfill: %w", err)
+		}
+
+		if TestShutdownAfterBackfill {
+			return nil // In tests we sometimes want to shut down here
 		}
 	}
 
 	// Once all backfills are complete, make sure an up-to-date state checkpoint
 	// gets emitted. This ensures that streams reliably transition into the Active
-	// state on the first connector run even if there are no replication events
-	// occurring.
+	// state during tests even if there is no backfill work to do.
 	logrus.Info("no tables currently require backfilling")
 	if err := c.emitState(); err != nil {
 		return err
 	}
+	if TestShutdownAfterCaughtUp {
+		return nil // In tests we typically want to shut down at this point
+	}
 
-	// Once there is no more backfilling to do, just stream changes forever and emit
-	// state updates on every transaction commit.
+	// Finally, we can just stream changes indefinitely, emitting state updates on every transaction commit.
 	if err := c.streamForever(ctx, replStream); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (c *Capture) updateState(ctx context.Context) error {
+func (c *Capture) updateState(_ context.Context) error {
 	// Create the Streams map if nil
 	if c.State.Streams == nil {
 		c.State.Streams = make(map[boilerplate.StateKey]*TableState)
@@ -476,7 +432,7 @@ func (c *Capture) updateState(ctx context.Context) error {
 	// bindings and then re-enable them (which will cause them all to get backfilled anew, as they
 	// should after such an event).
 	if allStreamsAreNew {
-		logrus.Info("no active bindings, resetting cursor")
+		logrus.Info("all bindings are new, resetting replication cursor")
 		c.State.Cursor = ""
 	}
 
@@ -485,70 +441,30 @@ func (c *Capture) updateState(ctx context.Context) error {
 	return c.emitState()
 }
 
-func (c *Capture) streamCatchup(ctx context.Context, replStream ReplicationStream, watermark string) error {
-	return c.streamToWatermarkWithOptions(ctx, replStream, watermark, true)
-}
-
-func (c *Capture) streamToWatermark(ctx context.Context, replStream ReplicationStream, watermark string) error {
-	return c.streamToWatermarkWithOptions(ctx, replStream, watermark, false)
-}
-
 func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStream) error {
 	logrus.Info("streaming replication events indefinitely")
 	for ctx.Err() == nil {
-		// Spawn a worker goroutine which will write the watermark value after the appropriate interval.
-		var watermark = uuid.New().String()
-		var group, workerCtx = errgroup.WithContext(ctx)
-		group.Go(func() error {
-			select {
-			case <-workerCtx.Done():
-				logrus.WithField("watermark", watermark).Warn("not writing watermark due to context cancellation")
-				return workerCtx.Err()
-			case <-time.After(heartbeatWatermarkInterval):
-				if err := c.Database.WriteWatermark(workerCtx, watermark); err != nil {
-					logrus.WithField("watermark", watermark).Error("failed to write watermark")
-					return fmt.Errorf("error writing next watermark: %w", err)
-				}
-				logrus.WithField("watermark", watermark).Debug("watermark written")
-				return nil
-			}
-		})
-
-		// Perform replication streaming until the watermark is reached (or the
-		// watermark-writing thread returns an error which cancels the context).
-		group.Go(func() error {
-			if err := c.streamCatchup(workerCtx, replStream, watermark); err != nil {
-				return fmt.Errorf("error streaming until watermark: %w", err)
-			}
-			return nil
-		})
-
-		if err := group.Wait(); err != nil {
+		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
 			return err
 		}
 	}
 	return ctx.Err()
 }
 
-// streamToWatermarkWithOptions implements two very similar operations:
+// streamToFence processes replication events until after a new fence is reached.
 //
-//   - streamCatchup: Processes replication events until the watermark is reached
-//     and then stops. Whenever a database transaction commit is reported, a Flow
-//     state checkpoint update is emitted.
-//   - streamToWatermark: Like streamCatchup except that no state checkpoints are
-//     emitted during replication processing. This is done during backfills so that
-//     a chunk of backfilled rows plus all relevant replication events will be
-//     committed into the same Flow transaction.
+// If reportFlush is true then all database transaction commits will be reported as
+// Flow transaction commits, and if it's false then they will not (this is used in
+// backfills to ensure that a backfill chunk and all concurrent changes commit as
+// a single Flow transaction).
 //
-// Both operations are implemented as a single function here with a parameter
-// controlling checkpoint behavior because they're so similar.
-func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream ReplicationStream, watermark string, reportFlush bool) error {
-	logrus.WithField("watermark", watermark).Info("streaming to watermark")
-	var watermarksTable = c.Database.WatermarksTable()
-	var watermarkReached = false
+// The fenceAfter argument is passed to the underlying replication stream, so that
+// it can make sure to stream changes for at least that length of time.
+func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream, fenceAfter time.Duration, reportFlush bool) error {
+	logrus.WithField("fenceAfter", fenceAfter.String()).Info("streaming to fence")
 
-	// Log a warning and perform replication diagnostics if we don't observe the watermark within a few minutes
-	var diagnosticsTimeout = time.AfterFunc(2*heartbeatWatermarkInterval, func() {
+	// Log a warning and perform replication diagnostics if we don't observe the next fence within a few minutes
+	var diagnosticsTimeout = time.AfterFunc(fenceAfter+automatedDiagnosticsTimeout, func() {
 		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
 		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
 			logrus.WithField("err", err).Error("replication diagnostics error")
@@ -556,16 +472,20 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 	})
 	defer diagnosticsTimeout.Stop()
 
-	// When streaming completes (because we've either reached the watermark or encountered an error),
+	// When streaming completes (because we've either reached the fence or encountered an error),
 	// log the number of events which have been processed.
 	var eventCount int
 	defer func() { logrus.WithField("events", eventCount).Info("processed replication events") }()
 
-	for event := range replStream.Events() {
+	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		eventCount++
 
-		// Flush events update the checkpointed LSN and trigger a state update.
-		// If this is the commit after the target watermark, it also ends the loop.
+		// Keepalive events do nothing other than increment the event count.
+		if _, ok := event.(*KeepaliveEvent); ok {
+			return nil
+		}
+
+		// Flush events update the checkpoint LSN and may trigger a state update.
 		if event, ok := event.(*FlushEvent); ok {
 			c.State.Cursor = event.Cursor
 			if reportFlush {
@@ -573,32 +493,11 @@ func (c *Capture) streamToWatermarkWithOptions(ctx context.Context, replStream R
 					return fmt.Errorf("error emitting state update: %w", err)
 				}
 			}
-			if watermarkReached {
-				return nil
-			}
-			continue
+			return nil
 		}
 
-		// Check for watermark change events and set a flag when the target watermark is reached.
-		// The subsequent FlushEvent will exit the loop.
-		if event, ok := event.(*ChangeEvent); ok {
-			if event.Operation != DeleteOp && event.Source.Common().StreamID() == watermarksTable {
-				var actual = event.After["watermark"]
-				logrus.WithFields(logrus.Fields{"expected": watermark, "actual": actual}).Debug("watermark change")
-				if actual == watermark {
-					watermarkReached = true
-				}
-			}
-		}
-
-		if err := c.handleReplicationEvent(event); err != nil {
-			return err
-		}
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-	return errWatermarkNotReached
+		return c.handleReplicationEvent(event)
+	})
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
@@ -677,7 +576,7 @@ func (c *Capture) backfillStreams(ctx context.Context) error {
 	if len(streams) != 0 {
 		var streamID = streams[rand.Intn(len(streams))]
 		logrus.WithFields(logrus.Fields{
-			"streams":  streams,
+			"count":    len(streams),
 			"selected": streamID,
 		}).Info("backfilling streams")
 		if err := c.backfillStream(ctx, streamID); err != nil {
@@ -699,7 +598,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	// Process backfill query results as a callback-driven stream.
 	var lastRowKey = streamState.Scanned
 	var eventCount int
-	var err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
+	var backfillComplete, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
 		if streamState.Mode == TableModePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
@@ -730,13 +629,18 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	}
 
 	// Update stream state to reflect backfill results
+	logrus.WithFields(logrus.Fields{
+		"stream": streamID,
+		"rows":   eventCount,
+	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
-	if eventCount == 0 {
+	state.BackfilledCount += eventCount
+	if backfillComplete {
+		logrus.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableModeActive
 		state.Scanned = nil
 	} else {
 		state.Scanned = lastRowKey
-		state.BackfilledCount += eventCount
 	}
 	state.dirty = true
 	c.State.Streams[stateKey] = state
@@ -851,12 +755,16 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 
 	var cursor = c.pending.cursors[count-1]
 	c.pending.cursors = c.pending.cursors[count:]
-	logrus.WithField("cursor", cursor).Trace("acknowledged up to cursor")
-	replStream.Acknowledge(ctx, cursor)
-	return nil
+	logrus.WithFields(logrus.Fields{
+		"count":  count,
+		"cursor": cursor,
+	}).Debug("acknowledged up to cursor")
+	return replStream.Acknowledge(ctx, cursor)
 }
 
+type StreamID = string
+
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
-func JoinStreamID(namespace, stream string) string {
+func JoinStreamID(namespace, stream string) StreamID {
 	return strings.ToLower(namespace + "." + stream)
 }

@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-brevo:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_brevo
+        config: {}
+    bindings: []

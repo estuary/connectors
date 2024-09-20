@@ -12,10 +12,11 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgconn"
+	"github.com/google/uuid"
 	"github.com/jackc/pglogrepl"
-	"github.com/jackc/pgproto3/v2"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
 
@@ -54,8 +55,35 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
+	// Check that the slot's `confirmed_flush_lsn` is less than or equal to our resume cursor value.
+	// This is necessary because Postgres deliberately allows clients to specify an older start LSN,
+	// and then ignores that and uses the confirmed LSN instead. Supposedly this simplifies writing
+	// clients in some cases, but in our case it never helps, and instead it causes trouble if/when
+	// the replication slot is dropped and recreated.
+	//
+	// TODO(wgd): Upgrade this check to an actual failure once it's been verified to work in prod.
+	if slotInfo, err := queryReplicationSlotInfo(ctx, db.conn, slot); err != nil {
+		logrus.WithField("err", err).Warn("error querying replication slot info")
+	} else if slotInfo == nil {
+		// This should never happen, since the "does the slot exist" validation check still exists and
+		// runs before we reach this part of the code. But I want this section of new logic here to be
+		// completely unable to produce a fatal error, and double-checking to make extra sure we don't
+		// accidentally dereference a null pointer doesn't really hurt anything.
+		logrus.WithField("slot", slot).Warn("replication slot has no metadata (and probably doesn't exist?)")
+	} else if slotInfo.Active {
+		logrus.WithField("slot", slot).Warn("replication slot is already active (is another capture already running against this database?)")
+	} else if slotInfo.WALStatus == "lost" {
+		logrus.WithField("slot", slot).Warn("replication slot was invalidated by the server, it must be deleted and all bindings backfilled")
+	} else if startLSN < slotInfo.ConfirmedFlushLSN {
+		logrus.WithFields(logrus.Fields{
+			"slot":         slot,
+			"confirmedLSN": slotInfo.ConfirmedFlushLSN.String(),
+			"startLSN":     startLSN.String(),
+		}).Warn("replication slot confirmed_flush_lsn greater than connector start LSN (this means it was probably deleted+recreated and all bindings need to be backfilled)")
+	}
+
 	logrus.WithFields(logrus.Fields{
-		"startLSN":    startLSN,
+		"startLSN":    startLSN.String(),
 		"publication": publication,
 		"slot":        slot,
 	}).Info("starting replication")
@@ -78,6 +106,11 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
+	var typeMap = pgtype.NewMap()
+	if err := registerDatatypeTweaks(typeMap); err != nil {
+		return nil, err
+	}
+
 	var stream = &replicationStream{
 		db:       db,
 		conn:     conn,
@@ -88,7 +121,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		lastTxnEndLSN:   startLSN,
 		nextTxnFinalLSN: 0,
 		nextTxnMillis:   0,
-		connInfo:        pgtype.NewConnInfo(),
+		typeMap:         typeMap,
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 	}
@@ -124,9 +157,9 @@ type postgresSource struct {
 
 // Named constants for the LSN locations within a postgresSource.Location.
 const (
-	pgLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
-	pgLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
-	pgLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
+	PGLocLastCommitEndLSN = 0 // Index of last Commit.EndLSN in postgresSource.Location.
+	PGLocEventLSN         = 1 // Index of this event LSN in postgresSource.Location.
+	PGLocBeginFinalLSN    = 2 // Index of current Begin.FinalLSN in postgresSource.Location.
 )
 
 func (s *postgresSource) Common() sqlcapture.SourceCommon {
@@ -135,9 +168,7 @@ func (s *postgresSource) Common() sqlcapture.SourceCommon {
 
 // A replicationStream represents the process of receiving PostgreSQL
 // Logical Replication events, managing keepalives and status updates,
-// and translating changes into a more friendly representation. There
-// is no built-in concurrency, so Process() must be called reasonably
-// soon after StartReplication() in order to not time out.
+// and translating changes into a more friendly representation.
 type replicationStream struct {
 	db       *postgresDatabase
 	conn     *pgconn.PgConn // The PostgreSQL replication connection
@@ -150,6 +181,7 @@ type replicationStream struct {
 	eventBuf sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
 
 	ackLSN          uint64        // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
+	previousAckLSN  pglogrepl.LSN // The last acknowledged LSN sent to the server in a Standby Status Update. Only used to reduce log spam at INFO level.
 	lastTxnEndLSN   pglogrepl.LSN // End LSN (record + 1) of the last completed transaction.
 	nextTxnFinalLSN pglogrepl.LSN // Final LSN of the commit currently being processed, or zero if between transactions.
 	nextTxnMillis   int64         // Unix timestamp (in millis) at which the change originally occurred.
@@ -160,9 +192,8 @@ type replicationStream struct {
 	// the DB.
 	standbyStatusDeadline time.Time
 
-	// connInfo is a sort of type registry used when decoding values
-	// from the database.
-	connInfo *pgtype.ConnInfo
+	// typeMap is a sort of type registry used when decoding values from the database.
+	typeMap *pgtype.Map
 
 	// relations keeps track of all "Relation Messages" from the database. These
 	// messages tell us about the integer ID corresponding to a particular table
@@ -186,16 +217,92 @@ const standbyStatusInterval = 10 * time.Second
 // In normal use it's a constant, it's just a variable so that tests are more
 // likely to exercise blocking sends and backpressure.
 //
-// The buffer is much larger for PostgreSQL than for most other databases, because
-// empirically this helps us to cope with spikes of intense load which can otherwise
-// cause the database to cut us off.
-var replicationBufferSize = 16 * 1024 // Assuming change events average ~2kB then 16k * 2kB = 32MB
+// This buffer has been set to a fairly small value, because larger buffers can
+// cause OOM kills when the incoming data rate exceeds the rate at which we're
+// serializing data and getting it into Gazette journals.
+var replicationBufferSize = 16
 
-func (s *replicationStream) Events() <-chan sqlcapture.DatabaseEvent {
-	return s.events
+func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
+	// Time-based event streaming until the fenceAfter duration is reached.
+	if fenceAfter > 0 {
+		var deadline = time.NewTimer(fenceAfter)
+		defer deadline.Stop()
+
+	loop:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-deadline.C:
+				break loop
+			case event, ok := <-s.events:
+				if !ok {
+					return sqlcapture.ErrFenceNotReached
+				} else if err := callback(event); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Establish a watermark-based fence position.
+	var fenceWatermark = uuid.New().String()
+	if err := s.db.WriteWatermark(ctx, fenceWatermark); err != nil {
+		return fmt.Errorf("error establishing watermark fence: %w", err)
+	}
+
+	// Stream replication events until the fence is reached.
+	var fenceReached = false
+	var watermarkStreamID = s.db.WatermarksTable()
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case event, ok := <-s.events:
+			if !ok {
+				return sqlcapture.ErrFenceNotReached
+			} else if err := callback(event); err != nil {
+				return err
+			}
+
+			// Mark the fence as reached when we observe a change event on the watermarks stream
+			// with the expected value.
+			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
+					var actual = event.After["watermark"]
+					if actual == nil {
+						actual = event.After["WATERMARK"]
+					}
+					logrus.WithFields(logrus.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
+					if actual == fenceWatermark {
+						fenceReached = true
+					}
+				}
+			}
+
+			// The flush event following the watermark change ends the stream-to-fence operation.
+			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
+				return nil
+			}
+		}
+	}
 }
 
 func (s *replicationStream) StartReplication(ctx context.Context) error {
+	// Activate replication for the watermarks table.
+	var discovery, err = s.db.DiscoverTables(ctx)
+	if err != nil {
+		return err
+	}
+	var watermarks = s.db.config.Advanced.WatermarksTable
+	var watermarksInfo = discovery[watermarks]
+	if watermarksInfo == nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
+	}
+	if err := s.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
+		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	}
+
 	var streamCtx, streamCancel = context.WithCancel(ctx)
 	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	s.errCh = make(chan error)
@@ -325,11 +432,49 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		}).Trace("ignoring Origin message")
 		return nil, nil
 	case *pglogrepl.TypeMessage:
+		// There are five kinds of user-defined datatype in Postgres:
+		//  - Domain types declared via 'CREATE DOMAIN name AS data_type'
+		//  - Tuples declared via 'CREATE TYPE name AS (...elements...)'
+		//  - Ranges declared via 'CREATE TYPE name AS RANGE (SUBTYPE = subtype, ...)'
+		//  - Enums declared via 'CREATE TYPE name AS ENUM (...values...)'
+		//  - Custom scalars defined with input and output functions
+		//
+		// We ignore custom scalar types as an option because they're incredibly niche.
+		//
+		// When a TypeMessage informs us about a tuple, range, or enum type it gives
+		// us the OID of the type and the 'schema.typename' name of the custom type.
+		// We receive no information about the element types or legal values of the
+		// user-defined type, and so we don't bother to do anything with the info and
+		// instead just let our unknown OID handling treat them as generic text.
+		//
+		// When a TypeMessage informs us about a *domain* type however, it gives us
+		// the OID of the type and the 'schema.typename' of the *base type*. When the
+		// base type is a builtin Postgres datatype the schema is omitted, and this
+		// implicitly means 'pg_catalog'.
+		//
+		// Ideally we want domain types to be decoded the same as a value of whichever
+		// base datatype it corresponds to. This is accomplished using a bit of logic
+		// that looks up the base name in the type map and then registers the user type
+		// OID as having the same name and codec.
 		logrus.WithFields(logrus.Fields{
-			"datatype":  msg.DataType,
+			"oid":       msg.DataType,
 			"namespace": msg.Namespace,
 			"name":      msg.Name,
-		}).Trace("user type definition")
+		}).Debug("user type definition")
+		if msg.Namespace == "" {
+			if baseType, ok := s.typeMap.TypeForName(msg.Name); ok {
+				s.typeMap.RegisterType(&pgtype.Type{
+					OID:   msg.DataType,
+					Name:  baseType.Name,
+					Codec: baseType.Codec,
+				})
+			} else {
+				logrus.WithFields(logrus.Fields{
+					"oid":  msg.DataType,
+					"name": msg.Name,
+				}).Warn("unknown type name for user-defined type")
+			}
+		}
 		return nil, nil
 	case *pglogrepl.BeginMessage:
 		if s.nextTxnFinalLSN != 0 {
@@ -541,28 +686,28 @@ func (s *replicationStream) decodeTuple(
 	return fields, nil
 }
 
-func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (interface{}, error) {
-	var decoder pgtype.TextDecoder
-	if dt, ok := s.connInfo.DataTypeForOID(dataType); ok {
-		decoder, ok = dt.Value.(pgtype.TextDecoder)
-		if !ok {
-			decoder = &pgtype.GenericText{}
-		}
-	} else {
-		decoder = &pgtype.GenericText{}
+func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (any, error) {
+	var dt, ok = s.typeMap.TypeForOID(dataType)
+	if !ok {
+		// Replication values always use the text encoding, and in the absence of any specific
+		// data type mapping we want to treat them as generic text strings, which is just a cast.
+		logrus.WithFields(logrus.Fields{
+			"oid":  dataType,
+			"text": string(data),
+		}).Trace("unknown OID, decoding as generic text")
+		return string(data), nil
 	}
-	if err := decoder.DecodeText(s.connInfo, data); err != nil {
-		if _, ok := err.(*time.ParseError); ok {
-			// The only known situations where a valid Postgres timestamp may fail to parse
-			// are when the year is greater than 9999 or less than 0. We don't support years
-			// outside of that range because timestamps are serialized to RFC3339, but generally
-			// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
-			// these all to the same error value is as good as any other option.
-			return negativeInfinityTimestamp, nil
-		}
-		return nil, err
+
+	var val, err = dt.Codec.DecodeValue(s.typeMap, dataType, pgtype.TextFormatCode, data)
+	// The only known situations where a valid Postgres timestamp may fail to parse
+	// are when the year is greater than 9999 or less than 0. We don't support years
+	// outside of that range because timestamps are serialized to RFC3339, but generally
+	// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
+	// these all to the same error value is as good as any other option.
+	if _, ok := err.(*time.ParseError); ok {
+		return negativeInfinityTimestamp, nil
 	}
-	return decoder.(pgtype.Value).Get(), nil
+	return val, err
 }
 
 // receiveMessage reads and parses the next replication message from the database,
@@ -626,10 +771,10 @@ func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
 
 func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
+	defer s.tables.Unlock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns
 	s.tables.discovery[streamID] = discovery
-	s.tables.Unlock()
 	return nil
 }
 
@@ -650,7 +795,12 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
 func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
-	logrus.WithField("cursor", cursor).Debug("advancing acknowledged LSN")
+	if cursor == "" {
+		// The empty cursor will be acknowledged once at startup when all bindings
+		// are new, because the initial state checkpoint will have an unspecified
+		// cursor value on purpose. We don't need to do anything with those.
+		return nil
+	}
 	var lsn, err = pglogrepl.ParseLSN(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
@@ -661,7 +811,13 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) erro
 
 func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 	var ackLSN = pglogrepl.LSN(atomic.LoadUint64(&s.ackLSN))
-	logrus.WithField("ackLSN", ackLSN).Debug("sending Standby Status Update")
+	if ackLSN != s.previousAckLSN {
+		// Log at info level whenever we're about to confirm a different LSN from last time.
+		logrus.WithField("ackLSN", ackLSN.String()).Info("advancing confirmed LSN")
+		s.previousAckLSN = ackLSN
+	} else {
+		logrus.WithField("ackLSN", ackLSN.String()).Debug("sending Standby Status Update")
+	}
 	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
 		WALWritePosition: ackLSN,
 	})
@@ -700,14 +856,14 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 			for idx, val := range row {
 				logFields[string(keys[idx].Name)] = val
 			}
-			logrus.WithFields(logFields).Info("got row")
+			logrus.WithFields(logFields).Info("got diagnostic row")
 		}
 		if numResults == 0 {
 			logrus.WithField("query", q).Info("no results")
 		}
 	}
 
-	query("SELECT * FROM public.flow_watermarks;")
+	query("SELECT * FROM " + db.WatermarksTable() + ";")
 	query("SELECT * FROM pg_replication_slots;")
 	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
 	return nil

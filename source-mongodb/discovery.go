@@ -24,12 +24,22 @@ var minimalSchema = generateMinimalSchema()
 const idProperty = "_id"
 
 const (
-	metaProperty = "_meta"
-	opProperty   = "op"
+	metaProperty   = "_meta"
+	opProperty     = "op"
+	beforeProperty = "before"
+	sourceProperty = "source"
 )
 
 type documentMetadata struct {
-	Op string `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
+	Op     string         `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
+	Before map[string]any `json:"before,omitempty" jsonschema:"title=Before Document,description=Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."`
+	Source *sourceMeta    `json:"source,omitempty" jsonschema:"title=Source,description=Document source metadata."`
+}
+
+type sourceMeta struct {
+	DB         string `json:"db" jsonschema:"description=Name of the source MongoDB database."`
+	Collection string `json:"collection" jsonschema:"description=Name of the source MongoDB collection."`
+	Snapshot   bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."`
 }
 
 func generateMinimalSchema() json.RawMessage {
@@ -54,6 +64,31 @@ func generateMinimalSchema() json.RawMessage {
 				metaProperty: metadataSchema,
 			},
 			"x-infer-schema": true,
+		},
+		If: &jsonschema.Schema{
+			Extras: map[string]interface{}{
+				"properties": map[string]*jsonschema.Schema{
+					"_meta": {
+						Extras: map[string]interface{}{
+							"properties": map[string]*jsonschema.Schema{
+								"op": {
+									Extras: map[string]interface{}{
+										"const": "d",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Then: &jsonschema.Schema{
+			Extras: map[string]interface{}{
+				"reduce": map[string]interface{}{
+					"strategy": "merge",
+					"delete":   true,
+				},
+			},
 		},
 	}
 
@@ -82,10 +117,6 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 			panic(err)
 		}
 	}()
-
-	if _, err = checkOplog(ctx, client); err != nil {
-		return nil, err
-	}
 
 	var systemDatabases = []string{"config", "local"}
 

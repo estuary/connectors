@@ -4,6 +4,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,11 +12,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	sf "github.com/snowflakedb/gosnowflake"
 	"go.gazette.dev/core/consumer/protocol"
@@ -24,8 +28,8 @@ import (
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe for Delta Update bindings"`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
 
 	// If the endpoint schema is the same as the resource schema, the resource path will be only the
 	// table name. This is to provide compatibility for materializations that were created prior to
@@ -75,15 +79,13 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-// The Snowflake driver Params map uses string pointers as values, which is what this is used for.
-var trueString = "true"
-
 // newSnowflakeDriver creates a new Driver for Snowflake.
 func newSnowflakeDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var parsed = new(config)
 			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
@@ -92,7 +94,6 @@ func newSnowflakeDriver() *sql.Driver {
 
 			log.WithFields(log.Fields{
 				"host":     parsed.Host,
-				"user":     parsed.User,
 				"database": parsed.Database,
 				"schema":   parsed.Schema,
 				"tenant":   tenant,
@@ -101,7 +102,23 @@ func newSnowflakeDriver() *sql.Driver {
 			var metaBase sql.TablePath = []string{parsed.Schema}
 			var metaSpecs, _ = sql.MetaTables(metaBase)
 
-			var dialect = snowflakeDialect(parsed.Schema)
+			dsn, err := parsed.toURI(tenant)
+			if err != nil {
+				return nil, fmt.Errorf("building snowflake dsn: %w", err)
+			}
+
+			db, err := stdsql.Open("snowflake", dsn)
+			if err != nil {
+				return nil, fmt.Errorf("newSnowflakeDriver stdsql.Open: %w", err)
+			}
+			defer db.Close()
+
+			timestampTypeMapping, err := getTimestampTypeMapping(ctx, db)
+			if err != nil {
+				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
+			}
+
+			var dialect = snowflakeDialect(parsed.Schema, timestampTypeMapping)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
@@ -119,25 +136,45 @@ func newSnowflakeDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
+}
+
+func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, error) {
+	xdb := sqlx.NewDb(db, "snowflake").Unsafe()
+
+	type paramRow struct {
+		Value string `db:"value"`
+	}
+
+	got := paramRow{}
+	if err := xdb.GetContext(ctx, &got, "SHOW PARAMETERS LIKE 'TIMESTAMP_TYPE_MAPPING';"); err != nil {
+		return "", err
+	}
+
+	m := timestampTypeMapping(got.Value)
+	if !m.valid() {
+		return "", fmt.Errorf("invalid timestamp type mapping: %s", got.Value)
+	}
+
+	log.WithField("value", got.Value).Debug("queried TIMESTAMP_TYPE_MAPPING")
+
+	if m == timestampNTZ {
+		// Default to LTZ if the TIMESTAMP_TYPE_MAPPING is set to NTZ, either
+		// explicitly or via the default.
+		m = timestampLTZ
+	}
+
+	return m, nil
 }
 
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
 	cfg        *config
+	ep         *sql.Endpoint
 	db         *stdsql.DB
 	pipeClient *PipeClient
-
-	// We initialise pipes (with a create or replace query) on the first Store
-	// to ensure that queries running as part of the first recovery Acknowledge
-	// do not create duplicates. Queries running on a pipe are idempotent so long
-	// as the pipe is not removed or replaced. The replace clause of the query
-	// will wipe the history of the pipe and so lead to duplicate documents
-	pipesInit bool
-
-	// map of pipe name to beginMarker cursors
-	pipeMarkers map[string]string
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -148,30 +185,26 @@ type transactor struct {
 		conn  *stdsql.Conn
 		fence *sql.Fence
 	}
-	templates   templates
-	bindings    []*binding
-	updateDelay time.Duration
-	cp          checkpoint
+	templates templates
+	bindings  []*binding
+	sched     schedule.Schedule
+	cp        checkpoint
 
-	// this shard's range spec, used to key pipes so they don't collide
-	_range *pf.RangeSpec
+	// this shard's range spec and version, used to key pipes so they don't collide
+	_range  *pf.RangeSpec
+	version string
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	if err := json.Unmarshal(state, &d.cp); err != nil {
 		return err
-	}
-	// TODO: remove after migration
-	for _, item := range d.cp {
-		if len(item.StagedDir) == 0 {
-			log.WithField("state", string(state)).Info("found old checkpoint format, ignoring the checkpoint and starting clean")
-			d.cp = make(checkpoint)
-			break
-		}
 	}
 
 	return nil
@@ -186,9 +219,12 @@ func newTransactor(
 ) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
-	dialect := snowflakeDialect(cfg.Schema)
+	dsn, err := cfg.toURI(ep.Tenant)
+	if err != nil {
+		return nil, fmt.Errorf("building snowflake dsn: %w", err)
+	}
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true))
+	db, err := stdsql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 	}
@@ -201,33 +237,36 @@ func newTransactor(
 		}
 		pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
 		if err != nil {
-			return nil, fmt.Errorf("NewPipeCLient: %w", err)
+			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 	}
 
 	var d = &transactor{
-		cfg:         cfg,
-		templates:   renderTemplates(dialect),
-		db:          db,
-		pipeClient:  pipeClient,
-		pipeMarkers: make(map[string]string),
-		_range:      open.Range,
+		cfg:        cfg,
+		ep:         ep,
+		templates:  renderTemplates(ep.Dialect),
+		db:         db,
+		pipeClient: pipeClient,
+		_range:     open.Range,
+		version:    open.Version,
 	}
 
-	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Host+cfg.Warehouse)); err != nil {
 		return nil, err
+	} else if useSched {
+		d.sched = sched
 	}
 
 	d.store.fence = &fence
 
 	// Establish connections.
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
+	if db, err := stdsql.Open("snowflake", dsn); err != nil {
 		return nil, fmt.Errorf("load stdsql.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("load db.Conn: %w", err)
 	}
 
-	if db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, true)); err != nil {
+	if db, err := stdsql.Open("snowflake", dsn); err != nil {
 		return nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
 		return nil, fmt.Errorf("store db.Conn: %w", err)
@@ -239,7 +278,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
+		if err = d.addBinding(binding); err != nil {
 			return nil, fmt.Errorf("%v: %w", binding, err)
 		}
 	}
@@ -248,7 +287,8 @@ func newTransactor(
 }
 
 type binding struct {
-	target   sql.Table
+	target sql.Table
+
 	pipeName string
 	// Variables exclusively used by Load.
 	load struct {
@@ -264,18 +304,29 @@ type binding struct {
 	}
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
-	var d = new(binding)
-	d.target = target
+func (d *transactor) addBinding(target sql.Table) error {
+	var b = new(binding)
+	b.target = target
 
-	d.load.stage = newStagedFile(os.TempDir())
-	d.store.stage = newStagedFile(os.TempDir())
+	b.load.stage = newStagedFile(os.TempDir())
+	b.store.stage = newStagedFile(os.TempDir())
 
-	t.bindings = append(t.bindings, d)
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
+		var pipeName string
+		var err error
+		if pipeName, err = RenderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.pipeName); err != nil {
+			return fmt.Errorf("pipeName template: %w", err)
+		} else {
+			pipeName = strings.ToUpper(strings.Trim(pipeName, "`"))
+			b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, pipeName)
+		}
+	}
+
+	d.bindings = append(d.bindings, b)
 	return nil
 }
 
-const MaxConcurrentLoads = 5
+const MaxConcurrentQueries = 5
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -297,7 +348,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	var subqueries = make(map[int]string)
-	var toDelete []string
+	var filesToCleanup []string
 	for i, b := range d.bindings {
 		if !b.load.stage.started {
 			// Pass.
@@ -306,10 +357,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if subqueries[i], err = RenderTableAndFileTemplate(b.target, dir, d.templates.loadQuery); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			toDelete = append(toDelete, dir)
+			filesToCleanup = append(filesToCleanup, dir)
 		}
 	}
-	defer d.deleteFiles(ctx, toDelete)
+	defer d.deleteFiles(ctx, filesToCleanup)
 
 	log.Info("load: finished encoding and uploading of files")
 
@@ -318,7 +369,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.SetLimit(MaxConcurrentLoads)
+	group.SetLimit(MaxConcurrentQueries)
 	// Used to ensure we have no data-interleaving when calling |loaded|
 	var mutex sync.Mutex
 
@@ -374,41 +425,29 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
+func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, error) {
+	// Check to see if a pipe for this version already exists
+	var query = fmt.Sprintf("SHOW PIPES LIKE '%s';", pipeName)
+	rows, err := d.db.QueryContext(ctx, query)
+	if err != nil {
+		return false, fmt.Errorf("finding pipe %q: %w", pipeName, err)
+	}
+	return rows.Next(), nil
+}
+
 type checkpointItem struct {
 	Table     string
 	Query     string
 	StagedDir string
 	PipeName  string
 	PipeFiles []fileRecord
+	Version   string
 }
 
 type checkpoint = map[string]*checkpointItem
 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
-
-	if !d.pipesInit {
-		log.Info("store: initialising pipes")
-		for _, b := range d.bindings {
-			// If this is a delta updates binding and we are using JWT auth type, this binding
-			// can use snowpipe
-			if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
-				if pipeName, err := RenderTableAndShardTemplate(b.target, d._range.KeyBegin, d.templates.pipeName); err != nil {
-					return nil, fmt.Errorf("pipeName template: %w", err)
-				} else {
-					b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, strings.ToUpper(strings.Trim(pipeName, "`")))
-				}
-
-				if createPipe, err := RenderTableAndShardTemplate(b.target, d._range.KeyBegin, d.templates.createPipe); err != nil {
-					return nil, fmt.Errorf("createPipe template: %w", err)
-				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
-					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
-				}
-			}
-		}
-
-		d.pipesInit = true
-	}
 
 	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
@@ -418,9 +457,19 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.store.mustMerge = true
 		}
 
+		var flowDocument = it.RawJSON
+		if d.cfg.HardDelete && it.Delete {
+			if it.Exists {
+				flowDocument = json.RawMessage(`"delete"`)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
+		}
+
 		if err := b.store.stage.start(ctx, d.db); err != nil {
 			return nil, err
-		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
@@ -452,14 +501,48 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					Table:     b.target.Identifier,
 					Query:     mergeIntoQuery,
 					StagedDir: dir,
+					Version:   d.version,
 				}
 			}
 		} else if b.pipeName != "" {
+			var pipeNameParts = strings.Split(b.pipeName, ".")
+			var pipeNameLastPart = pipeNameParts[len(pipeNameParts)-1]
+
+			// Check to see if a pipe for this version already exists
+			exists, err := d.pipeExists(ctx, pipeNameLastPart)
+			if err != nil {
+				return nil, err
+			}
+
+			// Only create the pipe if it doesn't exist. Since the pipe name is versioned by the spec
+			// it means if the spec has been updated, we will end up creating a new pipe
+			if !exists {
+				log.WithField("name", b.pipeName).Info("store: creating pipe")
+				if createPipe, err := RenderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.createPipe); err != nil {
+					return nil, fmt.Errorf("createPipe template: %w", err)
+				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
+					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
+				}
+			}
+
+			// Our understanding is that CREATE PIPE is _eventually consistent_, and so we
+			// wait until we can make sure the pipe exists before continuing
+			for !exists {
+				exists, err = d.pipeExists(ctx, pipeNameLastPart)
+				if err != nil {
+					return nil, err
+				}
+				if !exists {
+					time.Sleep(5 * time.Second)
+				}
+			}
+
 			d.cp[b.target.StateKey] = &checkpointItem{
 				Table:     b.target.Identifier,
 				StagedDir: dir,
 				PipeFiles: b.store.stage.uploaded,
 				PipeName:  b.pipeName,
+				Version:   d.version,
 			}
 
 		} else {
@@ -561,14 +644,12 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	// Run the queries using AsyncMode, which means that `ExecContext` will not block
-	// until the query is successful, rather we will store the results of these queries
-	// in a map so that we can then call `RowsAffected` on them, blocking until
-	// the queries are actually executed and done
-	var asyncCtx = sf.WithAsyncMode(ctx)
+	// Run store queries concurrently, as each independently operates on a separate table.
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(MaxConcurrentQueries)
+
 	log.Info("store: starting committing changes")
 
-	var results = make(map[string]stdsql.Result)
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
@@ -578,12 +659,18 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		if len(item.Query) > 0 {
-			log.WithField("table", item.Table).Info("store: starting query")
-			if result, err := d.store.conn.ExecContext(asyncCtx, item.Query); err != nil {
-				return nil, fmt.Errorf("query %q failed: %w", item.Query, err)
-			} else {
-				results[stateKey] = result
-			}
+			item := item
+			group.Go(func() error {
+				log.WithField("table", item.Table).Info("store: starting query")
+				if _, err := d.db.ExecContext(groupCtx, item.Query); err != nil {
+					return fmt.Errorf("query %q failed: %w", item.Query, err)
+				}
+
+				log.WithField("table", item.Table).Info("store: finished query")
+				d.deleteFiles(ctx, []string{item.StagedDir})
+
+				return nil
+			})
 		} else if len(item.PipeFiles) > 0 {
 			log.WithField("table", item.Table).Info("store: starting pipe requests")
 			var fileRequests = make([]FileRequest, len(item.PipeFiles))
@@ -592,6 +679,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			}
 
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
+				var insertErr InsertFilesError
+				if errors.As(err, &insertErr) && insertErr.Code == "390404" && strings.Contains(insertErr.Message, "Pipe not found") {
+					log.WithField("pipeName", item.PipeName).Info("pipe does not exist, skipping this checkpoint item")
+					// Pipe was not found for this checkpoint item. We take this to mean that this item has already
+					// been processed and the pipe has been cleaned up by us in a prior Acknowledge
+					continue
+				}
 				return nil, fmt.Errorf("snowpipe insertFiles: %w", err)
 			} else {
 				log.WithField("response", resp).Debug("insertFiles successful")
@@ -605,14 +699,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 	}
 
-	for stateKey, r := range results {
-		var item = d.cp[stateKey]
-		if _, err := r.RowsAffected(); err != nil {
-			return nil, fmt.Errorf("query failed: %w", err)
-		}
-		log.WithField("table", item.Table).Info("store: finished query")
-
-		d.deleteFiles(ctx, []string{item.StagedDir})
+	if err := group.Wait(); err != nil {
+		return nil, fmt.Errorf("executing concurrent store query: %w", err)
 	}
 
 	// Keep asking for a report on the files that have been submitted for processing
@@ -620,8 +708,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 	// If we see no results from the REST API for `maxTries` iterations, then we
 	// fallback to asking the `COPY_HISTORY` table. We allow up to 5 minutes for results to show up in the REST API.
-	var maxTries = 20
-	var retryDelaySeconds = 3 * time.Second
+	var maxTries = 40
+	var retryDelay = 3 * time.Second
 	for tries := 0; tries < maxTries; tries++ {
 		for pipeName, pipe := range pipes {
 			// if the pipe has no files to begin with, just skip it
@@ -634,18 +722,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			// The REST API does not wake up the warehouse, hence our preference
 			// however this API is not the most ergonomic and sometimes does not yield
 			// results as expected
-			report, err := d.pipeClient.InsertReport(pipeName, d.pipeMarkers[pipeName])
+			report, err := d.pipeClient.InsertReport(pipeName)
 			if err != nil {
 				return nil, fmt.Errorf("snowpipe: insertReports: %w", err)
-			}
-
-			// completeResult=false means the latest report we received has a cursor
-			// which is ahead, and some results have not been seen by us and will not be
-			// seen with the given cursor. So we reset the cursor in this case and try again.
-			if !report.CompleteResult {
-				d.pipeMarkers[pipeName] = ""
-			} else {
-				d.pipeMarkers[pipeName] = report.NextBeginMark
 			}
 
 			// If the files have already been loaded, when we submit a request to
@@ -658,7 +737,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// We try `maxTries` times since it may take some time for the REST API
 				// to reflect the new pipe requests
 				if tries < maxTries-1 {
-					time.Sleep(retryDelaySeconds)
+					time.Sleep(retryDelay)
 					continue
 				}
 
@@ -694,7 +773,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// If items are still in progress, we continue trying to fetch their results
 				if hasItemsInProgress {
 					tries--
-					time.Sleep(retryDelaySeconds)
+					time.Sleep(retryDelay)
 					continue
 				}
 
@@ -725,12 +804,33 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				d.deleteFiles(ctx, []string{pipe.dir})
 				continue
 			} else {
-				time.Sleep(retryDelaySeconds)
+				time.Sleep(retryDelay)
 			}
 		}
 	}
 
 	log.Info("store: finished committing changes")
+
+	for _, b := range d.bindings {
+		var item, ok = d.cp[b.target.StateKey]
+		if !ok {
+			continue
+		}
+		// If the spec version has bumped, we need to clean up the old pipes
+		if len(item.PipeName) > 0 && item.Version != d.version {
+			log.WithField("pipeName", item.PipeName).Info("dropping pipe")
+			if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s;", item.PipeName)); err != nil {
+				return nil, fmt.Errorf("dropping pipe %s failed: %w", item.PipeName, err)
+			}
+		}
+	}
+
+	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+			return nil, fmt.Errorf("triggering dbt job: %w", err)
+		}
+	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again
@@ -745,7 +845,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		checkpointClear[b.target.StateKey] = nil
 		delete(d.cp, b.target.StateKey)
 	}
-	var checkpointJSON, err = json.Marshal(checkpointClear)
+	checkpointJSON, err := json.Marshal(checkpointClear)
 	if err != nil {
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}

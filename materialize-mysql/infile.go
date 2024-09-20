@@ -20,6 +20,7 @@ const (
 	loadInfileName   = "flow_batch_data_load"
 	insertInfileName = "flow_batch_data_insert"
 	updateInfileName = "flow_batch_data_update"
+	deleteInfileName = "flow_batch_data_delete"
 )
 
 type infile struct {

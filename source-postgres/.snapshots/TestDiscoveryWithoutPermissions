@@ -15,19 +15,43 @@ Binding 0:
           "$anchor": "PublicDiscoverywithoutpermissions_117535",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -99,9 +123,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

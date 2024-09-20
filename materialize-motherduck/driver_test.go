@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -138,27 +137,6 @@ func TestPrereqs(t *testing.T) {
 			want: nil,
 		},
 		{
-			name: "token is well formed but wrong",
-			cfg: func(cfg config) *config {
-				cfg.Token = fmt.Sprintf(
-					"%s.%s.%s",
-					base64.RawURLEncoding.EncodeToString([]byte("first")),
-					base64.RawURLEncoding.EncodeToString([]byte("middle")),
-					base64.RawURLEncoding.EncodeToString([]byte("last")),
-				)
-				return &cfg
-			},
-			want: []error{fmt.Errorf("invalid token: unauthenticated")},
-		},
-		{
-			name: "wrong schema",
-			cfg: func(cfg config) *config {
-				cfg.Schema = "wrong" + cfg.Schema
-				return &cfg
-			},
-			want: []error{fmt.Errorf("schema %q does not exist", "wrong"+cfg.Schema)},
-		},
-		{
 			name: "bucket doesn't exist",
 			cfg: func(cfg config) *config {
 				cfg.Bucket = nonExistentBucket
@@ -182,31 +160,13 @@ func TestPrereqs(t *testing.T) {
 			},
 			want: []error{fmt.Errorf("not authorized to write to %q", cfg.Bucket)},
 		},
-		{
-			name: "database problem and bucket problem",
-			cfg: func(cfg config) *config {
-				cfg.Schema = "wrong" + cfg.Schema
-				cfg.Bucket = nonExistentBucket
-				return &cfg
-			},
-			want: []error{
-				fmt.Errorf("schema %q does not exist", "wrong"+cfg.Schema),
-				fmt.Errorf("bucket %q does not exist", nonExistentBucket),
-			},
-		},
 	}
 
 	ctx := context.Background()
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(cfg)
-
-			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
-			require.NoError(t, err)
-			defer client.Close()
-
-			require.Equal(t, tt.want, client.PreReqs(ctx).Unwrap())
+			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg), "testing").Unwrap())
 		})
 	}
 }

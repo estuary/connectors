@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	"github.com/sirupsen/logrus"
 )
 
@@ -174,7 +174,7 @@ func (db *postgresDatabase) prerequisitePublication(ctx context.Context) error {
 	// If the user already created the publication we won't try and set the flag, that's their job.
 	// The main reason this might fail is if we're running against a pre-v13 database, which doesn't
 	// have this flag, so we log but ignore any errors here.
-	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true)`)); err != nil {
+	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION "%s" SET (publish_via_partition_root = true)`, pubName)); err != nil {
 		logEntry.WithField("err", err).Warn("unable to set publish_via_partition_root flag (this is normal for versions < 13)")
 	}
 
@@ -186,17 +186,16 @@ func (db *postgresDatabase) prerequisiteWatermarksTable(ctx context.Context) err
 	var logEntry = logrus.WithField("table", table)
 
 	// If we can successfully write a watermark then we're satisfied here
-	if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
+	var err = db.WriteWatermark(ctx, "existence-check")
+	if err == nil {
 		logEntry.Debug("watermarks table already exists")
 		return nil
-	} else {
-		logEntry.WithField("err", err).Warn("error writing to watermarks table")
 	}
+	logEntry.WithField("err", err).Warn("error writing to watermarks table")
 
 	// If we can create the watermarks table and then write a watermark, that also works
 	logEntry.Info("attempting to create watermarks table")
-	var _, err = db.conn.Exec(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table))
-	if err == nil {
+	if _, err := db.conn.Exec(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot TEXT PRIMARY KEY, watermark TEXT);", table)); err == nil {
 		if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
 			logEntry.Info("successfully created watermarks table")
 			return nil
@@ -238,41 +237,59 @@ func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, schema,
 
 // addTableToPublication adds a table to a publication if it isn't already part of that publication.
 func (db *postgresDatabase) addTableToPublication(ctx context.Context, pubName string, schema string, table string) error {
+	var streamID = sqlcapture.JoinStreamID(schema, table)
 	var logEntry = logrus.WithFields(logrus.Fields{
 		"publication": pubName,
 		"schema":      schema,
 		"table":       table,
 	})
 
-	// The table may have already been added to the publication by a previous invocation, or the
-	// publication was created as FOR ALL TABLES. In either case it will show up in this query, and
-	// we won't try to add it to the publication again.
-	var count int
-	if err := db.conn.QueryRow(ctx, fmt.Sprintf(`
-		SELECT COUNT(*) FROM pg_catalog.pg_publication_tables 
-		WHERE
-			pubname = '%s' AND
-			schemaname = '%s' AND
-			tablename = '%s';
-		`,
-		pubName,
-		schema,
-		table,
-	)).Scan(&count); err != nil {
-		return fmt.Errorf("error querying publications: %w", err)
-	}
-	if count == 1 {
+	// If the table is already published, do nothing.
+	if pub, err := db.isTablePublished(ctx, pubName, schema, table); err != nil {
+		return fmt.Errorf("error checking publication status for table %q: %w", streamID, err)
+	} else if pub {
 		logEntry.Debug("table is already part of publication")
 		return nil
 	}
 
+	// Otherwise add the table to the publication
 	logEntry.Info("attempting to add table to publication")
-
 	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION "%s" ADD TABLE "%s"."%s";`, pubName, schema, table)); err != nil {
-		return fmt.Errorf("table %s.%s is not in publication %s and couldn't be added automatically", schema, table, pubName)
+		return fmt.Errorf("table %q is not in publication %s and couldn't be added automatically", streamID, pubName)
 	}
-
+	db.tablesPublished[streamID] = true // Probably unnecessary but good hygiene
 	logEntry.Info("added table to publication")
 
 	return nil
+}
+
+// isTablePublished checks whether a particular table is published via the named publication. It caches
+// the database query results so that only a single round-trip is required no matter how many tables we
+// end up checking.
+func (db *postgresDatabase) isTablePublished(ctx context.Context, pubName string, schema string, table string) (bool, error) {
+	// First check the cache to see if the table is published.
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+	if db.tablesPublished == nil {
+		db.tablesPublished = make(map[string]bool)
+	}
+	if pub, ok := db.tablesPublished[streamID]; ok {
+		return pub, nil
+	}
+
+	// If we don't have any cached information, query the database and cache the results.
+	var rows, err = db.conn.Query(ctx, `SELECT schemaname, tablename FROM pg_catalog.pg_publication_tables WHERE pubname = $1`, pubName)
+	if err != nil {
+		return false, fmt.Errorf("error querying publication %q: %w", pubName, err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var schema, table string
+		if err := rows.Scan(&schema, &table); err != nil {
+			return false, fmt.Errorf("error querying publication %q: %w", pubName, err)
+		}
+		var id = sqlcapture.JoinStreamID(schema, table)
+		db.tablesPublished[id] = true
+	}
+
+	return db.tablesPublished[streamID], nil
 }

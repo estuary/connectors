@@ -15,18 +15,22 @@ Binding 0:
           "$anchor": "DboTest_Generic_SimpleDiscovery_49210954",
           "properties": {
             "a": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
             },
             "b": {
+              "description": "(source type: varchar(2000))",
               "type": [
                 "string",
                 "null"
               ]
             },
             "c": {
-              "type": "number"
+              "type": "number",
+              "description": "(source type: non-nullable real)"
             },
             "d": {
+              "description": "(source type: varchar(255))",
               "type": [
                 "string",
                 "null"

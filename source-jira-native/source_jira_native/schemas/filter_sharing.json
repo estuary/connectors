@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id"],
+  "properties": {
+    "id": {
+      "type": "integer",
+      "description": "The unique identifier of the share permission.",
+      "readOnly": true
+    }
+  },
+  "additionalProperties": true,
+  "description": "Details of a share permission for the filter."
+}

@@ -13,7 +13,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // Config tells the connector how to connect to and interact with the source database.

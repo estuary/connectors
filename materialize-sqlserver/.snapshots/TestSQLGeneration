@@ -1,200 +1,216 @@
---- Begin target_table temp_load_name ---
-#flow_temp_load_0--- End target_table temp_load_name ---
-
---- Begin "Delta Updates" temp_load_name ---
-#flow_temp_load_1--- End "Delta Updates" temp_load_name ---
-
---- Begin target_table temp_store_name ---
-#flow_temp_store_0--- End target_table temp_store_name ---
-
---- Begin "Delta Updates" temp_store_name ---
-#flow_temp_store_1--- End "Delta Updates" temp_store_name ---
-
---- Begin target_table truncateTempLoadTable ---
+--- Begin key_value truncateTempLoadTable ---
 
 TRUNCATE TABLE #flow_temp_load_0;
---- End target_table truncateTempLoadTable ---
+--- End key_value truncateTempLoadTable ---
 
---- Begin "Delta Updates" truncateTempLoadTable ---
+--- Begin delta_updates truncateTempLoadTable ---
 
 TRUNCATE TABLE #flow_temp_load_1;
---- End "Delta Updates" truncateTempLoadTable ---
+--- End delta_updates truncateTempLoadTable ---
 
---- Begin target_table truncateTempStoreTable ---
+--- Begin key_value truncateTempStoreTable ---
 
 TRUNCATE TABLE #flow_temp_store_0;
---- End target_table truncateTempStoreTable ---
+--- End key_value truncateTempStoreTable ---
 
---- Begin "Delta Updates" truncateTempStoreTable ---
+--- Begin delta_updates truncateTempStoreTable ---
 
 TRUNCATE TABLE #flow_temp_store_1;
---- End "Delta Updates" truncateTempStoreTable ---
+--- End delta_updates truncateTempStoreTable ---
 
---- Begin target_table createLoadTable ---
+--- Begin key_value createLoadTable ---
 
 CREATE TABLE #flow_temp_load_0 (
 		key1 BIGINT NOT NULL,
-		"key!2" BIT NOT NULL,
-		PRIMARY KEY (key1, "key!2")
+		key2 BIT NOT NULL,
+		"key!binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		PRIMARY KEY (key1, key2, "key!binary")
 );
---- End target_table createLoadTable ---
+--- End key_value createLoadTable ---
 
---- Begin "Delta Updates" createLoadTable ---
+--- Begin delta_updates createLoadTable ---
 
 CREATE TABLE #flow_temp_load_1 (
 		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		PRIMARY KEY ("theKey")
 );
---- End "Delta Updates" createLoadTable ---
+--- End delta_updates createLoadTable ---
 
---- Begin target_table createStoreTable ---
+--- Begin key_value createStoreTable ---
 
 CREATE TABLE #flow_temp_store_0 (
 		key1 BIGINT NOT NULL,
-		"key!2" BIT NOT NULL,
-		"Camel_Case" BIGINT,
-		"a Time" DATETIME2,
+		key2 BIT NOT NULL,
+		"key!binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
-		lower_case BIGINT,
-		"value" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"boolean" BIT,
+		flow_published_at DATETIME2 NOT NULL,
+		"integer" BIGINT,
+		"integerGt64Bit" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"integerWithUserDDL" DECIMAL(20),
+		multiple varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		number DOUBLE PRECISION,
+		"numberCastToString" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"object" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		string varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger" BIGINT,
+		"stringInteger39Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger66Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringNumber" DOUBLE PRECISION,
 		flow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 
-		PRIMARY KEY (key1, "key!2")
+		PRIMARY KEY (key1, key2, "key!binary")
 );
---- End target_table createStoreTable ---
+--- End key_value createStoreTable ---
 
---- Begin "Delta Updates" createStoreTable ---
+--- Begin delta_updates createStoreTable ---
 
 CREATE TABLE #flow_temp_store_1 (
 		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
-		"aValue" BIGINT
+		"aValue" BIGINT,
+		flow_published_at DATETIME2 NOT NULL
 );
---- End "Delta Updates" createStoreTable ---
+--- End delta_updates createStoreTable ---
 
---- Begin target_table createTargetTable ---
+--- Begin key_value createTargetTable ---
 
-IF OBJECT_ID(N'target_table', 'U') IS NULL BEGIN
-CREATE TABLE target_table (
+IF OBJECT_ID(N'key_value', 'U') IS NULL BEGIN
+CREATE TABLE key_value (
 		key1 BIGINT NOT NULL,
-		"key!2" BIT NOT NULL,
-		"Camel_Case" BIGINT,
-		"a Time" DATETIME2,
+		key2 BIT NOT NULL,
+		"key!binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
-		lower_case BIGINT,
-		"value" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"boolean" BIT,
+		flow_published_at DATETIME2 NOT NULL,
+		"integer" BIGINT,
+		"integerGt64Bit" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"integerWithUserDDL" DECIMAL(20),
+		multiple varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		number DOUBLE PRECISION,
+		"numberCastToString" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"object" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		string varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger" BIGINT,
+		"stringInteger39Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringInteger66Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"stringNumber" DOUBLE PRECISION,
 		flow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 
-		PRIMARY KEY (key1, "key!2")
+		PRIMARY KEY (key1, key2, "key!binary")
 );
 END;
---- End target_table createTargetTable ---
+--- End key_value createTargetTable ---
 
---- Begin "Delta Updates" createTargetTable ---
+--- Begin delta_updates createTargetTable ---
 
-IF OBJECT_ID(N'Delta Updates', 'U') IS NULL BEGIN
-CREATE TABLE "Delta Updates" (
+IF OBJECT_ID(N'delta_updates', 'U') IS NULL BEGIN
+CREATE TABLE delta_updates (
 		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
-		"aValue" BIGINT
+		"aValue" BIGINT,
+		flow_published_at DATETIME2 NOT NULL
 );
 END;
---- End "Delta Updates" createTargetTable ---
+--- End delta_updates createTargetTable ---
 
---- Begin target_table directCopy ---
+--- Begin key_value directCopy ---
 
-	INSERT INTO target_table 
+	INSERT INTO key_value 
 		(
-			key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document
+			key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
 		)
 	SELECT
-			key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document
+			key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
 	FROM #flow_temp_store_0
---- End target_table directCopy ---
+--- End key_value directCopy ---
 
---- Begin "Delta Updates" directCopy ---
+--- Begin delta_updates directCopy ---
 
-	INSERT INTO "Delta Updates" 
+	INSERT INTO delta_updates 
 		(
-			"theKey", "aValue"
+			"theKey", "aValue", flow_published_at
 		)
 	SELECT
-			"theKey", "aValue"
+			"theKey", "aValue", flow_published_at
 	FROM #flow_temp_store_1
---- End "Delta Updates" directCopy ---
+--- End delta_updates directCopy ---
 
---- Begin target_table mergeInto ---
+--- Begin key_value mergeInto ---
 
-	MERGE INTO target_table
+	MERGE INTO key_value
 	USING (
-		SELECT key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document
+		SELECT key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
 		FROM #flow_temp_store_0
 	) AS r
-	ON target_table.key1 = r.key1 AND target_table."key!2" = r."key!2"
-	WHEN MATCHED AND r.flow_document=NULL THEN
+	ON key_value.key1 = r.key1 AND key_value.key2 = r.key2 AND key_value."key!binary" = r."key!binary"
+	WHEN MATCHED AND r.flow_document='"delete"' THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET target_table."Camel_Case" = r."Camel_Case", target_table."a Time" = r."a Time", target_table."array" = r."array", target_table.lower_case = r.lower_case, target_table."value" = r."value", target_table.flow_document = r.flow_document
+		UPDATE SET key_value."array" = r."array", key_value."binary" = r."binary", key_value."boolean" = r."boolean", key_value.flow_published_at = r.flow_published_at, key_value."integer" = r."integer", key_value."integerGt64Bit" = r."integerGt64Bit", key_value."integerWithUserDDL" = r."integerWithUserDDL", key_value.multiple = r.multiple, key_value.number = r.number, key_value."numberCastToString" = r."numberCastToString", key_value."object" = r."object", key_value.string = r.string, key_value."stringInteger" = r."stringInteger", key_value."stringInteger39Chars" = r."stringInteger39Chars", key_value."stringInteger66Chars" = r."stringInteger66Chars", key_value."stringNumber" = r."stringNumber", key_value.flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
-		INSERT (key1, "key!2", "Camel_Case", "a Time", "array", lower_case, "value", flow_document)
-		VALUES (r.key1, r."key!2", r."Camel_Case", r."a Time", r."array", r.lower_case, r."value", r.flow_document);
---- End target_table mergeInto ---
+		INSERT (key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+		VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r."boolean", r.flow_published_at, r."integer", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r.number, r."numberCastToString", r."object", r.string, r."stringInteger", r."stringInteger39Chars", r."stringInteger66Chars", r."stringNumber", r.flow_document);
+--- End key_value mergeInto ---
 
---- Begin "Delta Updates" mergeInto ---
+--- Begin delta_updates mergeInto ---
 
-	MERGE INTO "Delta Updates"
+	MERGE INTO delta_updates
 	USING (
-		SELECT "theKey", "aValue"
+		SELECT "theKey", "aValue", flow_published_at
 		FROM #flow_temp_store_1
 	) AS r
-	ON "Delta Updates"."theKey" = r."theKey"
+	ON delta_updates."theKey" = r."theKey"
 	WHEN MATCHED THEN
-		UPDATE SET "Delta Updates"."aValue" = r."aValue"
+		UPDATE SET delta_updates."aValue" = r."aValue", delta_updates.flow_published_at = r.flow_published_at
 	WHEN NOT MATCHED THEN
-		INSERT ("theKey", "aValue")
-		VALUES (r."theKey", r."aValue");
---- End "Delta Updates" mergeInto ---
+		INSERT ("theKey", "aValue", flow_published_at)
+		VALUES (r."theKey", r."aValue", r.flow_published_at);
+--- End delta_updates mergeInto ---
 
---- Begin target_table loadInsert ---
+--- Begin key_value loadInsert ---
 
-INSERT INTO #flow_temp_load_0 (key1, "key!2")
-	VALUES (@p1, @p2);
---- End target_table loadInsert ---
+INSERT INTO #flow_temp_load_0 (key1, key2, "key!binary")
+	VALUES (@p1, @p2, @p3);
+--- End key_value loadInsert ---
 
---- Begin "Delta Updates" loadInsert ---
+--- Begin delta_updates loadInsert ---
 
 INSERT INTO #flow_temp_load_1 ("theKey")
 	VALUES (@p1);
---- End "Delta Updates" loadInsert ---
+--- End delta_updates loadInsert ---
 
---- Begin target_table loadQuery ---
+--- Begin key_value loadQuery ---
 
 SELECT 0, r.flow_document
 	FROM #flow_temp_load_0 AS l
-	JOIN target_table AS r
+	JOIN key_value AS r
 		 ON  l.key1 = r.key1
-		 AND l."key!2" = r."key!2"
+		 AND l.key2 = r.key2
+		 AND l."key!binary" = r."key!binary"
 
---- End target_table loadQuery ---
+--- End key_value loadQuery ---
 
---- Begin "Delta Updates" loadQuery ---
+--- Begin delta_updates loadQuery ---
 
 SELECT TOP 0 -1, NULL
 
---- End "Delta Updates" loadQuery ---
+--- End delta_updates loadQuery ---
 
 --- Begin alter table add columns ---
 
-ALTER TABLE target_table ADD
+ALTER TABLE key_value ADD
 	first_new_column STRING,
 	second_new_column BOOL;
 --- End alter table add columns ---
 
 --- Begin Fence Update ---
-
-UPDATE "path"."To".checkpoints
+UPDATE "path"."to".checkpoints
 	SET   "checkpoint" = 'AAECAwQFBgcICQ=='
 	WHERE materialization = 'some/Materialization'
 	AND   key_begin = 1122867
 	AND   key_end   = 4293844428
 	AND   fence     = 123;
 --- End Fence Update ---
+
 

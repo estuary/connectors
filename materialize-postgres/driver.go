@@ -10,17 +10,19 @@ import (
 	"strings"
 	"text/template"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -42,11 +44,15 @@ type tunnelConfig struct {
 
 // config represents the endpoint configuration for postgres.
 type config struct {
-	Address  string         `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User     string         `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string         `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string         `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Schema   string         `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+
+	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
+
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -75,6 +81,17 @@ func (c *config) Validate() error {
 		}
 	}
 
+	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
+	}
+
+	// Connection poolers cause all sorts of problems with the materialization's
+	// use of temporary tables and prepared statements, so the most common
+	// addresses that use connection poolers are not allowed.
+	if strings.HasSuffix(c.Address, ".pooler.supabase.com:6543") || strings.HasSuffix(c.Address, ".pooler.supabase.com") {
+		return cerrors.NewUserError(nil, fmt.Sprintf("address must be a direct connection: address %q is using the Supabase connection pooler, consult go.estuary.dev/supabase-direct-address for details", c.Address))
+	}
+
 	return nil
 }
 
@@ -87,12 +104,7 @@ func (c *config) ToURI() string {
 		address = "localhost:5432"
 	}
 
-	// If the user did not specify a port (or no network tunnel is being used), default to port
-	// 5432. pgx ends up doing this anyway, but we do it here to make it more explicit and stable in
-	// case that underlying behavior changes in the future.
-	if !strings.Contains(address, ":") {
-		address = address + ":5432"
-	}
+	address = ensurePort(address)
 
 	var uri = url.URL{
 		Scheme: "postgres",
@@ -113,18 +125,22 @@ func (c *config) ToURI() string {
 	return uri.String()
 }
 
-func (c *config) metaSchema() string {
-	if c.Schema == "" {
-		return "public"
+func ensurePort(addr string) string {
+	// If the user did not specify a port, default to 5432 since that is almost always what is
+	// desired. pgx ends up doing this anyway, and we also need it for cases where a network tunnel
+	// is being used and the port is not set.
+	if !strings.Contains(addr, ":") {
+		addr = addr + ":5432"
 	}
-	return c.Schema
+
+	return addr
 }
 
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
-	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)"`
+	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
@@ -159,6 +175,34 @@ func newPostgresDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel: func(ctx context.Context, conf any) error {
+			cfg := conf.(*config)
+
+			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+				host, port, err := net.SplitHostPort(ensurePort(cfg.Address))
+				if err != nil {
+					return fmt.Errorf("splitting address to host and port: %w", err)
+				}
+
+				var sshConfig = &networkTunnel.SshConfig{
+					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
+					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
+					ForwardHost: host,
+					ForwardPort: port,
+					LocalPort:   "5432",
+				}
+				var tunnel = sshConfig.CreateTunnel()
+
+				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+				if err := tunnel.Start(); err != nil {
+					return fmt.Errorf("error starting network tunnel: %w", err)
+				}
+			}
+
+			return nil
+		},
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
@@ -177,29 +221,6 @@ func newPostgresDriver() *sql.Driver {
 			}
 			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
-			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
-				host, port, err := net.SplitHostPort(cfg.Address)
-				if err != nil {
-					return nil, fmt.Errorf("splitting address to host and port: %w", err)
-				}
-
-				var sshConfig = &networkTunnel.SshConfig{
-					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
-					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
-					ForwardHost: host,
-					ForwardPort: port,
-					LocalPort:   "5432",
-				}
-				var tunnel = sshConfig.CreateTunnel()
-
-				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
-				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
-				if err := tunnel.Start(); err != nil {
-					return nil, fmt.Errorf("error starting network tunnel: %w", err)
-				}
-			}
-
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             pgDialect,
@@ -213,10 +234,13 @@ func newPostgresDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 
 type transactor struct {
+	cfg *config
+
 	// Variables exclusively used by Load.
 	load struct {
 		conn     *pgx.Conn
@@ -237,16 +261,25 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 ) (_ m.Transactor, err error) {
-	var d = &transactor{}
+	var cfg = ep.Config.(*config)
+
+	var d = &transactor{cfg: cfg}
 	d.store.fence = fence
 
-	var cfg = ep.Config.(*config)
 	// Establish connections.
 	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, fmt.Errorf("load pgx.Connect: %w", err)
 	}
 	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, fmt.Errorf("store pgx.Connect: %w", err)
+	}
+
+	// Override statement_timeout with a session-level setting to never timeout
+	// statements.
+	if _, err := d.load.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
+		return nil, fmt.Errorf("load set statement_timeout: %w", err)
+	} else if _, err := d.store.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
+		return nil, fmt.Errorf("store set statement_timeout: %w", err)
 	}
 
 	for _, binding := range bindings {
@@ -271,6 +304,7 @@ type binding struct {
 	loadInsertSQL      string
 	storeUpdateSQL     string
 	storeInsertSQL     string
+	deleteQuerySQL     string
 	loadQuerySQL       string
 }
 
@@ -285,6 +319,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		{&b.loadInsertSQL, tplLoadInsert},
 		{&b.storeInsertSQL, tplStoreInsert},
 		{&b.storeUpdateSQL, tplStoreUpdate},
+		{&b.deleteQuerySQL, tplDeleteQuery},
 		{&b.loadQuerySQL, tplLoadQuery},
 	} {
 		var err error
@@ -392,17 +427,33 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	var batch pgx.Batch
 	batchBytes := 0
 	for it.Next() {
-		// Similar to the accounting in (*transactor).Store, this assumes that lengths of packed
-		// tuples & the document JSON are proportional to the size of the item in the batch.
-		batchBytes += len(it.PackedKey) + len(it.PackedValues) + len(it.RawJSON)
 		var b = d.bindings[it.Binding]
 
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
-			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if it.Exists {
-			batch.Queue(b.storeUpdateSQL, converted...)
+		if it.Delete && d.cfg.HardDelete {
+			if it.Exists {
+				if converted, err := b.target.ConvertKey(it.Key); err != nil {
+					return nil, fmt.Errorf("converting delete keys: %w", err)
+				} else if it.Exists {
+					batch.Queue(b.deleteQuerySQL, converted...)
+				}
+
+				batchBytes += len(it.PackedKey)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
 		} else {
-			batch.Queue(b.storeInsertSQL, converted...)
+			// Similar to the accounting in (*transactor).Store, this assumes that lengths of packed
+			// tuples & the document JSON are proportional to the size of the item in the batch.
+			batchBytes += len(it.PackedKey) + len(it.PackedValues) + len(it.RawJSON)
+
+			if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
+				return nil, fmt.Errorf("converting store parameters: %w", err)
+			} else if it.Exists {
+				batch.Queue(b.storeUpdateSQL, converted...)
+			} else {
+				batch.Queue(b.storeInsertSQL, converted...)
+			}
 		}
 
 		if batchBytes >= batchBytesLimit {
@@ -448,6 +499,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			if err := txn.Commit(ctx); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
+			}
+
+			if d.cfg.DBTJobTrigger.Enabled() {
+				log.Info("store: dbt job trigger")
+				if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+					return fmt.Errorf("triggering dbt job: %w", err)
+				}
 			}
 
 			return nil

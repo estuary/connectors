@@ -1,0 +1,24 @@
+{
+  "properties": {
+    "metric": {
+      "type": ["null", "string"]
+    },
+    "id": {
+      "type": "integer"
+    },
+    "time": {
+      "type": ["null", "string"]
+    },
+    "instance_id": {
+      "type": ["null", "integer"]
+    },
+    "ticket_id": {
+      "type": ["null", "integer"]
+    },
+    "type": {
+      "type": ["null", "string"]
+    }
+  },
+  "type": ["object"],
+  "required": ["id"]
+}

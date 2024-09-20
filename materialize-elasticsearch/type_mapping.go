@@ -26,9 +26,10 @@ const (
 )
 
 type property struct {
-	Type   elasticPropertyType `json:"type"`
-	Coerce bool                `json:"coerce,omitempty"`
-	Index  *bool               `json:"index,omitempty"`
+	Type        elasticPropertyType `json:"type"`
+	Coerce      bool                `json:"coerce,omitempty"`
+	Index       *bool               `json:"index,omitempty"`
+	IgnoreAbove int                 `json:"ignore_above,omitempty"`
 }
 
 func propForField(field string, binding *pf.MaterializationSpec_Binding) (property, error) {
@@ -94,7 +95,15 @@ func propForProjection(p *pf.Projection, fc json.RawMessage) (property, error) {
 			}
 		}
 	case pf.JsonTypeObject:
-		return property{Type: elasticTypeFlattened}, nil
+		return property{
+			Type: elasticTypeFlattened,
+			// See https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html
+			// This setting is to avoid extremely long strings causing errors due to Elastic's
+			// requirement that strings do not have a byte length longer than 32766. Long strings
+			// will not be indexed or stored in the Lucene index, but will still be present in the
+			// _source field.
+			IgnoreAbove: 32766 / 4,
+		}, nil
 	case pf.JsonTypeNumber:
 		return property{Type: elasticTypeDouble}, nil
 	default:
@@ -116,7 +125,11 @@ func buildIndexProperties(b *pf.MaterializationSpec_Binding) (map[string]propert
 	if d := b.FieldSelection.Document; d != "" {
 		// Do not index the root document projection, since this would be less useful than other
 		// selected fields and potentially costly.
-		props[translateField(d)] = property{Type: elasticTypeFlattened, Index: boolPtr(false)}
+		props[translateField(d)] = property{
+			Type: elasticTypeFlattened,
+			// See above for comment on pf.JsonTypeObject.
+			IgnoreAbove: 32766 / 4,
+			Index:       boolPtr(false)}
 	}
 
 	return props, nil

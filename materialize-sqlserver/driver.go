@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -32,10 +33,14 @@ type tunnelConfig struct {
 
 // config represents the endpoint configuration for sql server.
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 1433 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 1433 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+
+	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=DBT Job Trigger,description=Trigger a DBT Job when new data is available"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
@@ -52,6 +57,10 @@ func (c *config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := c.DBTJobTrigger.Validate(); err != nil {
+		return err
 	}
 
 	return nil
@@ -91,12 +100,17 @@ func (c *config) ToURI() string {
 }
 
 type tableConfig struct {
-	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
-	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{}
+	return &tableConfig{
+		// Default to an explicit endpoint configuration schema, if set.
+		// This will be over-written by a present `schema` property within `raw`.
+		Schema: ep.Config.(*config).Schema,
+	}
 }
 
 // Validate the resource configuration.
@@ -108,6 +122,9 @@ func (r tableConfig) Validate() error {
 }
 
 func (c tableConfig) Path() sql.TablePath {
+	if c.Schema != "" {
+		return []string{c.Schema, c.Table}
+	}
 	return []string{c.Table}
 }
 
@@ -120,26 +137,14 @@ func newSqlServerDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlserver",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-			}
-
-			log.WithFields(log.Fields{
-				"database": cfg.Database,
-				"address":  cfg.Address,
-				"user":     cfg.User,
-			}).Info("opening database")
-
-			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
+		StartTunnel: func(ctx context.Context, conf any) error {
+			cfg := conf.(*config)
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 				host, port, err := net.SplitHostPort(cfg.Address)
 				if err != nil {
-					return nil, fmt.Errorf("splitting address to host and port: %w", err)
+					return fmt.Errorf("splitting address to host and port: %w", err)
 				}
 
 				var sshConfig = &networkTunnel.SshConfig{
@@ -154,9 +159,29 @@ func newSqlServerDriver() *sql.Driver {
 				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
 				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
 				if err := tunnel.Start(); err != nil {
-					return nil, fmt.Errorf("error starting network tunnel: %w", err)
+					return fmt.Errorf("error starting network tunnel: %w", err)
 				}
 			}
+
+			return nil
+		},
+		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
+			var cfg = new(config)
+			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
+				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+			}
+
+			log.WithFields(log.Fields{
+				"database": cfg.Database,
+				"address":  cfg.Address,
+				"user":     cfg.User,
+			}).Info("opening database")
+
+			var metaBase sql.TablePath
+			if cfg.Schema != "" {
+				metaBase = append(metaBase, cfg.Schema)
+			}
+			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
 			db, err := stdsql.Open("sqlserver", cfg.ToURI())
 			if err != nil {
@@ -169,11 +194,13 @@ func newSqlServerDriver() *sql.Driver {
 				return nil, fmt.Errorf("check collations: %w", err)
 			}
 
-			// We don't (yet) allow setting a schema for the endpoint or resources, so we need to get the
-			// default schema for the configured user.
-			var schema string
-			if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
-				return nil, fmt.Errorf("querying schema for current user: %w", err)
+			// If an explicit schema is not configured, query the default schema
+			// for the configured user.
+			schema := cfg.Schema
+			if schema == "" {
+				if err := db.QueryRowContext(ctx, "select schema_name()").Scan(&schema); err != nil {
+					return nil, fmt.Errorf("querying schema for current user: %w", err)
+				}
 			}
 
 			var dialect = sqlServerDialect(collation, schema)
@@ -192,10 +219,12 @@ func newSqlServerDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 
 type transactor struct {
+	cfg       *config
 	templates templates
 	// Variables exclusively used by Load.
 	load struct {
@@ -220,10 +249,10 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 	) (_ m.Transactor, err error) {
-		var d = &transactor{templates: templates}
+		var cfg = ep.Config.(*config)
+		var d = &transactor{templates: templates, cfg: cfg}
 		d.store.fence = fence
 
-		var cfg = ep.Config.(*config)
 		// Establish connections.
 		if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
 			return nil, fmt.Errorf("load sql.Open: %w", err)
@@ -458,7 +487,16 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var b = d.bindings[it.Binding]
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		var flowDocument = it.RawJSON
+		if d.cfg.HardDelete && it.Delete {
+			if it.Exists {
+				flowDocument = json.RawMessage(`"delete"`)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
+		}
+		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
@@ -538,6 +576,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			if err := txn.Commit(); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
+			}
+
+			if d.cfg.DBTJobTrigger.Enabled() {
+				log.Info("store: dbt job trigger")
+				if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+					return fmt.Errorf("triggering dbt job: %w", err)
+				}
 			}
 
 			return nil

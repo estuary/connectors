@@ -13,21 +13,25 @@ Binding 0:
           "$anchor": "DboTest_Generic_KeylessDiscovery_t32386",
           "properties": {
             "a": {
+              "description": "(source type: int)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "b": {
+              "description": "(source type: varchar(2000))",
               "type": [
                 "string",
                 "null"
               ]
             },
             "c": {
-              "type": "number"
+              "type": "number",
+              "description": "(source type: non-nullable real)"
             },
             "d": {
+              "description": "(source type: varchar(255))",
               "type": [
                 "string",
                 "null"

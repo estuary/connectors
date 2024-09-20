@@ -19,10 +19,10 @@ OAUTH2_SPEC = OAuth2Spec(
     provider="google",
     authUrlTemplate="https://accounts.google.com/o/oauth2/auth?access_type=offline&prompt=consent&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&scope=https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
     accessTokenUrlTemplate="https://oauth2.googleapis.com/token",
-    accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
     accessTokenBody=(
         '{"grant_type": "authorization_code", "client_id": "{{{ client_id }}}", "client_secret": "{{{ client_secret }}}", "redirect_uri": "{{{ redirect_uri }}}", "code": "{{{ code }}}"}'
     ),
+    accessTokenHeaders={"content-type":"application/json"},
     accessTokenResponseMap={"refresh_token": "/refresh_token"},
 )
 
@@ -49,23 +49,31 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 
 class NumberType(StrEnum):
+    TEXT = "TEXT"
+    NUMBER = "NUMBER"
+    TIME = "TIME"
     CURRENCY = "CURRENCY"
     DATE = "DATE"
     DATE_TIME = "DATE_TIME"
     PERCENT = "PERCENT"
+    SCIENTIFIC = "SCIENTIFIC"
 
 
-class Sheet(BaseModel, extra="forbid"):
+class Sheet(BaseModel, extra="allow"):
     """
     Models a Google Spreadsheet Sheet.
     See: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets
     """
 
-    class Properties(BaseModel, extra="forbid"):
+    class Properties(BaseModel, extra="allow"):
         class Grid(BaseModel, extra="forbid"):
             rowCount: int
             columnCount: int
             frozenRowCount: int = 0
+            frozenColumnCount: int = 0
+            hideGridlines: bool = False
+            rowGroupControlAfter: bool = False
+            columnGroupControlAfter: bool = False
 
         sheetId: int
         title: str
@@ -78,6 +86,7 @@ class Sheet(BaseModel, extra="forbid"):
     class EffectiveValue(BaseModel, extra="forbid"):
         stringValue: str | None = None
         numberValue: Decimal | None = None
+        boolValue: bool | None = None
         errorValue: dict | None = None
 
     class EffectiveFormat(BaseModel, extra="forbid"):
@@ -91,16 +100,18 @@ class Sheet(BaseModel, extra="forbid"):
         effectiveValue: "Sheet.EffectiveValue | None" = None
 
     class RowData(BaseModel, extra="forbid"):
-        values: list["Sheet.Value"]
+        values: list["Sheet.Value"] | None = None
 
     class Data(BaseModel, extra="forbid"):
-        rowData: list["Sheet.RowData"]
+        rowData: list["Sheet.RowData"] | None = None
 
         @model_validator(mode="after")
         def _post_init(self) -> "Sheet.Data":
             # Remove all trailing rows which have no set cells.
+            # Note that this can be represented as either no values, or a list of values where the
+            # effectiveValue of each cell is empty.
             while self.rowData:
-                if all(not v.effectiveValue for v in self.rowData[-1].values):
+                if (not self.rowData[-1].values) or all(not v.effectiveValue for v in self.rowData[-1].values):
                     self.rowData.pop()
                 else:
                     break

@@ -15,13 +15,15 @@ Binding 0:
           "$anchor": "DboTest_VarcharKeyDiscovery_42325208",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "string"
+              "type": "string",
+              "description": "(source type: non-nullable varchar(64))"
             }
           }
         }

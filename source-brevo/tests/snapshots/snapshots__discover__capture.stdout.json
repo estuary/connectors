@@ -1,0 +1,104 @@
+[
+  {
+    "recommendedName": "Contacts",
+    "resourceConfig": {
+      "stream": "Contacts",
+      "syncMode": "incremental",
+      "cursorField": [
+        "createdSince"
+      ]
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "The unique id of a contact"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "ContactsAttributes",
+    "resourceConfig": {
+      "stream": "ContactsAttributes",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The unique name of a contact attribute"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/name"
+    ]
+  },
+  {
+    "recommendedName": "ContactsLists",
+    "resourceConfig": {
+      "stream": "ContactsLists",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "type": "object",
+      "$schema": "http://json-schema.org/schema#",
+      "properties": {
+        "id": {
+          "type": "integer",
+          "description": "The unique id of a contact list"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "additionalProperties": true,
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  }
+]

@@ -12547,12 +12547,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -14037,31 +14031,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -14083,12 +14053,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -14200,18 +14164,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -16282,12 +16234,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -17772,31 +17718,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -17818,12 +17740,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -17935,18 +17851,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -20033,12 +19937,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -21523,31 +21421,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -21569,12 +21443,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -21686,18 +21554,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -23776,12 +23632,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -25266,31 +25116,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -25312,12 +25138,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -25429,18 +25249,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -27519,12 +27327,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -29009,31 +28811,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -29055,12 +28833,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -29172,18 +28944,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -31262,12 +31022,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -32752,31 +32506,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -32798,12 +32528,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -32915,18 +32639,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -35021,12 +34733,6 @@
             "string"
           ]
         },
-        "age_targeting": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "attribution_setting": {
           "type": [
             "null",
@@ -36511,31 +36217,7 @@
             "number"
           ]
         },
-        "estimated_ad_recall_rate_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recall_rate_upper_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "estimated_ad_recallers": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_lower_bound": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "estimated_ad_recallers_upper_bound": {
           "type": [
             "null",
             "number"
@@ -36557,12 +36239,6 @@
           "type": [
             "null",
             "number"
-          ]
-        },
-        "gender_targeting": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "impressions": {
@@ -36674,18 +36350,6 @@
               }
             }
           }
-        },
-        "labels": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "location": {
-          "type": [
-            "null",
-            "string"
-          ]
         },
         "mobile_app_purchase_roas": {
           "type": [
@@ -38731,6 +38395,9 @@
       },
       "type": [
         "object"
+      ],
+      "required": [
+        "id"
       ]
     },
     "key": [
@@ -39178,6 +38845,7 @@
       ],
       "required": [
         "actor_id",
+        "application_id",
         "event_time",
         "event_type",
         "object_id"

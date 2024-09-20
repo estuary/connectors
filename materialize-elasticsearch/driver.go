@@ -42,9 +42,11 @@ type credentials struct {
 }
 
 type config struct {
-	Credentials credentials    `json:"credentials"`
-	Endpoint    string         `json:"endpoint"`
-	Advanced    advancedConfig `json:"advanced,omitempty"`
+	Credentials credentials `json:"credentials"`
+	Endpoint    string      `json:"endpoint"`
+	HardDelete  bool        `json:"hardDelete,omitempty"`
+
+	Advanced advancedConfig `json:"advanced,omitempty"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty"`
 }
@@ -67,6 +69,13 @@ func configSchema() json.RawMessage {
 			"description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
 			"pattern": "^(http://|https://).+$",
 			"order": 0
+		  },
+		  "hardDelete": {
+		    "type": "boolean",
+		    "title": "Hard Delete",
+		    "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+		    "default": false,
+		    "order": 1
 		  },
 		  "credentials": {
 			"type": "object",
@@ -241,11 +250,12 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 
 	es, err := elasticsearch.NewClient(
 		elasticsearch.Config{
-			Addresses:     []string{endpoint},
-			Username:      c.Credentials.Username,
-			Password:      c.Credentials.Password,
-			APIKey:        c.Credentials.ApiKey,
-			RetryOnStatus: []int{429, 502, 503, 504},
+			Addresses:           []string{endpoint},
+			CompressRequestBody: true,
+			Username:            c.Credentials.Username,
+			Password:            c.Credentials.Password,
+			APIKey:              c.Credentials.ApiKey,
+			RetryOnStatus:       []int{429, 502, 503, 504},
 			RetryBackoff: func(i int) time.Duration {
 				d := time.Duration(1<<i) * time.Second
 				log.WithFields(log.Fields{
@@ -267,7 +277,7 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 
 type resource struct {
 	Index        string `json:"index" jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false"`
+	DeltaUpdates bool   `json:"delta_updates" jsonschema:"default=false" jsonschema_extras:"x-delta-updates=true"`
 	Shards       *int   `json:"number_of_shards,omitempty"`
 }
 
@@ -461,6 +471,14 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		return nil, nil, fmt.Errorf("creating client: %w", err)
 	}
 
+	isServerless, err := client.isServerless(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting serverless status: %w", err)
+	}
+	if isServerless {
+		log.Info("connected to a serverless elasticsearch cluster")
+	}
+
 	indexToBinding := make(map[string]int)
 	var bindings []binding
 	for idx, b := range open.Materialization.Bindings {
@@ -493,8 +511,10 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	}
 
 	var transactor = &transactor{
+		cfg:            &cfg,
 		client:         client,
 		bindings:       bindings,
+		isServerless:   isServerless,
 		indexToBinding: indexToBinding,
 	}
 	return transactor, &pm.Response_Opened{}, nil

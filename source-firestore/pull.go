@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
+	"strconv"
 	"sync"
 	"time"
 
@@ -45,12 +47,24 @@ const progressLogInterval = 10000
 // elapsed since the previous backfill was started.
 //
 // TODO(wgd): Consider making this user-configurable?
-const backfillRestartDelay = 6 * time.Hour
+const (
+	backfillRestartDelayNoRestartCursor   = 6 * time.Hour
+	backfillRestartDelayWithRestartCursor = 5 * time.Minute
+)
 
 const (
 	backfillChunkSize   = 256
 	concurrentBackfills = 2
 )
+
+// The minimum length of time for which a new restart cursor value will be buffered in
+// memory before being committed to the state checkpoint. This ensures that in the event
+// of a re-backfill there will be some minimum amount of overlap between the most recent
+// change events and the restart point of the backfill.
+//
+// This is a constant in typical usage, but is made a variable so that tests can override
+// the value to something smaller.
+var restartCursorPendingInterval = 5 * time.Minute
 
 func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	log.Debug("connector started")
@@ -65,10 +79,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
 			return fmt.Errorf("parsing state checkpoint: %w", err)
 		}
-	}
-
-	if err := migrateState(&prevState, open.Capture.Bindings); err != nil {
-		return fmt.Errorf("migrating previous state: %w", err)
 	}
 
 	updatedResourceStates, err := initResourceStates(prevState.Resources, open.Capture.Bindings)
@@ -108,51 +118,8 @@ type capture struct {
 
 type captureState struct {
 	sync.RWMutex
-	Resources    map[boilerplate.StateKey]*resourceState `json:"bindingStateV1,omitempty"`
-	OldResources map[string]*resourceState               `json:"Resources,omitempty"` // TODO(whb): Remove once all captures have migrated.
-	stateKeys    map[string]boilerplate.StateKey         // Allow for lookups of the stateKey from a document path.
-}
-
-func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) error {
-	if state.Resources != nil && state.OldResources != nil {
-		return fmt.Errorf("application error: both Resources and OldResources were non-nil")
-	} else if state.Resources != nil {
-		log.Info("skipping state migration since it's already done")
-		return nil
-	}
-
-	state.Resources = make(map[boilerplate.StateKey]*resourceState)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		ll := log.WithFields(log.Fields{
-			"stateKey": b.StateKey,
-			"path":     res.Path,
-		})
-
-		stateFromOld, ok := state.OldResources[res.Path]
-		if !ok {
-			// This may happen if the connector has never emitted any checkpoints with data for this
-			// binding.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.Resources[boilerplate.StateKey(b.StateKey)] = stateFromOld
-		ll.Info("migrated binding state")
-	}
-
-	state.OldResources = nil
-
-	return nil
+	Resources map[boilerplate.StateKey]*resourceState `json:"bindingStateV1,omitempty"`
+	stateKeys map[string]boilerplate.StateKey         // Allow for lookups of the stateKey from a document path.
 }
 
 type resourceState struct {
@@ -164,6 +131,15 @@ type resourceState struct {
 	// that at some point in the future a new backfill of that collection(s) needs
 	// to be performed to re-establish consistency.
 	Inconsistent bool `json:"Inconsistent,omitempty"`
+
+	// The `RestartCursorValue` property is updated periodically during change streaming
+	// (if the binding has a `RestartCursorPath` setting) so it holds an arbitrarily selected
+	// restart-cursor value which was recently observed in the dataset.
+	RestartCursorValue any `json:"RestartCursorValue,omitempty"`
+
+	restartCursorPath           []string  // The parsed path to the restart-cursor property. Not serialized as part of the state, it's just copied from the resource spec for convenience.
+	pendingRestartCursorTimeout time.Time // The timestamp after which the pending restart-cursor value may be promoted to active. Zero if there is no pending value.
+	pendingRestartCursorValue   any       // A new restart-cursor value which has been buffered temporarily and may eventually be promoted to active.
 
 	bindingIndex int
 	path         string
@@ -211,7 +187,11 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 			bindingIndex: idx,
 			path:         res.Path,
 		}
+		if res.RestartCursorPath != "" {
+			state.restartCursorPath = parseJSONPointer(res.RestartCursorPath)
+		}
 		if prevState, ok := prevStates[stateKey]; ok && !prevState.Inconsistent {
+			state.RestartCursorValue = prevState.RestartCursorValue
 			state.ReadTime = prevState.ReadTime
 			state.Backfill = prevState.Backfill
 		} else if ok && prevState.Inconsistent {
@@ -219,14 +199,23 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 			// change data has been skipped. To get back into a consistent state, we will have
 			// to restart from the current moment (to maximize our changes of staying caught
 			// up going forward) and start a new backfill of the entire collection.
-			var prevStartTime time.Time
+			var startTime time.Time
 			if prevState.Backfill != nil {
-				prevStartTime = prevState.Backfill.StartAfter
+				startTime = prevState.Backfill.StartAfter
 			}
-			var startTime = prevStartTime.Add(backfillRestartDelay)
-			if time.Now().After(startTime) {
+			// Add a restart delay unless the current StartAfter time is already in the future.
+			if startTime.Before(time.Now()) {
+				var backfillRestartDelay = backfillRestartDelayNoRestartCursor
+				if len(state.restartCursorPath) != 0 {
+					backfillRestartDelay = backfillRestartDelayWithRestartCursor
+				}
+				startTime = startTime.Add(backfillRestartDelay)
+			}
+			// If the adjusted start time is still in the past, we ought to start immediately.
+			if startTime.Before(time.Now()) {
 				startTime = time.Now()
 			}
+			state.RestartCursorValue = prevState.RestartCursorValue
 			state.ReadTime = now
 			if res.BackfillMode == backfillModeNone {
 				state.Backfill = nil
@@ -248,11 +237,11 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 				return nil, fmt.Errorf("invalid backfill mode %q for %q", res.BackfillMode, res.Path)
 			}
 			if res.InitTimestamp != "" {
-				if ts, err := time.Parse(time.RFC3339Nano, res.InitTimestamp); err != nil {
+				var ts, err = time.Parse(time.RFC3339Nano, res.InitTimestamp)
+				if err != nil {
 					return nil, fmt.Errorf("invalid initTimestamp value %q: %w", res.InitTimestamp, err)
-				} else {
-					state.ReadTime = ts
 				}
+				state.ReadTime = ts
 			}
 		}
 		states[stateKey] = state
@@ -316,11 +305,11 @@ func (s *captureState) UpdateReadTimes(collectionID string, readTime time.Time) 
 	return checkpointJSON, nil
 }
 
-func (s *captureState) UpdateBackfillState(collectionID string, state *backfillState) (json.RawMessage, error) {
+func (s *captureState) UpdateBackfillState(resourcePaths []resourcePath, state *backfillState) (json.RawMessage, error) {
 	s.Lock()
 	var updated = make(map[boilerplate.StateKey]*resourceState)
 	for stateKey, resourceState := range s.Resources {
-		if getLastCollectionGroupID(resourceState.path) == collectionID && resourceState.Backfill != nil {
+		if slices.Contains(resourcePaths, resourceState.path) {
 			resourceState.Backfill = state
 			updated[stateKey] = resourceState
 		}
@@ -334,22 +323,27 @@ func (s *captureState) UpdateBackfillState(collectionID string, state *backfillS
 	return checkpointJSON, nil
 }
 
-func (s *captureState) MarkInconsistent(collectionID string) (json.RawMessage, error) {
+func (s *captureState) MarkInconsistent(collectionID string) (json.RawMessage, bool, error) {
+	var allStreamsHaveRestartCursors = true
+
 	s.Lock()
 	var updated = make(map[boilerplate.StateKey]*resourceState)
 	for stateKey, resourceState := range s.Resources {
 		if getLastCollectionGroupID(resourceState.path) == collectionID {
 			resourceState.Inconsistent = true
 			updated[stateKey] = resourceState
+			if len(resourceState.restartCursorPath) == 0 {
+				allStreamsHaveRestartCursors = false
+			}
 		}
 	}
 	s.Unlock()
 
 	var checkpointJSON, err = json.Marshal(&captureState{Resources: updated})
 	if err != nil {
-		return nil, fmt.Errorf("error serializing state checkpoint: %w", err)
+		return nil, false, fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
-	return checkpointJSON, nil
+	return checkpointJSON, allStreamsHaveRestartCursors, nil
 }
 
 func (c *capture) Run(ctx context.Context) error {
@@ -360,7 +354,7 @@ func (c *capture) Run(ctx context.Context) error {
 	// underlying API works (so for instance 'users/*/messages' and 'groups/*/messages'
 	// are both 'messages').
 	var watchCollections = make(map[collectionGroupID]time.Time)
-	var backfillCollections = make(map[collectionGroupID]*backfillState)
+	var backfills []*backfillDescription
 	for _, resourceState := range c.State.Resources {
 		var collectionID = getLastCollectionGroupID(resourceState.path)
 		if startTime, ok := watchCollections[collectionID]; !ok || resourceState.ReadTime.Before(startTime) {
@@ -376,21 +370,27 @@ func (c *capture) Run(ctx context.Context) error {
 			"startAfter": resourceState.Backfill.StartAfter,
 			"cursor":     resourceState.Backfill.Cursor,
 		}).Debug("backfill required for binding")
-		if resumeState, ok := backfillCollections[collectionID]; !ok {
-			backfillCollections[collectionID] = resourceState.Backfill
-		} else if !resumeState.Equal(resourceState.Backfill) {
-			log.WithFields(log.Fields{
-				"resource":   resourceState.path,
-				"collection": collectionID,
-			}).Warn("backfill state mismatch, restarting all impacted collections")
 
-			resumeState.Cursor = ""
-			resumeState.MTime = time.Time{}
-			if resumeState.StartAfter.After(resourceState.Backfill.StartAfter) {
-				// Take the minimum StartAfter time across all collections so that we begin
-				// backfilling the new one as soon as possible.
-				resumeState.StartAfter = resourceState.Backfill.StartAfter
+		// Determine if there's already a compatible backfill (one with the same collection
+		// group ID and backfill cursor) and if so just add this resource path to that one.
+		// Otherwise add another backfill to the list.
+		var compatibleBackfill *backfillDescription
+		for _, backfill := range backfills {
+			if backfill.CollectionID == collectionID && backfill.ResumeState.Equal(resourceState.Backfill) && slices.Equal(backfill.RestartCursorPath, resourceState.restartCursorPath) && backfill.RestartCursorValue == resourceState.RestartCursorValue {
+				compatibleBackfill = backfill
+				break
 			}
+		}
+		if compatibleBackfill != nil {
+			compatibleBackfill.ResourcePaths = append(compatibleBackfill.ResourcePaths, resourceState.path)
+		} else {
+			backfills = append(backfills, &backfillDescription{
+				CollectionID:       collectionID,
+				ResourcePaths:      []string{resourceState.path},
+				ResumeState:        resourceState.Backfill,
+				RestartCursorPath:  resourceState.restartCursorPath,
+				RestartCursorValue: resourceState.RestartCursorValue,
+			})
 		}
 	}
 
@@ -405,8 +405,8 @@ func (c *capture) Run(ctx context.Context) error {
 
 	// If we're going to perform any async backfills, connect to Firestore via the client library too
 	var libraryClient *firestore.Client
-	if len(backfillCollections) > 0 {
-		log.WithField("backfills", len(backfillCollections)).Debug("opening second firestore client for async backfills")
+	if len(backfills) > 0 {
+		log.WithField("backfills", len(backfills)).Debug("opening second firestore client for async backfills")
 		app, err := firebase.NewApp(ctx, nil, credsOpt)
 		if err != nil {
 			return err
@@ -446,7 +446,7 @@ func (c *capture) Run(ctx context.Context) error {
 	log.WithFields(log.Fields{
 		"bindings":       len(c.State.Resources),
 		"watches":        len(watchCollections),
-		"asyncBackfills": len(backfillCollections),
+		"asyncBackfills": len(backfills),
 	}).Info("capture starting")
 	for collectionID, startTime := range watchCollections {
 		var collectionID, startTime = collectionID, startTime // Copy the loop variables for each closure
@@ -458,12 +458,15 @@ func (c *capture) Run(ctx context.Context) error {
 			return nil
 		})
 	}
-	for collectionID, resumeState := range backfillCollections {
-		var collectionID, resumeState = collectionID, resumeState // Copy loop variables for each closure
-		log.WithField("collection", collectionID).Debug("starting backfill worker")
+	for _, backfill := range backfills {
+		var backfill = backfill // Copy loop variable for each closure
+		log.WithFields(log.Fields{
+			"collection": backfill.CollectionID,
+			"resources":  backfill.ResourcePaths,
+		}).Debug("starting backfill worker")
 		eg.Go(func() error {
-			if err := c.BackfillAsync(ctx, libraryClient, collectionID, resumeState); err != nil {
-				return fmt.Errorf("error backfilling collection %q: %w", collectionID, err)
+			if err := c.BackfillAsync(ctx, libraryClient, backfill); err != nil {
+				return fmt.Errorf("error backfilling collection %q: %w", backfill.CollectionID, err)
 			}
 			return nil
 		})
@@ -476,11 +479,24 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
-func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, collectionID string, resumeState *backfillState) error {
-	var logEntry = log.WithFields(log.Fields{"collection": collectionID})
+type backfillDescription struct {
+	CollectionID  collectionGroupID // The collection group ID this backfill will query
+	ResourcePaths []resourcePath    // All resource paths which will be captured by this backfill
+	ResumeState   *backfillState    // The backfill state from which to resume
+
+	RestartCursorPath  []string // The parsed path to the restart cursor property, or nil if there is no such property.
+	RestartCursorValue any      // The most recent restart cursor value from this resource, or nil if there is no such value.
+}
+
+func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, backfill *backfillDescription) error {
+	var logEntry = log.WithFields(log.Fields{
+		"collection": backfill.CollectionID,
+		"resources":  backfill.ResourcePaths,
+	})
 
 	// This should never happen since we only run BackfillAsync when there's a
 	// backfill to perform, but seemed safe enough to check anyway.
+	var resumeState = backfill.ResumeState
 	if resumeState == nil || resumeState.Completed {
 		logEntry.Warn("internal error: no backfill necessary")
 		return nil
@@ -507,23 +523,23 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 		// This will cause the backfill to restart from the beginning after the capture gets restarted,
 		// and in the meantime it will show up as an error in the UI in case there's a persistent issue.
 		resumeState.Cursor = ""
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
+		if checkpointJSON, err := c.State.UpdateBackfillState(backfill.ResourcePaths, resumeState); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
 		}
-		return fmt.Errorf("restarting backfill %q: error fetching resume document %q", collectionID, resumeState.Cursor)
+		return fmt.Errorf("restarting backfill %q: error fetching resume document %q", backfill.CollectionID, resumeState.Cursor)
 	} else if !resumeDocument.UpdateTime.Equal(resumeState.MTime) {
 		// Just like if the resume document fetch fails, mtime mismatches cause us to error out, so
 		// we'll restart from the beginning when the connector gets restarted and in the meantime
 		// it'll show up red in the UI.
 		resumeState.Cursor = ""
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
+		if checkpointJSON, err := c.State.UpdateBackfillState(backfill.ResourcePaths, resumeState); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
 		}
-		return fmt.Errorf("restarting backfill %q: resume document %q modified during backfill", collectionID, resumeState.Cursor)
+		return fmt.Errorf("restarting backfill %q: resume document %q modified during backfill", backfill.CollectionID, resumeState.Cursor)
 	} else {
 		cursor = resumeDocument
 	}
@@ -556,9 +572,22 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 		// remain fully caught up or Very Bad Things happen.
 		c.streamsInCatchup.Wait()
 
-		var query firestore.Query = client.CollectionGroup(collectionID).Query
+		var query firestore.Query = client.CollectionGroup(backfill.CollectionID).Query
+		if backfill.RestartCursorPath != nil {
+			query = query.OrderByPath(firestore.FieldPath(backfill.RestartCursorPath), firestore.Asc)
+		}
 		if cursor != nil {
 			query = query.StartAfter(cursor)
+		} else if backfill.RestartCursorPath != nil && backfill.RestartCursorValue != nil {
+			var startAfter = backfill.RestartCursorValue
+			if restartString, ok := backfill.RestartCursorValue.(string); ok {
+				// If the RestartCursorValue is a string holding a valid RFC3339 timestamp then
+				// assume that it's actually a typed timestamp in the source dataset.
+				if ts, err := time.Parse(time.RFC3339Nano, restartString); err == nil {
+					startAfter = ts
+				}
+			}
+			query = query.StartAfter(startAfter)
 		}
 		query = query.Limit(backfillChunkSize)
 
@@ -567,7 +596,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 			if status.Code(err) == codes.Canceled {
 				err = context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
 			}
-			return fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", collectionID, numDocuments, err)
+			return fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", backfill.CollectionID, numDocuments, err)
 		}
 		logEntry.WithFields(log.Fields{
 			"total": numDocuments,
@@ -588,9 +617,9 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 			cursor = doc
 
 			// The 'CollectionGroup' query is potentially over-broad, so skip documents
-			// which aren't actually part of a resource being backfilled.
+			// which aren't actually part of the current backfill.
 			var resourcePath = documentToResourcePath(doc.Ref.Path)
-			if !c.State.BackfillingAsync(resourcePath) {
+			if !slices.Contains(backfill.ResourcePaths, resourcePath) {
 				continue
 			}
 
@@ -603,6 +632,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 				Path:       doc.Ref.Path,
 				CreateTime: &doc.CreateTime,
 				UpdateTime: &doc.UpdateTime,
+				Snapshot:   true,
 			}
 
 			if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
@@ -622,7 +652,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 			"cursor": resumeState.Cursor,
 			"mtime":  resumeState.MTime,
 		}).Debug("updating backfill cursor")
-		if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
+		if checkpointJSON, err := c.State.UpdateBackfillState(backfill.ResourcePaths, resumeState); err != nil {
 			return err
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
@@ -633,7 +663,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, c
 	resumeState.Completed = true
 	resumeState.Cursor = ""
 	resumeState.MTime = time.Time{}
-	if checkpointJSON, err := c.State.UpdateBackfillState(collectionID, resumeState); err != nil {
+	if checkpointJSON, err := c.State.UpdateBackfillState(backfill.ResourcePaths, resumeState); err != nil {
 		return err
 	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 		return err
@@ -732,8 +762,31 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 		}
 		logEntry.WithField("resp", resp).Trace("got response")
 
+		var prevResumeToken string
+
 		switch resp := resp.ResponseType.(type) {
 		case *firestore_pb.ListenResponse_TargetChange:
+			// This is an experimental bit of debugging-in-production logging added in April 2024
+			// in order to investigate whether it might be possible to make incremental streaming
+			// progress using resume tokens instead of read times when retrying.
+			//
+			// The official Firestore client library (which we don't use because it doesn't allow
+			// us to stream incremental results before an entire consistent snapshot has been read
+			// into memory) only updates the resume token when a consistent point is reached. But
+			// it is theoretically permitted for the server to send useful resume tokens before we
+			// reach that point, and if it does then this might allow us to more reliably stream
+			// changes from high-throughput collections.
+			if len(resp.TargetChange.ResumeToken) != 0 {
+				var nextResumeToken = string(resp.TargetChange.ResumeToken)
+				if nextResumeToken != prevResumeToken {
+					logEntry.WithFields(log.Fields{
+						"token":   nextResumeToken,
+						"targets": resp.TargetChange.TargetIds,
+					}).Debug("got new resume token")
+					prevResumeToken = nextResumeToken
+				}
+			}
+
 			logEntry.WithField("tc", resp.TargetChange).Trace("TargetChange Event")
 			switch tc := resp.TargetChange; tc.TargetChangeType {
 			case firestore_pb.TargetChange_NO_CHANGE:
@@ -770,10 +823,22 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 				listenClient = nil
 				if catchupStreaming {
 					logEntry.WithField("docs", numDocuments).Warn("replication failed to catch up, skipping to latest changes (go.estuary.dev/YRDsKd)")
-					if checkpointJSON, err := c.State.MarkInconsistent(collectionID); err != nil {
+					var checkpointJSON, allStreamsHaveRestartCursors, err = c.State.MarkInconsistent(collectionID)
+					if err != nil {
 						return err
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 						return err
+					}
+					// If all impacted bindings have a restart cursor, we don't need to wait nearly as long
+					// before triggering a connector restart.
+					//
+					// TODO(wgd): This is suboptimal. If another collection ID stream breaks shortly after
+					// this one and it _doesn't_ have a restart cursor available, we will still restart
+					// after the shorter delay here. The proper fix might be to eliminate restarting
+					// entirely.
+					var backfillRestartDelay = backfillRestartDelayNoRestartCursor
+					if allStreamsHaveRestartCursors {
+						backfillRestartDelay = backfillRestartDelayWithRestartCursor
 					}
 					time.AfterFunc(backfillRestartDelay+time.Hour, func() {
 						logEntry.Fatal("forcing connector restart to establish consistency")
@@ -905,10 +970,68 @@ func (c *capture) HandleDocument(ctx context.Context, resourcePath string, doc *
 		return fmt.Errorf("error serializing document %q: %w", doc.Name, err)
 	} else if err := c.Output.Documents(bindingIndex, docJSON); err != nil {
 		return err
-	} else if err := c.Output.Checkpoint(json.RawMessage(emptyCheckpoint), true); err != nil {
+	}
+
+	var checkpointUpdate = json.RawMessage(emptyCheckpoint)
+
+	// Update restart-cursor state by promoting a pending value to current if necessary
+	// and by buffering a new value if a cursor path is specified.
+	//
+	// TODO(wgd): Consider factoring this out as a helper function like other state accesses?
+	c.State.Lock()
+	if sk, ok := c.State.stateKeys[resourcePath]; ok {
+		if state := c.State.Resources[sk]; state != nil {
+			if !state.pendingRestartCursorTimeout.IsZero() && time.Now().Before(state.pendingRestartCursorTimeout) {
+				state.RestartCursorValue = state.pendingRestartCursorValue
+				state.pendingRestartCursorTimeout = time.Time{}
+				state.pendingRestartCursorValue = nil
+
+				var updated = map[boilerplate.StateKey]*resourceState{sk: state}
+				var updateJSON, err = json.Marshal(&captureState{Resources: updated})
+				if err != nil {
+					return fmt.Errorf("error serializing state checkpoint: %w", err)
+				}
+				checkpointUpdate = updateJSON
+			}
+			if len(state.restartCursorPath) > 0 && state.pendingRestartCursorTimeout.IsZero() {
+				if restartCursorValue, ok := indexDocumentByPath(fields, state.restartCursorPath); ok {
+					state.pendingRestartCursorTimeout = time.Now().Add(restartCursorPendingInterval)
+					state.pendingRestartCursorValue = restartCursorValue
+				}
+			}
+		}
+	}
+	c.State.Unlock()
+
+	if err := c.Output.Checkpoint(checkpointUpdate, true); err != nil {
 		return err
 	}
 	return nil
+}
+
+// indexDocumentByPath implements JSON pointer indexing rules given a parsed
+// list of individual path elements.
+func indexDocumentByPath(x any, path []string) (any, bool) {
+	for _, p := range path {
+		if obj, ok := x.(map[string]any); ok {
+			var fval, ok = obj[p]
+			if !ok {
+				return nil, false
+			}
+			x = fval
+		} else if arr, ok := x.([]any); ok {
+			if idx, err := strconv.Atoi(p); err != nil {
+				return nil, false
+			} else if idx < 0 || idx >= len(arr) {
+				return nil, false
+			} else {
+				x = arr[idx]
+			}
+		} else {
+			return nil, false
+		}
+	}
+	return x, true
 }
 
 func (c *capture) HandleDelete(ctx context.Context, resourcePath string, docName string, readTime time.Time) error {
@@ -952,6 +1075,10 @@ func translateValue(val *firestore_pb.Value) (interface{}, error) {
 	case *firestore_pb.Value_DoubleValue:
 		if math.IsNaN(val.DoubleValue) {
 			return "NaN", nil
+		} else if math.IsInf(val.DoubleValue, +1) {
+			return "Infinity", nil
+		} else if math.IsInf(val.DoubleValue, -1) {
+			return "-Infinity", nil
 		}
 		return val.DoubleValue, nil
 	case *firestore_pb.Value_TimestampValue:
@@ -997,6 +1124,10 @@ func sanitizeValue(x interface{}) interface{} {
 	case float64:
 		if math.IsNaN(x) {
 			return "NaN"
+		} else if math.IsInf(x, +1) {
+			return "Infinity"
+		} else if math.IsInf(x, -1) {
+			return "-Infinity"
 		}
 	case []interface{}:
 		for idx, value := range x {

@@ -13,6 +13,8 @@ import (
 	sf "github.com/snowflakedb/gosnowflake"
 )
 
+var _ sql.SchemaManager = (*client)(nil)
+
 type client struct {
 	db  *stdsql.DB
 	cfg *config
@@ -22,7 +24,12 @@ type client struct {
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI(ep.Tenant, false))
+	dsn, err := cfg.toURI(ep.Tenant)
+	if err != nil {
+		return nil, err
+	}
+
+	db, err := stdsql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +54,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 		return nil, fmt.Errorf("querying for connected database: %w", err)
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, c.cfg.Schema, resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
 }
 
 func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
@@ -56,26 +63,7 @@ func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) er
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	var schemaName = c.cfg.Schema
-	if len(tc.Path) > 1 {
-		schemaName = tc.Path[0]
-	}
-
-	var conn, err = c.db.Conn(ctx)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))); err != nil {
-		return err
-	}
-
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
-		return err
-	}
-
-	_, err = conn.ExecContext(ctx, tc.TableCreateSql)
+	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
 	return err
 }
 
@@ -83,16 +71,7 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		var conn, err = c.db.Conn(ctx)
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
-			return err
-		}
-		_, err = conn.ExecContext(ctx, stmt)
+		_, err := c.db.ExecContext(ctx, stmt)
 		return err
 	}, nil
 }
@@ -105,24 +84,37 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	alterColumnStmt := alterColumnStmtBuilder.String()
 
 	return alterColumnStmt, func(ctx context.Context) error {
-		var conn, err = c.db.Conn(ctx)
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("USE SCHEMA %s", c.ep.Dialect.Identifier(c.cfg.Schema))); err != nil {
-			return err
-		}
-		_, err = conn.ExecContext(ctx, alterColumnStmt)
+		_, err := c.db.ExecContext(ctx, alterColumnStmt)
 		return err
 	}, nil
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	return sql.StdListSchemas(ctx, c.db)
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
+}
+
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
-	if err := c.db.PingContext(ctx); err != nil {
+	cfg := conf.(*config)
+
+	dsn, err := cfg.toURI(tenant)
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
+
+	db, err := stdsql.Open("snowflake", dsn)
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
+
+	if err := db.PingContext(ctx); err != nil {
 		var sfError *sf.SnowflakeError
 		if errors.As(err, &sfError) {
 			switch sfError.Number {
@@ -132,7 +124,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 				// incorrect, but would be confusing for a user because we have a separate "Account"
 				// input field. We want to be specific here and report that it is the account
 				// identifier in the host URL.
-				err = fmt.Errorf("incorrect account identifier %q in host URL", strings.TrimSuffix(c.cfg.Host, ".snowflakecomputing.com"))
+				err = fmt.Errorf("incorrect account identifier %q in host URL", strings.TrimSuffix(cfg.Host, ".snowflakecomputing.com"))
 			case 390100:
 				err = fmt.Errorf("incorrect username or password")
 			case 390201:
@@ -140,7 +132,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 				// distinguish between that for the database, schema, or warehouse. The snowflake
 				// error message in these cases is fairly decent fortunately.
 			case 390189:
-				err = fmt.Errorf("role %q does not exist", c.cfg.Role)
+				err = fmt.Errorf("role %q does not exist", cfg.Role)
 			}
 		}
 
@@ -150,11 +142,11 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 		// the user and the configuration did not set a warehouse, this may be `null`, and the user
 		// needs to configure a specific warehouse to use.
 		var currentWarehouse *string
-		if err := c.db.QueryRowContext(ctx, "SELECT CURRENT_WAREHOUSE();").Scan(&currentWarehouse); err != nil {
+		if err := db.QueryRowContext(ctx, "SELECT CURRENT_WAREHOUSE();").Scan(&currentWarehouse); err != nil {
 			errs.Err(fmt.Errorf("checking for active warehouse: %w", err))
 		} else {
 			if currentWarehouse == nil {
-				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", c.cfg.User))
+				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", cfg.Credentials.User))
 			}
 		}
 	}

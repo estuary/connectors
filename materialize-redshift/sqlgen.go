@@ -2,9 +2,9 @@ package main
 
 import (
 	"fmt"
-	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 	"time"
 	"unicode/utf8"
 
@@ -12,13 +12,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
-// Identifiers matching the this pattern do not need to be quoted. See
-// https://docs.aws.amazon.com/redshift/latest/dg/r_names.html. Identifiers (table names and column
-// names) are case-insensitive, even if they are quoted. They are always converted to lowercase by
-// default.
-var simpleIdentifierRegexp = regexp.MustCompile(`(?i)^[a-z_][a-z0-9_]*$`)
-
-var rsDialect = func() sql.Dialect {
+var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 	textConverter := func(te tuple.TupleElement) (interface{}, error) {
 		if s, ok := te.(string); ok {
 			// Redshift will terminate values going into VARCHAR columns where the null
@@ -35,94 +29,96 @@ var rsDialect = func() sql.Dialect {
 		return te, nil
 	}
 
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE PRECISION"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:   sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.ARRAY:    sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.BINARY:   sql.NewStaticMapper("VARBYTE"),
-		sql.MULTIPLE: sql.NewStaticMapper("SUPER", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)), // Note: Actually a VARCHAR(256)
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)),
-					Delegate:   sql.NewStaticMapper("NUMERIC(38,0)", sql.WithElementConverter(sql.StdStrToInt())),
-				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("TEXT", sql.WithElementConverter(textConverter)),
-					// NOTE(johnny): I can't find any documentation on Redshift Nan/Infinity/-Infinity handling.
-					// There's some indication that others have resorted to mapping these to NULL:
-					// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
-					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat(nil, nil, nil))),
-				},
-				"date": sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("TIMESTAMPTZ", sql.WithElementConverter(
-					func(te tuple.TupleElement) (interface{}, error) {
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT"),
+				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("numeric")),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:   sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.ARRAY:    sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.BINARY:   sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
+			sql.MULTIPLE: sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("numeric"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(sql.ToStr)),
+				38,
+			),
+			// NOTE(johnny): I can't find any documentation on Redshift Nan/Infinity/-Infinity handling.
+			// There's some indication that others have resorted to mapping these to NULL:
+			// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter)), // Note: Actually a VARCHAR(256)
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date": sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
 						// Redshift supports timestamps with microsecond precision. It will reject
 						// timestamps with higher precision than that, so we truncate anything
 						// beyond microseconds.
-						if s, ok := te.(string); ok {
-							parsed, err := time.Parse(time.RFC3339Nano, s)
-							if err != nil {
-								return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
-							}
-
-							return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
+						parsed, err := time.Parse(time.RFC3339Nano, s)
+						if err != nil {
+							return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
 						}
 
-						return te, nil
-					})),
-				// "time" is not currently support due to limitations with loading time values from
-				// staged JSON.
-				// "time": sql.NewStaticMapper("TIMETZ"),
-			},
-			WithContentType: map[string]sql.TypeMapper{
-				// The largest allowable size for a VARBYTE is 1,024,000 bytes. Our stored specs and
-				// checkpoints can be quite long, so we need to use as large of column size as
-				// possible for these tables.
-				"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("VARBYTE(1024000)"),
-				"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("VARBYTE(1024000)"),
-			},
+						return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
+					}))),
+					// "time" is not currently support due to limitations with loading time values from
+					// staged JSON.
+					// "time": sql.NewStaticMapper("TIMETZ"),
+				},
+				WithContentType: map[string]sql.MapProjectionFn{
+					// The largest allowable size for a VARBYTE is 1,024,000 bytes. Our stored specs and
+					// checkpoints can be quite long, so we need to use as large of column size as
+					// possible for these tables.
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.MapStatic("VARBYTE(1024000)"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.MapStatic("VARBYTE(1024000)"),
+				},
+			}),
 		},
-	}
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"numeric"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double precision"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"super"}, Validate: sql.JsonCompatible},
-		sql.ColValidation{Types: []string{"character varying"}, Validate: sql.StringCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
+		// NB: We are not using NOT NULL text so that all columns are created as nullable. This is
+		// necessary because Redshift does not support dropping a NOT NULL constraint, so we need to
+		// create columns as nullable to preserve the ability to change collection schema fields from
+		// required to not required or remove fields from the materialization.
 	)
+
+	// Redshift lowercases all identifiers by default, unless the parameter
+	// `enable_case_sensitive_identifier` is TRUE, which causes quoted identifiers preserve their
+	// case.
+	identifierTransform := func(in string) string {
+		return truncatedIdentifier(strings.ToLower(in))
+	}
+	if caseSensitiveIdentifierEnabled {
+		identifierTransform = func(in string) string {
+			return truncatedIdentifier(in)
+		}
+	}
 
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its
-				// empty the default Redshift schema "public" will implicitly be used. Also note
-				// that Redshift lowercases all identifiers.
+				// empty the default Redshift schema "public" will implicitly be used.
 				return sql.InfoTableLocation{
 					TableSchema: "public",
-					TableName:   truncatedIdentifier(strings.ToLower(path[0])),
+					TableName:   identifierTransform(path[0]),
 				}
 			} else {
 				return sql.InfoTableLocation{
-					TableSchema: truncatedIdentifier(strings.ToLower(path[0])),
-					TableName:   truncatedIdentifier(strings.ToLower(path[1])),
+					TableSchema: identifierTransform(path[0]),
+					TableName:   identifierTransform(path[1]),
 				}
 			}
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
-			return truncatedIdentifier(strings.ToLower(field))
+			return identifierTransform(field)
 		}),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
-					return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(REDSHIFT_RESERVED_WORDS, strings.ToLower(s))
+					return sql.IsSimpleIdentifier(s) && !slices.Contains(REDSHIFT_RESERVED_WORDS, strings.ToLower(s))
 				},
 				sql.QuoteTransform(`"`, `""`),
 			))),
@@ -137,18 +133,18 @@ var rsDialect = func() sql.Dialect {
 		// create columns as nullable to preserve the ability to change collection schema fields from
 		// required to not required or remove fields from the materialization.
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    0, // Redshift automatically truncates column names that are too long
 		CaseInsensitiveColumns: true,
 	}
-}()
+}
 
 type copyFromS3Params struct {
-	Target          string
-	Columns         []*sql.Column
-	ManifestURL     string
-	Config          *config
-	TruncateColumns bool
+	Target                         string
+	Columns                        []*sql.Column
+	ManifestURL                    string
+	Config                         *config
+	CaseSensitiveIdentifierEnabled bool
+	TruncateColumns                bool
 }
 
 type loadTableParams struct {
@@ -156,10 +152,26 @@ type loadTableParams struct {
 	VarCharLength int
 }
 
-var (
-	tplAll = sql.MustParseTemplate(rsDialect, "root", `
+type templates struct {
+	createTargetTable *template.Template
+	createLoadTable   *template.Template
+	createStoreTable  *template.Template
+	createDeleteTable *template.Template
+	mergeInto         *template.Template
+	deleteQuery       *template.Template
+	loadQuery         *template.Template
+	updateFence       *template.Template
+	copyFromS3        *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_name" -}}
 flow_temp_table_{{ $.Binding }}
+{{- end }}
+
+{{ define "temp_name_deleted" -}}
+{{ template "temp_name" $ }}_deleted
 {{- end }}
 
 -- Templated creation of a materialized table definition and comments.
@@ -203,6 +215,15 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 );
 {{ end }}
 
+{{ define "createDeleteTable" }}
+CREATE TEMPORARY TABLE {{ template "temp_name_deleted" . }} (
+{{- range $ind, $key := $.Keys }}
+	{{- if $ind }},{{ end }}
+  {{ $key.Identifier }} {{ $key.DDL }}
+{{- end }}
+);
+{{ end }}
+
 -- Templated query which updates an existing row in the target table. Redshift does not support
 -- "WHEN MATCHED AND", so if/when deletion is implemented using a NULL document, a separate delete
 -- statement will be needed in addition to this merge statement.
@@ -235,6 +256,17 @@ WHEN NOT MATCHED THEN
 		r.{{$col.Identifier}}
 	{{- end -}}
 	);
+{{ end }}
+
+{{ define "deleteQuery" }}
+{{ if $.Document -}}
+DELETE FROM {{ $.Identifier }}
+USING {{ template "temp_name_deleted" . }} AS r
+WHERE {{ range $ind, $key := $.Keys }}
+{{- if $ind }} AND {{end -}}
+	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
+{{- end }}
+{{- end }}
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
@@ -274,7 +306,11 @@ FROM '{{ $.ManifestURL }}'
 MANIFEST
 CREDENTIALS 'aws_access_key_id={{ $.Config.AWSAccessKeyID }};aws_secret_access_key={{ $.Config.AWSSecretAccessKey }}'
 REGION '{{ $.Config.Region }}'
+{{ if $.CaseSensitiveIdentifierEnabled -}}
+JSON 'auto'
+{{- else -}}
 JSON 'auto ignorecase'
+{{- end }}
 GZIP
 DATEFORMAT 'auto'
 TIMEFORMAT 'auto'
@@ -284,15 +320,19 @@ TRUNCATECOLUMNS;
 ;
 {{- end }}
 {{ end }}
-`)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateStoreTable  = tplAll.Lookup("createStoreTable")
-	tplMergeInto         = tplAll.Lookup("mergeInto")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
-	tplCopyFromS3        = tplAll.Lookup("copyFromS3")
-)
+	`)
+	return templates{
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		createLoadTable:   tplAll.Lookup("createLoadTable"),
+		createStoreTable:  tplAll.Lookup("createStoreTable"),
+		createDeleteTable: tplAll.Lookup("createDeleteTable"),
+		mergeInto:         tplAll.Lookup("mergeInto"),
+		deleteQuery:       tplAll.Lookup("deleteQuery"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		updateFence:       tplAll.Lookup("updateFence"),
+		copyFromS3:        tplAll.Lookup("copyFromS3"),
+	}
+}
 
 const varcharTableAlter = "ALTER TABLE %s ALTER COLUMN %s TYPE VARCHAR(MAX);"
 

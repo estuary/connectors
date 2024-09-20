@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test_json_column_26214": 2 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":{"a":123},"id":0,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":{"b":456},"id":1,"txid":999999}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_json_column_26214":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+

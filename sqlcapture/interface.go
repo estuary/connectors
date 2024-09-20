@@ -3,6 +3,7 @@ package sqlcapture
 import (
 	"context"
 	"encoding/json"
+	"time"
 
 	"github.com/invopop/jsonschema"
 )
@@ -74,9 +75,9 @@ type ChangeEvent struct {
 	After     map[string]interface{}
 }
 
-// FlushEvent informs the generic sqlcapture logic about transaction
-// boundaries.
+// FlushEvent informs the generic sqlcapture logic about transaction boundaries.
 type FlushEvent struct {
+	// The cursor value at which the current transaction was committed.
 	Cursor string
 }
 
@@ -87,19 +88,25 @@ type MetadataEvent struct {
 	Metadata json.RawMessage
 }
 
-// A DatabaseEvent can be a ChangeEvent, FlushEvent, or MetadataEvent.
+// KeepaliveEvent informs the generic sqlcapture logic that the replication stream
+// is still active and processing WAL entries which don't require other events.
+type KeepaliveEvent struct{}
+
+// A DatabaseEvent can be a ChangeEvent, FlushEvent, MetadataEvent, or KeepaliveEvent.
 type DatabaseEvent interface {
 	isDatabaseEvent()
 	String() string
 }
 
-func (*ChangeEvent) isDatabaseEvent()   {}
-func (*FlushEvent) isDatabaseEvent()    {}
-func (*MetadataEvent) isDatabaseEvent() {}
+func (*ChangeEvent) isDatabaseEvent()    {}
+func (*FlushEvent) isDatabaseEvent()     {}
+func (*MetadataEvent) isDatabaseEvent()  {}
+func (*KeepaliveEvent) isDatabaseEvent() {}
 
-func (*ChangeEvent) String() string   { return "ChangeEvent" }
-func (*FlushEvent) String() string    { return "FlushEvent" }
-func (*MetadataEvent) String() string { return "MetadataEvent" }
+func (*ChangeEvent) String() string    { return "ChangeEvent" }
+func (evt *FlushEvent) String() string { return "FlushEvent" }
+func (*MetadataEvent) String() string  { return "MetadataEvent" }
+func (*KeepaliveEvent) String() string { return "KeepaliveEvent" }
 
 // KeyFields returns suitable fields for extracting the event primary key.
 func (e *ChangeEvent) KeyFields() map[string]interface{} {
@@ -118,20 +125,20 @@ type Database interface {
 	// ReplicationStream constructs a new ReplicationStream object, from which
 	// a neverending sequence of change events can be read.
 	ReplicationStream(ctx context.Context, startCursor string) (ReplicationStream, error)
-	// WriteWatermark writes the provided string into the 'watermarks' table.
-	WriteWatermark(ctx context.Context, watermark string) error
-	// WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
-	WatermarksTable() string
+
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) error
+	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, err error)
 	// DiscoverTables queries the database for information about tables available for capture.
-	DiscoverTables(ctx context.Context) (map[string]*DiscoveryInfo, error)
+	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 	EmptySourceMetadata() SourceMetadata
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
 	ShouldBackfill(streamID string) bool
+	// HistoryMode returns whether history mode (non-associative reduction of events) is enabled
+	HistoryMode() bool
 
 	// The collection key which should be suggested if discovery fails to find suitable
 	// primary key. This should be some property or combination of properties in the
@@ -169,9 +176,17 @@ type Database interface {
 // tables before starting replication.
 type ReplicationStream interface {
 	ActivateTable(ctx context.Context, streamID string, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
-
 	StartReplication(ctx context.Context) error
-	Events() <-chan DatabaseEvent
+
+	// StreamToFence yields via the provided callback all change events between the
+	// current stream position and a new "fence" position which is guaranteed to be
+	// no earlier in the WAL than the point at which the StreamToFence call began.
+	//
+	// If fenceAfter is greater than zero, the fence should not be established until
+	// after the specified amount of time has passed. This should be used to guarantee
+	// that indefinite streaming doesn't busy-loop on an idle database.
+	StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event DatabaseEvent) error) error
+
 	Acknowledge(ctx context.Context, cursor string) error
 	Close(ctx context.Context) error
 }
@@ -179,8 +194,8 @@ type ReplicationStream interface {
 // DiscoveryInfo holds metadata about a specific table in the database, and
 // is used during discovery to automatically generate catalog information.
 type DiscoveryInfo struct {
-	Name        string                // The PostgreSQL table name.
-	Schema      string                // The PostgreSQL schema (a namespace, in normal parlance) which contains the table.
+	Name        string                // The table's name.
+	Schema      string                // The schema (a namespace, in normal parlance) which contains the table.
 	Columns     map[string]ColumnInfo // Information about each column of the table.
 	PrimaryKey  []string              // An ordered list of the column names which together form the table's primary key.
 	ColumnNames []string              // The names of all columns, in the table's natural order.
@@ -198,6 +213,10 @@ type DiscoveryInfo struct {
 	// been reached yet) because we can't actually answer the question of whether some
 	// arbitrary key lies before or after the current backfill cursor.
 	UnpredictableKeyOrdering bool
+
+	// ExtraDetails may hold additional details about a table, in cases where there are
+	// things a specific connector needs to know about a table for its own use.
+	ExtraDetails any
 }
 
 // ColumnInfo holds metadata about a specific column of some table in the

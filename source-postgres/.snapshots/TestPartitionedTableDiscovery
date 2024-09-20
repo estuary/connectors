@@ -16,9 +16,11 @@ Binding 0:
           "properties": {
             "logdate": {
               "type": "string",
-              "format": "date-time"
+              "format": "date-time",
+              "description": "(source type: non-nullable date)"
             },
             "value": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
@@ -29,6 +31,28 @@ Binding 0:
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -100,9 +124,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

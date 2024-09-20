@@ -16,6 +16,20 @@ on:
       - "source-google-analytics-data-api/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
+      - "source-linkedin-ads-v2/**"
+      - "source-oracle-flashback/**"
+      - "source-klaviyo/**"
+      - "source-recharge/**"
+      - "source-stripe-native/**"
+      - "source-zendesk-support/**"
+      - "source-iterable/**"
+      - "source-pendo/**"
+      - "source-twilio/**"
+      - "source-jira-native/**"
+      - "source-mixpanel-native/**"
+      - "source-brevo/**"
+      - "source-impact-native/**"
+
   pull_request:
     branches: [main]
     paths:
@@ -31,6 +45,22 @@ on:
       - "source-google-analytics-data-api/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
+      - "source-stripe-native/**"
+      - "source-linkedin-ads-v2/**"
+      - "source-oracle-flashback/**"
+      - "source-recharge/**"
+      - "source-klaviyo/**"
+      - "source-recharge/**"
+      - "source-stripe-native/**"
+      - "source-zendesk-support/**"
+      - "source-iterable/**"
+      - "source-jira-native/**"
+      - "source-pendo/**"
+      - "source-twilio/**"
+      - "source-jira-native/**"
+      - "source-mixpanel-native/**"
+      - "source-brevo/**"
+      - "source-impact-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,7 +68,7 @@ concurrency:
 
 jobs:
   py_connector:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
@@ -85,13 +115,73 @@ jobs:
             type: capture
             version: v2
             usage_rate: "1.0"
+          - name: source-oracle-flashback
+            type: capture
+            version: v1
+            usage_rate: "1.0"
           - name: source-linkedin-pages
             type: capture
             version: v1
             usage_rate: "1.0"
+          - name: source-linkedin-ads-v2
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-klaviyo
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-recharge
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-stripe-native
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-zendesk-support
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-iterable
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-pendo
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-twilio
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-jira-native
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-mixpanel-native
+            type: capture
+            version: v2
+            usage_rate: "1.0"
+          - name: source-brevo
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-impact-native
+            type: capture
+            version: v2
+            usage_rate: "1.0"
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download flow-network-tunnel and add it to $PATH
+        run: |
+          mkdir ./network-tunnel
+          docker pull ghcr.io/estuary/network-tunnel:dev
+          docker cp $(docker create --name temp ghcr.io/estuary/network-tunnel:dev sh):/flow-network-tunnel ./network-tunnel/flow-network-tunnel
+          docker rm temp
+          echo "${PWD}/network-tunnel" >> $GITHUB_PATH
 
       - name: Common Setup
         id: setup
@@ -117,8 +207,18 @@ jobs:
           cd ..
           pytest ${{ matrix.connector.name }}
 
+      # Uncomment to allow each connector to have its own Dockerfile
+      #- name: Find Dockerfile for ${{ matrix.connector.name }}
+      #  id: dockerfile
+      #  run: |
+      #    DOCKERFILE_PATH="${PWD}/estuary-cdk/common.Dockerfile"
+      #    if [ -f "${{ matrix.connector.name }}/Dockerfile" ]; then
+      #      DOCKERFILE_PATH="${PWD}/${{ matrix.connector.name }}/Dockerfile"
+      #    fi
+      #    echo "path=${DOCKERFILE_PATH}" >> $GITHUB_OUTPUT
+
       - name: Build ${{ matrix.connector.name }} Docker Image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: estuary-cdk/common.Dockerfile

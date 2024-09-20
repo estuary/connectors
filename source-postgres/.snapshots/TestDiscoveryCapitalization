@@ -15,19 +15,43 @@ Binding 0:
           "$anchor": "TestDiscoveryCapitalization_AaAaA",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -99,9 +123,6 @@ Binding 0:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {
@@ -130,19 +151,43 @@ Binding 1:
           "$anchor": "TestDiscoverycapitalization_bbbbb",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -214,9 +259,6 @@ Binding 1:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {
@@ -245,19 +287,43 @@ Binding 2:
           "$anchor": "TestDiscoverycapitalization_ccccc",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "id": {
-              "type": "integer"
+              "type": "integer",
+              "description": "(source type: non-nullable int4)"
             }
           }
         }
       },
       "allOf": [
         {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "required": [
             "_meta"
           ],
@@ -329,9 +395,6 @@ Binding 2:
                 "strategy": "merge"
               }
             }
-          },
-          "reduce": {
-            "strategy": "merge"
           }
         },
         {

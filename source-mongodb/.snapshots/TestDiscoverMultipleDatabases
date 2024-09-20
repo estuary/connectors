@@ -6,6 +6,23 @@ Binding 0:
       "collection": "collection1"
     },
     "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "type": "object",
       "required": [
         "_id"
@@ -27,6 +44,35 @@ Binding 0:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
             }
           },
           "type": "object"
@@ -46,6 +92,23 @@ Binding 1:
       "collection": "collection2"
     },
     "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "type": "object",
       "required": [
         "_id"
@@ -67,6 +130,35 @@ Binding 1:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
             }
           },
           "type": "object"
@@ -86,6 +178,23 @@ Binding 2:
       "collection": "collection1"
     },
     "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "type": "object",
       "required": [
         "_id"
@@ -107,6 +216,35 @@ Binding 2:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
             }
           },
           "type": "object"
@@ -126,6 +264,23 @@ Binding 3:
       "collection": "collection2"
     },
     "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
       "type": "object",
       "required": [
         "_id"
@@ -147,6 +302,35 @@ Binding 3:
               ],
               "title": "Change Operation",
               "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
             }
           },
           "type": "object"

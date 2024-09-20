@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	sql "github.com/estuary/connectors/materialize-sql"
+	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -51,7 +51,7 @@ type stagedFile struct {
 	// configured, and the randomly generated UUID of this stagedFile for this connector invocation.
 	prefix string
 
-	encoder *sql.CountingEncoder
+	encoder *enc.JsonEncoder
 	group   *errgroup.Group
 
 	// List of file names uploaded during the current transaction for transaction data, not
@@ -101,7 +101,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	r, w := io.Pipe()
 
-	f.encoder = sql.NewCountingEncoder(w, true, f.fields)
+	f.encoder = enc.NewJsonEncoder(w, f.fields)
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	f.group = group
@@ -151,7 +151,7 @@ func (f *stagedFile) encodeRow(ctx context.Context, row []interface{}) error {
 		return fmt.Errorf("encoding row: %w", err)
 	}
 
-	if f.encoder.Written() >= sql.DefaultFileSizeLimit {
+	if f.encoder.Written() >= enc.DefaultJsonFileSizeLimit {
 		if err := f.flushFile(); err != nil {
 			return err
 		}

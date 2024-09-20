@@ -19,14 +19,13 @@ func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	// Our version checking may have been overly conservative, so let's err in the
 	// other direction for a while and disengage the check entirely.
 	if err := db.prerequisiteVersion(ctx); err != nil {
-		logrus.WithField("err", err).Debug("database version may be insufficient")
+		logrus.WithField("err", err).Warn("database version may be insufficient")
 	}
 
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteBinlogEnabled,
 		db.prerequisiteBinlogFormat,
 		db.prerequisiteBinlogExpiry,
-		db.prerequisiteWatermarksTable,
 		db.prerequisiteUserPermissions,
 	} {
 		if err := prereq(ctx); err != nil {
@@ -46,62 +45,20 @@ const (
 	mariadbReqMinorVersion = 3
 )
 
-func (db *mysqlDatabase) prerequisiteVersion(ctx context.Context) error {
-	// This connector works for both MySQL and MariaDB. If the queried version indicates that we're
-	// connecting to a MariaDB instance, the version requirements will be set accordingly further
-	// down.
-	database := "MySQL"
-	minMajor := mysqlReqMajorVersion
-	minMinor := mysqlReqMinorVersion
-
-	var version string
-	results, err := db.conn.Execute(`SELECT @@GLOBAL.version;`)
-	if err != nil {
-		logrus.Warn(fmt.Errorf("unable to query 'version' system variable: %w", err))
-	} else if len(results.Values) != 1 || len(results.Values[0]) != 1 {
-		logrus.Warn(fmt.Errorf("unable to query 'version' system variable: malformed response"))
-	} else {
-		version = string(results.Values[0][0].AsString())
-		// This check may not be perfect, but it should be conservative: Since MariaDB has a higher
-		// minimum version requirement, only increase the version requirements corresponding to
-		// MariaDB if we can conclusively prove that this is a MariaDB instance.
-		if strings.Contains(strings.ToLower(version), "mariadb") {
-			database = "MariaDB"
-			minMajor = mariadbReqMajorVersion
-			minMinor = mariadbReqMinorVersion
-		}
-
-		if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
-			logrus.Warn(fmt.Errorf("unable to parse server version from '%s': %w", version, err))
-		} else if !sqlcapture.ValidVersion(major, minor, minMajor, minMinor) {
-			// Return an error only if the actual version could be definitively determined to be
-			// less than required.
-			return fmt.Errorf(
-				"minimum supported %s version is %d.%d: attempted to capture from database version %d.%d",
-				database,
-				minMajor,
-				minMinor,
-				major,
-				minor,
-			)
-		} else {
-			logrus.WithFields(logrus.Fields{
-				"version": version,
-				"major":   major,
-				"minor":   minor,
-			}).Info("queried database version")
-			return nil
-		}
+func (db *mysqlDatabase) prerequisiteVersion(_ context.Context) error {
+	var minMajor, minMinor = mysqlReqMajorVersion, mysqlReqMinorVersion
+	if db.versionProduct == "MariaDB" {
+		minMajor, minMinor = mariadbReqMajorVersion, mariadbReqMinorVersion
 	}
 
-	// Catch-all trailing log message for cases where the server version could not be determined.
-	logrus.Warn(fmt.Sprintf(
-		"attempting to capture from unknown database version: minimum supported %s version is %d.%d",
-		database,
-		minMajor,
-		minMinor,
-	))
-
+	if !sqlcapture.ValidVersion(db.versionMajor, db.versionMinor, minMajor, minMinor) {
+		return fmt.Errorf(
+			"minimum supported %s version is %d.%d: attempted to capture from database version %d.%d",
+			db.versionProduct,
+			minMajor, minMinor,
+			db.versionMajor, db.versionMinor,
+		)
+	}
 	return nil
 }
 
@@ -155,95 +112,14 @@ func (db *mysqlDatabase) prerequisiteBinlogExpiry(ctx context.Context) error {
 	return nil
 }
 
-func (db *mysqlDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
-	var table = db.config.Advanced.WatermarksTable
-	var logEntry = logrus.WithField("table", table)
-
-	// If we can successfully write a watermark then we're satisfied here
-	if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
-		logEntry.Debug("watermarks table already exists")
-		return nil
-	}
-
-	// If we can create the watermarks table and then write a watermark, that also works
-	logEntry.Info("watermarks table doesn't exist, attempting to create it")
-
-	// Try to create the watermarks database if it doesn't already exist. WatermarksTable from the
-	// configuration has already been validated as being in the fully-qualified form of
-	// <database>.<table>.
-	if _, err := db.conn.Execute(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", strings.Split(table, ".")[0])); err != nil {
-		// It is entirely possible that the watermarks database already exists but we don't have
-		// permission to create databases. In this case we will get an "Access Denied" error here.
-		logEntry.WithField("err", err).Debug("failed to create watermarks database")
-	} else if _, err := db.conn.Execute(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (slot INTEGER PRIMARY KEY, watermark TEXT);", table)); err != nil {
-		logEntry.WithField("err", err).Error("failed to create watermarks table")
-	} else if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
-		logEntry.Info("successfully created watermarks table")
-		return nil
-	}
-
-	return fmt.Errorf("user %q cannot write to the watermarks table %q", db.config.User, table)
-}
-
 func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error {
-	// The SHOW MASTER STATUS command requires REPLICATION CLIENT or SUPER privileges,
-	// and thus serves as an easy way to test whether the user is authorized for CDC.
-	var results, err = db.conn.Execute("SHOW MASTER STATUS;")
-	if err != nil {
+	// The SHOW MASTER STATUS / SHOW BINARY LOG STATUS command requires REPLICATION CLIENT
+	// or SUPER privileges, and thus serves as an easy way to test whether the user is
+	// authorized for CDC.
+	if _, err := db.queryBinlogStatus(); err != nil {
+		logrus.WithField("err", err).Info("failed to query binlog status")
 		return fmt.Errorf("user %q needs the REPLICATION CLIENT permission", db.config.User)
 	}
-
-	if len(results.Values) == 0 {
-		// This failure condition has nothing to do with user permissions, but since we're
-		// already running SHOW MASTER STATUS it would be redundant to do it again in a separate
-		// check just to verify that the result is non-empty.
-		return fmt.Errorf("unable to query latest binlog position (is binary logging enabled?)")
-	}
-
-	// The result of a `SHOW MASTER STATUS` query also tells us if only specific schemas are
-	// written to the binlog because the user specified --binlog-do-db startup flags. There are
-	// a lot of ways this could theoretically be misconfigured so we won't bother trying to check
-	// for every possible misconfiguration, but the specific case of "the schemas of interest are
-	// logged but the schema containing the Flow watermarks table isn't" occurs often enough that
-	// it's worth explicitly checking and producing a nice error in that case.
-	for _, rowValues := range results.Values {
-		// Translate the result row into a map so that minor changes we don't care
-		// about don't impact our processing.
-		var row = make(map[string]any)
-		for colIdx, colValue := range rowValues {
-			var key = string(results.Fields[colIdx].Name)
-			var val = colValue.Value()
-			if bs, ok := val.([]byte); ok {
-				val = string(bs)
-			}
-			row[key] = val
-		}
-
-		// Blindly splitting and indexing is valid here because validation for the Config
-		// struct already checked that the watermarks table name is fully-qualified.
-		var watermarksSchema = strings.Split(db.config.Advanced.WatermarksTable, ".")[0]
-
-		// The use of strings.Contains here could result in false negatives, but this is
-		// much less of a concern than potential false positives and the extra code needed
-		// to parse this column value into an actual list of schema names.
-		if doDB, ok := row["Binlog_Do_DB"].(string); ok && doDB != "" && !strings.Contains(doDB, watermarksSchema) {
-			return fmt.Errorf("binlog-do-db is set to %q, which doesn't include the watermark table schema %q", doDB, watermarksSchema)
-		}
-	}
-	results.Close()
-
-	// The SHOW SLAVE HOSTS command (called SHOW REPLICAS in newer versions, but we're
-	// using the deprecated form here for compatibility with old MySQL releases) requires
-	// the REPLICATION SLAVE permission, which we need for CDC.
-	//
-	// This check is currently disabled due to reports that it may be producing false
-	// positives in some setups.
-	//
-	// results, err = db.conn.Execute("SHOW SLAVE HOSTS;")
-	// if err != nil {
-	// 	return fmt.Errorf("user %q needs the REPLICATION SLAVE permission", db.config.User)
-	// }
-	// results.Close()
 	return nil
 }
 
@@ -302,10 +178,7 @@ func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
 	// And as the final resort we'll check 'expire_logs_days' if 'seconds' was zero or nonexistent.
 	expireLogsDays, err := queryNumericVariable(conn, `SHOW VARIABLES LIKE 'expire_logs_days';`)
 	logrus.WithFields(logrus.Fields{"days": expireLogsDays, "err": err}).Debug("queried MySQL variable 'expire_logs_days'")
-	if err != nil {
-		return 0, err
-	}
-	if expireLogsDays > 0 {
+	if err == nil && expireLogsDays > 0 {
 		return time.Duration(expireLogsDays) * 24 * time.Hour, nil
 	}
 

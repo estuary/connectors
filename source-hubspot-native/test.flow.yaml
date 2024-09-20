@@ -36,6 +36,9 @@ captures:
           interval: P1D
         target: acmeCo/properties
         disable: true
+      - resource:
+          name: email_events
+        target: acmeCo/email_events
     interval: 3m
     shards:
       logLevel: debug

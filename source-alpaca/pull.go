@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -17,49 +16,11 @@ import (
 
 type captureState struct {
 	// Mapping of binding names to how far along they have read.
-	BackfilledUntil    map[boilerplate.StateKey]time.Time `json:"bindingStateV1,omitempty"`
-	OldBackfilledUntil map[string]time.Time               `json:"backfilledUntil,omitempty"` // TODO(whb): Remove once all captures have migrated.
+	BackfilledUntil map[boilerplate.StateKey]time.Time `json:"bindingStateV1,omitempty"`
 }
 
-func migrateState(state *captureState, bindings []*pf.CaptureSpec_Binding) (bool, error) {
-	if state.BackfilledUntil != nil && state.OldBackfilledUntil != nil {
-		return false, fmt.Errorf("application error: both BackfilledUntil and OldBackfilledUntil were non-nil")
-	} else if state.BackfilledUntil != nil {
-		log.Info("skipping state migration since it's already done")
-		return false, nil
-	}
-
-	state.BackfilledUntil = make(map[boilerplate.StateKey]time.Time)
-
-	for _, b := range bindings {
-		if b.StateKey == "" {
-			return false, fmt.Errorf("state key was empty for binding %s", b.ResourcePath)
-		}
-
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return false, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		ll := log.WithFields(log.Fields{
-			"stateKey": b.StateKey,
-			"name":     res.Name,
-		})
-
-		stateFromOld, ok := state.OldBackfilledUntil[res.Name]
-		if !ok {
-			// This may happen if the connector has never emitted any checkpoints.
-			ll.Warn("no state found for binding while migrating state")
-			continue
-		}
-
-		state.BackfilledUntil[boilerplate.StateKey(b.StateKey)] = stateFromOld
-		ll.Info("migrated binding state")
-	}
-
-	state.OldBackfilledUntil = nil
-
-	return true, nil
+func (c *captureState) Validate() error {
+	return nil
 }
 
 type resourceState struct {
@@ -78,14 +39,12 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 
 	var checkpoint captureState
 	if open.StateJson != nil {
-		if err := json.Unmarshal(open.StateJson, &checkpoint); err != nil {
+		if err := pf.UnmarshalStrict(open.StateJson, &checkpoint); err != nil {
 			return fmt.Errorf("parsing driver checkpoint: %w", err)
 		}
 	}
-
-	migrated, err := migrateState(&checkpoint, open.Capture.Bindings)
-	if err != nil {
-		return err
+	if checkpoint.BackfilledUntil == nil {
+		checkpoint.BackfilledUntil = make(map[boilerplate.StateKey]time.Time)
 	}
 
 	resourceStates := make(map[string]*resourceState)
@@ -116,14 +75,6 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 
 	if err := stream.Ready(false); err != nil {
 		return err
-	}
-
-	if migrated {
-		if cp, err := json.Marshal(checkpoint); err != nil {
-			return fmt.Errorf("error serializing checkpoint %q: %w", checkpoint, err)
-		} else if err := stream.Checkpoint(cp, false); err != nil {
-			return fmt.Errorf("updating migrated checkpoint: %w", err)
-		}
 	}
 
 	var capture = &capture{

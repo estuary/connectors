@@ -47,6 +47,10 @@ func TestInfoSchema(t *testing.T) {
 	is.PushField(nullableField, transformPath(loc1)...)
 	is.PushField(nonNullableField, transformPath(loc2)...)
 
+	loc3 := []string{"third", "location"}
+
+	is.PushResource(transformPath(loc3)...)
+
 	t.Run("can't push a duplicate", func(t *testing.T) {
 		require.Panics(t, func() { is.PushField(nullableField, transformPath(loc1)...) })
 	})
@@ -82,6 +86,12 @@ func TestInfoSchema(t *testing.T) {
 		require.True(t, is.HasField(loc1, untransform(nullableField.Name)))
 		require.False(t, is.HasField([]string{"d'", "oh"}, untransform(nullableField.Name)))
 		require.False(t, is.HasField(loc1, untransform(nullableField.Name)+"d'oh"))
+	})
+
+	t.Run("HasResource", func(t *testing.T) {
+		require.True(t, is.HasResource(loc1))
+		require.False(t, is.HasResource([]string{"d'", "oh"}))
+		require.True(t, is.HasResource(loc3))
 	})
 
 	t.Run("FieldsForResource", func(t *testing.T) {

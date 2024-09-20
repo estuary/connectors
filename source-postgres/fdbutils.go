@@ -1,25 +1,28 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
-	"github.com/jackc/pgtype"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const numericKey = "N"
 
 // encodePgNumericKeyFDB encodes a pgtype.Numeric value to an FDB tuple.
 func encodePgNumericKeyFDB(key pgtype.Numeric) (tuple.Tuple, error) {
-	if encodedKey, err := encodePgNumeric(key); err != nil {
+	var encodedKey, err = encodePgNumeric(key)
+	if err != nil {
 		return nil, fmt.Errorf("encode pgtype.Numeric: %w", err)
-	} else if encodedBinary, err := key.EncodeBinary(nil, nil); err != nil {
-		return nil, fmt.Errorf("encode binary pgtype Numeric: %w", err)
-	} else {
-		return tuple.Tuple{numericKey, encodedKey, encodedBinary}, nil
 	}
+
+	var plan = pgtype.NumericCodec{}.PlanEncode(nil, 0, pgtype.BinaryFormatCode, key)
+	encodedBinary, err := plan.Encode(key, nil)
+	if err != nil {
+		return nil, fmt.Errorf("encode binary pgtype Numeric: %w", err)
+	}
+	return tuple.Tuple{numericKey, encodedKey, encodedBinary}, nil
 }
 
 // maybeDecodePgNumericTuple tries to decode the input tuple as a pgNumeric value.
@@ -28,7 +31,8 @@ func maybeDecodePgNumericTuple(t tuple.Tuple) interface{} {
 	if len(t) == 3 && t[0] == numericKey {
 		if b, ok := t[2].([]byte); ok {
 			var n pgtype.Numeric
-			if err := n.DecodeBinary(nil, b); err == nil {
+			var plan = pgtype.NumericCodec{}.PlanScan(nil, 0, pgtype.BinaryFormatCode, &n)
+			if err := plan.Scan(b, &n); err == nil {
 				return n
 			}
 		}
@@ -37,12 +41,10 @@ func maybeDecodePgNumericTuple(t tuple.Tuple) interface{} {
 }
 
 func encodePgNumeric(n pgtype.Numeric) (tuple.Tuple, error) {
-	if n.Status == pgtype.Null {
-		return nil, errors.New("Null value in Numeric Key Field")
-	} else if n.Status == pgtype.Undefined {
-		return nil, errors.New("Undefined value in Numeric Key Field")
+	if !n.Valid {
+		return nil, fmt.Errorf("invalid Numeric key value %#v", n)
 	} else if n.NaN {
-		return nil, errors.New("NaN value in a Numeric Key Field ")
+		return nil, fmt.Errorf("NaN value in Numeric key")
 	}
 
 	// Conceptually, a pgtype.Numeric is encoded into a tuple of (exponents, fraction),

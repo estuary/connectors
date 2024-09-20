@@ -1,0 +1,23 @@
+{
+    "type": ["object"],
+    "required": ["id"],
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "name": {
+        "type": ["null", "string"]
+      },
+      "created_at": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "updated_at": {
+        "type": ["null", "string"],
+        "format": "date-time"
+      },
+      "url": {
+        "type": ["null", "string"]
+      }
+    }
+  }

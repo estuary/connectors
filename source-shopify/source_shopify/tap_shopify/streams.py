@@ -136,6 +136,8 @@ class OrdersStream(tap_shopifyStream):
     primary_keys = ["id"]
     replication_key = "updated_at"
     schema_filepath = SCHEMAS_DIR / "order.json"
+    STATE_MSG_FREQUENCY = 10
+    is_sorted = True
 
     def post_process(self, row: dict, context: Optional[dict] = None):
         """Perform syntactic transformations only."""
@@ -149,15 +151,6 @@ class OrdersStream(tap_shopifyStream):
     def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
         """Return a context dictionary for child streams."""
         return {"order_id": record["id"]}
-
-    def get_url_params(self, context, next_page_token):
-        """Return a dictionary of values to be used in URL parameterization."""
-        params = super().get_url_params(context, next_page_token)
-
-        if not next_page_token:
-            params["status"] = "any"
-
-        return params
 
 
 class ProductsStream(tap_shopifyStream):
@@ -175,12 +168,74 @@ class TransactionsStream(tap_shopifyStream):
     """Transactions stream."""
 
     parent_stream_type = OrdersStream
+    ignore_parent_replication_keys = True
 
     name = "transactions"
     path = "/orders/{order_id}/transactions.json"
     records_jsonpath = "$.transactions[*]"
     primary_keys = ["id"]
     schema_filepath = SCHEMAS_DIR / "transaction.json"
+    state_partitioning_keys = []
+
+class RefundsStream(tap_shopifyStream):
+    """Refunds stream."""
+
+    parent_stream_type = OrdersStream
+    ignore_parent_replication_keys = True
+
+    name = "refunds"
+    path = "/orders/{order_id}/refunds.json"
+    records_jsonpath = "$.refunds[*]"
+    primary_keys = ["id"]
+    schema_filepath = SCHEMAS_DIR / "refund.json"
+    state_partitioning_keys = []
+
+class OrderRiskStream(tap_shopifyStream):
+    """OrderRisk stream."""
+
+    parent_stream_type = OrdersStream
+    ignore_parent_replication_keys = True
+
+    name = "order_risks"
+    path = "/orders/{order_id}/risks.json"
+    records_jsonpath = "$.risks[*]"
+    primary_keys = ["id"]
+    schema_filepath = SCHEMAS_DIR / "risk.json"
+    state_partitioning_keys = []
+
+class PriceRuleStream(tap_shopifyStream):
+    """PriceRules stream."""
+
+    name = "price_rules"
+    path = "/price_rules.json"
+    records_jsonpath = "$.price_rules[*]"
+    primary_keys = ["id"]
+    replication_key = "updated_at"
+    schema_filepath = SCHEMAS_DIR / "price_rule.json"
+
+    def get_child_context(self, record: dict, context: Optional[dict]) -> dict:
+        """Return a context dictionary for child streams."""
+        return {"price_rule_id": record["id"]}
+
+class DiscountCode(tap_shopifyStream):
+    """DiscountCode stream."""
+
+    parent_stream_type = PriceRuleStream
+
+    name = "discount_code"
+    path = "/price_rules/{price_rule_id}/discount_codes.json"
+    records_jsonpath = "$.discount_codes[*]"
+    primary_keys = ["id"]
+    schema_filepath = SCHEMAS_DIR / "discount_code.json"
+
+class CarrierServicesStream(tap_shopifyStream):
+    """CarrierServices stream."""
+
+    name = "carrier_services"
+    path = "/carrier_services.json"
+    records_jsonpath = "$.carrier_services[*]"
+    primary_keys = ["id"]
+    schema_filepath = SCHEMAS_DIR / "carrier_service.json"
 
 
 class UsersStream(tap_shopifyStream):
