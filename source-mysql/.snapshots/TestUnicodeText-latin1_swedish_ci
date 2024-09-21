@@ -10,5 +10,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FUnicodeText_latin1_swedish_ci_78412948_00":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FUnicodeText_latin1_swedish_ci_78412948_00":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

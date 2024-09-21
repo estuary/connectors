@@ -183,8 +183,8 @@ func predictableColumnOrder(colType any) bool {
 	// Currently all textual primary key columns are considered to be 'unpredictable' so that backfills
 	// will default to using the 'imprecise' ordering semantics which avoids full-table sorts. Refer to
 	// https://github.com/estuary/connectors/issues/1343 for more details.
-	if colType == "char" || colType == "varchar" || colType == "text" || colType == "tinytext" || colType == "mediumtext" || colType == "longtext" {
-		return false
+	if t, ok := colType.(*mysqlColumnType); ok {
+		return !slices.Contains([]string{"char", "varchar", "text", "tinytext", "mediumtext", "longtext"}, t.Type)
 	}
 	return true
 }
@@ -540,7 +540,7 @@ func (t *mysqlColumnType) String() string {
 	if t.Unsigned {
 		return t.Type + " unsigned"
 	}
-	if t.Charset != "utf8mb4" {
+	if t.Charset != "" && t.Charset != mysqlDefaultCharset {
 		return t.Type + " with charset " + t.Charset
 	}
 	return t.Type
@@ -607,8 +607,8 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 		}
 		return val, nil
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		if val, ok := val.([]byte); ok {
-			return decodeBytesToString(t.Charset, val)
+		if bs, ok := val.([]byte); ok {
+			return decodeBytesToString(t.Charset, bs)
 		} else if val == nil {
 			return nil, nil
 		}
@@ -630,21 +630,18 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return val, nil
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		if val, ok := val.([]byte); ok {
-			return decodeBytesToString(t.Charset, val)
-		} else if val == nil {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
+		return val, nil
 	}
 	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)
 }
 
+// The default character set in modern MySQL / MariaDB releases.
+const mysqlDefaultCharset = "utf8mb4"
+
 func decodeBytesToString(charset string, bs []byte) (string, error) {
 	if charset == "" {
-		// Assume an unknown charset is UTF-8 to preserve existing behavior
-		// for tasks with old metadata.
-		charset = "utf8mb4"
+		// Assume an unknown charset is UTF-8 so it can be omitted from serialized metadata.
+		charset = mysqlDefaultCharset
 	}
 
 	// TODO(wgd): Right here we need to apply an actual lookup table of some sort to
