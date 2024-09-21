@@ -22,5 +22,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FUnicodeText_utf8mb4_general_ci_78412948_02":{"backfilled":9,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":"text","id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FUnicodeText_utf8mb4_general_ci_78412948_02":{"backfilled":9,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

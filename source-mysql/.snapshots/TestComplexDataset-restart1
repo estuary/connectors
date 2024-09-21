@@ -20,7 +20,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":140,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeUAVRYAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":140,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeUAVRYAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -42,7 +42,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":150,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAUFSAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":150,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAUFSAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -64,7 +64,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":160,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAUlBAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":160,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAUlBAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -86,7 +86,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":170,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAU1JAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":170,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAU1JAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -108,7 +108,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":180,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAU5NAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":180,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAU5NAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -130,7 +130,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":190,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAVROAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":190,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgeoAVROAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -152,7 +152,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":200,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AUFLAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":200,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AUFLAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -174,7 +174,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":210,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AUdBAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":210,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AUdBAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -196,7 +196,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":220,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AU1EAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":220,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AU1EAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -218,7 +218,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":230,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AU5IAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":230,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AU5IAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -240,7 +240,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":240,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AVNDAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":240,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AVNDAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -262,7 +262,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":250,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AVdZAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":250,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"Fge8AVdZAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -284,7 +284,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":260,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAURFAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":260,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAURFAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -306,7 +306,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":270,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAUxBAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":270,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAUxBAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -328,7 +328,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":280,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAU5EAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":280,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAU5EAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -350,7 +350,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":290,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAVBBAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":290,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAVBBAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -372,7 +372,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":300,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAVdJAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":300,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfQAVdJAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -394,7 +394,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":310,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAURDAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":310,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAURDAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -416,7 +416,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":320,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAUtZAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":320,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAUtZAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -438,7 +438,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":330,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAU5DAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":330,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAU5DAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -460,7 +460,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":340,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAU9SAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":340,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAU9SAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -482,7 +482,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":350,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAVdBAA=="}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":350,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"UnfilteredBackfill","scanned":"FgfkAVdBAA=="}},"cursor":"binlog.000123:56789"}
 
 
 ####################################
@@ -497,7 +497,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":353,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":"varchar","population":{"type":"int"},"state":"varchar","year":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FComplexDataset_56015963":{"backfilled":353,"key_columns":["year","state"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
 
 
