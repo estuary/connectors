@@ -381,3 +381,24 @@ func TestUnicodeText(t *testing.T) {
 		})
 	}
 }
+
+func TestAddLegacyTextColumn(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "30621561"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY) CHARACTER SET latin1")
+	tb.Insert(ctx, t, table, [][]any{{1}, {2}, {3}})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	cs.Capture(ctx, t, nil)
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN data TEXT;", table))
+	tb.Insert(ctx, t, table, [][]any{
+		{4, "four"},
+		{5, "Heizölrückstoßabdämpfung"},
+		{6, "six"},
+	})
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
