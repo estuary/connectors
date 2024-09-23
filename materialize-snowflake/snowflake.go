@@ -681,9 +681,24 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
 				var insertErr InsertFilesError
 				if errors.As(err, &insertErr) && insertErr.Code == "390404" && strings.Contains(insertErr.Message, "Pipe not found") {
-					log.WithField("pipeName", item.PipeName).Debug("pipe does not exist, skipping this checkpoint item")
+					// This error can happen if either the pipe was not found, or we are not authorized to use it
+					// It is possible to not be authorized to use the pipe even though we have created it. When creating the pipe
+					// we specify the role by which to create the pipe, but when using Snowpipe, we can't specify a role. Rather, the
+					// default role of the user must have access to use the pipe. So here we make an additional check to make sure
+					// the user has access to the pipe directly, or it has a default role which has access, otherwise
+					// we advise the user to set a default role.
+					var pipeNameParts = strings.Split(item.PipeName, ".")
+					var pipeNameLastPart = pipeNameParts[len(pipeNameParts)-1]
+
+					if exists, err := d.pipeExists(ctx, pipeNameLastPart); err != nil {
+						return nil, fmt.Errorf("checking pipe existence %q: %w", item.PipeName, err)
+					} else if exists {
+						return nil, fmt.Errorf("pipe exists %q but Snowpipe cannot access it. This is most likely because the user does not have access to pipes through its default role. Try setting the default role of the user:\nALTER USER %s SET DEFAULT_ROLE=%s", pipeNameLastPart, d.cfg.Credentials.User, d.cfg.Role)
+					}
+
 					// Pipe was not found for this checkpoint item. We take this to mean that this item has already
 					// been processed and the pipe has been cleaned up by us in a prior Acknowledge
+					log.WithField("pipeName", item.PipeName).Info("pipe does not exist, skipping this checkpoint item")
 					continue
 				}
 				return nil, fmt.Errorf("snowpipe insertFiles: %w", err)
@@ -833,12 +848,17 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 	// Also clean up checkpoint items which are for previous versions of active bindings
 	for stateKey, item := range d.cp {
-		var key, version, _ = strings.Cut(stateKey, ".")
+		var key, backfill, _ = strings.Cut(stateKey, ".")
 		var hasActiveBindingDifferentVersion = false
+		var hasDifferentPipename = false
 		for _, b := range d.bindings {
-			var key2, version2, _ = strings.Cut(b.target.StateKey, ".")
-			if key == key2 && version != version2 {
+			var key2, backfill2, _ = strings.Cut(b.target.StateKey, ".")
+			if key == key2 && backfill != backfill2 {
 				hasActiveBindingDifferentVersion = true
+
+				if item.PipeName != b.pipeName {
+					hasDifferentPipename = true
+				}
 				break
 			}
 		}
@@ -847,9 +867,11 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			checkpointClear[stateKey] = nil
 			delete(d.cp, stateKey)
 
-			log.WithField("pipeName", item.PipeName).WithField("stateKey", stateKey).Info("dropping pipe and clearing checkpoint")
-			if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s;", item.PipeName)); err != nil {
-				return nil, fmt.Errorf("dropping pipe %s failed: %w", item.PipeName, err)
+			if hasDifferentPipename {
+				log.WithField("pipeName", item.PipeName).WithField("stateKey", stateKey).Info("dropping pipe and clearing checkpoint")
+				if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s", d.ep.Dialect.Identifier(item.PipeName))); err != nil {
+					return nil, fmt.Errorf("dropping pipe %s failed: %w", item.PipeName, err)
+				}
 			}
 		}
 	}
