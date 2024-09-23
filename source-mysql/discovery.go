@@ -630,6 +630,8 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return val, nil
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
+		// Backfill text keys are serialized as the raw bytes or string we receive, which is generally
+		// fine because we always receive backfill results in UTF-8.
 		return val, nil
 	}
 	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)
