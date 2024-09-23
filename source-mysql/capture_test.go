@@ -402,3 +402,22 @@ func TestAddLegacyTextColumn(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+func TestBackfillLegacyTextKey(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "83451544"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(32) PRIMARY KEY, data TEXT) CHARACTER SET latin1")
+	tb.Insert(ctx, t, table, [][]any{
+		{"août", "August"},
+		{"forêt", "forest"},
+		{"résumé", "resume"},
+		{"oào", "test à ordering"},
+		{"oèo", "test è ordering"},
+		{"oòo", "test ò ordering"},
+	})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1 // Capture one row per backfill query
+	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+	cupaloy.SnapshotT(t, summary)
+}
