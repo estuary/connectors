@@ -764,6 +764,13 @@ func translateDataType(t sqlparser.ColumnType) any {
 		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
+	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
+		var charset = t.Charset.Name
+		if charset == "" {
+			// FIXME(2024-09-23): This is entirely wrong and is just a placeholder while I work on the logic.
+			charset = mysqlDefaultCharset
+		}
+		return &mysqlColumnType{Type: typeName, Charset: charset}
 	default:
 		return typeName
 	}
