@@ -51,7 +51,6 @@ require (
 	github.com/microsoft/go-mssqldb v0.21.0
 	github.com/minio/highwayhash v1.0.2
 	github.com/mitchellh/mapstructure v1.5.0
-	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb
 	github.com/pkg/sftp v1.13.6
 	github.com/rockset/rockset-go-client v0.15.4
 	github.com/segmentio/encoding v0.4.0
@@ -186,6 +185,7 @@ require (
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
+	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect

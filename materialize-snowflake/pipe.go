@@ -284,7 +284,9 @@ func (c *PipeClient) InsertReport(pipeName string) (*InsertReportResponse, error
 	}
 
 	var w strings.Builder
-	c.insertReportTpl.Execute(&w, urlTemplate)
+	if err := c.insertReportTpl.Execute(&w, urlTemplate); err != nil {
+		panic(err)
+	}
 	var url = w.String()
 
 	req, err := http.NewRequest("GET", url, nil)
