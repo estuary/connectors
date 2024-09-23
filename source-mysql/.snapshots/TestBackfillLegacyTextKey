@@ -1,0 +1,88 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test_backfilllegacytextkey_83451544": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:0"}},"data":"August","id":"août"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FBackfillLegacyTextKey_83451544":{"backfilled":1,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"charset":"latin1","type":"varchar"}}}},"mode":"UnfilteredBackfill","scanned":"AWFvw7t0AA=="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWFvw7t0AA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_backfilllegacytextkey_83451544": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:1"}},"data":"forest","id":"forêt"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FBackfillLegacyTextKey_83451544":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"charset":"latin1","type":"varchar"}}}},"mode":"UnfilteredBackfill","scanned":"AWZvcsOqdAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWZvcsOqdAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test_backfilllegacytextkey_83451544": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:2"}},"data":"test à ordering","id":"oào"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FBackfillLegacyTextKey_83451544":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"charset":"latin1","type":"varchar"}}}},"mode":"UnfilteredBackfill","scanned":"AW/DoG8A"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AW/DoG8A"
+####################################
+# ================================
+# Collection "acmeCo/test/test_backfilllegacytextkey_83451544": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:3"}},"data":"test è ordering","id":"oèo"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FBackfillLegacyTextKey_83451544":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"charset":"latin1","type":"varchar"}}}},"mode":"UnfilteredBackfill","scanned":"AW/DqG8A"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AW/DqG8A"
+####################################
+# ================================
+# Collection "acmeCo/test/test_backfilllegacytextkey_83451544": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:4"}},"data":"test ò ordering","id":"oòo"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FBackfillLegacyTextKey_83451544":{"backfilled":5,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"charset":"latin1","type":"varchar"}}}},"mode":"UnfilteredBackfill","scanned":"AW/Dsm8A"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AW/Dsm8A"
+####################################
+# ================================
+# Collection "acmeCo/test/test_backfilllegacytextkey_83451544": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:5"}},"data":"resume","id":"résumé"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FBackfillLegacyTextKey_83451544":{"backfilled":6,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"charset":"latin1","type":"varchar"}}}},"mode":"UnfilteredBackfill","scanned":"AXLDqXN1bcOpAA=="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AXLDqXN1bcOpAA=="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FBackfillLegacyTextKey_83451544":{"backfilled":6,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"charset":"latin1","type":"varchar"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
+
+
