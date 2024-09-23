@@ -681,7 +681,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			if resp, err := d.pipeClient.InsertFiles(item.PipeName, fileRequests); err != nil {
 				var insertErr InsertFilesError
 				if errors.As(err, &insertErr) && insertErr.Code == "390404" && strings.Contains(insertErr.Message, "Pipe not found") {
-					log.WithField("pipeName", item.PipeName).Info("pipe does not exist, skipping this checkpoint item")
+					log.WithField("pipeName", item.PipeName).Debug("pipe does not exist, skipping this checkpoint item")
 					// Pipe was not found for this checkpoint item. We take this to mean that this item has already
 					// been processed and the pipe has been cleaned up by us in a prior Acknowledge
 					continue
@@ -811,20 +811,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 	log.Info("store: finished committing changes")
 
-	for _, b := range d.bindings {
-		var item, ok = d.cp[b.target.StateKey]
-		if !ok {
-			continue
-		}
-		// If the spec version has bumped, we need to clean up the old pipes
-		if len(item.PipeName) > 0 && item.Version != d.version {
-			log.WithField("pipeName", item.PipeName).Info("dropping pipe")
-			if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s;", item.PipeName)); err != nil {
-				return nil, fmt.Errorf("dropping pipe %s failed: %w", item.PipeName, err)
-			}
-		}
-	}
-
 	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
 		log.Info("store: dbt job trigger")
 		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
@@ -844,6 +830,28 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	for _, b := range d.bindings {
 		checkpointClear[b.target.StateKey] = nil
 		delete(d.cp, b.target.StateKey)
+	}
+	// Also clean up checkpoint items which are for previous versions of active bindings
+	for stateKey, item := range d.cp {
+		var key, version, _ = strings.Cut(stateKey, ".")
+		var hasActiveBindingDifferentVersion = false
+		for _, b := range d.bindings {
+			var key2, version2, _ = strings.Cut(b.target.StateKey, ".")
+			if key == key2 && version != version2 {
+				hasActiveBindingDifferentVersion = true
+				break
+			}
+		}
+		// If the spec version has bumped, we need to clean up the old pipes
+		if hasActiveBindingDifferentVersion {
+			checkpointClear[stateKey] = nil
+			delete(d.cp, stateKey)
+
+			log.WithField("pipeName", item.PipeName).WithField("stateKey", stateKey).Info("dropping pipe and clearing checkpoint")
+			if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s;", item.PipeName)); err != nil {
+				return nil, fmt.Errorf("dropping pipe %s failed: %w", item.PipeName, err)
+			}
+		}
 	}
 	checkpointJSON, err := json.Marshal(checkpointClear)
 	if err != nil {
