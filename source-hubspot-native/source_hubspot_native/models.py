@@ -230,6 +230,16 @@ class Association(BaseModel, extra="forbid"):
     # TODO(johnny): This can potentially have a `pager`, but I'm leaving it out
     # to see if it's ever encountered. If it is, I think we handle by ignoring
     # it and having a position of "we'll get (only) the first page".
+    # TODO(whb): We did encounter this, and for now have decided to ignore any
+    # extra pages.
+    class Cursor(BaseModel, extra="forbid"):
+        after: str
+        link: str
+
+    class Paging(BaseModel, extra="forbid"):
+        next: "Association.Cursor"
+
+    paging: Paging | None = None
 
 
 # An unconstrained Item type.
