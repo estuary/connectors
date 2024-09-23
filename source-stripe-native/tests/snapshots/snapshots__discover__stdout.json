@@ -48,6 +48,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -55,6 +59,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Accounts",
@@ -114,10 +119,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "Persons",
       "type": "object",
@@ -176,10 +186,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "ExternalAccountCards",
       "type": "object",
@@ -238,10 +253,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "ExternalBankAccount",
       "type": "object",
@@ -300,6 +320,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -307,6 +331,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "ApplicationFees",
@@ -366,10 +391,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "ApplicationFeesRefunds",
       "type": "object",
@@ -428,6 +458,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -435,6 +469,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Customers",
@@ -494,10 +529,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "Bank_Accounts",
       "type": "object",
@@ -539,7 +579,7 @@
         }
       },
       "additionalProperties": true,
-      "description": "Parent Stream: Customers",
+      "description": "Parent Stream: Customers\n\nWhen backfilling, Cards behaves as a child stream. But during incremental replication,\nCards listens to distinct events that contain Card documents, meaning it isn't a child stream.",
       "properties": {
         "_meta": {
           "allOf": [
@@ -556,10 +596,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "Cards",
       "type": "object",
@@ -618,10 +663,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "CustomerBalanceTransaction",
       "type": "object",
@@ -663,7 +713,7 @@
         }
       },
       "additionalProperties": true,
-      "description": "Parent Stream: Customers",
+      "description": "Parent Stream: Customers\n\nWhen backfilling, PaymentMethods behaves as a child stream. But during incremental replication,\nPaymentMethods listens to distinct events that contain PaymentMethods documents, meaning it\nisn't a child stream.",
       "properties": {
         "_meta": {
           "allOf": [
@@ -680,10 +730,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "PaymentMethods",
       "type": "object",
@@ -742,6 +797,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -749,6 +808,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Charges",
@@ -808,6 +868,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -815,6 +879,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "CheckoutSessions",
@@ -874,10 +939,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "CheckoutSessionsLine",
       "type": "object",
@@ -936,6 +1006,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -943,6 +1017,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Coupons",
@@ -1002,6 +1077,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1009,6 +1088,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "CreditNotes",
@@ -1068,10 +1148,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "CreditNotesLines",
       "type": "object",
@@ -1130,6 +1215,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1137,6 +1226,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Disputes",
@@ -1196,6 +1286,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1203,6 +1297,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "EarlyFraudWarning",
@@ -1262,6 +1357,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1269,6 +1368,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "InvoiceItems",
@@ -1328,6 +1428,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1335,6 +1439,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Invoices",
@@ -1394,10 +1499,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "InvoiceLineItems",
       "type": "object",
@@ -1456,6 +1566,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1463,6 +1577,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "PaymentIntent",
@@ -1522,6 +1637,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1529,6 +1648,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Payouts",
@@ -1588,6 +1708,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1595,6 +1719,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Plans",
@@ -1654,6 +1779,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1661,6 +1790,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Products",
@@ -1720,6 +1850,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1727,6 +1861,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "PromotionCode",
@@ -1786,6 +1921,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1793,6 +1932,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Refunds",
@@ -1852,6 +1992,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1859,6 +2003,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Reviews",
@@ -1918,6 +2063,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -1925,6 +2074,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "SetupIntents",
@@ -1984,10 +2134,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "SetupAttempts",
       "type": "object",
@@ -2046,6 +2201,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2053,6 +2212,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Subscriptions",
@@ -2112,6 +2272,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2119,6 +2283,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "SubscriptionsSchedule",
@@ -2209,6 +2374,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2219,6 +2388,7 @@
       },
       "required": [
         "id",
+        "object",
         "created",
         "items"
       ],
@@ -2280,6 +2450,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "subscription_item": {
           "title": "Subscription Item",
           "type": "string"
@@ -2287,6 +2461,7 @@
       },
       "required": [
         "id",
+        "object",
         "subscription_item"
       ],
       "title": "UsageRecords",
@@ -2346,6 +2521,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2353,6 +2532,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "TopUps",
@@ -2412,6 +2592,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2419,6 +2603,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Transfers",
@@ -2478,10 +2663,15 @@
         "id": {
           "title": "Id",
           "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
         }
       },
       "required": [
-        "id"
+        "id",
+        "object"
       ],
       "title": "TransferReversals",
       "type": "object",
@@ -2541,6 +2731,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2548,6 +2742,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "Files",
@@ -2608,6 +2803,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2615,6 +2814,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "FilesLink",
@@ -2675,6 +2875,10 @@
           "title": "Id",
           "type": "string"
         },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
         "created": {
           "title": "Created",
           "type": "integer"
@@ -2682,6 +2886,7 @@
       },
       "required": [
         "id",
+        "object",
         "created"
       ],
       "title": "BalanceTransactions",
