@@ -24,6 +24,7 @@ from .models import (
     EndpointConfig,
     STREAMS,
     REGIONAL_STREAMS,
+    SPLIT_CHILD_STREAM_NAMES,
 )
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
@@ -77,8 +78,8 @@ async def all_resources(
             is_accessible_stream = await check_accessibility(http, log, url)
 
         if is_accessible_stream:
-            # If the stream class does not have a TYPES attribute, then it does not have any associated events.
-            resource = base_object(base_stream, http, config.start_date) if hasattr(base_stream, "TYPES") else no_events_object(base_stream, http, config.start_date)
+            # If the stream class does not have an EVENT_TYPES attribute, then it does not have any associated events.
+            resource = base_object(base_stream, http, config.start_date) if hasattr(base_stream, "EVENT_TYPES") else no_events_object(base_stream, http, config.start_date)
             all_streams.append(resource)
 
             children = element.get("children", [])
@@ -94,6 +95,8 @@ async def all_resources(
                     match child_stream.NAME:
                         case "UsageRecords":
                             all_streams.append(usage_records(base_stream, child_stream, http, config.start_date))
+                        case _ if child_stream.NAME in SPLIT_CHILD_STREAM_NAMES:
+                            all_streams.append(split_child_object(base_stream, child_stream, http, config.start_date))
                         case _:
                             all_streams.append(child_object(base_stream, child_stream, http, config.start_date))
 
@@ -167,6 +170,46 @@ def child_object(
             state,
             task,
             fetch_changes=functools.partial(fetch_incremental_substreams, cls, child_cls, http),
+            fetch_page=functools.partial(fetch_backfill_substreams, cls, child_cls, start_date, http),
+        )
+
+    cutoff = datetime.now(tz=UTC)
+
+    return Resource(
+        name=child_cls.NAME,
+        key=["/id"],
+        model=child_cls,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
+        ),
+        initial_config=ResourceConfig(name=child_cls.NAME),
+        schema_inference=True,
+    )
+
+def split_child_object(
+    cls, child_cls, http: HTTPSession, start_date: datetime
+) -> Resource:
+    """
+    split_child_object handles the case where a stream is a child stream when backfilling
+    but incrementally replicates based off events that contain the child stream resource directly
+    in the API response. Meaning, the stream behaves like a non-chid stream incrementally.
+    """
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_incremental, child_cls, http),
             fetch_page=functools.partial(fetch_backfill_substreams, cls, child_cls, start_date, http),
         )
 
