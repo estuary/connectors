@@ -143,10 +143,7 @@ async def fetch_incremental_actions(
                     max_ts = _s_to_dt(results[f"CreationDate"])
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
-            
-                elif _s_to_dt(results[f"CreationDate"]) < log_cursor:
-                    iterating = False
-                    break
+
             if result.get("@nextpageuri"):
                 url = API + result["@nextpageuri"]
             else:
