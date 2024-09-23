@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC
 from decimal import Decimal
 from estuary_cdk.http import HTTPSession
 from logging import Logger
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
+from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Literal
 import json
 
 from estuary_cdk.capture.common import (
@@ -26,6 +26,18 @@ from .models import (
 API = "https://api.stripe.com/v1"
 MAX_PAGE_LIMIT = 100
 
+def add_event_types(params: dict[str, str | int], event_types: dict[str, Literal["c", "u", "d"]]):
+    """
+    Adds the event types (i.e. keys) of the passed in `event_types` dict to a
+    dict of query parameters.
+    """
+    for index, type in enumerate(event_types.keys()):
+        params.update({
+            f"types[{index}]": type,
+        })
+
+    return params
+
 async def fetch_incremental(
     cls: type[StripeObjectWithEvents],
     http: HTTPSession,
@@ -46,7 +58,8 @@ async def fetch_incremental(
     iterating = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    parameters = add_event_types(parameters, cls.EVENT_TYPES)
     max_ts = log_cursor
 
     while iterating:
@@ -64,6 +77,16 @@ async def fetch_incremental(
             # Emit documents if we haven't seen them.
             if event_ts >= log_cursor:
                 doc = cls.model_validate(event.data.object)
+                doc.meta_ = cls.Meta(op=cls.EVENT_TYPES[event.type])
+
+                # ExternalAccountCards and ExternalBankAccount share the same events even though the
+                # returned documents are different. We skip document if they aren't
+                # for the current stream.
+                if cls.NAME == "ExternalAccountCards" and doc.object != "card":
+                    continue
+                elif cls.NAME == "ExternalBankAccount" and doc.object != "bank_account":
+                    continue
+
                 yield doc
             elif event_ts < log_cursor:
                 iterating = False
@@ -147,7 +170,8 @@ async def fetch_incremental_substreams(
     iterating = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
     max_ts = log_cursor
 
     while iterating:
@@ -179,7 +203,7 @@ async def fetch_incremental_substreams(
                 if child_data is None:
                     pass # move to next customer
                 async for doc in child_data:
-                    doc.meta_ = cls_child.Meta(op="u")
+                    doc.meta_ = cls_child.Meta(op=cls.EVENT_TYPES[event.type])
                     yield doc 
         
             elif event_ts < log_cursor:
@@ -383,7 +407,8 @@ async def fetch_incremental_usage_records(
     iterating = True
 
     url = f"{API}/events"
-    parameters = {"type": cls.TYPES, "limit": MAX_PAGE_LIMIT}
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
     max_ts = log_cursor
 
     while iterating:
@@ -416,7 +441,7 @@ async def fetch_incremental_usage_records(
                     if child_data is None:
                         pass # move to next item
                     async for doc in child_data:
-                        doc.meta_ = cls_child.Meta(op="u")
+                        doc.meta_ = cls_child.Meta(op=cls.EVENT_TYPES[event.type])
                         yield doc 
 
             elif event_ts < log_cursor:
