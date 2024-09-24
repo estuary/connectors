@@ -188,7 +188,8 @@ type mysqlReplicationStream struct {
 }
 
 type mysqlTableMetadata struct {
-	Schema mysqlTableSchema `json:"schema"`
+	Schema         mysqlTableSchema `json:"schema"`
+	DefaultCharset string           `json:"charset,omitempty"`
 }
 
 type mysqlTableSchema struct {
@@ -667,7 +668,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
 			var newName = alter.NewColDefinition.Name.String()
-			var newType = translateDataType(alter.NewColDefinition.Type)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type)
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -691,7 +692,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			}
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
-			var newType = translateDataType(alter.NewColDefinition.Type)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type)
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -722,7 +723,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var newCols []string
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
-				var dataType = translateDataType(col.Type)
+				var dataType = translateDataType(meta, col.Type)
 				meta.Schema.ColumnTypes[col.Name.String()] = dataType
 			}
 
@@ -756,7 +757,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 	return nil
 }
 
-func translateDataType(t sqlparser.ColumnType) any {
+func translateDataType(meta *mysqlTableMetadata, t sqlparser.ColumnType) any {
 	switch typeName := strings.ToLower(t.Type); typeName {
 	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
@@ -767,8 +768,10 @@ func translateDataType(t sqlparser.ColumnType) any {
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
 		var charset = t.Charset.Name
 		if charset == "" {
-			// FIXME(2024-09-23): This is entirely wrong and is just a placeholder while I work on the logic.
-			charset = mysqlDefaultCharset
+			charset = meta.DefaultCharset // If not explicitly specified, use the default charset of the table
+		}
+		if charset == "" {
+			charset = mysqlDefaultCharset // If the default charset is also not known, fall back to UTF-8
 		}
 		return &mysqlColumnType{Type: typeName, Charset: charset}
 	default:
@@ -930,11 +933,19 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 
 		metadata.Schema.Columns = discovery.ColumnNames
 		metadata.Schema.ColumnTypes = colTypes
+		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
+			if extraDetails.DefaultCharset != mysqlDefaultCharset {
+				// Only track the default charset of the table if it's not the MySQL default.
+				// This minimizes test snapshot updates and redundant information in checkpoints.
+				metadata.DefaultCharset = extraDetails.DefaultCharset
+			}
+		}
 
 		logrus.WithFields(logrus.Fields{
 			"stream":  streamID,
 			"columns": metadata.Schema.Columns,
 			"types":   metadata.Schema.ColumnTypes,
+			"charset": metadata.DefaultCharset,
 		}).Debug("initialized table metadata")
 	}
 
