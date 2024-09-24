@@ -151,7 +151,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			db, err := cfg.db(ctx)
 			require.NoError(t, err)
 
-			rows, err := sql.DumpTestTable(t, db, duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table), duckDialect.Identifier("key"))
+			rows, err := sql.DumpTestTable(t, db, duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table))
 
 			require.NoError(t, err)
 
