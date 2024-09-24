@@ -43,55 +43,6 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	// First check if there are any interrupted column migrations which must be resumed, before we
-	// construct the InfoSchema
-	migrationsTable := c.ep.Dialect.Identifier(c.cfg.Schema, "flow_migrations")
-	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`SELECT "table", step, col_identifier, col_field, col_ddl FROM %s`, migrationsTable))
-	if err != nil {
-		if !strings.Contains(err.Error(), "FLOW_MIGRATIONS' does not exist") {
-			return nil, fmt.Errorf("finding flow_migrations: %w", err)
-		}
-	}
-	if rows != nil {
-		defer rows.Close()
-		for rows.Next() {
-			var stmts [][]string
-			var tableIdentifier, colIdentifier, colField, DDL string
-			var step int
-			if err := rows.Scan(&tableIdentifier, &step, &colIdentifier, &colField, &DDL); err != nil {
-				return nil, fmt.Errorf("reading flow_migrations row: %w", err)
-			}
-			var steps, acceptableErrors = c.columnChangeSteps(tableIdentifier, colField, colIdentifier, DDL)
-
-			for s := step; s < len(steps); s++ {
-				stmts = append(stmts, []string{steps[s], acceptableErrors[s]})
-				stmts = append(stmts, []string{fmt.Sprintf(`UPDATE %s SET step = %d WHERE "table"='%s';`, migrationsTable, s+1, tableIdentifier)})
-			}
-
-			stmts = append(stmts, []string{fmt.Sprintf(`DELETE FROM %s WHERE "table"='%s';`, migrationsTable, tableIdentifier)})
-
-			for _, stmt := range stmts {
-				query := stmt[0]
-				var acceptableError string
-				if len(stmt) > 1 {
-					acceptableError = stmt[1]
-				}
-
-				if _, err := c.db.ExecContext(ctx, query); err != nil {
-					if acceptableError != "" && strings.Contains(err.Error(), acceptableError) {
-						// This is an acceptable error for this step, so we do not throw an error
-					} else {
-						return nil, fmt.Errorf("resume migration: %w", err)
-					}
-				}
-			}
-		}
-
-		if _, err := c.db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s;", migrationsTable)); err != nil {
-			return nil, fmt.Errorf("dropping flow_migrations: %w", err)
-		}
-	}
-
 	// Currently the "catalog" is always the database value from the endpoint configuration in all
 	// capital letters. It is possible to connect to Snowflake databases that aren't in all caps by
 	// quoting the database name. We don't do that currently and it's hard to say if we ever will
@@ -139,50 +90,6 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
-func (c *client) columnChangeSteps(tableIdentifier, colField, colIdentifier, DDL string) ([]string, []string) {
-	var tempColumnName = fmt.Sprintf("%s_flowtmp1", colField)
-	var tempColumnIdentifier = c.ep.Dialect.Identifier(tempColumnName)
-	var tempOriginalRename = fmt.Sprintf("%s_flowtmp2", colField)
-	var tempOriginalRenameIdentifier = c.ep.Dialect.Identifier(tempOriginalRename)
-	return []string{
-			fmt.Sprintf(
-				"ALTER TABLE %s ADD COLUMN %s %s;",
-				tableIdentifier,
-				tempColumnIdentifier,
-				DDL,
-			),
-			fmt.Sprintf(
-				"UPDATE %s SET %s = %s;",
-				tableIdentifier,
-				tempColumnIdentifier,
-				colIdentifier,
-			),
-			fmt.Sprintf(
-				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-				tableIdentifier,
-				colIdentifier,
-				tempOriginalRenameIdentifier,
-			),
-			fmt.Sprintf(
-				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-				tableIdentifier,
-				tempColumnIdentifier,
-				colIdentifier,
-			),
-			fmt.Sprintf(
-				"ALTER TABLE %s DROP COLUMN %s;",
-				tableIdentifier,
-				tempOriginalRenameIdentifier,
-			),
-		}, []string{
-			"already exists",
-			"",
-			"does not exist",
-			"does not exist",
-			"does not exist",
-		}
-}
-
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 	var alterColumnStmtBuilder strings.Builder
@@ -195,30 +102,21 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		var migrationsTable = c.ep.Dialect.Identifier(c.cfg.Schema, "flow_migrations")
-		stmts = append(stmts, fmt.Sprintf(`CREATE OR REPLACE TABLE %s("table" STRING, step INTEGER, col_identifier STRING, col_field STRING, col_ddl STRING);`, migrationsTable))
-
-		for _, ch := range ta.ColumnTypeChanges {
-			stmts = append(stmts, fmt.Sprintf(
-				`INSERT INTO %s("table", step, col_identifier, col_field, col_ddl) VALUES ('%s', 0, '%s', '%s', '%s');`,
-				migrationsTable,
-				ta.Identifier,
-				ch.Identifier,
-				ch.Field,
-				ch.DDL,
-			))
-		}
-
-		for _, ch := range ta.ColumnTypeChanges {
-			var steps, _ = c.columnChangeSteps(ta.Identifier, ch.Field, ch.Identifier, ch.DDL)
-
-			for s := 0; s < len(steps); s++ {
-				stmts = append(stmts, steps[s])
-				stmts = append(stmts, fmt.Sprintf(`UPDATE %s SET STEP=%d WHERE "table"='%s';`, migrationsTable, s+1, ta.Identifier))
+		for _, ct := range ta.ColumnTypeChanges {
+			var m = sql.ColumnTypeMigration{
+				MappedType:    ct.MappedType,
+				OriginalField: ct.Field,
 			}
+			steps := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m)
+			stmts = append(stmts, steps...)
 		}
+	}
 
-		stmts = append(stmts, fmt.Sprintf("DROP TABLE %s;", migrationsTable))
+	if len(ta.ColumnTypeChangeMigrations) > 0 {
+		for _, m := range ta.ColumnTypeChangeMigrations {
+			steps := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m)
+			stmts = append(stmts, steps...)
+		}
 	}
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {

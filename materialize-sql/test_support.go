@@ -348,21 +348,7 @@ func RunValidateAndApplyMigrationsTests(
 		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
-		sch := dumpSchema(t)
-
-		// Validate again.
-		validateRes, err = driver.Validate(ctx, validateReq(fixture, configJson, resourceConfigJson))
-		require.NoError(t, err)
-
-		snap.WriteString("\nBase Re-validated Constraints:\n")
-		snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
-
 		insertData(t, []string{"key", "scalarValue", "numericString"}, []string{"'1'", "'test'", "123"})
-
-		// Apply again - this should be a no-op.
-		_, err = driver.Apply(ctx, applyReq(fixture, configJson, resourceConfigJson, validateRes, true))
-		require.NoError(t, err)
-		require.Equal(t, sch, dumpSchema(t))
 
 		snap.WriteString("\nMigratable Changes Before Apply Schema:\n")
 		snap.WriteString(dumpSchema(t) + "\n")

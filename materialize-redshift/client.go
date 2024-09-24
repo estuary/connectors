@@ -126,38 +126,13 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		for _, ch := range ta.ColumnTypeChanges {
-			var tempColumnName = c.ep.Dialect.Identifier(fmt.Sprintf("%s_flowtmp1", ch.Field))
-			var tempOriginalRename = c.ep.Dialect.Identifier(fmt.Sprintf("%s_flowtmp2", ch.Field))
-			statements = append(statements, fmt.Sprintf(
-				"ALTER TABLE %s ADD COLUMN %s %s;",
-				ta.Identifier,
-				tempColumnName,
-				ch.DDL,
-			))
-			statements = append(statements, fmt.Sprintf(
-				"UPDATE %s SET %s = %s;",
-				ta.Identifier,
-				tempColumnName,
-				ch.Identifier,
-			))
-			statements = append(statements, fmt.Sprintf(
-				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-				ta.Identifier,
-				ch.Identifier,
-				tempOriginalRename,
-			))
-			statements = append(statements, fmt.Sprintf(
-				"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-				ta.Identifier,
-				tempColumnName,
-				ch.Identifier,
-			))
-			statements = append(statements, fmt.Sprintf(
-				"ALTER TABLE %s DROP COLUMN %s;",
-				ta.Identifier,
-				tempOriginalRename,
-			))
+		for _, ct := range ta.ColumnTypeChanges {
+			var m = sql.ColumnTypeMigration{
+				MappedType:    ct.MappedType,
+				OriginalField: ct.Field,
+			}
+			steps := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m)
+			statements = append(statements, steps...)
 		}
 	}
 
