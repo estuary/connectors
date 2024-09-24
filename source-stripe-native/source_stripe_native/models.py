@@ -151,6 +151,12 @@ class Accounts(BaseStripeObjectWithEvents):
         "account.updated": "u",
     }
 
+    # Accounts docs returned in account.updated events may not have a created field.
+    created: int = Field(
+        default=None,
+        # Don't schematize the default value.
+        json_schema_extra=lambda x: x.pop('default') # type: ignore
+    )
 
 # Could not verify Persons events are generated in test mode, but suspect
 # they are generated in Stripe's live mode.
