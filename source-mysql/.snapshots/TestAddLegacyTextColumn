@@ -4,11 +4,11 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:0"}},"id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:1"}},"id":2}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:2"}},"id":3}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Heiz\ufffdlr\ufffdcksto\ufffdabd\ufffdmpfung","id":5}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Heizölrückstoßabdämpfung","id":5}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"four","id":4}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"six","id":6}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FAddLegacyTextColumn_30621561":{"backfilled":3,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FAddLegacyTextColumn_30621561":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"latin1","schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
