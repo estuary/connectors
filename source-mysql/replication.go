@@ -290,7 +290,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					if err != nil {
 						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 					}
-					if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
+					if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
 						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 					}
 					var sourceInfo = &mysqlSourceInfo{
@@ -330,10 +330,10 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 						if err != nil {
 							return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 						}
-						if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
+						if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
 						}
-						if err := rs.db.translateRecordFields(columnTypes, after); err != nil {
+						if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
 							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 						}
 						var sourceInfo = &mysqlSourceInfo{
@@ -368,7 +368,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					if err != nil {
 						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 					}
-					if err := rs.db.translateRecordFields(columnTypes, before); err != nil {
+					if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
 						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 					}
 					var sourceInfo = &mysqlSourceInfo{
@@ -790,7 +790,7 @@ func translateDataType(t sqlparser.ColumnType) any {
 func unquoteEnumValues(values []string) []string {
 	var unquoted []string
 	for _, qval := range values {
-		unquoted = append(unquoted, decodeMySQLString(qval))
+		unquoted = append(unquoted, unquoteMySQLString(qval))
 	}
 	return unquoted
 }
