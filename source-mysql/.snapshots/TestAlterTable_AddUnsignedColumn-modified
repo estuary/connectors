@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FAlterTable_AddUnsignedColumn_57413089":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","uintval"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"},"uintval":{"type":"bigint","unsigned":true}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FAlterTable_AddUnsignedColumn_57413089":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data","uintval"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"},"uintval":{"type":"bigint","unsigned":true}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

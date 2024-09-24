@@ -772,7 +772,7 @@ func translateDataType(meta *mysqlTableMetadata, t sqlparser.ColumnType) any {
 		} else if t.Options.Collate != "" {
 			charset = charsetFromCollation(t.Options.Collate) // If only a collation is declared, figure out what charset that implies
 		} else if meta.DefaultCharset != "" {
-			charset = meta.DefaultCharset // In the absence of a column-specific declaration, use the default table charset if known
+			charset = meta.DefaultCharset // In the absence of a column-specific declaration, use the default table charset
 		} else {
 			charset = mysqlDefaultCharset // Finally fall back to UTF-8 if nothing else supersedes that
 		}
@@ -937,11 +937,7 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 		metadata.Schema.Columns = discovery.ColumnNames
 		metadata.Schema.ColumnTypes = colTypes
 		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
-			if extraDetails.DefaultCharset != mysqlDefaultCharset {
-				// Only track the default charset of the table if it's not the MySQL default.
-				// This minimizes test snapshot updates and redundant information in checkpoints.
-				metadata.DefaultCharset = extraDetails.DefaultCharset
-			}
+			metadata.DefaultCharset = extraDetails.DefaultCharset
 		}
 
 		logrus.WithFields(logrus.Fields{

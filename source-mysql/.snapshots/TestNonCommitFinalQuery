@@ -6,5 +6,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FNonCommitFinalQuery_82446880":{"backfilled":2,"key_columns":["id"],"metadata":{"schema":{"columns":["id","data","extra"],"types":{"data":{"charset":"utf8mb4","type":"text"},"extra":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FNonCommitFinalQuery_82446880":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data","extra"],"types":{"data":{"charset":"utf8mb4","type":"text"},"extra":{"charset":"utf8mb4","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
