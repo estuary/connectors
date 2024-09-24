@@ -389,6 +389,7 @@ func TestAddLegacyTextColumn(t *testing.T) {
 	tb.Insert(ctx, t, table, [][]any{{1}, {2}, {3}})
 
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
 	sqlcapture.TestShutdownAfterCaughtUp = true
 	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
 
@@ -400,6 +401,14 @@ func TestAddLegacyTextColumn(t *testing.T) {
 		{6, "six"},
 	})
 	cs.Capture(ctx, t, nil)
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN data_ucs TEXT COLLATE ucs2_general_ci;", table))
+	tb.Insert(ctx, t, table, [][]any{
+		{7, "777", "seven"},
+		{8, "888", "次常用字"},
+		{9, "999", "nine"},
+	})
+	cs.Capture(ctx, t, nil)
+
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
