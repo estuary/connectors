@@ -137,7 +137,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			rows, err := sql.DumpTestTable(t, db, databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), databricksDialect.Identifier("key"))
+			rows, err := sql.DumpTestTable(t, db, databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
 
 			require.NoError(t, err)
 

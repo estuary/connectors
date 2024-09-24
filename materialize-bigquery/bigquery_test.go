@@ -71,45 +71,7 @@ func TestValidateAndApply(t *testing.T) {
 		resourceConfig,
 		func(t *testing.T) string {
 			t.Helper()
-
-			job, err := client.query(ctx, fmt.Sprintf(
-				"select column_name, is_nullable, data_type from %s where table_name = %s;",
-				bqDialect.Identifier(cfg.Dataset, "INFORMATION_SCHEMA", "COLUMNS"),
-				bqDialect.Literal(resourceConfig.Table),
-			))
-			require.NoError(t, err)
-
-			it, err := job.Read(ctx)
-			require.NoError(t, err)
-
-			type foundColumn struct {
-				Name     string `bigquery:"column_name"`
-				Nullable string `bigquery:"is_nullable"`
-				Type     string `bigquery:"data_Type"`
-			}
-
-			cols := []foundColumn{}
-			for {
-				var c foundColumn
-				if err = it.Next(&c); err == iterator.Done {
-					break
-				} else if err != nil {
-					require.NoError(t, err)
-				}
-				cols = append(cols, c)
-			}
-
-			slices.SortFunc(cols, func(a, b foundColumn) int {
-				return strings.Compare(a.Name, b.Name)
-			})
-
-			var out strings.Builder
-			enc := json.NewEncoder(&out)
-			for _, c := range cols {
-				require.NoError(t, enc.Encode(c))
-			}
-
-			return out.String()
+			return dumpSchema(t, ctx, client, cfg, resourceConfig)
 		},
 		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
@@ -148,44 +110,8 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		cfg,
 		resourceConfig,
 		func(t *testing.T) string {
-			job, err := client.query(ctx, fmt.Sprintf(
-				"select column_name, is_nullable, data_type from %s where table_name = %s;",
-				bqDialect.Identifier(cfg.Dataset, "INFORMATION_SCHEMA", "COLUMNS"),
-				bqDialect.Literal(resourceConfig.Table),
-			))
-			require.NoError(t, err)
-
-			it, err := job.Read(ctx)
-			require.NoError(t, err)
-
-			type foundColumn struct {
-				Name     string `bigquery:"column_name"`
-				Nullable string `bigquery:"is_nullable"`
-				Type     string `bigquery:"data_Type"`
-			}
-
-			cols := []foundColumn{}
-			for {
-				var c foundColumn
-				if err = it.Next(&c); err == iterator.Done {
-					break
-				} else if err != nil {
-					require.NoError(t, err)
-				}
-				cols = append(cols, c)
-			}
-
-			slices.SortFunc(cols, func(a, b foundColumn) int {
-				return strings.Compare(a.Name, b.Name)
-			})
-
-			var out strings.Builder
-			enc := json.NewEncoder(&out)
-			for _, c := range cols {
-				require.NoError(t, enc.Encode(c))
-			}
-
-			return out.String()
+			t.Helper()
+			return dumpSchema(t, ctx, client, cfg, resourceConfig)
 		},
 		func(t *testing.T, cols []string, values []string) {
 			t.Helper()
@@ -400,4 +326,47 @@ func TestSpecification(t *testing.T) {
 	require.NoError(t, err)
 
 	cupaloy.SnapshotT(t, formatted)
+}
+
+func dumpSchema(t *testing.T, ctx context.Context, client *client, cfg config, resourceConfig tableConfig) string {
+	t.Helper()
+
+	job, err := client.query(ctx, fmt.Sprintf(
+		"select column_name, is_nullable, data_type from %s where table_name = %s;",
+		bqDialect.Identifier(cfg.Dataset, "INFORMATION_SCHEMA", "COLUMNS"),
+		bqDialect.Literal(resourceConfig.Table),
+	))
+	require.NoError(t, err)
+
+	it, err := job.Read(ctx)
+	require.NoError(t, err)
+
+	type foundColumn struct {
+		Name     string `bigquery:"column_name"`
+		Nullable string `bigquery:"is_nullable"`
+		Type     string `bigquery:"data_Type"`
+	}
+
+	cols := []foundColumn{}
+	for {
+		var c foundColumn
+		if err = it.Next(&c); err == iterator.Done {
+			break
+		} else if err != nil {
+			require.NoError(t, err)
+		}
+		cols = append(cols, c)
+	}
+
+	slices.SortFunc(cols, func(a, b foundColumn) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, c := range cols {
+		require.NoError(t, enc.Encode(c))
+	}
+
+	return out.String()
 }
