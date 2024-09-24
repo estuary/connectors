@@ -50,8 +50,10 @@ var pgDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[sql.FlatType][]string{
-			sql.STRING: {"numeric", "integer", "double precision"},
+		MigratableTypes: map[string][]string{
+			"numeric":          {"character varying", "text"},
+			"integer":          {"character varying", "text"},
+			"double precision": {"character varying", "text"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {

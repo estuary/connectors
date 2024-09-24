@@ -147,7 +147,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), testDialect.Identifier("key"))
+			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
 
 			require.NoError(t, err)
 

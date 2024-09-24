@@ -87,8 +87,9 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 	}
 
 	return sql.Dialect{
-		MigratableTypes: map[sql.FlatType][]string{
-			sql.STRING: {"number", "float"},
+		MigratableTypes: map[string][]string{
+			"number": {"text"},
+			"float":  {"text"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {

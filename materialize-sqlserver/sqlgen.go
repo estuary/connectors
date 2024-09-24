@@ -85,8 +85,9 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[sql.FlatType][]string{
-			sql.STRING: {"float", "bigint"},
+		MigratableTypes: map[string][]string{
+			"float":  {strings.ToLower(textType), stringType},
+			"bigint": {strings.ToLower(textType), stringType},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {

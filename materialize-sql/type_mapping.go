@@ -452,7 +452,7 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+func (c constrainter) compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
 	proj := buildProjection(proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
@@ -470,15 +470,34 @@ func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *p
 		return strings.EqualFold(existing.Type, compatibleType)
 	})
 
-	isMigratableType := false
-	proposedFlatType, _ := proj.AsFlatType()
-	if migratableList, ok := c.dialect.MigratableTypes[proposedFlatType]; ok {
-		isMigratableType = slices.ContainsFunc(migratableList, func(migratableType string) bool {
-			return strings.EqualFold(existing.Type, migratableType)
-		})
+	return isCompatibleType, nil
+}
+
+func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+	proj := buildProjection(proposed, rawFieldConfig)
+	mapped, err := c.dialect.MapType(&proj)
+	if err != nil {
+		return false, fmt.Errorf("mapping type: %w", err)
 	}
 
-	return isCompatibleType || isMigratableType, nil
+	var migratableTypes = c.dialect.MigratableTypes
+	// If the types are not compatible, but are migratable, attempt to migrate
+	if slices.Contains(migratableTypes[strings.ToLower(existing.Type)], strings.ToLower(mapped.DDL)) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+	if compatible, err := c.compatible(existing, proposed, rawFieldConfig); err != nil {
+		return false, err
+	} else if !compatible {
+		return false, nil
+	} else {
+		migratable, err := c.migratable(existing, proposed, rawFieldConfig)
+		return migratable, err
+	}
 }
 
 func (c constrainter) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
