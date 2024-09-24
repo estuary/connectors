@@ -468,6 +468,61 @@ func StdCreateSchema(ctx context.Context, db *sql.DB, dialect Dialect, schemaNam
 	return err
 }
 
+func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, migration ColumnTypeMigration) []string {
+	var originalIdentifier = dialect.Identifier(migration.OriginalField)
+
+	var firstTempColumn = migration.OriginalField + ColumnMigrationFirstStepSuffix
+	var firstTempColumnIdentifier = dialect.Identifier(firstTempColumn)
+
+	var secondTempColumn = migration.OriginalField + ColumnMigrationSecondStepSuffix
+	var secondTempColumnIdentifier = dialect.Identifier(secondTempColumn)
+
+	var step = 0
+	if len(migration.ProgressFields) == 1 && migration.ProgressFields[0] == firstTempColumn {
+		step = 1
+	} else if len(migration.ProgressFields) == 2 {
+		step = 3
+	} else if len(migration.ProgressFields) == 1 && migration.ProgressFields[0] == secondTempColumn {
+		step = 4
+	}
+
+	var steps = []string{
+		fmt.Sprintf(
+			"ALTER TABLE %s ADD COLUMN %s %s;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			migration.DDL,
+		),
+		fmt.Sprintf(
+			// The WHERE filter is required by some warehouses (bigquery)
+			"UPDATE %s SET %s = CAST(%s AS %s) WHERE true;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			originalIdentifier,
+			migration.DDL,
+		),
+		fmt.Sprintf(
+			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+			table.Identifier,
+			originalIdentifier,
+			secondTempColumnIdentifier,
+		),
+		fmt.Sprintf(
+			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			originalIdentifier,
+		),
+		fmt.Sprintf(
+			"ALTER TABLE %s DROP COLUMN %s;",
+			table.Identifier,
+			secondTempColumnIdentifier,
+		),
+	}
+
+	return steps[step:]
+}
+
 func ToLocatePathFn(fn TableLocatorFn) boilerplate.LocatePathFn {
 	return func(in []string) []string {
 		loc := fn(in)

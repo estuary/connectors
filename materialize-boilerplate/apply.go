@@ -197,6 +197,13 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 
 					if !slices.Equal(existingNonNullTypes, newNonNullTypes) {
 						params.ChangedFieldTypes = append(params.ChangedFieldTypes, projection)
+					} else if existingProjection.Inference.String_ != nil && projection.Inference.String_ != nil {
+						var existingFormat = existingProjection.Inference.String_.Format
+						var newFormat = projection.Inference.String_.Format
+
+						if existingFormat != newFormat {
+							params.ChangedFieldTypes = append(params.ChangedFieldTypes, projection)
+						}
 					}
 				} else {
 					// Field does not exist in the materialized resource, so this is a new
