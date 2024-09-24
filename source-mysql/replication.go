@@ -766,12 +766,15 @@ func translateDataType(meta *mysqlTableMetadata, t sqlparser.ColumnType) any {
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		var charset = t.Charset.Name
-		if charset == "" {
-			charset = meta.DefaultCharset // If not explicitly specified, use the default charset of the table
-		}
-		if charset == "" {
-			charset = mysqlDefaultCharset // If the default charset is also not known, fall back to UTF-8
+		var charset string
+		if t.Charset.Name != "" {
+			charset = t.Charset.Name // If explicitly specified, the declared charset wins
+		} else if t.Options.Collate != "" {
+			charset = charsetFromCollation(t.Options.Collate) // If only a collation is declared, figure out what charset that implies
+		} else if meta.DefaultCharset != "" {
+			charset = meta.DefaultCharset // In the absence of a column-specific declaration, use the default table charset if known
+		} else {
+			charset = mysqlDefaultCharset // Finally fall back to UTF-8 if nothing else supersedes that
 		}
 		return &mysqlColumnType{Type: typeName, Charset: charset}
 	default:
