@@ -486,7 +486,7 @@ func charsetFromCollation(name string) string {
 			return charset
 		}
 	}
-	logrus.WithField("coillation", name).Error("unknown charset for collation, assuming UTF-8")
+	logrus.WithField("collation", name).Error("unknown charset for collation, assuming UTF-8")
 	return mysqlDefaultCharset
 }
 
