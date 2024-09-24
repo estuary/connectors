@@ -37,6 +37,12 @@ type TableAlter struct {
 	// supports changing the column type, these columns will be altered, otherwise the projection will
 	// will be rejected as forbidden.
 	ColumnTypeChanges []Column
+
+	// For connectors that use column renaming to migrate columns from one type to another
+	// it is possible that the migration is interrupted by a crash / restart. In these instances
+	// we detect the temporary columns using their suffixes and pass these in-progress migrations
+	// to the connector client to finish
+	ColumnTypeChangeMigrations []ColumnTypeMigration
 }
 
 // MetaSpecsUpdate is an endpoint-specific parameterized query and parameters needed to persist a
@@ -203,6 +209,29 @@ func (a *sqlApplier) DeleteResource(ctx context.Context, path []string) (string,
 	return a.client.DeleteTable(ctx, path)
 }
 
+type ColumnTypeMigration struct {
+	MappedType
+	OriginalField  string
+	ProgressFields []string
+}
+
+// Column name suffixes used during column migration using the rename method
+const ColumnMigrationFirstStepSuffix = "_flowtmp1"
+const ColumnMigrationSecondStepSuffix = "_flowtmp2"
+
+func (a *sqlApplier) isFieldPendingMigration(resourcePath []string, field string) []string {
+	var fields []string
+	if a.is.HasField(resourcePath, field+ColumnMigrationFirstStepSuffix) {
+		fields = append(fields, field+ColumnMigrationFirstStepSuffix)
+	}
+
+	if a.is.HasField(resourcePath, field+ColumnMigrationSecondStepSuffix) {
+		fields = append(fields, field+ColumnMigrationSecondStepSuffix)
+	}
+
+	return fields
+}
+
 func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	table, err := getTable(a.endpoint, spec, bindingIndex)
 	if err != nil {
@@ -228,6 +257,15 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		if err != nil {
 			return "", nil, err
 		}
+
+		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
+			alter.ColumnTypeChangeMigrations = append(alter.ColumnTypeChangeMigrations, ColumnTypeMigration{
+				OriginalField:  col.Field,
+				ProgressFields: migrationSteps,
+				MappedType:     col.MappedType,
+			})
+			continue
+		}
 		alter.AddColumns = append(alter.AddColumns, col)
 	}
 
@@ -236,11 +274,21 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		if err != nil {
 			return "", nil, err
 		}
+
+		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
+			alter.ColumnTypeChangeMigrations = append(alter.ColumnTypeChangeMigrations, ColumnTypeMigration{
+				OriginalField:  col.Field,
+				ProgressFields: migrationSteps,
+				MappedType:     col.MappedType,
+			})
+			continue
+		}
+
 		alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, col)
 	}
 
 	// If there is nothing to do, skip
-	if len(alter.AddColumns) == 0 && len(alter.DropNotNulls) == 0 && len(alter.ColumnTypeChanges) == 0 {
+	if len(alter.AddColumns) == 0 && len(alter.DropNotNulls) == 0 && len(alter.ColumnTypeChanges) == 0 && len(alter.ColumnTypeChangeMigrations) == 0 {
 		return "", nil, nil
 	}
 
