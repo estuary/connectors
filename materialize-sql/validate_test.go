@@ -72,7 +72,7 @@ func TestValidateMigrations(t *testing.T) {
 			require.NoError(t, err)
 
 			snap.WriteString(tt.name + ":\n")
-			snap.WriteString(snapshotConstraints(t, cs) + "\n")
+			snap.WriteString(boilerplate.SnapshotConstraints(t, cs) + "\n")
 		})
 	}
 	cupaloy.SnapshotT(t, snap.String())
@@ -81,8 +81,8 @@ func TestValidateMigrations(t *testing.T) {
 type testConstrainter struct{}
 
 func (testConstrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
-	var formattedToString = existing.Type == "integer,string" && strings.Join(proposed.Inference.Types, ",") == "string"
-	return existing.Type == strings.Join(proposed.Inference.Types, ",") || formattedToString, nil
+	var migratable = existing.Type == "integer,string" && strings.Join(proposed.Inference.Types, ",") == "string"
+	return existing.Type == strings.Join(proposed.Inference.Types, ",") || migratable, nil
 }
 
 func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
