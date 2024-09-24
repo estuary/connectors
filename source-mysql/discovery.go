@@ -651,7 +651,20 @@ func decodeBytesToString(charset string, bs []byte) (string, error) {
 
 	var decodeFn, ok = mysqlStringDecoders[charset]
 	if !ok {
-		return "", fmt.Errorf("internal error: no decode function for charset %q", charset)
+		// If the charset of a column is unknown, we assume it's UTF-8. This means that,
+		// hopefully, no captures will suddenly begin failing when the text decoding fix
+		// goes to production. Since before this logic existed we assumed all text would
+		// be UTF-8 compatible this doesn't hurt any previously-working captures.
+		//
+		// Instead of erroring out, the connector will log an error which we can go check
+		// for after this reaches production, which will tell us if there are any charsets
+		// we still need to add. But this function is called for every text column of every
+		// replicated change event so it would be much too spammy if we logged it every time,
+		// so we also register the unknown charset as UTF-8 so this only triggers once per
+		// unknown charset (per task restart).
+		logrus.WithField("charset", charset).Error("unknown charset, assuming UTF-8/ASCII compatible")
+		mysqlStringDecoders[charset] = decodeUTF8
+		decodeFn = decodeUTF8
 	}
 	var str, err = decodeFn(bs)
 	if err != nil {
