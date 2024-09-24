@@ -104,5 +104,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FGeneric_CatalogPrimaryKey_46055452":{"backfilled":100,"key_columns":["fullname","year"],"metadata":{"schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FGeneric_CatalogPrimaryKey_46055452":{"backfilled":100,"key_columns":["fullname","year"],"metadata":{"charset":"utf8mb4","schema":{"columns":["year","state","fullname","population"],"types":{"fullname":{"charset":"utf8mb4","type":"varchar"},"population":{"type":"int"},"state":{"charset":"utf8mb4","type":"varchar"},"year":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
