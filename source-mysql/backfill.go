@@ -103,7 +103,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
-		if err := db.translateRecordFields(columnTypes, fields); err != nil {
+		if err := db.translateRecordFields(true, columnTypes, fields); err != nil {
 			return fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 

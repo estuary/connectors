@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -16,6 +17,7 @@ import (
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/text/encoding/charmap"
 )
 
 const (
@@ -244,7 +246,7 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*j
 	return schema.toType(), nil
 }
 
-func (db *mysqlDatabase) translateRecordFields(columnTypes map[string]interface{}, f map[string]interface{}) error {
+func (db *mysqlDatabase) translateRecordFields(isBackfill bool, columnTypes map[string]interface{}, f map[string]interface{}) error {
 	if columnTypes == nil {
 		return fmt.Errorf("unknown column types")
 	}
@@ -261,7 +263,7 @@ func (db *mysqlDatabase) translateRecordFields(columnTypes map[string]interface{
 			delete(f, id)
 			continue
 		}
-		var translated, err = db.translateRecordField(columnTypes[id], val)
+		var translated, err = db.translateRecordField(isBackfill, columnTypes[id], val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
 		}
@@ -274,15 +276,15 @@ const mysqlTimestampLayout = "2006-01-02 15:04:05"
 
 var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' or timezone from capture configuration must contain a valid IANA time zone name or +HH:MM offset (go.estuary.dev/80J6rX)")
 
-func (db *mysqlDatabase) translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
+func (db *mysqlDatabase) translateRecordField(isBackfill bool, columnType interface{}, val interface{}) (interface{}, error) {
 	if columnType == nil {
 		return nil, fmt.Errorf("unknown column type")
 	}
+	if columnType, ok := columnType.(*mysqlColumnType); ok {
+		return columnType.translateRecordField(isBackfill, val)
+	}
 	if str, ok := val.(string); ok {
 		val = []byte(str)
-	}
-	if columnType, ok := columnType.(*mysqlColumnType); ok {
-		return columnType.translateRecordField(val)
 	}
 	switch val := val.(type) {
 	case float64:
@@ -546,12 +548,7 @@ func (t *mysqlColumnType) String() string {
 	return t.Type
 }
 
-func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, error) {
-	logrus.WithFields(logrus.Fields{
-		"type":  fmt.Sprintf("%#v", t),
-		"value": fmt.Sprintf("%#v", val),
-	}).Trace("translating record field")
-
+func (t *mysqlColumnType) translateRecordField(isBackfill bool, val interface{}) (interface{}, error) {
 	switch t.Type {
 	case "enum":
 		if index, ok := val.(int64); ok {
@@ -607,7 +604,13 @@ func (t *mysqlColumnType) translateRecordField(val interface{}) (interface{}, er
 		}
 		return val, nil
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		if bs, ok := val.([]byte); ok {
+		if str, ok := val.(string); ok {
+			return str, nil
+		} else if bs, ok := val.([]byte); ok {
+			if isBackfill {
+				// Backfills always return string results as UTF-8
+				return string(bs), nil
+			}
 			return decodeBytesToString(t.Charset, bs)
 		} else if val == nil {
 			return nil, nil
@@ -646,10 +649,14 @@ func decodeBytesToString(charset string, bs []byte) (string, error) {
 		charset = mysqlDefaultCharset
 	}
 
-	// TODO(wgd): Right here we need to apply an actual lookup table of some sort to
-	// figure out the charset-appropriate decode function, or to error out if we don't
-	// know this character set.
-	var str = string(bs)
+	var decodeFn, ok = mysqlStringDecoders[charset]
+	if !ok {
+		return "", fmt.Errorf("internal error: no decode function for charset %q", charset)
+	}
+	var str, err = decodeFn(bs)
+	if err != nil {
+		return "", fmt.Errorf("internal error: failed to decode bytes to charset %q: %w", charset, err)
+	}
 
 	// If the string is short enough then we're done, otherwise we need to apply
 	// a Unicode-aware truncation to the string contents.
@@ -664,6 +671,43 @@ func decodeBytesToString(charset string, bs []byte) (string, error) {
 		}
 	}
 	return buf.String(), nil
+}
+
+var mysqlStringDecoders = map[string]func([]byte) (string, error){
+	"utf8mb3": decodeUTF8,
+	"utf8mb4": decodeUTF8,
+	"latin1":  decodeLatin1,
+	"ucs2":    decodeUCS2,
+}
+
+func decodeUTF8(bs []byte) (string, error) {
+	return string(bs), nil
+}
+
+func decodeLatin1(bs []byte) (string, error) {
+	var decoder = charmap.ISO8859_1.NewDecoder()
+	var decodedBytes, err = decoder.Bytes(bs)
+	if err != nil {
+		return "", nil
+	}
+	return string(decodedBytes), nil
+}
+
+func decodeUCS2(bs []byte) (string, error) {
+	if len(bs)%2 == 1 {
+		return "", fmt.Errorf("string length must be a multiple of two: got %d bytes", len(bs))
+	}
+	var runes = make([]rune, 0, len(bs)/2)
+	for i := 0; i < len(bs); i += 2 {
+		// Per https://dev.mysql.com/doc/refman/8.0/en/charset-unicode-ucs2.html
+		// MySQL's UCS-2 charset only supports BMP characters, so we ignore here
+		// the possibility of surrogate pairs.
+		//
+		// If this proves incorrect, we could instead use package 'unicode/utf16'
+		// to decode []uint16 -> string
+		runes = append(runes, rune(binary.BigEndian.Uint16(bs[i:])))
+	}
+	return string(runes), nil
 }
 
 // enumValuesRegexp matches a MySQL-format single-quoted string followed by
@@ -704,14 +748,14 @@ func parseEnumValues(details string) []string {
 	// and take submatch #1 which is the body of each string.
 	var opts []string
 	for _, match := range enumValuesRegexp.FindAllStringSubmatch(details, -1) {
-		opts = append(opts, decodeMySQLString(match[1]))
+		opts = append(opts, unquoteMySQLString(match[1]))
 	}
 	return opts
 }
 
-// decodeStringMySQL decodes a MySQL-format single-quoted string (including
-// possible backslash escapes) and returns it in unquoted, unescaped form.
-func decodeMySQLString(qstr string) string {
+// unquoteStringMySQL unquotes a MySQL-format single-quoted string (and unescapes
+// any backslash escapes) and returns it in unquoted, unescaped form.
+func unquoteMySQLString(qstr string) string {
 	if strings.HasPrefix(qstr, "'") && strings.HasSuffix(qstr, "'") {
 		qstr = strings.TrimPrefix(qstr, "'")
 		qstr = strings.TrimSuffix(qstr, "'")
