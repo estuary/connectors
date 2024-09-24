@@ -447,7 +447,7 @@ func normalizeMySQLTimestamp(ts string) string {
 }
 
 const queryDiscoverTables = `
-  SELECT table_schema, table_name, table_type, engine
+  SELECT table_schema, table_name, table_type, engine, table_collation
   FROM information_schema.tables
   WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys');`
 
@@ -460,20 +460,39 @@ func getTables(_ context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInf
 
 	var tables []*sqlcapture.DiscoveryInfo
 	for _, row := range results.Values {
+		var collation = string(row[4].AsString())
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
 			Schema:    string(row[0].AsString()),
 			Name:      string(row[1].AsString()),
 			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
 			ExtraDetails: &mysqlTableDiscoveryDetails{
-				StorageEngine: string(row[3].AsString()),
+				StorageEngine:  string(row[3].AsString()),
+				DefaultCharset: charsetFromCollation(collation),
 			},
 		})
 	}
 	return tables, nil
 }
 
+func charsetFromCollation(name string) string {
+	// According to https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html:
+	//
+	//     The output does not explicitly list the table default character set, but the collation
+	//     name begins with the character set name.
+	//
+	// We rely on this assumption to identify known charsets based on the decoders table here.
+	for charset := range mysqlStringDecoders {
+		if strings.HasPrefix(name, charset) {
+			return charset
+		}
+	}
+	logrus.WithField("coillation", name).Error("unknown charset for collation, assuming UTF-8")
+	return mysqlDefaultCharset
+}
+
 type mysqlTableDiscoveryDetails struct {
-	StorageEngine string
+	StorageEngine  string
+	DefaultCharset string
 }
 
 const queryDiscoverColumns = `
