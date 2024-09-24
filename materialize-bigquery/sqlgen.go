@@ -98,8 +98,10 @@ var bqDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[sql.FlatType][]string{
-			sql.STRING: {"integer", "bignumeric", "float"},
+		MigratableTypes: map[string][]string{
+			"integer":    {"string"},
+			"bignumeric": {"string"},
+			"float":      {"string"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{

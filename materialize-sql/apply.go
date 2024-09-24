@@ -56,16 +56,18 @@ type MetaSpecsUpdate struct {
 var _ boilerplate.Applier = (*sqlApplier)(nil)
 
 type sqlApplier struct {
-	client   Client
-	is       *boilerplate.InfoSchema
-	endpoint *Endpoint
+	client       Client
+	is           *boilerplate.InfoSchema
+	endpoint     *Endpoint
+	constrainter constrainter
 }
 
-func newSqlApplier(client Client, is *boilerplate.InfoSchema, endpoint *Endpoint) *sqlApplier {
+func newSqlApplier(client Client, is *boilerplate.InfoSchema, endpoint *Endpoint, constrainter constrainter) *sqlApplier {
 	return &sqlApplier{
-		client:   client,
-		is:       is,
-		endpoint: endpoint,
+		client:       client,
+		is:           is,
+		endpoint:     endpoint,
+		constrainter: constrainter,
 	}
 }
 
@@ -269,11 +271,38 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		alter.AddColumns = append(alter.AddColumns, col)
 	}
 
-	for _, changedType := range bindingUpdate.ChangedFieldTypes {
-		col, err := getColumn(changedType.Field)
+	var changedFieldTypes []Column
+
+	var binding = spec.Bindings[bindingIndex]
+	var collection = binding.Collection
+	for _, proposed := range collection.Projections {
+		existing, err := a.is.GetField(table.Path, proposed.Field)
 		if err != nil {
-			return "", nil, err
+			continue
 		}
+
+		var rawFieldConfig = binding.FieldSelection.FieldConfigJsonMap[proposed.Field]
+		compatible, err := a.constrainter.compatible(existing, &proposed, rawFieldConfig)
+		if err != nil {
+			return "", nil, fmt.Errorf("checking compatibility of %q: %w", proposed.Field, err)
+		}
+
+		migratable, err := a.constrainter.migratable(existing, &proposed, rawFieldConfig)
+		if err != nil {
+			return "", nil, fmt.Errorf("checking migratability of %q: %w", proposed.Field, err)
+		}
+
+		// If the types are not compatible, but are migratable, attempt to migrate
+		if !compatible && migratable {
+			col, err := getColumn(proposed.Field)
+			if err != nil {
+				return "", nil, err
+			}
+			changedFieldTypes = append(changedFieldTypes, col)
+		}
+	}
+
+	for _, col := range changedFieldTypes {
 
 		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
 			alter.ColumnTypeChangeMigrations = append(alter.ColumnTypeChangeMigrations, ColumnTypeMigration{

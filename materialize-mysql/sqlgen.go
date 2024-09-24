@@ -86,8 +86,10 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[sql.FlatType][]string{
-			sql.STRING: {"decimal", "bigint", "double"},
+		MigratableTypes: map[string][]string{
+			"decimal": {"varchar", "longtext"},
+			"bigint":  {"varchar", "longtext"},
+			"double":  {"varchar", "longtext"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the

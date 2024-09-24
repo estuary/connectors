@@ -59,8 +59,10 @@ var databricksDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[sql.FlatType][]string{
-			sql.STRING: {"long", "decimal", "double"},
+		MigratableTypes: map[string][]string{
+			"decimal": {"string"},
+			"long":    {"string"},
+			"double":  {"string"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -110,6 +112,8 @@ var databricksDialect = func() sql.Dialect {
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
 -- Templated creation of a materialized table definition and comments:
+-- delta.columnMapping.mode enables column renaming in Databricks. Column renaming was introduced in Databricks Runtime 10.4 LTS which was released in March 2022.
+-- See https://docs.databricks.com/en/release-notes/runtime/10.4lts.html
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
   {{- range $ind, $col := $.Columns }}
