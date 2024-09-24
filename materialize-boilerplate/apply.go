@@ -37,10 +37,6 @@ type BindingUpdate struct {
 	// applied materialization spec, and is now delta updates. Some systems may need to do things
 	// like drop primary key restraints in response to this change.
 	NewlyDeltaUpdates bool
-
-	// ChangedFieldTypes is a list of projections that have a changed type. The connector may or may
-	// not support migrating these cases
-	ChangedFieldTypes []pf.Projection
 }
 
 // Applier represents the capabilities needed for an endpoint to apply changes to materialized
@@ -190,21 +186,6 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 						// modified to be made nullable since it may need to hold null values now.
 						params.NewlyNullableFields = append(params.NewlyNullableFields, existingField)
 					}
-
-					existingProjection := existingBinding.Collection.GetProjection(field)
-					existingNonNullTypes := nonNullTypes(existingProjection.Inference.Types)
-					newNonNullTypes := nonNullTypes(projection.Inference.Types)
-
-					if !slices.Equal(existingNonNullTypes, newNonNullTypes) {
-						params.ChangedFieldTypes = append(params.ChangedFieldTypes, projection)
-					} else if existingProjection.Inference.String_ != nil && projection.Inference.String_ != nil {
-						var existingFormat = existingProjection.Inference.String_.Format
-						var newFormat = projection.Inference.String_.Format
-
-						if existingFormat != newFormat {
-							params.ChangedFieldTypes = append(params.ChangedFieldTypes, projection)
-						}
-					}
 				} else {
 					// Field does not exist in the materialized resource, so this is a new
 					// projection to add to it.
@@ -275,15 +256,4 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 	}
 
 	return &pm.Response_Applied{ActionDescription: strings.Join(actionDescriptions, "\n")}, nil
-}
-
-func nonNullTypes(types []string) []string {
-	var filtered []string
-	for _, t := range types {
-		if t != pf.JsonTypeNull {
-			filtered = append(filtered, t)
-		}
-	}
-
-	return filtered
 }

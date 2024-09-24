@@ -44,8 +44,10 @@ var duckDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[sql.FlatType][]string{
-			sql.STRING: {"double", "bigint", "hugeint"},
+		MigratableTypes: map[string][]string{
+			"double":  {"varchar"},
+			"bigint":  {"varchar"},
+			"hugeint": {"varchar"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
