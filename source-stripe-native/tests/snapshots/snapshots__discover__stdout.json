@@ -59,8 +59,7 @@
       },
       "required": [
         "id",
-        "object",
-        "created"
+        "object"
       ],
       "title": "Accounts",
       "type": "object",
