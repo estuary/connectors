@@ -53,14 +53,21 @@
           "type": "string"
         },
         "created": {
-          "title": "Created",
-          "type": "integer"
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Created"
         }
       },
       "required": [
         "id",
-        "object",
-        "created"
+        "object"
       ],
       "title": "Accounts",
       "type": "object",
