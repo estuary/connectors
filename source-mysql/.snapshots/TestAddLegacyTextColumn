@@ -1,14 +1,17 @@
 # ================================
-# Collection "acmeCo/test/test_addlegacytextcolumn_30621561": 6 Documents
+# Collection "acmeCo/test/test_addlegacytextcolumn_30621561": 9 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:0"}},"id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:1"}},"id":2}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:2"}},"id":3}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Heizölrückstoßabdämpfung","id":5}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Heizölrückstoßabdämpfung","id":5}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"six","id":6}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"777","data_ucs":"seven","id":7}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"888","data_ucs":"次常用字","id":8}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddLegacyTextColumn_30621561","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"999","data_ucs":"nine","id":9}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FAddLegacyTextColumn_30621561":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"latin1","schema":{"columns":["id","data"],"types":{"data":{"charset":"latin1","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FAddLegacyTextColumn_30621561":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"latin1","schema":{"columns":["id","data","data_ucs"],"types":{"data":{"charset":"latin1","type":"text"},"data_ucs":{"charset":"ucs2","type":"text"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
