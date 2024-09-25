@@ -16,7 +16,7 @@ import jsonschema
 import requests
 from airbyte_cdk.models import FailureType, SyncMode
 from airbyte_cdk.sources import AbstractSource
-from airbyte_cdk.sources.streams import Stream
+from airbyte_cdk.sources.streams import Stream, IncrementalMixin
 from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.utils import AirbyteTracedException
 from requests import HTTPError
@@ -98,12 +98,13 @@ class GoogleAnalyticsDataApiAbstractStream(HttpStream, ABC):
         return super().backoff_time(response)
 
 
-class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
+class GoogleAnalyticsDataApiBaseStream(IncrementalMixin, GoogleAnalyticsDataApiAbstractStream):
     """
     https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/properties/runReport
     """
 
     _record_date_format = "%Y%m%d"
+    _cursor_value = None
     offset = 0
 
     metadata = MetadataDescriptor()
@@ -123,6 +124,15 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
     @staticmethod
     def add_dimensions(dimensions, row) -> dict:
         return dict(zip(dimensions, [v["value"] for v in row["dimensionValues"]]))
+    
+    # necessary to support incremental state
+    @property
+    def state(self):
+        return {self.cursor_field: self._cursor_value}
+
+    @state.setter
+    def state(self, value):
+        self._cursor_value = value[self.cursor_field]
 
     @staticmethod
     def add_metrics(metrics, metric_types, row) -> dict:
@@ -231,14 +241,6 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
                 record["endDate"] = stream_slice["endDate"]
             yield record
 
-    def get_updated_state(self, current_stream_state: MutableMapping[str, Any], latest_record: Mapping[str, Any]):
-        updated_state = utils.string_to_date(latest_record[self.cursor_field], old_format=self._record_date_format)
-        stream_state_value = current_stream_state.get(self.cursor_field)
-        if stream_state_value:
-            stream_state_value = utils.string_to_date(stream_state_value, old_format=self._record_date_format)
-            updated_state = max(updated_state, stream_state_value)
-        current_stream_state[self.cursor_field] = updated_state.strftime(self._record_date_format)
-        return current_stream_state
 
     def request_body_json(
         self,
@@ -266,7 +268,9 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
         today: datetime.datetime = datetime.date.today()
         start_date_config = utils.string_to_date(self.config["date_ranges_start_date"])
 
-        start_date = stream_state and stream_state.get(self.cursor_field)
+        if self.cursor_field:
+            start_date = stream_state and stream_state.get(self.cursor_field)
+
         if start_date:
             start_date = utils.string_to_date(start_date, old_format=self._record_date_format)
             start_date -= LOOKBACK_WINDOW
@@ -285,6 +289,35 @@ class GoogleAnalyticsDataApiBaseStream(GoogleAnalyticsDataApiAbstractStream):
                     "endDate": utils.date_to_string(min(start_date + datetime.timedelta(days=self.config["window_in_days"] - 1), today)),
                 }
                 start_date += datetime.timedelta(days=self.config["window_in_days"])
+    
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: Optional[List[str]] = None,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Optional[Mapping[str, Any]] = None,
+    ):
+
+        # data is returned chornologically if cursor_field is date, so we update state
+        # accordingly
+        records = super().read_records(sync_mode, cursor_field, stream_slice, stream_state)
+        for record in records:
+            if self.cursor_field == "date" and record.get(self.cursor_field):
+                record_cursor = utils.string_to_date(record[self.cursor_field], self._record_date_format)
+                if self.state.get(self.cursor_field) and type(self.state[self.cursor_field]) != datetime.date:
+                    state_cursor = utils.string_to_date(self.state[self.cursor_field], self._record_date_format, old_format=DATE_FORMAT)
+
+                if not self.state[self.cursor_field] or record_cursor > state_cursor:
+                    self.state = {self.cursor_field: record[self.cursor_field]}
+                    yield record
+            elif record.get(self.cursor_field):
+                if not self.state[self.cursor_field] or record[self.cursor_field] > self.state[self.cursor_field]:
+                    self.state[self.cursor_field] = record[self.cursor_field]
+                    yield record
+
+            elif not self.cursor_field:
+                yield record
+
 
 
 class PivotReport(GoogleAnalyticsDataApiBaseStream):
