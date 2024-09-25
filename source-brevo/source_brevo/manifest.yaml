@@ -47,16 +47,16 @@ definitions:
         datetime_format: "%Y-%m-%dT%H:%M:%S.%f%z"
         start_datetime:
           type: MinMaxDatetime
-          datetime: "{{ config[\"start_date\"] }}"
-          datetime_format: "%Y-%m-%dT%H:%M:%SZ"
+          datetime: "{{ config['start_date'] }}"
+          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
         start_time_option:
           type: RequestOption
-          inject_into: request_parameter
           field_name: modifiedAt
+          inject_into: request_parameter
         end_time_option:
           type: RequestOption
-          inject_into: request_parameter
           field_name: modifiedAt
+          inject_into: request_parameter
         end_datetime:
           type: MinMaxDatetime
           datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%SZ') }}"
