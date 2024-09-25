@@ -41,26 +41,26 @@ definitions:
               inject_on_first_request: true
       incremental_sync:
         type: DatetimeBasedCursor
-        cursor_field: modifiedSince
+        cursor_field: modifiedAt
         cursor_datetime_formats:
-          - "%Y-%m-%dT%H:%M:%S.%fZ"
-        datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
+          - "%Y-%m-%dT%H:%M:%S.%f%z"
+        datetime_format: "%Y-%m-%dT%H:%M:%S.%f%z"
         start_datetime:
           type: MinMaxDatetime
           datetime: "{{ config[\"start_date\"] }}"
-          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
+          datetime_format: "%Y-%m-%dT%H:%M:%SZ"
         start_time_option:
           type: RequestOption
           inject_into: request_parameter
-          field_name: modifiedSince
+          field_name: modifiedAt
         end_time_option:
           type: RequestOption
           inject_into: request_parameter
-          field_name: modifiedSince
+          field_name: modifiedAt
         end_datetime:
           type: MinMaxDatetime
-          datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%S.%fZ') }}"
-          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
+          datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%SZ') }}"
+          datetime_format: "%Y-%m-%dT%H:%M:%SZ"
     ContactsAttributes:
       type: DeclarativeStream
       name: ContactsAttributes
