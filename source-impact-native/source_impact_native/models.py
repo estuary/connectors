@@ -64,9 +64,7 @@ class Ads(BaseDocument, extra="allow"):
     START_DATE_INCREMENTAL: ClassVar[str]  = None
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
-    PRIMARY_KEY: ClassVar[str] = "/Id"
-
-    Id: str
+    PRIMARY_KEY: ClassVar[str] = "/_meta/row_id"
 
 class Catalogs(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Catalogs"
@@ -74,9 +72,7 @@ class Catalogs(BaseDocument, extra="allow"):
     START_DATE_INCREMENTAL: ClassVar[str]  = None
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
-    PRIMARY_KEY: ClassVar[str] = "/Id"
-
-    Id: str
+    PRIMARY_KEY: ClassVar[str] = "/_meta/row_id"
 
 class Invoices(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Invoices"
@@ -137,9 +133,8 @@ class Campaigns(BaseDocument, extra="allow"):
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
-    PRIMARY_KEY: ClassVar[str] = "/Id"
+    PRIMARY_KEY: ClassVar[str] = "/_meta/row_id"
 
-    Id: str
 
 class Reports(BaseDocument, extra="allow"):
     # No query parameters available, and no date replication key
@@ -167,9 +162,7 @@ class PhoneNumbers(BaseDocument, extra="allow"):
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = "DateCreated"
-    PRIMARY_KEY: ClassVar[str] = "/Id"
-
-    Id: str
+    PRIMARY_KEY: ClassVar[str] = "/_meta/row_id"
 
 class PromoCodes(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "PromoCodes"
@@ -218,9 +211,7 @@ class MediaPartnerGroups(BaseDocument, extra="allow"):
     START_DATE: ClassVar[str] = ""
     END_DATE: ClassVar[str] = ""
     REP_KEY: ClassVar[str] = ""
-    PRIMARY_KEY: ClassVar[str] = "/Id"
-
-    Id: str
+    PRIMARY_KEY: ClassVar[str] = "/_meta/row_id"
 
 class Notes(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Notes"
