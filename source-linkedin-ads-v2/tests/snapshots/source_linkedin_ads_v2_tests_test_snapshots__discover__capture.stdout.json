@@ -18,14 +18,6 @@
         "id": {
           "description": "The unique identifier for the account.",
           "type": "integer"
-        },
-        "lastModified": {
-          "description": "The date and time when the user account was last modified",
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
         }
       },
       "required": [
@@ -63,14 +55,6 @@
         "account": {
           "description": "The account associated with the user",
           "type": "string"
-        },
-        "lastModified": {
-          "description": "The date and time when the user account was last modified",
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
         }
       },
       "required": [
@@ -617,14 +601,6 @@
         "id": {
           "description": "Unique identifier for the campaign group.",
           "type": "integer"
-        },
-        "lastModified": {
-          "description": "The date and time when the user account was last modified",
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
         }
       },
       "required": [
@@ -752,14 +728,6 @@
         "id": {
           "description": "Unique identifier for the conversion.",
           "type": "integer"
-        },
-        "lastModified": {
-          "description": "The date and time when the user account was last modified",
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
         }
       },
       "required": [
