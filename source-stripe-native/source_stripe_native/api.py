@@ -3,13 +3,16 @@ from decimal import Decimal
 from estuary_cdk.http import HTTPSession
 from logging import Logger
 from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator, Literal
-import json
+import json, re
 
 from estuary_cdk.capture.common import (
     BaseDocument,
     PageCursor,
     LogCursor,
 )
+
+
+from estuary_cdk.http import HTTPError
 
 
 from .models import (
@@ -25,6 +28,8 @@ from .models import (
 
 API = "https://api.stripe.com/v1"
 MAX_PAGE_LIMIT = 100
+
+MISSING_RESOURCE_REGEX = r"resource_missing.+No such.+"
 
 def add_event_types(params: dict[str, str | int], event_types: dict[str, Literal["c", "u", "d"]]):
     """
@@ -328,9 +333,21 @@ async def _capture_substreams(
     while True:
         if cls_child.NAME == "Persons" and parent_data.controller["requirement_collection"] == "stripe" :
             break
-        result_child = ListResult[cls_child].model_validate_json(
-            await http.request(log, child_url, method="GET", params=parameters)
-        )
+
+        try:
+            result_child = ListResult[cls_child].model_validate_json(
+                await http.request(log, child_url, method="GET", params=parameters)
+            )
+        except HTTPError as err:
+            # It's possible for us to process events for deleted parent resources, making
+            # the requests for the associated child resources fail. Stripe returns a 404
+            # error & a message containing "resource_missing" and "No such" when this happens.
+            if err.code == 404 and bool(re.search(MISSING_RESOURCE_REGEX, err.message, re.DOTALL)):
+                log.warning(f"Missing resource error for URL {child_url}. Skipping to the next resource.", err)
+                break
+            # Propagate all other errors.
+            else:
+                raise err
 
         for doc in result_child.data:
             yield doc
