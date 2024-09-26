@@ -428,7 +428,6 @@ class InvoiceLineItems(BaseStripeChildObject):
     EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
         "invoice.created": "c",
         "invoice.updated": "u",
-        "invoice.deleted": "d",
     }
 
 
