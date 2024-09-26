@@ -30,12 +30,8 @@ impl Acknowledgements {
 pub struct Emitter(io::Stdout);
 
 impl Emitter {
-    pub async fn emit_doc(&mut self, binding: u32, doc: &impl Serialize) -> anyhow::Result<()> {
+    pub async fn emit_doc(&mut self, binding: u32, doc_json: String) -> anyhow::Result<()> {
         use tokio::io::AsyncWriteExt;
-
-        // We intentionally don't use `write_capture_response` here because we don't want to wait
-        // for the flush call to complete.
-        let doc_json = serde_json::to_string(doc).context("serializing output document")?;
 
         let resp = Response {
             captured: Some(Captured { binding, doc_json }),
@@ -68,7 +64,7 @@ impl Emitter {
 }
 
 struct Transaction {
-    docs: Vec<(u32, serde_json::Value)>,
+    docs: Vec<(u32, String)>,
     completion_tx: oneshot::Sender<()>,
 }
 
@@ -108,7 +104,7 @@ impl Transactor {
     /// Outputs the given documenents, followed by a checkpoint. The future will not complete
     /// until the transactor has read an acknowledgement that Flow transaction has completed,
     /// or an error occurs.
-    pub async fn publish(&self, docs: Vec<(u32, serde_json::Value)>) -> anyhow::Result<()> {
+    pub async fn publish(&self, docs: Vec<(u32, String)>) -> anyhow::Result<()> {
         let (tx, rx) = oneshot::channel();
         self.client_tx
             .send(Transaction {
@@ -124,17 +120,11 @@ impl Transactor {
 
 async fn ack_loop(
     mut acks: Acknowledgements,
-    mut pub_rx: mpsc::Receiver<Transaction>,
+    mut pub_rx: mpsc::Receiver<oneshot::Sender<()>>,
 ) -> anyhow::Result<()> {
     // Counter of checkpoints that have been acknowledged already.
     let mut ack_count: u32 = 0;
-    while let Some(Transaction {
-        completion_tx,
-        docs,
-    }) = pub_rx.recv().await
-    {
-        std::mem::drop(docs); // free the memory while we wait
-
+    while let Some(completion_tx) = pub_rx.recv().await {
         // Do we need to wait for an acknowledgement?
         if ack_count == 0 {
             ack_count = acks.next_ack().await.context("awaiting acknowledgement")?;
@@ -149,7 +139,7 @@ async fn ack_loop(
 async fn transactor_loop(
     mut emitter: Emitter,
     mut client_rx: mpsc::Receiver<Transaction>,
-    mut acks_tx: mpsc::Sender<Transaction>,
+    mut acks_tx: mpsc::Sender<oneshot::Sender<()>>,
 ) -> anyhow::Result<()> {
     while let Some(txn) = client_rx.recv().await {
         try_handle_txn(txn, &mut emitter, &mut acks_tx).await?;
@@ -158,18 +148,18 @@ async fn transactor_loop(
 }
 
 async fn try_handle_txn(
-    txn: Transaction,
+    mut txn: Transaction,
     emitter: &mut Emitter,
-    acks_tx: &mut mpsc::Sender<Transaction>,
+    acks_tx: &mut mpsc::Sender<oneshot::Sender<()>>,
 ) -> anyhow::Result<()> {
-    for (binding_index, doc) in txn.docs.iter() {
-        emitter.emit_doc(*binding_index, doc).await?;
+    for (binding_index, doc) in std::mem::take(&mut txn.docs) {
+        emitter.emit_doc(binding_index, doc).await?;
     }
     let checkpoint = serde_json::Value::Object(serde_json::Map::new());
     emitter.commit(&checkpoint, false).await?;
 
     acks_tx
-        .send(txn)
+        .send(txn.completion_tx)
         .await
         .map_err(|_| anyhow::anyhow!("acknowledgements task stopped"))
 }
