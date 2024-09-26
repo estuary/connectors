@@ -8,11 +8,6 @@
     "account": {
       "description": "The account associated with the user",
       "type": "string"
-    },
-    "lastModified": {
-      "description": "The date and time when the user account was last modified",
-      "type": ["null", "string"],
-      "format": "date-time"
     }
   }
 }

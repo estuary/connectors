@@ -100,7 +100,9 @@ class LinkedinAdsStream(HttpStream, ABC):
         Transform 'date-time' items to RFC3339 format
         """
         for item in record:
+            self.logger.error(f"{record}")
             if item in self.date_time_fields and record[item]:
+                self.logger.error(f"{record[item]}")
                 record[item] = pendulum.parse(record[item]).to_rfc3339_string()
         return record
 

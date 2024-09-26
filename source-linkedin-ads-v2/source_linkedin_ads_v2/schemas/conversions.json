@@ -7,11 +7,6 @@
     "id": {
       "description": "Unique identifier for the conversion.",
       "type": "integer"
-    },
-    "lastModified": {
-      "description": "The date and time when the user account was last modified",
-      "type": ["null", "string"],
-      "format": "date-time"
     }
   }
 }
