@@ -1,7 +1,25 @@
 ---
 collections:
   acmeCo/account_users:
-    schema: account_users.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: AccountUsers
+      required:
+        - account
+      additionalProperties: true
+      properties:
+        account:
+          description: The account associated with the user
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /account
   acmeCo/accounts:
@@ -16,12 +34,6 @@ collections:
         id:
           description: The unique identifier for the account.
           type: integer
-        lastModified:
-          description: The date and time when the user account was last modified
-          type:
-            - "null"
-            - string
-          format: date-time
         _meta:
           type: object
           properties:
@@ -330,7 +342,25 @@ collections:
       - /string_of_pivot_values
       - /end_date
   acmeCo/campaign_groups:
-    schema: campaign_groups.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Campaign Groups
+      required:
+        - id
+      additionalProperties: true
+      properties:
+        id:
+          description: Unique identifier for the campaign group.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/campaigns:
@@ -348,12 +378,6 @@ collections:
         id:
           description: Unique identifier for the conversion.
           type: integer
-        lastModified:
-          description: The date and time when the user account was last modified
-          type:
-            - "null"
-            - string
-          format: date-time
         _meta:
           type: object
           properties:
