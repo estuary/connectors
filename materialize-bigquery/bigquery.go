@@ -2,14 +2,14 @@ package connector
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/dbt"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -18,19 +18,16 @@ import (
 
 // Config represents the endpoint configuration for BigQuery.
 type config struct {
-	ProjectID        string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
-	CredentialsJSON  string `json:"credentials_json" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=1"`
-	Region           string `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region." jsonschema_extras:"order=2"`
-	Dataset          string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
-	Bucket           string `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
-	BucketPath       string `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket." jsonschema_extras:"order=5"`
-	BillingProjectID string `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified." jsonschema_extras:"order=6"`
-
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
-}
-
-type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce compute time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
+	ProjectID        string                     `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
+	CredentialsJSON  string                     `json:"credentials_json" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=1"`
+	Region           string                     `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region." jsonschema_extras:"order=2"`
+	Dataset          string                     `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
+	Bucket           string                     `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
+	BucketPath       string                     `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket." jsonschema_extras:"order=5"`
+	BillingProjectID string                     `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified." jsonschema_extras:"order=6"`
+	HardDelete       bool                       `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=7"`
+	Schedule         boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger    dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt job when new data is available"`
 }
 
 func (c *config) Validate() error {
@@ -50,7 +47,7 @@ func (c *config) Validate() error {
 	// Sanity check: Are the provided credentials valid JSON? A common error is to upload
 	// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
 	// directly to bigquery.NewClient.
-	if !json.Valid(decodeCredentials(c.CredentialsJSON)) {
+	if !json.Valid([]byte(c.CredentialsJSON)) {
 		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 	}
 
@@ -60,7 +57,11 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if err := c.Schedule.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.DBTJobTrigger.Validate(); err != nil {
 		return err
 	}
 
@@ -71,7 +72,7 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	var clientOpts []option.ClientOption
 
 	clientOpts = append(clientOpts,
-		option.WithCredentialsJSON(decodeCredentials(c.CredentialsJSON)),
+		option.WithCredentialsJSON([]byte(c.CredentialsJSON)),
 		option.WithUserAgent("Estuary Technologies"))
 
 	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
@@ -98,8 +99,8 @@ func (c *config) client(ctx context.Context) (*client, error) {
 
 type tableConfig struct {
 	Table     string `json:"table" jsonschema:"title=Table,description=Table in the BigQuery dataset to store materialized result in." jsonschema_extras:"x-collection-name=true"`
-	Dataset   string `json:"dataset,omitempty" jsonschema:"title=Alternative Dataset,description=Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration."`
-	Delta     bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false."`
+	Dataset   string `json:"dataset,omitempty" jsonschema:"title=Alternative Dataset,description=Alternative dataset for this table (optional). Must be located in the region set in the endpoint configuration." jsonschema_extras:"x-schema-name=true"`
+	Delta     bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Defaults is false." jsonschema_extras:"x-delta-updates=true"`
 	projectID string
 }
 
@@ -129,22 +130,6 @@ func (c tableConfig) DeltaUpdates() bool {
 	return c.Delta
 }
 
-// decodeCredentials allows support for legacy credentials that were base64 encoded. Previously, the
-// connector required base64 encoding of JSON service account credentials. In the future, this
-// fallback can be removed when base64 encoded credentials are no longer supported and only
-// unencoded JSON is acceptable.
-func decodeCredentials(credentialString string) []byte {
-	decoded, err := base64.StdEncoding.DecodeString(credentialString)
-	if err == nil {
-		// If the provided credentials string was a valid base64 encoding, assume that it was base64
-		// encoded JSON and return the result of successfully decoding that.
-		return decoded
-	}
-
-	// Otherwise, assume that the credentials string was not base64 encoded.
-	return []byte(credentialString)
-}
-
 func Driver() *sql.Driver {
 	return newBigQueryDriver()
 }
@@ -152,8 +137,9 @@ func Driver() *sql.Driver {
 func newBigQueryDriver() *sql.Driver {
 	return &sql.Driver{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
-		EndpointSpecType: config{},
-		ResourceSpecType: tableConfig{},
+		EndpointSpecType: new(config),
+		ResourceSpecType: new(tableConfig),
+		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
@@ -184,5 +170,6 @@ func newBigQueryDriver() *sql.Driver {
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }

@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
-	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -32,11 +32,7 @@ type config struct {
 	Bucket             string `json:"bucket" jsonschema:"title=Bucket" jsonschema_extras:"order=8"`
 	BucketPath         string `json:"bucketPath" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
-}
-
-type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active warehouse time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
+	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 }
 
 // ToURI converts the Config to a DSN string.
@@ -80,7 +76,7 @@ func (c *config) Validate() error {
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides"`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides" jsonschema_extras:"x-schema-name=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
@@ -108,6 +104,7 @@ func newStarburstDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-starburst",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
@@ -136,6 +133,7 @@ func newStarburstDriver() *sql.Driver {
 				Tenant:              tenant,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 
@@ -148,9 +146,9 @@ type transactor struct {
 	store struct {
 		conn *stdsql.Conn
 	}
-	bindings    []*binding
-	s3Operator  *S3Operator
-	updateDelay time.Duration
+	bindings   []*binding
+	s3Operator *S3Operator
+	sched      schedule.Schedule
 }
 
 func newTransactor(
@@ -166,8 +164,10 @@ func newTransactor(
 	var transactor = &transactor{
 		cfg: cfg,
 	}
-	if transactor.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
+	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Account)); err != nil {
 		return nil, err
+	} else if useSched {
+		transactor.sched = sched
 	}
 
 	// Establish connections.
@@ -265,8 +265,11 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {

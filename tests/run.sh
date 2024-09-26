@@ -77,19 +77,6 @@ DATA_PLANE_PID=$!
 # Arrange to stop the data plane on exit.
 trap "kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID}" EXIT
 
-# Get the spec from the connector and ensure it's valid json.
-cat >"$TESTDIR/spec.yaml" <<EOF
-captures:
-  tests/${CONNECTOR}/from-source:
-    endpoint:
-      connector:
-        image: "${CONNECTOR_IMAGE}"
-        config: {}
-    bindings: []
-EOF
-
-flowctl raw spec --source "$TESTDIR/spec.yaml" | jq -cM || bail "failed to validate spec"
-
 # Execute test-specific setup steps.
 echo -e "\nexecuting setup"
 source "tests/${CONNECTOR}/setup.sh" || bail "${CONNECTOR}/setup.sh failed"
@@ -100,6 +87,20 @@ fi
 if [[ -z "$CONNECTOR_CONFIG" ]]; then
   bail "setup did not set CONNECTOR_CONFIG"
 fi
+
+# Get the spec from the connector and ensure it's valid json.
+cat >"$TESTDIR/spec.yaml" <<EOF
+captures:
+  tests/${CONNECTOR}/from-source:
+    endpoint:
+      connector:
+        image: "${CONNECTOR_IMAGE}"
+        config: ${CONNECTOR_CONFIG}
+    bindings: []
+EOF
+
+flowctl raw spec --source "$TESTDIR/spec.yaml" | jq -cM || bail "failed to validate spec"
+
 TEST_STATUS="Test Failed"
 function test_shutdown() {
   kill -s SIGTERM ${DATA_PLANE_PID} && wait ${DATA_PLANE_PID} && ./tests/${CONNECTOR}/cleanup.sh
@@ -114,8 +115,8 @@ trap "test_shutdown" EXIT
 export ID_TYPE="${ID_TYPE:-integer}"
 
 # Verify discover works
-flowctl-go api discover --image="${CONNECTOR_IMAGE}" --network "flow-test" --log.level=debug --config=<(echo ${CONNECTOR_CONFIG}) >${TESTDIR}/discover_output.json || bail "Discover failed."
-cat ${TESTDIR}/discover_output.json | jq ".bindings[] | select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
+flowctl raw discover --network flow-test --source $TESTDIR/spec.yaml -o json --emit-raw >${TESTDIR}/discover_output.json || bail "Discover failed."
+cat ${TESTDIR}/discover_output.json | jq "select(.recommendedName == \"${TEST_STREAM}\") | .documentSchema" >${TESTDIR}/bindings.json
 
 if [[ -f "tests/${CONNECTOR}/bindings.json" ]]; then
   cat ${TESTDIR}/bindings.json
@@ -126,16 +127,18 @@ fi
 # Generate the test-specific catalog source.
 cat tests/template.flow.yaml | envsubst >"${CATALOG_SOURCE}"
 
+BUILD_ID=1122334455667788
+
 # Build the catalog.
 flowctl-go api build \
-  --build-id test-build-id \
-  --build-db ${TMPDIR}/builds/test-build-id \
+  --build-id ${BUILD_ID} \
+  --build-db ${TMPDIR}/builds/${BUILD_ID} \
   --source ${CATALOG_SOURCE} \
   --network "flow-test" ||
   bail "Build failed."
 
 # Activate the catalog.
-flowctl-go api activate --build-id test-build-id --all --network "flow-test" --log.level info || bail "Activate failed."
+flowctl-go api activate --build-id ${BUILD_ID} --all --network "flow-test" --log.level info || bail "Activate failed."
 
 # When we try to read the container name below, we assume that there will only be 1
 # materialize-sqlite container. This sleep makes it more likely that any materialize-sqlite
@@ -166,7 +169,7 @@ while true; do
 done
 
 # Clean up the activated catalog.
-flowctl-go api delete --build-id test-build-id --all --log.level info || bail "Delete failed."
+flowctl-go api delete --build-id ${BUILD_ID} --all --log.level info || bail "Delete failed."
 
 # Will be printed by the shutdown trap *after* any shutdown logging from flowctl
 TEST_STATUS="Test Passed"

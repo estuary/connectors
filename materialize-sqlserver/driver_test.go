@@ -222,7 +222,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.Database = "wrong" + cfg.Database
 				return &cfg
 			},
-			want: []string{"Cannot open database \"wrongflow\" that was requested by the login."},
+			want: []string{"Cannot open database \"wrongmaster\" that was requested by the login."},
 		},
 		{
 			name: "wrong address",
@@ -238,13 +238,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(*cfg)
-
-			c, err := newClient(ctx, &sql.Endpoint{Config: cfg})
-			require.NoError(t, err)
-			defer c.Close()
-
-			var actual = c.PreReqs(ctx).Unwrap()
+			var actual = preReqs(ctx, tt.cfg(*cfg), "testing").Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

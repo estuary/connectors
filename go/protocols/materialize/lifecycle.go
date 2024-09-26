@@ -245,6 +245,7 @@ func ReadFlush(request *pm.Request) error {
 type StoreIterator struct {
 	Binding      int             // Binding index of this stored document.
 	Exists       bool            // Does this document exist in the store already?
+	Delete       bool            // Has this document been deleted? Implies Exists.
 	Key          tuple.Tuple     // Key of the document to store.
 	PackedKey    []byte          // PackedKey of the document to store.
 	Values       tuple.Tuple     // Values of the document to store.
@@ -298,6 +299,7 @@ func (it *StoreIterator) Next() bool {
 	}
 	it.RawJSON = s.DocJson
 	it.Exists = s.Exists
+	it.Delete = s.Delete
 
 	it.Total++
 	return true

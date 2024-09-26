@@ -10,6 +10,7 @@ import (
 	"math"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	_ "github.com/databricks/databricks-sql-go"
@@ -42,12 +43,14 @@ func mustDSN() string {
 	return strings.TrimLeft(uri.String(), "/")
 }
 
+var runQuery = flag.Bool("run-query", false, "just run a query and exit")
+
 func main() {
 	flag.Parse()
 
-	tables := flag.Args()
-	if len(tables) != 1 {
-		log.Fatal("must provide single table name as an argument")
+	args := flag.Args()
+	if len(args) != 1 {
+		log.Fatal("must provide a single argument")
 	}
 
 	ctx := context.Background()
@@ -58,7 +61,15 @@ func main() {
 	}
 	defer db.Close()
 
-	query := fmt.Sprintf("SELECT * FROM %s ORDER BY id, flow_published_at;", tables[0])
+	if *runQuery {
+		if _, err := db.ExecContext(ctx, args[0]); err != nil {
+			fmt.Println(fmt.Errorf("could not exec query %s: %w", args[0], err))
+			os.Exit(1)
+		}
+		os.Exit(0)
+	}
+
+	query := fmt.Sprintf("SELECT * FROM %s ORDER BY id, flow_published_at;", args[0])
 
 	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
@@ -68,6 +79,10 @@ func main() {
 	cols, err := rows.Columns()
 	if err != nil {
 		log.Fatal(fmt.Errorf("getting columns: %w", err))
+	}
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		log.Fatal(fmt.Errorf("getting column types: %w", err))
 	}
 
 	data := make([]interface{}, len(cols))
@@ -83,6 +98,7 @@ func main() {
 			log.Fatal("scanning row: %w", err)
 		}
 		row := make(map[string]any)
+
 		for idx, val := range data {
 			switch v := val.(type) {
 			case float64:
@@ -92,6 +108,11 @@ func main() {
 					val = "Infinity"
 				} else if math.IsInf(v, -1) {
 					val = "-Infinity"
+				}
+			}
+			if v, ok := val.(string); ok && colTypes[idx].DatabaseTypeName() == "DECIMAL" {
+				if num, err := strconv.ParseUint(v, 10, 64); err == nil {
+					val = num
 				}
 			}
 			row[cols[idx]] = val

@@ -68,6 +68,7 @@ type documentMetadata struct {
 	CreateTime *time.Time `json:"ctime,omitempty" jsonschema:"title=Create Time,description=The time at which the document was created. Unset if the document is deleted."`
 	UpdateTime *time.Time `json:"mtime" jsonschema:"title=Update Time,description=The time at which the document was most recently updated (or deleted)."`
 	Deleted    bool       `json:"delete,omitempty" jsonschema:"title=Delete Flag,description=True if the document has been deleted, unset otherwise."`
+	Snapshot   bool       `json:"snapshot,omitempty" jsonschema:"title=Backfill Flag,description=True if this document was captured from a backfill of the collection and unset for streaming change events."`
 }
 
 // minimalSchema is the maximally-permissive schema which just specifies the
@@ -130,7 +131,7 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 	}
 	defer client.Close()
 
-	bindings, err := discoverCollections(ctx, client)
+	bindings, err := discoverCollections(ctx, client, cfg.Advanced.ExtraCollections, cfg.Advanced.SkipDiscovery)
 	if err != nil {
 		return nil, fmt.Errorf("discovery error: %w", err)
 	}
@@ -154,7 +155,7 @@ type discoveryState struct {
 	}
 }
 
-func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.Response_Discovered_Binding, error) {
+func discoverCollections(ctx context.Context, client *firestore.Client, extraCollections []string, skipAutodiscovery bool) ([]*pc.Response_Discovered_Binding, error) {
 	scanners, ctx := errgroup.WithContext(ctx)
 	var state = &discoveryState{
 		client:        client,
@@ -164,25 +165,33 @@ func discoverCollections(ctx context.Context, client *firestore.Client) ([]*pc.R
 	state.shared.counts = make(map[resourcePath]int)
 	state.shared.resources = make(map[resourcePath]struct{})
 
-	// Request processing of all top-level collections.
-	var collections, err = client.Collections(ctx).GetAll()
-	if err != nil {
-		return nil, err
-	}
-	for _, coll := range collections {
-		state.handleCollection(ctx, coll)
+	if !skipAutodiscovery {
+		// Request scanning of all top-level collections.
+		var collections, err = client.Collections(ctx).GetAll()
+		if err != nil {
+			return nil, err
+		}
+		for _, coll := range collections {
+			state.handleCollection(ctx, coll)
+		}
+
+		// Wait for all scanners to terminate
+		if err := state.scanners.Wait(); err != nil {
+			return nil, err
+		}
 	}
 
-	// Wait for all scanners to terminate
-	if err := state.scanners.Wait(); err != nil {
-		return nil, err
+	// Locking the mutex here should be unnecessary as all worker threads have
+	// completed, but we might as well do it anyway.
+	state.shared.Lock()
+	defer state.shared.Unlock()
+
+	// Add all resource paths specified via the advanced 'ExtraCollections' config.
+	for _, extraCollection := range extraCollections {
+		state.shared.resources[extraCollection] = struct{}{}
 	}
 
 	// Convert the set of resources which exist into bindings and return them.
-	// Locking the mutex here should be unnecessary as all worker threads have
-	// completed.
-	state.shared.Lock()
-	defer state.shared.Unlock()
 	var bindings []*pc.Response_Discovered_Binding
 	for resourcePath := range state.shared.resources {
 		resourceJSON, err := json.Marshal(resource{

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["self"],
+  "properties": {
+    "self": {
+      "description": "The URL of these issue watcher details.",
+      "type": "string",
+      "readOnly": true
+    }
+  },
+  "additionalProperties": true,
+  "description": "The details of watchers on an issue."
+}

@@ -8,5 +8,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FDatetimeNormalization_24528211":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","x"],"types":{"id":"int","x":"datetime"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FDatetimeNormalization_24528211":{"backfilled":4,"key_columns":["id"],"metadata":{"schema":{"columns":["id","x"],"types":{"id":{"type":"int"},"x":"datetime"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

@@ -1,0 +1,412 @@
+---
+collections:
+  acmeCo/account_users:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: AccountUsers
+      required:
+        - account
+      additionalProperties: true
+      properties:
+        account:
+          description: The account associated with the user
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /account
+  acmeCo/accounts:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Accounts
+      required:
+        - id
+      additionalProperties: true
+      properties:
+        id:
+          description: The unique identifier for the account.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/ad_campaign_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_creative_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_impression_device_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_company_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_company_size_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_country_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_industry_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_job_function_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_job_title_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_region_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/ad_member_seniority_analytics:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Ad Creative Analytics
+      required:
+        - string_of_pivot_values
+        - end_date
+      additionalProperties: true
+      properties:
+        string_of_pivot_values:
+          type: string
+        end_date:
+          description: End date of the ad analytics data.
+          type: string
+          format: date
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /string_of_pivot_values
+      - /end_date
+  acmeCo/campaign_groups:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Campaign Groups
+      required:
+        - id
+      additionalProperties: true
+      properties:
+        id:
+          description: Unique identifier for the campaign group.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/conversions:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      title: Conversions
+      required:
+        - id
+      properties:
+        id:
+          description: Unique identifier for the conversion.
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/creatives:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      title: Creatives
+      required:
+        - id
+      additionalProperties: true
+      properties:
+        id:
+          description: The unique identifier of the creative.
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id

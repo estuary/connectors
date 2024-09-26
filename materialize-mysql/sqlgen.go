@@ -43,58 +43,46 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 }
 
 var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
-		sql.BOOLEAN: sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:  sql.NewStaticMapper("JSON"),
-		sql.ARRAY:   sql.NewStaticMapper("JSON"),
-		sql.BINARY:  sql.NewStaticMapper("LONGBLOB"),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.PrimaryKeyMapper{
-				PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-				Delegate:   sql.NewStaticMapper("LONGTEXT"),
-			},
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-					Delegate:   sql.NewStaticMapper("NUMERIC(65,0)", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT"),
+				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal")),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
+			sql.OBJECT:   sql.MapStatic("JSON"),
+			sql.ARRAY:    sql.MapStatic("JSON"),
+			sql.BINARY:   sql.MapStatic("LONGTEXT"),
+			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToStr)),
+				65,
+			),
+			// We encode as CSV and must send MySQL string sentinels for
+			// non-numeric float values.
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double"), sql.UsingConverter(sql.StrToFloat("NaN", "+inf", "-inf"))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapPrimaryKey(
+					sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
+					sql.MapStatic("LONGTEXT"),
+				),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("DATETIME(6)", sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation))),
+					"time":      sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation))),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR(256)"),
-					// We encode as CSV and must send MySQL string sentinels.
-					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat("NaN", "+inf", "-inf"))),
+				WithContentType: map[string]sql.MapProjectionFn{
+					// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
+					// checkpoints can be quite long, so we need to use as large of column size as
+					// possible for these tables.
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.MapStatic("LONGBLOB"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.MapStatic("LONGBLOB"),
 				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("DATETIME(6)", sql.WithElementConverter(rfc3339ToTZ(tzLocation))),
-				"time":      sql.NewStaticMapper("TIME(6)", sql.WithElementConverter(rfc3339TimeToTZ(tzLocation))),
-			},
-			WithContentType: map[string]sql.TypeMapper{
-				// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and
-				// checkpoints can be quite long, so we need to use as large of column size as
-				// possible for these tables.
-				"application/x-protobuf; proto=flow.MaterializationSpec": sql.NewStaticMapper("LONGBLOB"),
-				"application/x-protobuf; proto=consumer.Checkpoint":      sql.NewStaticMapper("LONGBLOB"),
-			},
+			}),
 		},
-		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
-
-	columnValidator := sql.NewColumnValidator(
-		// "decimal" is for NUMERIC(65,0) that is used for { type: string, format: integer }
-		sql.ColValidation{Types: []string{"bigint", "decimal"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"tinyint"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
-		sql.ColValidation{Types: []string{"varchar", "longtext"}, Validate: sql.StringCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"datetime"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
+		sql.WithNotNullText("NOT NULL"),
 	)
 
 	return sql.Dialect{
@@ -117,7 +105,6 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			return "?"
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    64,
 		CaseInsensitiveColumns: true,
 	}
@@ -158,6 +145,7 @@ type templates struct {
 	tempTruncate      *template.Template
 	createLoadTable   *template.Template
 	createUpdateTable *template.Template
+	createDeleteTable *template.Template
 	createTargetTable *template.Template
 	alterTableColumns *template.Template
 	updateLoad        *template.Template
@@ -166,6 +154,9 @@ type templates struct {
 	insertLoad        *template.Template
 	loadQuery         *template.Template
 	loadLoad          *template.Template
+	deleteLoad        *template.Template
+	deleteQuery       *template.Template
+	deleteTruncate    *template.Template
 	installFence      *template.Template
 	updateFence       *template.Template
 }
@@ -178,6 +169,10 @@ flow_temp_load_table_{{ $.Binding }}
 
 {{ define "temp_update_name" -}}
 flow_temp_update_table_{{ $.Binding }}
+{{- end }}
+
+{{ define "temp_delete_name" -}}
+flow_temp_delete_table_{{ $.Binding }}
 {{- end }}
 
 -- Templated creation of a materialized table definition and comments:
@@ -244,7 +239,7 @@ TRUNCATE {{ template "temp_load_name" . }};
 -- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "temp_load_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "temp_load_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -279,7 +274,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 -- Template to load data into target table
 
 {{ define "insertLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifier }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifier }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -311,7 +306,7 @@ CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 {{ end }}
 
 {{ define "updateLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "temp_update_name" . }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "temp_update_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -345,6 +340,53 @@ FROM {{ template "temp_update_name" . }};
 
 {{ define "truncateUpdateTable" }}
 TRUNCATE {{ template "temp_update_name" . }};
+{{ end }}
+
+
+{{ define "createDeleteTable" }}
+CREATE TEMPORARY TABLE {{ template "temp_delete_name" . }} (
+	{{- range $ind, $col := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}} {{$col.DDL}}
+	{{- end }}
+	,
+	PRIMARY KEY (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{end -}}
+		{{$key.Identifier}}
+	{{- end -}}
+	)
+) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
+{{ end }}
+
+{{ define "deleteLoad" }}
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "temp_delete_name" . }} CHARACTER SET utf8mb4
+	FIELDS
+		TERMINATED BY ','
+		OPTIONALLY ENCLOSED BY '"'
+		ESCAPED BY ''
+	LINES
+		TERMINATED BY '\n'
+(
+	{{- range $ind, $col := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}
+	{{- end }}
+);
+{{ end }}
+
+{{ define "deleteQuery" }}
+DELETE original FROM {{ $.Identifier }} original, {{ template "temp_delete_name" . }} temp
+WHERE 
+	{{- range $ind, $col := $.Keys }}
+		{{- if $ind }} AND {{ end }}
+		original.{{$col.Identifier}} = temp.{{$col.Identifier}}
+	{{- end -}}
+;
+{{ end }}
+
+{{ define "truncateDeleteTable" }}
+TRUNCATE {{ template "temp_delete_name" . }};
 {{ end }}
 
 {{ define "installFence" }}
@@ -402,11 +444,15 @@ UPDATE {{ Identifier $.TablePath }}
 		createLoadTable:   tplAll.Lookup("createLoadTable"),
 		createUpdateTable: tplAll.Lookup("createUpdateTable"),
 		createTargetTable: tplAll.Lookup("createTargetTable"),
+		createDeleteTable: tplAll.Lookup("createDeleteTable"),
 		alterTableColumns: tplAll.Lookup("alterTableColumns"),
 		updateLoad:        tplAll.Lookup("updateLoad"),
 		updateReplace:     tplAll.Lookup("updateReplace"),
 		updateTruncate:    tplAll.Lookup("truncateUpdateTable"),
 		insertLoad:        tplAll.Lookup("insertLoad"),
+		deleteLoad:        tplAll.Lookup("deleteLoad"),
+		deleteQuery:       tplAll.Lookup("deleteQuery"),
+		deleteTruncate:    tplAll.Lookup("truncateDeleteTable"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		loadLoad:          tplAll.Lookup("loadLoad"),
 		installFence:      tplAll.Lookup("installFence"),

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"slices"
 	"strings"
 	"time"
 
@@ -15,8 +14,9 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgconn"
+	log "github.com/sirupsen/logrus"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -40,8 +40,16 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
+
+	cfg := conf.(*config)
+
+	db, err := stdsql.Open("pgx", cfg.ToURI())
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
@@ -49,7 +57,7 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if err := c.db.PingContext(ctx); err != nil {
+	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var pgErr *pgconn.PgError
 		var netConnErr *net.DNSError
@@ -60,15 +68,15 @@ func (c *client) PreReqs(ctx context.Context) *sql.PrereqErr {
 			case "28P01":
 				err = fmt.Errorf("incorrect username or password")
 			case "3D000":
-				err = fmt.Errorf("database %q does not exist", c.cfg.Database)
+				err = fmt.Errorf("database %q does not exist", cfg.Database)
 			}
 		} else if errors.As(err, &netConnErr) {
 			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", c.cfg.Address)
+				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
 			}
 		} else if errors.As(err, &netOpErr) {
 			if netOpErr.Timeout() {
-				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", c.cfg.Address)
+				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
 		}
 
@@ -104,15 +112,32 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		}
 	}
 
-	statements := []string{}
-	if res.AdditionalSql != "" {
-		statements = append(statements, txnStatements(tc.TableCreateSql, res.AdditionalSql))
-	} else {
-		statements = append(statements, tc.TableCreateSql)
+	txn, err := c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("db.BeginTx: %w", err)
+	}
+	defer txn.Rollback()
+
+	if _, err := txn.ExecContext(ctx, tc.TableCreateSql); err != nil {
+		return fmt.Errorf("executing CREATE TABLE statement: %w", err)
 	}
 
-	_, err := c.db.ExecContext(ctx, strings.Join(statements, "\n"))
-	return err
+	if res.AdditionalSql != "" {
+		if _, err := txn.ExecContext(ctx, res.AdditionalSql); err != nil {
+			return fmt.Errorf("executing additional SQL statement '%s': %w", res.AdditionalSql, err)
+		}
+
+		log.WithFields(log.Fields{
+			"table": tc.Identifier,
+			"query": res.AdditionalSql,
+		}).Info("executed AdditionalSql")
+	}
+
+	if err := txn.Commit(); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
@@ -159,8 +184,4 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 func (c *client) Close() {
 	c.db.Close()
-}
-
-func txnStatements(stmts ...string) string {
-	return strings.Join(slices.Insert([]string{"BEGIN;", "COMMIT;"}, 1, stmts...), "\n")
 }

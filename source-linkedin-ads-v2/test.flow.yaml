@@ -1,0 +1,113 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-linkedin-ads-v2:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_linkedin_ads_v2
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: accounts
+          syncMode: full_refresh
+        target: acmeCo/accounts
+      - resource:
+          stream: account_users
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/account_users
+      - resource:
+          stream: ad_campaign_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_campaign_analytics
+      - resource:
+          stream: ad_creative_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_creative_analytics
+      - resource:
+          stream: ad_impression_device_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_impression_device_analytics
+      - resource:
+          stream: ad_member_company_size_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_company_size_analytics
+      - resource:
+          stream: ad_member_country_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_country_analytics
+      - resource:
+          stream: ad_member_job_function_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_job_function_analytics
+      - resource:
+          stream: ad_member_job_title_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_job_title_analytics
+      - resource:
+          stream: ad_member_industry_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_industry_analytics
+      - resource:
+          stream: ad_member_seniority_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_seniority_analytics
+      - resource:
+          stream: ad_member_region_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_region_analytics
+      - resource:
+          stream: ad_member_company_analytics
+          syncMode: incremental
+          cursorField:
+            - end_date
+        target: acmeCo/ad_member_company_analytics
+      - resource:
+          stream: campaign_groups
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/campaign_groups
+      - resource:
+          stream: campaigns
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/campaigns
+      - resource:
+          stream: creatives
+          syncMode: incremental
+          cursorField:
+            - lastModifiedAt
+        target: acmeCo/creatives
+      - resource:
+          stream: conversions
+          syncMode: incremental
+          cursorField:
+            - lastModified
+        target: acmeCo/conversions

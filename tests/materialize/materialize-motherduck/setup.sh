@@ -4,15 +4,6 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export MOTHERDUCK_TOKEN="${MOTHERDUCK_TOKEN}"
-export MOTHERDUCK_DATABASE="${MOTHERDUCK_DATABASE}"
-export MOTHERDUCK_SCHEMA="${MOTHERDUCK_SCHEMA}"
-export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
-export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
-export AWS_REGION="${AWS_REGION}"
-
-export motherduck_token="${MOTHERDUCK_TOKEN}"
-
 config_json_template='{
     "token": "${MOTHERDUCK_TOKEN}",
     "database": "${MOTHERDUCK_DATABASE}",
@@ -26,10 +17,15 @@ config_json_template='{
 resources_json_template='[
   {
     "resource": {
-      "table": "simple_delta",
-      "delta_updates": true
+      "table": "simple"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
+  },
+  {
+    "resource": {
+      "table": "duplicate_keys_standard"
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
   },
   {
     "resource": {
@@ -53,8 +49,7 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "multiple_types_delta",
-      "delta_updates": true
+      "table": "multiple_types"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
     "fields": {
@@ -69,15 +64,30 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "formatted_strings_delta",
-      "delta_updates": true
+      "table": "formatted_strings"
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "unsigned_bigint"
+    },
+    "source": "${TEST_COLLECTION_UNSIGNED_BIGINT}"
+  },
+  {
+    "resource": {
+      "table": "deletions"
+    },
+    "source": "${TEST_COLLECTION_DELETIONS}"
   }
 ]'
 
-export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export MOTHERDUCK_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
+export MOTHERDUCK_SCHEMA="$(echo $CONNECTOR_CONFIG | jq -r .schema)"
+export motherduck_token="$(echo $CONNECTOR_CONFIG | jq -r .token)"
+
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"

@@ -11,21 +11,17 @@ import (
 // them as a FoundationDB serialized tuple. It applies the `translate` callback to
 // each field value so that complex database-specific types can be "lowered" into
 // FDB-serializable values.
-func EncodeRowKey(key []string, fields map[string]interface{}, fieldTypes map[string]interface{}, translate func(key interface{}, ktype interface{}) (tuple.TupleElement, error)) ([]byte, error) {
-	if fieldTypes == nil {
-		fieldTypes = emptyFieldTypesMap
-	}
+func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes map[string]T, translate func(key interface{}, ktype T) (tuple.TupleElement, error)) ([]byte, error) {
 	var xs = make([]interface{}, len(key))
 	var err error
 	for i, elem := range key {
-		if xs[i], err = translate(fields[elem], fieldTypes[elem]); err != nil {
+		var ktype = fieldTypes[elem]
+		if xs[i], err = translate(fields[elem], ktype); err != nil {
 			return nil, fmt.Errorf("error encoding column %q: %w", elem, err)
 		}
 	}
 	return packTuple(xs)
 }
-
-var emptyFieldTypesMap = make(map[string]interface{})
 
 // We translate a list of column values (representing the primary key of a
 // database row) into a list of bytes using the FoundationDB tuple encoding
@@ -41,10 +37,14 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 		// Values not natively supported by the FoundationDB tuple encoding code
 		// must be converted into ones that are.
 		switch x := x.(type) {
+		case uint8:
+			t = append(t, uint(x))
 		case uint16:
 			t = append(t, uint(x))
 		case uint32:
 			t = append(t, uint(x))
+		case int8:
+			t = append(t, int(x))
 		case int16:
 			t = append(t, int(x))
 		case int32:

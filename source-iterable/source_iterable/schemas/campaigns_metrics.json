@@ -1,0 +1,17 @@
+{
+  "properties":{
+      "data": {
+          "properties":{
+              "id":{
+                  "type":["null", "integer"]
+              }
+          },
+          "type":"object"
+      },
+      "id":{
+            "type":"integer"
+       }
+      
+  },
+  "type": "object"
+}

@@ -640,6 +640,12 @@
                 "string"
               ]
             },
+            "hs_country_code": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_created_by_user_id": {
               "type": [
                 "null",
@@ -967,6 +973,18 @@
             },
             "hs_sales_email_last_replied": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -2797,6 +2815,18 @@
                 "boolean"
               ]
             },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_testpurge": {
               "type": [
                 "null",
@@ -3888,6 +3918,18 @@
                 "number"
               ]
             },
+            "hs_closed_deal_close_date": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_closed_deal_create_date": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_closed_won_count": {
               "type": [
                 "null",
@@ -4054,6 +4096,12 @@
                 "number"
               ]
             },
+            "hs_has_empty_conditional_stage_properties": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_is_closed": {
               "type": [
                 "null",
@@ -4061,6 +4109,12 @@
               ]
             },
             "hs_is_closed_won": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_is_in_first_deal_stage": {
               "type": [
                 "null",
                 "boolean"
@@ -4230,6 +4284,12 @@
                 "number"
               ]
             },
+            "hs_open_deal_create_date": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_pinned_engagement_id": {
               "type": [
                 "null",
@@ -4274,6 +4334,18 @@
             },
             "hs_sales_email_last_replied": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -4773,6 +4845,18 @@
                 "number"
               ]
             },
+            "hs_closed_deal_close_date": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_closed_deal_create_date": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_closed_won_count": {
               "type": [
                 "null",
@@ -4939,6 +5023,12 @@
                 "number"
               ]
             },
+            "hs_has_empty_conditional_stage_properties": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_is_closed": {
               "type": [
                 "null",
@@ -4946,6 +5036,12 @@
               ]
             },
             "hs_is_closed_won": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_is_in_first_deal_stage": {
               "type": [
                 "null",
                 "boolean"
@@ -5115,6 +5211,12 @@
                 "number"
               ]
             },
+            "hs_open_deal_create_date": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_pinned_engagement_id": {
               "type": [
                 "null",
@@ -5159,6 +5261,18 @@
             },
             "hs_sales_email_last_replied": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -6917,6 +7031,18 @@
                 "boolean"
               ]
             },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_timestamp": {
               "format": "date-time",
               "type": [
@@ -7657,6 +7783,18 @@
                 "string"
               ]
             },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_timestamp": {
               "format": "date-time",
               "type": [
@@ -8211,6 +8349,18 @@
                 "string"
               ]
             },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_time_to_book_meeting_from_first_contact": {
               "type": [
                 "null",
@@ -8596,6 +8746,18 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_timestamp": {
@@ -9052,6 +9214,18 @@
               ]
             },
             "hs_scheduled_tasks": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -9934,6 +10108,18 @@
                 "boolean"
               ]
             },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_spam_submissions": {
               "type": [
                 "null",
@@ -10266,6 +10452,12 @@
                 "number"
               ]
             },
+            "hs_forecast_type_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_goal_definition_key": {
               "type": [
                 "null",
@@ -10572,6 +10764,18 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_should_notify_on_achieved": {
@@ -11098,6 +11302,18 @@
               ]
             },
             "hs_recurring_billing_terms": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -12386,6 +12602,18 @@
             },
             "hs_recurring_billing_start_date": {
               "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -13716,6 +13944,18 @@
                 "boolean"
               ]
             },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_testpurge": {
               "type": [
                 "null",
@@ -14850,6 +15090,12 @@
                 "string"
               ]
             },
+            "hs_latest_message_visible_to_visitor": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_merged_object_ids": {
               "type": [
                 "null",
@@ -15021,6 +15267,24 @@
             },
             "hs_sales_email_last_replied": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_seen_by_agent_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_shared_user_ids": {
               "type": [
                 "null",
                 "string"

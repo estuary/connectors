@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["id"],
+  "properties": {
+    "id": {
+      "description": "The ID of the workflow scheme.",
+      "type": "integer",
+      "readOnly": true
+    }
+  },
+  "additionalProperties": true,
+  "description": "Details about a workflow scheme."
+}

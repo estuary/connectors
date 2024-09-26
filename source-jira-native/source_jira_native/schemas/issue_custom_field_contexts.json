@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "description": "The details of a custom field context.",
+  "required": ["id"],
+  "properties": {
+    "id": {
+      "description": "The ID of the context.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

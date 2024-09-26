@@ -13,24 +13,28 @@ Binding 0:
           "$anchor": "TestSecondaryIndexDiscovery_nullable_index_g31990",
           "properties": {
             "data": {
+              "description": "(source type: text)",
               "type": [
                 "string",
                 "null"
               ]
             },
             "k1": {
+              "description": "(source type: int)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "k2": {
+              "description": "(source type: int)",
               "type": [
                 "integer",
                 "null"
               ]
             },
             "k3": {
+              "description": "(source type: int)",
               "type": [
                 "integer",
                 "null"

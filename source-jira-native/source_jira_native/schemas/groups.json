@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["groupId"],
+  "properties": {
+    "groupId": {
+      "description": "The ID of the group, if available, which uniquely identifies the group across all Atlassian products. For example, *952d12c3-5b5b-4d04-bb32-44d383afc4b2*.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": true,
+  "description": "The list of groups found in a search, including header text (Showing X of Y matching groups) and total of matched groups."
+}

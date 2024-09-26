@@ -1,0 +1,326 @@
+---
+collections:
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+      - /id
+  acmeCo/campaigns_metrics:
+    schema:
+      properties:
+        data:
+          properties:
+            id:
+              type:
+                - "null"
+                - integer
+          type: object
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/channels:
+    schema:
+      properties:
+        id:
+          type: integer
+        name:
+          type:
+            - "null"
+            - string
+        channelType:
+          type:
+            - "null"
+            - string
+        messageMedium:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/custom_event:
+    schema: custom_event.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/email_bounce:
+    schema: email_bounce.schema.yaml
+    key:
+      - /messageId
+      - /email
+  acmeCo/email_click:
+    schema: email_click.schema.yaml
+    key:
+      - /messageId
+      - /email
+  acmeCo/email_complaint:
+    schema: email_complaint.schema.yaml
+    key:
+      - /messageId
+      - /email
+  acmeCo/email_open:
+    schema: email_open.schema.yaml
+    key:
+      - /messageId
+      - /email
+  acmeCo/email_send:
+    schema: email_send.schema.yaml
+    key:
+      - /messageId
+      - /email
+  acmeCo/email_send_skip:
+    schema: email_send_skip.schema.yaml
+    key:
+      - /messageId
+      - /email
+  acmeCo/email_subscribe:
+    schema: email_subscribe.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/email_unsubscribe:
+    schema: email_unsubscribe.schema.yaml
+    key:
+      - /email
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/hosted_unsubscribe_click:
+    schema: hosted_unsubscribe_click.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/in_app_click:
+    schema: in_app_click.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/in_app_close:
+    schema: in_app_close.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/in_app_delete:
+    schema: in_app_delete.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/in_app_delivery:
+    schema: in_app_delivery.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/in_app_open:
+    schema: in_app_open.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/in_app_send:
+    schema: in_app_send.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/in_app_send_skip:
+    schema: in_app_send_skip.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/inbox_message_impression:
+    schema: inbox_message_impression.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/inbox_session:
+    schema: inbox_session.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/list_users:
+    schema:
+      properties:
+        email:
+          type: string
+        listId:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
+    key:
+      - /listId
+  acmeCo/lists:
+    schema:
+      properties:
+        id:
+          type:
+            - "null"
+            - integer
+        name:
+          type:
+            - "null"
+            - string
+        createdAt:
+          type:
+            - "null"
+            - integer
+        listType:
+          type:
+            - "null"
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/message_types:
+    schema:
+      properties:
+        id:
+          type: integer
+        name:
+          type:
+            - "null"
+            - string
+        channelId:
+          type:
+            - "null"
+            - number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/metadata:
+    schema:
+      properties:
+        name:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
+    key:
+      - /_meta/row_id
+  acmeCo/purchase:
+    schema: purchase.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/push_bounce:
+    schema: push_bounce.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/push_open:
+    schema: push_open.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/push_send:
+    schema: push_send.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/push_send_skip:
+    schema: push_send_skip.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/push_uninstall:
+    schema: push_uninstall.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/sms_bounce:
+    schema: sms_bounce.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/sms_click:
+    schema: sms_click.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/sms_received:
+    schema: sms_received.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/sms_send:
+    schema: sms_send.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/sms_send_skip:
+    schema: sms_send_skip.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/sms_usage_info:
+    schema: sms_usage_info.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/templates:
+    schema: templates.schema.yaml
+    key:
+      - /templateId
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /email
+  acmeCo/web_push_click:
+    schema: web_push_click.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/web_push_send:
+    schema: web_push_send.schema.yaml
+    key:
+      - /email
+      - /createdAt
+  acmeCo/web_push_send_skip:
+    schema: web_push_send_skip.schema.yaml
+    key:
+      - /email
+      - /createdAt

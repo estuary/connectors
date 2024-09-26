@@ -6,7 +6,7 @@ set -o nounset
 
 function dropTable() {
 	echo "dropping $1"
-	echo "y" | dbsqlcli -e "DROP TABLE IF EXISTS $1";
+	go run ${TEST_DIR}/materialize-databricks/fetch-data.go --run-query "DROP TABLE IF EXISTS $1"
 }
 
 # Remove materialized tables.
@@ -16,6 +16,7 @@ dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_delta"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.duplicate_keys_delta_exclude_flow_doc"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.multiple_types"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.formatted_strings"
+dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.unsigned_bigint"
+dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.deletions"
 
-yes | dbsqlcli -e "delete from \`$DATABRICKS_CATALOG\`.\`some-schema\`.flow_materializations_v2 where MATERIALIZATION='tests/materialize-databricks/materialize';"
-
+go run ${TEST_DIR}/materialize-databricks/fetch-data.go --run-query "delete from \`$DATABRICKS_CATALOG\`.\`some-schema\`.flow_materializations_v2 where MATERIALIZATION='tests/materialize-databricks/materialize';"

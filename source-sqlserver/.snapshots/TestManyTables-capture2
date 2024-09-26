@@ -1,0 +1,55 @@
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_000": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_000","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 0 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_000","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 0 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_001": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_001","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 1 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_001","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 1 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_002": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_002","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 2 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_002","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 2 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_003": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_003","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 3 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_003","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 3 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_004": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_004","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 4 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_004","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 4 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_005": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_005","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 5 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_005","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 5 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_006": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_006","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 6 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_006","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 6 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_007": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_007","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 7 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_007","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 7 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_008": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_008","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 8 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_008","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 8 row four","id":4}
+# ================================
+# Collection "acmeCo/test/test_manytables_2546318_009": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_009","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 9 row five","id":5}
+{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_ManyTables_2546318_009","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"table 9 row four","id":4}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"dbo%2Ftest_ManyTables_2546318_000":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_001":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_002":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_003":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_004":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_005":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_006":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_007":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_008":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_009":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_010":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_011":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_012":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_013":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_014":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_015":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_016":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_017":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_018":{"backfilled":2,"key_columns":["id"],"mode":"Active"},"dbo%2Ftest_ManyTables_2546318_019":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+

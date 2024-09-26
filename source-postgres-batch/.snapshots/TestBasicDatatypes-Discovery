@@ -2,7 +2,8 @@ Binding 0:
 {
     "resource_config_json": {
       "name": "test_basic_datatypes_13111208",
-      "template": "{{if .IsFirstQuery -}}\n  SELECT xmin AS txid, * FROM \"test\".\"basic_datatypes_13111208\" ORDER BY xmin::text::bigint;\n{{- else -}}\n  SELECT xmin AS txid, * FROM \"test\".\"basic_datatypes_13111208\" WHERE xmin::text::bigint \u003e $1 ORDER BY xmin::text::bigint;\n{{- end}}",
+      "schema": "test",
+      "table": "basic_datatypes_13111208",
       "cursor": [
         "txid"
       ]

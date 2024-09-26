@@ -1,0 +1,11 @@
+{ "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["label"],
+  "properties": {
+    "label": {
+      "description": "The label associated with the issue in Jira.",
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

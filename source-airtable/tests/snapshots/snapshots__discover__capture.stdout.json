@@ -25,26 +25,6 @@
             "string"
           ]
         },
-        "name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "status": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "cost": {
-          "type": [
-            "null",
-            "number",
-            "string"
-          ],
-          "format": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -87,24 +67,6 @@
           ]
         },
         "_airtable_table_name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "name": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "notes": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "status": {
           "type": [
             "null",
             "string"

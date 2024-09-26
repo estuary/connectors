@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
@@ -32,8 +33,9 @@ func (c *client) createMetaIndex(ctx context.Context, replicas *int) error {
 		"specBytes": {Type: elasticTypeBinary},
 	}
 
-	numShards := 1
-	return c.createIndex(ctx, defaultFlowMaterializations, &numShards, replicas, props)
+	// The meta index will always be created with the default number of shards.
+	// Long term we plan to not require a meta index at all.
+	return c.createIndex(ctx, defaultFlowMaterializations, nil, replicas, props)
 }
 
 func (c *client) putSpec(ctx context.Context, spec *pf.MaterializationSpec, version string) error {
@@ -236,4 +238,28 @@ func (c *client) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error
 	}
 
 	return is, nil
+}
+
+func (c *client) isServerless(ctx context.Context) (bool, error) {
+	res, err := c.es.Info(c.es.Info.WithContext(ctx))
+	if err != nil {
+		return false, fmt.Errorf("getting serverless status: %w", err)
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		return false, fmt.Errorf("getting serverless status error response [%s] %s", res.Status(), res.String())
+	}
+
+	type infoResponse struct {
+		Version struct {
+			BuildFlavor string `json:"build_flavor"`
+		} `json:"version"`
+	}
+
+	var info infoResponse
+	if err := json.NewDecoder(res.Body).Decode(&info); err != nil {
+		return false, fmt.Errorf("decoding serverless status response: %w", err)
+	}
+
+	return strings.EqualFold(info.Version.BuildFlavor, "serverless"), nil
 }

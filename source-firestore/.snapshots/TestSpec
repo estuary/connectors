@@ -14,6 +14,27 @@
         "type": "string",
         "title": "Database",
         "description": "Optional name of the database to capture from. Leave blank to autodetect. Typically \"projects/$PROJECTID/databases/(default)\"."
+      },
+      "advanced": {
+        "properties": {
+          "extra_collections": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Extra Collections",
+            "description": "A list of collection paths (in the form \"foo/*/bar/*/baz\") which will always be assumed to exist even if not found by autodiscovery. Useful for very rare collections which may not be reliably detected by discovery sampling of the dataset."
+          },
+          "skip_discovery": {
+            "type": "boolean",
+            "title": "Skip Automatic Discovery",
+            "description": "When set the connector will skip automatic collection discovery. This generally only makes sense when the \"Extra Collections\" setting is used."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
       }
     },
     "type": "object",
@@ -43,7 +64,14 @@
       },
       "initTimestamp": {
         "type": "string",
+        "title": "Initial Replication Timestamp",
         "description": "Optionally overrides the initial replication timestamp (which is either Zero or Now depending on the backfill mode). Has no effect if changed after a binding is added."
+      },
+      "restartCursorPath": {
+        "type": "string",
+        "pattern": "^(/([^/~]|~[01])+)*$",
+        "title": "Restart Cursor Path",
+        "description": "Optionally specifies a JSON pointer to some document property which increases monotonically and can be used as a restart cursor to optimize backfill behavior when streaming consistency is lost. Generally this only matters for collections with very high write volumes."
       }
     },
     "type": "object",

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -13,15 +14,14 @@ import (
 func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	var errs []error
 
-	//if err := db.prerequisiteVersion(ctx); err != nil {
-	//	// Return early if the database version is incompatible with the connector since additional
-	//	// errors will be of minimal use.
-	//	errs = append(errs, err)
-	//	return errs
-	//}
+	if err := db.prerequisiteVersion(ctx); err != nil {
+		log.WithField("err", err).Debug("server version prerequisite failed")
+	}
 
 	for _, prereq := range []func(ctx context.Context) error{
 		db.prerequisiteCDCEnabled,
+		db.prerequisiteChangeTableCleanup,
+		db.prerequisiteCaptureInstanceManagement,
 		db.prerequisiteWatermarksTable,
 		db.prerequisiteWatermarksCaptureInstance,
 		db.prerequisiteMaximumLSN,
@@ -131,6 +131,46 @@ func isCDCEnabled(ctx context.Context, conn *sql.DB, dbName string) (bool, error
 	return cdcEnabled, nil
 }
 
+func (db *sqlserverDatabase) prerequisiteChangeTableCleanup(ctx context.Context) error {
+	// If automatic change-table cleanup is not in use there is nothing to verify here.
+	if !db.config.Advanced.AutomaticChangeTableCleanup {
+		return nil
+	}
+
+	if hasPermission, err := currentUserHasDBOwner(ctx, db.conn); err != nil {
+		return fmt.Errorf("error querying 'db_owner' role membership: %w", err)
+	} else if !hasPermission {
+		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
+	}
+	return nil
+}
+
+func (db *sqlserverDatabase) prerequisiteCaptureInstanceManagement(ctx context.Context) error {
+	// If automatic capture instance management is not in use there is nothing to verify here.
+	if !db.config.Advanced.AutomaticCaptureInstances {
+		return nil
+	}
+
+	if hasPermission, err := currentUserHasDBOwner(ctx, db.conn); err != nil {
+		return fmt.Errorf("error querying 'db_owner' role membership: %w", err)
+	} else if !hasPermission {
+		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
+	}
+	return nil
+}
+
+func currentUserHasDBOwner(ctx context.Context, conn *sql.DB) (bool, error) {
+	var isMember *int
+	if err := conn.QueryRowContext(ctx, "SELECT IS_ROLEMEMBER('db_owner');").Scan(&isMember); err != nil {
+		return false, err
+	} else if isMember == nil {
+		return false, fmt.Errorf("unexpected null result") // should never happen
+	} else if *isMember == 1 {
+		return true, nil
+	}
+	return false, nil
+}
+
 func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
 	var table = db.config.Advanced.WatermarksTable
 	var logEntry = log.WithField("table", table)
@@ -160,6 +200,11 @@ func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) er
 func (db *sqlserverDatabase) prerequisiteWatermarksCaptureInstance(ctx context.Context) error {
 	var schema, table = splitStreamID(db.config.Advanced.WatermarksTable)
 	return db.prerequisiteTableCaptureInstance(ctx, schema, table)
+}
+
+func splitStreamID(streamID string) (string, string) {
+	var bits = strings.SplitN(streamID, ".", 2)
+	return bits[0], bits[1]
 }
 
 func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
@@ -193,64 +238,24 @@ func (db *sqlserverDatabase) prerequisiteTableCaptureInstance(ctx context.Contex
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 	var logEntry = log.WithField("table", streamID)
 
-	// TODO(wgd): It's rather inefficient to redo the 'list instances' work for each table.
-	var captureInstances, err = listCaptureInstances(ctx, db.conn)
+	// TODO(wgd): It's inefficient to redo the 'list instances' work for each table,
+	// consider caching this across all prerequisite validation calls.
+	var captureInstances, err = cdcListCaptureInstances(ctx, db.conn)
 	if err != nil {
 		return fmt.Errorf("unable to query capture instances for table %q: %w", streamID, err)
 	}
 
 	// If the table has at least one preexisting capture instance then we're happy
-	var instanceNames = captureInstances[streamID]
-	if len(instanceNames) > 0 {
-		logEntry.WithField("instances", instanceNames).Debug("table has capture instances")
+	var instancesForStream = captureInstances[streamID]
+	if len(instancesForStream) > 0 {
+		logEntry.WithField("instances", instancesForStream).Debug("table has capture instances")
 		return nil
 	}
 
 	// Otherwise we attempt to create one
-	const query = `EXEC sys.sp_cdc_enable_table @source_schema = @p1, @source_name = @p2, @role_name = @p3, @capture_instance = @p4;`
-	var instanceName = fmt.Sprintf("%s_%s", schema, table)
-	if _, err := db.conn.ExecContext(ctx, query, schema, table, db.config.User, instanceName); err == nil {
+	if instanceName, err := cdcCreateCaptureInstance(ctx, db.conn, schema, table, db.config.User); err == nil {
 		logEntry.WithField("instance", instanceName).Info("enabled cdc for table")
 		return nil
 	}
 	return fmt.Errorf("table %q has no capture instances and user %q cannot create one", streamID, db.config.User)
-}
-
-// listCaptureInstances queries SQL Server system tables and returns a map from stream IDs
-// to the capture instance name, if a capture instance exists which matches the configured
-// naming pattern.
-func listCaptureInstances(ctx context.Context, conn *sql.DB) (map[string][]string, error) {
-	log.Trace("listing capture instances")
-	// This query will enumerate all "capture instances" currently present, along with the
-	// schema/table names identifying the source table.
-	const query = `SELECT sch.name, tbl.name, ct.capture_instance
-	                 FROM cdc.change_tables AS ct
-					 JOIN sys.tables AS tbl ON ct.source_object_id = tbl.object_id
-					 JOIN sys.schemas AS sch ON tbl.schema_id = sch.schema_id;`
-	var rows, err = conn.QueryContext(ctx, query)
-	if err != nil {
-		return nil, fmt.Errorf("error listing CDC instances: %w", err)
-	}
-	defer rows.Close()
-
-	// Process result rows from the above query
-	var captureInstances = make(map[string][]string)
-	for rows.Next() {
-		var schemaName, tableName, instanceName string
-		if err := rows.Scan(&schemaName, &tableName, &instanceName); err != nil {
-			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
-
-		// In SQL Server, every source table may have up to two "capture instances" associated with it.
-		// If a capture instance exists which satisfies the configured naming pattern, then that's one
-		// that we should use (and thus if the pattern is "flow_<schema>_<table>" we can be fairly sure
-		// not to collide with any other uses of CDC on this database).
-		var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
-		log.WithFields(log.Fields{
-			"stream":   streamID,
-			"instance": instanceName,
-		}).Trace("discovered capture instance")
-		captureInstances[streamID] = append(captureInstances[streamID], instanceName)
-	}
-	return captureInstances, nil
 }

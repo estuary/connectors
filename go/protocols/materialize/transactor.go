@@ -7,6 +7,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/estuary/connectors/go/schedule"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -68,18 +69,19 @@ type Transactor interface {
 // fewer, larger transactions which may be desirable to reduce warehouse compute costs or comply
 // with rate limits.
 type DelayedCommitter interface {
-	// AckDelay returns the total target time for each commit to complete for streaming commits.
-	// Whether a commit is "streaming" or not is estimated via storeThreshold (see below). The
-	// duration will subtract the actual time taken by the StartCommitFunc returned by Stored and
-	// the time taken by Acknowledge.
-	AckDelay() time.Duration
+	// Schedule returns the desired schedule for acknowledging streaming
+	// commits. Whether a commit is "streaming" or not is estimated via
+	// storeThreshold (see below). Implementations must somewhat awkwardly
+	// return a boolean value indicated if a schedule should be used at all. If
+	// this is false, acknowledgements will be made immediately. This boolean
+	// value is used instead of checking the returned schedule.Schedule
+	// interface for `nil` to avoid ambiguities resulting from the returned
+	// interface containing a `nil` value, but the interface itself not actually
+	// being `nil`.
+	Schedule() (sched schedule.Schedule, useSchedule bool)
 }
 
 const (
-	// Default update delay for materializations implementing DelayedCommitter to use if no other
-	// delay has been set.
-	defaultUpdateDelay = 30 * time.Minute
-
 	// storeThreshold is a somewhat crude indication that a transaction was likely part of a backfill
 	// vs. a smaller incremental streaming transaction. If a materialization is configured with a commit
 	// delay, it should only apply that delay to transactions that occur after it has fully backfilled
@@ -163,11 +165,14 @@ func RunTransactions(
 		return err
 	}
 
-	var ackDelay time.Duration
+	var ackSchedule schedule.Schedule
+	useSchedule := false
 	if d, ok := transactor.(DelayedCommitter); ok {
-		ackDelay = d.AckDelay()
-		if ackDelay > 0 {
-			log.WithField("delay", ackDelay.String()).Info("transactor running with ackDelay")
+		ackSchedule, useSchedule = d.Schedule()
+		if useSchedule {
+			log.Info("transactor running with acknowledgement schedule")
+		} else {
+			log.Info("transactor will acknowledge commits without delay")
 		}
 	}
 
@@ -178,16 +183,13 @@ func RunTransactions(
 		// loadErr is the last loadAll() result,
 		// and is readable upon its close of its parameter `loadDoneCh`.
 		loadErr error
-		// The variables used for controlling a delay on sending transaction acknowledgements to the
-		// runtime. This will "spread out" transaction processing and result in fewer, larger
-		// transactions which may be desirable to reduce warehouse compute costs or comply with rate
-		// limits. They are safe to access in the concurrent await function because they are only
-		// set in the "round" loop after awaitDoneCh has closed.
-		//
-		// commitStartedAt is the time at which the the commit for the latest round began.
-		commitStartedAt time.Time
-		// storedHistory acts as a ring buffer tabulating the most recent stored document counts for
-		// transactions.
+		// lastAckTime is the time the last acknowledged response was sent. It
+		// is used for scheduling the sending of the next acknowledged response.
+		lastAckTime time.Time
+		// storedHistory acts as a ring buffer tabulating the most recent stored
+		// document counts for transactions. This is used to estimate if we are
+		// in a "streaming" mode or not, based on a consistent number of
+		// documents per transactions being below the threshold.
 		storedHistory [storedHistorySize]int
 	)
 
@@ -242,24 +244,35 @@ func RunTransactions(
 			return err
 		}
 
-		if ackDelay > 0 && !commitStartedAt.IsZero() && storedHistoryBelowThreshold() {
-			remainingDelay := ackDelay - time.Since(commitStartedAt)
-			if remainingDelay > 0 {
-				log.WithFields(log.Fields{
-					"remainingDelay":  remainingDelay.String(),
-					"configuredDelay": ackDelay.String(),
-					"storedHistory":   storedHistory,
-				}).Info("delaying before acknowledging commit")
+		if useSchedule && !lastAckTime.IsZero() && storedHistoryBelowThreshold() {
+			nextAckAt := ackSchedule.Next(lastAckTime)
+			d := time.Until(nextAckAt)
+
+			ll := log.WithFields(log.Fields{
+				"lastAckTime":      lastAckTime.UTC().Truncate(time.Second).String(),
+				"nextScheduledAck": nextAckAt.UTC().Truncate(time.Second).String(),
+				"storedHistory":    storedHistory,
+			})
+
+			if d > 0 {
+				ll.WithField("delay", d.Truncate(time.Second).String()).Info("delaying before acknowledging commit")
+			} else {
+				ll.Info("not delaying since current time is after next scheduled acknowledgement")
 			}
 
 			select {
 			case <-loadDoneCh:
 				return nil
-			case <-time.After(remainingDelay):
+			case <-time.After(d):
 			}
 		}
 
-		return WriteAcknowledged(stream, ackState, &txResponse)
+		if err := WriteAcknowledged(stream, ackState, &txResponse); err != nil {
+			return err
+		}
+
+		lastAckTime = time.Now()
+		return nil
 	}
 
 	// load is a closure for async execution of Transactor.Load.
@@ -382,7 +395,6 @@ func RunTransactions(
 
 		// `startCommit` may be nil to indicate a no-op commit.
 		var stateUpdate *pf.ConnectorState = nil
-		commitStartedAt = time.Now()
 		if startCommit != nil {
 			stateUpdate, ourCommitOp = startCommit(
 				stream.Context(), runtimeCheckpoint)
@@ -408,17 +420,4 @@ func RunTransactions(
 		}
 	}
 	panic("not reached")
-}
-
-// ParseDelay parses the delay Go duration string, returning and error if it is not valid, the
-// parsed value if it is not an empty string, and the defaultUpdateDelay otherwise.
-func ParseDelay(delay string) (time.Duration, error) {
-	if delay != "" {
-		parsed, err := time.ParseDuration(delay)
-		if err != nil {
-			return 0, fmt.Errorf("could not parse updateDelay '%s': must be a valid Go duration string", delay)
-		}
-		return parsed, nil
-	}
-	return defaultUpdateDelay, nil
 }

@@ -8,55 +8,39 @@ import (
 )
 
 var duckDialect = func() sql.Dialect {
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER:  sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:   sql.NewStaticMapper("DOUBLE"),
-		sql.BOOLEAN:  sql.NewStaticMapper("BOOLEAN"),
-		sql.OBJECT:   sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.ARRAY:    sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.BINARY:   sql.NewStaticMapper("BLOB"),
-		sql.MULTIPLE: sql.NewStaticMapper("JSON", sql.WithElementConverter(sql.JsonBytesConverter)),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.NewStaticMapper("VARCHAR"),
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR"),
-					Delegate:   sql.NewStaticMapper("HUGEINT", sql.WithElementConverter(sql.StdStrToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT"),
+				sql.MapStatic("HUGEINT"),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE"),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:   sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.ARRAY:    sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.BINARY:   sql.MapStatic("VARCHAR"),
+			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("HUGEINT", sql.UsingConverter(sql.StrToInt)),
+				sql.MapStatic("VARCHAR", sql.UsingConverter(sql.ToStr)),
+				// A 96-bit integer is 39 characters long, but not all 39 digit
+				// integers will fit in one.
+				38,
+			),
+			// https://duckdb.org/docs/sql/data_types/numeric.html#floating-point-types
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE", sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("VARCHAR"),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("TIMESTAMP WITH TIME ZONE"),
+					"duration":  sql.MapStatic("INTERVAL"),
+					"time":      sql.MapStatic("TIME"),
+					"uuid":      sql.MapStatic("UUID"),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper("VARCHAR"),
-					// https://duckdb.org/docs/sql/data_types/numeric.html#floating-point-types
-					Delegate: sql.NewStaticMapper("DOUBLE", sql.WithElementConverter(sql.StdStrToFloat("NaN", "Infinity", "-Infinity"))),
-				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("TIMESTAMP WITH TIME ZONE"),
-				"duration":  sql.NewStaticMapper("INTERVAL"),
-				"time":      sql.NewStaticMapper("TIME"),
-				// UUIDs are currently broken in the DuckDB version used by MotherDuck, see
-				// https://github.com/duckdb/duckdb/issues/9193. To support UUIDs in the future,
-				// we'll need to re-backfill tables that have UUIDs as strings, or allow string
-				// columns to validate as uuid columns.
-				// "uuid":      sql.NewStaticMapper("UUID"),
-			},
+			}),
 		},
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{"bigint", "hugeint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"double"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"boolean"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"json"}, Validate: sql.JsonCompatible},
-		sql.ColValidation{Types: []string{"varchar"}, Validate: sql.StringCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"timestamp with time zone"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"interval"}, Validate: sql.DurationCompatible},
-		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
-		sql.ColValidation{Types: []string{"uuid"}, Validate: sql.UuidCompatible},
+		sql.WithNotNullText("NOT NULL"),
 	)
 
 	return sql.Dialect{
@@ -76,13 +60,12 @@ var duckDialect = func() sql.Dialect {
 			return "?"
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    0, // Duckdb has no apparent limit on how long column names can be
 		CaseInsensitiveColumns: true,
 	}
 }()
 
-type storeParams struct {
+type queryParams struct {
 	sql.Table
 	Files []string
 }
@@ -100,7 +83,58 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 );
 {{ end }}
 
+{{ define "loadQuery" }}
+{{ if $.Document -}}
+SELECT {{ $.Binding }} AS binding, l.{{ $.Document.Identifier }} AS doc
+FROM {{ $.Identifier }} AS l
+JOIN read_json(
+	[
+	{{- range $ind, $f := $.Files }}
+	{{- if $ind }}, {{ end }}'{{ $f }}'
+	{{- end -}}
+	],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$key.Identifier}}: '{{$key.DDL}}'
+	{{- end }}
+	}
+) AS r
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end -}}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+{{- end }}
+{{ end }}
+
 -- Templated query for merging documents from S3 into the target table.
+
+{{ define "storeDeleteQuery" }}
+DELETE FROM {{$.Identifier}} AS l
+USING read_json(
+	[
+	{{- range $ind, $f := $.Files }}
+	{{- if $ind }}, {{ end }}'{{ $f }}'
+	{{- end -}}
+	],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}: '{{$col.DDL}}'
+	{{- end }}
+	}
+) AS r
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} WHERE {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }};
+{{ end }}
 
 {{ define "storeQuery" }}
 INSERT INTO {{$.Identifier}} BY NAME
@@ -118,7 +152,7 @@ SELECT * FROM read_json(
 		{{$col.Identifier}}: '{{$col.DDL}}'
 	{{- end }}
 	}
-);
+){{ if $.Document }} WHERE {{ $.Document.Identifier }} != '"delete"'{{- end }};
 {{ end }}
 
 -- Templated update of a fence checkpoint.
@@ -134,5 +168,7 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
 	tplStoreQuery        = tplAll.Lookup("storeQuery")
+	tplStoreDeleteQuery  = tplAll.Lookup("storeDeleteQuery")
+	tplLoadQuery         = tplAll.Lookup("loadQuery")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 )

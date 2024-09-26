@@ -1,28 +1,161 @@
---- Begin db.schema.delta_updates createTargetTable ---
-CREATE TABLE IF NOT EXISTS db.schema.delta_updates (
-	"theKey" VARCHAR NOT NULL,
-	"aValue" BIGINT
-);
---- End db.schema.delta_updates createTargetTable ---
+--- Begin ""."a-schema".key_value createTargetTable ---
 
---- Begin db.schema.delta_updates storeQuery ---
-INSERT INTO db.schema.delta_updates BY NAME
-SELECT * FROM read_json(
-	['s3://bucket/file1', 's3://bucket/file2'],
-	format='newline_delimited',
-	compression='gzip',
-	columns={
-		"theKey": 'VARCHAR NOT NULL',
-		"aValue": 'BIGINT'
-	}
+CREATE TABLE IF NOT EXISTS ""."a-schema".key_value (
+	key1 BIGINT NOT NULL,
+	key2 BOOLEAN NOT NULL,
+	"key!binary" VARCHAR NOT NULL,
+	"array" JSON,
+	"binary" VARCHAR,
+	boolean BOOLEAN,
+	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	"integer" BIGINT,
+	"integerGt64Bit" HUGEINT,
+	"integerWithUserDDL" DECIMAL(20),
+	multiple JSON,
+	number DOUBLE,
+	"numberCastToString" VARCHAR,
+	object JSON,
+	string VARCHAR,
+	"stringInteger" HUGEINT,
+	"stringInteger39Chars" VARCHAR,
+	"stringInteger66Chars" VARCHAR,
+	"stringNumber" DOUBLE,
+	flow_document JSON NOT NULL
 );
---- End db.schema.delta_updates storeQuery ---
+--- End ""."a-schema".key_value createTargetTable ---
+
+--- Begin ""."a-schema".delta_updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS ""."a-schema".delta_updates (
+	"theKey" VARCHAR NOT NULL,
+	"aValue" BIGINT,
+	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+--- End ""."a-schema".delta_updates createTargetTable ---
 
 --- Begin Fence Update ---
-UPDATE checkpoints
+UPDATE path."to".checkpoints
 	SET   checkpoint = 'AAECAwQFBgcICQ=='
 	WHERE materialization = 'some/Materialization'
 	AND   key_begin = 1122867
 	AND   key_end   = 4293844428
 	AND   fence     = 123;
 --- End Fence Update ---
+
+--- Begin ""."a-schema".key_value loadQuery ---
+SELECT 0 AS binding, l.flow_document AS doc
+FROM ""."a-schema".key_value AS l
+JOIN read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		key1: 'BIGINT NOT NULL',
+		key2: 'BOOLEAN NOT NULL',
+		"key!binary": 'VARCHAR NOT NULL'
+	}
+) AS r
+	 ON  l.key1 = r.key1
+	 AND l.key2 = r.key2
+	 AND l."key!binary" = r."key!binary"
+--- End ""."a-schema".key_value loadQuery ---
+
+--- Begin ""."a-schema".key_value storeDeleteQuery ---
+DELETE FROM ""."a-schema".key_value AS l
+USING read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		key1: 'BIGINT NOT NULL',
+		key2: 'BOOLEAN NOT NULL',
+		"key!binary": 'VARCHAR NOT NULL',
+		"array": 'JSON',
+		"binary": 'VARCHAR',
+		boolean: 'BOOLEAN',
+		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL',
+		"integer": 'BIGINT',
+		"integerGt64Bit": 'HUGEINT',
+		"integerWithUserDDL": 'DECIMAL(20)',
+		multiple: 'JSON',
+		number: 'DOUBLE',
+		"numberCastToString": 'VARCHAR',
+		object: 'JSON',
+		string: 'VARCHAR',
+		"stringInteger": 'HUGEINT',
+		"stringInteger39Chars": 'VARCHAR',
+		"stringInteger66Chars": 'VARCHAR',
+		"stringNumber": 'DOUBLE',
+		flow_document: 'JSON NOT NULL'
+	}
+) AS r
+	 WHERE l.key1 = r.key1
+	 AND l.key2 = r.key2
+	 AND l."key!binary" = r."key!binary";
+--- End ""."a-schema".key_value storeDeleteQuery ---
+
+--- Begin ""."a-schema".key_value storeQuery ---
+INSERT INTO ""."a-schema".key_value BY NAME
+SELECT * FROM read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		key1: 'BIGINT NOT NULL',
+		key2: 'BOOLEAN NOT NULL',
+		"key!binary": 'VARCHAR NOT NULL',
+		"array": 'JSON',
+		"binary": 'VARCHAR',
+		boolean: 'BOOLEAN',
+		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL',
+		"integer": 'BIGINT',
+		"integerGt64Bit": 'HUGEINT',
+		"integerWithUserDDL": 'DECIMAL(20)',
+		multiple: 'JSON',
+		number: 'DOUBLE',
+		"numberCastToString": 'VARCHAR',
+		object: 'JSON',
+		string: 'VARCHAR',
+		"stringInteger": 'HUGEINT',
+		"stringInteger39Chars": 'VARCHAR',
+		"stringInteger66Chars": 'VARCHAR',
+		"stringNumber": 'DOUBLE',
+		flow_document: 'JSON NOT NULL'
+	}
+) WHERE flow_document != '"delete"';
+--- End ""."a-schema".key_value storeQuery ---
+
+--- Begin ""."a-schema".delta_updates loadQuery ---
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+--- End ""."a-schema".delta_updates loadQuery ---
+
+--- Begin ""."a-schema".delta_updates storeDeleteQuery ---
+DELETE FROM ""."a-schema".delta_updates AS l
+USING read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		"theKey": 'VARCHAR NOT NULL',
+		"aValue": 'BIGINT',
+		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL'
+	}
+) AS r
+	 WHERE l."theKey" = r."theKey";
+--- End ""."a-schema".delta_updates storeDeleteQuery ---
+
+--- Begin ""."a-schema".delta_updates storeQuery ---
+INSERT INTO ""."a-schema".delta_updates BY NAME
+SELECT * FROM read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		"theKey": 'VARCHAR NOT NULL',
+		"aValue": 'BIGINT',
+		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL'
+	}
+);
+--- End ""."a-schema".delta_updates storeQuery ---
+
+

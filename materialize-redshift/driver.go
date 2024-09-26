@@ -11,24 +11,25 @@ import (
 	"slices"
 	"strings"
 	"text/template"
-	"time"
 
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jackc/pgconn"
-	"github.com/jackc/pgx/v4"
+	"github.com/jackc/pgx/v5"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
 	// Imported for side-effects (registers the required stdsql driver)
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -62,25 +63,20 @@ type tunnelConfig struct {
 }
 
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address,description=Host and port of the database. Example: red-shift-cluster-name.account.us-east-2.redshift.amazonaws.com:5439" jsonschema_extras:"order=0"`
-	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
-	Schema   string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
-
-	Bucket             string `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=5"`
-	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
-	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=7"`
-	Region             string `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
-	BucketPath         string `json:"bucketPath,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
-
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
-
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
-}
-
-type advancedConfig struct {
-	UpdateDelay string `json:"updateDelay,omitempty" jsonschema:"title=Update Delay,description=Potentially reduce active cluster time by increasing the delay between updates. Defaults to 30 minutes if unset.,enum=0s,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h"`
+	Address            string                     `json:"address" jsonschema:"title=Address,description=Host and port of the database. Example: red-shift-cluster-name.account.us-east-2.redshift.amazonaws.com:5439" jsonschema_extras:"order=0"`
+	User               string                     `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password           string                     `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database           string                     `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to. The materialization will attempt to connect to the default database for the provided user if omitted." jsonschema_extras:"order=3"`
+	Schema             string                     `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=4"`
+	Bucket             string                     `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=5"`
+	AWSAccessKeyID     string                     `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=6"`
+	AWSSecretAccessKey string                     `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=7"`
+	Region             string                     `json:"region" jsonschema:"title=Region,description=Region of the S3 staging bucket. For optimal performance this should be in the same region as the Redshift database cluster." jsonschema_extras:"order=8"`
+	BucketPath         string                     `json:"bucketPath,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
+	HardDelete         bool                       `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=10"`
+	Schedule           boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger      dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
+	NetworkTunnel      *tunnelConfig              `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
 }
 
 func (c *config) Validate() error {
@@ -105,7 +101,11 @@ func (c *config) Validate() error {
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
 	}
 
-	if _, err := m.ParseDelay(c.Advanced.UpdateDelay); err != nil {
+	if err := c.Schedule.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.DBTJobTrigger.Validate(); err != nil {
 		return err
 	}
 
@@ -156,8 +156,8 @@ func (c *config) toS3Client(ctx context.Context) (*s3.Client, error) {
 
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)."`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false."`
+	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)." jsonschema_extras:"x-schema-name=true"`
+	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
@@ -192,6 +192,32 @@ func newRedshiftDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-redshift",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
+		StartTunnel: func(ctx context.Context, conf any) error {
+			cfg := conf.(*config)
+
+			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+			if cfg.networkTunnelEnabled() {
+				host, port, err := net.SplitHostPort(cfg.Address)
+				if err != nil {
+					return fmt.Errorf("splitting address to host and port: %w", err)
+				}
+
+				var sshConfig = &networkTunnel.SshConfig{
+					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
+					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
+					ForwardHost: host,
+					ForwardPort: port,
+					LocalPort:   "5432",
+				}
+				var tunnel = sshConfig.CreateTunnel()
+
+				if err := tunnel.Start(); err != nil {
+					return fmt.Errorf("error starting network tunnel: %w", err)
+				}
+			}
+
+			return nil
+		},
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
@@ -210,117 +236,128 @@ func newRedshiftDriver() *sql.Driver {
 			}
 			metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
 
-			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
-			if cfg.networkTunnelEnabled() {
-				host, port, err := net.SplitHostPort(cfg.Address)
-				if err != nil {
-					return nil, fmt.Errorf("splitting address to host and port: %w", err)
-				}
+			db, err := stdsql.Open("pgx", cfg.toURI())
+			if err != nil {
+				return nil, fmt.Errorf("opening db: %w", err)
+			}
+			defer db.Close()
 
-				var sshConfig = &networkTunnel.SshConfig{
-					SshEndpoint: cfg.NetworkTunnel.SshForwarding.SshEndpoint,
-					PrivateKey:  []byte(cfg.NetworkTunnel.SshForwarding.PrivateKey),
-					ForwardHost: host,
-					ForwardPort: port,
-					LocalPort:   "5432",
-				}
-				var tunnel = sshConfig.CreateTunnel()
+			var caseSensitiveIdentifier string
+			if err := db.QueryRowContext(ctx, "SHOW enable_case_sensitive_identifier;").Scan(&caseSensitiveIdentifier); err != nil {
+				return nil, fmt.Errorf("querying enable_case_sensitive_identifier: %w", err)
+			}
 
-				if err := tunnel.Start(); err != nil {
-					return nil, fmt.Errorf("error starting network tunnel: %w", err)
-				}
+			var caseSensitiveIdentifierEnabled = strings.EqualFold(caseSensitiveIdentifier, "on")
+			var dialect = rsDialect(caseSensitiveIdentifierEnabled)
+			var templates = renderTemplates(dialect)
+
+			if caseSensitiveIdentifierEnabled {
+				log.WithField("caseSensitiveIdentifierEnabled", caseSensitiveIdentifierEnabled).Info("detected value for enable_case_sensitive_identifier")
 			}
 
 			return &sql.Endpoint{
 				Config:              cfg,
-				Dialect:             rsDialect,
+				Dialect:             dialect,
 				MetaSpecs:           &metaSpecs,
 				MetaCheckpoints:     &metaCheckpoints,
 				NewClient:           newClient,
-				CreateTableTemplate: tplCreateTargetTable,
+				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				NewTransactor:       prepareNewTransactor(templates, caseSensitiveIdentifierEnabled),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
 			}, nil
 		},
+		PreReqs: preReqs,
 	}
 }
 
 var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
-	fence       sql.Fence
-	bindings    []*binding
-	cfg         *config
-	updateDelay time.Duration
+	templates templates
+	dialect   sql.Dialect
+	fence     sql.Fence
+	bindings  []*binding
+	cfg       *config
+	sched     schedule.Schedule
 }
 
-func newTransactor(
-	ctx context.Context,
-	ep *sql.Endpoint,
-	fence sql.Fence,
-	bindings []sql.Table,
-	open pm.Request_Open,
-) (_ m.Transactor, err error) {
-	var cfg = ep.Config.(*config)
+func prepareNewTransactor(
+	templates templates,
+	caseSensitiveIdentifierEnabled bool,
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
+	return func(
+		ctx context.Context,
+		ep *sql.Endpoint,
+		fence sql.Fence,
+		bindings []sql.Table,
+		open pm.Request_Open,
+	) (_ m.Transactor, err error) {
+		var cfg = ep.Config.(*config)
 
-	var d = &transactor{
-		fence: fence,
-		cfg:   cfg,
-	}
-
-	if d.updateDelay, err = m.ParseDelay(cfg.Advanced.UpdateDelay); err != nil {
-		return nil, err
-	}
-
-	s3client, err := d.cfg.toS3Client(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	db, err := stdsql.Open("pgx", d.cfg.toURI())
-	if err != nil {
-		return nil, err
-	}
-	defer db.Close()
-
-	schemas := []string{}
-	for _, b := range bindings {
-		if !slices.Contains(schemas, b.InfoLocation.TableSchema) {
-			schemas = append(schemas, b.InfoLocation.TableSchema)
+		var d = &transactor{
+			templates: templates,
+			dialect:   ep.Dialect,
+			fence:     fence,
+			cfg:       cfg,
 		}
-	}
 
-	catalog := cfg.Database
-	if catalog == "" {
-		// An endpoint-level database configuration is not required, so query for the active
-		// database if that's the case.
-		if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
-			return nil, fmt.Errorf("querying for connected database: %w", err)
+		if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Address)); err != nil {
+			return nil, err
+		} else if useSched {
+			d.sched = sched
 		}
-	}
-	resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
-	for _, b := range open.Materialization.Bindings {
-		resourcePaths = append(resourcePaths, b.ResourcePath)
-	}
-	is, err := sql.StdFetchInfoSchema(ctx, db, rsDialect, catalog, resourcePaths)
-	if err != nil {
-		return nil, err
-	}
 
-	for idx, target := range bindings {
-		if err = d.addBinding(
-			idx,
-			target,
-			s3client,
-			is,
-		); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+		s3client, err := d.cfg.toS3Client(ctx)
+		if err != nil {
+			return nil, err
 		}
-	}
 
-	return d, nil
+		db, err := stdsql.Open("pgx", d.cfg.toURI())
+		if err != nil {
+			return nil, err
+		}
+		defer db.Close()
+
+		schemas := []string{}
+		for _, b := range bindings {
+			if !slices.Contains(schemas, b.InfoLocation.TableSchema) {
+				schemas = append(schemas, b.InfoLocation.TableSchema)
+			}
+		}
+
+		catalog := cfg.Database
+		if catalog == "" {
+			// An endpoint-level database configuration is not required, so query for the active
+			// database if that's the case.
+			if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
+				return nil, fmt.Errorf("querying for connected database: %w", err)
+			}
+		}
+		resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
+		for _, b := range open.Materialization.Bindings {
+			resourcePaths = append(resourcePaths, b.ResourcePath)
+		}
+		is, err := sql.StdFetchInfoSchema(ctx, db, ep.Dialect, catalog, resourcePaths)
+		if err != nil {
+			return nil, err
+		}
+
+		for idx, target := range bindings {
+			if err = d.addBinding(
+				idx,
+				target,
+				s3client,
+				is,
+				caseSensitiveIdentifierEnabled,
+			); err != nil {
+				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+			}
+		}
+
+		return d, nil
+	}
 }
 
 type binding struct {
@@ -328,13 +365,29 @@ type binding struct {
 	varcharColumnMetas      []varcharColumnMeta
 	loadFile                *stagedFile
 	storeFile               *stagedFile
+	deleteFile              *stagedFile
 	createLoadTableTemplate *template.Template
 	createStoreTableSQL     string
+	createDeleteTableSQL    string
 	mergeIntoSQL            string
+	deleteQuerySQL          string
 	loadQuerySQL            string
 	copyIntoLoadTableSQL    string
 	copyIntoMergeTableSQL   string
+	copyIntoDeleteTableSQL  string
 	copyIntoTargetTableSQL  string
+
+	// A reference of all staged file cleanup operations that should be run once
+	// the commit has completed. Will be empty if not data was processed for
+	// this binding. Applies to the Store phase only.
+	cleanupFiles []func(context.Context)
+	// If any deletions must be done for the Store data processed by this binding.
+	hasDeletes bool
+	// If any non-deletion Store requests were received for this binding.
+	hasStores bool
+	// If a merge operation must be done, or if a more efficient COPY INTO can
+	// be used to store the data for the transaction.
+	mustMerge bool
 }
 
 // varcharColumnMeta contains metadata about Redshift varchar columns. Currently this is just the
@@ -350,11 +403,13 @@ func (t *transactor) addBinding(
 	target sql.Table,
 	client *s3.Client,
 	is *boilerplate.InfoSchema,
+	caseSensitiveIdentifierEnabled bool,
 ) error {
 	var b = &binding{
-		target:    target,
-		loadFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
-		storeFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.ColumnNames()),
+		target:     target,
+		loadFile:   newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
+		storeFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.ColumnNames()),
+		deleteFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
 	}
 
 	// Render templates that require specific S3 "COPY INTO" parameters.
@@ -367,15 +422,17 @@ func (t *transactor) addBinding(
 	}{
 		{&b.copyIntoLoadTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.KeyPtrs(), false, b.loadFile},
 		{&b.copyIntoMergeTableSQL, fmt.Sprintf("flow_temp_table_%d", bindingIdx), target.Columns(), true, b.storeFile},
+		{&b.copyIntoDeleteTableSQL, fmt.Sprintf("flow_temp_table_%d_deleted", bindingIdx), target.KeyPtrs(), false, b.deleteFile},
 		{&b.copyIntoTargetTableSQL, target.Identifier, target.Columns(), true, b.storeFile},
 	} {
 		var sql strings.Builder
-		if err := tplCopyFromS3.Execute(&sql, copyFromS3Params{
-			Target:          m.target,
-			Columns:         m.columns,
-			ManifestURL:     m.stagedFile.fileURI(manifestFile),
-			Config:          t.cfg,
-			TruncateColumns: m.truncateColumns,
+		if err := t.templates.copyFromS3.Execute(&sql, copyFromS3Params{
+			Target:                         m.target,
+			Columns:                        m.columns,
+			ManifestURL:                    m.stagedFile.fileURI(manifestFile),
+			Config:                         t.cfg,
+			CaseSensitiveIdentifierEnabled: caseSensitiveIdentifierEnabled,
+			TruncateColumns:                m.truncateColumns,
 		}); err != nil {
 			return err
 		}
@@ -387,9 +444,11 @@ func (t *transactor) addBinding(
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createStoreTableSQL, tplCreateStoreTable},
-		{&b.mergeIntoSQL, tplMergeInto},
-		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.createStoreTableSQL, t.templates.createStoreTable},
+		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
+		{&b.mergeIntoSQL, t.templates.mergeInto},
+		{&b.deleteQuerySQL, t.templates.deleteQuery},
+		{&b.loadQuerySQL, t.templates.loadQuery},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -399,7 +458,7 @@ func (t *transactor) addBinding(
 
 	// The load table template is re-evaluated every transaction to account for the specific string
 	// lengths observed for string keys in the load key set.
-	b.createLoadTableTemplate = tplCreateLoadTable
+	b.createLoadTableTemplate = t.templates.createLoadTable
 
 	// Retain column metadata information for this binding as a snapshot of the target table
 	// configuration when the connector started, indexed in the same order as values will be
@@ -435,8 +494,11 @@ func (t *transactor) addBinding(
 	return nil
 }
 
-func (t *transactor) AckDelay() time.Duration {
-	return t.updateDelay
+func (t *transactor) Schedule() (schedule.Schedule, bool) {
+	if t.sched != nil {
+		return t.sched, true
+	}
+	return nil, false
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -576,30 +638,83 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	// hasUpdates is used to track if a given binding includes only insertions for this store round
-	// or if it includes any updates. If it is only insertions a more efficient direct copy from S3
-	// can be performed into the target table rather than copying into a staging table and merging
-	// into the target table.
-	hasUpdates := make([]bool, len(d.bindings))
-
 	// varcharColumnUpdates records any VARCHAR columns that need their lengths increased. The keys
 	// are table identifiers, and the values are a list of column identifiers that need altered.
 	// Columns will only ever be to altered it to VARCHAR(MAX).
 	varcharColumnUpdates := make(map[string][]string)
 
+	flushStagedFile := func(ctx context.Context, b *binding) error {
+		if b.storeFile.started {
+			cleanup, err := b.storeFile.flush(ctx)
+			if err != nil {
+				return fmt.Errorf("flushing store file: %w", err)
+			}
+			b.cleanupFiles = append(b.cleanupFiles, cleanup)
+		}
+		if b.deleteFile.started {
+			cleanup, err := b.deleteFile.flush(ctx)
+			if err != nil {
+				return fmt.Errorf("flushing delete file: %w", err)
+			}
+			b.cleanupFiles = append(b.cleanupFiles, cleanup)
+		}
+		return nil
+	}
+
 	log.Info("store: starting encoding and uploading of files")
+	var lastBinding = -1
 	for it.Next() {
-		if it.Exists {
-			hasUpdates[it.Binding] = true
+		if lastBinding == -1 {
+			lastBinding = it.Binding
+		}
+
+		if lastBinding != it.Binding {
+			// Flush the staged file(s) for the binding now that it's stores are
+			// fully processed.
+			var b = d.bindings[lastBinding]
+			if err := flushStagedFile(ctx, b); err != nil {
+				return nil, fmt.Errorf("flushing staged files for collection %q: %w", b.target.Source.String(), err)
+			}
+			lastBinding = it.Binding
 		}
 
 		var b = d.bindings[it.Binding]
-		b.storeFile.start()
+		var file *stagedFile
 
-		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
-		if err != nil {
-			return nil, fmt.Errorf("converting store parameters: %w", err)
+		var err error
+		var converted []any
+
+		// Unfortunately Redshift does not support MERGE INTO statements with multiple clauses
+		// so we can't use it to both update and delete rows. So instead we use a separate
+		// temporary table and run a `DELETE USING` query to delete rows
+		if d.cfg.HardDelete && it.Delete {
+			if it.Exists {
+				file = b.deleteFile
+				b.hasDeletes = true
+
+				converted, err = b.target.ConvertKey(it.Key)
+				if err != nil {
+					return nil, fmt.Errorf("converting delete parameters: %w", err)
+				}
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
+		} else {
+			b.hasStores = true
+			if it.Exists {
+				b.mustMerge = true
+			}
+
+			file = b.storeFile
+
+			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+			if err != nil {
+				return nil, fmt.Errorf("converting store parameters: %w", err)
+			}
 		}
+
+		file.start()
 
 		// See if we need to increase any VARCHAR column lengths.
 		for idx, c := range converted {
@@ -631,12 +746,20 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		if err := b.storeFile.encodeRow(ctx, converted); err != nil {
+		if err := file.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
+	}
+
+	// Flush the final binding.
+	if lastBinding != -1 {
+		var b = d.bindings[lastBinding]
+		if err := flushStagedFile(ctx, b); err != nil {
+			return nil, fmt.Errorf("final binding flushing staged files for collection %q: %w", b.target.Source.String(), err)
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -647,15 +770,35 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		var fenceUpdate strings.Builder
-		if err := tplUpdateFence.Execute(&fenceUpdate, d.fence); err != nil {
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.fence); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), hasUpdates, varcharColumnUpdates) })
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), varcharColumnUpdates) })
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates []bool, varcharColumnUpdates map[string][]string) error {
+func (d *transactor) commit(
+	ctx context.Context,
+	fenceUpdate string,
+	varcharColumnUpdates map[string][]string,
+) error {
+	defer func() {
+		for _, b := range d.bindings {
+			// Arrange to clean up any staged files once this commit attempt is
+			// done.
+			for _, cleanupFn := range b.cleanupFiles {
+				cleanupFn(ctx)
+			}
+
+			// Reset per-transaction properties for the next round.
+			b.cleanupFiles = nil
+			b.hasDeletes = false
+			b.hasStores = false
+			b.mustMerge = false
+		}
+	}()
+
 	conn, err := pgx.Connect(ctx, d.cfg.toURI())
 	if err != nil {
 		return fmt.Errorf("store pgx.Connect: %w", err)
@@ -714,24 +857,35 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 	// checkpoints table. For best performance, a single materialization per database should be
 	// used, or separate materializations within the same database should use a different schema for
 	// their metadata.
-	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", rsDialect.Identifier(d.fence.TablePath...))); err != nil {
+	if _, err := txn.Exec(ctx, fmt.Sprintf("lock %s;", d.dialect.Identifier(d.fence.TablePath...))); err != nil {
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
 	}
 
 	log.Info("store: starting copying of files into tables")
-	for idx, b := range d.bindings {
-		if !b.storeFile.started {
-			// No stores for this binding.
+	for _, b := range d.bindings {
+		if b.hasDeletes {
+			// Create the temporary table for staging values to delete from the target table.
+			// Redshift actually supports transactional DDL for creating tables, so this can be
+			// executed within the transaction.
+			if _, err := txn.Exec(ctx, b.createDeleteTableSQL); err != nil {
+				return fmt.Errorf("creating delete table: %w", err)
+			}
+
+			log.WithField("table", b.target.Identifier).Info("store: starting deleting from table")
+
+			if _, err := txn.Exec(ctx, b.copyIntoDeleteTableSQL); err != nil {
+				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.deleteFile.prefix, b.target.Identifier, err)
+			} else if _, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
+				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
+			}
+			log.WithField("table", b.target.Identifier).Info("store: finished deleting from table")
+		}
+
+		if !b.hasStores {
 			continue
 		}
 
-		delete, err := b.storeFile.flush(ctx)
-		if err != nil {
-			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
-		}
-		defer delete(ctx)
-
-		if hasUpdates[idx] {
+		if b.mustMerge {
 			// Create the temporary table for staging values to merge into the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
@@ -764,6 +918,13 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string, hasUpdates 
 		return errors.New("this instance was fenced off by another")
 	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
+	}
+
+	if d.cfg.DBTJobTrigger.Enabled() {
+		log.Info("store: dbt job trigger")
+		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
+			return fmt.Errorf("triggering dbt job: %w", err)
+		}
 	}
 
 	log.Info("store: finished commit")

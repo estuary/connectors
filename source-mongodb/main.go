@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +15,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -25,16 +29,78 @@ import (
 	mongoDriver "go.mongodb.org/mongo-driver/x/mongo/driver"
 )
 
+// Downloads TLS certificates for connecting to AWS DocumentDB. This is used in
+// `documentDBTLSConfig()` if the configured address is for AWS DocumentDB.
+//go:generate wget -O global-bundle.pem https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem
+
+//go:embed global-bundle.pem
+var documentDBTLSCerts embed.FS
+
+type captureMode string
+
+const (
+	captureModeChangeStream captureMode = "Change Stream Incremental"
+	captureModeSnapshot     captureMode = "Batch Snapshot"
+	captureModeIncremental  captureMode = "Batch Incremental"
+)
+
+func (m captureMode) validate() error {
+	switch m {
+	case captureModeChangeStream, captureModeSnapshot, captureModeIncremental:
+		return nil
+	default:
+		return fmt.Errorf("invalid capture mode: %s", m)
+	}
+}
+
 type resource struct {
-	Database   string `json:"database" jsonschema:"title=Database name"`
-	Collection string `json:"collection" jsonschema:"title=Collection name"`
+	Database     string      `json:"database" jsonschema:"title=Database name" jsonschema_extras:"order=0"`
+	Collection   string      `json:"collection" jsonschema:"title=Collection name" jsonschema_extras:"order=1"`
+	Mode         captureMode `json:"captureMode,omitempty" jsonschema:"title=Capture Mode,enum=Change Stream Incremental,enum=Batch Snapshot,enum=Batch Incremental" jsonschema_extras:"order=2"`
+	Cursor       string      `json:"cursorField,omitempty" jsonschema:"title=Cursor Field,description=The name of the field to use as a cursor for batch-mode bindings. For best performance this field should be indexed. When used with 'Batch Incremental' mode documents added to the collection are expected to always have the cursor field and for it to be strictly increasing." jsonschema_extras:"order=3"`
+	PollSchedule string      `json:"pollSchedule,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to poll batch collections (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=4"`
 }
 
 func (r resource) Validate() error {
 	if r.Collection == "" {
 		return fmt.Errorf("collection is required")
 	}
+	if r.Database == "" {
+		return fmt.Errorf("database is required")
+	}
+
+	if r.PollSchedule != "" {
+		if err := schedule.Validate(r.PollSchedule); err != nil {
+			return fmt.Errorf("invalid polling schedule '%s' for '%s.%s': %w", r.PollSchedule, r.Database, r.Collection, err)
+		}
+	}
+
+	if r.Mode != "" {
+		if err := r.Mode.validate(); err != nil {
+			return fmt.Errorf("validating capture mode for '%s.%s': %w", r.Database, r.Collection, err)
+		}
+		if r.Mode == captureModeIncremental || r.Mode == captureModeSnapshot {
+			if r.Cursor == "" {
+				return fmt.Errorf("cursor field is required for '%s.%s' with mode '%s'", r.Database, r.Collection, r.Mode)
+			}
+		}
+	}
+
 	return nil
+}
+
+func (r resource) getMode() captureMode {
+	if r.Mode != "" {
+		return r.Mode
+	}
+	return captureModeChangeStream
+}
+
+func (r resource) getCursorField() string {
+	if r.Cursor != "" {
+		return r.Cursor
+	}
+	return idProperty
 }
 
 type sshForwarding struct {
@@ -46,14 +112,20 @@ type tunnelConfig struct {
 	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
 }
 
-// config represents the endpoint configuration for mongodb
 type config struct {
-	Address  string `json:"address" jsonschema:"title=Address" jsonschema_description:"The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin." jsonschema_extras:"order=0"`
-	User     string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the instance." jsonschema_extras:"order=3"`
+	Address              string `json:"address" jsonschema:"title=Address" jsonschema_description:"The connection URI for your database without the username and password. For example mongodb://my-mongo.test?authSource=admin." jsonschema_extras:"order=0"`
+	User                 string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password             string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database             string `json:"database,omitempty" jsonschema:"title=Database,description=Optional comma-separated list of the databases to discover. If not provided will discover all available databases in the deployment." jsonschema_extras:"order=3"`
+	BatchAndChangeStream bool   `json:"batchAndChangeStream,omitempty" jsonschema:"title=Capture Batch Collections in Addition to Change Stream Collections,description=Discover collections that can only be batch captured if the deployment supports change streams. Check this box to capture views and time series collections as well as change streams. All collections will be captured in batch mode if the server does not support change streams regardless of this setting." jsonschema_extras:"order=4"`
+	PollSchedule         string `json:"pollSchedule,omitempty" jsonschema:"title=Default Batch Collection Polling Schedule,description=When and how often to poll batch collections. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$,order=5"`
 
-	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+	NetworkTunnel *tunnelConfig  `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network." jsonschema_extras:"order=6"`
+	Advanced      advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=7"`
+}
+
+type advancedConfig struct {
+	ExclusiveCollectionFilter bool `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."`
 }
 
 func (c *config) Validate() error {
@@ -72,6 +144,12 @@ func (c *config) Validate() error {
 	// mongodb+srv:// urls do not support port
 	if err == nil && uri.Scheme == "mongodb+srv" && uri.Port() != "" {
 		return fmt.Errorf("`mongodb+srv://` addresses do not support specifying the port")
+	}
+
+	if c.PollSchedule != "" {
+		if err := schedule.Validate(c.PollSchedule); err != nil {
+			return fmt.Errorf("invalid default polling schedule %q: %w", c.PollSchedule, err)
+		}
 	}
 
 	return nil
@@ -103,6 +181,15 @@ func (c *config) ToURI() string {
 
 type driver struct{}
 
+func isDocumentDB(address string) (bool, error) {
+	uri, err := url.Parse(address)
+	if err != nil {
+		return false, fmt.Errorf("parsing address: %w", err)
+	}
+
+	return strings.HasSuffix(uri.Hostname(), ".docdb.amazonaws.com"), nil
+}
+
 func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// Mongodb atlas offers an "online-archive" service, which does not work
 	// with this connector because it doesn't support change streams. Their UI
@@ -110,7 +197,18 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// a more helpful error message in the event that someone tries to use the
 	// online-archive url instead of the regular mongodb url.
 	if strings.Contains(cfg.Address, "atlas-online-archive") {
-		return nil, fmt.Errorf("The provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas online archive', which is not supported by this connector. Please use the regular cluster URL instead")
+	}
+
+	// Similarly, MongoDB "Atlas SQL" does not support change streams, so our
+	// connector doesn't work with that either.
+	if strings.HasPrefix(cfg.Address, "mongodb://atlas-sql") {
+		return nil, fmt.Errorf("the provided URL appears to be for 'Atlas SQL Interface', which is not supported by this connector. Please use the regular cluster URL instead")
+	}
+
+	isDocDB, err := isDocumentDB(cfg.Address)
+	if err != nil {
+		return nil, err
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
@@ -132,6 +230,8 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		if err := tunnel.Start(); err != nil {
 			return nil, fmt.Errorf("error starting network tunnel: %w", err)
 		}
+	} else if isDocDB {
+		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", cfg.Address)
 	}
 
 	// Create a new client and connect to the server. "Majority" read concern is set to avoid
@@ -145,6 +245,17 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// being completely disabled. We could re-evaluate this priority after
 	// https://github.com/mongodb/mongo-go-driver/pull/1577 is merged and released.
 	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zlib", "snappy", "zstd"}).SetReadConcern(readconcern.Majority())
+	if isDocDB {
+		tlsConfig, err := documentDBTLSConfig()
+		if err != nil {
+			return nil, fmt.Errorf("tlsConfig for documentDB: %w", err)
+		}
+		// In addition to the TLS configuration, DocumentDB doesn't support
+		// connecting in replica set mode through an SSH tunnel, so the
+		// directConnection query parameter is required.
+		opts = opts.SetTLSConfig(tlsConfig).SetDirect(true)
+	}
+
 	client, err := mongo.Connect(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -181,6 +292,20 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	}
 
 	return client, nil
+}
+
+func documentDBTLSConfig() (*tls.Config, error) {
+	var tlsConfig = new(tls.Config)
+	tlsConfig.InsecureSkipVerify = true // for connecting to `localhost` via SSH tunnel
+	tlsConfig.RootCAs = x509.NewCertPool()
+
+	if certs, err := documentDBTLSCerts.ReadFile("global-bundle.pem"); err != nil {
+		return nil, fmt.Errorf("failed to open global-bundle.pem: %w", err)
+	} else if ok := tlsConfig.RootCAs.AppendCertsFromPEM(certs); !ok {
+		return nil, fmt.Errorf("failed parsing pem file")
+	}
+
+	return tlsConfig, nil
 }
 
 func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
@@ -224,7 +349,22 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, fmt.Errorf("getting list of databases: %w", err)
 	}
 
+	var lastResources []resource
+	var lastBackfillCounters []uint32
+	if req.LastCapture != nil {
+		for _, lastBinding := range req.LastCapture.Bindings {
+			var res resource
+			if err := pf.UnmarshalStrict(lastBinding.ResourceConfigJson, &res); err != nil {
+				return nil, fmt.Errorf("error parsing resource config for lastBinding: %w", err)
+			}
+			lastResources = append(lastResources, res)
+			lastBackfillCounters = append(lastBackfillCounters, lastBinding.Backfill)
+		}
+	}
+
+	var dbCollectionSpecs = make(map[string][]*mongo.CollectionSpecification)
 	var bindings = []*pc.Response_Validated_Binding{}
+	var servInf *serverInfo
 
 	for _, binding := range req.Bindings {
 		var res resource
@@ -232,36 +372,70 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
+		if servInf == nil {
+			servInf, err = getServerInfo(ctx, cfg, client, res.Database)
+			if err != nil {
+				return nil, fmt.Errorf("getting server info: %w", err)
+			}
+		}
+
+		var resourcePath = []string{res.Database, res.Collection}
+
+		// Validate changes to the resource spec.
+		for idx, lastResource := range lastResources {
+			if lastResource.Database == res.Database && lastResource.Collection == res.Collection {
+				// Changing the capture mode is not allowed, although
+				// theoretically going from change stream to a snapshot could
+				// work. It's just easier to not allow it for now unless the
+				// binding is being reset (backfill counter incremented) as
+				// well.
+				if lastResource.getMode() != res.getMode() && binding.Backfill == lastBackfillCounters[idx] {
+					return nil, fmt.Errorf("cannot change mode from %s to %s for binding %q without backfilling the binding", lastResource.getMode(), res.getMode(), resourcePath)
+				}
+
+				// Change the cursor field is not allowed for batch bindings.
+				if lastResource.getMode() != captureModeChangeStream {
+					if lastResource.getCursorField() != res.getCursorField() && binding.Backfill == lastBackfillCounters[idx] {
+						return nil, fmt.Errorf("cannot change cursor field from %s to %s for binding %q without backfilling the binding", lastResource.getCursorField(), res.getCursorField(), resourcePath)
+					}
+				}
+			}
+		}
+
 		if !slices.Contains(existingDatabases, res.Database) {
 			return nil, fmt.Errorf("database %s does not exist", res.Database)
 		}
 
-		var db = client.Database(res.Database)
-
-		collections, err := db.ListCollectionNames(ctx, bson.D{{"name", res.Collection}})
-		if err != nil {
-			return nil, fmt.Errorf("listing collections in database %s: %w", db.Name(), err)
-		}
-
-		if !slices.Contains(collections, res.Collection) {
-			return nil, fmt.Errorf("could not find collection %s in database %s", res.Collection, db.Name())
-		}
-
-		// Ensure a change stream can be initialized on databases. This verifies that
-		// ReplicaSet is enabled on the database.
-		cursor, err := db.Watch(ctx, mongo.Pipeline{})
-		if err != nil {
-			if e, ok := err.(mongo.ServerError); ok {
-				if e.HasErrorMessage("The $changeStream stage is only supported on replica sets") {
-					return nil, cerrors.NewUserError(err, fmt.Sprintf("unable to verify that a change stream can be created for collection %s: ReplicaSet is not enabled on your database", res.Database))
-				}
+		var db = res.Database
+		if _, ok := dbCollectionSpecs[db]; !ok {
+			specs, err := client.Database(db).ListCollectionSpecifications(ctx, bson.D{})
+			if err != nil {
+				return nil, fmt.Errorf("listing collections in database %s: %w", db, err)
 			}
-			return nil, fmt.Errorf("creating change stream for database %s: %w", res.Database, err)
+			dbCollectionSpecs[db] = specs
 		}
-		cursor.Close(ctx)
+		specs := dbCollectionSpecs[db]
+
+		specIdx := slices.IndexFunc(specs, func(spec *mongo.CollectionSpecification) bool {
+			return spec.Name == res.Collection
+		})
+		if specIdx == -1 {
+			return nil, fmt.Errorf("could not find collection %s in database %s", res.Collection, db)
+		}
+		collection := specs[specIdx]
+		collectionType := mongoCollectionType(collection.Type)
+		if err := collectionType.validate(); err != nil {
+			return nil, fmt.Errorf("unsupported collection type: %w", err)
+		}
+
+		if !servInf.supportsChangeStreams && res.getMode() == captureModeChangeStream {
+			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the server does not support change streams", resourcePath, res.getMode())
+		} else if res.getMode() == captureModeChangeStream && !collectionType.canChangeStream() {
+			return nil, fmt.Errorf("binding %q is configured with mode '%s', but the collection type '%s' does not support change streams", resourcePath, res.getMode(), collectionType)
+		}
 
 		bindings = append(bindings, &pc.Response_Validated_Binding{
-			ResourcePath: []string{res.Database, res.Collection},
+			ResourcePath: resourcePath,
 		})
 	}
 

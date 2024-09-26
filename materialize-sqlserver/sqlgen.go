@@ -9,33 +9,30 @@ import (
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 // strToInt is used for sqlserver specific conversion from an integer-formatted string or integer to
 // an integer. The sqlserver driver doesn't appear to have any way to provide an integer value
 // larger than 8 bytes as a parameter (such as may go in a NUMERIC(38,0) column). The value provided
 // must always be an integer that fits in an int64.
-func strToInt() sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
-		// per JSON specification so we must handle this possibility here. Anything after the
-		// decimal is discarded on the assumption that Flow has validated the data and verified that
-		// the decimal component is all 0's.
-		if idx := strings.Index(str, "."); idx != -1 {
-			str = str[:idx]
-		}
+var strToInt sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
+	// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
+	// per JSON specification so we must handle this possibility here. Anything after the
+	// decimal is discarded on the assumption that Flow has validated the data and verified that
+	// the decimal component is all 0's.
+	if idx := strings.Index(str, "."); idx != -1 {
+		str = str[:idx]
+	}
 
-		out, err := strconv.ParseInt(str, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)
-		}
+	out, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert %q to int64: %w", str, err)
+	}
 
-		return out, nil
-	})
-}
+	return out, nil
+})
 
-var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
+var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect {
 	var stringType = "varchar"
 	// If the collation does not support UTF8, we fallback to using nvarchar
 	// for string columns
@@ -46,66 +43,56 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 	var textType = fmt.Sprintf("%s(MAX) COLLATE %s", stringType, collation)
 	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
 
-	// nvarchar and varchar fields require the value to be a string instead of a
-	// bytearray to handle unicode properly, so we convert to str after converting
-	// to json.RawMessage
-	var jsonConverter = sql.WithElementConverter(sql.Compose(sql.StdByteArrayToStr, sql.JsonBytesConverter))
-
-	var mapper sql.TypeMapper = sql.ProjectionTypeMapper{
-		sql.INTEGER: sql.NewStaticMapper("BIGINT"),
-		sql.NUMBER:  sql.NewStaticMapper("DOUBLE PRECISION"),
-		sql.BOOLEAN: sql.NewStaticMapper("BIT"),
-		sql.OBJECT:  sql.NewStaticMapper(textType, jsonConverter),
-		sql.ARRAY:   sql.NewStaticMapper(textType, jsonConverter),
-		sql.BINARY:  sql.NewStaticMapper("VARBINARY(MAX)"),
-		sql.STRING: sql.StringTypeMapper{
-			Fallback: sql.PrimaryKeyMapper{
-				// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
-				// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
-				// stored in the column, not the character count.
-				// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
-				// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-				PrimaryKey: sql.NewStaticMapper(textPKType),
-				Delegate:   sql.NewStaticMapper(textType),
-			},
-			WithFormat: map[string]sql.TypeMapper{
-				"integer": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper(textPKType),
-					Delegate:   sql.NewStaticMapper("BIGINT", sql.WithElementConverter(strToInt())),
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT"),
+				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToStr)),
+			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float")),
+			sql.BOOLEAN:  sql.MapStatic("BIT"),
+			sql.OBJECT:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.ARRAY:    sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.BINARY:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
+			sql.MULTIPLE: sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("BIGINT", sql.UsingConverter(strToInt)),
+				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToStr)),
+				// The maximum length of a signed 64-bit integer is 19
+				// characters.
+				18,
+			),
+			// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
+			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapPrimaryKey(
+					// sqlserver cannot do varchar/nvarchar primary keys larger than 900 bytes, and in
+					// sqlserver, the number N passed to varchar(N), denotes the maximum bytes
+					// stored in the column, not the character count.
+					// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
+					// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
+					sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
+					sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
+				),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("DATE"),
+					"date-time": sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC())),
+					"time":      sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC())),
 				},
-				"number": sql.PrimaryKeyMapper{
-					PrimaryKey: sql.NewStaticMapper(textPKType),
-					// SQL Server doesn't handle non-numeric float types and we must map them to NULL.
-					Delegate: sql.NewStaticMapper("DOUBLE PRECISION", sql.WithElementConverter(sql.StdStrToFloat(nil, nil, nil))),
-				},
-				"date":      sql.NewStaticMapper("DATE"),
-				"date-time": sql.NewStaticMapper("DATETIME2", sql.WithElementConverter(rfc3339ToUTC())),
-				"time":      sql.NewStaticMapper("TIME", sql.WithElementConverter(rfc3339TimeToUTC())),
-			},
+			}),
 		},
-		sql.MULTIPLE: sql.NewStaticMapper(textType, jsonConverter),
-	}
-
-	mapper = sql.NullableMapper{
-		NotNullText: "NOT NULL",
-		Delegate:    mapper,
-	}
-
-	columnValidator := sql.NewColumnValidator(
-		sql.ColValidation{Types: []string{stringType}, Validate: stringCompatible},
-		sql.ColValidation{Types: []string{"bit"}, Validate: sql.BooleanCompatible},
-		sql.ColValidation{Types: []string{"bigint"}, Validate: sql.IntegerCompatible},
-		sql.ColValidation{Types: []string{"float"}, Validate: sql.NumberCompatible},
-		sql.ColValidation{Types: []string{"date"}, Validate: sql.DateCompatible},
-		sql.ColValidation{Types: []string{"datetime2"}, Validate: sql.DateTimeCompatible},
-		sql.ColValidation{Types: []string{"time"}, Validate: sql.TimeCompatible},
+		sql.WithNotNullText("NOT NULL"),
 	)
 
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
-			return sql.InfoTableLocation{
-				TableSchema: schemaName,
-				TableName:   path[0],
+			if len(path) == 1 {
+				// A schema isn't required to be set on the endpoint or any
+				// resource, and if its empty the default schema for the
+				// configured user will implicitly be used.
+				return sql.InfoTableLocation{TableSchema: defaultSchema, TableName: path[0]}
+			} else {
+				return sql.InfoTableLocation{TableSchema: path[0], TableName: path[1]}
 			}
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
@@ -122,16 +109,9 @@ var sqlServerDialect = func(collation string, schemaName string) sql.Dialect {
 			return fmt.Sprintf("@p%d", index+1)
 		}),
 		TypeMapper:             mapper,
-		ColumnValidator:        columnValidator,
 		MaxColumnCharLength:    128,
 		CaseInsensitiveColumns: true,
 	}
-}
-
-// stringCompatible allow strings of any format, arrays, objects, or fields with multiple types to
-// be materialized.
-func stringCompatible(p pf.Projection) bool {
-	return sql.StringCompatible(p) || sql.JsonCompatible(p)
 }
 
 func rfc3339ToUTC() sql.ElementConverter {
@@ -331,7 +311,7 @@ SELECT TOP 0 -1, NULL
 		{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Document }}
-	WHEN MATCHED AND r.{{ $.Document.Identifier }}=NULL THEN
+	WHEN MATCHED AND r.{{ $.Document.Identifier }}='"delete"' THEN
 		DELETE
 	{{- end }}
 	WHEN MATCHED THEN

@@ -290,5 +290,16 @@ properties:
     type:
       - object
       - "null"
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type:
+          - integer
+    required:
+      - row_id
 type: object
+required:
+  - id
+  - _meta
 x-infer-schema: true

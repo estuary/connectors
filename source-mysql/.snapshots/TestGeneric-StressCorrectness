@@ -6,5 +6,5 @@ no invariant violations observed
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FGeneric_StressCorrectness_51314288":{"backfilled":999,"key_columns":["id"],"metadata":{"schema":{"columns":["id","counter"],"types":{"counter":"int","id":"int"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FGeneric_StressCorrectness_51314288":{"backfilled":999,"key_columns":["id"],"metadata":{"schema":{"columns":["id","counter"],"types":{"counter":{"type":"int"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

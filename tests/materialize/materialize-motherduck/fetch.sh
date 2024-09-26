@@ -5,11 +5,14 @@ set -o pipefail
 set -o nounset
 
 function exportToJsonl() {
-  duckdb -json md: "set timezone to UTC; select * from ${MOTHERDUCK_DATABASE}.${MOTHERDUCK_SCHEMA}."$1" ORDER BY ID;" | jq "{ "_table": \"$1\", rows: . }"
+  duckdb md: "set timezone to UTC; copy(select * from ${MOTHERDUCK_DATABASE}.${MOTHERDUCK_SCHEMA}."$1" order by ID) to '/dev/stdout' (format json);" | jq "{ "_table": \"$1\", rows: . }"
 }
 
-exportToJsonl "simple_delta"
+exportToJsonl "simple"
+exportToJsonl "duplicate_keys_standard"
 exportToJsonl "duplicate_keys_delta"
 exportToJsonl "duplicate_keys_delta_exclude_flow_doc"
-exportToJsonl "multiple_types_delta"
-exportToJsonl "formatted_strings_delta"
+exportToJsonl "multiple_types"
+exportToJsonl "formatted_strings"
+exportToJsonl "unsigned_bigint"
+exportToJsonl "deletions"

@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["distinct_id"],
+  "properties": {
+    "distinct_id": {
+      "description": "The unique identifier for the user.",
+      "type": "string"
+    },
+    "id": {
+      "description": "The unique ID associated with the user.",
+      "type": "string"
+    }
+  }
+}

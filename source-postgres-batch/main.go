@@ -7,13 +7,14 @@ import (
 	"fmt"
 	"net/url"
 	"strings"
+	"text/template"
 
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 
-	_ "github.com/jackc/pgx/v4/stdlib"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -105,46 +106,55 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	return db, nil
 }
 
-const tableQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  SELECT xmin AS txid, * FROM %[1]s ORDER BY xmin::text::bigint;
+// A discussion on the use of XIDs as query cursors:
+//
+// XID values are 32-bit unsigned integers with implicit wraparound on overflow and underflow.
+// The lowest 'normal' XID value is 3. The values 0-2 are reserved as sentinels, with 2 being
+// the "Frozen XID" value.
+//
+// While Postgres has a comparison function `TransactionIdPrecedes()` internally, this is not
+// exposed in the form of a comparison predicate or ordering method. So we have to cast XIDs
+// to integers (by way of text) and then reimplement the desired ordering behavior ourselves.
+//
+// Given a particular "cursor" value obtained from a previous polling query execution, we can
+// begin by assuming that there are fewer than 2^31 "live" XIDs greater than that cursor. The
+// issue is that with XID wraparound some of these values may be numerically smaller. Given a
+// wrapping uint32 wrapping subtraction operator the expression `xmin - cursor` would compute
+// an orderable count of "how far past the previous cursor" a given row is.
+//
+// We can emulate wrapping uint32 subtraction using PostgreSQL int64 values by simply writing
+// the expression `((x::bigint - y::bigint)<<32)>>32`.
+//
+// The xmin polling query below assumes that the source table is updated more frequently than
+// the XID epoch wraps around. If this assumption is violated it would in principle be doable
+// to `SELECT txid_current() as polled_txid, ...` and use "polled_txid" as the cursor value.
+const tableQueryTemplate = `{{if .IsFirstQuery -}}
+  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} ORDER BY xmin::text::bigint;
 {{- else -}}
-  SELECT xmin AS txid, * FROM %[1]s WHERE xmin::text::bigint > $1 ORDER BY xmin::text::bigint;
-{{- end}}`
-
-// This is currently unused, but is a useful example of how the function
-// generatePostgresResource might be extended to support view discovery.
-const viewQueryTemplateTemplate = `{{if .IsFirstQuery -}}
-  {{- /* This query will be executed first, without cursor values */ -}}
-  SELECT * FROM %[1]s;
-{{- else -}}
-  {{- /**************************************************************
-       * Subsequently (if cursor columns are listed in the resource *
-	   * config) this query will be executed with the value(s) from *
-	   * the last row of the previous query provided as parameters. *
-	   *                                                            *
-	   * Consult the connector documentation for examples.          *
-       **************************************************************/ -}}
-  SELECT * FROM %[1]s WHERE columnName > queryParameter;
+  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}}
+    WHERE (((xmin::text::bigint - $1::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3
+    ORDER BY (((xmin::text::bigint - $1::bigint)<<32)>>32);
 {{- end}}`
 
 func quoteTableName(schema, table string) string {
-	return fmt.Sprintf(`"%s"."%s"`, schema, table)
+	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
+}
+
+var templateFuncs = template.FuncMap{
+	"quoteTableName":  quoteTableName,
+	"quoteIdentifier": quoteIdentifier,
 }
 
 func generatePostgresResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	var queryTemplate string
-	var cursorColumns []string
-	if strings.EqualFold(tableType, "BASE TABLE") {
-		queryTemplate = fmt.Sprintf(tableQueryTemplateTemplate, quoteTableName(schemaName, tableName))
-		cursorColumns = []string{"txid"}
-	} else {
+	if !strings.EqualFold(tableType, "BASE TABLE") {
 		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 	}
 
 	return &Resource{
-		Name:     resourceName,
-		Template: queryTemplate,
-		Cursor:   cursorColumns,
+		Name:       resourceName,
+		SchemaName: schemaName,
+		TableName:  tableName,
+		Cursor:     []string{"txid"},
 	}, nil
 }
 
@@ -161,11 +171,12 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 }
 
 var postgresDriver = &BatchSQLDriver{
-	DocumentationURL: "https://go.estuary.dev/source-postgres-batch",
-	ConfigSchema:     generateConfigSchema(),
-	Connect:          connectPostgres,
-	GenerateResource: generatePostgresResource,
-	TranslateValue:   translatePostgresValue,
+	DocumentationURL:     "https://go.estuary.dev/source-postgres-batch",
+	ConfigSchema:         generateConfigSchema(),
+	Connect:              connectPostgres,
+	GenerateResource:     generatePostgresResource,
+	TranslateValue:       translatePostgresValue,
+	DefaultQueryTemplate: tableQueryTemplate,
 }
 
 func generateConfigSchema() json.RawMessage {

@@ -2,17 +2,20 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	_ "github.com/go-mysql-org/go-mysql/driver"
 
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/sirupsen/logrus"
@@ -20,13 +23,18 @@ import (
 )
 
 var (
-	dbAddress = flag.String("db_address", "localhost:3306", "The database server address to use for tests")
-	dbName    = flag.String("db_name", "mysql", "Use the named database for tests")
+	dbName = flag.String("db_name", "mysql", "Use the named database for tests")
 
-	dbControlUser = flag.String("db_control_user", "root", "The user for test setup/control operations")
-	dbControlPass = flag.String("db_control_pass", "secret1234", "The password the the test setup/control user")
-	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
-	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+	dbCaptureAddress = flag.String("db_capture_address", "localhost:3306", "The database server address to use for test captures")
+	dbCaptureUser    = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
+	dbCapturePass    = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+
+	dbControlAddress = flag.String("db_control_address", "localhost:3306", "The database server address to use for test setup/control operations. Leave unset to use capture settings.")
+	dbControlUser    = flag.String("db_control_user", "root", "The user for test setup/control operations. Leave unset to use capture settings.")
+	dbControlPass    = flag.String("db_control_pass", "secret1234", "The password the the test setup/control user. Leave unset to use capture settings.")
+
+	useMyISAM                = flag.Bool("use_myisam_engine", false, "When set, all test tables will be created using the MyISAM storage engine")
+	skipBinlogRetentionCheck = flag.Bool("skip_binlog_retention_check", false, "When set, skips the binlog retention sanity check")
 )
 
 const testSchemaName = "test"
@@ -43,7 +51,6 @@ func TestMain(m *testing.M) {
 	} else {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
-	fixMysqlLogging()
 
 	os.Exit(m.Run())
 }
@@ -55,21 +62,32 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 		return nil
 	}
 
+	// During tests, establish a fence every 3 seconds during indefinite streaming.
+	sqlcapture.StreamingFenceInterval = 3 * time.Second
+
+	// During tests, the stream-to-fence watchdog timeout should be much lower.
+	streamToFenceWatchdogTimeout = 2 * time.Second
+
 	logrus.WithFields(logrus.Fields{
 		"user": *dbControlUser,
-		"addr": *dbAddress,
+		"addr": *dbControlAddress,
 	}).Info("opening control connection")
-	var conn, err = client.Connect(*dbAddress, *dbControlUser, *dbControlPass, *dbName)
+	var conn, err = client.Connect(*dbControlAddress, *dbControlUser, *dbControlPass, *dbName)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
 
+	if *useMyISAM { // Allow manual testing against MyISAM tables
+		conn.Execute("SET default_storage_engine = MyISAM;")
+	}
+
 	// Construct the capture config
 	var captureConfig = Config{
-		Address:  *dbAddress,
+		Address:  *dbCaptureAddress,
 		User:     *dbCaptureUser,
 		Password: *dbCapturePass,
 		Advanced: advancedConfig{
-			DBName: *dbName,
+			DBName:                   *dbName,
+			SkipBinlogRetentionCheck: *skipBinlogRetentionCheck,
 		},
 	}
 	captureConfig.Advanced.BackfillChunkSize = 16
@@ -86,6 +104,8 @@ type testBackend struct {
 	config  Config
 }
 
+func (tb *testBackend) UpperCaseMode() bool { return false }
+
 func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 	var prevBufferSize = replicationBufferSize
 	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
@@ -95,8 +115,8 @@ func (tb *testBackend) lowerTuningParameters(t testing.TB) {
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
-	sanitizers[`"binlog.000123:56789:123"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+:[0-9]+"`)
-	sanitizers[`"binlog.000123:56789"`] = regexp.MustCompile(`"binlog\.[0-9]+:[0-9]+"`)
+	sanitizers[`"cursor":"binlog.000123:56789:123"`] = regexp.MustCompile(`"cursor":".+\.[0-9]+:[0-9]+:[0-9]+"`)
+	sanitizers[`"cursor":"binlog.000123:56789"`] = regexp.MustCompile(`"cursor":".+\.[0-9]+:[0-9]+"`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 	sanitizers[`"txid":"11111111-1111-1111-1111-111111111111:111"`] = regexp.MustCompile(`"txid":"[0-9a-f-]+:[0-9]+"`)
 
@@ -459,49 +479,27 @@ func TestAlterTable_AddEnumColumn(t *testing.T) {
 	t.Run("rebackfilled", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-// TestBinlogExpirySanityCheck verifies that the "dangerously short binlog expiry"
-// sanity check is working as intended.
-func TestBinlogExpirySanityCheck(t *testing.T) {
+func TestAlterTable_AddUnsignedColumn(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
-	var cs = tb.CaptureSpec(ctx, t)
+	var uniqueID = "57413089"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
 
-	for idx, tc := range []struct {
-		VarName     string
-		VarValue    int
-		SkipCheck   bool
-		ExpectError bool
-		Message     string
-	}{
-		{"binlog_expire_logs_seconds", 2592000, false, false, "A 30-day expiry should not produce an error"},
-		{"binlog_expire_logs_seconds", 604800, false, false, "A 7-day expiry should not produce an error"},
-		{"binlog_expire_logs_seconds", 518400, false, true, "A 6-day expiry *should* produce an error"},
-		{"binlog_expire_logs_seconds", 518400, true, false, "A 6-day expiry should not produce an error if we skip the sanity check"},
-		{"expire_logs_days", 30, false, false, "A 30-day expiry should not produce an error"},
-		{"expire_logs_days", 7, false, false, "A 7-day expiry should not produce an error"},
-		{"expire_logs_days", 6, false, true, "A 6-day expiry *should* produce an error"},
-		{"expire_logs_days", 6, true, false, "A 6-day expiry should not produce an error if we skip the sanity check"},
-		{"binlog_expire_logs_seconds", 0, false, false, "A value of zero should also not produce an error"},
-		{"binlog_expire_logs_seconds", 2592000, false, false, "Resetting expiry back to the default value"},
-	} {
-		t.Run(fmt.Sprintf("%d_%s_%d", idx, tc.VarName, tc.VarValue), func(t *testing.T) {
-			// Set both expiry variables to their desired values. We start by setting them
-			// both to zero because MySQL only allows one at a time to be nonzero.
-			tb.Query(ctx, t, "SET GLOBAL binlog_expire_logs_seconds = 0;")
-			tb.Query(ctx, t, "SET GLOBAL expire_logs_days = 0;")
-			tb.Query(ctx, t, fmt.Sprintf("SET GLOBAL %s = %d;", tc.VarName, tc.VarValue))
+	t.Run("discover1", func(t *testing.T) { tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 
-			// Perform validation, which should run the sanity check
-			cs.EndpointSpec.(*Config).Advanced.SkipBinlogRetentionCheck = tc.SkipCheck
-			var _, err = cs.Validate(ctx, t)
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-			// Verify the result
-			if tc.ExpectError {
-				require.Error(t, err, tc.Message)
-			} else {
-				require.NoError(t, err, tc.Message)
-			}
-		})
-	}
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN uintval BIGINT UNSIGNED;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{
+		{3, "eee", "17777777777777777777"},
+		{4, "fff", "18000000000000000000"},
+	})
+	t.Run("discover2", func(t *testing.T) { tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+	t.Run("modified", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("rebackfilled", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
 func TestSkipBackfills(t *testing.T) {
@@ -568,10 +566,18 @@ func TestComplexDataset(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
 
 	t.Run("init", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[13] // Next restart between (1940, 'NV') and (1940, 'NY')
-		logrus.WithField("checkpoint", string(cs.Checkpoint)).Warn("restart at")
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 130
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0x94, 0x01, 0x4e, 0x56, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
@@ -580,9 +586,18 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
 	})
 	t.Run("restart1", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[10] // Next restart in the middle of 1980 data
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 230
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0xbc, 0x01, 0x4e, 0x48, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
@@ -595,4 +610,25 @@ func TestComplexDataset(t *testing.T) {
 		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
 	})
+}
+
+// TestNonCommitFinalQuery sets up a situation where the capture needs to resume
+// and stream to a fence, but the database is idle and the final event in the WAL
+// is not a transaction commit.
+//
+// This can be a tricky situation for a positional fence mechanism to handle.
+func TestNonCommitFinalQuery(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "82446880"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, "aaa"}, {1, "bbb"}})
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	tests.RunCapture(ctx, t, cs)
+	cs.Reset()
+
+	// The ALTER TABLE query here should be a no-op
+	tb.Insert(ctx, t, tableName, [][]any{{2, "ccc"}, {3, "ddd"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableName))
+	tests.VerifiedCapture(ctx, t, cs)
 }

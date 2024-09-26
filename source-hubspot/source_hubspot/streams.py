@@ -447,8 +447,9 @@ class Stream(HttpStream, ABC):
         # Here we define both the new expiry date and its copy
         # This will be used to compare wether the token expiry date has rotated
         # if the token has a new expiry date, it means we have a new token
-        self.authenticator._token_expiry_date = self.authenticator._token_expiry_date.subtract(minutes=2)
-        old_expiry_date = deepcopy(self.authenticator._token_expiry_date)
+        if type(self.authenticator) is Oauth2Authenticator: 
+            self.authenticator._token_expiry_date = self.authenticator._token_expiry_date.subtract(minutes=2)
+            old_expiry_date = deepcopy(self.authenticator._token_expiry_date)
         try:
             while not pagination_complete:
                 properties = self._property_wrapper
@@ -472,7 +473,7 @@ class Stream(HttpStream, ABC):
                 # our token has expired and calculate the new _token_expiry_date
                 # then, we compare with the deep copy of the last token expiry date
                 # if its different, that means we have a new token. 
-                if old_expiry_date != self.authenticator._token_expiry_date:
+                if type(self.authenticator) is Oauth2Authenticator and old_expiry_date != self.authenticator._token_expiry_date:
                     # this means that we got a new token
                     self.logger.info(" GOT NEW TOKEN ")
                     self.authenticator._token_expiry_date = self.authenticator._token_expiry_date.subtract(minutes=2)

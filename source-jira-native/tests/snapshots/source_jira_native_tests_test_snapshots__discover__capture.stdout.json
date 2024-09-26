@@ -1,0 +1,2073 @@
+[
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of an application role.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "description": "The key identifier of the application role.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/key"
+    ],
+    "recommendedName": "application_roles",
+    "resourceConfig": {
+      "stream": "application_roles",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "List of system avatars.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the avatar.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "avatars",
+    "resourceConfig": {
+      "stream": "avatars",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "Unique identifier of the board.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "boards",
+    "resourceConfig": {
+      "stream": "boards",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier of the issue",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "board_issues",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "board_issues",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of a dashboard.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the dashboard.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "dashboards",
+    "resourceConfig": {
+      "stream": "dashboards",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of a filter.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier for the filter.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "filters",
+    "resourceConfig": {
+      "stream": "filters",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of a share permission for the filter.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier of the share permission.",
+          "readOnly": true,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "filter_sharing",
+    "resourceConfig": {
+      "stream": "filter_sharing",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "The list of groups found in a search, including header text (Showing X of Y matching groups) and total of matched groups.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "groupId": {
+          "description": "The ID of the group, if available, which uniquely identifies the group across all Atlassian products. For example, *952d12c3-5b5b-4d04-bb32-44d383afc4b2*.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "groupId"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/groupId"
+    ],
+    "recommendedName": "groups",
+    "resourceConfig": {
+      "stream": "groups",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique ID of the issue.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issues",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "issues",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the comment.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_comments",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "issue_comments",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about a field.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the field.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_fields",
+    "resourceConfig": {
+      "stream": "issue_fields",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of a field configuration.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the field configuration.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_field_configurations",
+    "resourceConfig": {
+      "stream": "issue_field_configurations",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "The details of a custom field context.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the context.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_custom_field_contexts",
+    "resourceConfig": {
+      "stream": "issue_custom_field_contexts",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of the custom field options for a context.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the custom field option.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_custom_field_options",
+    "resourceConfig": {
+      "stream": "issue_custom_field_options",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A list of issue link type beans.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the issue link type. Used as the type of issue link in `issueLink` resource. Required on create when `name` isn't provided. Otherwise, read only.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_link_types",
+    "resourceConfig": {
+      "stream": "issue_link_types",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of an issue navigator column item.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "value": {
+          "description": "The actual value/data associated with the label in the issue navigator column.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/value"
+    ],
+    "recommendedName": "issue_navigator_settings",
+    "resourceConfig": {
+      "stream": "issue_navigator_settings",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about a notification scheme.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the notification scheme.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_notification_schemes",
+    "resourceConfig": {
+      "stream": "issue_notification_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "An issue priority.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the issue priority.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_priorities",
+    "resourceConfig": {
+      "stream": "issue_priorities",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "An entity property, for more information see [Entity properties](https://developer.atlassian.com/cloud/jira/platform/jira-entity-properties/).",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "description": "The key of the property. Required on create and update.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/key"
+    ],
+    "recommendedName": "issue_properties",
+    "resourceConfig": {
+      "stream": "issue_properties",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of an issue remote link.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the link.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_remote_links",
+    "resourceConfig": {
+      "stream": "issue_remote_links",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of an issue resolution.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the issue resolution.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_resolutions",
+    "resourceConfig": {
+      "stream": "issue_resolutions",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "List of security schemes.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the issue security scheme.",
+          "readOnly": true,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_security_schemes",
+    "resourceConfig": {
+      "stream": "issue_security_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "Unique identifier for the issue transition",
+          "type": [
+            "string"
+          ]
+        },
+        "issueId": {
+          "description": "Identifier of the issue associated with the transition",
+          "type": [
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "issueId"
+      ],
+      "title": "Issue Transitions",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/issueId",
+      "/id"
+    ],
+    "recommendedName": "issue_transitions",
+    "resourceConfig": {
+      "stream": "issue_transitions",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of an issue type scheme.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier for the issue type scheme.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_type_schemes",
+    "resourceConfig": {
+      "stream": "issue_type_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about an issue type.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the issue type.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_types",
+    "resourceConfig": {
+      "stream": "issue_types",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of an issue type screen scheme.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the issue type screen scheme.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_type_screen_schemes",
+    "resourceConfig": {
+      "stream": "issue_type_screen_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "The details of votes on an issue.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "self": {
+          "description": "The URL of these issue vote details.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "self"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/self"
+    ],
+    "recommendedName": "issue_votes",
+    "resourceConfig": {
+      "stream": "issue_votes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "The details of watchers on an issue.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "self": {
+          "description": "The URL of these issue watcher details.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "self"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/self"
+    ],
+    "recommendedName": "issue_watchers",
+    "resourceConfig": {
+      "stream": "issue_watchers",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of a worklog.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the worklog record.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "issue_worklogs",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "issue_worklogs",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details of an application property.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique ID of the application property. The ID is the same as the key.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "jira_settings",
+    "resourceConfig": {
+      "stream": "jira_settings",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "label": {
+          "description": "The label associated with the issue in Jira.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "label"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/label"
+    ],
+    "recommendedName": "labels",
+    "resourceConfig": {
+      "stream": "labels",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about permissions.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "description": "Unique key identifier for the permission",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/key"
+    ],
+    "recommendedName": "permissions",
+    "resourceConfig": {
+      "stream": "permissions",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "List of all permission schemes.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the permission scheme.",
+          "readOnly": true,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "permission_schemes",
+    "resourceConfig": {
+      "stream": "permission_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about a project.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the project.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "projects",
+    "resourceConfig": {
+      "stream": "projects",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Project Roles",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the project role.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "project_roles",
+    "resourceConfig": {
+      "stream": "project_roles",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "List of project avatars.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the avatar.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "project_avatars",
+    "resourceConfig": {
+      "stream": "project_avatars",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A project category.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the project category.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "project_categories",
+    "resourceConfig": {
+      "stream": "project_categories",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about a project component.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier for the component.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "project_components",
+    "resourceConfig": {
+      "stream": "project_components",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A project's sender email address.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "projectId": {
+          "description": "The unique identifier for the project.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/projectId"
+    ],
+    "recommendedName": "project_email",
+    "resourceConfig": {
+      "stream": "project_email",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about a security scheme.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the issue level security item.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "project_permission_schemes",
+    "resourceConfig": {
+      "stream": "project_permission_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about a project type.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "description": "The key of the project type.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/key"
+    ],
+    "recommendedName": "project_types",
+    "resourceConfig": {
+      "stream": "project_types",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique ID of the version.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "readOnly": true,
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "project_versions",
+    "resourceConfig": {
+      "stream": "project_versions",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the screen.",
+          "readOnly": true,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "screens",
+    "resourceConfig": {
+      "stream": "screens",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A screen tab.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the screen tab.",
+          "readOnly": true,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "screen_tabs",
+    "resourceConfig": {
+      "stream": "screen_tabs",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A screen tab field.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the screen tab field.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "screen_tab_fields",
+    "resourceConfig": {
+      "stream": "screen_tab_fields",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A screen scheme.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the screen scheme.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "screen_schemes",
+    "resourceConfig": {
+      "stream": "screen_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier for the sprint.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "sprints",
+    "resourceConfig": {
+      "stream": "sprints",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "ID of the issue",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "sprint_issues",
+    "resourceConfig": {
+      "cursorField": [
+        "updated"
+      ],
+      "stream": "sprint_issues",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "Details about the time tracking provider.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "key": {
+          "description": "The key associated with the time tracking provider.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/key"
+    ],
+    "recommendedName": "time_tracking",
+    "resourceConfig": {
+      "stream": "time_tracking",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A user with details as permitted by the user's Atlassian Account privacy settings. However, be aware of these exceptions:\n\n *  User record deleted from Atlassian: This occurs as the result of a right to be forgotten request. In this case, `displayName` provides an indication and other parameters have default values or are blank (for example, email is blank).\n *  User record corrupted: This occurs as a results of events such as a server import and can only happen to deleted users. In this case, `accountId` returns *unknown* and all other parameters have fallback values.\n *  User record unavailable: This usually occurs due to an internal service outage. In this case, all parameters have fallback values.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "accountId": {
+          "description": "The account ID of the user, uniquely identifying the user across all Atlassian products. Required in requests.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/accountId"
+    ],
+    "recommendedName": "users",
+    "resourceConfig": {
+      "stream": "users",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A user with details as permitted by the user's Atlassian Account privacy settings. However, be aware of these exceptions:\n\n *  User record deleted from Atlassian: This occurs as the result of a right to be forgotten request. In this case, `displayName` provides an indication and other parameters have default values or are blank (for example, email is blank).\n *  User record corrupted: This occurs as a results of events such as a server import and can only happen to deleted users. In this case, `accountId` returns *unknown* and all other parameters have fallback values.\n *  User record unavailable: This usually occurs due to an internal service outage. In this case, all parameters have fallback values.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "accountId": {
+          "description": "The account ID of the user, uniquely identifying the user across all Atlassian products. Required in requests.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "accountId"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/accountId"
+    ],
+    "recommendedName": "users_groups_detailed",
+    "resourceConfig": {
+      "stream": "users_groups_detailed",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "entity_id": {
+          "type": "string"
+        }
+      },
+      "readOnly": true,
+      "required": [
+        "entity_id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/entity_id"
+    ],
+    "recommendedName": "workflows",
+    "resourceConfig": {
+      "stream": "workflows",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the workflow scheme.",
+          "readOnly": true,
+          "type": "integer"
+        }
+      },
+      "readOnly": true,
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "workflow_schemes",
+    "resourceConfig": {
+      "stream": "workflow_schemes",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A status.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the status.",
+          "readOnly": true,
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "workflow_statuses",
+    "resourceConfig": {
+      "stream": "workflow_statuses",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "description": "A status category.",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The ID of the status category.",
+          "readOnly": true,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "workflow_status_categories",
+    "resourceConfig": {
+      "stream": "workflow_status_categories",
+      "syncMode": "full_refresh"
+    }
+  }
+]

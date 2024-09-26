@@ -1,0 +1,49 @@
+---
+tap_stream_id: carrier_services
+replication_method: FULL_TABLE
+key_properties:
+  - id
+stream: carrier_services
+metadata:
+  - breadcrumb:
+      - properties
+      - active
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - callback_url
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - id
+    metadata:
+      inclusion: automatic
+  - breadcrumb:
+      - properties
+      - name
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - service_discovery
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb:
+      - properties
+      - admin_graphql_api_id
+    metadata:
+      inclusion: available
+      selected: true
+  - breadcrumb: []
+    metadata:
+      inclusion: available
+      selected: true
+      selected-by-default: true
+      table-key-properties:
+        - id

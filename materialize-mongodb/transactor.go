@@ -31,6 +31,7 @@ const (
 )
 
 type transactor struct {
+	cfg      *config
 	client   *mongo.Client
 	bindings []*binding
 }
@@ -132,28 +133,40 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		key := fmt.Sprintf("%x", it.PackedKey) // Hex-encode
 
-		var doc bson.M
-		if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
-			return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
-		}
-		// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
-		// _id for each record we insert
-		if !t.bindings[it.Binding].deltaUpdates {
-			doc[idField] = key
-		}
-
-		var m mongo.WriteModel
-		if it.Exists {
-			m = &mongo.ReplaceOneModel{
-				Filter:      bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}},
-				Replacement: doc,
+		if it.Delete && t.cfg.HardDelete {
+			if it.Exists {
+				del := &mongo.DeleteOneModel{Filter: map[string]string{idField: key}}
+				batch = append(batch, del)
+				batchSize += len(key)
+			} else {
+				// Ignore items which do not exist and are already deleted
+				continue
 			}
 		} else {
-			m = &mongo.InsertOneModel{Document: doc}
+			var doc bson.M
+			if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
+				return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
+			}
+			// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
+			// _id for each record we insert
+			if !t.bindings[it.Binding].deltaUpdates {
+				doc[idField] = key
+			}
+
+			var m mongo.WriteModel
+			if it.Exists {
+				m = &mongo.ReplaceOneModel{
+					Filter:      bson.D{{Key: idField, Value: bson.D{{Key: "$eq", Value: key}}}},
+					Replacement: doc,
+				}
+			} else {
+				m = &mongo.InsertOneModel{Document: doc}
+			}
+
+			batch = append(batch, m)
+			batchSize += len(it.RawJSON)
 		}
 
-		batch = append(batch, m)
-		batchSize += len(it.RawJSON)
 		lastBinding = it.Binding
 	}
 
@@ -238,13 +251,15 @@ func (t *transactor) storeWorker(
 				return nil
 			}
 
-			var expectModified, expectInserted int64
+			var expectModified, expectInserted, expectDeleted int64
 			for _, m := range batch.models {
 				switch m.(type) {
 				case *mongo.ReplaceOneModel:
 					expectModified++
 				case *mongo.InsertOneModel:
 					expectInserted++
+				case *mongo.DeleteOneModel:
+					expectDeleted++
 				default:
 					return fmt.Errorf("invalid model type: %T", m)
 				}
@@ -259,8 +274,12 @@ func (t *transactor) storeWorker(
 				return fmt.Errorf("bulk write for collection %s: %w", collection.Name(), err)
 			}
 
-			// Sanity check the result of the bulk write operation.
-			if res.ModifiedCount != expectModified || res.InsertedCount != expectInserted {
+			// Sanity check the result of the bulk write operation. For updated documents, we check
+			// MatchedCount instead of ModifiedCount since certain Flow reduction strategies can
+			// result in identical documents being stored, and MongoDB does not report an attempted
+			// "replace" with an identical document as an update when it's part of a bulk write
+			// operation.
+			if res.MatchedCount != expectModified || res.InsertedCount != expectInserted || res.DeletedCount != expectDeleted {
 				logrus.WithFields(logrus.Fields{
 					"deleted":        res.DeletedCount,
 					"inserted":       res.InsertedCount,
@@ -269,14 +288,19 @@ func (t *transactor) storeWorker(
 					"upserted":       res.UpsertedCount,
 					"expectModified": expectModified,
 					"expectInserted": expectInserted,
+					"expectDeleted":  expectDeleted,
 				}).Warn("bulk write counts")
 
 				return fmt.Errorf(
-					"unexpected bulkWrite counts: got %d modified vs %d expected, %d inserted vs %d expected",
-					res.UpsertedCount,
+					"unexpected bulkWrite counts for MongoDB collection %s.%s: got %d matched vs %d expected, %d inserted vs %d expected, %d deleted vs %d expected",
+					collection.Database().Name(),
+					collection.Name(),
+					res.MatchedCount,
 					expectModified,
 					res.InsertedCount,
 					expectInserted,
+					res.DeletedCount,
+					expectDeleted,
 				)
 			}
 		}

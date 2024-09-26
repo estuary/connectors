@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -37,7 +41,10 @@ const (
 	// progress report is currently just the count of stream documents that have been processed,
 	// which provides a nice indication in the logs of what the capture is doing when it is reading
 	// change streams.
-	streamLoggerInterval = 1 * time.Minute
+	streamLoggerInterval = 5 * time.Minute
+
+	// The default polling schedule if none is supplied by the user.
+	defualtBatchPollingSchedule = "24h"
 )
 
 // Pull is a very long lived RPC through which the Flow runtime and a
@@ -48,21 +55,44 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("parsing config json: %w", err)
 	}
 
-	var bindings = make([]bindingInfo, len(open.Capture.Bindings))
-	var resourceBindingInfo = make(map[string]bindingInfo)
+	if cfg.PollSchedule == "" {
+		cfg.PollSchedule = defualtBatchPollingSchedule
+	}
+	defaultSched, err := schedule.Parse(cfg.PollSchedule)
+	if err != nil {
+		return fmt.Errorf("invalid default poll schedule: %w", err)
+	}
+
+	var changeStreamBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
+	var batchBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
+	var trackedChangeStreamBindings = make(map[string]bindingInfo)
 	for idx, binding := range open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
-		var sk = boilerplate.StateKey(binding.StateKey)
-		bindings[idx] = bindingInfo{
+
+		info := bindingInfo{
 			resource: res,
 			index:    idx,
-			stateKey: sk,
+			stateKey: boilerplate.StateKey(binding.StateKey),
 		}
-		resourceBindingInfo[resourceId(res)] = bindings[idx]
+
+		if res.getMode() == captureModeChangeStream {
+			changeStreamBindings = append(changeStreamBindings, info)
+			trackedChangeStreamBindings[resourceId(res.Database, res.Collection)] = info
+		} else {
+			info.schedule = defaultSched
+			if res.PollSchedule != "" {
+				info.schedule, err = schedule.Parse(res.PollSchedule)
+				if err != nil {
+					return fmt.Errorf("invalid poll schedule for %q: %w", binding.ResourcePath, err)
+				}
+			}
+			batchBindings = append(batchBindings, info)
+		}
 	}
+	allBindings := append(changeStreamBindings, batchBindings...)
 
 	var ctx = stream.Context()
 
@@ -77,33 +107,22 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}()
 
-	log.Info("connected to database")
-
-	// Log some basic information about the database we are connected to if possible. buildInfo is
-	// an administrator command so it may not be available on all databases / configurations.
-	if info, err := getBuildInfo(ctx, client); err != nil {
-		log.WithError(err).Info("could not query buildInfo")
-	} else {
-		log.WithFields(log.Fields{
-			"version": info.Version,
-		}).Info("buildInfo")
-	}
-
 	var prevState captureState
 	if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
 		return fmt.Errorf("unmarshalling previous state: %w", err)
 	}
 
-	prevState, err = updateResourceStates(prevState, bindings)
+	prevState, err = updateResourceStates(prevState, allBindings)
 	if err != nil {
 		return fmt.Errorf("updating resource states: %w", err)
 	}
 
 	var c = capture{
-		client:              client,
-		output:              stream,
-		state:               prevState,
-		resourceBindingInfo: resourceBindingInfo,
+		client:                      client,
+		output:                      stream,
+		state:                       prevState,
+		trackedChangeStreamBindings: trackedChangeStreamBindings,
+		lastEventClusterTime:        make(map[string]primitive.Timestamp),
 	}
 
 	if err := c.output.Ready(false); err != nil {
@@ -118,41 +137,74 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("outputting prevState checkpoint: %w", err)
 	}
 
+	if len(allBindings) == 0 {
+		// No bindings to capture.
+		return nil
+	}
+
+	serverInfo, err := getServerInfo(ctx, cfg, client, allBindings[0].resource.Database)
+	if err != nil {
+		return fmt.Errorf("checking server info: %w", err)
+	}
+	log.WithFields(log.Fields{
+		"version":               serverInfo.version,
+		"supportsChangeStreams": serverInfo.supportsChangeStreams,
+		"supportsPreImages":     serverInfo.supportsPreImages,
+	}).Info("connected to database")
+
+	coordinator := newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
+		return getClusterOpTime(ctx, client)
+	})
+
 	didBackfill := false
-	for !prevState.isBackfillComplete(bindings) {
+	for !prevState.isChangeStreamBackfillComplete(changeStreamBindings) {
+		if !didBackfill {
+			log.Info("backfilling incremental change stream collections")
+		}
 		didBackfill = true
+
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
-		// backfill is in progress. The first call to initializeStreams opens change stream cursors,
-		// and streamCatchup catches up the streams to the present and closes the cursors out while
-		// the backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, bindings); err != nil {
+		// backfill is in progress.
+		if streams, err := c.initializeStreams(ctx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
 			return err
-		} else if err := c.streamCatchup(ctx, streams); err != nil {
+		} else if err := coordinator.startCatchingUp(ctx); err != nil {
 			return err
-		} else if err := c.backfillCollections(ctx, bindings, backfillFor); err != nil {
+		} else if err := c.streamChanges(ctx, coordinator, streams, true); err != nil {
+			return err
+		} else if err := c.backfillChangeStreamCollections(ctx, coordinator, changeStreamBindings, backfillFor); err != nil {
 			return err
 		}
 	}
 
 	if didBackfill {
-		log.Info("backfill complete")
+		log.Info("finished backfill of incremental change stream collections")
+	}
+	group, groupCtx := errgroup.WithContext(ctx)
+
+	if len(changeStreamBindings) > 0 {
+		log.Info("streaming change events indefinitely")
+		streams, err := c.initializeStreams(groupCtx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter)
+		if err != nil {
+			return err
+		}
+		group.Go(func() error { return c.streamChanges(groupCtx, coordinator, streams, false) })
+	}
+	if len(batchBindings) > 0 {
+		log.Info("processing scheduled batch collections indefinitely")
+		group.Go(func() error { return c.backfillBatchCollections(groupCtx, coordinator, batchBindings) })
+	}
+	if len(batchBindings) > 0 && len(changeStreamBindings) > 0 {
+		group.Go(func() error { return coordinator.startRepeatingStreamCatchups(groupCtx) })
 	}
 
-	// Once all tables are done backfilling, we can read change streams forever.
-	if streams, err := c.initializeStreams(ctx, bindings); err != nil {
-		return err
-	} else if err := c.streamForever(ctx, streams); err != nil {
-		return fmt.Errorf("streaming changes forever: %w", err)
-	}
-
-	return nil
+	return group.Wait()
 }
 
 type capture struct {
-	client              *mongo.Client
-	output              *boilerplate.PullOutput
-	resourceBindingInfo map[string]bindingInfo
+	client                      *mongo.Client
+	output                      *boilerplate.PullOutput
+	trackedChangeStreamBindings map[string]bindingInfo
 
 	// mu provides synchronization for values that are accessed by concurrent backfill and change
 	// stream goroutines.
@@ -160,16 +212,30 @@ type capture struct {
 	state                 captureState
 	processedStreamEvents int
 	emittedStreamDocs     int
+	lastEventClusterTime  map[string]primitive.Timestamp
+}
 
-	// Controls for starting and stopping the stream progress logger.
-	streamLoggerStop   chan (struct{})
-	streamLoggerActive sync.WaitGroup
+func getClusterOpTime(ctx context.Context, client *mongo.Client) (primitive.Timestamp, error) {
+	var out primitive.Timestamp
+
+	// Note: Although we are using the "admin" database, this command works for any database, even
+	// if it doesn't exist, no matter what permissions the connecting user has.
+	if raw, err := client.Database("admin").RunCommand(ctx, bson.M{"hello": "1"}).Raw(); err != nil {
+		return out, fmt.Errorf("running 'hello' command: %w", err)
+	} else if opRaw, err := raw.LookupErr("operationTime"); err != nil {
+		return out, fmt.Errorf("looking up 'operationTime' field: %w", err)
+	} else if err := opRaw.Unmarshal(&out); err != nil {
+		return out, fmt.Errorf("unmarshaling 'operationTime' field: %w", err)
+	}
+
+	return out, nil
 }
 
 type bindingInfo struct {
 	resource resource
 	index    int
 	stateKey boilerplate.StateKey
+	schedule schedule.Schedule
 }
 
 type captureState struct {
@@ -177,7 +243,7 @@ type captureState struct {
 	DatabaseResumeTokens map[string]bson.Raw                    `json:"databaseResumeTokens,omitempty"`
 }
 
-func updateResourceStates(prevState captureState, bindings []bindingInfo) (captureState, error) {
+func updateResourceStates(prevState captureState, allBindings []bindingInfo) (captureState, error) {
 	var newState = captureState{
 		Resources:            make(map[boilerplate.StateKey]resourceState),
 		DatabaseResumeTokens: make(map[string]bson.Raw),
@@ -185,22 +251,26 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 
 	trackedDatabases := make(map[string]struct{})
 
-	// Only include bindings in the state that are currently active bindings. This is necessary
-	// because the Flow runtime does not yet automatically prune stateKeys that are no longer
-	// included as bindings. A binding becomes inconsistent once removed from the capture
-	// because its change events will begin to be filtered out, and must start over if ever
-	// re-added.
+	// Only include bindings in the state that are currently active bindings.
+	// This is necessary because the Flow runtime does not yet automatically
+	// prune stateKeys that are no longer included as bindings. Also, a change
+	// stream binding becomes inconsistent once removed from the capture because
+	// its change events will begin to be filtered out, and must start over if
+	// ever re-added.
 	if prevState.Resources != nil {
-		for _, binding := range bindings {
+		for _, binding := range allBindings {
 			var sk = binding.stateKey
 			if resState, ok := prevState.Resources[sk]; ok {
 				newState.Resources[sk] = resState
-				trackedDatabases[binding.resource.Database] = struct{}{}
+				if binding.resource.getMode() == captureModeChangeStream {
+					trackedDatabases[binding.resource.Database] = struct{}{}
+				}
 			}
 		}
 	}
 
-	// Reset the database resume tokens if there are no active bindings for a given database.
+	// Reset the database resume tokens if there are no active change stream
+	// bindings for a given database.
 	for db, tok := range prevState.DatabaseResumeTokens {
 		if _, ok := trackedDatabases[db]; !ok {
 			log.WithFields(log.Fields{
@@ -216,9 +286,9 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 	return newState, nil
 }
 
-func (s *captureState) isBackfillComplete(bindings []bindingInfo) bool {
-	for _, b := range bindings {
-		if !s.Resources[b.stateKey].Backfill.Done {
+func (s *captureState) isChangeStreamBackfillComplete(changeStreamBindings []bindingInfo) bool {
+	for _, b := range changeStreamBindings {
+		if !s.Resources[b.stateKey].Backfill.done() {
 			return false
 		}
 	}
@@ -230,9 +300,21 @@ func (s *captureState) Validate() error {
 }
 
 type backfillState struct {
-	Done           bool           `json:"done,omitempty"`
-	LastId         *bson.RawValue `json:"last_id,omitempty"`
-	BackfilledDocs int            `json:"backfilled_docs,omitempty"`
+	Done *bool `json:"done,omitempty"`
+	// TODO(whb): LastCursorValue is serialized as "last_id" for backward
+	// compatibility. I may change this later with a state migration but am
+	// refraining from doing it right now.
+	LastCursorValue *bson.RawValue `json:"last_id,omitempty"`
+	BackfilledDocs  int            `json:"backfilled_docs,omitempty"`
+	LastPollStart   *time.Time     `json:"last_poll_start,omitempty"`
+}
+
+func (s backfillState) done() bool {
+	return s.Done != nil && *s.Done
+}
+
+func makePtr[T any](in T) *T {
+	return &in
 }
 
 type resourceState struct {
@@ -310,17 +392,121 @@ func idToString(value interface{}) string {
 	return string(j)
 }
 
-type buildInfo struct {
-	Version string `bson:"version"`
+type serverInfo struct {
+	version               string
+	supportsPreImages     bool
+	supportsChangeStreams bool
 }
 
-func getBuildInfo(ctx context.Context, client *mongo.Client) (buildInfo, error) {
-	var info buildInfo
-	if res := client.Database("admin").RunCommand(ctx, bson.D{{"buildInfo", 1}}); res.Err() != nil {
-		return info, res.Err()
-	} else if err := res.Decode(&info); err != nil {
-		return info, err
-	} else {
-		return info, nil
+type buildInfo struct {
+	Version      string `bson:"version"`
+	VersionArray []int  `bson:"versionArray"`
+}
+
+func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, database string) (*serverInfo, error) {
+	var buildInfo buildInfo
+	if res := client.Database("admin").RunCommand(ctx, bson.D{{Key: "buildInfo", Value: 1}}); res.Err() != nil {
+		return nil, fmt.Errorf("running 'buildInfo' command: %w", res.Err())
+	} else if err := res.Decode(&buildInfo); err != nil {
+		return nil, fmt.Errorf("decoding buildInfo: %w", err)
 	}
+
+	if isDocDB, err := isDocumentDB(cfg.Address); err != nil {
+		return nil, err
+	} else if isDocDB {
+		// DocumentDB supports change streams sort-of. The main limitation is
+		// that they don't currently produce a post-batch resume token, so
+		// there's really no way for us to make sure that the most recently
+		// obtained token doesn't expire before new events are added to the
+		// change stream. This makes them basically unusable if the desire is to
+		// maintain 100% data consistency with the source, short of some more
+		// sophisticated strategy like watermarking that we aren't going to do
+		// right now.
+		return &serverInfo{
+			version:               buildInfo.Version,
+			supportsPreImages:     false,
+			supportsChangeStreams: false,
+		}, nil
+	}
+
+	changeStreams, err := supportsChangeStreams(ctx, client, database)
+	if err != nil {
+		return nil, fmt.Errorf("checking change stream support: %w", err)
+	}
+
+	var preImages bool
+	if changeStreams {
+		if preImages, err = supportsPreImages(ctx, client, database, buildInfo); err != nil {
+			return nil, fmt.Errorf("checking change stream pre-image support: %w", err)
+		}
+	}
+
+	return &serverInfo{
+		version:               buildInfo.Version,
+		supportsPreImages:     preImages,
+		supportsChangeStreams: changeStreams,
+	}, nil
+}
+
+func supportsChangeStreams(ctx context.Context, client *mongo.Client, database string) (bool, error) {
+	if cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{}); err != nil {
+		log.WithError(err).Info("connected server does not support change streams")
+		return false, nil
+	} else if err := cs.Close(ctx); err != nil {
+		return false, fmt.Errorf("closing change stream: %w", err)
+	}
+
+	return true, nil
+}
+
+// supportsPreImages returns true if the server supports pre-images. To support
+// pre-images, the server must be a sufficiently recent version, and it must
+// support the $changeStreamSplitLargeEvent pipeline stage that is required to
+// split large change event documents that may arise from including the
+// pre-image for updates to large documents.
+//
+// Support for the $changeStreamSplitLargeEvent pipeline stage was added in
+// version 6.0.9 and 7.0.0+, so that's the first thing we check. Some versions
+// of MongoDB Atlas also do not support the $changeStreamSplitLargeEvent
+// pipeline stage, and the only way to know if we are connecting to one of those
+// short of using the MongoDB Atlas admin API (which requires a separate API
+// key) is to just try opening a change stream with the option enabled and
+// seeing if it works or not.
+func supportsPreImages(ctx context.Context, client *mongo.Client, database string, b buildInfo) (bool, error) {
+	ll := log.WithField("version", b.Version)
+
+	if len(b.VersionArray) < 3 {
+		ll.WithField("VersionArray", b.VersionArray).Info("not requesting pre-images due to insufficient version information")
+		return false, nil
+	}
+
+	major := b.VersionArray[0]
+	minor := b.VersionArray[1]
+	patch := b.VersionArray[2]
+	sufficientVersion := major >= 7 || (major == 6 && patch >= 9) || (major == 6 && minor >= 1)
+
+	if !sufficientVersion {
+		ll.Info("not requesting pre-images because this MongoDB server version is too old")
+		return false, nil
+	}
+
+	// Try opening a change stream with the $changeStreamSplitLargeEvent
+	// pipeline stage.
+	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}})
+	if err != nil {
+		var commandError mongo.CommandError
+		if errors.As(err, &commandError) {
+			if commandError.Name == "AtlasError" && strings.HasPrefix(commandError.Message, "$changeStreamSplitLargeEvent is not allowed") {
+				ll.WithField("atlasError", err).Info("not requesting pre-images because this MongoDB Atlas instance does not support the $changeStreamSplitLargeEvent stage")
+				return false, nil
+			}
+		}
+		return false, fmt.Errorf("opening change stream to test for $changeStreamSplitLargeEvent support: %w", err)
+	}
+
+	if err := cs.Close(ctx); err != nil {
+		return false, fmt.Errorf("closing change stream: %w", err)
+	}
+
+	return true, nil
 }

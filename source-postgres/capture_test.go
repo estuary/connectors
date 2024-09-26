@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -10,9 +11,11 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/jackc/pglogrepl"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 // TestReplicaIdentity exercises the 'REPLICA IDENTITY' setting of a table,
@@ -283,10 +286,18 @@ func TestComplexDataset(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
 
 	t.Run("init", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[13] // Next restart between (1940, 'NV') and (1940, 'NY')
-		logrus.WithField("checkpoint", string(cs.Checkpoint)).Warn("restart at")
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2Fcomplexdataset_86827053"].BackfilledCount = 130
+		state.Streams["test%2Fcomplexdataset_86827053"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2Fcomplexdataset_86827053"].Scanned = []byte{0x16, 0x07, 0x94, 0x02, 0x4e, 0x56, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{
@@ -295,9 +306,18 @@ func TestComplexDataset(t *testing.T) {
 		{1990, "XX", "No Such State", 123456}, // An insert after the second restart, which will be visible in the table scan and should be filtered during replication
 	})
 	t.Run("restart1", func(t *testing.T) {
-		var summary, states = tests.RestartingBackfillCapture(ctx, t, cs)
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 		cupaloy.SnapshotT(t, summary)
-		cs.Checkpoint = states[10] // Next restart in the middle of 1980 data
+
+		// Rewind the backfill state to a specific reproducible point
+		var state sqlcapture.PersistentState
+		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
+		state.Streams["test%2Fcomplexdataset_86827053"].BackfilledCount = 230
+		state.Streams["test%2Fcomplexdataset_86827053"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2Fcomplexdataset_86827053"].Scanned = []byte{0x16, 0x07, 0xbc, 0x02, 0x4e, 0x48, 0x00}
+		var bs, err = json.Marshal(&state)
+		require.NoError(t, err)
+		cs.Checkpoint = bs
 	})
 
 	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE state = 'XX';", tableName))
@@ -465,12 +485,8 @@ func TestCaptureOversizedFields(t *testing.T) {
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = new(st.ChecksumValidator)
 
-	var oldCaptureShutdownDelay = tests.CaptureShutdownDelay
-	tests.CaptureShutdownDelay = 10 * time.Second
-	t.Cleanup(func() { tests.CaptureShutdownDelay = oldCaptureShutdownDelay })
-
-	var largeText = strings.Repeat("data", 4194304)         // 16MiB string
-	var largeJSON = fmt.Sprintf(`{"text":"%s"}`, largeText) // ~16MiB JSON object
+	var largeText = strings.Repeat("data", 4194304)          // 16MiB string
+	var largeJSON = fmt.Sprintf(`{"text": "%s"}`, largeText) // ~16MiB JSON object
 	tb.Insert(ctx, t, tableName, [][]any{
 		{0, largeText, []byte(largeText), largeJSON, largeJSON},
 		{1, largeText, []byte(largeText), largeJSON, largeJSON},
@@ -488,4 +504,50 @@ func TestCaptureOversizedFields(t *testing.T) {
 		})
 		tests.VerifiedCapture(ctx, t, cs)
 	})
+}
+
+func TestCaptureAfterSlotDropped(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "46115540"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	// Run a normal capture
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Drop the replication slot while the task is offline, and it should recreate
+	// the replication slot and then start failing because its saved position isn't
+	// valid any longer.
+	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
+	tb.Query(ctx, t, "SELECT pg_drop_replication_slot('flow_slot');")
+	tb.Insert(ctx, t, tableName, [][]any{{4, "four"}, {5, "five"}})
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// A subsequent capture run should still be failing since we haven't fixed it.
+	tb.Insert(ctx, t, tableName, [][]any{{6, "six"}, {7, "seven"}})
+	t.Run("capture3", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Append a version to the state key to simulate bumping the backfill counter for this binding.
+	cs.Bindings[0].StateKey += ".v2"
+	t.Run("capture4", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+// TestCaptureDomainJSONB exercises an edge case where a user-defined domain type
+// has a concrete type which uses a custom decoder registered in the PGX type map.
+func TestCaptureDomainJSONB(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "40925847"
+
+	tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
+	tb.Query(ctx, t, `CREATE DOMAIN UserDomain AS JSONB`)
+	t.Cleanup(func() { tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`) })
+
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data UserDomain NOT NULL)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, `{}`}, {1, `{"foo": "bar"}`}})
+	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]any{{2, `{"baz": [1, 2, 3]}`}, {3, `{"asdf": {"a": 1, "b": 2}}`}})
+	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }

@@ -19,10 +19,12 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		// in templates and this is most-frequently used with TablePath.Base().
 		"Identifier": func(p TablePath) string { return dialect.Identifier(p...) },
 		"Join":       func(s []string, delim string) string { return strings.Join(s, delim) },
+		"Split":      func(s string, delim string) []string { return strings.Split(s, delim) },
 		"Repeat":     func(n int) []bool { return make([]bool, n) },
 		"Add":        func(a, b int) int { return a + b },
 		"Contains":   func(s string, substr string) bool { return strings.Contains(s, substr) },
 		"Last":       func(s []string) string { return s[len(s)-1] },
+		"First":      func(s []string) string { return s[0] },
 	})
 	return template.Must(tpl.Parse(body))
 }

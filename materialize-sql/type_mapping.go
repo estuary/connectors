@@ -3,17 +3,13 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
-	"math/big"
+	"math"
 	"slices"
-	"strconv"
 	"strings"
-	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 // FlatType is a flattened, database-friendly representation of a document location's type.
@@ -22,17 +18,19 @@ import (
 // * Hoisting JSON `null` out of the type representation and into a separate orthogonal concern.
 type FlatType string
 
-// FlatType constants that are used by ColumnMapper
+// FlatType constants that are used by TypeMapper
 const (
-	ARRAY    FlatType = "array"
-	BINARY   FlatType = "binary"
-	BOOLEAN  FlatType = "boolean"
-	INTEGER  FlatType = "integer"
-	MULTIPLE FlatType = "multiple"
-	NEVER    FlatType = "never"
-	NUMBER   FlatType = "number"
-	OBJECT   FlatType = "object"
-	STRING   FlatType = "string"
+	ARRAY          FlatType = "array"
+	BINARY         FlatType = "binary"
+	BOOLEAN        FlatType = "boolean"
+	INTEGER        FlatType = "integer"
+	MULTIPLE       FlatType = "multiple"
+	NEVER          FlatType = "never"
+	NUMBER         FlatType = "number"
+	OBJECT         FlatType = "object"
+	STRING         FlatType = "string"
+	STRING_INTEGER FlatType = "string_integer"
+	STRING_NUMBER  FlatType = "string_number"
 )
 
 // Projection lifts a pf.Projection into a form that's more easily worked with for SQL column mapping.
@@ -96,15 +94,25 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 
 	// Compatible numeric formatted strings can be materialized as either integers or numbers,
 	// depending on the format string.
-	if _, ok := boilerplate.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
-		return STRING, mustExist
+	if format, ok := boilerplate.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
+		switch format {
+		case boilerplate.StringFormatInteger:
+			return STRING_INTEGER, mustExist
+		case boilerplate.StringFormatNumber:
+			return STRING_NUMBER, mustExist
+		}
 	}
 
 	var types []FlatType
 	for _, ty := range p.Inference.Types {
 		switch ty {
 		case "string":
-			types = append(types, STRING)
+
+			if p.Inference.String_.ContentEncoding == "base64" {
+				types = append(types, BINARY)
+			} else {
+				types = append(types, STRING)
+			}
 		case "integer":
 			types = append(types, INTEGER)
 		case "number", "fractional":
@@ -128,6 +136,16 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	}
 }
 
+// CompatibleColumnTypes is a list of column types that the mapped type
+// corresponding to the Flow field's schema is compatible with. By default the
+// DDL used to create the column is included in this list, so any additional
+// column types to be considered compatible for validation should be added using
+// the AlsoCompatibleWith variadic option when configuring the type mapping.
+// Most often this is used when the endpoint's information schema describes the
+// column in a different way than the DDL used to create it. Types are
+// case-insensitive.
+type CompatibleColumnTypes []string
+
 type MappedType struct {
 	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL
 	// for new table creation.
@@ -137,353 +155,256 @@ type MappedType struct {
 	NullableDDL string
 	// Converter of tuple elements for this mapping, into SQL runtime values.
 	Converter ElementConverter `json:"-"`
-	// ParsedFieldConfig is a Dialect-defined parsed implementation of the (optional)
-	// additional field configuration supplied within the field selection.
-	ParsedFieldConfig interface{}
+	// The list of compatible column types for this mapping. Any columns with
+	// types not in this list will produce an "unsatisfiable" constraint. The
+	// DDL used to create the column is included by default.
+	CompatibleColumnnTypes CompatibleColumnTypes
+	// If the column is using user-defined DDL or not. The selected field will
+	// always pass validation if this is true.
+	UserDefinedDDL bool
 }
 
-// ElementConverter maps from a TupleElement into a runtime type instance that's compatible with the SQL driver.
-type ElementConverter func(tuple.TupleElement) (interface{}, error)
+// MapProjectionFn is a function that converts a Projection into the column DDL
+// and element converter for storing values into the column.
+type MapProjectionFn func(p *Projection) (string, CompatibleColumnTypes, ElementConverter)
 
-// TupleConverter maps from a Tuple into a slice of runtime type instances that are compatible with the SQL driver.
-type TupleConverter func(tuple.Tuple) ([]interface{}, error)
+var _ TypeMapper = DDLMapper{}
 
-// NewTupleConverter builds a TupleConverter from an ordered list of ElementConverter.
-func NewTupleConverter(e ...ElementConverter) TupleConverter {
-	return func(t tuple.Tuple) (out []interface{}, err error) {
-		out = make([]interface{}, len(e))
-		for i := range e {
-			if out[i], err = e[i](t[i]); err != nil {
-				return nil, fmt.Errorf("converting tuple index %d: %w", i, err)
-			}
-		}
-		return out, nil
+// DDLMapper completes the column definition from the column DDL, by adding the
+// "not null" and "nullable" text (if applicable), the comment for the column,
+// and handling any field configuration options.
+type DDLMapper struct {
+	notNullText  string
+	nullableText string
+	m            map[FlatType]MapProjectionFn
+}
+
+type FlatTypeMappings map[FlatType]MapProjectionFn
+
+func NewDDLMapper(mappings FlatTypeMappings, opts ...DDLMapperOption) DDLMapper {
+	out := DDLMapper{m: make(map[FlatType]MapProjectionFn)}
+
+	for _, o := range opts {
+		o(&out)
+	}
+
+	for ft, mapper := range mappings {
+		out.m[ft] = mapper
+	}
+
+	return out
+}
+
+type DDLMapperOption func(*DDLMapper)
+
+// WithNotNullText sets the "not null" DDL that will be used for columns with
+// fields that can never be NULL.
+func WithNotNullText(notNullText string) DDLMapperOption {
+	return func(m *DDLMapper) {
+		m.notNullText = notNullText
 	}
 }
 
-// StaticMapper is a TypeMapper which returns a consistent MappedType.
-type StaticMapper MappedType
-
-var _ TypeMapper = StaticMapper{}
-
-type StaticMapperOption func(*StaticMapper)
-
-func (sm StaticMapper) MapType(*Projection) (MappedType, error) {
-	return (MappedType)(sm), nil
+// WithNullableText sets the "nullable" DDL that will be used for columns with
+// fields that can be NULL. Most databases will assume that a column may contain
+// null as long as it isn't declared with a NOT NULL constraint, but some
+// databases (e.g. ms sql server) make that behavior configurable, requiring the
+// DDL to explicitly declare a column with NULL if it may contain null values.
+func WithNullableText(nullableText string) DDLMapperOption {
+	return func(m *DDLMapper) {
+		m.nullableText = nullableText
+	}
 }
 
-func NewStaticMapper(ddl string, opts ...StaticMapperOption) StaticMapper {
-	sm := StaticMapper{
-		DDL:               ddl,
-		NullableDDL:       ddl,
-		Converter:         func(te tuple.TupleElement) (interface{}, error) { return te, nil },
-		ParsedFieldConfig: nil,
+type mapStaticConfig struct {
+	compatible CompatibleColumnTypes
+	converter  ElementConverter
+}
+
+type mapStaticOption func(*mapStaticConfig)
+
+// AlsoCompatibleWith sets additional column types that the mapped type should
+// be considered compatible with.
+func AlsoCompatibleWith(compatibleTypes ...string) mapStaticOption {
+	return func(c *mapStaticConfig) {
+		c.compatible = append(c.compatible, compatibleTypes...)
+	}
+}
+
+// Using converter sets a custom ElementConverter for the mapped type.
+func UsingConverter(converter ElementConverter) mapStaticOption {
+	return func(c *mapStaticConfig) {
+		c.converter = converter
+	}
+}
+
+// MapStatic creates a ProjectionMapper that always returns the same DDL. All
+// mapping configurations must eventually resolve with a MapStatic that defines
+// the DDL for a column as the "leaf" MapProjectionFn in a possibly compound
+// arrangement of additional MapProjectionFn's, such as MapPrimaryKey or
+// MapString.
+func MapStatic(ddl string, opts ...mapStaticOption) MapProjectionFn {
+	cfg := mapStaticConfig{
+		// A projection is always valid with a reported endpoint column type
+		// that matches it exactly.
+		compatible: []string{ddl},
 	}
 
 	for _, o := range opts {
-		o(&sm)
+		o(&cfg)
 	}
 
-	return sm
-}
-
-func WithElementConverter(converter ElementConverter) StaticMapperOption {
-	return func(sm *StaticMapper) {
-		sm.Converter = converter
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		return ddl, cfg.compatible, cfg.converter
 	}
 }
 
-// JsonBytesConverter serializes a value to raw JSON bytes for storage in an endpoint compatible
-// with JSON bytes.
-func JsonBytesConverter(te tuple.TupleElement) (interface{}, error) {
-	switch ii := te.(type) {
-	case []byte:
-		return json.RawMessage(ii), nil
-	case json.RawMessage:
-		return ii, nil
-	case nil:
-		return json.RawMessage(nil), nil
-	default:
-		bytes, err := json.Marshal(te)
-		if err != nil {
-			return nil, fmt.Errorf("could not serialize %q as json bytes: %w", te, err)
+// MapPrimaryKey specifies an alternate MapProjectionFn for the the column if it
+// is a primary key. This is useful for cases where specific databases require
+// certain variations of a type for primary keys. For example, MySQL does not
+// accept TEXT as a primary key, but a VARCHAR with specified size works.
+func MapPrimaryKey(pkMapper, delegate MapProjectionFn) MapProjectionFn {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		if p.IsPrimaryKey {
+			return pkMapper(p)
 		}
-
-		return json.RawMessage(bytes), nil
+		return delegate(p)
 	}
 }
 
-// StringCastConverter builds an ElementConverter from the string-handling callback. Any non-string
-// types are returned without modification. This should be used for converting fields that have a
-// string type and one additional type. The callback should convert the string into the desired type
-// per the endpoint's requirements.
-func StringCastConverter(fn func(string) (interface{}, error)) ElementConverter {
-	return func(te tuple.TupleElement) (interface{}, error) {
-		switch tt := te.(type) {
-		case string:
-			return fn(tt)
-		default:
-			return te, nil
-		}
-	}
+// StringMappings defines how string fields are mapped to database column types.
+type StringMappings struct {
+	// Fallback is the default mapping function for string fields. It is used
+	// when there is no format or content type that applies. Typically this
+	// should be the database's TEXT column or similar.
+	Fallback MapProjectionFn
+	// WithFormat provides a mapping function for string fields that have a
+	// matching format annotation that may use a special column type, ex:
+	// "date" or "date-time".
+	WithFormat map[string]MapProjectionFn
+	// WithContentType provides a mapping function for string fields that have a
+	// matching Content-Type annotation. As an example, this is occasionally
+	// used by materializations for creating a special column type for the
+	// "checkpoints" column, since that field has a specific Content-Type set.
+	//
+	// Content-Type is different than Content-Encoding. The only
+	// Content-Encoding that is currently handled is base64, and that will
+	// create a BINARY flat type that should be handled like other flat types.
+	WithContentType map[string]MapProjectionFn
 }
 
-func Compose(upper ElementConverter, lower ElementConverter) ElementConverter {
-	return func(te tuple.TupleElement) (interface{}, error) {
-		var a, err = lower(te)
-		if err != nil {
-			return nil, err
-		}
+// StringTypeMapper is a special MapProjectionFn for string type columns, which
+// can take the format or content type into account when deciding how to handle
+// the column.
+func MapString(m StringMappings) MapProjectionFn {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		delegate := m.Fallback
 
-		return upper(a)
-	}
-}
-
-// StdByteArrayToStr builds an ElementConverter that converts []byte to string.
-func StdByteArrayToStr(te tuple.TupleElement) (interface{}, error) {
-	switch tt := te.(type) {
-	case []byte:
-		if tt == nil {
-			return nil, nil
-		}
-		return string(tt), nil
-	case json.RawMessage:
-		if tt == nil {
-			return nil, nil
-		}
-		return string(tt), nil
-	default:
-		return te, nil
-	}
-}
-
-// StdStrToInt builds an ElementConverter that attempts to convert a string into a big.Int. Strings
-// formatted as integers are often larger than the maximum that can be represented by an int64. The
-// concrete type of the return value is a big.Int which will be represented correctly as JSON, but
-// may not be directly usable by a SQL driver as a parameter.
-func StdStrToInt() ElementConverter {
-	return StringCastConverter(func(str string) (interface{}, error) {
-		// Strings ending in a 0 decimal part like "1.0" or "3.00" are considered valid as integers
-		// per JSON specification so we must handle this possibility here. Anything after the
-		// decimal is discarded on the assumption that Flow has validated the data and verified that
-		// the decimal component is all 0's.
-		if idx := strings.Index(str, "."); idx != -1 {
-			str = str[:idx]
-		}
-
-		var i big.Int
-		out, ok := i.SetString(str, 10)
-		if !ok {
-			return nil, fmt.Errorf("could not convert %q to big.Int", str)
-		}
-		return out, nil
-	})
-}
-
-// StdStrToFloat builds an ElementConverter that attempts to convert a string into an float64 value.
-// It can be used for endpoints that do not require more digits than an float64 can provide.
-// `format: number` strings may have special values `NaN`, `Infinity`, and `-Infinity`,
-// and note that a native float64-parsed value of these types is not JSON-encodable.
-// The caller must provide specific sentinels to return for these special values,
-// and those sentinel values may depend on what's supported by the endpoint system.
-func StdStrToFloat(nan, posInfinity, negInfinity interface{}) ElementConverter {
-	return StringCastConverter(func(str string) (interface{}, error) {
-		switch str {
-		case "NaN":
-			return nan, nil
-		case "Infinity":
-			return posInfinity, nil
-		case "-Infinity":
-			return negInfinity, nil
-		default:
-			out, err := strconv.ParseFloat(str, 64)
-			if err != nil {
-				return nil, fmt.Errorf("could not convert %q to float64: %w", str, err)
+		if p.Inference.String_ != nil {
+			if h, ok := m.WithFormat[p.Inference.String_.Format]; ok {
+				delegate = h
+			} else if h, ok := m.WithContentType[p.Inference.String_.ContentType]; ok {
+				delegate = h
 			}
-			return out, nil
 		}
-	})
-}
 
-const (
-	minimumTimestamp = "0001-01-01T00:00:00Z"
-	minimumDate      = "0001-01-01"
-)
-
-// ClampDatetime provides handling for endpoints that do not accept "0000" as a year by replacing
-// these datetimes with minimumTimestamp.
-func ClampDatetime() ElementConverter {
-	return StringCastConverter(func(str string) (interface{}, error) {
-		if parsed, err := time.Parse(time.RFC3339Nano, str); err != nil {
-			return nil, err
-		} else if parsed.Year() == 0 {
-			return minimumTimestamp, nil
-		}
-		return str, nil
-	})
-}
-
-// ClampDate is like ClampDatetime but just for dates.
-func ClampDate() ElementConverter {
-	return StringCastConverter(func(str string) (interface{}, error) {
-		if parsed, err := time.Parse(time.DateOnly, str); err != nil {
-			return nil, err
-		} else if parsed.Year() == 0 {
-			return minimumDate, nil
-		}
-		return str, nil
-	})
-}
-
-// NullableMapper wraps a ColumnMapper to add "NULL" and/or "NOT NULL" to the generated SQL type
-// depending on the nullability of the column. Most databases will assume that a column may contain
-// null as long as it isn't declared with a NOT NULL constraint, but some databases (e.g. ms sql
-// server) make that behavior configurable, requiring the DDL to explicitly declare a column with
-// NULL if it may contain null values. This wrapper will handle either or both cases.
-type NullableMapper struct {
-	NotNullText, NullableText string
-	Delegate                  TypeMapper
-}
-
-var _ TypeMapper = NullableMapper{}
-
-func (m NullableMapper) MapType(p *Projection) (mapped MappedType, err error) {
-	if mapped, err = m.Delegate.MapType(p); err != nil {
-		return
-	} else if _, notNull := p.AsFlatType(); notNull && m.NotNullText != "" {
-		mapped.DDL += " " + m.NotNullText
-	} else if m.NullableText != "" {
-		mapped.DDL += " " + m.NullableText
-		mapped.NullableDDL = mapped.DDL
-	}
-
-	return
-}
-
-// PrimaryKeyMapper wraps a ColumnMapper to specify the type of the column in
-// the case that it is a primary key. This is useful for cases where specific
-// databases require certain variations of a type for primary keys. For example,
-// MySQL does not accept TEXT as a primary key, but a VARCHAR with specified
-// size works.
-type PrimaryKeyMapper struct {
-	PrimaryKey TypeMapper
-	Delegate   TypeMapper
-}
-
-var _ TypeMapper = PrimaryKeyMapper{}
-
-func (m PrimaryKeyMapper) MapType(p *Projection) (mapped MappedType, err error) {
-	if p.IsPrimaryKey {
-		return m.PrimaryKey.MapType(p)
-	} else {
-		return m.Delegate.MapType(p)
+		return delegate(p)
 	}
 }
 
-// StringTypeMapper is a special TypeMapper for string type columns, which can take the format
-// and/or content type into account when deciding what sql column type to generate.
-type StringTypeMapper struct {
-	WithFormat      map[string]TypeMapper
-	WithContentType map[string]TypeMapper
-	Fallback        TypeMapper
-}
-
-var _ TypeMapper = StringTypeMapper{}
-
-func maybeStripStringFormat(p *pf.Projection, rawFieldConfigJson json.RawMessage) (*pf.Projection, error) {
-	// TODO(whb): This bit of hackery is to provide backwards compatibility for materializations
-	// that use numeric-as-string fields with numeric formats which were created before support for
-	// materializing these fields as numeric values was added. It provides an escape hatch via the
-	// field config to ignore the string formatting and continue materializing the fields as a
-	// regular string, which will allow such materializations to continue working. It is not meant
-	// to be user-facing and is configured as-needed by Estuary support staff. We should remove this
-	// when a more comprehensive backwards compatibility layer is added to the materialization
-	// dialects.
-	type fieldConfigOptions struct {
-		IgnoreStringFormat bool `json:"ignoreStringFormat"`
-	}
-	if rawFieldConfigJson != nil {
-		var options fieldConfigOptions
-		if err := json.Unmarshal(rawFieldConfigJson, &options); err != nil {
-			return nil, err
-		} else if options.IgnoreStringFormat {
-			log.WithFields(log.Fields{
-				"field":  p.Field,
-				"format": p.Inference.String_.Format,
-			}).Info("ignoring string format for field")
-			p.Inference.String_.Format = ""
+// MapStringMaxLen uses an alternate mapping for string fields where string
+// inference is available and the string is longer than the cutoff.
+func MapStringMaxLen(def, alt MapProjectionFn, cutoff uint32) MapProjectionFn {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		if p.Inference.String_ != nil &&
+			p.Inference.String_.MaxLength > cutoff {
+			return alt(p)
 		}
-	}
 
-	return p, nil
+		return def(p)
+	}
 }
 
-func (m StringTypeMapper) MapType(p *Projection) (MappedType, error) {
-	if _, err := maybeStripStringFormat(&p.Projection, p.RawFieldConfig); err != nil {
+// MapSignedInt64 uses an alternate mapping for numeric fields where numeric
+// inference is available and the minimum or maximum of the inferred range is
+// outside the bounds of what will fit in a signed 64 bit integer.
+func MapSignedInt64(def, alt MapProjectionFn) MapProjectionFn {
+	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+		if p.Inference.Numeric != nil &&
+			(p.Inference.Numeric.Minimum < math.MinInt64 || p.Inference.Numeric.Maximum > math.MaxInt64) {
+			// Numeric Minimum and Maximums are stated as powers of 10, so
+			// comparisons to exact integer values aren't precise, but this
+			// logic should still work out since 1e19 is greater than 1<<63, and
+			// that's the next power of 10 bigger than the maximum signed 64 bit
+			// integer.
+			return alt(p)
+		}
+
+		return def(p)
+	}
+}
+
+type fieldConfig struct {
+	// CastToString will materialize the field as a string representation of its
+	// value.
+	CastToString bool `json:"castToString"`
+	// IgnoreStringFormat is a legacy configuration used as an alias for
+	// castToString.
+	IgnoreStringFormat bool `json:"ignoreStringFormat"`
+	// DDL allows for user-defined DDL overrides for creating the column.
+	DDL string `json:"DDL"`
+}
+
+func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
+	ft, mustExist := p.AsFlatType()
+
+	h, ok := d.m[ft]
+	if !ok {
 		return MappedType{}, fmt.Errorf("unable to map field %s with type %s", p.Field, p.Inference.Types)
 	}
 
-	if flat, _ := p.AsFlatType(); flat != STRING && m.Fallback == nil {
-		return ErrorMapper{}.MapType(p)
-	} else if flat != STRING {
-		return m.Fallback.MapType(p)
-	} else if delegate, ok := m.WithFormat[p.Inference.String_.Format]; ok {
-		return delegate.MapType(p)
-	} else if delegate, ok := m.WithContentType[p.Inference.String_.ContentType]; ok {
-		return delegate.MapType(p)
-	} else if m.Fallback == nil {
-		return ErrorMapper{}.MapType(p)
-	} else {
-		return m.Fallback.MapType(p)
+	ddl, compatibleTypes, converter := h(p)
+	if converter == nil {
+		converter = passThrough
 	}
-}
 
-// ProjectionTypeMapper selects an inner TypeMapper based on a Projection's FlatType.
-type ProjectionTypeMapper map[FlatType]TypeMapper
-
-var _ TypeMapper = ProjectionTypeMapper{}
-
-func (m ProjectionTypeMapper) MapType(p *Projection) (MappedType, error) {
-	var flat, _ = p.AsFlatType()
-
-	if delegate, ok := m[flat]; ok {
-		return delegate.MapType(p)
-	} else {
-		return ErrorMapper{}.MapType(p)
+	var fc fieldConfig
+	if p.RawFieldConfig != nil {
+		if err := json.Unmarshal(p.RawFieldConfig, &fc); err != nil {
+			return MappedType{}, fmt.Errorf("unmarshaling field config: %w", err)
+		}
 	}
-}
 
-// MaxLengthMapper checks if the projection is a STRING type Projection having a MaxLength.
-// If it is, it invokes WithLength with the MaxLength to map the Projection and returns
-// the result. Otherwise, it invokes and returns Fallback.
-type MaxLengthMapper struct {
-	WithLength           TypeMapper
-	WithLengthFmtPattern string
-	Fallback             TypeMapper
-}
-
-var _ TypeMapper = MaxLengthMapper{}
-
-func (m MaxLengthMapper) MapType(p *Projection) (MappedType, error) {
-	var flat, _ = p.AsFlatType()
-
-	if flat != STRING || p.Inference.String_.MaxLength == 0 {
-		return m.Fallback.MapType(p)
-	} else if mapped, err := m.WithLength.MapType(p); err != nil {
-		return MappedType{}, err
-	} else {
-		mapped.DDL = fmt.Sprintf(mapped.DDL, p.Inference.String_.MaxLength)
-		return mapped, nil
+	if fc.IgnoreStringFormat || fc.CastToString {
+		// Materialize this field as a "plain" string, and convert its values to
+		// strings if configured.
+		p := *p
+		p.Inference.String_ = &pf.Inference_String{}
+		ddl, compatibleTypes, _ = d.m[STRING](&p)
+		converter = ToStr
 	}
-}
 
-// ErrorMapper returns a mapping error for the Projection.
-type ErrorMapper struct{}
+	if fc.DDL != "" {
+		// User has specified a custom DDL, so use that.
+		ddl = fc.DDL
+	}
 
-var _ TypeMapper = ErrorMapper{}
+	out := MappedType{
+		DDL:                    ddl,
+		NullableDDL:            ddl,
+		Converter:              converter,
+		CompatibleColumnnTypes: compatibleTypes,
+		UserDefinedDDL:         fc.DDL != "",
+	}
 
-func (m ErrorMapper) MapType(p *Projection) (MappedType, error) {
-	return MappedType{}, fmt.Errorf("unable to map field %s with type %s", p.Field, p.Inference.Types)
+	if mustExist && d.notNullText != "" {
+		out.DDL += " " + d.notNullText
+	} else if d.nullableText != "" {
+		out.DDL += " " + d.nullableText
+		out.NullableDDL = out.DDL
+	}
+
+	return out, nil
 }
 
 type constrainter struct {
@@ -532,12 +453,22 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 }
 
 func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	p, err := maybeStripStringFormat(proposed, rawFieldConfig)
+	proj := buildProjection(proposed, rawFieldConfig)
+	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("mapping type: %w", err)
 	}
 
-	return c.dialect.ValidateColumn(existing, *p)
+	if mapped.UserDefinedDDL {
+		// Fields with custom DDL set are always said to be compatible, since it
+		// is not practical in general to correlate the database's
+		// representation of an existing column and the user's DDL definition.
+		return true, nil
+	}
+
+	return slices.ContainsFunc(mapped.CompatibleColumnnTypes, func(compatibleType string) bool {
+		return strings.EqualFold(existing.Type, compatibleType)
+	}), nil
 }
 
 func (c constrainter) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {

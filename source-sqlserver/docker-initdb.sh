@@ -1,4 +1,5 @@
 #!/bin/sh
+set -ex
 /opt/mssql/bin/sqlservr &
 DBPID="$!"
 
@@ -27,7 +28,17 @@ GRANT SELECT, INSERT, UPDATE ON dbo.flow_watermarks TO flow_capture;
 GO
 EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'flow_watermarks', @role_name = NULL;
 GO
-  " | /opt/mssql-tools/bin/sqlcmd -U sa -P gf6w6dkD
+EXEC sys.sp_cdc_change_job @pollinginterval = 1;
+GO
+WAITFOR DELAY '00:00:02';
+GO
+EXEC sys.sp_cdc_stop_job @job_type = 'capture';
+GO
+WAITFOR DELAY '00:00:02';
+GO
+EXEC sys.sp_cdc_start_job @job_type = 'capture';
+GO
+  " | /opt/mssql-tools18/bin/sqlcmd -C -U sa -P gf6w6dkD
   echo "[initdb] Database initialization complete!"
   touch /var/opt/mssql/initdb-performed
 else

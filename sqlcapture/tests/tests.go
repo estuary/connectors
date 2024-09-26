@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -58,7 +59,7 @@ func testConfigSchema(ctx context.Context, t *testing.T, tb TestBackend) {
 // matches a golden snapshot
 func testSimpleDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "49210954"
-	tb.CreateTable(ctx, t, uniqueID, "(a INTEGER PRIMARY KEY, b TEXT, c REAL NOT NULL, d VARCHAR(255))")
+	tb.CreateTable(ctx, t, uniqueID, "(a INTEGER PRIMARY KEY, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))")
 	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 }
 
@@ -67,7 +68,7 @@ func testSimpleDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 // shut down due to a lack of further events.
 func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "24869578"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 	VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID)))
 }
@@ -77,7 +78,7 @@ func testSimpleCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts performed after the first capture.
 func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "58418982"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
@@ -91,7 +92,7 @@ func testReplicationInserts(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts and row updates performed after the first capture.
 func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "79710599"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}})
@@ -107,7 +108,7 @@ func testReplicationUpdates(ctx context.Context, t *testing.T, tb TestBackend) {
 // additional inserts and deletions performed after the first capture.
 func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "65713151"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
@@ -122,7 +123,7 @@ func testReplicationDeletes(ctx context.Context, t *testing.T, tb TestBackend) {
 // and only adds data after replication has begun.
 func testEmptyTable(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "91431165"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
 	t.Run("init", func(t *testing.T) { VerifiedCapture(ctx, t, cs) })
@@ -134,8 +135,8 @@ func testEmptyTable(ctx context.Context, t *testing.T, tb TestBackend) {
 // for tables which are configured in the catalog.
 func testIgnoredStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	var unique1, unique2 = "17789375", "24120951"
-	var table1 = tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var table2 = tb.CreateTable(ctx, t, unique2, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table1 = tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
+	var table2 = tb.CreateTable(ctx, t, unique2, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	tb.Insert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 
@@ -152,9 +153,9 @@ func testIgnoredStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 // well as adding/removing/re-adding a stream.
 func testMultipleStreams(ctx context.Context, t *testing.T, tb TestBackend) {
 	var unique1, unique2, unique3 = "14930049", "26016615", "30084965"
-	var table1 = tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var table2 = tb.CreateTable(ctx, t, unique2, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var table3 = tb.CreateTable(ctx, t, unique3, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var table1 = tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
+	var table2 = tb.CreateTable(ctx, t, unique2, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
+	var table3 = tb.CreateTable(ctx, t, unique3, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	tb.Insert(ctx, t, table1, [][]interface{}{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, table2, [][]interface{}{{3, "three"}, {4, "four"}, {5, "five"}})
 	tb.Insert(ctx, t, table3, [][]interface{}{{6, "six"}, {7, "seven"}, {8, "eight"}})
@@ -187,7 +188,11 @@ func testCatalogPrimaryKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.Mode = sqlcapture.BackfillModeAutomatic
-	res.PrimaryKey = []string{"fullname", "year"}
+	if tb.UpperCaseMode() {
+		res.PrimaryKey = []string{"FULLNAME", "YEAR"}
+	} else {
+		res.PrimaryKey = []string{"fullname", "year"}
+	}
 	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resourceJSON
@@ -214,7 +219,11 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 	var res sqlcapture.Resource
 	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
 	res.Mode = sqlcapture.BackfillModeAutomatic
-	res.PrimaryKey = []string{"fullname", "year"}
+	if tb.UpperCaseMode() {
+		res.PrimaryKey = []string{"FULLNAME", "YEAR"}
+	} else {
+		res.PrimaryKey = []string{"fullname", "year"}
+	}
 	resourceJSON, err := json.Marshal(res)
 	require.NoError(t, err)
 	cs.Bindings[0].ResourceConfigJson = resourceJSON
@@ -233,7 +242,7 @@ func testCatalogPrimaryKeyOverride(ctx context.Context, t *testing.T, tb TestBac
 // binding doesn't actually exist.
 func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
 	var unique1, unique2 = "18865235", "27607177"
-	tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.CreateTable(ctx, t, unique1, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var binding1 = DiscoverBindings(ctx, t, tb, regexp.MustCompile(unique1))[0]
 	var binding2 = BindingReplace(binding1, unique1, unique2)
 	var cs = tb.CaptureSpec(ctx, t)
@@ -243,7 +252,7 @@ func testMissingTable(ctx context.Context, t *testing.T, tb TestBackend) {
 
 func testDuplicatedScanKey(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "92011048"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8), data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8), data VARCHAR(2000))")
 	tb.Insert(ctx, t, tableName, [][]any{{"AAA", "1"}, {"BBB", "2"}, {"BBB", "3"}, {"CCC", "4"}})
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Bindings[0].Collection.Key = []string{"id"}
@@ -274,7 +283,7 @@ func testDuplicatedScanKey(ctx context.Context, t *testing.T, tb TestBackend) {
 //     increase by exactly one for every successive update. If this is not the
 //     case then some changes have been skipped or duplicated.
 func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
-	const numTotalIDs = 2000
+	const loadGenTime = 90 * time.Second // Run the load generator for this long
 	const numActiveIDs = 100
 
 	if testing.Short() {
@@ -284,29 +293,30 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "51314288"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, counter INTEGER)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &correctnessInvariantsCaptureValidator{
-		NumExpectedIDs: numTotalIDs,
-	}
+	var validator = &correctnessInvariantsCaptureValidator{}
+	cs.Validator = validator
 	cs.Sanitizers[`"backfilled":999`] = regexp.MustCompile(`"backfilled":[0-9]+`)
 	cs.Validator.Reset()
 
-	// Run the load generator for at most 60s
-	loadgenCtx, cancelLoadgen := context.WithCancel(ctx)
-	time.AfterFunc(60*time.Second, cancelLoadgen)
-	defer cancelLoadgen()
-	go func(ctx context.Context) {
+	var loadgenDeadline = time.Now().Add(loadGenTime)
+	var loadgenDone atomic.Bool
+	var numTotalIDs atomic.Int64
+	go func() {
+		log.WithField("runtime", loadGenTime.String()).Info("load generator started")
 		var nextID int
 		var activeIDs = make(map[int]int) // Map from ID to counter value
 		for {
-			// There should always be N active IDs (until we reach the end)
-			for nextID < numTotalIDs && len(activeIDs) < numActiveIDs {
+			// There should always be N active IDs (until we reach the end of the test)
+			for len(activeIDs) < numActiveIDs && time.Now().Before(loadgenDeadline) {
+				if nextID%1000 == 0 {
+					log.WithField("id", nextID).Info("load generator progress")
+				}
 				activeIDs[nextID] = 1
 				nextID++
 			}
 			// Thus if we run out of active IDs we must be done
 			if len(activeIDs) == 0 {
-				log.Info("load generator complete")
-				return
+				break
 			}
 
 			// Randomly select an entry from the active set
@@ -336,13 +346,27 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 			} else {
 				activeIDs[selected] = counter + 1
 			}
-
-			// Slow down database load generation to at most 500 QPS
-			time.Sleep(2 * time.Millisecond)
 		}
-	}(loadgenCtx)
 
-	// Start the capture in parallel with the ongoing database load
+		log.WithField("count", nextID).Info("load generator finished")
+		numTotalIDs.Store(int64(nextID))
+		time.Sleep(1 * time.Second)
+		loadgenDone.Store(true)
+	}()
+
+	// Wait a little while to let some backfill data accumulate.
+	time.Sleep(20 * time.Second)
+
+	// Repeatedly run the capture in parallel with the ongoing database load,
+	// killing and restarting it regularly, until the load generator is done.
+	for !loadgenDone.Load() {
+		var captureCtx, cancelCapture = context.WithCancel(ctx)
+		time.AfterFunc(20*time.Second, cancelCapture)
+		cs.Capture(captureCtx, t, nil)
+	}
+
+	// Run the capture once more and verify the overall results this time.
+	validator.NumExpectedIDs = int(numTotalIDs.Load())
 	VerifiedCapture(ctx, t, cs)
 }
 
@@ -358,26 +382,55 @@ type correctnessInvariantsCaptureValidator struct {
 }
 
 var correctnessInvariantsStateTransitions = map[string]string{
-	"New:Create(1)":     "1",        // A row may first be observed at any point
-	"New:Create(2)":     "2",        // A row may first be observed at any point
-	"New:Create(3)":     "3",        // A row may first be observed at any point
-	"New:Create(4)":     "4",        // A row may first be observed at any point
-	"New:Create(6)":     "6",        // A row may first be observed at any point
-	"New:Create(7)":     "7",        // A row may first be observed at any point
-	"New:Create(8)":     "Finished", // A row may first be observed at any point
-	"New:Update(2)":     "2",        // This first observation may also be an update
-	"New:Update(3)":     "3",        // This first observation may also be an update
-	"New:Update(4)":     "4",        // This first observation may also be an update
-	"New:Delete()":      "Deleted",  // This first observation could theoretically also be a deletion
-	"New:Update(7)":     "7",        // This first observation may also be an update
-	"New:Update(8)":     "Finished", // This first observation may also be an update
-	"1:Update(2)":       "2",
-	"2:Update(3)":       "3",
-	"3:Update(4)":       "4",
-	"4:Delete()":        "Deleted",
+	"New:Create(1)": "1",        // A row may first be observed at any point
+	"New:Create(2)": "2",        // A row may first be observed at any point
+	"New:Create(3)": "3",        // A row may first be observed at any point
+	"New:Create(4)": "4",        // A row may first be observed at any point
+	"New:Create(6)": "6",        // A row may first be observed at any point
+	"New:Create(7)": "7",        // A row may first be observed at any point
+	"New:Create(8)": "Finished", // A row may first be observed at any point
+
+	"New:Update(2)": "2",        // This first observation may also be an update
+	"New:Update(3)": "3",        // This first observation may also be an update
+	"New:Update(4)": "4",        // This first observation may also be an update
+	"New:Delete()":  "Deleted",  // This first observation could theoretically also be a deletion
+	"New:Update(7)": "7",        // This first observation may also be an update
+	"New:Update(8)": "Finished", // This first observation may also be an update
+
+	"1:Update(2)": "2",
+	"1:Update(3)": "3",
+	"1:Update(4)": "4",
+	"1:Delete()":  "Deleted",
+	"1:Create(6)": "6",
+	"1:Update(7)": "7",
+	"1:Update(8)": "Finished",
+
+	"2:Update(3)": "3",
+	"2:Update(4)": "4",
+	"2:Delete()":  "Deleted",
+	"2:Create(6)": "6",
+	"2:Update(7)": "7",
+	"2:Update(8)": "Finished",
+
+	"3:Update(4)": "4",
+	"3:Delete()":  "Deleted",
+	"3:Create(6)": "6",
+	"3:Update(7)": "7",
+	"3:Update(8)": "Finished",
+
+	"4:Delete()":  "Deleted",
+	"4:Create(6)": "6",
+	"4:Update(7)": "7",
+	"4:Update(8)": "Finished",
+
 	"Deleted:Create(6)": "6",
-	"6:Update(7)":       "7",
-	"7:Update(8)":       "Finished",
+	"Deleted:Update(7)": "7",
+	"Deleted:Update(8)": "Finished",
+
+	"6:Update(7)": "7",
+	"6:Update(8)": "Finished",
+
+	"7:Update(8)": "Finished",
 }
 
 func (v *correctnessInvariantsCaptureValidator) Output(collection string, data json.RawMessage) {
@@ -404,7 +457,7 @@ func (v *correctnessInvariantsCaptureValidator) Output(collection string, data j
 	case "u":
 		change = fmt.Sprintf("Update(%d)", event.Counter)
 	case "d":
-		change = fmt.Sprintf("Delete()")
+		change = "Delete()"
 	default:
 		change = fmt.Sprintf("UnknownOperation(%q)", event.Meta.Operation)
 	}
@@ -422,6 +475,8 @@ func (v *correctnessInvariantsCaptureValidator) Checkpoint(data json.RawMessage)
 		var prevState = v.states[id]
 		if prevState == "" {
 			prevState = "New"
+		} else if prevState == "Error" {
+			continue // Ignore rows once they enter an error state
 		}
 		var edge = prevState + ":" + change
 
@@ -448,7 +503,7 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 
 	for id := 0; id < v.NumExpectedIDs; id++ {
 		var state = v.states[id]
-		if state != "Finished" {
+		if state != "Finished" && state != "Error" {
 			fmt.Fprintf(v.violations, "id %d in state %q (expected \"Finished\")\n", id, state)
 		}
 	}
@@ -463,7 +518,7 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 
 func testReplicationOnly(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "34322067"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, data VARCHAR(2000))")
 
 	// Create a capture spec and replace the suggested "Without Key" backfill mode
 	// with the "Only Changes" one. This mirrors the deliberate user action which
@@ -493,13 +548,13 @@ func testReplicationOnly(ctx context.Context, t *testing.T, tb TestBackend) {
 
 func testKeylessDiscovery(ctx context.Context, t *testing.T, tb TestBackend) {
 	const uniqueString = "t32386"
-	tb.CreateTable(ctx, t, uniqueString, "(a INTEGER, b TEXT, c REAL NOT NULL, d VARCHAR(255))")
-	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
+	tb.CreateTable(ctx, t, uniqueString, "(a INTEGER, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))")
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile("(?i)"+regexp.QuoteMeta(uniqueString)))
 }
 
 func testKeylessCapture(ctx context.Context, t *testing.T, tb TestBackend) {
 	var uniqueID = "91511186"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, data TEXT)")
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, data VARCHAR(2000))")
 	var generate = func(n, m int) [][]any {
 		var rows [][]any
 		for i := n; i < m; i++ {

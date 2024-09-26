@@ -1,0 +1,54 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-google-pubsub/config",
+    "properties": {
+      "projectId": {
+        "type": "string",
+        "title": "Project ID",
+        "description": "Google Cloud Project ID that contains the PubSub topics.",
+        "order": 0
+      },
+      "credentialsJson": {
+        "type": "string",
+        "title": "Service Account JSON",
+        "description": "Google Cloud Service Account JSON credentials to use for authentication.",
+        "multiline": true,
+        "order": 1,
+        "secret": true
+      },
+      "subscriptionPrefix": {
+        "type": "string",
+        "title": "Subscription Prefix",
+        "description": "Prefix to prepend to the PubSub topics subscription names. Subscription names will be in the form of \u003cprefix\u003e_EstuaryFlow_\u003crandom string\u003e if a prefix is provided vs. EstuaryFlow_\u003crandom string\u003e if no prefix is provided.",
+        "order": 2
+      }
+    },
+    "type": "object",
+    "required": [
+      "projectId",
+      "credentialsJson"
+    ],
+    "title": "Source Google PubSub Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-google-pubsub/resource",
+    "properties": {
+      "topic": {
+        "type": "string",
+        "title": "Topic",
+        "description": "Name of the PubSub topic to subscribe to."
+      }
+    },
+    "type": "object",
+    "required": [
+      "topic"
+    ],
+    "title": "Resource"
+  },
+  "documentation_url": "https://go.estuary.dev/source-google-pubsub",
+  "resource_path_pointers": [
+    "/topic"
+  ]
+}

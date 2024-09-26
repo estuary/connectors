@@ -176,12 +176,19 @@ func convertNumeric(te tuple.TupleElement) (any, error) {
 }
 
 func convertBase64(te tuple.TupleElement) (any, error) {
-	bytes, err := base64.StdEncoding.DecodeString(te.(string))
-	if err != nil {
-		return nil, fmt.Errorf("decoding bytes from string: %w", err)
-	}
+	switch t := te.(type) {
+	case string:
+		bytes, err := base64.StdEncoding.DecodeString(t)
+		if err != nil {
+			return nil, fmt.Errorf("decoding bytes from string: %w", err)
+		}
 
-	return bytes, nil
+		return bytes, nil
+	case nil:
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("convertBase64 unsupported type %T (%#v)", te, te)
+	}
 }
 
 type constrainter struct{}

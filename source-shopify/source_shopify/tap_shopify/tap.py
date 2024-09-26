@@ -19,6 +19,11 @@ from tap_shopify.streams import (
     ProductsStream,
     TransactionsStream,
     UsersStream,
+    RefundsStream,
+    DiscountCode,
+    PriceRuleStream,
+    CarrierServicesStream,
+    OrderRiskStream,
 )
 
 # Commented stream types are gated behind our shopify app being granted protected data permissions
@@ -26,14 +31,19 @@ STREAM_TYPES = [
     # AbandonedCheckouts,
     CollectStream,
     CustomCollections,
-    # CustomersStream,
+    CustomersStream,
     InventoryItemsStream,
     InventoryLevelsStream,
     LocationsStream,
     MetafieldsStream,
-    # OrdersStream,
+    OrdersStream,
     ProductsStream,
-    # TransactionsStream,
+    TransactionsStream,
+    RefundsStream,
+    DiscountCode,
+    PriceRuleStream,
+    CarrierServicesStream,
+    OrderRiskStream,
 ]
 
 
@@ -120,6 +130,8 @@ class Tap_Shopify(Tap):
         th.Property(
             "start_date",
             th.DateTimeType,
+            required=True,
+            default="2020-01-01",
             description="The earliest record date to sync",
         ),
         th.Property(

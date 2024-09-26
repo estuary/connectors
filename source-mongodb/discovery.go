@@ -16,6 +16,27 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
+type mongoCollectionType string
+
+const (
+	mongoCollectionTypeCollection mongoCollectionType = "collection"
+	mongoCollectionTypeView       mongoCollectionType = "view"
+	mongoCollectionTypeTimeseries mongoCollectionType = "timeseries"
+)
+
+func (m mongoCollectionType) validate() error {
+	switch m {
+	case mongoCollectionTypeCollection, mongoCollectionTypeView, mongoCollectionTypeTimeseries:
+		return nil
+	default:
+		return fmt.Errorf("invalid collection type: %s", m)
+	}
+}
+
+func (m mongoCollectionType) canChangeStream() bool {
+	return m == mongoCollectionTypeCollection
+}
+
 // minimalSchema is the maximally-permissive schema which just specifies the
 // _id key. The schema of collections is minimalSchema as we
 // rely on Flow's schema inference to infer the collection schema
@@ -24,12 +45,22 @@ var minimalSchema = generateMinimalSchema()
 const idProperty = "_id"
 
 const (
-	metaProperty = "_meta"
-	opProperty   = "op"
+	metaProperty   = "_meta"
+	opProperty     = "op"
+	beforeProperty = "before"
+	sourceProperty = "source"
 )
 
 type documentMetadata struct {
-	Op string `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
+	Op     string         `json:"op,omitempty" jsonschema:"title=Change Operation,description=Change operation type: 'c' Create/Insert 'u' Update 'd' Delete.,enum=c,enum=u,enum=d"`
+	Before map[string]any `json:"before,omitempty" jsonschema:"title=Before Document,description=Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."`
+	Source *sourceMeta    `json:"source,omitempty" jsonschema:"title=Source,description=Document source metadata."`
+}
+
+type sourceMeta struct {
+	DB         string `json:"db" jsonschema:"description=Name of the source MongoDB database."`
+	Collection string `json:"collection" jsonschema:"description=Name of the source MongoDB collection."`
+	Snapshot   bool   `json:"snapshot,omitempty" jsonschema:"description=Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."`
 }
 
 func generateMinimalSchema() json.RawMessage {
@@ -54,6 +85,31 @@ func generateMinimalSchema() json.RawMessage {
 				metaProperty: metadataSchema,
 			},
 			"x-infer-schema": true,
+		},
+		If: &jsonschema.Schema{
+			Extras: map[string]interface{}{
+				"properties": map[string]*jsonschema.Schema{
+					"_meta": {
+						Extras: map[string]interface{}{
+							"properties": map[string]*jsonschema.Schema{
+								"op": {
+									Extras: map[string]interface{}{
+										"const": "d",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		Then: &jsonschema.Schema{
+			Extras: map[string]interface{}{
+				"reduce": map[string]interface{}{
+					"strategy": "merge",
+					"delete":   true,
+				},
+			},
 		},
 	}
 
@@ -83,7 +139,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		}
 	}()
 
-	var systemDatabases = []string{"config", "local"}
+	var systemDatabases = []string{"admin", "config", "local"}
 
 	var databaseNames []string
 	// If no databases are provided in config, we discover across all databases
@@ -108,6 +164,15 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 
 	var bindings = []*pc.Response_Discovered_Binding{}
 
+	if len(databaseNames) == 0 {
+		return &pc.Response_Discovered{Bindings: bindings}, nil
+	}
+
+	serverInfo, err := getServerInfo(ctx, cfg, client, databaseNames[0])
+	if err != nil {
+		return nil, fmt.Errorf("getting server info: %w", err)
+	}
+
 	for _, dbName := range databaseNames {
 		var db = client.Database(dbName)
 
@@ -117,15 +182,42 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		}
 
 		for _, collection := range collections {
-			// Views cannot be used with change streams, so we don't support them for
-			// capturing at the moment
-			if collection.Type == "view" {
+			collectionType := mongoCollectionType(collection.Type)
+			if err := collectionType.validate(); err != nil {
+				return nil, fmt.Errorf("unsupported discovered collection type: %w", err)
+			}
+
+			if serverInfo.supportsChangeStreams && !collectionType.canChangeStream() && !cfg.BatchAndChangeStream {
+				continue
+			} else if strings.HasPrefix(collection.Name, "system.") {
 				continue
 			}
-			if strings.HasPrefix(collection.Name, "system.") {
-				continue
+
+			var mode = captureModeChangeStream
+			var cursor string
+			var pollSchedule string
+			if !collectionType.canChangeStream() || !serverInfo.supportsChangeStreams {
+				mode = captureModeSnapshot
+				cursor = idProperty
 			}
-			resourceJSON, err := json.Marshal(resource{Database: db.Name(), Collection: collection.Name})
+
+			if collectionType == mongoCollectionTypeTimeseries {
+				tfRaw, err := collection.Options.LookupErr("timeseries", "timeField")
+				if err != nil {
+					return nil, fmt.Errorf("looking up timeField: %w", err)
+				}
+				cursor = tfRaw.StringValue()
+				mode = captureModeIncremental
+				pollSchedule = "5m"
+			}
+
+			resourceJSON, err := json.Marshal(resource{
+				Database:     db.Name(),
+				Collection:   collection.Name,
+				Mode:         mode,
+				Cursor:       cursor,
+				PollSchedule: pollSchedule,
+			})
 			if err != nil {
 				return nil, fmt.Errorf("serializing resource json: %w", err)
 			}

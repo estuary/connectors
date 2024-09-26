@@ -1,0 +1,752 @@
+[
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier for the account.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Accounts",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "accounts",
+    "resourceConfig": {
+      "stream": "accounts",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "account": {
+          "description": "The account associated with the user",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account"
+      ],
+      "title": "AccountUsers",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account"
+    ],
+    "recommendedName": "account_users",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "account_users",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_campaign_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_campaign_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_creative_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_creative_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_impression_device_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_impression_device_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_company_size_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_company_size_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_country_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_country_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_job_function_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_job_function_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_job_title_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_job_title_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_industry_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_industry_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_seniority_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_seniority_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_region_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_region_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "end_date": {
+          "description": "End date of the ad analytics data.",
+          "format": "date",
+          "type": "string"
+        },
+        "string_of_pivot_values": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "string_of_pivot_values",
+        "end_date"
+      ],
+      "title": "Ad Creative Analytics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/string_of_pivot_values",
+      "/end_date"
+    ],
+    "recommendedName": "ad_member_company_analytics",
+    "resourceConfig": {
+      "cursorField": [
+        "end_date"
+      ],
+      "stream": "ad_member_company_analytics",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "Unique identifier for the campaign group.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Campaign Groups",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaign_groups",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "campaign_groups",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier of the campaign.",
+          "type": "integer"
+        },
+        "lastModified": {
+          "description": "The date and time when the user account was last modified",
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Campaigns",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "campaigns",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "The unique identifier of the creative.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Creatives",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "creatives",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModifiedAt"
+      ],
+      "stream": "creatives",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "id": {
+          "description": "Unique identifier for the conversion.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Conversions",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "conversions",
+    "resourceConfig": {
+      "cursorField": [
+        "lastModified"
+      ],
+      "stream": "conversions",
+      "syncMode": "incremental"
+    }
+  }
+]

@@ -1,5 +1,6 @@
 import abc
 import asyncio
+from enum import Enum
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from logging import Logger
@@ -13,6 +14,7 @@ from typing import (
     Iterable,
     Literal,
     TypeVar,
+    Tuple,
 )
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
@@ -22,18 +24,19 @@ from ..flow import (
     CaptureBinding,
     OAuth2Spec,
     ValidationError,
+    BasicAuth,
 )
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
 
-
-LogCursor = AwareDatetime | NonNegativeInt
+LogCursor = Tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
 The two predominant strategies for accessing logs are:
  a) fetching entities which were created / updated / deleted since a given datetime.
- b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal). 
+ b) fetching changes by their offset in a sequential log (Kafka partition or Gazette journal).
 
-Note that `str` cannot be added to this type union, as it makes parsing states ambiguous.
+Note that `str` cannot be added to this type union, as it makes parsing states ambiguous, however
+the tuple type allows for str or integer values to be used
 """
 
 PageCursor = str | int | None
@@ -45,11 +48,15 @@ and "no pages remain" in a response context.
 """
 
 
-class BaseDocument(BaseModel):
+class Triggers(Enum):
+    BACKFILL = 'BACKFILL'
 
+
+class BaseDocument(BaseModel):
     class Meta(BaseModel):
         op: Literal["c", "u", "d"] = Field(
-            description="Operation type (c: Create, u: Update, d: Delete)"
+            default="u",
+            description="Operation type (c: Create, u: Update, d: Delete)",
         )
         row_id: int = Field(
             default=-1,
@@ -166,10 +173,12 @@ _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
 class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key."""
 
-    bindingStateV1: dict[str, _BaseResourceState] = {}
+    bindingStateV1: dict[str, _BaseResourceState | None] = {}
+    backfillRequests: dict[str, bool | None] = {}
 
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
+
 
 @dataclass
 class AssociatedDocument(Generic[_BaseDocument]):
@@ -181,7 +190,8 @@ class AssociatedDocument(Generic[_BaseDocument]):
     doc: _BaseDocument
     binding: int
 
-FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument, None]]
+
+FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
 """
 FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
 
@@ -193,7 +203,7 @@ not emitted by the connector.
 
 FetchPageFn = Callable[
     [Logger, PageCursor, LogCursor],
-    AsyncGenerator[_BaseDocument | AssociatedDocument | PageCursor, None],
+    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
 ]
 """
 FetchPageFn fetches available checkpoints since the provided last PageCursor.
@@ -218,7 +228,7 @@ returning without yielding a final PageCursor.
 
 FetchChangesFn = Callable[
     [Logger, LogCursor],
-    AsyncGenerator[_BaseDocument | AssociatedDocument | LogCursor, None],
+    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | LogCursor, None],
 ]
 """
 FetchChangesFn fetches available checkpoints since the provided last LogCursor.
@@ -381,12 +391,27 @@ def open(
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
 
     async def _run(task: Task):
+        backfill_requests = []
+        if open.state.backfillRequests is not None:
+            for stateKey in open.state.backfillRequests.keys():
+                task.log.info(
+                    "clearing checkpoint due to backfill trigger",
+                    {"stateKey": stateKey},
+                )
+                backfill_requests.append(stateKey)
+                task.checkpoint(
+                    ConnectorState(
+                        bindingStateV1={stateKey: None},
+                        backfillRequests={stateKey: None},
+                    )
+                )
+
         for index, (binding, resource) in enumerate(resolved_bindings):
             state: _ResourceState | None = open.state.bindingStateV1.get(
                 binding.stateKey
             )
 
-            if state is None:
+            if state is None or binding.stateKey in backfill_requests:
                 # Checkpoint the binding's initialized state prior to any processing.
                 task.checkpoint(
                     ConnectorState(
@@ -431,7 +456,7 @@ def open_binding(
         async def closure(task: Task):
             assert state.inc
             await _binding_incremental_task(
-                binding, binding_index, fetch_changes, state.inc, task
+                binding, binding_index, fetch_changes, state.inc, task,
             )
 
         task.spawn_child(f"{prefix}.incremental", closure)
@@ -441,7 +466,7 @@ def open_binding(
         async def closure(task: Task):
             assert state.backfill
             await _binding_backfill_task(
-                binding, binding_index, fetch_page, state.backfill, task
+                binding, binding_index, fetch_page, state.backfill, task,
             )
 
         task.spawn_child(f"{prefix}.backfill", closure)
@@ -510,9 +535,15 @@ async def _binding_snapshot_task(
 
         count = 0
         async for doc in fetch_snapshot(task.log):
-            doc.meta_ = BaseDocument.Meta(
-                op="u" if count < state.last_count else "c", row_id=count
-            )
+            if isinstance(doc, dict):
+                doc["meta_"] = {
+                    "op": "u" if count < state.last_count else "c",
+                    "row_id": count
+                }
+            else:
+                doc.meta_ = BaseDocument.Meta(
+                    op="u" if count < state.last_count else "c", row_id=count
+                )
             task.captured(binding_index, doc)
             count += 1
 
@@ -561,11 +592,15 @@ async def _binding_backfill_task(
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
+        if task.stopping.event.is_set():
+            task.log.debug(f"backfill is yielding to stop")
+            return
+
         # Track if fetch_page returns without having yielded a PageCursor.
-        done = True 
+        done = True
 
         async for item in fetch_page(task.log, state.next_page, state.cutoff):
-            if isinstance(item, BaseDocument):
+            if isinstance(item, BaseDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
                 done = True
             elif isinstance(item, AssociatedDocument):
@@ -600,23 +635,49 @@ async def _binding_incremental_task(
     connector_state = ConnectorState(
         bindingStateV1={binding.stateKey: ResourceState(inc=state)}
     )
+
+    sleep_for = timedelta()
+
     task.log.info(f"resuming incremental replication", state)
 
+    if isinstance(state.cursor, datetime):
+        lag = datetime.now(tz=UTC) - state.cursor
+
+        if lag < binding.resourceConfig.interval:
+            sleep_for = binding.resourceConfig.interval - lag
+            task.log.info("incremental task ran recently, sleeping until `interval` has fully elapsed", {"sleep_for": sleep_for, "interval": binding.resourceConfig.interval})
+
     while True:
-        # Yield to the event loop to prevent starvation.
-        await asyncio.sleep(0)
+        try:
+            if not task.stopping.event.is_set():
+                await asyncio.wait_for(
+                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                )
+
+            task.log.debug(f"incremental replication is idle and is yielding to stop")
+            return
+        except asyncio.TimeoutError:
+            pass  # `sleep_for` elapsed.
 
         checkpoints = 0
         pending = False
 
         async for item in fetch_changes(task.log, state.cursor):
-            if isinstance(item, BaseDocument):
+            if isinstance(item, BaseDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
                 pending = True
             elif isinstance(item, AssociatedDocument):
-                # TODO(jshearer): Assert that the binding index exists (and is enabled?)
                 task.captured(item.binding, item.doc)
                 pending = True
+            elif item == Triggers.BACKFILL:
+                task.log.info("incremental task triggered backfill")
+                task.stopping.event.set()
+                task.checkpoint(
+                    ConnectorState(
+                        backfillRequests={binding.stateKey: True}
+                    )
+                )
+                return
             else:
                 # Ensure LogCursor types match and that they're strictly increasing.
                 is_larger = False
@@ -644,35 +705,23 @@ async def _binding_incremental_task(
                 "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
             )
 
-        sleep_for : timedelta = binding.resourceConfig.interval
-
         if not checkpoints:
             # We're idle. Sleep for the full back-off interval.
-            sleep_for = binding.resourceConfig.interval 
+            sleep_for = binding.resourceConfig.interval
 
         elif isinstance(state.cursor, datetime):
             lag = (datetime.now(tz=UTC) - state.cursor)
 
             if lag > binding.resourceConfig.interval:
                 # We're not idle. Attempt to fetch the next changes.
+                sleep_for = timedelta()
                 continue
             else:
                 # We're idle. Sleep until the cursor is `interval` old.
                 sleep_for = binding.resourceConfig.interval - lag
         else:
             # We're not idle. Attempt to fetch the next changes.
+            sleep_for = timedelta()
             continue
 
         task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
-
-        # At this point we've fully caught up with the log and are idle.
-        try:
-            if not task.stopping.event.is_set():
-                await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
-                )
-
-            task.log.debug(f"incremental replication is idle and is yielding to stop")
-            return
-        except asyncio.TimeoutError:
-            pass  # `interval` elapsed.

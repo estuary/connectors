@@ -28,6 +28,10 @@ ARG DOCS_URL
 # `python.yaml` workflow matrix.
 ARG USAGE_RATE
 
+RUN apt-get update && \
+    apt install -y --no-install-recommends \
+    openssh-client
+
 LABEL FLOW_RUNTIME_PROTOCOL=${CONNECTOR_TYPE}
 LABEL FLOW_RUNTIME_CODEC=json
 LABEL dev.estuary.usage-rate=${USAGE_RATE}
@@ -35,6 +39,7 @@ LABEL dev.estuary.usage-rate=${USAGE_RATE}
 COPY --from=builder /opt/$CONNECTOR_NAME /opt/$CONNECTOR_NAME
 COPY --from=builder /opt/estuary-cdk /opt/estuary-cdk
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 ENV DOCS_URL=${DOCS_URL}
 ENV CONNECTOR_NAME=${CONNECTOR_NAME}

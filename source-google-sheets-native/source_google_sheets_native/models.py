@@ -49,10 +49,14 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 
 class NumberType(StrEnum):
+    TEXT = "TEXT"
+    NUMBER = "NUMBER"
+    TIME = "TIME"
     CURRENCY = "CURRENCY"
     DATE = "DATE"
     DATE_TIME = "DATE_TIME"
     PERCENT = "PERCENT"
+    SCIENTIFIC = "SCIENTIFIC"
 
 
 class Sheet(BaseModel, extra="allow"):
@@ -66,6 +70,10 @@ class Sheet(BaseModel, extra="allow"):
             rowCount: int
             columnCount: int
             frozenRowCount: int = 0
+            frozenColumnCount: int = 0
+            hideGridlines: bool = False
+            rowGroupControlAfter: bool = False
+            columnGroupControlAfter: bool = False
 
         sheetId: int
         title: str
@@ -78,6 +86,7 @@ class Sheet(BaseModel, extra="allow"):
     class EffectiveValue(BaseModel, extra="forbid"):
         stringValue: str | None = None
         numberValue: Decimal | None = None
+        boolValue: bool | None = None
         errorValue: dict | None = None
 
     class EffectiveFormat(BaseModel, extra="forbid"):
@@ -91,16 +100,18 @@ class Sheet(BaseModel, extra="allow"):
         effectiveValue: "Sheet.EffectiveValue | None" = None
 
     class RowData(BaseModel, extra="forbid"):
-        values: list["Sheet.Value"]
+        values: list["Sheet.Value"] | None = None
 
     class Data(BaseModel, extra="forbid"):
-        rowData: list["Sheet.RowData"]
+        rowData: list["Sheet.RowData"] | None = None
 
         @model_validator(mode="after")
         def _post_init(self) -> "Sheet.Data":
             # Remove all trailing rows which have no set cells.
+            # Note that this can be represented as either no values, or a list of values where the
+            # effectiveValue of each cell is empty.
             while self.rowData:
-                if all(not v.effectiveValue for v in self.rowData[-1].values):
+                if (not self.rowData[-1].values) or all(not v.effectiveValue for v in self.rowData[-1].values):
                     self.rowData.pop()
                 else:
                     break

@@ -1,0 +1,11 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+the capture cannot run due to the following error(s):
+ - user "flow_capture" does not have the "db_owner" role which is required for automatic change table cleanup
+
+# Capture Instance Contained 40 Rows At Finish

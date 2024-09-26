@@ -61,7 +61,10 @@ func TestValidateAndApply(t *testing.T) {
 		Schema: "PUBLIC",
 	}
 
-	db, err := stdsql.Open("snowflake", cfg.ToURI("testing"))
+	dsn, err := cfg.toURI("testing")
+	require.NoError(t, err)
+
+	db, err := stdsql.Open("snowflake", dsn)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -131,7 +134,7 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong username",
 			cfg: func(cfg config) *config {
-				cfg.Credentials.User = "wrong" + cfg.User
+				cfg.Credentials.User = "wrong" + cfg.Credentials.User
 				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
@@ -139,7 +142,7 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong password",
 			cfg: func(cfg config) *config {
-				cfg.Credentials.Password = "wrong" + cfg.Password
+				cfg.Credentials.Password = "wrong" + cfg.Credentials.Password
 				return &cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
@@ -154,17 +157,9 @@ func TestPrereqs(t *testing.T) {
 		},
 	}
 
-	ctx := context.Background()
-
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := tt.cfg(cfg)
-
-			client, err := newClient(ctx, &sql.Endpoint{Config: cfg})
-			require.NoError(t, err)
-			defer client.Close()
-
-			require.Equal(t, tt.want, client.PreReqs(context.Background()).Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(cfg), "testing").Unwrap())
 		})
 	}
 }

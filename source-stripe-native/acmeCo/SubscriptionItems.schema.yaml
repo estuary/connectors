@@ -1,0 +1,134 @@
+---
+$defs:
+  Items:
+    additionalProperties: true
+    properties:
+      object:
+        const: list
+        enum:
+          - list
+        title: Object
+        type: string
+      data:
+        items:
+          $ref: "#/$defs/Values"
+        title: Data
+        type: array
+    required:
+      - object
+      - data
+    title: Items
+    type: object
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+  Values:
+    additionalProperties: true
+    properties:
+      id:
+        title: Id
+        type: string
+      parent_id:
+        anyOf:
+          - type: string
+          - type: "null"
+        default: ~
+        title: Parent Id
+      object:
+        const: subscription_item
+        enum:
+          - subscription_item
+        title: Object
+        type: string
+      billing_thresholds:
+        anyOf:
+          - type: object
+          - type: "null"
+        default: ~
+        title: Billing Thresholds
+      created:
+        title: Created
+        type: integer
+      metadata:
+        anyOf:
+          - type: object
+          - type: "null"
+        default: ~
+        title: Metadata
+      discounts:
+        anyOf:
+          - items:
+              type: object
+            type: array
+          - type: "null"
+        default: ~
+        title: Discounts
+      plan:
+        anyOf:
+          - type: object
+          - type: "null"
+        default: ~
+        title: Plan
+      price:
+        title: Price
+        type: object
+      quantity:
+        anyOf:
+          - type: integer
+          - type: "null"
+        default: ~
+        title: Quantity
+      subscription:
+        title: Subscription
+        type: string
+      tax_rates:
+        anyOf:
+          - items:
+              type: object
+            type: array
+          - type: "null"
+        default: ~
+        title: Tax Rates
+    required:
+      - id
+      - object
+      - created
+      - price
+      - subscription
+    title: Values
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    allOf:
+      - $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+  items:
+    $ref: "#/$defs/Items"
+required:
+  - id
+  - items
+title: SubscriptionItems
+type: object
+x-infer-schema: true

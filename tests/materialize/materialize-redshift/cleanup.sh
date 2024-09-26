@@ -18,6 +18,7 @@ dropTable "duplicate_keys_delta_exclude_flow_doc"
 dropTable "multiple_types"
 dropTable "formatted_strings"
 dropTable "long_string"
+dropTable "deletions"
 
 # Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
 # runs start from scratch.

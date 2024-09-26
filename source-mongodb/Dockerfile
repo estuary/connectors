@@ -1,6 +1,6 @@
 # Build Stage
 ################################################################################
-FROM golang:1.21-bullseye as builder
+FROM golang:1.22-bullseye as builder
 
 WORKDIR /builder
 
@@ -16,7 +16,7 @@ COPY source-mongodb     ./source-mongodb
 # Run the unit tests.
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
-RUN go test -v ./source-mongodb/...
+RUN go test -short -v ./source-mongodb/...
 
 # Build the connector.
 RUN go build -o ./connector -v ./source-mongodb/...

@@ -76,6 +76,10 @@ func TestTrickyTableNames(t *testing.T) {
 }
 
 func TestPartitionedTable(t *testing.T) {
+	if *useMyISAM {
+		t.Skipf("MyISAM does not support partitioned tables")
+	}
+
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var uniqueID = "83812828"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, `(
@@ -171,6 +175,7 @@ func TestEnumPrimaryKey(t *testing.T) {
 	cs.Validator = &st.OrderedCaptureValidator{}
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 3
 
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 	// Insert various test values and then capture them
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"A", 1, "A1"}, {"A", 2, "A2"}, {"A", 3, "A3"}, {"A", 4, "A4"},
@@ -192,6 +197,7 @@ func TestEnumDecodingFix(t *testing.T) {
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.OrderedCaptureValidator{}
 
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 	// Insert various test values and then capture them via replication
 	tb.Insert(ctx, t, tableName, [][]interface{}{{1, "A"}, {2, "B"}, {3, "C"}, {4, "D"}, {5, "error"}})
 	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
@@ -266,9 +272,51 @@ func TestEnumEmptyString(t *testing.T) {
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.OrderedCaptureValidator{}
 
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
 	// Insert various test values and then capture them via replication
 	tb.Insert(ctx, t, tableName, [][]any{{1, "A"}, {2, "B"}, {3, "C"}, {4, "error"}, {100, 0}, {101, 1}, {102, ""}, {105, 5}})
 	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 	tb.Insert(ctx, t, tableName, [][]any{{5, "A"}, {6, "B"}, {7, "C"}, {8, "error"}, {200, 0}, {201, 1}, {202, ""}, {205, 5}})
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestUnsignedIntegers(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "45511171"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, v1 TINYINT UNSIGNED, v2 SMALLINT UNSIGNED, v3 MEDIUMINT UNSIGNED, v4 INT UNSIGNED, v8 BIGINT UNSIGNED)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	t.Run("discovery", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+	// Insert various test values and then capture them via replication
+	tb.Insert(ctx, t, tableName, [][]any{{1, "222", "55555", "11111111", "3333333333", "17777777777777777777"}})
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tb.Insert(ctx, t, tableName, [][]any{{2, "222", "55555", "11111111", "3333333333", "17777777777777777777"}})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestPartialRowImages(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+
+	tb.Query(ctx, t, "SET SESSION binlog_row_image = 'MINIMAL'")
+	t.Cleanup(func() { tb.Query(ctx, t, "SET SESSION binlog_row_image = 'FULL'") })
+
+	var uniqueID = "16824726"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a INTEGER, b INTEGER, c INTEGER)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, 0, 0, 0}, {1, 1, 1, 1}, {2, 2, 2, 2}})
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s(id, a) VALUES (3, 3)", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s(id, b) VALUES (4, 4)", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s(id, c) VALUES (5, 5)", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET a = 6 WHERE id = 0", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET b = 7 WHERE id = 1", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET c = 8 WHERE id = 2", tableName))
+	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf("DELETE FROM %s WHERE id = 2", tableName))
+	t.Run("delete", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
