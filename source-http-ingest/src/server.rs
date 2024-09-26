@@ -6,13 +6,18 @@ use axum::{
     extract::{DefaultBodyLimit, Json, Path, Query, State},
     routing, Router,
 };
+use doc::Annotation;
 use http::status::StatusCode;
-use serde_json::Value;
+use json::validator::Validator;
+use serde_json::{value::RawValue, Value};
 use tower_http::decompression::RequestDecompressionLayer;
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder};
 use utoipa_swagger_ui::SwaggerUi;
 
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 use tokio::io;
 use tokio::sync::Mutex;
 
@@ -97,8 +102,9 @@ async fn handle_webhook(
 }
 
 struct CollectionHandler {
+    schema_url: url::Url,
+    schema_index: json::schema::index::Index<'static, doc::Annotation>,
     binding_index: u32,
-    validator: doc::Validator,
     id_header: Option<String>,
 }
 
@@ -131,52 +137,59 @@ mod pointers {
     }
 }
 
+mod properties {
+    pub const META: &str = "_meta";
+    pub const ID: &str = "webhookId";
+    pub const TS: &str = "receivedAt";
+    pub const QUERY: &str = "query";
+    pub const HEADERS: &str = "headers";
+}
+
 impl CollectionHandler {
     fn prepare_doc(
         &self,
-        mut object: Value,
+        mut object: JsonObj,
         id: String,
         headers: serde_json::Map<String, Value>,
         query_params: serde_json::Map<String, Value>,
         ts: String,
-    ) -> anyhow::Result<(u32, Value)> {
-        if !object.is_object() {
-            anyhow::bail!("expected a JSON object, got {}", type_name(&object));
-        }
-
-        if let Some(loc) = pointers::ID.create_value(&mut object) {
-            *loc = Value::String(id);
+    ) -> anyhow::Result<(u32, String)> {
+        // If the object already contains a _meta property, parse it so that we can add to it.
+        let mut meta: serde_json::Map<String, Value> = if object.contains_key(properties::META) {
+            let val = object.remove(properties::META).unwrap();
+            serde_json::from_str(val.get()).context("parsing existing _meta property")?
         } else {
-            anyhow::bail!("invalid document, cannot create _meta object");
-        }
+            serde_json::Map::with_capacity(4)
+        };
 
-        if let Some(loc) = pointers::TS.create_value(&mut object) {
-            *loc = Value::String(ts);
-        }
-
-        if let Some(loc) = pointers::HEADERS.create_value(&mut object) {
-            *loc = Value::Object(headers);
-        }
+        meta.insert(properties::ID.to_string(), Value::String(id));
+        meta.insert(properties::TS.to_string(), Value::String(ts));
+        meta.insert(properties::HEADERS.to_string(), Value::Object(headers));
 
         // It seems like most people probably won't use query parameters at all, so only include
         // them if non-empty. That way, users who don't use them won't have columns added for them
         // in their materializations.
         if !query_params.is_empty() {
-            if let Some(loc) = pointers::QUERY_PARAMS.create_value(&mut object) {
-                *loc = Value::Object(query_params);
-            }
+            meta.insert(properties::QUERY.to_string(), Value::Object(query_params));
         }
-        Ok((self.binding_index, object))
+
+        let meta_value =
+            serde_json::value::to_raw_value(&meta).context("serializing _meta object")?;
+        object.insert(properties::META.to_string(), meta_value);
+
+        let serialized = serde_json::to_string(&object).context("serializing prepared document")?;
+
+        Ok((self.binding_index, serialized))
     }
 
     /// Turns a JSON request body into an array of one or more documents, along with
     /// the binding index of the collection.
     fn prepare_documents(
         &self,
-        body: Value,
+        body: JsonBody,
         request_headers: axum::http::header::HeaderMap,
         query_params: serde_json::Map<String, serde_json::Value>,
-    ) -> anyhow::Result<Vec<(u32, Value)>> {
+    ) -> anyhow::Result<Vec<(u32, String)>> {
         let header_id = if let Some(header_key) = self.id_header.as_ref() {
             // If the config specified a header to use as the id, then require it to be present.
             Some(required_string_header(&request_headers, header_key.as_str())?.to_owned())
@@ -205,12 +218,12 @@ impl CollectionHandler {
             .unwrap();
 
         match body {
-            obj @ Value::Object(_) => {
+            JsonBody::Object(obj) => {
                 let id = header_id.unwrap_or_else(new_uuid);
                 let prepped = self.prepare_doc(obj, id, header_json, query_params, ts)?;
                 Ok(vec![prepped])
             }
-            Value::Array(arr) => {
+            JsonBody::Array(arr) => {
                 let mut prepped = Vec::with_capacity(arr.len());
                 for (i, inner) in arr.into_iter().enumerate() {
                     // suffix the header id, if provided, with the index of each
@@ -229,10 +242,6 @@ impl CollectionHandler {
                 }
                 Ok(prepped)
             }
-            other => Err(anyhow::anyhow!(
-                "expected an object or array, got {}",
-                type_name(&other)
-            )),
         }
     }
 }
@@ -273,13 +282,25 @@ impl Handler {
             let schema_value = serde_json::from_str::<Value>(&binding.collection.write_schema_json)
                 .context("parsing write_schema_json")?;
             let uri = url::Url::parse("http://not.areal.host/").unwrap();
-            let schema = json::schema::build::build_schema(uri, &schema_value)?;
-            let validator = doc::Validator::new(schema)?;
+            let schema = json::schema::build::build_schema(uri.clone(), &schema_value)?;
+
+            // We intentionally leak the memory here in order to get a `&'static Schema`, because
+            // the schema index only works with references. The workaround would be to add a
+            // function to `doc::Validator` to allow it to validate a `&str` instead of requiring
+            // a parsed document.
+            let schema_box = Box::new(schema);
+            let schema_ref: &'static json::schema::Schema<Annotation> = Box::leak(schema_box);
+            let mut index_builder = json::schema::index::IndexBuilder::new();
+            index_builder
+                .add(schema_ref)
+                .context("adding schema to index")?;
+            let index = index_builder.into_index();
 
             collections_by_path.insert(
                 path,
                 CollectionHandler {
-                    validator,
+                    schema_url: uri,
+                    schema_index: index,
                     binding_index,
                     id_header: binding.resource_config.id_from_header,
                 },
@@ -330,9 +351,12 @@ impl Handler {
             }
         }
 
-        // Try to deserialize the body as json _before_ acquiring the handlers lock,
-        // to prevent slow connection from impacting others.
-        let json: Value = match serde_json::from_slice(&body) {
+        let parse_result = if body.trim_ascii_start().starts_with(b"[") {
+            serde_json::from_slice::<Vec<JsonObj>>(&body).map(JsonBody::Array)
+        } else {
+            serde_json::from_slice::<JsonObj>(&body).map(JsonBody::Object)
+        };
+        let json: JsonBody = match parse_result {
             Ok(j) => j,
             Err(err) => {
                 let content_type = request_headers.get("content-type");
@@ -375,13 +399,27 @@ impl Handler {
         // impact other requests. So this ensures that each request is all-or-
         // nothing, which is probably simpler for users to reason about anyway.
         for (_, doc) in enhanced_docs.iter() {
-            let validation_result = collection.validator.validate(None, doc)?;
-            if let Err(validation_err) = validation_result.ok() {
-                tracing::info!(error = %validation_err, uri_path = %collection_path, "request document failed validation");
+            let CollectionHandler {
+                schema_index,
+                schema_url,
+                ..
+            } = &collection;
+            let mut validator: Validator<doc::Annotation, json::validator::SpanContext> =
+                Validator::new(schema_index);
+            validator
+                .prepare(schema_url)
+                .context("preparing validator")?;
+
+            let mut deserializer = serde_json::Deserializer::from_str(&doc);
+            json::de::walk(&mut deserializer, &mut validator).context("validating document")?;
+
+            if validator.invalid() {
+                let basic_output = json::validator::build_basic_output(validator.outcomes());
+                tracing::info!(%basic_output, uri_path = %collection_path, "request document failed validation");
                 return Ok((
                     StatusCode::BAD_REQUEST,
                     Json(
-                        serde_json::json!({"error": "request body failed validation", "validationError": validation_err }),
+                        serde_json::json!({"error": "request body failed validation", "basicOutput": basic_output }),
                     ),
                 ));
             }
@@ -643,17 +681,15 @@ fn err_response(
     (status, Json(json))
 }
 
-fn type_name(val: &Value) -> &'static str {
-    match val {
-        Value::Null => "null",
-        Value::Bool(_) => "boolean",
-        Value::Number(_) => "number",
-        Value::String(_) => "string",
-        Value::Array(_) => "array",
-        Value::Object(_) => "object",
-    }
-}
-
 fn new_uuid() -> String {
     uuid::Uuid::new_v4().to_string()
+}
+
+type JsonObj = BTreeMap<String, Box<RawValue>>;
+
+#[derive(serde::Deserialize)]
+#[serde(untagged)]
+enum JsonBody {
+    Object(JsonObj),
+    Array(Vec<JsonObj>),
 }

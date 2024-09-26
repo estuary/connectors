@@ -57,6 +57,7 @@ async fn test_http_request_processing() -> Result<(), anyhow::Error> {
         // needing to figure out what it is by parsing log output.
         .env("SOURCE_HTTP_INGEST_PORT", "27172")
         .env("LOG_LEVEL", "debug")
+        .env("RUST_BACKTRACE", "1")
         .spawn()?;
 
     let stdin = child.stdin.take().unwrap();
