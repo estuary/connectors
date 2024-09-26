@@ -592,21 +592,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "Id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "Id"
-      ],
       "title": "Campaigns",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/Id"
+      "/_meta/row_id"
     ]
   },
   {
@@ -653,21 +646,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "Id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "Id"
-      ],
       "title": "Ads",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/Id"
+      "/_meta/row_id"
     ]
   },
   {
@@ -714,21 +700,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "Id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "Id"
-      ],
       "title": "Catalogs",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/Id"
+      "/_meta/row_id"
     ]
   },
   {
@@ -829,21 +808,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "Id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "Id"
-      ],
       "title": "PhoneNumbers",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/Id"
+      "/_meta/row_id"
     ]
   },
   {
@@ -1134,21 +1106,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "Id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "Id"
-      ],
       "title": "MediaPartnerGroups",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/Id"
+      "/_meta/row_id"
     ]
   }
 ]
