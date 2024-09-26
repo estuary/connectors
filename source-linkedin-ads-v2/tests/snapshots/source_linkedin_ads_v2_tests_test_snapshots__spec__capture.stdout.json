@@ -115,7 +115,7 @@
               ],
               "title": "OAuth2.0",
               "type": "object",
-              "x-oauth-provider": "linkedin"
+              "x-oauth2-provider": "linkedin"
             },
             {
               "properties": {
