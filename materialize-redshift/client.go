@@ -24,6 +24,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/jackc/pgconn"
+	"github.com/pierrec/lz4/v4"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -294,6 +295,16 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return c.withDB(func(db *stdsql.DB) error { return sql.StdSQLExecStatements(ctx, db, statements) })
 }
 
+func LZ4Decompress(src []byte) ([]byte, error) {
+	var out []byte
+	var reader = lz4.NewReader(bytes.NewReader(src))
+	if _, err := reader.Read(out); err != nil {
+		return nil, err
+	}
+
+	return out, nil
+}
+
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var err = c.withDB(func(db *stdsql.DB) error {
 		var err error
@@ -303,7 +314,21 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 				return nil, err
 			}
 
-			return base64.StdEncoding.DecodeString(string(fenceHexBytes))
+			// Fences are now compressed, but in order to maintain continuity of running
+			// materializations, we need to support loading the old base64-encoded fences
+			// as well. They'll be written back as lz4-encoded, so eventually we should
+			// be able to remove this check.
+			validLZ4, err := lz4.ValidFrameHeader(fenceHexBytes)
+
+			if err == nil && validLZ4 {
+				if decompressed, err := LZ4Decompress(fenceHexBytes); err != nil {
+					return nil, err
+				} else {
+					return decompressed, nil
+				}
+			} else {
+				return base64.StdEncoding.DecodeString(string(fenceHexBytes))
+			}
 		})
 		return err
 	})

@@ -290,7 +290,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 
 {{ define "updateFence" }}
 UPDATE {{ Identifier $.TablePath }}
-	SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
+	SET   checkpoint = {{ Literal (LZ4Compress $.Checkpoint | Base64Std) }}
 	WHERE materialization = {{ Literal $.Materialization.String }}
 	AND   key_begin = {{ $.KeyBegin }}
 	AND   key_end   = {{ $.KeyEnd }}

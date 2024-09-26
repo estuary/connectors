@@ -148,7 +148,7 @@ WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 
 
 --- Begin Fence Update ---
 UPDATE path."to".checkpoints
-	SET   checkpoint = 'AAECAwQFBgcICQ=='
+	SET   checkpoint = 'BCJNGGRwuQoAAIAAAQIDBAUGBwgJAAAAAKaizGw='
 	WHERE materialization = 'some/Materialization'
 	AND   key_begin = 1122867
 	AND   key_end   = 4293844428

@@ -1,10 +1,15 @@
 package sql
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/base64"
+	"fmt"
+	"io"
 	"strings"
 	"text/template"
 
+	"github.com/pierrec/lz4/v4"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -12,8 +17,28 @@ import (
 // installs common functions for accessing Dialect behavior.
 func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 	var tpl = template.New(name).Funcs(template.FuncMap{
-		"Literal":          dialect.Literal,
-		"Base64Std":        base64.StdEncoding.EncodeToString,
+		"Literal":   dialect.Literal,
+		"Base64Std": base64.StdEncoding.EncodeToString,
+		"LZ4Compress": func(src []byte) ([]byte, error) {
+			var out bytes.Buffer
+			bufWriter := bufio.NewWriter(&out)
+			var writer = lz4.NewWriter(bufWriter)
+
+			if _, err := io.Copy(writer, bytes.NewReader(src)); err != nil {
+				return nil, err
+			}
+			// Need to both close/flush the lz4 writer, and the bufio.Writer
+			if err := writer.Close(); err != nil {
+				return nil, err
+			}
+			if err := bufWriter.Flush(); err != nil {
+				return nil, err
+			}
+
+			fmt.Printf("In: %v, Out: %v", src, out)
+
+			return out.Bytes(), nil
+		},
 		"ColumnIdentifier": dialect.Identifier,
 		// Tweak signature slightly to take TablePath, as dynamic slicing is a bit tricky
 		// in templates and this is most-frequently used with TablePath.Base().
