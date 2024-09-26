@@ -5,9 +5,12 @@ edition = "2021"
 
 
 [dependencies]
+allocator = { git = "https://github.com/estuary/flow" }
 doc = { git = "https://github.com/estuary/flow" }
 json = { git = "https://github.com/estuary/flow" }
-proto-flow = { git = "https://github.com/estuary/flow", features = ["generate"] }
+proto-flow = { git = "https://github.com/estuary/flow", features = [
+    "generate",
+] }
 
 anyhow = "1.0"
 async-trait = "0.1"
@@ -16,10 +19,7 @@ futures = "0.3"
 http = "1.0"
 schemars = "0.8"
 serde = "1.0"
-serde_json = { version = "1.0", features = [
-    "raw_value",
-    "float_roundtrip"
-] }
+serde_json = { version = "1.0", features = ["raw_value", "float_roundtrip"] }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [
