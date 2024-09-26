@@ -17,7 +17,7 @@
           {
             "type": "object",
             "title": "OAuth2.0",
-            "x-oauth2-provider": "linkedin",
+            "x-oauth-provider": "linkedin",
             "required": ["auth_method", "client_id", "client_secret", "refresh_token"],
             "properties": {
               "auth_method": {
