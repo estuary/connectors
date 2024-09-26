@@ -30,6 +30,7 @@ API = "https://api.stripe.com/v1"
 MAX_PAGE_LIMIT = 100
 
 MISSING_RESOURCE_REGEX = r"resource_missing.+No such.+"
+NOT_ON_LEGACY_BILLING_REGEX = r"Cannot list usage record summaries for.+because it is not on the legacy metered billing system"
 
 def add_event_types(params: dict[str, str | int], event_types: dict[str, Literal["c", "u", "d"]]):
     """
@@ -343,7 +344,24 @@ async def _capture_substreams(
             # the requests for the associated child resources fail. Stripe returns a 404
             # error & a message containing "resource_missing" and "No such" when this happens.
             if err.code == 404 and bool(re.search(MISSING_RESOURCE_REGEX, err.message, re.DOTALL)):
-                log.warning(f"Missing resource error for URL {child_url}. Skipping to the next resource.", err)
+                log.warning(
+                    f"Missing resource error for URL {child_url}. Skipping to the next resource.",
+                    {
+                        "code": err.code,
+                        "message": err.message
+                    },
+                )
+                break
+            # If we request usage record summaries for subscription items that do not use the
+            # legacy billing system, Stripe returns a 400 error & a pretty specific message.
+            elif err.code == 400 and bool(re.search(NOT_ON_LEGACY_BILLING_REGEX, err.message, re.DOTALL)):
+                log.warning(
+                    f"Cannot retrieve usage record summaries for {id} since it is not on Stripe's legacy billing system. Skipping to the next resource.",
+                    {
+                        "code": err.code,
+                        "message": err.message
+                    },
+                )
                 break
             # Propagate all other errors.
             else:
