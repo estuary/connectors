@@ -87,22 +87,29 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		))
 	}
 
-	for _, f := range ta.ColumnTypeChanges {
-		stmts = append(stmts, fmt.Sprintf(
-			"ALTER TABLE %s ALTER COLUMN %s TYPE %s;",
-			ta.Identifier,
-			f.Identifier,
-			f.DDL,
-		))
+	if len(ta.ColumnTypeChanges) > 0 {
+		for _, m := range ta.ColumnTypeChanges {
+			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m); err != nil {
+				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+			} else {
+				stmts = append(stmts, steps...)
+			}
+		}
 	}
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		txn, err := c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer txn.Rollback()
+
 		for _, stmt := range stmts {
-			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+			if _, err := txn.ExecContext(ctx, stmt); err != nil {
 				return err
 			}
 		}
-		return nil
+		return txn.Commit()
 	}, nil
 }
 

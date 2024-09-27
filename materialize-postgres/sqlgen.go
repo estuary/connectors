@@ -55,9 +55,13 @@ var pgDialect = func() sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: map[string][]string{
-			"numeric":          {"character varying", "text"},
-			"integer":          {"character varying", "text"},
-			"double precision": {"character varying", "text"},
+			"numeric":                  {"text"},
+			"integer":                  {"text"},
+			"double precision":         {"text"},
+			"text":                     {"decimal", "numeric", "double precision", "date", "time", "timestamptz"},
+			"date":                     {"text"},
+			"time without time zone":   {"text"},
+			"timestamp with time zone": {"text"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -133,6 +137,7 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 -- single statement for efficiency.
 
 {{ define "alterTableColumns" }}
+{{- if or $.DropNotNulls $.AddColumns}}
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
@@ -142,12 +147,8 @@ ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
 	ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL
-{{- end }}
-{{- if and (or $.DropNotNulls $.AddColumns) $.ColumnTypeChanges}},{{ end }}
-{{- range $ind, $col := $.ColumnTypeChanges }}
-	{{- if $ind }},{{ end }}
-	ALTER COLUMN {{ $col.Identifier }} TYPE {{ $col.DDL }}
 {{- end }};
+{{- end -}}
 {{ end }}
 
 -- Templated creation of a temporary load table:

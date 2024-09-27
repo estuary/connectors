@@ -87,9 +87,13 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 
 	return sql.Dialect{
 		MigratableTypes: map[string][]string{
-			"decimal": {"varchar", "longtext"},
-			"bigint":  {"varchar", "longtext"},
-			"double":  {"varchar", "longtext"},
+			"decimal":  {"varchar", "longtext"},
+			"bigint":   {"varchar", "longtext"},
+			"double":   {"varchar", "longtext"},
+			"varchar":  {"date", "time(6)"},
+			"longtext": {"date", "time(6)"},
+			"date":     {"longtext", "varchar"},
+			"time":     {"longtext", "varchar"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
@@ -205,6 +209,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 -- single statement for efficiency.
 
 {{ define "alterTableColumns" }}
+{{- if or $.DropNotNulls $.AddColumns}}
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
@@ -214,12 +219,8 @@ ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.DropNotNulls }}
 	{{- if $ind }},{{ end }}
 	MODIFY {{ ColumnIdentifier $col.Name }} {{$col.Type}}
-{{- end }}
-{{- if and (or $.DropNotNulls $.AddColumns) $.ColumnTypeChanges}},{{ end }}
-{{- range $ind, $col := $.ColumnTypeChanges }}
-	{{- if $ind }},{{ end }}
-	MODIFY {{ $col.Identifier }} {{$col.DDL}}
 {{- end }};
+{{- end }}
 {{ end }}
 
 -- Templated creation of a temporary load table:

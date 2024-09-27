@@ -60,9 +60,12 @@ var databricksDialect = func() sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: map[string][]string{
-			"decimal": {"string"},
-			"long":    {"string"},
-			"double":  {"string"},
+			"decimal":   {"string"},
+			"long":      {"string"},
+			"double":    {"string"},
+			"string":    {"numeric(38,0)", "double", "long", "date", "timestamp"},
+			"timestamp": {"string"},
+			"date":      {"string"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{

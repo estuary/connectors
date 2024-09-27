@@ -98,9 +98,13 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: map[string][]string{
-			"numeric":          {"character varying", "text"},
-			"bigint":           {"character varying", "text"},
-			"double precision": {"character varying", "text"},
+			"numeric":                  {"character varying", "text"},
+			"bigint":                   {"character varying", "text"},
+			"double precision":         {"character varying", "text"},
+			"character varying":        {"decimal", "numeric", "double precision", "date", "time", "timestamptz"},
+			"date":                     {"text"},
+			"time without time zone":   {"text"},
+			"timestamp with time zone": {"text"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {

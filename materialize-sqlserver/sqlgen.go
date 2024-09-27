@@ -86,8 +86,12 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 
 	return sql.Dialect{
 		MigratableTypes: map[string][]string{
-			"float":  {strings.ToLower(textType), stringType},
-			"bigint": {strings.ToLower(textType), stringType},
+			"float":     {strings.ToLower(textType), stringType},
+			"bigint":    {strings.ToLower(textType), stringType},
+			stringType:  {"double precision", "bigint", "date", "datetime2", "time"},
+			"date":      {strings.ToLower(textType)},
+			"datetime2": {strings.ToLower(textType)},
+			"time":      {strings.ToLower(textType)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -192,17 +196,13 @@ END;
 -- Server does not support modifying multiple columns in a single statement.
 
 {{ define "alterTableColumns" }}
-ALTER TABLE {{$.Identifier}}
-{{- range $ind, $col := $.ColumnTypeChanges }}
-	{{- if $ind }},{{ end }}
-	ALTER COLUMN {{ $col.Identifier }} {{$col.DDL}}
-{{- end }}
-{{- if and $.AddColumns $.ColumnTypeChanges}},{{ end }}
-{{- if $.AddColumns }} ADD{{ end }}
+{{- if $.AddColumns }}
+ALTER TABLE {{$.Identifier}} ADD
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }};
+{{- end -}}
 {{ end }}
 
 -- Templated creation of a temporary load table:

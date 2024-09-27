@@ -16,6 +16,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/flow"
 	mssqldb "github.com/microsoft/go-mssqldb"
+	log "github.com/sirupsen/logrus"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -88,12 +89,55 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
 }
 
+var columnMigrationSteps = []sql.ColumnMigrationStep{
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+		return fmt.Sprintf("ALTER TABLE %s ADD %s %s;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			migration.DDL,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+		return fmt.Sprintf(
+			"UPDATE %s SET %s = %s;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			migration.Identifier,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, _ string) (string, error) {
+		var secondTempColumn = migration.Field + sql.ColumnMigrationSecondStepSuffix
+		return fmt.Sprintf(
+			"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
+			table.Path[0],
+			migration.Field,
+			secondTempColumn,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, _ string) (string, error) {
+		var firstTempColumn = migration.Field + sql.ColumnMigrationFirstStepSuffix
+		return fmt.Sprintf(
+			"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
+			table.Path[0],
+			firstTempColumn,
+			migration.Field,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s DROP COLUMN %s;",
+			table.Identifier,
+			secondTempColumnIdentifier,
+		), nil
+	},
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var statements []string
 
 	// SQL Server supports adding multiple columns in a single statement, but only a single
 	// modification per statement.
-	if len(ta.AddColumns) > 0 || len(ta.ColumnTypeChanges) > 0 {
+	if len(ta.AddColumns) > 0 {
 		var addColumnsStmt strings.Builder
 		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
@@ -133,13 +177,30 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 	}
 
+	if len(ta.ColumnTypeChanges) > 0 {
+		for _, m := range ta.ColumnTypeChanges {
+			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, columnMigrationSteps...); err != nil {
+				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+			} else {
+				statements = append(statements, steps...)
+			}
+		}
+	}
+
 	return strings.Join(statements, "\n"), func(ctx context.Context) error {
+		txn, err := c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer txn.Rollback()
+
 		for _, stmt := range statements {
-			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+			log.WithField("q", stmt).Info("query")
+			if _, err := txn.ExecContext(ctx, stmt); err != nil {
 				return err
 			}
 		}
-		return nil
+		return txn.Commit()
 	}, nil
 }
 
