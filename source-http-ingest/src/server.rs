@@ -9,7 +9,8 @@ use axum::{
 use doc::Annotation;
 use http::status::StatusCode;
 use json::validator::Validator;
-use serde_json::{value::RawValue, Value};
+use models::RawValue;
+use serde_json::Value;
 use tower_http::decompression::RequestDecompressionLayer;
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder};
 use utoipa_swagger_ui::SwaggerUi;
@@ -173,8 +174,7 @@ impl CollectionHandler {
             meta.insert(properties::QUERY.to_string(), Value::Object(query_params));
         }
 
-        let meta_value =
-            serde_json::value::to_raw_value(&meta).context("serializing _meta object")?;
+        let meta_value = models::RawValue::from_value(&Value::Object(meta));
         object.insert(properties::META.to_string(), meta_value);
 
         let serialized = serde_json::to_string(&object).context("serializing prepared document")?;
@@ -685,7 +685,7 @@ fn new_uuid() -> String {
     uuid::Uuid::new_v4().to_string()
 }
 
-type JsonObj = BTreeMap<String, Box<RawValue>>;
+type JsonObj = BTreeMap<String, RawValue>;
 
 #[derive(serde::Deserialize)]
 #[serde(untagged)]

@@ -8,6 +8,7 @@ edition = "2021"
 allocator = { git = "https://github.com/estuary/flow" }
 doc = { git = "https://github.com/estuary/flow" }
 json = { git = "https://github.com/estuary/flow" }
+models = { git = "https://github.com/estuary/flow" }
 proto-flow = { git = "https://github.com/estuary/flow", features = [
     "generate",
 ] }
