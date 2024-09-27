@@ -492,8 +492,8 @@ func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *p
 func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
 	if compatible, err := c.compatible(existing, proposed, rawFieldConfig); err != nil {
 		return false, err
-	} else if !compatible {
-		return false, nil
+	} else if compatible {
+		return true, nil
 	} else {
 		migratable, err := c.migratable(existing, proposed, rawFieldConfig)
 		return migratable, err
