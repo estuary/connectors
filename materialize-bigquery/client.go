@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
@@ -152,8 +153,11 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.ColumnTypeChanges) > 0 {
 		for _, m := range ta.ColumnTypeChanges {
-			steps := sql.StdColumnTypeMigration(ctx, bqDialect, ta.Table, m)
-			stmts = append(stmts, steps...)
+			if steps, err := sql.StdColumnTypeMigration(ctx, bqDialect, ta.Table, m); err != nil {
+				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+			} else {
+				stmts = append(stmts, steps...)
+			}
 		}
 	}
 
@@ -162,6 +166,9 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			if _, err := c.query(ctx, stmt); err != nil {
 				return err
 			}
+			// Frequent table alter queries sometimes lead to "hangs" with BigQuery, even when run against small tables
+			// adding this small delay seems to help avoid the hangs
+			time.Sleep(1 * time.Second)
 		}
 		return nil
 	}, nil

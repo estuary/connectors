@@ -1,5 +1,9 @@
 Base Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
+{"Field":"dateString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"datetimeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
@@ -10,8 +14,14 @@ Base Initial Constraints:
 {"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
+{"Field":"timeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
 Migratable Changes Before Apply Schema:
+{"Name":"DATESTRING","Nullable":"YES","Type":"TEXT"}
+{"Name":"DATETIMESTRING","Nullable":"YES","Type":"TEXT"}
+{"Name":"DATETIMEVALUE","Nullable":"YES","Type":"TIMESTAMP_LTZ"}
+{"Name":"DATEVALUE","Nullable":"YES","Type":"DATE"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
@@ -20,16 +30,22 @@ Migratable Changes Before Apply Schema:
 {"Name":"NUMERICSTRING","Nullable":"YES","Type":"NUMBER"}
 {"Name":"OPTIONAL","Nullable":"YES","Type":"VARIANT"}
 {"Name":"SCALARVALUE","Nullable":"NO","Type":"TEXT"}
+{"Name":"TIMESTRING","Nullable":"YES","Type":"TEXT"}
+{"Name":"TIMEVALUE","Nullable":"YES","Type":"TEXT"}
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
 
 
 Migratable Changes Before Apply Data:
-KEY (TEXT), _meta/flow_truncated (BOOLEAN), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), NUMERICSTRING (FIXED), OPTIONAL (VARIANT), SCALARVALUE (TEXT), FLOW_DOCUMENT (VARIANT)
+KEY (TEXT), _meta/flow_truncated (BOOLEAN), DATESTRING (TEXT), DATEVALUE (DATE), DATETIMESTRING (TEXT), DATETIMEVALUE (TIMESTAMP_LTZ), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), NUMERICSTRING (FIXED), OPTIONAL (VARIANT), SCALARVALUE (TEXT), TIMESTRING (TEXT), TIMEVALUE (TEXT), FLOW_DOCUMENT (VARIANT)
 
-1, 0, 2024-09-13 01:01:01 -0700 PDT, <nil>, <nil>, 123, <nil>, test, {}
+1, 0, 2020-05-05, 2024-01-01 00:00:00 +0000 UTC, 2020-05-05T05:05:05Z, 2024-01-01 01:01:01 -0800 PST, 2024-09-13 01:01:01 -0700 PDT, <nil>, <nil>, 123, <nil>, test, 05:05:05, 01:01:01, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"dateString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"datetimeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
@@ -40,8 +56,14 @@ Migratable Changes Constraints:
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
+{"Field":"timeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Migratable Changes Applied Schema:
+{"Name":"DATESTRING","Nullable":"YES","Type":"DATE"}
+{"Name":"DATETIMESTRING","Nullable":"YES","Type":"TIMESTAMP_LTZ"}
+{"Name":"DATETIMEVALUE","Nullable":"YES","Type":"TEXT"}
+{"Name":"DATEVALUE","Nullable":"YES","Type":"TEXT"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"KEY","Nullable":"NO","Type":"TEXT"}
@@ -50,11 +72,13 @@ Migratable Changes Applied Schema:
 {"Name":"NUMERICSTRING","Nullable":"YES","Type":"TEXT"}
 {"Name":"OPTIONAL","Nullable":"YES","Type":"VARIANT"}
 {"Name":"SCALARVALUE","Nullable":"NO","Type":"TEXT"}
+{"Name":"TIMESTRING","Nullable":"YES","Type":"TEXT"}
+{"Name":"TIMEVALUE","Nullable":"YES","Type":"TEXT"}
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
 
 
 Migratable Changes Applied Data:
-KEY (TEXT), _meta/flow_truncated (BOOLEAN), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), OPTIONAL (VARIANT), SCALARVALUE (TEXT), FLOW_DOCUMENT (VARIANT), NUMERICSTRING (TEXT)
+KEY (TEXT), _meta/flow_truncated (BOOLEAN), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), OPTIONAL (VARIANT), SCALARVALUE (TEXT), TIMESTRING (TEXT), TIMEVALUE (TEXT), FLOW_DOCUMENT (VARIANT), DATESTRING (DATE), DATEVALUE (TEXT), DATETIMESTRING (TIMESTAMP_LTZ), DATETIMEVALUE (TEXT), NUMERICSTRING (TEXT)
 
-1, 0, 2024-09-13 01:01:01 -0700 PDT, <nil>, <nil>, <nil>, test, {}, 123
+1, 0, 2024-09-13 01:01:01 -0700 PDT, <nil>, <nil>, <nil>, test, 05:05:05, 01:01:01, {}, 2020-05-05 00:00:00 +0000 UTC, 2024-01-01, 2020-05-04 22:05:05 -0700 PDT, 2024-01-01 01:01:01.000 -0800, 123
 
