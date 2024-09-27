@@ -33,16 +33,11 @@ type TableAlter struct {
 	// materialization.
 	DropNotNulls []boilerplate.EndpointField
 
-	// ColumnTypeChanges is a list of columns that need their type changed. If the connector
-	// supports changing the column type, these columns will be altered, otherwise the projection will
-	// will be rejected as forbidden.
-	ColumnTypeChanges []Column
-
-	// For connectors that use column renaming to migrate columns from one type to another
+	// ColumnTypeChanges is a list of columns that need their type changed. For connectors that use column renaming to migrate columns from one type to another
 	// it is possible that the migration is interrupted by a crash / restart. In these instances
 	// we detect the temporary columns using their suffixes and pass these in-progress migrations
 	// to the connector client to finish
-	ColumnTypeChangeMigrations []ColumnTypeMigration
+	ColumnTypeChanges []ColumnTypeMigration
 }
 
 // MetaSpecsUpdate is an endpoint-specific parameterized query and parameters needed to persist a
@@ -261,10 +256,11 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		}
 
 		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
-			alter.ColumnTypeChangeMigrations = append(alter.ColumnTypeChangeMigrations, ColumnTypeMigration{
+			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, ColumnTypeMigration{
 				OriginalField:  col.Field,
 				ProgressFields: migrationSteps,
-				MappedType:     col.MappedType,
+				// At this stage we don't have the MappedType anymore, but it's okay because if we don't have the original column anymore
+				// (hence the new projection), it means we have already created the new column and set its value.
 			})
 			continue
 		}
@@ -303,21 +299,19 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 	}
 
 	for _, col := range changedFieldTypes {
-
+		var m = ColumnTypeMigration{
+			OriginalField: col.Field,
+			MappedType:    col.MappedType,
+		}
 		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
-			alter.ColumnTypeChangeMigrations = append(alter.ColumnTypeChangeMigrations, ColumnTypeMigration{
-				OriginalField:  col.Field,
-				ProgressFields: migrationSteps,
-				MappedType:     col.MappedType,
-			})
-			continue
+			m.ProgressFields = migrationSteps
 		}
 
-		alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, col)
+		alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, m)
 	}
 
 	// If there is nothing to do, skip
-	if len(alter.AddColumns) == 0 && len(alter.DropNotNulls) == 0 && len(alter.ColumnTypeChanges) == 0 && len(alter.ColumnTypeChangeMigrations) == 0 {
+	if len(alter.AddColumns) == 0 && len(alter.DropNotNulls) == 0 && len(alter.ColumnTypeChanges) == 0 {
 		return "", nil, nil
 	}
 
