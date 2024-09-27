@@ -75,9 +75,16 @@
                   ]
                 },
                 "value": {
+                  "items": {
+                    "type": [
+                        "null",
+                        "string"
+                    ]
+                  },
                   "type": [
                     "null",
-                    "string"
+                    "string",
+                    "array"
                   ]
                 }
               },
