@@ -57,7 +57,8 @@
           "access_url": {
             "type": "string",
             "title": "Access URL",
-            "description": "dbt access URL can be found in your Account Settings. See go.estuary.dev/dbt-cloud-trigger"
+            "description": "dbt access URL can be found in your Account Settings. See go.estuary.dev/dbt-cloud-trigger",
+            "pattern": "^https://.+$"
           },
           "api_key": {
             "type": "string",
