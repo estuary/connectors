@@ -164,18 +164,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		for _, ct := range ta.ColumnTypeChanges {
-			var m = sql.ColumnTypeMigration{
-				MappedType:    ct.MappedType,
-				OriginalField: ct.Field,
-			}
-			steps := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m)
-			stmts = append(stmts, steps...)
-		}
-	}
-
-	if len(ta.ColumnTypeChangeMigrations) > 0 {
-		for _, m := range ta.ColumnTypeChangeMigrations {
+		for _, m := range ta.ColumnTypeChanges {
 			steps := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m)
 			stmts = append(stmts, steps...)
 		}
