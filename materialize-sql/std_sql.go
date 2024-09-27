@@ -13,7 +13,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -62,7 +61,7 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 		if _, err := conn.ExecContext(ctx, statement); err != nil {
 			return fmt.Errorf("executing statement (%s): %w", statement, err)
 		}
-		logrus.WithField("sql", statement).Debug("executed statement")
+		log.WithField("sql", statement).Debug("executed statement")
 	}
 
 	return err
@@ -469,13 +468,55 @@ func StdCreateSchema(ctx context.Context, db *sql.DB, dialect Dialect, schemaNam
 	return err
 }
 
-func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, migration ColumnTypeMigration) []string {
-	var originalIdentifier = dialect.Identifier(migration.OriginalField)
+type ColumnMigrationStep func(dialect Dialect, table Table, migration ColumnTypeMigration, firstTempColumn, secondTempColumn string) (string, error)
 
-	var firstTempColumn = migration.OriginalField + ColumnMigrationFirstStepSuffix
+var StdMigrationSteps = []ColumnMigrationStep{
+	func(dialect Dialect, table Table, migration ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			migration.DDL,
+		), nil
+	},
+	func(dialect Dialect, table Table, migration ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+		return fmt.Sprintf(
+			// The WHERE filter is required by some warehouses (bigquery)
+			"UPDATE %s SET %s = CAST(%s AS %s) WHERE true;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			migration.Identifier,
+			migration.DDL,
+		), nil
+	},
+	func(dialect Dialect, table Table, migration ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+			table.Identifier,
+			migration.Identifier,
+			secondTempColumnIdentifier,
+		), nil
+	},
+	func(dialect Dialect, table Table, migration ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+			table.Identifier,
+			firstTempColumnIdentifier,
+			migration.Identifier,
+		), nil
+	},
+	func(dialect Dialect, table Table, migration ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s DROP COLUMN %s;",
+			table.Identifier,
+			secondTempColumnIdentifier,
+		), nil
+	},
+}
+
+func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, migration ColumnTypeMigration, steps ...ColumnMigrationStep) ([]string, error) {
+	var firstTempColumn = migration.Field + ColumnMigrationFirstStepSuffix
 	var firstTempColumnIdentifier = dialect.Identifier(firstTempColumn)
-
-	var secondTempColumn = migration.OriginalField + ColumnMigrationSecondStepSuffix
+	var secondTempColumn = migration.Field + ColumnMigrationSecondStepSuffix
 	var secondTempColumnIdentifier = dialect.Identifier(secondTempColumn)
 
 	var step = 0
@@ -489,46 +530,30 @@ func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, m
 
 	log.WithFields(log.Fields{
 		"table":          table.Identifier,
-		"column":         migration.OriginalField,
+		"column":         migration.Field,
 		"progressFields": migration.ProgressFields,
 		"ddl":            migration.DDL,
 		"step":           step,
 	}).Info("migrating columns using column renaming")
-	var steps = []string{
-		fmt.Sprintf(
-			"ALTER TABLE %s ADD COLUMN %s %s;",
-			table.Identifier,
-			firstTempColumnIdentifier,
-			migration.DDL,
-		),
-		fmt.Sprintf(
-			// The WHERE filter is required by some warehouses (bigquery)
-			"UPDATE %s SET %s = CAST(%s AS %s) WHERE true;",
-			table.Identifier,
-			firstTempColumnIdentifier,
-			originalIdentifier,
-			migration.DDL,
-		),
-		fmt.Sprintf(
-			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-			table.Identifier,
-			originalIdentifier,
-			secondTempColumnIdentifier,
-		),
-		fmt.Sprintf(
-			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-			table.Identifier,
-			firstTempColumnIdentifier,
-			originalIdentifier,
-		),
-		fmt.Sprintf(
-			"ALTER TABLE %s DROP COLUMN %s;",
-			table.Identifier,
-			secondTempColumnIdentifier,
-		),
+
+	if len(steps) == 0 {
+		steps = StdMigrationSteps
 	}
 
-	return steps[step:]
+	if len(steps) < len(StdMigrationSteps) {
+		return nil, fmt.Errorf("must have at least %d steps", len(StdMigrationSteps))
+	}
+
+	var renderedSteps = make([]string, len(steps)-step)
+	for i, s := range steps[step:] {
+		var err error
+		renderedSteps[i], err = s(dialect, table, migration, firstTempColumnIdentifier, secondTempColumnIdentifier)
+		if err != nil {
+			return nil, fmt.Errorf("rendering step %d: %w", i, err)
+		}
+	}
+
+	return renderedSteps, nil
 }
 
 func ToLocatePathFn(fn TableLocatorFn) boilerplate.LocatePathFn {

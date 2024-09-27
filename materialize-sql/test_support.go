@@ -346,7 +346,9 @@ func RunValidateAndApplyMigrationsTests(
 		_, err = driver.Apply(ctx, boilerplate.ApplyReq(fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
-		insertData(t, []string{"key", "scalarValue", "numericString"}, []string{"'1'", "'test'", "123"})
+		insertData(t,
+			[]string{"key", "scalarValue", "numericString", "dateValue", "datetimeValue", "timeValue", "dateString", "datetimeString", "timeString"},
+			[]string{"'1'", "'test'", "123", "'2024-01-01'", "'2024-01-01 01:01:01'", "'01:01:01'", "'2020-05-05'", "'2020-05-05T05:05:05Z'", "'05:05:05'"})
 
 		snap.WriteString("\nMigratable Changes Before Apply Schema:\n")
 		snap.WriteString(dumpSchema(t) + "\n")

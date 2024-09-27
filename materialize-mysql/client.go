@@ -99,7 +99,63 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, "def", resourcePaths)
 }
 
+func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigrationStep {
+	return []sql.ColumnMigrationStep{
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+			return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
+				table.Identifier,
+				firstTempColumnIdentifier,
+				migration.DDL,
+			), nil
+		},
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+			return fmt.Sprintf(
+				"UPDATE %s SET %s = %s;",
+				table.Identifier,
+				firstTempColumnIdentifier,
+				migration.Identifier,
+			), nil
+		},
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
+			is, err := c.InfoSchema(ctx, [][]string{table.Path})
+			if err != nil {
+				return "", err
+			}
+			field, err := is.GetField(table.Path, migration.Field)
+			if err != nil {
+				return "", err
+			}
+			// TODO: get a full mapped DDL, or at least get nullability in
+			return fmt.Sprintf(
+				"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
+				table.Identifier,
+				migration.Identifier,
+				secondTempColumnIdentifier,
+				field.Type,
+			), nil
+		},
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+			return fmt.Sprintf(
+				"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
+				table.Identifier,
+				firstTempColumnIdentifier,
+				migration.Identifier,
+				migration.DDL,
+			), nil
+		},
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
+			return fmt.Sprintf(
+				"ALTER TABLE %s DROP COLUMN %s;",
+				table.Identifier,
+				secondTempColumnIdentifier,
+			), nil
+		},
+	}
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	var stmts []string
+
 	if len(ta.DropNotNulls) > 0 {
 		// In order to drop a NOT NULL constraint, the full field definition must be re-stated
 		// without the NOT NULL part. There may be columns that aren't and/or never were part of our
@@ -148,9 +204,33 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 	alterColumnStmt := alterColumnStmtBuilder.String()
 
-	return alterColumnStmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, alterColumnStmt)
-		return err
+	if len(strings.Trim(alterColumnStmt, "\n")) > 0 {
+		stmts = append(stmts, alterColumnStmt)
+	}
+
+	if len(ta.ColumnTypeChanges) > 0 {
+		for _, m := range ta.ColumnTypeChanges {
+			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, c.columnMigrationSteps(ctx)...); err != nil {
+				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+			} else {
+				stmts = append(stmts, steps...)
+			}
+		}
+	}
+
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		txn, err := c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer txn.Rollback()
+
+		for _, stmt := range stmts {
+			if _, err := txn.ExecContext(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return txn.Commit()
 	}, nil
 }
 

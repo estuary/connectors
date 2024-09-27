@@ -5,11 +5,17 @@ collections:
       properties:
         key: { type: string }
         scalarValue: { type: "string" }
-        numericString: { type: "string" }
         nonScalarValue: { type: object }
         multiple: { type: [integer, string, boolean] }
         nullValue: { type: "null" }
         optional: { type: object }
+        numericString: { type: "string" }
+        dateValue: { type: string }
+        datetimeValue: { type: string }
+        timeValue: { type: string }
+        dateString: { type: string, format: date }
+        datetimeString: { type: string, format: date-time }
+        timeString: { type: string, format: time }
       required: [key, scalarValue]
     key: [/key]
     projections:

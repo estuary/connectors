@@ -207,8 +207,7 @@ func (a *sqlApplier) DeleteResource(ctx context.Context, path []string) (string,
 }
 
 type ColumnTypeMigration struct {
-	MappedType
-	OriginalField  string
+	Column
 	ProgressFields []string
 }
 
@@ -216,8 +215,7 @@ type ColumnTypeMigration struct {
 const ColumnMigrationFirstStepSuffix = "_flowtmp1"
 const ColumnMigrationSecondStepSuffix = "_flowtmp2"
 
-func (a *sqlApplier) isFieldPendingMigration(resourcePath []string, field string) []string {
-	var fields []string
+func (a *sqlApplier) isFieldPendingMigration(resourcePath []string, field string) (fields []string) {
 	if a.is.HasField(resourcePath, field+ColumnMigrationFirstStepSuffix) {
 		fields = append(fields, field+ColumnMigrationFirstStepSuffix)
 	}
@@ -241,7 +239,7 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 				return *c, nil
 			}
 		}
-		return Column{}, fmt.Errorf("could not find column for field %q in table %q", field, table.Identifier)
+		return Column{}, fmt.Errorf("could not find column for field %q in table %s", field, table.Identifier)
 	}
 
 	alter := TableAlter{
@@ -256,18 +254,16 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		}
 
 		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
+			// At this stage we don't have the MappedType anymore, but it's okay because if we don't have the original column anymore
+			// (hence the new projection), it means we have already created the new column and set its value.
 			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, ColumnTypeMigration{
-				OriginalField:  col.Field,
+				Column:         col,
 				ProgressFields: migrationSteps,
-				// At this stage we don't have the MappedType anymore, but it's okay because if we don't have the original column anymore
-				// (hence the new projection), it means we have already created the new column and set its value.
 			})
 			continue
 		}
 		alter.AddColumns = append(alter.AddColumns, col)
 	}
-
-	var changedFieldTypes []Column
 
 	var binding = spec.Bindings[bindingIndex]
 	var collection = binding.Collection
@@ -294,20 +290,12 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 			if err != nil {
 				return "", nil, err
 			}
-			changedFieldTypes = append(changedFieldTypes, col)
+			var m = ColumnTypeMigration{Column: col}
+			if migrationSteps := a.isFieldPendingMigration(table.Path, m.Field); len(migrationSteps) > 0 {
+				m.ProgressFields = migrationSteps
+			}
+			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, m)
 		}
-	}
-
-	for _, col := range changedFieldTypes {
-		var m = ColumnTypeMigration{
-			OriginalField: col.Field,
-			MappedType:    col.MappedType,
-		}
-		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
-			m.ProgressFields = migrationSteps
-		}
-
-		alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, m)
 	}
 
 	// If there is nothing to do, skip

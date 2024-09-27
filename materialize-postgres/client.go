@@ -150,15 +150,41 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	var stmts []string
+
 	var alterColumnStmtBuilder strings.Builder
 	if err := tplAlterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 		return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 	}
 	alterColumnStmt := alterColumnStmtBuilder.String()
 
-	return alterColumnStmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, alterColumnStmt)
-		return err
+	if len(strings.Trim(alterColumnStmt, "\n")) > 0 {
+		stmts = append(stmts, alterColumnStmt)
+	}
+
+	if len(ta.ColumnTypeChanges) > 0 {
+		for _, m := range ta.ColumnTypeChanges {
+			if steps, err := sql.StdColumnTypeMigration(ctx, pgDialect, ta.Table, m); err != nil {
+				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+			} else {
+				stmts = append(stmts, steps...)
+			}
+		}
+	}
+
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		txn, err := c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		defer txn.Rollback()
+
+		for _, stmt := range stmts {
+			if _, err := txn.ExecContext(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return txn.Commit()
 	}, nil
 }
 

@@ -480,9 +480,7 @@ func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *p
 		return false, fmt.Errorf("mapping type: %w", err)
 	}
 
-	var migratableTypes = c.dialect.MigratableTypes
-	// If the types are not compatible, but are migratable, attempt to migrate
-	if slices.Contains(migratableTypes[strings.ToLower(existing.Type)], strings.ToLower(mapped.DDL)) {
+	if slices.Contains(c.dialect.MigratableTypes[strings.ToLower(existing.Type)], strings.ToLower(mapped.DDL)) {
 		return true, nil
 	}
 

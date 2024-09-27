@@ -102,6 +102,9 @@ var bqDialect = func() sql.Dialect {
 			"integer":    {"string"},
 			"bignumeric": {"string"},
 			"float":      {"string"},
+			"string":     {"integer", "bignumeric(38,0)", "float64", "date", "timestamp"},
+			"date":       {"string"},
+			"timestamp":  {"string"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
