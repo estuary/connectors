@@ -14,6 +14,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // StdFetchSpecAndVersion is a convenience for Client implementations which
@@ -486,6 +487,13 @@ func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, m
 		step = 4
 	}
 
+	log.WithFields(log.Fields{
+		"table":          table.Identifier,
+		"column":         migration.OriginalField,
+		"progressFields": migration.ProgressFields,
+		"ddl":            migration.DDL,
+		"step":           step,
+	}).Info("migrating columns using column renaming")
 	var steps = []string{
 		fmt.Sprintf(
 			"ALTER TABLE %s ADD COLUMN %s %s;",
