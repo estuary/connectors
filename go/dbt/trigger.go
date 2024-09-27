@@ -14,7 +14,7 @@ import (
 type JobConfig struct {
 	JobID         string `json:"job_id" jsonschema:"title=Job ID,description=dbt job ID"`
 	AccountID     string `json:"account_id" jsonschema:"title=Account ID,description=dbt account ID"`
-	AccessURL     string `json:"access_url,omitempty" jsonschema:"title=Access URL,description=dbt access URL can be found in your Account Settings. See go.estuary.dev/dbt-cloud-trigger"`
+	AccessURL     string `json:"access_url,omitempty" jsonschema:"title=Access URL,description=dbt access URL can be found in your Account Settings. See go.estuary.dev/dbt-cloud-trigger" jsonschema_extras:"pattern=^https://.+$"`
 	AccountPrefix string `json:"account_prefix" jsonschema:"-"`
 	APIKey        string `json:"api_key" jsonschema:"title=API Key,description=dbt API Key" jsonschema_extras:"secret=true"`
 	Cause         string `json:"cause,omitempty" jsonschema:"title=Cause Message,description=You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary Flow'."`
