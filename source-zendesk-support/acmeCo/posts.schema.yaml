@@ -19,6 +19,7 @@ properties:
       type:
         - "null"
         - number
+        - string
   featured:
     type:
       - "null"
