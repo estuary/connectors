@@ -194,8 +194,12 @@ async fn write_docs(
     count: usize,
     url: String,
     client: reqwest::Client,
-    headers: HeaderMap,
+    mut headers: HeaderMap,
 ) -> anyhow::Result<()> {
+    headers.insert(
+        "Content-Type",
+        reqwest::header::HeaderValue::from_static("application/json"),
+    );
     let expected = serde_json::json!({"published": 1});
     for i in 0..count {
         if let Err(err) = post_doc(i, url.as_str(), &client, &expected, headers.clone()).await {
@@ -213,10 +217,16 @@ async fn post_doc(
     expected_resp: &serde_json::Value,
     headers: HeaderMap,
 ) -> anyhow::Result<()> {
+    // Write a request that contains nested values with newlines in order to ensure that
+    // the connector handles those properly.
+    let body = serde_json::to_vec_pretty(
+        &serde_json::json!({"docIndex": i, "url": url, "nested": {"a": "b"}}),
+    )
+    .unwrap();
     let resp = client
         .post(url)
         .headers(headers)
-        .json(&serde_json::json!({"docIndex": i, "url": url}))
+        .body(body)
         .timeout(std::time::Duration::from_secs(10))
         .send()
         .await?
