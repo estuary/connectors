@@ -43,24 +43,17 @@ definitions:
         type: DatetimeBasedCursor
         cursor_field: modifiedAt
         cursor_datetime_formats:
+          - "%Y-%m-%dT%H:%M:%S.%fZ"
           - "%Y-%m-%dT%H:%M:%S.%f%z"
-        datetime_format: "%Y-%m-%dT%H:%M:%S.%f%z"
+        datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
         start_datetime:
           type: MinMaxDatetime
           datetime: "{{ config['start_date'] }}"
           datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
         start_time_option:
           type: RequestOption
-          field_name: modifiedAt
+          field_name: modifiedSince
           inject_into: request_parameter
-        end_time_option:
-          type: RequestOption
-          field_name: modifiedAt
-          inject_into: request_parameter
-        end_datetime:
-          type: MinMaxDatetime
-          datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%SZ') }}"
-          datetime_format: "%Y-%m-%dT%H:%M:%SZ"
     ContactsAttributes:
       type: DeclarativeStream
       name: ContactsAttributes
