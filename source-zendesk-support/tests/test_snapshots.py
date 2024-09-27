@@ -30,13 +30,20 @@ def test_capture(request, snapshot):
             seen.add(stream)
 
     for l in unique_stream_lines:
-        _, rec = l[0], l[1]
+        stream, rec = l[0], l[1]
 
         rec['_meta']['row_id'] = 0
         if "updated_at" in rec:
             rec["updated_at"] = "redacted"
         if "last_login_at" in rec:
             rec["last_login_at"] = "redacted"
+        if stream == "acmeCo/tags":
+            rec["name"] = "redacted"
+            # Updating count with rec["count"] = 1 sets count to be
+            # the tuple [1] instead of the int 1. We can get around
+            # this by deleting the attribute then re-setting it.
+            del rec["count"]
+            rec["count"] = 1
 
 
     assert snapshot("capture.stdout.json") == unique_stream_lines
