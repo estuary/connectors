@@ -221,7 +221,7 @@ ALTER TABLE {{$.Identifier}}
 	{{- if $ind }},{{ end }}
 	MODIFY {{ ColumnIdentifier $col.Name }} {{$col.Type}}
 {{- end }};
-{{- end -}}
+{{- end }}
 {{ end }}
 
 -- Templated creation of a temporary load table:
