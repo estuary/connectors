@@ -202,7 +202,7 @@ ALTER TABLE {{$.Identifier}} ADD
 	{{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }};
-{{- end -}}
+{{- end }}
 {{ end }}
 
 -- Templated creation of a temporary load table:

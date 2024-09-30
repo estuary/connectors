@@ -134,7 +134,7 @@ ALTER TABLE {{$.Identifier}}
 	{{- if $ind }},{{ end }}
 	ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL
 {{- end }};
-{{- end -}}
+{{- end }}
 {{ end }}
 
 -- Templated creation of a temporary load table:
