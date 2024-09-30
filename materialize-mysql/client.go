@@ -16,24 +16,28 @@ import (
 )
 
 type client struct {
-	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	db         *stdsql.DB
+	cfg        *config
+	ep         *sql.Endpoint
+	tzLocation *time.Location
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
+func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
+	return func(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
+		cfg := ep.Config.(*config)
 
-	db, err := stdsql.Open("mysql", cfg.ToURI())
-	if err != nil {
-		return nil, err
+		db, err := stdsql.Open("mysql", cfg.ToURI())
+		if err != nil {
+			return nil, err
+		}
+
+		return &client{
+			db:         db,
+			cfg:        cfg,
+			ep:         ep,
+			tzLocation: tzLocation,
+		}, nil
 	}
-
-	return &client{
-		db:  db,
-		cfg: cfg,
-		ep:  ep,
-	}, nil
 }
 
 func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
@@ -98,6 +102,24 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, "def", resourcePaths)
 }
 
+func formatOffset(loc *time.Location) string {
+	now := time.Now().In(loc)
+	_, offset := now.Zone()
+
+	sign := "+"
+	if offset < 0 {
+		sign = "-"
+		offset = -offset
+	}
+	hours := offset / 3600
+	minutes := (offset % 3600) / 60
+	return fmt.Sprintf("%s%02d:%02d", sign, hours, minutes)
+}
+
+func castRfc3339ToDateTime(loc *time.Location, identifier string) string {
+	return fmt.Sprintf("CONVERT_TZ(STR_TO_DATE(SUBSTRING(%s, 1, 19), '%%Y-%%m-%%dT%%H:%%i:%%s'), '+00:00', '%s')", identifier, formatOffset(loc))
+}
+
 func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigrationStep {
 	return []sql.ColumnMigrationStep{
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
@@ -108,11 +130,16 @@ func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigration
 			), nil
 		},
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+			// Migrating from string to datetime
+			var cast = fmt.Sprintf("%s", migration.Identifier)
+			if migration.DDL == "DATETIME(6)" {
+				cast = castRfc3339ToDateTime(c.tzLocation, migration.Identifier)
+			}
 			return fmt.Sprintf(
 				"UPDATE %s SET %s = %s;",
 				table.Identifier,
 				firstTempColumnIdentifier,
-				migration.Identifier,
+				cast,
 			), nil
 		},
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
@@ -124,13 +151,16 @@ func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigration
 			if err != nil {
 				return "", err
 			}
-			// TODO: get a full mapped DDL, or at least get nullability in
+			var originalDDL = field.Type
+			if !field.Nullable {
+				originalDDL += " NOT NULL"
+			}
 			return fmt.Sprintf(
 				"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
 				table.Identifier,
 				migration.Identifier,
 				secondTempColumnIdentifier,
-				field.Type,
+				originalDDL,
 			), nil
 		},
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
