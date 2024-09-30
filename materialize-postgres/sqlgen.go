@@ -43,6 +43,10 @@ var pgDialect = func() sql.Dialect {
 					"macaddr":   sql.MapStatic("MACADDR"),
 					"macaddr8":  sql.MapStatic("MACADDR8"),
 					"time":      sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone")),
+					// UUID format was added on 30-Sept-2024, and pre-existing
+					// text type of columns are allowed to validate for
+					// compatibility with pre-existing columns.
+					"uuid": sql.MapStatic("UUID", sql.AlsoCompatibleWith("text", "character varying")),
 				},
 			}),
 		},
