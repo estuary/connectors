@@ -82,6 +82,16 @@ var pgDialect = func() sql.Dialect {
 	}
 }()
 
+type loadTableKey struct {
+	Identifier string
+	DDL        string
+}
+
+type loadTableColumns struct {
+	Binding int
+	Keys    []loadTableKey
+}
+
 var (
 	tplAll = sql.MustParseTemplate(pgDialect, "root", `
 {{ define "temp_name" -}}

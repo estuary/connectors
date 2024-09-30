@@ -135,6 +135,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
+	is *boilerplate.InfoSchema,
 ) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 

@@ -260,6 +260,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
+	is *boilerplate.InfoSchema,
 ) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 
@@ -283,7 +284,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
+		if err = d.addBinding(ctx, binding, is); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -299,23 +300,21 @@ func newTransactor(
 }
 
 type binding struct {
-	target             sql.Table
-	createLoadTableSQL string
-	loadInsertSQL      string
-	storeUpdateSQL     string
-	storeInsertSQL     string
-	deleteQuerySQL     string
-	loadQuerySQL       string
+	target         sql.Table
+	loadInsertSQL  string
+	storeUpdateSQL string
+	storeInsertSQL string
+	deleteQuerySQL string
+	loadQuerySQL   string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target}
 
 	for _, m := range []struct {
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.createLoadTableSQL, tplCreateLoadTable},
 		{&b.loadInsertSQL, tplLoadInsert},
 		{&b.storeInsertSQL, tplStoreInsert},
 		{&b.storeUpdateSQL, tplStoreUpdate},
@@ -331,8 +330,23 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	t.bindings = append(t.bindings, b)
 
 	// Create a binding-scoped temporary table for staged keys to load.
-	if _, err := t.load.conn.Exec(ctx, b.createLoadTableSQL); err != nil {
-		return fmt.Errorf("Exec(%s): %w", b.createLoadTableSQL, err)
+	input := loadTableColumns{Binding: b.target.Binding}
+	for _, k := range b.target.Keys {
+		existing, err := is.GetField(b.target.Path, k.Field)
+		if err != nil {
+			return fmt.Errorf("getting existing key field %s for binding %s: %w", k.Field, b.target.Path, err)
+		}
+		input.Keys = append(input.Keys, loadTableKey{
+			Identifier: k.Identifier,
+			DDL:        existing.Type + " NOT NULL", // nullable key fields are not allowed
+		})
+	}
+
+	var w strings.Builder
+	if err := tplCreateLoadTable.Execute(&w, &input); err != nil {
+		return fmt.Errorf("executing createLoadTable template: %w", err)
+	} else if _, err := t.load.conn.Exec(ctx, w.String()); err != nil {
+		return fmt.Errorf("Exec(%s): %w", w.String(), err)
 	}
 
 	return nil
