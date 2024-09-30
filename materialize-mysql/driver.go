@@ -322,7 +322,7 @@ func newMysqlDriver() *sql.Driver {
 				Dialect:             dialect,
 				MetaSpecs:           &metaSpecs,
 				MetaCheckpoints:     &metaCheckpoints,
-				NewClient:           newClient,
+				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(dialect, templates),

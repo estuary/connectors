@@ -90,10 +90,11 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			"decimal":  {"varchar", "longtext"},
 			"bigint":   {"varchar", "longtext"},
 			"double":   {"varchar", "longtext"},
-			"varchar":  {"date", "time(6)"},
-			"longtext": {"date", "time(6)"},
+			"varchar":  {"date", "time(6)", "datetime(6)"},
+			"longtext": {"date", "time(6)", "datetime(6)"},
 			"date":     {"longtext", "varchar"},
 			"time":     {"longtext", "varchar"},
+			"datetime": {"longtext", "varchar"},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
@@ -220,7 +221,7 @@ ALTER TABLE {{$.Identifier}}
 	{{- if $ind }},{{ end }}
 	MODIFY {{ ColumnIdentifier $col.Name }} {{$col.Type}}
 {{- end }};
-{{- end }}
+{{- end -}}
 {{ end }}
 
 -- Templated creation of a temporary load table:
