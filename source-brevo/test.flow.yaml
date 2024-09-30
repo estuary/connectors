@@ -8,4 +8,18 @@ captures:
           - "-m"
           - source_brevo
         config: {}
-    bindings: []
+    bindings:
+      - resource:
+          stream: Contacts
+          syncMode: incremental
+          cursorField:
+            - modifiedSince
+        target: acmeCo/Contacts
+      - resource:
+          stream: ContactsAttributes
+          syncMode: full_refresh
+        target: acmeCo/ContactsAttributes
+      - resource:
+          stream: ContactsLists
+          syncMode: full_refresh
+        target: acmeCo/ContactsLists

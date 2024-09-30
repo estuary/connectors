@@ -1,4 +1,4 @@
-version: 4.4.2
+version: 4.6.2
 
 type: DeclarativeSource
 
@@ -25,24 +25,35 @@ definitions:
           extractor:
             type: DpathExtractor
             field_path: [contacts]
+        paginator:
+            type: DefaultPaginator
+            page_token_option:
+              type: RequestOption
+              inject_into: request_parameter
+              field_name: offset
+            page_size_option:
+              type: RequestOption
+              inject_into: request_parameter
+              field_name: limit
+            pagination_strategy:
+              type: OffsetIncrement
+              page_size: 1000
+              inject_on_first_request: true
       incremental_sync:
         type: DatetimeBasedCursor
-        cursor_field: createdSince
+        cursor_field: modifiedAt
         cursor_datetime_formats:
           - "%Y-%m-%dT%H:%M:%S.%fZ"
+          - "%Y-%m-%dT%H:%M:%S.%f%z"
         datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
         start_datetime:
           type: MinMaxDatetime
-          datetime: '{{ config["start_date"] }}'
+          datetime: "{{ config['start_date'] }}"
           datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"
-        end_datetime:
-          type: MinMaxDatetime
-          datetime: "{{ now_utc().strftime('%Y-%m-%dT%H:%M:%S.%fZ') }}"
-          datetime_format: "%Y-%m-%dT%H:%M:%S.%fZ"  
-      schema_loader:
-        type: InlineSchemaLoader
-        schema:
-          $ref: "#/schemas/Contacts"
+        start_time_option:
+          type: RequestOption
+          field_name: modifiedSince
+          inject_into: request_parameter
     ContactsAttributes:
       type: DeclarativeStream
       name: ContactsAttributes
