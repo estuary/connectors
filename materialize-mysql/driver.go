@@ -379,13 +379,14 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates templates,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
+		is *boilerplate.InfoSchema,
 	) (_ m.Transactor, err error) {
 		var cfg = ep.Config.(*config)
 		var d = &transactor{dialect: dialect, templates: templates, cfg: cfg}
@@ -401,21 +402,6 @@ func prepareNewTransactor(
 			return nil, fmt.Errorf("store sql.Open: %w", err)
 		} else if d.store.conn, err = db.Conn(ctx); err != nil {
 			return nil, fmt.Errorf("store db.Conn: %w", err)
-		}
-
-		db, err := stdsql.Open("mysql", cfg.ToURI())
-		if err != nil {
-			return nil, fmt.Errorf("newTransactor sql.Open: %w", err)
-		}
-		defer db.Close()
-
-		resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
-		for _, b := range open.Materialization.Bindings {
-			resourcePaths = append(resourcePaths, b.ResourcePath)
-		}
-		is, err := sql.StdFetchInfoSchema(ctx, db, ep.Dialect, "def", resourcePaths)
-		if err != nil {
-			return nil, err
 		}
 
 		for _, binding := range bindings {

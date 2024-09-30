@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -197,6 +198,7 @@ func newTransactor(
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
+	is *boilerplate.InfoSchema,
 ) (_ m.Transactor, err error) {
 	cfg := ep.Config.(*config)
 

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/url"
-	"slices"
 	"strings"
 	"text/template"
 
@@ -286,13 +285,14 @@ type transactor struct {
 func prepareNewTransactor(
 	templates templates,
 	caseSensitiveIdentifierEnabled bool,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
+		is *boilerplate.InfoSchema,
 	) (_ m.Transactor, err error) {
 		var cfg = ep.Config.(*config)
 
@@ -310,36 +310,6 @@ func prepareNewTransactor(
 		}
 
 		s3client, err := d.cfg.toS3Client(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		db, err := stdsql.Open("pgx", d.cfg.toURI())
-		if err != nil {
-			return nil, err
-		}
-		defer db.Close()
-
-		schemas := []string{}
-		for _, b := range bindings {
-			if !slices.Contains(schemas, b.InfoLocation.TableSchema) {
-				schemas = append(schemas, b.InfoLocation.TableSchema)
-			}
-		}
-
-		catalog := cfg.Database
-		if catalog == "" {
-			// An endpoint-level database configuration is not required, so query for the active
-			// database if that's the case.
-			if err := db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
-				return nil, fmt.Errorf("querying for connected database: %w", err)
-			}
-		}
-		resourcePaths := make([][]string, 0, len(open.Materialization.Bindings))
-		for _, b := range open.Materialization.Bindings {
-			resourcePaths = append(resourcePaths, b.ResourcePath)
-		}
-		is, err := sql.StdFetchInfoSchema(ctx, db, ep.Dialect, catalog, resourcePaths)
 		if err != nil {
 			return nil, err
 		}
