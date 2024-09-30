@@ -263,8 +263,8 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 
 	var tables []Table
 	for index, spec := range open.Materialization.Bindings {
+		resourcePaths = append(resourcePaths, spec.ResourcePath)
 		var resource = endpoint.NewResource(endpoint)
-		resourcePaths = append(resourcePaths, resource.Path())
 
 		if err := pf.UnmarshalStrict(spec.ResourceConfigJson, resource); err != nil {
 			return nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Name, err)
