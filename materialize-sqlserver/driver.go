@@ -241,13 +241,14 @@ type transactor struct {
 
 func prepareNewTransactor(
 	templates templates,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open) (m.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
+		is *boilerplate.InfoSchema,
 	) (_ m.Transactor, err error) {
 		var cfg = ep.Config.(*config)
 		var d = &transactor{templates: templates, cfg: cfg}

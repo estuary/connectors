@@ -246,7 +246,10 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 	}
 	defer client.Close()
 
+	var resourcePaths [][]string
 	if endpoint.MetaSpecs != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
+
 		if _, loadedVersion, err = loadSpec(ctx, client, endpoint, open.Materialization.Name); err != nil {
 			return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 		} else if loadedVersion == "" {
@@ -261,6 +264,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 	var tables []Table
 	for index, spec := range open.Materialization.Bindings {
 		var resource = endpoint.NewResource(endpoint)
+		resourcePaths = append(resourcePaths, resource.Path())
 
 		if err := pf.UnmarshalStrict(spec.ResourceConfigJson, resource); err != nil {
 			return nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Name, err)
@@ -285,6 +289,8 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 	}
 
 	if endpoint.MetaCheckpoints != nil {
+		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
+
 		// We must install a fence to prevent another (zombie) instances of this
 		// materialization from committing further transactions.
 		var metaCheckpoints, err = ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect)
@@ -303,7 +309,12 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 		}
 	}
 
-	transactor, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open)
+	is, err := client.InfoSchema(ctx, resourcePaths)
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting info schema: %w", err)
+	}
+
+	transactor, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open, is)
 	if err != nil {
 		return nil, nil, fmt.Errorf("building transactor: %w", err)
 	}

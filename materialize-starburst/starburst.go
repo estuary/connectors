@@ -157,6 +157,7 @@ func newTransactor(
 	_ sql.Fence,
 	tables []sql.Table,
 	open pm.Request_Open,
+	is *boilerplate.InfoSchema,
 ) (_ m.Transactor, err error) {
 	var cfg = ep.Config.(*config)
 	var templates = renderTemplates(starburstTrinoDialect)
