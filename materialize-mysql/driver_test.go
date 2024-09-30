@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -224,7 +225,7 @@ func TestFencingCases(t *testing.T) {
 	var dialect = testDialect
 	var templates = renderTemplates(dialect)
 
-	c, err := newClient(ctx, &sql.Endpoint{Config: testConfig()})
+	c, err := prepareNewClient(time.UTC)(ctx, &sql.Endpoint{Config: testConfig()})
 	require.NoError(t, err)
 	defer c.Close()
 
