@@ -291,7 +291,7 @@ class TestAllStreams:
             (GroupMemberships, "group_memberships"),
             (Groups, "groups"),
             (Macros, "macros"),
-            (Organizations, "organizations"),
+            (Organizations, "incremental/organizations"),
             (OrganizationMemberships, "organization_memberships"),
             (SatisfactionRatings, "satisfaction_ratings"),
             (SlaPolicies, "slas/policies.json"),
@@ -340,14 +340,12 @@ class TestSourceZendeskSupportStream:
         "stream_cls",
         [
             (Macros),
-            (Organizations),
             (Groups),
             (SatisfactionRatings),
             (TicketFields),
         ],
         ids=[
             "Macros",
-            "Organizations",
             "Groups",
             "SatisfactionRatings",
             "TicketFields",
@@ -390,19 +388,12 @@ class TestSourceZendeskSupportStream:
         "stream_cls, current_state, last_record, expected",
         [
             (Macros, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
-            (
-                Organizations,
-                {"updated_at": "2022-03-17T16:03:07Z"},
-                {"updated_at": "2023-03-17T16:03:07Z"},
-                {"updated_at": "2023-03-17T16:03:07Z"},
-            ),
             (Groups, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
             (SatisfactionRatings, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
             (TicketFields, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
         ],
         ids=[
             "Macros",
-            "Organizations",
             "Groups",
             "SatisfactionRatings",
             "TicketFields",
@@ -417,13 +408,11 @@ class TestSourceZendeskSupportStream:
         "stream_cls, expected",
         [
             (Macros, None),
-            (Organizations, None),
             (Groups, None),
             (TicketFields, None),
         ],
         ids=[
             "Macros",
-            "Organizations",
             "Groups",
             "TicketFields",
         ],
@@ -437,13 +426,11 @@ class TestSourceZendeskSupportStream:
         "stream_cls, expected",
         [
             (Macros, {"start_time": 1622505600}),
-            (Organizations, {"start_time": 1622505600}),
             (Groups, {"start_time": 1622505600, "exclude_deleted": False}),
             (TicketFields, {"start_time": 1622505600}),
         ],
         ids=[
             "Macros",
-            "Organizations",
             "Groups",
             "TicketFields",
         ],
@@ -682,11 +669,13 @@ class TestSourceZendeskIncrementalExportStream:
             (Users),
             (Tickets),
             (TicketMetrics),
+            (Organizations),
         ],
         ids=[
             "Users",
             "Tickets",
-            "TicketMetrics"
+            "TicketMetrics",
+            "Organizations",
         ],
     )
     def test_next_page_token(self, requests_mock, stream_cls):
@@ -703,11 +692,13 @@ class TestSourceZendeskIncrementalExportStream:
             (Users, {"start_time": 1622505600}),
             (Tickets, {"start_time": 1622505600}),
             (TicketMetrics, {"start_time": 1622505600, "include": "metric_sets"}),
+            (Organizations, {"start_time": 1622505600}),
         ],
         ids=[
             "Users",
             "Tickets",
-            "TicketMetrics"
+            "TicketMetrics",
+            "Organizations",
         ],
     )
     def test_request_params(self, stream_cls, expected):
@@ -720,10 +711,12 @@ class TestSourceZendeskIncrementalExportStream:
         [
             (Users),
             (Tickets),
+            (Organizations),
         ],
         ids=[
             "Users",
             "Tickets",
+            "Organizations",
         ],
     )
     def test_parse_response(self, requests_mock, stream_cls):

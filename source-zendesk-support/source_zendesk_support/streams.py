@@ -10,7 +10,7 @@ import time
 from abc import ABC
 from collections import deque
 from concurrent.futures import Future, ProcessPoolExecutor
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from functools import partial
 from math import ceil
 from pickle import PickleError, dumps
@@ -73,6 +73,18 @@ def to_int(s):
             return res[0]
     return s
 
+
+def _ts_to_dt(ts: int) -> str:
+    """
+    Converts a millisecond UNIX timestamp to a date-time formatted string.
+    """
+    return datetime.fromtimestamp(ts, tz=UTC).isoformat(' ')
+
+def _dt_to_ts(dt_str: str) -> int:
+    """
+    Converts a date-time formatted string to a millisecond UNIX timestamp.
+    """
+    return int(datetime.fromisoformat(dt_str).timestamp())
 
 class SourceZendeskException(Exception):
     """default exception of custom SourceZendesk logic"""
@@ -507,6 +519,74 @@ class SourceZendeskIncrementalExportStream(SourceZendeskSupportCursorPaginationS
             yield record
 
 
+class SourceZendeskSupportIncrementalTimeExportStream(SourceZendeskSupportFullRefreshStream, IncrementalMixin):
+    """
+    Incremental time-based export streams.
+    API docs: https://developer.zendesk.com/documentation/ticketing/managing-tickets/using-the-incremental-export-api/#time-based-incremental-exports
+    Airbyte Incremental Stream Docs: https://docs.airbyte.com/connector-development/cdk-python/incremental-stream for some background.
+
+    Uses IncrementalMixin's state setter & getter to persist cursors between requests.
+
+    Note: Incremental time-based export streams theoretically can get stuck in a loop if
+    1000+ resources are updated at the exact same time.
+    """
+    state_checkpoint_interval = 1000
+    _cursor_value = ""
+
+    @property
+    def cursor_field(self) -> str:
+        """Name of the field associated with the state"""
+        return "updated_at"
+
+    @property
+    def state(self) -> Mapping[str, Any]:
+        return {self.cursor_field: self._cursor_value}
+
+    @state.setter
+    def state(self, value: Mapping[str, Any]):
+        self._cursor_value = value[self.cursor_field]
+
+    def path(self, **kwargs) -> str:
+        return f"incremental/{self.response_list_name}"
+
+    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+        if self._ignore_pagination:
+            return None
+
+        response_json = response.json()
+
+        pagination_complete = response_json.get(END_OF_STREAM_KEY, False)
+        if pagination_complete:
+            return None
+
+        next_start_time = response_json.get("end_time", None)
+        if next_start_time:
+            return {"start_time": next_start_time}
+
+    def request_params(
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None,
+    ) -> MutableMapping[str, Any]:
+        if next_page_token:
+            return next_page_token
+
+        start_time_state = self.state.get(self.cursor_field, None)
+        if start_time_state:
+            return {"start_time": _dt_to_ts(start_time_state)}
+        else:
+            return {"start_time": calendar.timegm(pendulum.parse(self._start_date).utctimetuple())}
+
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        response_json = response.json()
+
+        records = response_json.get(self.response_list_name, [])
+        for record in records:
+            yield record
+        
+        cursor = response_json.get("end_time", None)
+        if cursor and len(records) != 0:
+            self.state = {self.cursor_field: _ts_to_dt(cursor)}
+
+
 class SourceZendeskSupportIncrementalCursorExportStream(SourceZendeskIncrementalExportStream, IncrementalMixin):
     """
     Incremental cursor export for Users and Tickets streams
@@ -654,6 +734,17 @@ class SourceZendeskSupportTicketEventsExportStream(SourceZendeskIncrementalExpor
                     yield event
 
 
+class Organizations(SourceZendeskSupportIncrementalTimeExportStream):
+    """
+    API docs: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-organization-export
+
+    Note: This stream theoretically can get stuck in a loop if 1000+ organizations are
+    updated at the exact same time. I don't anticipate this will be an issue, but we
+    should keep this in mind if we notice an Organizations stream is stuck.
+    """
+    response_list_name = "organizations"
+
+
 class OrganizationMemberships(SourceZendeskSupportCursorPaginationStream):
     """OrganizationMemberships stream: https://developer.zendesk.com/api-reference/ticketing/organizations/organization_memberships/"""
 
@@ -716,10 +807,6 @@ class Users(SourceZendeskSupportIncrementalCursorExportStream):
     """Users stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/#incremental-user-export-cursor-based"""
 
     response_list_name: str = "users"
-
-
-class Organizations(SourceZendeskSupportStream):
-    """Organizations stream: https://developer.zendesk.com/api-reference/ticketing/ticket-management/incremental_exports/"""
 
 
 class Tickets(SourceZendeskSupportIncrementalCursorExportStream):

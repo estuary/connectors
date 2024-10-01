@@ -15,7 +15,7 @@ from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams.http.exceptions import DefaultBackoffException
 from requests.exceptions import ConnectionError
 from source_zendesk_support.source import BasicApiTokenAuthenticator
-from source_zendesk_support.streams import Macros, Organizations
+from source_zendesk_support.streams import Macros, Organizations, Groups
 
 STREAM_ARGS: dict = {
     "subdomain": "fake-subdomain",
@@ -141,7 +141,7 @@ def test_sleep_time():
     pages = 4
 
     start = datetime.datetime.now()
-    stream = Organizations(**STREAM_ARGS)
+    stream = Groups(**STREAM_ARGS)
     stream.page_size = page_size
 
     def record_gen(start=0, end=100):
@@ -164,7 +164,7 @@ def test_sleep_time():
             {
                 "status_code": 200,
                 "headers": {},
-                "text": json.dumps({"organizations": list(record_gen(page * page_size, min(records_count, (page + 1) * page_size)))})
+                "text": json.dumps({"groups": list(record_gen(page * page_size, min(records_count, (page + 1) * page_size)))})
             }
             for page in range(pages)
         ]
