@@ -110,7 +110,6 @@ jobs:
           - materialize-pinecone
           - materialize-postgres
           - materialize-redshift
-          - materialize-rockset
           - materialize-s3-csv
           - materialize-s3-iceberg
           - materialize-s3-parquet
@@ -200,8 +199,6 @@ jobs:
           load: true
           build-args: BASE_IMAGE=ghcr.io/estuary/base-image:${{ steps.prep.outputs.tag }}
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
-          secrets: |
-            "rockset_api_key=${{ secrets.ROCKSET_API_KEY }}"
 
       - name: Build ${{ matrix.connector }} Python Docker Image
         uses: docker/build-push-action@v2
