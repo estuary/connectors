@@ -210,7 +210,6 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 -- single statement for efficiency.
 
 {{ define "alterTableColumns" }}
-{{- if or $.DropNotNulls $.AddColumns}}
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
@@ -221,7 +220,6 @@ ALTER TABLE {{$.Identifier}}
 	{{- if $ind }},{{ end }}
 	MODIFY {{ ColumnIdentifier $col.Name }} {{$col.Type}}
 {{- end }};
-{{- end }}
 {{ end }}
 
 -- Templated creation of a temporary load table:

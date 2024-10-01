@@ -16,7 +16,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/flow"
 	mssqldb "github.com/microsoft/go-mssqldb"
-	log "github.com/sirupsen/logrus"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -188,19 +187,12 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	return strings.Join(statements, "\n"), func(ctx context.Context) error {
-		txn, err := c.db.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer txn.Rollback()
-
 		for _, stmt := range statements {
-			log.WithField("q", stmt).Info("query")
-			if _, err := txn.ExecContext(ctx, stmt); err != nil {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 				return err
 			}
 		}
-		return txn.Commit()
+		return nil
 	}, nil
 }
 
