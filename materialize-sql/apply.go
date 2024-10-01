@@ -208,24 +208,12 @@ func (a *sqlApplier) DeleteResource(ctx context.Context, path []string) (string,
 
 type ColumnTypeMigration struct {
 	Column
-	ProgressFields []string
+	ProgressColumnExists bool
+	OriginalColumnExists bool
 }
 
-// Column name suffixes used during column migration using the rename method
-const ColumnMigrationFirstStepSuffix = "_flowtmp1"
-const ColumnMigrationSecondStepSuffix = "_flowtmp2"
-
-func (a *sqlApplier) isFieldPendingMigration(resourcePath []string, field string) (fields []string) {
-	if a.is.HasField(resourcePath, field+ColumnMigrationFirstStepSuffix) {
-		fields = append(fields, field+ColumnMigrationFirstStepSuffix)
-	}
-
-	if a.is.HasField(resourcePath, field+ColumnMigrationSecondStepSuffix) {
-		fields = append(fields, field+ColumnMigrationSecondStepSuffix)
-	}
-
-	return fields
-}
+// Column name suffix used during column migration using the rename method
+const ColumnMigrationTemporarySuffix = "_flowtmp1"
 
 func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	table, err := getTable(a.endpoint, spec, bindingIndex)
@@ -253,12 +241,13 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 			return "", nil, err
 		}
 
-		if migrationSteps := a.isFieldPendingMigration(table.Path, col.Field); len(migrationSteps) > 0 {
+		if a.is.HasField(table.Path, col.Field+ColumnMigrationTemporarySuffix) {
 			// At this stage we don't have the MappedType anymore, but it's okay because if we don't have the original column anymore
 			// (hence the new projection), it means we have already created the new column and set its value.
 			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, ColumnTypeMigration{
-				Column:         col,
-				ProgressFields: migrationSteps,
+				Column:               col,
+				ProgressColumnExists: true,
+				OriginalColumnExists: false,
 			})
 			continue
 		}
@@ -290,9 +279,10 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 			if err != nil {
 				return "", nil, err
 			}
-			var m = ColumnTypeMigration{Column: col}
-			if migrationSteps := a.isFieldPendingMigration(table.Path, m.Field); len(migrationSteps) > 0 {
-				m.ProgressFields = migrationSteps
+			var m = ColumnTypeMigration{
+				Column:               col,
+				OriginalColumnExists: true,
+				ProgressColumnExists: a.is.HasField(table.Path, col.Field+ColumnMigrationTemporarySuffix),
 			}
 			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, m)
 		}
