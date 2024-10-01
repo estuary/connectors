@@ -89,44 +89,35 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 }
 
 var columnMigrationSteps = []sql.ColumnMigrationStep{
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
 		return fmt.Sprintf("ALTER TABLE %s ADD %s %s;",
 			table.Identifier,
-			firstTempColumnIdentifier,
+			tempColumnIdentifier,
 			migration.DDL,
 		), nil
 	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
 		return fmt.Sprintf(
 			"UPDATE %s SET %s = %s;",
 			table.Identifier,
-			firstTempColumnIdentifier,
+			tempColumnIdentifier,
 			migration.Identifier,
 		), nil
 	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, _ string) (string, error) {
-		var secondTempColumn = migration.Field + sql.ColumnMigrationSecondStepSuffix
-		return fmt.Sprintf(
-			"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
-			table.Path[0],
-			migration.Field,
-			secondTempColumn,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, _ string) (string, error) {
-		var firstTempColumn = migration.Field + sql.ColumnMigrationFirstStepSuffix
-		return fmt.Sprintf(
-			"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
-			table.Path[0],
-			firstTempColumn,
-			migration.Field,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
 		return fmt.Sprintf(
 			"ALTER TABLE %s DROP COLUMN %s;",
 			table.Identifier,
-			secondTempColumnIdentifier,
+			migration.Identifier,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
+		var tempColumn = migration.Field + sql.ColumnMigrationTemporarySuffix
+		return fmt.Sprintf(
+			"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
+			table.Path[0],
+			tempColumn,
+			migration.Field,
 		), nil
 	},
 }

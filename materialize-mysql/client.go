@@ -123,61 +123,40 @@ func castRfc3339ToDateTime(loc *time.Location, identifier string) string {
 
 func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigrationStep {
 	return []sql.ColumnMigrationStep{
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
 			return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
 				table.Identifier,
-				firstTempColumnIdentifier,
+				tempColumnIdentifier,
 				migration.DDL,
 			), nil
 		},
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
 			// Migrating from string to datetime
-			var cast = fmt.Sprintf("%s", migration.Identifier)
+			var cast = migration.Identifier
 			if migration.DDL == "DATETIME(6)" {
 				cast = castRfc3339ToDateTime(c.tzLocation, migration.Identifier)
 			}
 			return fmt.Sprintf(
 				"UPDATE %s SET %s = %s;",
 				table.Identifier,
-				firstTempColumnIdentifier,
+				tempColumnIdentifier,
 				cast,
 			), nil
 		},
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
-			is, err := c.InfoSchema(ctx, [][]string{table.Path})
-			if err != nil {
-				return "", err
-			}
-			field, err := is.GetField(table.Path, migration.Field)
-			if err != nil {
-				return "", err
-			}
-			var originalDDL = field.Type
-			if !field.Nullable {
-				originalDDL += " NOT NULL"
-			}
-			return fmt.Sprintf(
-				"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
-				table.Identifier,
-				migration.Identifier,
-				secondTempColumnIdentifier,
-				originalDDL,
-			), nil
-		},
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, firstTempColumnIdentifier, _ string) (string, error) {
-			return fmt.Sprintf(
-				"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
-				table.Identifier,
-				firstTempColumnIdentifier,
-				migration.Identifier,
-				migration.DDL,
-			), nil
-		},
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _, secondTempColumnIdentifier string) (string, error) {
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
 			return fmt.Sprintf(
 				"ALTER TABLE %s DROP COLUMN %s;",
 				table.Identifier,
-				secondTempColumnIdentifier,
+				migration.Identifier,
+			), nil
+		},
+		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
+			return fmt.Sprintf(
+				"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
+				table.Identifier,
+				tempColumnIdentifier,
+				migration.Identifier,
+				migration.DDL,
 			), nil
 		},
 	}
