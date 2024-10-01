@@ -160,7 +160,6 @@ type templates struct {
 	mergeInto         *template.Template
 	deleteQuery       *template.Template
 	loadQuery         *template.Template
-	updateFence       *template.Template
 	copyFromS3        *template.Template
 }
 
@@ -286,17 +285,6 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 {{- end }}
 {{ end }}
 
--- Templated update of a fence checkpoint.
-
-{{ define "updateFence" }}
-UPDATE {{ Identifier $.TablePath }}
-	SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-	WHERE materialization = {{ Literal $.Materialization.String }}
-	AND   key_begin = {{ $.KeyBegin }}
-	AND   key_end   = {{ $.KeyEnd }}
-	AND   fence     = {{ $.Fence }};
-{{ end }}
-
 -- Templated command to copy data from an S3 file into the destination table. Note the 'ignorecase'
 -- JSON option: This is necessary since by default Redshift lowercases all identifiers.
 
@@ -329,7 +317,6 @@ TRUNCATECOLUMNS;
 		mergeInto:         tplAll.Lookup("mergeInto"),
 		deleteQuery:       tplAll.Lookup("deleteQuery"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
-		updateFence:       tplAll.Lookup("updateFence"),
 		copyFromS3:        tplAll.Lookup("copyFromS3"),
 	}
 }
