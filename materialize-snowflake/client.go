@@ -5,6 +5,7 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -62,9 +63,22 @@ func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) er
 	return err
 }
 
+// The error message returned from Snowflake for the multi-statement table
+// creation queries is mostly a bunch of garbled nonsense about Javascript
+// execution errors if the user doesn't have permission to create tables in the
+// schema, but it does embed the useful part in the midst of all that. This is a
+// common enough error mode that we do some extra processing for this case to
+// make it more obvious what is happening.
+var errInsufficientPrivileges = regexp.MustCompile(`Insufficient privileges to operate on schema '([^']+)'`)
+
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
-	return err
+	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
+		if matches := errInsufficientPrivileges.FindStringSubmatch(err.Error()); len(matches) > 0 {
+			err = errors.New(matches[0])
+		}
+		return err
+	}
+	return nil
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
