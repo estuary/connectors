@@ -31,6 +31,12 @@ const (
 	// example, if documents average 2kb then a 10mb batch size will allow for ~5000 documents per
 	// batch.
 	batchBytesLimit = 10 * 1024 * 1024 // Bytes
+
+	// Limit the maximum number of documents in a buffered batch as well since
+	// very small documents (particularly keys to load) have a much higher ratio
+	// of "overhead" to actual data size, and the batchBytesLimit alone may
+	// result in excessive memory use.
+	batchSizeLimit = 5000
 )
 
 type sshForwarding struct {
@@ -381,7 +387,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			batch.Queue(b.loadInsertSQL, converted...)
 		}
 
-		if batchBytes >= batchBytesLimit {
+		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
 			if err := sendBatch(ctx, txn, &batch); err != nil {
 				return fmt.Errorf("sending load batch: %w", err)
 			}
@@ -470,7 +476,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 		}
 
-		if batchBytes >= batchBytesLimit {
+		if batchBytes >= batchBytesLimit || batch.Len() > batchSizeLimit {
 			if err := sendBatch(ctx, txn, &batch); err != nil {
 				return nil, fmt.Errorf("sending store batch: %w", err)
 			}
