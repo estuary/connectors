@@ -230,4 +230,5 @@ type ColumnInfo struct {
 	IsNullable  bool        // True if the column can contain nulls.
 	DataType    interface{} // The datatype of this column. May be a string name or a more complex struct.
 	Description *string     // Stored description of the column, if any.
+	OmitColumn  bool        // True if the column should be omitted from discovery JSON schema generation.
 }
