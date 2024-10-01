@@ -82,6 +82,10 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		// Build `properties` schemas for each table column.
 		var properties = make(map[string]*jsonschema.Schema)
 		for _, column := range table.Columns {
+			if column.OmitColumn {
+				continue // Skip adding properties corresponding to omitted columns
+			}
+
 			var jsonType, err = db.TranslateDBToJSONType(column)
 			if err != nil {
 				// Unhandled types are translated to the catch-all schema {} but with
