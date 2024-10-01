@@ -214,3 +214,27 @@ func TestScanKeyTypes(t *testing.T) {
 		})
 	}
 }
+
+func TestEnumScanKey(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+
+	tb.Query(ctx, t, `DROP TYPE IF EXISTS UserEnum CASCADE`)
+	tb.Query(ctx, t, `CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')`)
+	t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserEnum CASCADE`) })
+
+	var uniqueID = "97825976"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, color UserEnum, data TEXT, PRIMARY KEY (id, color))")
+
+	tb.Insert(ctx, t, tableName, [][]any{
+		{1, "green", "data"}, {8, "blue", "data"}, {3, "red", "data"},
+		{0, "blue", "data"}, {1, "blue", "data"}, {0, "red", "data"},
+		{7, "red", "data"}, {6, "green", "data"}, {2, "blue", "data"},
+		{1, "red", "data"}, {2, "red", "data"}, {0, "green", "data"},
+		{4, "green", "data"}, {2, "green", "data"}, {5, "blue", "data"},
+	})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
+	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+	cupaloy.SnapshotT(t, summary)
+}
