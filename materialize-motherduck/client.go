@@ -99,18 +99,12 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
-		txn, err := c.db.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer txn.Rollback()
-
 		for _, stmt := range stmts {
-			if _, err := txn.ExecContext(ctx, stmt); err != nil {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 				return err
 			}
 		}
-		return txn.Commit()
+		return nil
 	}, nil
 }
 

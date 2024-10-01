@@ -11,7 +11,6 @@ import (
 	"slices"
 	"strings"
 	"sync"
-	"time"
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
@@ -142,12 +141,12 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 // the workaround is to re-backfill the table so it gets created fresh with the needed columns.
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
-	var alterColumnStmtBuilder strings.Builder
-	if err := tplAlterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
-		return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
-	}
-	alterColumnStmt := alterColumnStmtBuilder.String()
-	if len(strings.Trim(alterColumnStmt, "\n")) > 0 {
+	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
+		var alterColumnStmtBuilder strings.Builder
+		if err := tplAlterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
+			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		alterColumnStmt := alterColumnStmtBuilder.String()
 		stmts = append(stmts, alterColumnStmt)
 	}
 
@@ -166,9 +165,6 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			if _, err := c.query(ctx, stmt); err != nil {
 				return err
 			}
-			// Frequent table alter queries sometimes lead to "hangs" with BigQuery, even when run against small tables
-			// adding this small delay seems to help avoid the hangs
-			time.Sleep(1 * time.Second)
 		}
 		return nil
 	}, nil

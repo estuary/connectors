@@ -228,13 +228,13 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 	}
 
-	var alterColumnStmtBuilder strings.Builder
-	if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
-		return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
-	}
-	alterColumnStmt := alterColumnStmtBuilder.String()
+	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
+		var alterColumnStmtBuilder strings.Builder
+		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
+			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		alterColumnStmt := alterColumnStmtBuilder.String()
 
-	if len(strings.Trim(alterColumnStmt, "\n")) > 0 {
 		stmts = append(stmts, alterColumnStmt)
 	}
 
@@ -249,18 +249,12 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
-		txn, err := c.db.BeginTx(ctx, nil)
-		if err != nil {
-			return err
-		}
-		defer txn.Rollback()
-
 		for _, stmt := range stmts {
-			if _, err := txn.ExecContext(ctx, stmt); err != nil {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 				return err
 			}
 		}
-		return txn.Commit()
+		return nil
 	}, nil
 }
 

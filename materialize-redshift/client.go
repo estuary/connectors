@@ -138,13 +138,14 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 	}
 
-	// Each table column addition statement is a separate statement, but will be grouped
-	// together in a single multi-statement query.
-	alterStmt := "BEGIN; " + strings.Join(statements, "\n") + " END; "
-
-	return alterStmt, func(ctx context.Context) error {
-		_, err := c.db.ExecContext(ctx, alterStmt)
-		return err
+	return strings.Join(statements, "\n"), func(ctx context.Context) error {
+		for _, stmt := range statements {
+			_, err := c.db.ExecContext(ctx, stmt)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
 	}, nil
 }
 
