@@ -92,12 +92,12 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
-	var alterColumnStmtBuilder strings.Builder
-	if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
-		return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
-	}
-	alterColumnStmt := alterColumnStmtBuilder.String()
-	if len(strings.Trim(alterColumnStmt, "\n")) > 0 {
+	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
+		var alterColumnStmtBuilder strings.Builder
+		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
+			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		alterColumnStmt := alterColumnStmtBuilder.String()
 		stmts = append(stmts, alterColumnStmt)
 	}
 

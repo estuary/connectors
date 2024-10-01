@@ -452,7 +452,7 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (c constrainter) compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+func (c constrainter) compatibleType(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
 	proj := buildProjection(proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
@@ -488,7 +488,7 @@ func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *p
 }
 
 func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	if compatible, err := c.compatible(existing, proposed, rawFieldConfig); err != nil {
+	if compatible, err := c.compatibleType(existing, proposed, rawFieldConfig); err != nil {
 		return false, err
 	} else if compatible {
 		return true, nil

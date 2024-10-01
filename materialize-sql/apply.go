@@ -274,7 +274,7 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		}
 
 		var rawFieldConfig = binding.FieldSelection.FieldConfigJsonMap[proposed.Field]
-		compatible, err := a.constrainter.compatible(existing, &proposed, rawFieldConfig)
+		compatible, err := a.constrainter.compatibleType(existing, &proposed, rawFieldConfig)
 		if err != nil {
 			return "", nil, fmt.Errorf("checking compatibility of %q: %w", proposed.Field, err)
 		}
