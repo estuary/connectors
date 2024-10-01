@@ -438,7 +438,7 @@ class TestSourceZendeskSupportStream:
         [
             (Macros, {"start_time": 1622505600}),
             (Organizations, {"start_time": 1622505600}),
-            (Groups, {"start_time": 1622505600}),
+            (Groups, {"start_time": 1622505600, "exclude_deleted": False}),
             (TicketFields, {"start_time": 1622505600}),
         ],
         ids=[
