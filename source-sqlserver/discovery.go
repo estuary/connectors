@@ -60,10 +60,6 @@ func (db *sqlserverDatabase) discoverTables(ctx context.Context) (map[sqlcapture
 			table.OmitBinding = true
 		}
 		tableMap[streamID] = table
-
-		if details, ok := table.ExtraDetails.(*sqlserverTableDiscoveryDetails); ok {
-			details.ComputedColumns = computedColumns[streamID]
-		}
 	}
 	for _, column := range columns {
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
@@ -97,6 +93,18 @@ func (db *sqlserverDatabase) discoverTables(ctx context.Context) (map[sqlcapture
 		}
 		info.PrimaryKey = key
 		tableMap[id] = info
+	}
+
+	// Add computed columns information
+	for streamID, table := range tableMap {
+		if details, ok := table.ExtraDetails.(*sqlserverTableDiscoveryDetails); ok {
+			details.ComputedColumns = computedColumns[streamID]
+		}
+		for _, columnName := range computedColumns[streamID] {
+			var info = table.Columns[columnName]
+			info.OmitColumn = true
+			table.Columns[columnName] = info
+		}
 	}
 
 	// For tables which have no primary key but have a valid secondary index,

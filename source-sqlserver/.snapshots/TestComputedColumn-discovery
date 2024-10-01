@@ -28,10 +28,6 @@ Binding 0:
                 "null"
               ]
             },
-            "computed": {
-              "type": "string",
-              "description": "(source type: non-nullable varchar(64))"
-            },
             "id": {
               "type": "integer",
               "description": "(source type: non-nullable int)"
