@@ -1,0 +1,205 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"red","data":"data","id":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":1,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FAJyZWQA"}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FAJyZWQA"
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"green","data":"data","id":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":2,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FAJncmVlbgA="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FAJncmVlbgA="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"blue","data":"data","id":0}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":3,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FAJibHVlAA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FAJibHVlAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"red","data":"data","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":4,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQECcmVkAA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQECcmVkAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"green","data":"data","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":5,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQECZ3JlZW4A"}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQECZ3JlZW4A"
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"blue","data":"data","id":1}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":6,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQECYmx1ZQA="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQECYmx1ZQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"red","data":"data","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":7,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQICcmVkAA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQICcmVkAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"green","data":"data","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":8,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQICZ3JlZW4A"}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQICZ3JlZW4A"
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"blue","data":"data","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":9,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQICYmx1ZQA="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQICYmx1ZQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"red","data":"data","id":3}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":10,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQMCcmVkAA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQMCcmVkAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"green","data":"data","id":4}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":11,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQQCZ3JlZW4A"}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQQCZ3JlZW4A"
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"blue","data":"data","id":5}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":12,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQUCYmx1ZQA="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQUCYmx1ZQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"green","data":"data","id":6}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":13,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQYCZ3JlZW4A"}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQYCZ3JlZW4A"
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"red","data":"data","id":7}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":14,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQcCcmVkAA=="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQcCcmVkAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_enumscankey_97825976": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"enumscankey_97825976","loc":[11111111,11111111,11111111]}},"color":"blue","data":"data","id":8}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":15,"key_columns":["id","color"],"mode":"UnfilteredBackfill","scanned":"FQgCYmx1ZQA="}},"cursor":"0/1111111"}
+
+
+####################################
+### Capture from Key "FQgCYmx1ZQA="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fenumscankey_97825976":{"backfilled":15,"key_columns":["id","color"],"mode":"Active"}},"cursor":"0/1111111"}
+
+
+

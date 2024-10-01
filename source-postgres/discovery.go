@@ -184,7 +184,10 @@ func predictableColumnOrder(colType any) bool {
 	// https://github.com/estuary/connectors/issues/1343 for more details.
 	if colType == "varchar" || colType == "bpchar" || colType == "text" {
 		return false
+	} else if _, ok := colType.(postgresEnumType); ok {
+		return false
 	}
+
 	return true
 }
 
