@@ -45,6 +45,10 @@ func (db *sqlserverDatabase) discoverTables(ctx context.Context) (map[sqlcapture
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
+	computedColumns, err := getComputedColumns(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database computed columns: %w", err)
+	}
 
 	// Aggregate column information into DiscoveryInfo structs using a map
 	// from fully-qualified table names to the corresponding info.
@@ -56,6 +60,10 @@ func (db *sqlserverDatabase) discoverTables(ctx context.Context) (map[sqlcapture
 			table.OmitBinding = true
 		}
 		tableMap[streamID] = table
+
+		if details, ok := table.ExtraDetails.(*sqlserverTableDiscoveryDetails); ok {
+			details.ComputedColumns = computedColumns[streamID]
+		}
 	}
 	for _, column := range columns {
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
@@ -177,6 +185,10 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 	return true
 }
 
+type sqlserverTableDiscoveryDetails struct {
+	ComputedColumns []string // List of the names of computed columns in this table, in no particular order.
+}
+
 const queryDiscoverTables = `
   SELECT table_schema, table_name, table_type
   FROM information_schema.tables
@@ -198,9 +210,10 @@ func getTables(ctx context.Context, conn *sql.DB) ([]*sqlcapture.DiscoveryInfo, 
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
-			Schema:    tableSchema,
-			Name:      tableName,
-			BaseTable: strings.EqualFold(tableType, "BASE TABLE"),
+			Schema:       tableSchema,
+			Name:         tableName,
+			BaseTable:    strings.EqualFold(tableType, "BASE TABLE"),
+			ExtraDetails: &sqlserverTableDiscoveryDetails{},
 		})
 	}
 	return tables, nil
@@ -348,6 +361,33 @@ func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[stri
 		}
 	}
 	return streamIndexColumns, err
+}
+
+const queryListComputedColumns = `
+SELECT sch.name, tbl.name, col.name
+  FROM sys.columns col
+    JOIN sys.tables tbl ON tbl.object_id = col.object_id
+	JOIN sys.schemas sch ON sch.schema_id = tbl.schema_id
+  WHERE col.is_computed = 1;
+`
+
+func getComputedColumns(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID][]string, error) {
+	var rows, err = conn.QueryContext(ctx, queryListComputedColumns)
+	if err != nil {
+		return nil, fmt.Errorf("error querying computed columns: %w", err)
+	}
+	defer rows.Close()
+
+	var computedColumns = make(map[sqlcapture.StreamID][]string)
+	for rows.Next() {
+		var tableSchema, tableName, columnName string
+		if err := rows.Scan(&tableSchema, &tableName, &columnName); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
+		computedColumns[streamID] = append(computedColumns[streamID], columnName)
+	}
+	return computedColumns, nil
 }
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.

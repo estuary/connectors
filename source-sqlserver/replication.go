@@ -97,8 +97,9 @@ type sqlserverReplicationStream struct {
 }
 
 type tableReplicationInfo struct {
-	KeyColumns  []string
-	ColumnTypes map[string]any
+	KeyColumns      []string
+	ColumnTypes     map[string]any
+	ComputedColumns []string // List of the names of computed columns in this table, in no particular order.
 }
 
 func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
@@ -128,10 +129,16 @@ func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamI
 		columnTypes[columnName] = columnInfo.DataType
 	}
 
+	var computedColumns []string
+	if details, ok := discovery.ExtraDetails.(*sqlserverTableDiscoveryDetails); ok {
+		computedColumns = details.ComputedColumns
+	}
+
 	rs.tables.Lock()
 	rs.tables.info[streamID] = &tableReplicationInfo{
-		KeyColumns:  keyColumns,
-		ColumnTypes: columnTypes,
+		KeyColumns:      keyColumns,
+		ColumnTypes:     columnTypes,
+		ComputedColumns: computedColumns,
 	}
 	rs.tables.Unlock()
 	log.WithFields(log.Fields{"stream": streamID}).Debug("activated table")
@@ -355,14 +362,15 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		}
 
 		queue = append(queue, &tablePollInfo{
-			StreamID:     streamID,
-			SchemaName:   instance.TableSchema,
-			TableName:    instance.TableName,
-			InstanceName: instance.Name,
-			KeyColumns:   info.KeyColumns,
-			ColumnTypes:  info.ColumnTypes,
-			FromLSN:      rs.fromLSN,
-			ToLSN:        toLSN,
+			StreamID:        streamID,
+			SchemaName:      instance.TableSchema,
+			TableName:       instance.TableName,
+			InstanceName:    instance.Name,
+			KeyColumns:      info.KeyColumns,
+			ColumnTypes:     info.ColumnTypes,
+			ComputedColumns: info.ComputedColumns,
+			FromLSN:         rs.fromLSN,
+			ToLSN:           toLSN,
 		})
 	}
 	rs.tables.RUnlock()
@@ -560,14 +568,15 @@ func (rs *sqlserverReplicationStream) cleanupChangeTables(ctx context.Context) e
 }
 
 type tablePollInfo struct {
-	StreamID     sqlcapture.StreamID
-	SchemaName   string
-	TableName    string
-	InstanceName string
-	KeyColumns   []string
-	ColumnTypes  map[string]any
-	FromLSN      LSN
-	ToLSN        LSN
+	StreamID        sqlcapture.StreamID
+	SchemaName      string
+	TableName       string
+	InstanceName    string
+	KeyColumns      []string
+	ColumnTypes     map[string]any
+	ComputedColumns []string // List of the names of computed columns in this table, in no particular order.
+	FromLSN         LSN
+	ToLSN           LSN
 }
 
 func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *tablePollInfo) error {
@@ -603,6 +612,11 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		var fields = make(map[string]interface{})
 		for idx, name := range cnames {
 			fields[name] = vals[idx]
+		}
+		for _, name := range info.ComputedColumns {
+			// Computed columns always have a value of null in the change table so we should never capture them.
+			// One wonders why they're present in the change table at all, but this is a documented fact about SQL Server CDC.
+			delete(fields, name)
 		}
 
 		log.WithFields(log.Fields{"stream": info.StreamID, "data": fields}).Trace("got change")
