@@ -37,6 +37,11 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		columnTypes[name] = column.DataType
 	}
 
+	var computedColumns []string
+	if details, ok := info.ExtraDetails.(*sqlserverTableDiscoveryDetails); ok {
+		computedColumns = details.ComputedColumns
+	}
+
 	// Compute backfill query and arguments list
 	var query string
 	var args []any
@@ -103,6 +108,12 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		var fields = make(map[string]interface{})
 		for idx, name := range cnames {
 			fields[name] = vals[idx]
+		}
+		for _, name := range computedColumns {
+			// Computed column values cannot be captured via CDC, so we have to exclude them from
+			// backfills as well or we'd end up with incorrect/stale values. Better not to have a
+			// property at all in those circumstances.
+			delete(fields, name)
 		}
 
 		var rowKey []byte
