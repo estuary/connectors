@@ -75,6 +75,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "created_at": "2024-07-26T15:41:00Z",
+      "deleted_at": null,
       "details": "",
       "domain_names": [],
       "external_id": null,
