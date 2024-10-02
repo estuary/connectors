@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"net"
@@ -173,7 +174,7 @@ func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) er
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
+	return sql.StdInstallFence(ctx, c.db, checkpoints, fence, base64.StdEncoding.DecodeString)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

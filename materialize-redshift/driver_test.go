@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,8 +15,9 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 func mustGetCfg(t *testing.T) config {
@@ -112,61 +112,16 @@ func TestFencingCases(t *testing.T) {
 		testDialect,
 		templates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
-			conn, err := pgx.Connect(ctx, cfg.toURI())
-			if err != nil {
-				return fmt.Errorf("store pgx.Connect: %w", err)
+			var fenceUpdate strings.Builder
+			if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
+				return fmt.Errorf("evaluating fence template: %w", err)
 			}
-			defer conn.Close(ctx)
-
-			txn, err := conn.BeginTx(ctx, pgx.TxOptions{})
-			if err != nil {
-				return err
-			}
-			defer txn.Rollback(ctx)
-
-			if updateFence(ctx, txn, testDialect, fence) != nil {
-				return err
-			}
-
-			return txn.Commit(ctx)
+			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
 		},
 		func(table sql.Table) (out string, err error) {
 			err = c.(*client).withDB(func(db *stdsql.DB) error {
-				var sql = fmt.Sprintf(
-					"select materialization, key_begin, key_end, fence, FROM_VARBYTE(checkpoint, 'utf8') from %s order by materialization, key_begin, key_end asc;",
-					table.Identifier,
-				)
-
-				rows, err := db.Query(sql)
-				if err != nil {
-					return err
-				}
-				defer rows.Close()
-
-				var b strings.Builder
-				b.WriteString("materialization, key_begin, key_end, fence, checkpoint")
-
-				for rows.Next() {
-					b.WriteString("\n")
-					var materialization string
-					var keyBegin, keyEnd, fence int
-					var checkpoint string
-					if err = rows.Scan(&materialization, &keyBegin, &keyEnd, &fence, &checkpoint); err != nil {
-						return err
-					} else if base64Bytes, err := base64.StdEncoding.DecodeString(checkpoint); err != nil {
-						return err
-					} else if decompressed, err := maybeDecompressBytes(base64Bytes); err != nil {
-						return err
-					} else {
-						b.WriteString(fmt.Sprintf(
-							"%s, %d, %d, %d, %s",
-							materialization, keyBegin, keyEnd, fence, base64.StdEncoding.EncodeToString(decompressed)),
-						)
-					}
-				}
-
-				out = b.String()
-				return nil
+				out, err = sql.StdDumpTable(ctx, db, table)
+				return err
 			})
 			return
 		},
