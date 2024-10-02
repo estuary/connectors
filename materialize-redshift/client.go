@@ -6,6 +6,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -260,7 +261,7 @@ func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, mater
 	if err := c.db.QueryRowContext(
 		ctx,
 		fmt.Sprintf(
-			"SELECT version, FROM_VARBYTE(spec, 'utf8') FROM %s WHERE materialization = %s;",
+			"SELECT version, spec FROM %s WHERE materialization = %s;",
 			specs.Identifier,
 			specs.Keys[0].Placeholder,
 		),
@@ -269,7 +270,9 @@ func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, mater
 		return "", "", err
 	}
 
-	if specBytes, err := base64.StdEncoding.DecodeString(spec); err != nil {
+	if hexBytes, err := hex.DecodeString(spec); err != nil {
+		return "", "", fmt.Errorf("hex.DecodeString: %w", err)
+	} else if specBytes, err := base64.StdEncoding.DecodeString(string(hexBytes)); err != nil {
 		return "", "", fmt.Errorf("base64.DecodeString: %w", err)
 	} else if specBytes, err = maybeDecompressBytes(specBytes); err != nil {
 		return "", "", fmt.Errorf("decompressing spec: %w", err)
@@ -386,7 +389,7 @@ func installFence(ctx context.Context, db *stdsql.DB, checkpoints sql.Table, fen
 
 	if err = txn.QueryRow(
 		fmt.Sprintf(`
-			SELECT fence, key_begin, key_end, FROM_VARBYTE(checkpoint, 'utf8')
+			SELECT fence, key_begin, key_end, checkpoint
 				FROM %s
 				WHERE materialization=%s
 				AND key_begin<=%s
@@ -408,7 +411,9 @@ func installFence(ctx context.Context, db *stdsql.DB, checkpoints sql.Table, fen
 		readBegin, readEnd = 1, 0
 	} else if err != nil {
 		return sql.Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
-	} else if base64Bytes, err := base64.StdEncoding.DecodeString(checkpoint); err != nil {
+	} else if hexBytes, err := hex.DecodeString(checkpoint); err != nil {
+		return sql.Fence{}, fmt.Errorf("hex.DecodeString(checkpoint): %w", err)
+	} else if base64Bytes, err := base64.StdEncoding.DecodeString(string(hexBytes)); err != nil {
 		return sql.Fence{}, fmt.Errorf("base64.Decode(string(decompressed)): %w", err)
 	} else if fence.Checkpoint, err = maybeDecompressBytes(base64Bytes); err != nil {
 		return sql.Fence{}, fmt.Errorf("maybeDecompressBytes(fenceHexBytes): %w", err)
