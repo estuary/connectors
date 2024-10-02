@@ -215,7 +215,7 @@ class OracleColumn(BaseModel, extra="forbid"):
     nullable: bool = Field(default=True, alias="NULLABLE")
 
     @computed_field
-    def quoted_column_name(self) -> bool:
+    def quoted_column_name(self) -> str:
         return quote_identifier(self.column_name)
 
     @computed_field
@@ -253,11 +253,11 @@ class Table:
     model_fields: dict[str, Any]
 
     @computed_field
-    def quoted_owner(self) -> bool:
+    def quoted_owner(self) -> str:
         return quote_identifier(self.owner)
 
     @computed_field
-    def quoted_table_name(self) -> bool:
+    def quoted_table_name(self) -> str:
         return quote_identifier(self.table_name)
 
     def create_model(self) -> type[Document]:
