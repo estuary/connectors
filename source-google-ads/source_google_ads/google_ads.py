@@ -12,7 +12,7 @@ import pendulum
 from airbyte_cdk.models import FailureType
 from airbyte_cdk.utils import AirbyteTracedException
 from google.ads.googleads.client import GoogleAdsClient
-from google.ads.googleads.v15.services.types.google_ads_service import GoogleAdsRow, SearchGoogleAdsResponse
+from google.ads.googleads.v17.services.types.google_ads_service import GoogleAdsRow, SearchGoogleAdsResponse
 from google.api_core.exceptions import ServerError, TooManyRequests
 from google.auth import exceptions
 from proto.marshal.collections import Repeated, RepeatedComposite
@@ -36,7 +36,7 @@ REPORT_MAPPING = {
     "geographic_report": "geographic_view",
     "keyword_report": "keyword_view",
 }
-API_VERSION = "v15"
+API_VERSION = "v17"
 logger = logging.getLogger("airbyte")
 
 
@@ -70,7 +70,6 @@ class GoogleAds:
         client = self.client
         search_request = client.get_type("SearchGoogleAdsRequest")
         search_request.query = query
-        search_request.page_size = self.DEFAULT_PAGE_SIZE
         search_request.customer_id = customer_id
         return [self.ga_service.search(search_request)]
 
