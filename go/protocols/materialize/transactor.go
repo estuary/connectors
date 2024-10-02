@@ -146,14 +146,7 @@ func RunTransactions(
 	opened pm.Response_Opened,
 	transactor Transactor,
 ) (_err error) {
-	defer func() {
-		if _err != nil {
-			log.WithError(_err).Error("RunTransactions failed")
-		} else {
-			log.Debug("RunTransactions finished")
-		}
-		transactor.Destroy()
-	}()
+	defer func() { transactor.Destroy() }()
 
 	if err := open.Validate(); err != nil {
 		return fmt.Errorf("open is invalid: %w", err)
@@ -219,18 +212,12 @@ func RunTransactions(
 	// started commit, and then writes Acknowledged to the runtime.
 	// It has an exclusive ability to write to `stream` until it returns.
 	var await = func(
-		round int,
 		ourCommitOp OpFuture, // Resolves when the prior commit completes.
 		awaitDoneCh chan<- struct{}, // To be closed upon return.
 		loadDoneCh <-chan struct{}, // Signaled when load() has completed.
 	) (__out error) {
 
 		defer func() {
-			log.WithFields(log.Fields{
-				"round": round,
-				"error": __out,
-			}).Debug("await commit finished")
-
 			awaitErr = __out
 			close(awaitDoneCh)
 		}()
@@ -285,20 +272,12 @@ func RunTransactions(
 
 	// load is a closure for async execution of Transactor.Load.
 	var load = func(
-		round int,
 		it *LoadIterator,
 		loadDoneCh chan<- struct{}, // To be closed upon return.
 	) (__out error) {
 
 		var loaded int
 		defer func() {
-			log.WithFields(log.Fields{
-				"round":  round,
-				"total":  it.Total,
-				"loaded": loaded,
-				"error":  __out,
-			}).Debug("load finished")
-
 			loadErr = __out
 			close(loadDoneCh)
 		}()
@@ -348,11 +327,11 @@ func RunTransactions(
 		// On completion, Acknowledged has been written to the stream,
 		// and a concurrent load() phase may now begin to close.
 		// At exit, `awaitDoneCh` is closed and `awaitErr` is its status.
-		go await(round, ourCommitOp, awaitDoneCh, loadDoneCh)
+		go await(ourCommitOp, awaitDoneCh, loadDoneCh)
 
 		// Begin an async load of the current transaction.
 		// At exit, `loadDoneCh` is closed and `loadErr` is its status.
-		go load(round, &loadIt, loadDoneCh)
+		go load(&loadIt, loadDoneCh)
 
 		// Join over await() and load().
 		for awaitDoneCh != nil || loadDoneCh != nil {
@@ -383,7 +362,6 @@ func RunTransactions(
 		} else if err = WriteFlushed(stream, &txResponse); err != nil {
 			return err
 		}
-		log.WithField("round", round).Debug("wrote Flushed")
 
 		// Process all Store requests until StartCommit is read.
 		var storeIt = StoreIterator{stream: stream, request: &rxRequest, ctx: ctx}
@@ -395,7 +373,6 @@ func RunTransactions(
 			return fmt.Errorf("transactor.Store: %w", err)
 		}
 		storedHistory[round%storedHistorySize] = storeIt.Total
-		log.WithFields(log.Fields{"round": round, "stored": storeIt.Total}).Debug("Store finished")
 
 		var runtimeCheckpoint *pc.Checkpoint
 		if runtimeCheckpoint, err = ReadStartCommit(&rxRequest); err != nil {
