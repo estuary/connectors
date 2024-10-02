@@ -340,13 +340,11 @@ class TestSourceZendeskSupportStream:
         "stream_cls",
         [
             (Macros),
-            (Groups),
             (SatisfactionRatings),
             (TicketFields),
         ],
         ids=[
             "Macros",
-            "Groups",
             "SatisfactionRatings",
             "TicketFields",
         ],
@@ -365,7 +363,6 @@ class TestSourceZendeskSupportStream:
         [
             (Macros),
             (Organizations),
-            (Groups),
             (SatisfactionRatings),
             (TicketFields),
             (TicketMetrics),
@@ -373,7 +370,6 @@ class TestSourceZendeskSupportStream:
         ids=[
             "Macros",
             "Organizations",
-            "Groups",
             "SatisfactionRatings",
             "TicketFields",
             "TicketMetrics",
@@ -408,12 +404,10 @@ class TestSourceZendeskSupportStream:
         "stream_cls, expected",
         [
             (Macros, None),
-            (Groups, None),
             (TicketFields, None),
         ],
         ids=[
             "Macros",
-            "Groups",
             "TicketFields",
         ],
     )
@@ -426,12 +420,10 @@ class TestSourceZendeskSupportStream:
         "stream_cls, expected",
         [
             (Macros, {"start_time": 1622505600}),
-            (Groups, {"start_time": 1622505600, "exclude_deleted": False}),
             (TicketFields, {"start_time": 1622505600}),
         ],
         ids=[
             "Macros",
-            "Groups",
             "TicketFields",
         ],
     )
@@ -522,6 +514,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
     @pytest.mark.parametrize(
         "stream_cls, current_state, last_record, expected",
         [
+            (Groups, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
             (GroupMemberships, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
             (TicketForms, {}, {"updated_at": "2023-03-17T16:03:07Z"}, {"updated_at": "2023-03-17T16:03:07Z"}),
             (TicketMetricEvents, {}, {"time": "2024-03-17T16:03:07Z"}, {"time": "2024-03-17T16:03:07Z"}),
@@ -529,6 +522,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (OrganizationMemberships, {}, {"updated_at": "2025-03-17T16:03:07Z"}, {"updated_at": "2025-03-17T16:03:07Z"}),
         ],
         ids=[
+            "Groups",
             "GroupMemberships",
             "TicketForms",
             "TicketMetricEvents",
@@ -544,6 +538,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
     @pytest.mark.parametrize(
         "stream_cls, response, expected",
         [
+            (Groups, {}, None),
             (GroupMemberships, {}, None),
             (TicketForms, {}, None),
             (TicketMetricEvents, {}, None),
@@ -562,6 +557,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
             ),
         ],
         ids=[
+            "Groups",
             "GroupMemberships",
             "TicketForms",
             "TicketMetricEvents",
@@ -581,6 +577,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
     @pytest.mark.parametrize(
         "stream_cls, expected",
         [
+            (Groups, 1622505600),
             (GroupMemberships, 1622505600),
             (TicketForms, 1622505600),
             (TicketMetricEvents, 1622505600),
@@ -588,6 +585,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (OrganizationMemberships, 1622505600),
         ],
         ids=[
+            "Groups",
             "GroupMemberships",
             "TicketForms",
             "TicketMetricEvents",
@@ -603,6 +601,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
     @pytest.mark.parametrize(
         "stream_cls, expected",
         [
+            (Groups, {"page[size]": 100, "start_time": 1622505600, "exclude_deleted": False}),
             (GroupMemberships, {"page[size]": 100, "start_time": 1622505600, "sort_by": "asc"}),
             (TicketForms, {}),
             (TicketMetricEvents, {"page[size]": 1000, "start_time": 1622505600}),
@@ -611,6 +610,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (OrganizationMemberships, {"page[size]": 100, "start_time": 1622505600})
         ],
         ids=[
+            "Groups",
             "GroupMemberships",
             "TicketForms",
             "TicketMetricEvents",
