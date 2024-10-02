@@ -25,11 +25,18 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type MaterializeOptions struct {
+	// ExtendedLogging enables detailed logging of transactions progress.
+	// Typically this should be enabled for materializations that run large,
+	// long-running transactions, such as data warehouses.
+	ExtendedLogging bool
+}
+
 type Connector interface {
 	Spec(context.Context, *pm.Request_Spec) (*pm.Response_Spec, error)
 	Validate(context.Context, *pm.Request_Validate) (*pm.Response_Validated, error)
 	Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error)
-	NewTransactor(context.Context, pm.Request_Open) (m.Transactor, *pm.Response_Opened, error)
+	NewTransactor(context.Context, pm.Request_Open) (m.Transactor, *pm.Response_Opened, *MaterializeOptions, error)
 }
 
 // RunMain is the boilerplate main function of a materialization connector.
@@ -45,7 +52,8 @@ func RunMain(connector Connector) {
 		log.WithField("format", format).Fatal("invalid LOG_FORMAT (expected 'json', 'text', or 'color')")
 	}
 
-	if lvl, err := log.ParseLevel(getEnvDefault("LOG_LEVEL", "info")); err != nil {
+	lvl, err := log.ParseLevel(getEnvDefault("LOG_LEVEL", "info"))
+	if err != nil {
 		log.WithFields(log.Fields{"level": lvl, "error": err}).Fatal("unrecognized log level")
 	} else {
 		log.SetLevel(lvl)
@@ -72,7 +80,7 @@ func RunMain(connector Connector) {
 		}
 	}()
 
-	if err := materialize(ctx, stream, connector); err != nil {
+	if err := materialize(ctx, stream, connector, lvl); err != nil {
 		cerrors.HandleFinalError(err)
 	}
 	os.Exit(0)
@@ -86,7 +94,7 @@ func getEnvDefault(name, def string) string {
 	return s
 }
 
-func materialize(ctx context.Context, stream m.MaterializeStream, connector Connector) error {
+func materialize(ctx context.Context, stream m.MaterializeStream, connector Connector, lvl log.Level) error {
 	for {
 		var request pm.Request
 		if err := stream.RecvMsg(&request); err == io.EOF {
@@ -121,11 +129,16 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 				return err
 			}
 		case request.Open != nil:
-			transactor, opened, err := connector.NewTransactor(ctx, *request.Open)
+			transactor, opened, options, err := connector.NewTransactor(ctx, *request.Open)
 			if err != nil {
 				return err
 			}
-			return m.RunTransactions(ctx, newAuxStream(stream), *request.Open, *opened, transactor)
+
+			if options == nil {
+				options = &MaterializeOptions{}
+			}
+
+			return m.RunTransactions(ctx, newAuxStream(stream, lvl, *options), *request.Open, *opened, transactor)
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
