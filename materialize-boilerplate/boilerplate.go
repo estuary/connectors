@@ -125,7 +125,7 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 			if err != nil {
 				return err
 			}
-			return m.RunTransactions(ctx, stream, *request.Open, *opened, transactor)
+			return m.RunTransactions(ctx, newAuxStream(stream), *request.Open, *opened, transactor)
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
