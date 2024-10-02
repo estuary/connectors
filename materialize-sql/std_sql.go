@@ -69,7 +69,7 @@ func StdSQLExecStatements(ctx context.Context, db *sql.DB, statements []string) 
 
 // StdInstallFence is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.
-func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence Fence) (Fence, error) {
+func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence Fence, decodeFence func(string) ([]byte, error)) (Fence, error) {
 	var txn, err = db.BeginTx(ctx, nil)
 	if err != nil {
 		return Fence{}, fmt.Errorf("db.BeginTx: %w", err)
@@ -130,8 +130,8 @@ func StdInstallFence(ctx context.Context, db *sql.DB, checkpoints Table, fence F
 		readBegin, readEnd = 1, 0
 	} else if err != nil {
 		return Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
-	} else if fence.Checkpoint, err = base64.StdEncoding.DecodeString(checkpoint); err != nil {
-		return Fence{}, fmt.Errorf("base64.Decode(checkpoint): %w", err)
+	} else if fence.Checkpoint, err = decodeFence(checkpoint); err != nil {
+		return Fence{}, fmt.Errorf("decodeFence(checkpoint): %w", err)
 	}
 
 	// If a checkpoint for this exact range doesn't exist then insert it now.

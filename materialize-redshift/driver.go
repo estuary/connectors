@@ -739,11 +739,20 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, varcharColumnUpdates) })
+		var fenceUpdate strings.Builder
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.fence); err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence update template: %w", err))
+		}
+
+		return nil, pf.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String(), varcharColumnUpdates) })
 	}, nil
 }
 
-func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string][]string) error {
+func (d *transactor) commit(
+	ctx context.Context,
+	fenceUpdate string,
+	varcharColumnUpdates map[string][]string,
+) error {
 	defer func() {
 		for _, b := range d.bindings {
 			// Arrange to clean up any staged files once this commit attempt is
@@ -873,8 +882,10 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 
 	log.Info("store: finished encoding and uploading of files")
 
-	if err := updateFence(ctx, txn, d.dialect, d.fence); err != nil {
-		return err
+	if fenceRes, err := txn.Exec(ctx, fenceUpdate); err != nil {
+		return fmt.Errorf("fetching fence update rows: %w", err)
+	} else if fenceRes.RowsAffected() != 1 {
+		return errors.New("this instance was fenced off by another")
 	} else if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("committing store transaction: %w", err)
 	}
