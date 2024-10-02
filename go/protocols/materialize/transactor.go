@@ -14,6 +14,13 @@ import (
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
+// MaterializeStream is the basic interface used for sending and receiving
+// protocol messages.
+type MaterializeStream interface {
+	Send(*pm.Response) error
+	RecvMsg(*pm.Request) error
+}
+
 // Transactor is a store-agnostic interface for a materialization connector
 // that implements Flow materialization protocol transactions.
 type Transactor interface {
@@ -133,7 +140,8 @@ type StartCommitFunc = func(
 // RunTransactions processes materialization protocol transactions
 // over the established stream against a Connector.
 func RunTransactions(
-	stream pm.Connector_MaterializeServer,
+	ctx context.Context,
+	stream MaterializeStream,
 	open pm.Request_Open,
 	opened pm.Response_Opened,
 	transactor Transactor,
@@ -239,7 +247,7 @@ func RunTransactions(
 			return nil
 		}
 
-		ackState, err := transactor.Acknowledge(stream.Context())
+		ackState, err := transactor.Acknowledge(ctx)
 		if err != nil {
 			return err
 		}
@@ -327,7 +335,7 @@ func RunTransactions(
 		var (
 			awaitDoneCh         = make(chan struct{}) // Signals await() is done.
 			loadDoneCh          = make(chan struct{}) // Signals load() is done.
-			loadCtx, loadCancel = context.WithCancel(stream.Context())
+			loadCtx, loadCancel = context.WithCancel(ctx)
 			loadIt              = LoadIterator{stream: stream, request: &rxRequest, awaitDoneCh: awaitDoneCh, ctx: loadCtx}
 		)
 
@@ -377,7 +385,7 @@ func RunTransactions(
 		log.WithField("round", round).Debug("wrote Flushed")
 
 		// Process all Store requests until StartCommit is read.
-		var storeIt = StoreIterator{stream: stream, request: &rxRequest}
+		var storeIt = StoreIterator{stream: stream, request: &rxRequest, ctx: ctx}
 		var startCommit, err = transactor.Store(&storeIt)
 		if storeIt.err != nil {
 			err = storeIt.err // Prefer an iterator error as it's more directly causal.
@@ -396,8 +404,7 @@ func RunTransactions(
 		// `startCommit` may be nil to indicate a no-op commit.
 		var stateUpdate *pf.ConnectorState = nil
 		if startCommit != nil {
-			stateUpdate, ourCommitOp = startCommit(
-				stream.Context(), runtimeCheckpoint)
+			stateUpdate, ourCommitOp = startCommit(ctx, runtimeCheckpoint)
 		}
 		// As a convenience, map a nil OpFuture to a pre-resolved one so the
 		// rest of our handling can ignore the nil case.

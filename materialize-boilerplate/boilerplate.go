@@ -23,7 +23,6 @@ import (
 	"github.com/gogo/protobuf/jsonpb"
 	"github.com/gogo/protobuf/proto"
 	log "github.com/sirupsen/logrus"
-	"google.golang.org/grpc/metadata"
 )
 
 type Connector interface {
@@ -31,11 +30,6 @@ type Connector interface {
 	Validate(context.Context, *pm.Request_Validate) (*pm.Response_Validated, error)
 	Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error)
 	NewTransactor(context.Context, pm.Request_Open) (m.Transactor, *pm.Response_Opened, error)
-}
-
-// ConnectorServer wraps a Connector to implement the pc.ConnectorServer gRPC service interface.
-type ConnectorServer struct {
-	Connector
 }
 
 // RunMain is the boilerplate main function of a materialization connector.
@@ -58,15 +52,15 @@ func RunMain(connector Connector) {
 	}
 
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	var stream pm.Connector_MaterializeServer
+	var stream m.MaterializeStream
 
 	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
 	case "proto":
 		log.Debug("using protobuf codec")
-		stream = newProtoCodec(ctx)
+		stream = newProtoCodec()
 	case "json":
 		log.Debug("using json codec")
-		stream = newJsonCodec(ctx)
+		stream = newJsonCodec()
 	default:
 		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
 	}
@@ -78,9 +72,7 @@ func RunMain(connector Connector) {
 		}
 	}()
 
-	var server = ConnectorServer{connector}
-
-	if err := server.Materialize(stream); err != nil {
+	if err := materialize(ctx, stream, connector); err != nil {
 		cerrors.HandleFinalError(err)
 	}
 	os.Exit(0)
@@ -94,14 +86,10 @@ func getEnvDefault(name, def string) string {
 	return s
 }
 
-var _ pm.ConnectorServer = &ConnectorServer{}
-
-func (s *ConnectorServer) Materialize(stream pm.Connector_MaterializeServer) error {
-	var ctx = stream.Context()
-
+func materialize(ctx context.Context, stream m.MaterializeStream, connector Connector) error {
 	for {
-		var request, err = stream.Recv()
-		if err == io.EOF {
+		var request pm.Request
+		if err := stream.RecvMsg(&request); err == io.EOF {
 			return nil
 		} else if err != nil {
 			return err
@@ -111,7 +99,7 @@ func (s *ConnectorServer) Materialize(stream pm.Connector_MaterializeServer) err
 
 		switch {
 		case request.Spec != nil:
-			var response, err = s.Connector.Spec(ctx, request.Spec)
+			var response, err = connector.Spec(ctx, request.Spec)
 			if err != nil {
 				return err
 			}
@@ -121,61 +109,46 @@ func (s *ConnectorServer) Materialize(stream pm.Connector_MaterializeServer) err
 				return err
 			}
 		case request.Validate != nil:
-			if response, err := s.Connector.Validate(ctx, request.Validate); err != nil {
+			if response, err := connector.Validate(ctx, request.Validate); err != nil {
 				return err
 			} else if err := stream.Send(&pm.Response{Validated: response}); err != nil {
 				return err
 			}
 		case request.Apply != nil:
-			if response, err := s.Connector.Apply(ctx, request.Apply); err != nil {
+			if response, err := connector.Apply(ctx, request.Apply); err != nil {
 				return err
 			} else if err := stream.Send(&pm.Response{Applied: response}); err != nil {
 				return err
 			}
 		case request.Open != nil:
-			transactor, opened, err := s.Connector.NewTransactor(ctx, *request.Open)
+			transactor, opened, err := connector.NewTransactor(ctx, *request.Open)
 			if err != nil {
 				return err
 			}
-			return m.RunTransactions(stream, *request.Open, *opened, transactor)
+			return m.RunTransactions(ctx, stream, *request.Open, *opened, transactor)
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
 	}
 }
 
-func newProtoCodec(ctx context.Context) pm.Connector_MaterializeServer {
+func newProtoCodec() m.MaterializeStream {
 	return &protoCodec{
-		ctx: ctx,
-		r:   bufio.NewReaderSize(os.Stdin, 1<<21),
-		w:   protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
+		r: bufio.NewReaderSize(os.Stdin, 1<<21),
+		w: protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
 	}
 }
 
 type protoCodec struct {
-	ctx context.Context
-	r   *bufio.Reader
-	w   protoio.Writer
-}
-
-func (c *protoCodec) Context() context.Context {
-	return c.ctx
+	r *bufio.Reader
+	w protoio.Writer
 }
 
 func (c *protoCodec) Send(m *pm.Response) error {
-	return c.SendMsg(m)
+	return c.w.WriteMsg(m)
 }
-func (c *protoCodec) Recv() (*pm.Request, error) {
-	var m = new(pm.Request)
-	if err := c.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-func (c *protoCodec) SendMsg(m interface{}) error {
-	return c.w.WriteMsg(m.(proto.Message))
-}
-func (c *protoCodec) RecvMsg(m interface{}) error {
+
+func (c *protoCodec) RecvMsg(m *pm.Request) error {
 	var lengthBytes [4]byte
 
 	if _, err := io.ReadFull(c.r, lengthBytes[:]); err == io.EOF {
@@ -191,19 +164,10 @@ func (c *protoCodec) RecvMsg(m interface{}) error {
 		return err
 	}
 
-	if err := proto.Unmarshal(b, m.(proto.Message)); err != nil {
+	if err := proto.Unmarshal(b, m); err != nil {
 		return fmt.Errorf("decoding message: %w", err)
 	}
 	return nil
-}
-func (c *protoCodec) SendHeader(metadata.MD) error {
-	panic("SendHeader is not supported")
-}
-func (c *protoCodec) SetHeader(metadata.MD) error {
-	panic("SetHeader is not supported")
-}
-func (c *protoCodec) SetTrailer(metadata.MD) {
-	panic("SetTrailer is not supported")
 }
 
 func (c *protoCodec) peekMessage(size int) ([]byte, error) {
@@ -244,9 +208,8 @@ func (c *protoCodec) peekMessage(size int) ([]byte, error) {
 	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
-func newJsonCodec(ctx context.Context) pm.Connector_MaterializeServer {
+func newJsonCodec() m.MaterializeStream {
 	return &jsonCodec{
-		ctx: ctx,
 		marshaler: jsonpb.Marshaler{
 			EnumsAsInts:  false,
 			EmitDefaults: false,
@@ -263,29 +226,15 @@ func newJsonCodec(ctx context.Context) pm.Connector_MaterializeServer {
 }
 
 type jsonCodec struct {
-	ctx         context.Context
 	marshaler   jsonpb.Marshaler
 	unmarshaler jsonpb.Unmarshaler
 	decoder     *json.Decoder
 }
 
-func (c *jsonCodec) Context() context.Context {
-	return c.ctx
-}
 func (c *jsonCodec) Send(m *pm.Response) error {
-	return c.SendMsg(m)
-}
-func (c *jsonCodec) Recv() (*pm.Request, error) {
-	var m = new(pm.Request)
-	if err := c.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-func (c *jsonCodec) SendMsg(m interface{}) error {
 	var w bytes.Buffer
 
-	if err := c.marshaler.Marshal(&w, m.(proto.Message)); err != nil {
+	if err := c.marshaler.Marshal(&w, m); err != nil {
 		return fmt.Errorf("marshal response to json: %w", err)
 	}
 	_ = w.WriteByte('\n')
@@ -293,16 +242,8 @@ func (c *jsonCodec) SendMsg(m interface{}) error {
 	var _, err = os.Stdout.Write(w.Bytes())
 	return err
 }
-func (c *jsonCodec) RecvMsg(m interface{}) error {
-	m.(proto.Message).Reset()
-	return c.unmarshaler.UnmarshalNext(c.decoder, m.(proto.Message))
-}
-func (c *jsonCodec) SendHeader(metadata.MD) error {
-	panic("SendHeader is not supported")
-}
-func (c *jsonCodec) SetHeader(metadata.MD) error {
-	panic("SetHeader is not supported")
-}
-func (c *jsonCodec) SetTrailer(metadata.MD) {
-	panic("SetTrailer is not supported")
+
+func (c *jsonCodec) RecvMsg(m *pm.Request) error {
+	m.Reset()
+	return c.unmarshaler.UnmarshalNext(c.decoder, m)
 }
