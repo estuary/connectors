@@ -90,8 +90,6 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			"decimal":  {"varchar", "longtext"},
 			"bigint":   {"varchar", "longtext"},
 			"double":   {"varchar", "longtext"},
-			"varchar":  {"date", "time(6)", "datetime(6)"},
-			"longtext": {"date", "time(6)", "datetime(6)"},
 			"date":     {"longtext", "varchar"},
 			"time":     {"longtext", "varchar"},
 			"datetime": {"longtext", "varchar"},

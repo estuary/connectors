@@ -13,9 +13,7 @@ collections:
         dateValue: { type: string }
         datetimeValue: { type: string }
         timeValue: { type: string }
-        dateString: { type: string, format: date }
-        datetimeString: { type: string, format: date-time }
-        timeString: { type: string, format: time }
+        int64: { type: integer, maximum: 9223372036854775808}
       required: [key, scalarValue]
     key: [/key]
     projections:

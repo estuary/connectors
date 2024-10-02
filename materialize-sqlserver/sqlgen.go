@@ -86,9 +86,8 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 
 	return sql.Dialect{
 		MigratableTypes: map[string][]string{
-			"float":     {strings.ToLower(textType), stringType},
-			"bigint":    {strings.ToLower(textType), stringType},
-			stringType:  {"double precision", "bigint", "date", "datetime2", "time"},
+			"float":     {strings.ToLower(textType)},
+			"bigint":    {strings.ToLower(textType)},
 			"date":      {strings.ToLower(textType)},
 			"datetime2": {strings.ToLower(textType)},
 			"time":      {strings.ToLower(textType)},
