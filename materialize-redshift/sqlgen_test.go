@@ -35,7 +35,6 @@ func TestSQLGeneration(t *testing.T) {
 				templates.createDeleteTable,
 				templates.deleteQuery,
 			},
-			TplUpdateFence: templates.updateFence,
 		},
 	)
 
