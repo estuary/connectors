@@ -330,13 +330,14 @@ func RunTransactions(
 
 	// ourCommitOp is a future for the last async startCommit().
 	var ourCommitOp OpFuture = FinishedOperation(nil)
+	var loadCtx, loadCancel = context.WithCancel(ctx)
+	defer loadCancel()
 
 	for round := 0; true; round++ {
 		var (
-			awaitDoneCh         = make(chan struct{}) // Signals await() is done.
-			loadDoneCh          = make(chan struct{}) // Signals load() is done.
-			loadCtx, loadCancel = context.WithCancel(ctx)
-			loadIt              = LoadIterator{stream: stream, request: &rxRequest, awaitDoneCh: awaitDoneCh, ctx: loadCtx}
+			awaitDoneCh = make(chan struct{}) // Signals await() is done.
+			loadDoneCh  = make(chan struct{}) // Signals load() is done.
+			loadIt      = LoadIterator{stream: stream, request: &rxRequest, awaitDoneCh: awaitDoneCh, ctx: loadCtx}
 		)
 
 		if err = ReadAcknowledge(stream, &rxRequest); err != nil {
