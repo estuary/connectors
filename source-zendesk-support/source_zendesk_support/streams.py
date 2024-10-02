@@ -841,15 +841,16 @@ class TicketComments(SourceZendeskSupportTicketEventsExportStream):
             yield record
 
 
-class Groups(SourceZendeskSupportStream):
+class Groups(SourceZendeskSupportCursorPaginationStream):
     """Groups stream: https://developer.zendesk.com/api-reference/ticketing/groups/groups/"""
+
     def request_params(
         self,
-        stream_state: Mapping[str, Any] = None,
+        stream_state: Mapping[str, Any],
+        stream_slice: Mapping[str, Any] = None,
         next_page_token: Mapping[str, Any] = None,
-        **kwargs
     ) -> MutableMapping[str, Any]:
-        params = super().request_params(stream_state=stream_state, next_page_token=next_page_token, **kwargs)
+        params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
         # Zendesk by default excludes deleted groups. To include deleted groups in the API response, we have to
         # use the exclude_deleted query param.
         params.update({"exclude_deleted": False})
