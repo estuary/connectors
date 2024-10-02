@@ -1,11 +1,10 @@
 Base Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
-{"Field":"dateString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"datetimeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
 {"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
@@ -14,17 +13,15 @@ Base Initial Constraints:
 {"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"second_root","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
-{"Field":"timeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
 Migratable Changes Before Apply Schema:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"dateString","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"dateValue","Nullable":"YES","Type":"DATE"}
-{"Name":"datetimeString","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"flow_document","Nullable":"NO","Type":"JSON"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"int64","Nullable":"YES","Type":"BIGINT"}
 {"Name":"key","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"multiple","Nullable":"YES","Type":"JSON"}
 {"Name":"nonScalarValue","Nullable":"YES","Type":"JSON"}
@@ -32,23 +29,21 @@ Migratable Changes Before Apply Schema:
 {"Name":"optional","Nullable":"YES","Type":"JSON"}
 {"Name":"scalarValue","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"second_root","Nullable":"NO","Type":"JSON"}
-{"Name":"timeString","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"timeValue","Nullable":"YES","Type":"TIME"}
 
 
 Migratable Changes Before Apply Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), dateString (VARCHAR), dateValue (DATE), datetimeString (VARCHAR), datetimeValue (TIMESTAMPTZ), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), multiple (VARCHAR), nonScalarValue (VARCHAR), numericString (HUGEINT), optional (VARCHAR), scalarValue (VARCHAR), timeString (VARCHAR), timeValue (TIME), second_root (VARCHAR)
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), numericString (HUGEINT), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), timeValue (TIME), flow_document (VARCHAR)
 
-1, false, 2020-05-05, 2024-01-01 00:00:00 +0000 UTC, 2020-05-05T05:05:05Z, 2024-01-01 01:01:01 +0000 UTC, {}, 2024-09-13 01:01:01 +0000 UTC, <nil>, <nil>, 123, <nil>, test, 05:05:05, 1970-01-01 01:01:01 +0000 UTC, {}
+1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, 123, <nil>, test, {}, 1970-01-01 01:01:01 +0000 UTC, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"dateString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"datetimeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -57,17 +52,15 @@ Migratable Changes Constraints:
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"timeString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Migratable Changes Applied Schema:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"dateString","Nullable":"YES","Type":"DATE"}
 {"Name":"dateValue","Nullable":"YES","Type":"VARCHAR"}
-{"Name":"datetimeString","Nullable":"YES","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"flow_document","Nullable":"NO","Type":"JSON"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"int64","Nullable":"YES","Type":"BIGINT"}
 {"Name":"key","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"multiple","Nullable":"YES","Type":"JSON"}
 {"Name":"nonScalarValue","Nullable":"YES","Type":"JSON"}
@@ -75,12 +68,11 @@ Migratable Changes Applied Schema:
 {"Name":"optional","Nullable":"YES","Type":"JSON"}
 {"Name":"scalarValue","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"second_root","Nullable":"NO","Type":"JSON"}
-{"Name":"timeString","Nullable":"YES","Type":"TIME"}
 {"Name":"timeValue","Nullable":"YES","Type":"VARCHAR"}
 
 
 Migratable Changes Applied Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), dateString (DATE), dateValue (VARCHAR), datetimeString (TIMESTAMPTZ), datetimeValue (VARCHAR), numericString (VARCHAR), timeString (TIME), timeValue (VARCHAR)
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), flow_document (VARCHAR), dateValue (VARCHAR), datetimeValue (VARCHAR), numericString (VARCHAR), timeValue (VARCHAR)
 
-1, false, {}, 2024-09-13 01:01:01 +0000 UTC, <nil>, <nil>, <nil>, test, {}, 2020-05-05 00:00:00 +0000 UTC, 2024-01-01, 2020-05-05 05:05:05 +0000 UTC, 2023-12-31 20:01:01-05, 123, 1970-01-01 05:05:05 +0000 UTC, 01:01:01
+1, false, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, {}, {}, 2024-01-01, 2023-12-31 20:01:01-05, 123, 01:01:01
 

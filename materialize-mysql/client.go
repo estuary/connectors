@@ -103,24 +103,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, "def", resourcePaths)
 }
 
-func formatOffset(loc *time.Location) string {
-	now := time.Now().In(loc)
-	_, offset := now.Zone()
-
-	sign := "+"
-	if offset < 0 {
-		sign = "-"
-		offset = -offset
-	}
-	hours := offset / 3600
-	minutes := (offset % 3600) / 60
-	return fmt.Sprintf("%s%02d:%02d", sign, hours, minutes)
-}
-
-func castRfc3339ToDateTime(loc *time.Location, identifier string) string {
-	return fmt.Sprintf("CONVERT_TZ(STR_TO_DATE(SUBSTRING(%s, 1, 19), '%%Y-%%m-%%dT%%H:%%i:%%s'), '+00:00', '%s')", identifier, formatOffset(loc))
-}
-
 func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigrationStep {
 	return []sql.ColumnMigrationStep{
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
@@ -131,16 +113,11 @@ func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigration
 			), nil
 		},
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-			// Migrating from string to datetime
-			var cast = migration.Identifier
-			if migration.DDL == "DATETIME(6)" {
-				cast = castRfc3339ToDateTime(c.tzLocation, migration.Identifier)
-			}
 			return fmt.Sprintf(
 				"UPDATE %s SET %s = %s;",
 				table.Identifier,
 				tempColumnIdentifier,
-				cast,
+				migration.Identifier,
 			), nil
 		},
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {

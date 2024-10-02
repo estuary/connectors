@@ -54,7 +54,6 @@ var pgDialect = func() sql.Dialect {
 			"numeric":                  {"text"},
 			"integer":                  {"text"},
 			"double precision":         {"text"},
-			"text":                     {"decimal", "numeric", "double precision", "date", "time", "timestamptz"},
 			"date":                     {"text"},
 			"time without time zone":   {"text"},
 			"timestamp with time zone": {"text"},
