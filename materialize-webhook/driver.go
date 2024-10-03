@@ -123,10 +123,10 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return &pm.Response_Applied{}, nil
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var addresses []*url.URL
@@ -135,7 +135,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 		// Join paths of each binding with the base URL.
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
+			return nil, nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		addresses = append(addresses, cfg.Address.URL().ResolveReference(res.URL()))
 	}
@@ -143,7 +143,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 	var transactor = &transactor{
 		addresses: addresses,
 	}
-	return transactor, &pm.Response_Opened{}, nil
+	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 type transactor struct {

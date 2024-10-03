@@ -10,7 +10,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
-	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -19,8 +18,6 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
 )
-
-var _ m.DelayedCommitter = (*transactor)(nil)
 
 type transactor struct {
 	fence *sql.Fence
@@ -31,7 +28,6 @@ type transactor struct {
 	bucket     string
 
 	bindings []*binding
-	sched    schedule.Schedule
 }
 
 func newTransactor(
@@ -41,12 +37,12 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-) (_ m.Transactor, err error) {
+) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	cfg := ep.Config.(*config)
 
 	client, err := cfg.client(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	t := &transactor{
@@ -55,12 +51,6 @@ func newTransactor(
 		client:     client,
 		bucketPath: cfg.BucketPath,
 		bucket:     cfg.Bucket,
-	}
-
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.ProjectID+cfg.Dataset)); err != nil {
-		return nil, err
-	} else if useSched {
-		t.sched = sched
 	}
 
 	for _, binding := range bindings {
@@ -80,7 +70,7 @@ func newTransactor(
 		// have been created differently due to evolution of the dialect's column types.
 		meta, err := client.bigqueryClient.DatasetInProject(cfg.ProjectID, dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("getting table metadata: %w", err)
+			return nil, nil, fmt.Errorf("getting table metadata: %w", err)
 		}
 
 		log.WithFields(log.Fields{
@@ -95,11 +85,19 @@ func newTransactor(
 		}
 
 		if err = t.addBinding(binding, fieldSchemas); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
 
-	return t, nil
+	opts := &boilerplate.MaterializeOptions{
+		ExtendedLogging: true,
+		AckSchedule: &boilerplate.AckScheduleOption{
+			Config: cfg.Schedule,
+			Jitter: []byte(cfg.ProjectID + cfg.Dataset),
+		},
+	}
+
+	return t, opts, nil
 }
 
 func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema) error {
@@ -157,13 +155,6 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	}
 
 	return s, nil
-}
-
-func (t *transactor) Schedule() (schedule.Schedule, bool) {
-	if t.sched != nil {
-		return t.sched, true
-	}
-	return nil, false
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }

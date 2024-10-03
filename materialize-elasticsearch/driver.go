@@ -460,20 +460,20 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	}, is, true)
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	client, err := cfg.toClient(false)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating client: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating client: %w", err)
 	}
 
 	isServerless, err := client.isServerless(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting serverless status: %w", err)
+		return nil, nil, nil, fmt.Errorf("getting serverless status: %w", err)
 	}
 	if isServerless {
 		log.Info("connected to a serverless elasticsearch cluster")
@@ -484,7 +484,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	for idx, b := range open.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
+			return nil, nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
 		allFields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
@@ -494,7 +494,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		for idx, field := range allFields {
 			fields = append(fields, translateField(field))
 			if prop, err := propForField(field, b); err != nil {
-				return nil, nil, err
+				return nil, nil, nil, err
 			} else if prop.Type == elasticTypeDouble {
 				floatFields[idx] = true
 			}
@@ -517,7 +517,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		isServerless:   isServerless,
 		indexToBinding: indexToBinding,
 	}
-	return transactor, &pm.Response_Opened{}, nil
+	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 var (

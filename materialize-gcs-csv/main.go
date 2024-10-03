@@ -3,9 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io"
-	"time"
 
 	"github.com/estuary/connectors/filesink"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -30,16 +28,10 @@ func (c config) Validate() error {
 }
 
 func (c config) CommonConfig() filesink.CommonConfig {
-	interval, err := time.ParseDuration(c.UploadInterval)
-	if err != nil {
-		// Validated to parse in (config).Validate, so this should never fail.
-		panic(fmt.Errorf("failed to parse UploadInterval: %w", err))
-	}
-
 	return filesink.CommonConfig{
 		Prefix:         c.Prefix,
 		Extension:      ".csv.gz",
-		UploadInterval: interval,
+		UploadInterval: c.UploadInterval,
 		FileSizeLimit:  c.FileSizeLimit,
 	}
 }
