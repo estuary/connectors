@@ -55,7 +55,7 @@ const (
 	sentAcknowledged
 )
 
-type auxStream struct {
+type transactionsStream struct {
 	ctx     context.Context
 	stream  m.MaterializeStream
 	handler func(transactionsEvent)
@@ -66,15 +66,15 @@ type auxStream struct {
 	storedHistory []int
 }
 
-// newAuxStream wraps a base stream MaterializeStream with extra capabilities
-// via specific handling for events.
-func newAuxStream(
+// newTransactionsStream wraps a base stream MaterializeStream with extra
+// capabilities via specific handling for events.
+func newTransactionsStream(
 	ctx context.Context,
 	stream m.MaterializeStream,
 	lvl log.Level,
 	options MaterializeOptions,
-) (*auxStream, error) {
-	s := &auxStream{stream: stream, ctx: ctx}
+) (*transactionsStream, error) {
+	s := &transactionsStream{stream: stream, ctx: ctx}
 
 	var loggingHandler func(transactionsEvent)
 	if options.ExtendedLogging || lvl > log.InfoLevel {
@@ -106,7 +106,7 @@ func newAuxStream(
 
 // storedHistoryHandler updates the stored history accounting for calculating an
 // acknowledgement delay if an ackSchedule is configured.
-func (l *auxStream) storedHistoryHandler(delegate func(transactionsEvent)) func(transactionsEvent) {
+func (l *transactionsStream) storedHistoryHandler(delegate func(transactionsEvent)) func(transactionsEvent) {
 	var count int
 
 	return func(event transactionsEvent) {
@@ -132,7 +132,7 @@ func (l *auxStream) storedHistoryHandler(delegate func(transactionsEvent)) func(
 	}
 }
 
-func (l *auxStream) Send(m *pm.Response) error {
+func (l *transactionsStream) Send(m *pm.Response) error {
 	if m.Loaded != nil {
 		l.handler(sentLoaded)
 	} else if m.Flushed != nil {
@@ -149,7 +149,7 @@ func (l *auxStream) Send(m *pm.Response) error {
 	return l.stream.Send(m)
 }
 
-func (l *auxStream) RecvMsg(m *pm.Request) error {
+func (l *transactionsStream) RecvMsg(m *pm.Request) error {
 	if err := l.stream.RecvMsg(m); err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func (l *auxStream) RecvMsg(m *pm.Request) error {
 	return nil
 }
 
-func (l *auxStream) maybeDelayAcknowledgement() error {
+func (l *transactionsStream) maybeDelayAcknowledgement() error {
 	// lastAckTime at a zero value means this is the recovery commit, and we
 	// never delay on the recovery commit.
 	if l.ackSchedule != nil && !l.lastAckTime.IsZero() {
