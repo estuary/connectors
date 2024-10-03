@@ -34,7 +34,7 @@ Migratable Changes Before Apply Schema:
 Migratable Changes Before Apply Data:
 key (VARCHAR), _meta/flow_truncated (BOOL), datevalue (DATE), datetimevalue (TIMESTAMPTZ), flow_published_at (TIMESTAMPTZ), int64 (INT8), multiple (4000), nonscalarvalue (4000), numericstring (NUMERIC), optional (4000), scalarvalue (VARCHAR), timevalue (VARCHAR), flow_document (4000)
 
-1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01 +0000 GMT, 2024-09-13 02:01:01 +0100 IST, 1, <nil>, <nil>, 123, <nil>, test, 01:01:01, "{}"
+1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111 +0000 GMT, 2024-09-13 02:01:01 +0100 IST, 1, <nil>, <nil>, 123, <nil>, test, 01:01:01, "{}"
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -72,5 +72,5 @@ Migratable Changes Applied Schema:
 Migratable Changes Applied Data:
 key (VARCHAR), _meta/flow_truncated (BOOL), datevalue (TIMESTAMPTZ), datetimevalue (INT8), flow_published_at (4000), int64 (4000), multiple (4000), nonscalarvalue (VARCHAR), numericstring (VARCHAR), optional (4000), scalarvalue (VARCHAR), timevalue (VARCHAR), flow_document (VARCHAR)
 
-1, false, 2024-09-13 02:01:01 +0100 IST, 1, <nil>, <nil>, <nil>, test, 01:01:01, "{}", 2024-01-01, 2024-01-01 01:01:01+00, 123
+1, false, 2024-09-13 02:01:01 +0100 IST, 1, <nil>, <nil>, <nil>, test, 01:01:01, "{}", 2024-01-01, 2024-01-01T01:01:01.111111Z, 123
 

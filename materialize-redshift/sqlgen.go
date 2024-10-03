@@ -97,13 +97,13 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 	}
 
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"numeric":                  {"text"},
-			"bigint":                   {"text"},
-			"double precision":         {"text"},
-			"date":                     {"text"},
-			"time without time zone":   {"text"},
-			"timestamp with time zone": {"text"},
+		MigratableTypes: sql.MigrationSpecs{
+			"numeric":                  {sql.NewMigrationSpec([]string{"text"})},
+			"bigint":                   {sql.NewMigrationSpec([]string{"text"})},
+			"double precision":         {sql.NewMigrationSpec([]string{"text"})},
+			"date":                     {sql.NewMigrationSpec([]string{"text"})},
+			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
+			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -144,6 +144,10 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 		MaxColumnCharLength:    0, // Redshift automatically truncates column names that are too long
 		CaseInsensitiveColumns: true,
 	}
+}
+
+func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, migration.Identifier)
 }
 
 type copyFromS3Params struct {

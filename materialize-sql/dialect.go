@@ -22,7 +22,7 @@ type Dialect struct {
 	// MigratableTypes is a mapp of current column DDL as key, and a slice of DDLs
 	// which the key type can be migrated to.
 	// For example, "decimal": {"string"} means decimal columns can be migrated to string type
-	MigratableTypes map[string][]string
+	MigratableTypes MigrationSpecs
 }
 
 // TableLocatorer produces an InfoTableLocation for a given path.

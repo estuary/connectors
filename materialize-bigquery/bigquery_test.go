@@ -126,6 +126,15 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			values = append(values, "'2024-09-13 01:01:01'")
 			keys = append(keys, bqDialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
+
+			// bigquery does not support more than 6 fractional second precision, and will fail if we try
+			// to insert a value with 9
+			for i, _ := range values {
+				if keys[i] == "datetimeValue" {
+					values[i] = "'2024-01-01 01:01:01.111111'"
+				}
+			}
+
 			_, err = client.query(ctx, fmt.Sprintf(
 				"insert into %s (%s) VALUES (%s);",
 				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","),

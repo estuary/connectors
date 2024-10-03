@@ -208,6 +208,7 @@ func (a *sqlApplier) DeleteResource(ctx context.Context, path []string) (string,
 
 type ColumnTypeMigration struct {
 	Column
+	MigrationSpec
 	ProgressColumnExists bool
 	OriginalColumnExists bool
 }
@@ -242,7 +243,7 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		}
 
 		if a.is.HasField(table.Path, col.Field+ColumnMigrationTemporarySuffix) {
-			// At this stage we don't have the MappedType anymore, but it's okay because if we don't have the original column anymore
+			// At this stage we don't have the target MappedType anymore, but it's okay because if we don't have the original column anymore
 			// (hence the new projection), it means we have already created the new column and set its value.
 			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, ColumnTypeMigration{
 				Column:               col,
@@ -268,7 +269,7 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 			return "", nil, fmt.Errorf("checking compatibility of %q: %w", proposed.Field, err)
 		}
 
-		migratable, err := a.constrainter.migratable(existing, &proposed, rawFieldConfig)
+		migratable, migrationSpec, err := a.constrainter.migratable(existing, &proposed, rawFieldConfig)
 		if err != nil {
 			return "", nil, fmt.Errorf("checking migratability of %q: %w", proposed.Field, err)
 		}
@@ -281,6 +282,7 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 			}
 			var m = ColumnTypeMigration{
 				Column:               col,
+				MigrationSpec:        *migrationSpec,
 				OriginalColumnExists: true,
 				ProgressColumnExists: a.is.HasField(table.Path, col.Field+ColumnMigrationTemporarySuffix),
 			}

@@ -101,7 +101,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 			"UPDATE %s SET %s = %s;",
 			table.Identifier,
 			tempColumnIdentifier,
-			migration.Identifier,
+			migration.CastSQL(migration),
 		), nil
 	},
 	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {

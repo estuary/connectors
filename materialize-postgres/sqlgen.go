@@ -54,13 +54,13 @@ var pgDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"numeric":                  {"text"},
-			"integer":                  {"text"},
-			"double precision":         {"text"},
-			"date":                     {"text"},
-			"time without time zone":   {"text"},
-			"timestamp with time zone": {"text"},
+		MigratableTypes: sql.MigrationSpecs{
+			"numeric":                  {sql.NewMigrationSpec([]string{"text"})},
+			"integer":                  {sql.NewMigrationSpec([]string{"text"})},
+			"double precision":         {sql.NewMigrationSpec([]string{"text"})},
+			"date":                     {sql.NewMigrationSpec([]string{"text"})},
+			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
+			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -98,6 +98,10 @@ type loadTableKey struct {
 type loadTableColumns struct {
 	Binding int
 	Keys    []loadTableKey
+}
+
+func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, migration.Identifier)
 }
 
 var (
