@@ -8,10 +8,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
-	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -28,7 +26,7 @@ type Config interface {
 type CommonConfig struct {
 	Prefix         string
 	Extension      string
-	UploadInterval time.Duration
+	UploadInterval string
 	FileSizeLimit  int
 }
 
@@ -119,15 +117,15 @@ func (d FileDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	store, err := d.NewStore(ctx, driverCfg)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	bindings := make([]binding, 0, len(open.Materialization.Bindings))
@@ -137,7 +135,7 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.
 
 		var res resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		bindings = append(bindings, binding{
@@ -153,11 +151,19 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.
 		})
 	}
 
+	opts := &boilerplate.MaterializeOptions{
+		AckSchedule: &boilerplate.AckScheduleOption{
+			Config: boilerplate.ScheduleConfig{
+				SyncFrequency: driverCfg.CommonConfig().UploadInterval,
+			},
+		},
+	}
+
 	return &transactor{
 		bindings: bindings,
 		store:    store,
 		common:   driverCfg.CommonConfig(),
-	}, &pm.Response_Opened{}, nil
+	}, &pm.Response_Opened{}, opts, nil
 }
 
 type connectorState struct {
@@ -212,12 +218,6 @@ func (t *transactor) nextFileKey(b binding) string {
 		fmt.Sprintf("v%010d", b.backfill), // 10 digits to hold the largest possible uint32
 		fmt.Sprintf("%020d%s", next, t.common.Extension), // 20 digits to hold the largest possible uint64
 	)
-}
-
-// Schedule implements the DelayedCommitter interface, which is used to upload
-// files at the desired interval.
-func (t *transactor) Schedule() (schedule.Schedule, bool) {
-	return schedule.NewPeriodicSchedule(t.common.UploadInterval), true
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
