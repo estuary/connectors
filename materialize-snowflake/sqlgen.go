@@ -275,7 +275,7 @@ WHEN MATCHED THEN
 {{- if $.Table.Document -}}
 {{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 {{- end }}
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED and r.{{ $.Table.Document.Identifier }}!='delete' THEN
 	INSERT (
 	{{- range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
