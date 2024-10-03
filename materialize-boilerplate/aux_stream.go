@@ -1,10 +1,13 @@
 package boilerplate
 
 import (
+	"context"
+	"fmt"
 	"sync"
 	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/connectors/go/schedule"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
@@ -17,6 +20,22 @@ const (
 	// progress or how long the connector must be waiting for documents from the
 	// runtime before it logs something about that.
 	slowOperationThreshold = 15 * time.Second
+
+	// storeThreshold is a somewhat crude indication that a transaction was
+	// likely part of a backfill vs. a smaller incremental streaming
+	// transaction. If a materialization is configured with a commit delay, it
+	// should only apply that delay to transactions that occur after it has
+	// fully backfilled from the collection. The idea is that if a transaction
+	// stored a lot of documents it's probably part of a backfill.
+	storeThreshold = 1_000_000
+
+	// The number of transactions we will look back at for determining if an
+	// acknowledgement delay should be applied. The number of documents stored
+	// for all of these transactions must be below storeThreshold for the delay
+	// to apply. This is used to estimate if we are in a "streaming" mode or
+	// not, based on a consistent number of documents per transactions being
+	// below the threshold.
+	storedHistorySize = 5
 )
 
 // transactionsEvent represents one of the many interesting things that can
@@ -32,33 +51,85 @@ const (
 	sentLoaded
 	sentFlushed
 	sentStartedCommit
+	startedAckDelay
 	sentAcknowledged
 )
 
 type auxStream struct {
+	ctx     context.Context
 	stream  m.MaterializeStream
 	handler func(transactionsEvent)
+
+	// Variables used for handling acknowledgement delays when configured.
+	ackSchedule   schedule.Schedule
+	lastAckTime   time.Time
+	storedHistory []int
 }
 
 // newAuxStream wraps a base stream MaterializeStream with extra capabilities
 // via specific handling for events.
-func newAuxStream(stream m.MaterializeStream, lvl log.Level, options MaterializeOptions) *auxStream {
-	s := &auxStream{stream: stream}
+func newAuxStream(
+	ctx context.Context,
+	stream m.MaterializeStream,
+	lvl log.Level,
+	options MaterializeOptions,
+) (*auxStream, error) {
+	s := &auxStream{stream: stream, ctx: ctx}
 
-	if options.ExtendedLogging {
+	var loggingHandler func(transactionsEvent)
+	if options.ExtendedLogging || lvl > log.InfoLevel {
 		l := newExtendedLogger(log.InfoLevel)
-		s.handler = l.handler()
-	} else if lvl > log.InfoLevel {
-		// If debug logging (or a more verbose level) is enabled, log extended
-		// events at the configured level.
-		l := newExtendedLogger(lvl)
-		s.handler = l.handler()
+		loggingHandler = l.handler()
 	} else {
 		l := newBasicLogger()
-		s.handler = l.handler()
+		loggingHandler = l.handler()
 	}
 
-	return s
+	if options.AckSchedule != nil {
+		sched, err := createSchedule(options.AckSchedule.Config, options.AckSchedule.Jitter)
+		if err != nil {
+			return nil, fmt.Errorf("creating ack schedule: %w", err)
+		}
+		s.ackSchedule = sched
+	}
+
+	// ackSchedule may be `nil` even if options.AckSchedule was not if the
+	// configuration calls for an explicit 0 syncFrequency.
+	if s.ackSchedule != nil {
+		s.handler = s.storedHistoryHandler(loggingHandler)
+	} else {
+		s.handler = loggingHandler
+	}
+
+	return s, nil
+}
+
+// storedHistoryHandler updates the stored history accounting for calculating an
+// acknowledgement delay if an ackSchedule is configured.
+func (l *auxStream) storedHistoryHandler(delegate func(transactionsEvent)) func(transactionsEvent) {
+	var count int
+
+	return func(event transactionsEvent) {
+		switch event {
+		case readStore:
+			count++
+		case readStartCommit:
+			// It is possible to have commits with 0 Store requests, and those
+			// will be ignored for this calculation. The only time I've seen
+			// this happen is when a connector first starts up and has a
+			// `notBefore` that causes it to skip reading a large amount of
+			// journal data. It would not be appropriate to delay further
+			// commits in that case.
+			if count > 0 {
+				l.storedHistory = append(l.storedHistory, count)
+				if len(l.storedHistory) > storedHistorySize {
+					l.storedHistory = l.storedHistory[1:]
+				}
+				count = 0
+			}
+		}
+		delegate(event)
+	}
 }
 
 func (l *auxStream) Send(m *pm.Response) error {
@@ -69,6 +140,9 @@ func (l *auxStream) Send(m *pm.Response) error {
 	} else if m.StartedCommit != nil {
 		l.handler(sentStartedCommit)
 	} else if m.Acknowledged != nil {
+		if err := l.maybeDelayAcknowledgement(); err != nil {
+			return err
+		}
 		l.handler(sentAcknowledged)
 	}
 
@@ -95,6 +169,47 @@ func (l *auxStream) RecvMsg(m *pm.Request) error {
 	return nil
 }
 
+func (l *auxStream) maybeDelayAcknowledgement() error {
+	// lastAckTime at a zero value means this is the recovery commit, and we
+	// never delay on the recovery commit.
+	if l.ackSchedule != nil && !l.lastAckTime.IsZero() {
+		aboveThreshold := false
+		for _, v := range l.storedHistory {
+			if v >= storeThreshold {
+				aboveThreshold = true
+				break
+			}
+		}
+
+		nextAckAt := l.ackSchedule.Next(l.lastAckTime)
+		d := time.Until(nextAckAt)
+
+		ll := log.WithFields(log.Fields{
+			"lastAckTime":      l.lastAckTime.UTC().Truncate(time.Second).String(),
+			"nextScheduledAck": nextAckAt.UTC().Truncate(time.Second).String(),
+			"storedHistory":    l.storedHistory,
+		})
+
+		if aboveThreshold {
+			ll.Info("not delaying commit acknowledgement based on stored history")
+		} else if d <= 0 {
+			ll.Info("not delaying commit acknowledgement since current time is after next scheduled acknowledgement")
+		} else {
+			l.handler(startedAckDelay)
+			ll.WithField("delay", d.Truncate(time.Second).String()).Info("delaying before acknowledging commit")
+
+			select {
+			case <-l.ctx.Done():
+				return l.ctx.Err()
+			case <-time.After(d):
+			}
+		}
+	}
+
+	l.lastAckTime = time.Now()
+	return nil
+}
+
 type basicLogger struct {
 	mu                  sync.Mutex
 	round               int
@@ -103,6 +218,7 @@ type basicLogger struct {
 	readStores          int
 	waitingForDocsStart time.Time
 	commitStart         time.Time
+	ackDelayActive      bool
 }
 
 // newBasicLogger creates a logger that periodically logs some basic information
@@ -133,8 +249,8 @@ func (l *basicLogger) runLogger() {
 
 			if !l.waitingForDocsStart.IsZero() && time.Since(l.waitingForDocsStart) > slowOperationThreshold {
 				ll.Info("waiting for documents")
-			} else if !l.commitStart.IsZero() && time.Since(l.commitStart) > slowOperationThreshold {
-				ll.WithField("started", l.commitStart.UTC().String()).Info("materialization commit has been running for a long time")
+			} else if !l.ackDelayActive && !l.commitStart.IsZero() && time.Since(l.commitStart) > slowOperationThreshold {
+				ll.WithField("started", l.commitStart.UTC().Truncate(time.Second).String()).Info("materialization commit has been running for a long time")
 			} else {
 				ll.Info("materialization progress")
 			}
@@ -166,19 +282,19 @@ func (l *basicLogger) handler() func(transactionsEvent) {
 			loadPhaseStarted = false
 			l.commitStart = time.Now()
 			l.round++
-
 		case readAcknowledge:
 			if recovery {
 				l.commitStart = time.Now()
 			}
-
+		case startedAckDelay:
+			l.ackDelayActive = true
 		case sentAcknowledged:
 			if !loadPhaseStarted {
 				l.waitingForDocsStart = time.Now()
 			}
 			l.commitStart = time.Time{}
 			recovery = false
-
+			l.ackDelayActive = false
 		case readLoad, readFlush:
 			l.waitingForDocsStart = time.Time{}
 			loadPhaseStarted = true
@@ -199,6 +315,7 @@ type extendedLogger struct {
 	readingStoresStart  time.Time
 	commitStart         time.Time
 	waitingForDocsStart time.Time
+	ackDelayStart       time.Time
 }
 
 // newExtendedLogger returns a logger than logs detailed information about the
@@ -252,6 +369,7 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 	var stopStoreLogger func(logCb)
 	var stopWaitingForDocsLogger func(logCb)
 	var loadPhaseStarted bool
+	var ackDelayActive bool
 	var recovery = true
 
 	return func(event transactionsEvent) {
@@ -274,12 +392,10 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 		case sentStartedCommit:
 			loadPhaseStarted = false
 			l.round++
-
 		case sentAcknowledged:
 			if !loadPhaseStarted {
 				stopWaitingForDocsLogger = l.logAsync(l.waitingForDocsLogFn())
 			}
-
 		case readLoad, readFlush:
 			if !l.waitingForDocsStart.IsZero() {
 				stopWaitingForDocsLogger(l.finishedWaitingForDocsLogFn())
@@ -327,10 +443,18 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 			if recovery {
 				stopStoreLogger = l.logAsync(l.runningRecoveryCommitLogFn())
 			}
+		case startedAckDelay:
+			// NB: Ack delay is never used for the recovery commit.
+			stopStoreLogger(l.finishedCommitLogFn(l.round - 1))
+			stopStoreLogger = l.logAsync(l.waitingForAckDelayLogFn(l.round - 1))
+			ackDelayActive = true
 		case sentAcknowledged:
 			if recovery {
 				stopStoreLogger(l.finishedRecoveryCommitLogFn())
 				recovery = false
+			} else if ackDelayActive {
+				stopStoreLogger(l.finishedAckDelayLogFn(l.round - 1))
+				ackDelayActive = false
 			} else {
 				stopStoreLogger(l.finishedCommitLogFn(l.round - 1))
 			}
@@ -427,6 +551,24 @@ func (l *extendedLogger) finishedCommitLogFn(round int) logCb {
 			"round": round,
 			"took":  time.Since(l.commitStart).String(),
 		}).Log(l.lvl, "finished materialization commit")
+	}
+}
+
+func (l *extendedLogger) waitingForAckDelayLogFn(round int) logCb {
+	l.ackDelayStart = time.Now()
+	return func() {
+		log.WithFields(log.Fields{
+			"round": round,
+		}).Log(l.lvl, "waiting to acknowledge materialization commit")
+	}
+}
+
+func (l *extendedLogger) finishedAckDelayLogFn(round int) logCb {
+	return func() {
+		log.WithFields(log.Fields{
+			"round": round,
+			"took":  time.Since(l.ackDelayStart).String(),
+		}).Log(l.lvl, "acknowledged materialization commit after configured delay")
 	}
 }
 
