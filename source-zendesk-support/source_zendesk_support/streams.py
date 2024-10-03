@@ -932,6 +932,7 @@ class TicketMetricEvents(SourceZendeskSupportCursorPaginationStream):
     TicketMetricEvents stream: https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_metric_events/
     """
 
+    state_checkpoint_interval = 1000
     cursor_field = "time"
     page_size = 1000
 
