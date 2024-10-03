@@ -82,7 +82,7 @@ SELECT 0, `a-schema`.key_value.flow_document
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.`integerGt64Bit` = r.`integerGt64Bit`, l.`integerWithUserDDL` = r.`integerWithUserDDL`, l.multiple = r.multiple, l.number = r.number, l.`numberCastToString` = r.`numberCastToString`, l.object = r.object, l.string = r.string, l.`stringInteger` = r.`stringInteger`, l.`stringInteger39Chars` = r.`stringInteger39Chars`, l.`stringInteger66Chars` = r.`stringInteger66Chars`, l.`stringNumber` = r.`stringNumber`, l.flow_document = r.flow_document
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r.flow_document!='"delete"' THEN
 		INSERT (key1, key2, `key!binary`, array, binary, boolean, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
 		VALUES (r.key1, r.key2, r.`key!binary`, r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.`integerGt64Bit`, r.`integerWithUserDDL`, r.multiple, r.number, r.`numberCastToString`, r.object, r.string, r.`stringInteger`, r.`stringInteger39Chars`, r.`stringInteger66Chars`, r.`stringNumber`, r.flow_document);
 --- End `a-schema`.key_value mergeInto ---
@@ -99,32 +99,6 @@ SELECT 0, `a-schema`.key_value.flow_document
 	COPY_OPTIONS ( 'mergeSchema' = 'true' )
   ;
 --- End `a-schema`.key_value copyIntoDirect ---
-
---- Begin `a-schema`.delta_updates loadQuery ---
-SELECT -1, ""
---- End `a-schema`.delta_updates loadQuery ---
-
---- Begin `a-schema`.delta_updates mergeInto ---
-	MERGE INTO `a-schema`.delta_updates AS l
-	USING (
-		(
-			SELECT
-			`theKey`::STRING, `aValue`::LONG, flow_published_at::TIMESTAMP
-			FROM json.`file1`
-		)
-		 UNION ALL (
-			SELECT
-			`theKey`::STRING, `aValue`::LONG, flow_published_at::TIMESTAMP
-			FROM json.`file2`
-		)
-	) AS r
-	ON l.`theKey` = r.`theKey`
-	WHEN MATCHED THEN
-		UPDATE SET l.`aValue` = r.`aValue`, l.flow_published_at = r.flow_published_at
-	WHEN NOT MATCHED THEN
-		INSERT (`theKey`, `aValue`, flow_published_at)
-		VALUES (r.`theKey`, r.`aValue`, r.flow_published_at);
---- End `a-schema`.delta_updates mergeInto ---
 
 --- Begin `a-schema`.delta_updates copyIntoDirect ---
 	COPY INTO `a-schema`.delta_updates FROM (

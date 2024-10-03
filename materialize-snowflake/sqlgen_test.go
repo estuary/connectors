@@ -34,23 +34,41 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	)
 
-	for _, tbl := range tables {
-		for _, tpl := range []*template.Template{
-			templates.loadQuery,
-			templates.copyInto,
-			templates.mergeInto,
-		} {
-			var testcase = tbl.Identifier + " " + tpl.Name()
+	for _, tpl := range []*template.Template{
+		templates.loadQuery,
+		templates.copyInto,
+		templates.mergeInto,
+	} {
+		tbl := tables[0]
+		require.False(t, tbl.DeltaUpdates)
+		var testcase = tbl.Identifier + " " + tpl.Name()
 
-			var tf = tableAndFile{
-				Table: tbl,
-				File:  "test-file",
-			}
-
-			snap.WriteString("--- Begin " + testcase + " ---")
-			require.NoError(t, tpl.Execute(snap, &tf))
-			snap.WriteString("--- End " + testcase + " ---\n\n")
+		var tf = tableAndFile{
+			Table: tbl,
+			File:  "test-file",
 		}
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &tf))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
+	for _, tpl := range []*template.Template{
+		templates.copyInto,
+	} {
+		tbl := tables[1]
+		require.True(t, tbl.DeltaUpdates)
+		require.Nil(t, tbl.Document)
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		var tf = tableAndFile{
+			Table: tbl,
+			File:  "test-file",
+		}
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &tf))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
 	cupaloy.SnapshotT(t, snap.String())
