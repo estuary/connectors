@@ -111,7 +111,7 @@ type Endpoint struct {
 	// which will be parsed into and validated from a resource configuration.
 	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
-	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open, is *boilerplate.InfoSchema) (m.Transactor, error)
+	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open, is *boilerplate.InfoSchema) (m.Transactor, *boilerplate.MaterializeOptions, error)
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy

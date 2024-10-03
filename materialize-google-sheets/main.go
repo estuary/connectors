@@ -236,20 +236,20 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return &pm.Response_Applied{ActionDescription: description}, nil
 }
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var checkpoint driverCheckpoint
 	if err := pf.UnmarshalStrict(open.StateJson, &checkpoint); err != nil {
-		return nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing driver checkpoint: %w", err)
 	}
 
 	svc, err := cfg.buildService(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	states, err := loadSheetStates(
@@ -258,11 +258,11 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 		cfg.spreadsheetID(),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("recovering sheet states: %w", err)
+		return nil, nil, nil, fmt.Errorf("recovering sheet states: %w", err)
 	}
 
 	if err := writeSheetSentinels(ctx, svc, cfg.spreadsheetID(), states); err != nil {
-		return nil, nil, fmt.Errorf("writing sheet sentinels: %w", err)
+		return nil, nil, nil, fmt.Errorf("writing sheet sentinels: %w", err)
 	}
 
 	bindings, err := buildTransactorBindings(
@@ -271,11 +271,11 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 		states,
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	if err := writeSheetHeaders(ctx, svc, cfg.spreadsheetID(), bindings); err != nil {
-		return nil, nil, fmt.Errorf("writing sheet headers: %w", err)
+		return nil, nil, nil, fmt.Errorf("writing sheet headers: %w", err)
 	}
 
 	var transactor = &transactor{
@@ -284,7 +284,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 		round:         checkpoint.Round,
 		spreadsheetId: cfg.spreadsheetID(),
 	}
-	return transactor, &pm.Response_Opened{}, nil
+	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 func main() { boilerplate.RunMain(new(driver)) }

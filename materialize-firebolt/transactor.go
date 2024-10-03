@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/firebolt"
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -22,10 +23,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	var fb, err = firebolt.New(firebolt.Config{
@@ -35,14 +36,14 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 		Password:  cfg.Password,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating firebolt client: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating firebolt client: %w", err)
 	}
 
 	var bindings []*binding
 	for _, b := range open.Materialization.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return nil, nil, fmt.Errorf("parsing resource config: %w", err)
+			return nil, nil, nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 		bindings = append(bindings,
 			&binding{
@@ -53,7 +54,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 
 	queries, err := schemalate.GetQueriesBundle(open.Materialization)
 	if err != nil {
-		return nil, nil, fmt.Errorf("building firebolt search schema: %w", err)
+		return nil, nil, nil, fmt.Errorf("building firebolt search schema: %w", err)
 	}
 
 	var transactor = &transactor{
@@ -67,7 +68,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transa
 		prefix:       strings.TrimLeft(fmt.Sprintf("%s/%s/", CleanPrefix(cfg.S3Prefix), open.Materialization.Name), "/"),
 	}
 
-	return transactor, &pm.Response_Opened{}, nil
+	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 type binding struct {

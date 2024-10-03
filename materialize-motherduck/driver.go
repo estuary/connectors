@@ -199,22 +199,22 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-) (_ m.Transactor, err error) {
+) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	cfg := ep.Config.(*config)
 
 	s3client, err := cfg.toS3Client(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	db, err := cfg.db(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	conn, err := db.Conn(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("creating connection: %w", err)
+		return nil, nil, fmt.Errorf("creating connection: %w", err)
 	}
 
 	t := &transactor{
@@ -232,7 +232,7 @@ func newTransactor(
 		})
 	}
 
-	return t, nil
+	return t, nil, nil
 }
 
 type binding struct {

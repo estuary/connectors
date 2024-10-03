@@ -8,7 +8,6 @@ import (
 	"net/url"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
-	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -148,7 +147,6 @@ type transactor struct {
 	}
 	bindings   []*binding
 	s3Operator *S3Operator
-	sched      schedule.Schedule
 }
 
 func newTransactor(
@@ -158,43 +156,46 @@ func newTransactor(
 	tables []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-) (_ m.Transactor, err error) {
+) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 	var templates = renderTemplates(starburstTrinoDialect)
 
 	var transactor = &transactor{
 		cfg: cfg,
 	}
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Account)); err != nil {
-		return nil, err
-	} else if useSched {
-		transactor.sched = sched
-	}
 
 	// Establish connections.
 	transactor.load.conn, err = connectToDb(ctx, cfg.ToURI())
 	if err != nil {
-		return nil, fmt.Errorf("connection for load failed: %w", err)
+		return nil, nil, fmt.Errorf("connection for load failed: %w", err)
 	}
 	transactor.store.conn, err = connectToDb(ctx, cfg.ToURI())
 	if err != nil {
-		return nil, fmt.Errorf("connection for store failed: %w", err)
+		return nil, nil, fmt.Errorf("connection for store failed: %w", err)
 	}
 
 	for _, table := range tables {
 		materializationSpec := open.Materialization.Bindings[table.Binding]
 		if err = transactor.addBinding(ctx, materializationSpec, table, templates); err != nil {
-			return nil, fmt.Errorf("adding binding %v failed: %w", table, err)
+			return nil, nil, fmt.Errorf("adding binding %v failed: %w", table, err)
 		}
 	}
 
 	s3Config := s3config{AWSAccessKeyID: cfg.AWSAccessKeyID, AWSSecretAccessKey: cfg.AWSSecretAccessKey, Region: cfg.Region, Bucket: cfg.Bucket}
 	transactor.s3Operator, err = NewS3Operator(s3Config)
 	if err != nil {
-		return nil, fmt.Errorf("creating s3 operator: %w", err)
+		return nil, nil, fmt.Errorf("creating s3 operator: %w", err)
 	}
 
-	return transactor, nil
+	opts := &boilerplate.MaterializeOptions{
+		ExtendedLogging: true,
+		AckSchedule: &boilerplate.AckScheduleOption{
+			Config: cfg.Schedule,
+			Jitter: []byte(cfg.Account),
+		},
+	}
+
+	return transactor, opts, nil
 }
 
 type binding struct {
@@ -264,13 +265,6 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 		t.cp = make(checkpoint)
 	}
 	return nil
-}
-
-func (t *transactor) Schedule() (schedule.Schedule, bool) {
-	if t.sched != nil {
-		return t.sched, true
-	}
-	return nil, false
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
