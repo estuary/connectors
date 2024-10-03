@@ -21,8 +21,9 @@ class CustomQueryMixin:
         It will be ignored if provided.
         If you need to enable it, uncomment the next line instead of `return None` and modify your config
         """
-        # return self.config.get("primary_key") or None
-        return None
+        # TODO luis: Thats a quick hack to pass validation step with already created custom queries, will be removed along
+        # with the new custom query creation
+        return ["segments.date"]
 
     @property
     def name(self):
