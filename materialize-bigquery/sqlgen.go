@@ -98,12 +98,12 @@ var bqDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"integer":    {"string"},
-			"bignumeric": {"string"},
-			"float":      {"string"},
-			"date":       {"string"},
-			"timestamp":  {"string"},
+		MigratableTypes: sql.MigrationSpecs{
+			"integer":    {sql.NewMigrationSpec([]string{"string"})},
+			"bignumeric": {sql.NewMigrationSpec([]string{"string"})},
+			"float":      {sql.NewMigrationSpec([]string{"string"})},
+			"date":       {sql.NewMigrationSpec([]string{"string"})},
+			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -130,6 +130,10 @@ var bqDialect = func() sql.Dialect {
 		CaseInsensitiveColumns: true,
 	}
 }()
+
+func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FORMAT_TIMESTAMP('%%Y-%%m-%%dT%%H:%%M:%%E*SZ', %s, 'UTC') `, migration.Identifier)
+}
 
 var (
 	tplAll = sql.MustParseTemplate(bqDialect, "root", `

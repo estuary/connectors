@@ -87,13 +87,13 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 	}
 
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"number":        {"text"},
-			"float":         {"text"},
-			"date":          {"text"},
-			"timestamp_ntz": {"text"},
-			"timestamp_tz":  {"text"},
-			"timestamp_ltz": {"text"},
+		MigratableTypes: sql.MigrationSpecs{
+			"number":        {sql.NewMigrationSpec([]string{"text"})},
+			"float":         {sql.NewMigrationSpec([]string{"text"})},
+			"date":          {sql.NewMigrationSpec([]string{"text"})},
+			"timestamp_ntz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeNoTzToStringCast))},
+			"timestamp_tz":  {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
+			"timestamp_ltz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -128,6 +128,14 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 		MaxColumnCharLength:    255,
 		CaseInsensitiveColumns: false,
 	}
+}
+
+func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_VARCHAR(CONVERT_TIMEZONE('UTC', %s), 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')`, migration.Identifier)
+}
+
+func datetimeNoTzToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_VARCHAR(%s, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`, migration.Identifier)
 }
 
 type templates struct {

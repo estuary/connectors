@@ -473,18 +473,18 @@ func (c constrainter) compatibleType(existing boilerplate.EndpointField, propose
 	return isCompatibleType, nil
 }
 
-func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
 	proj := buildProjection(proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
-		return false, fmt.Errorf("mapping type: %w", err)
+		return false, nil, fmt.Errorf("mapping type: %w", err)
 	}
 
-	if slices.Contains(c.dialect.MigratableTypes[strings.ToLower(existing.Type)], strings.ToLower(mapped.DDL)) {
-		return true, nil
+	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, mapped.DDL); migrationSpec != nil {
+		return true, migrationSpec, nil
 	}
 
-	return false, nil
+	return false, nil, nil
 }
 
 func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
@@ -493,7 +493,7 @@ func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *p
 	} else if compatible {
 		return true, nil
 	} else {
-		migratable, err := c.migratable(existing, proposed, rawFieldConfig)
+		migratable, _, err := c.migratable(existing, proposed, rawFieldConfig)
 		return migratable, err
 	}
 }
