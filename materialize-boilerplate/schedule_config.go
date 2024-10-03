@@ -13,6 +13,9 @@ const (
 	slowInterval         = "4h" // interval to use when the "Fast Sync" is not enabled
 )
 
+// ScheduleConfig is the configuration for a materialization acknowledgement
+// schedule. Providing only a SyncFrequency will result in a fixed schedule;
+// otherwise an alternating schedule will be used.
 type ScheduleConfig struct {
 	SyncFrequency       string `json:"syncFrequency,omitempty" jsonschema:"title=Sync Frequency,enum=0s,enum=30s,enum=5m,enum=15m,enum=30m,enum=1h,enum=2h,enum=4h" jsonschema_extras:"order=0"`
 	Timezone            string `json:"timezone,omitempty" jsonschema:"title=Timezone" jsonschema_extras:"order=1"`
@@ -39,30 +42,17 @@ func (ScheduleConfig) GetFieldDocString(fieldName string) string {
 }
 
 func (c ScheduleConfig) Validate() error {
-	if _, _, err := CreateSchedule(c, nil); err != nil {
+	if _, err := createSchedule(c, nil); err != nil {
 		return fmt.Errorf("validating schedule configuration: %w", err)
 	}
 	return nil
 }
 
-// CreateSchedule creates a new schedule for acknowledging commits. As a
-// convenience, if only syncFrequency is provided it returns a fixed schedule.
-// Otherwise an alternating schedule is created.
-//
-// The value for `jitter` can be used to provide synchronization across tasks
-// which access a common destination resource. A good  example is Snowflake,
-// where if there are multiple materializations using the same compute
-// warehouse, ideally they would all make requests to the warehouse at the same
-// time to avoid waking it up repeatedly at random times through their sync
-// intervals. In these cases, the jitter should identify the shared resource
-// consistently across different materializations: For the Snowflake example,
-// this would be the combination of the host URL + warehouse name, since
-// warehouses are named uniquely per account.
-func CreateSchedule(cfg ScheduleConfig, jitter []byte) (sched schedule.Schedule, useSchedule bool, err error) {
+func createSchedule(cfg ScheduleConfig, jitter []byte) (schedule.Schedule, error) {
 	alternatingSchedule := false
 	if cfg.FastSyncStartTime != "" || cfg.FastSyncStopTime != "" || cfg.FastSyncEnabledDays != "" || cfg.Timezone != "" {
 		if cfg.SyncFrequency == "" || cfg.Timezone == "" || cfg.FastSyncStartTime == "" || cfg.FastSyncStopTime == "" {
-			return nil, false, fmt.Errorf("must provide 'timezone', 'syncFrequency', 'fastSyncStartTime', and 'fastSyncStopTime' when configuring sync frequency active times")
+			return nil, fmt.Errorf("must provide 'timezone', 'syncFrequency', 'fastSyncStartTime', and 'fastSyncStopTime' when configuring sync frequency active times")
 		}
 		alternatingSchedule = true
 	}
@@ -75,30 +65,30 @@ func CreateSchedule(cfg ScheduleConfig, jitter []byte) (sched schedule.Schedule,
 	if !alternatingSchedule {
 		parsedInterval, err := time.ParseDuration(freq)
 		if err != nil {
-			return nil, false, fmt.Errorf("parsing interval in CreateSchedule: %w", err)
+			return nil, fmt.Errorf("parsing interval in CreateSchedule: %w", err)
 		}
 
 		if parsedInterval == 0 {
 			// Special case: There is a 0 frequency and no alternating schedule,
 			// so there is no delay at all.
-			return nil, false, nil
+			return nil, nil
 		}
 
 		// There is a frequency set but they aren't using an alternating
 		// schedule, so just create a simple fixed schedule.
 		sched, err := schedule.NewFixedSchedule(freq, jitter)
 		if err != nil {
-			return nil, false, err
+			return nil, err
 		}
 
 		log.WithFields(log.Fields{
-			"config": cfg,
+			"syncFrequency": freq,
 		}).Info("created fixed schedule for acknowledgements")
 
-		return sched, true, nil
+		return sched, nil
 	}
 
-	sched, err = schedule.NewAlternatingSchedule(
+	sched, err := schedule.NewAlternatingSchedule(
 		slowInterval,
 		cfg.SyncFrequency,
 		cfg.FastSyncStartTime,
@@ -108,12 +98,12 @@ func CreateSchedule(cfg ScheduleConfig, jitter []byte) (sched schedule.Schedule,
 		jitter,
 	)
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	log.WithFields(log.Fields{
 		"config": cfg,
 	}).Info("created alternating schedule for acknowledgements")
 
-	return sched, true, nil
+	return sched, nil
 }

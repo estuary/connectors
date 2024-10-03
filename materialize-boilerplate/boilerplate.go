@@ -30,6 +30,29 @@ type MaterializeOptions struct {
 	// Typically this should be enabled for materializations that run large,
 	// long-running transactions, such as data warehouses.
 	ExtendedLogging bool
+
+	// AckSchedule is configuration for scheduling of runtime acknowledgements
+	// sent from the connector at the completion of its commits.
+	AckSchedule *AckScheduleOption
+}
+
+// AckScheduleOption enables a schedule for acknowledgements of the
+// materialization. This will "spread out" transaction processing and result in
+// fewer, larger transactions which may be desirable to reduce warehouse compute
+// costs or comply with rate limits.
+//
+// The value for Jitter can be used to provide synchronization across tasks
+// which access a common destination resource. A good example is Snowflake,
+// where if there are multiple materializations using the same compute
+// warehouse, ideally they would all make requests to the warehouse at the same
+// time to avoid waking it up repeatedly at random times through their sync
+// intervals. In these cases, the jitter should identify the shared resource
+// consistently across different materializations: For the Snowflake example,
+// this would be the combination of the host URL + warehouse name, since
+// warehouses are named uniquely per account.
+type AckScheduleOption struct {
+	Config ScheduleConfig
+	Jitter []byte
 }
 
 type Connector interface {
@@ -138,7 +161,12 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 				options = &MaterializeOptions{}
 			}
 
-			return m.RunTransactions(ctx, newAuxStream(stream, lvl, *options), *request.Open, *opened, transactor)
+			aux, err := newAuxStream(ctx, stream, lvl, *options)
+			if err != nil {
+				return fmt.Errorf("creating aux stream: %w", err)
+			}
+
+			return m.RunTransactions(ctx, aux, *request.Open, *opened, transactor)
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}

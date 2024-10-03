@@ -5,12 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"time"
 
-	"github.com/estuary/connectors/go/schedule"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
@@ -70,37 +67,6 @@ type Transactor interface {
 	// Destroy the Transactor, releasing any held resources.
 	Destroy()
 }
-
-// Transactors may implement DelayedCommitter to add an additional delay on sending transaction
-// acknowledgements to the runtime. This will "spread out" transaction processing and result in
-// fewer, larger transactions which may be desirable to reduce warehouse compute costs or comply
-// with rate limits.
-type DelayedCommitter interface {
-	// Schedule returns the desired schedule for acknowledging streaming
-	// commits. Whether a commit is "streaming" or not is estimated via
-	// storeThreshold (see below). Implementations must somewhat awkwardly
-	// return a boolean value indicated if a schedule should be used at all. If
-	// this is false, acknowledgements will be made immediately. This boolean
-	// value is used instead of checking the returned schedule.Schedule
-	// interface for `nil` to avoid ambiguities resulting from the returned
-	// interface containing a `nil` value, but the interface itself not actually
-	// being `nil`.
-	Schedule() (sched schedule.Schedule, useSchedule bool)
-}
-
-const (
-	// storeThreshold is a somewhat crude indication that a transaction was likely part of a backfill
-	// vs. a smaller incremental streaming transaction. If a materialization is configured with a commit
-	// delay, it should only apply that delay to transactions that occur after it has fully backfilled
-	// from the collection. The idea is that if a transaction stored a lot of documents it's probably
-	// part of a backfill.
-	storeThreshold = 1_000_000
-
-	// The number of transactions we will look back at for determining if the update delay should be
-	// applied. The number of documents stored for all of these transactions must be below
-	// storeThreshold for the delay to apply.
-	storedHistorySize = 5
-)
 
 // StartCommitFunc begins to commit a stored transaction.
 // Upon its return a commit operation may still be running in the background,
@@ -166,17 +132,6 @@ func RunTransactions(
 		return err
 	}
 
-	var ackSchedule schedule.Schedule
-	useSchedule := false
-	if d, ok := transactor.(DelayedCommitter); ok {
-		ackSchedule, useSchedule = d.Schedule()
-		if useSchedule {
-			log.Info("transactor running with acknowledgement schedule")
-		} else {
-			log.Info("transactor will acknowledge commits without delay")
-		}
-	}
-
 	var (
 		// awaitErr is the last await() result,
 		// and is readable upon its close of its parameter `awaitDoneCh`.
@@ -184,29 +139,7 @@ func RunTransactions(
 		// loadErr is the last loadAll() result,
 		// and is readable upon its close of its parameter `loadDoneCh`.
 		loadErr error
-		// lastAckTime is the time the last acknowledged response was sent. It
-		// is used for scheduling the sending of the next acknowledged response.
-		lastAckTime time.Time
-		// storedHistory acts as a ring buffer tabulating the most recent stored
-		// document counts for transactions. This is used to estimate if we are
-		// in a "streaming" mode or not, based on a consistent number of
-		// documents per transactions being below the threshold.
-		storedHistory [storedHistorySize]int
 	)
-
-	// True only if all historical stored counts are below the threshold.
-	storedHistoryBelowThreshold := func() bool {
-		for _, v := range storedHistory {
-			// Counts at 0 mean that we have not yet run storedHistorySize number of transactions
-			// yet to fully populate the storedHistory buffer beyond its initial zero values. They
-			// will only be 0 when the connector first starts up, as it is not possible for a
-			// transaction to have 0 documents stored.
-			if v == 0 || v > storeThreshold {
-				return false
-			}
-		}
-		return true
-	}
 
 	// await is a closure which awaits the completion of a previously
 	// started commit, and then writes Acknowledged to the runtime.
@@ -234,39 +167,12 @@ func RunTransactions(
 			return nil
 		}
 
-		ackState, err := transactor.Acknowledge(ctx)
-		if err != nil {
+		if ackState, err := transactor.Acknowledge(ctx); err != nil {
+			return err
+		} else if err := WriteAcknowledged(stream, ackState, &txResponse); err != nil {
 			return err
 		}
 
-		if useSchedule && !lastAckTime.IsZero() && storedHistoryBelowThreshold() {
-			nextAckAt := ackSchedule.Next(lastAckTime)
-			d := time.Until(nextAckAt)
-
-			ll := log.WithFields(log.Fields{
-				"lastAckTime":      lastAckTime.UTC().Truncate(time.Second).String(),
-				"nextScheduledAck": nextAckAt.UTC().Truncate(time.Second).String(),
-				"storedHistory":    storedHistory,
-			})
-
-			if d > 0 {
-				ll.WithField("delay", d.Truncate(time.Second).String()).Info("delaying before acknowledging commit")
-			} else {
-				ll.Info("not delaying since current time is after next scheduled acknowledgement")
-			}
-
-			select {
-			case <-loadDoneCh:
-				return nil
-			case <-time.After(d):
-			}
-		}
-
-		if err := WriteAcknowledged(stream, ackState, &txResponse); err != nil {
-			return err
-		}
-
-		lastAckTime = time.Now()
 		return nil
 	}
 
@@ -312,7 +218,7 @@ func RunTransactions(
 	var loadCtx, loadCancel = context.WithCancel(ctx)
 	defer loadCancel()
 
-	for round := 0; true; round++ {
+	for {
 		var (
 			awaitDoneCh = make(chan struct{}) // Signals await() is done.
 			loadDoneCh  = make(chan struct{}) // Signals load() is done.
@@ -372,8 +278,6 @@ func RunTransactions(
 		if err != nil {
 			return fmt.Errorf("transactor.Store: %w", err)
 		}
-		storedHistory[round%storedHistorySize] = storeIt.Total
-
 		var runtimeCheckpoint *pc.Checkpoint
 		if runtimeCheckpoint, err = ReadStartCommit(&rxRequest); err != nil {
 			return err
@@ -404,5 +308,4 @@ func RunTransactions(
 			return err
 		}
 	}
-	panic("not reached")
 }
