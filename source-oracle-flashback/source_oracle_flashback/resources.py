@@ -96,14 +96,11 @@ async def validate_flashback(
                 log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle for more information.")
 
 
-async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.AsyncConnectionPool, is_rds: bool,
+async def tables_to_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.AsyncConnectionPool, is_rds: bool, tables: list[Table],
 ) -> list[common.Resource]:
     resources_list = []
-
-    oracle_tables = await fetch_tables(log, pool, config.advanced.schemas)
-    owners = set([t.owner for t in oracle_tables])
-    oracle_columns = await fetch_columns(log, pool, owners)
+    max_rowids = []
 
     current_scn = None
     async with pool.acquire() as conn:
@@ -112,14 +109,6 @@ async def all_resources(
             current_scn = (await c.fetchone())[0]
 
     log.debug("current scn", current_scn)
-
-    tables = []
-    for ot in oracle_tables:
-        columns = [col for col in oracle_columns if col.table_name == ot.table_name and col.owner == ot.owner]
-        t = build_table(log, config, ot.owner, ot.table_name, columns)
-        tables.append(t)
-
-    max_rowids = []
 
     async with pool.acquire() as conn:
         with conn.cursor() as c:
@@ -210,3 +199,42 @@ async def all_resources(
         ))
 
     return resources_list
+
+
+async def enabled_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.AsyncConnectionPool, is_rds: bool,
+    bindings: list[common._ResolvableBinding],
+) -> list[common.Resource]:
+    oracle_tables = await fetch_tables(log, pool, config.advanced.schemas)
+    owners = set([t.owner for t in oracle_tables])
+    oracle_columns = await fetch_columns(log, pool, owners)
+
+    tables = []
+    for binding in bindings:
+        path = binding.resourceConfig.path()
+
+        # Find a resource which matches this binding.
+        for ot in oracle_tables:
+            if path == [ot.owner, ot.table_name]:
+                columns = [col for col in oracle_columns if col.table_name == ot.table_name and col.owner == ot.owner]
+                t = build_table(log, config, ot.owner, ot.table_name, columns)
+                tables.append(t)
+                break
+
+    return await tables_to_resources(log, http, config, pool, is_rds, tables)
+
+
+async def all_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig, pool: oracledb.AsyncConnectionPool, is_rds: bool,
+) -> list[common.Resource]:
+    oracle_tables = await fetch_tables(log, pool, config.advanced.schemas)
+    owners = set([t.owner for t in oracle_tables])
+    oracle_columns = await fetch_columns(log, pool, owners)
+
+    tables = []
+    for ot in oracle_tables:
+        columns = [col for col in oracle_columns if col.table_name == ot.table_name and col.owner == ot.owner]
+        t = build_table(log, config, ot.owner, ot.table_name, columns)
+        tables.append(t)
+
+    return await tables_to_resources(log, http, config, pool, is_rds, tables)
