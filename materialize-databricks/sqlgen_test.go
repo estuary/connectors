@@ -28,19 +28,35 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	)
 
-	for _, tbl := range tables {
-		for _, tpl := range []*template.Template{
-			tplLoadQuery,
-			tplMergeInto,
-			tplCopyIntoDirect,
-		} {
-			var testcase = tbl.Identifier + " " + tpl.Name()
+	for _, tpl := range []*template.Template{
+		tplLoadQuery,
+		tplMergeInto,
+		tplCopyIntoDirect,
+	} {
+		tbl := tables[0]
+		require.False(t, tbl.DeltaUpdates)
 
-			var tplData = tableWithFiles{Table: &tbl, StagingPath: "test-staging-path", Files: []string{"file1", "file2"}}
-			snap.WriteString("--- Begin " + testcase + " ---")
-			require.NoError(t, tpl.Execute(snap, &tplData))
-			snap.WriteString("--- End " + testcase + " ---\n\n")
-		}
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		var tplData = tableWithFiles{Table: &tbl, StagingPath: "test-staging-path", Files: []string{"file1", "file2"}}
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &tplData))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
+	for _, tpl := range []*template.Template{
+		tplCopyIntoDirect,
+	} {
+		tbl := tables[1]
+		require.True(t, tbl.DeltaUpdates)
+		require.Nil(t, tbl.Document)
+
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		var tplData = tableWithFiles{Table: &tbl, StagingPath: "test-staging-path", Files: []string{"file1", "file2"}}
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &tplData))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
 	cupaloy.SnapshotT(t, snap.String())
