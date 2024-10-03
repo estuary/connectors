@@ -116,7 +116,7 @@ func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigration
 				"UPDATE %s SET %s = %s;",
 				table.Identifier,
 				tempColumnIdentifier,
-				migration.Identifier,
+				migration.CastSQL(migration),
 			), nil
 		},
 		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {

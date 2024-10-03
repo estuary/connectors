@@ -35,12 +35,12 @@ Migratable Changes Before Apply Schema:
 Migratable Changes Before Apply Data:
 key (VARCHAR), _meta/flow_truncated (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), numericString (HUGEINT), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), timeValue (TIME), flow_document (VARCHAR)
 
-1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, 123, <nil>, test, {}, 1970-01-01 01:01:01 +0000 UTC, {}
+1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, 123, <nil>, test, {}, 1970-01-01 01:01:01 +0000 UTC, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"datetimeValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'datetimeValue' is already being materialized as endpoint type 'TIMESTAMP WITH TIME ZONE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -57,7 +57,7 @@ Migratable Changes Constraints:
 Migratable Changes Applied Schema:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
 {"Name":"dateValue","Nullable":"YES","Type":"VARCHAR"}
-{"Name":"datetimeValue","Nullable":"YES","Type":"VARCHAR"}
+{"Name":"datetimeValue","Nullable":"YES","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"flow_document","Nullable":"NO","Type":"JSON"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"int64","Nullable":"YES","Type":"BIGINT"}
@@ -72,7 +72,7 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), flow_document (VARCHAR), dateValue (VARCHAR), datetimeValue (VARCHAR), numericString (VARCHAR), timeValue (VARCHAR)
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), datetimeValue (TIMESTAMPTZ), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), flow_document (VARCHAR), dateValue (VARCHAR), numericString (VARCHAR), timeValue (VARCHAR)
 
-1, false, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, {}, {}, 2024-01-01, 2023-12-31 20:01:01-05, 123, 01:01:01
+1, false, 2024-01-01 01:01:01.111111 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, {}, {}, 2024-01-01, 123, 01:01:01
 

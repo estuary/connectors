@@ -481,11 +481,10 @@ var StdMigrationSteps = []ColumnMigrationStep{
 	func(dialect Dialect, table Table, migration ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
 		return fmt.Sprintf(
 			// The WHERE filter is required by some warehouses (bigquery)
-			"UPDATE %s SET %s = CAST(%s AS %s) WHERE true;",
+			"UPDATE %s SET %s = %s WHERE true;",
 			table.Identifier,
 			tempColumnIdentifier,
-			migration.Identifier,
-			migration.DDL,
+			migration.CastSQL(migration),
 		), nil
 	},
 	func(dialect Dialect, table Table, migration ColumnTypeMigration, _ string) (string, error) {

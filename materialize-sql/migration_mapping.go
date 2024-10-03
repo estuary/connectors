@@ -1,0 +1,50 @@
+package sql
+
+import (
+	"fmt"
+	"slices"
+	"strings"
+)
+
+type MigrationSpecs map[string][]MigrationSpec
+
+func (ms MigrationSpecs) FindMigrationSpec(sourceType string, targetDDL string) *MigrationSpec {
+	for _, m := range ms[strings.ToLower(sourceType)] {
+		if slices.Contains(m.TargetDDLs, strings.ToLower(targetDDL)) {
+			return &m
+		}
+	}
+
+	return nil
+}
+
+type CastSQLFunc func(migration ColumnTypeMigration) string
+
+type MigrationSpec struct {
+	TargetDDLs []string
+	CastSQL    CastSQLFunc
+}
+
+func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) MigrationSpec {
+	out := MigrationSpec{
+		TargetDDLs: targetDDLs,
+		CastSQL: func(m ColumnTypeMigration) string {
+			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.DDL)
+		},
+	}
+
+	for _, o := range opts {
+		o(&out)
+	}
+
+	return out
+}
+
+type MigrationSpecOption func(*MigrationSpec)
+
+// WithCastSQL sets the castSQL template of the migration
+func WithCastSQL(castSQL CastSQLFunc) MigrationSpecOption {
+	return func(m *MigrationSpec) {
+		m.CastSQL = castSQL
+	}
+}

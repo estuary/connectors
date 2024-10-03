@@ -44,14 +44,12 @@ var duckDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"double":                   {"varchar"},
-			"bigint":                   {"varchar"},
-			"hugeint":                  {"varchar"},
-			"varchar":                  {"double", "bigint", "hugeint", "date", "timestamp with time zone", "time"},
-			"date":                     {"varchar"},
-			"timestamp with time zone": {"varchar"},
-			"time":                     {"varchar"},
+		MigratableTypes: sql.MigrationSpecs{
+			"double":  {sql.NewMigrationSpec([]string{"varchar"})},
+			"bigint":  {sql.NewMigrationSpec([]string{"varchar"})},
+			"hugeint": {sql.NewMigrationSpec([]string{"varchar"})},
+			"date":    {sql.NewMigrationSpec([]string{"varchar"})},
+			"time":    {sql.NewMigrationSpec([]string{"varchar"})},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
@@ -73,6 +71,13 @@ var duckDialect = func() sql.Dialect {
 		CaseInsensitiveColumns: true,
 	}
 }()
+
+/* TODO: Unfortunately I have not been able to get this working, I keep getting an error about this
+   function not existing... which is strange
+
+func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`strftime(timezone('UTC', %s), '%%Y-%%m-%%dT%%H:%%M:%%S.%%fZ')`, migration.Identifier)
+}*/
 
 type queryParams struct {
 	sql.Table

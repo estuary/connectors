@@ -40,8 +40,8 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 		stringType = "nvarchar"
 	}
 
-	var textType = fmt.Sprintf("%s(MAX) COLLATE %s", stringType, collation)
-	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
+	var textType = fmt.Sprintf("%s(max) collate %s", stringType, strings.ToLower(collation))
+	var textPKType = fmt.Sprintf("%s(900) collate %s", stringType, strings.ToLower(collation))
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -84,13 +84,15 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 		sql.WithNotNullText("NOT NULL"),
 	)
 
+	var nocast = sql.WithCastSQL(migrationIdentifier)
+
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"float":     {strings.ToLower(textType)},
-			"bigint":    {strings.ToLower(textType)},
-			"date":      {strings.ToLower(textType)},
-			"datetime2": {strings.ToLower(textType)},
-			"time":      {strings.ToLower(textType)},
+		MigratableTypes: sql.MigrationSpecs{
+			"float":     {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
+			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -121,6 +123,11 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 	}
 }
 
+// by default we don't want to do `CAST(%s AS %s)` for MySQL
+func migrationIdentifier(migration sql.ColumnTypeMigration) string {
+	return migration.Identifier
+}
+
 func rfc3339ToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
 		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
@@ -139,6 +146,10 @@ func rfc3339TimeToUTC() sql.ElementConverter {
 			return t.UTC(), nil
 		}
 	})
+}
+
+func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FORMAT(%s AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'`, migration.Identifier)
 }
 
 type templates struct {

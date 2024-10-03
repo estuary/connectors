@@ -85,14 +85,16 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 		sql.WithNotNullText("NOT NULL"),
 	)
 
+	var nocast = sql.WithCastSQL(migrationIdentifier)
+
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"decimal":  {"varchar", "longtext"},
-			"bigint":   {"varchar", "longtext"},
-			"double":   {"varchar", "longtext"},
-			"date":     {"longtext", "varchar"},
-			"time":     {"longtext", "varchar"},
-			"datetime": {"longtext", "varchar"},
+		MigratableTypes: sql.MigrationSpecs{
+			"decimal":  {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+			"bigint":   {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+			"double":   {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+			"date":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+			"time":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+			"datetime": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(prepareDatetimeToStringCast(tzLocation)))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
@@ -115,6 +117,31 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 		TypeMapper:             mapper,
 		MaxColumnCharLength:    64,
 		CaseInsensitiveColumns: true,
+	}
+}
+
+func formatOffset(loc *time.Location) string {
+	now := time.Now().In(loc)
+	_, offset := now.Zone()
+
+	sign := "+"
+	if offset < 0 {
+		sign = "-"
+		offset = -offset
+	}
+	hours := offset / 3600
+	minutes := (offset % 3600) / 60
+	return fmt.Sprintf("%s%02d:%02d", sign, hours, minutes)
+}
+
+// by default we don't want to do `CAST(%s AS %s)` for MySQL
+func migrationIdentifier(migration sql.ColumnTypeMigration) string {
+	return migration.Identifier
+}
+
+func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {
+	return func(migration sql.ColumnTypeMigration) string {
+		return fmt.Sprintf(`DATE_FORMAT(CONVERT_TZ(%s, '%s', '+00:00'), '%%Y-%%m-%%dT%%H:%%i:%%s.%%fZ')`, migration.Identifier, formatOffset(loc))
 	}
 }
 

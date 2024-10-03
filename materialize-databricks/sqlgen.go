@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -59,13 +60,12 @@ var databricksDialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: map[string][]string{
-			"decimal":   {"string"},
-			"long":      {"string"},
-			"double":    {"string"},
-			"string":    {"numeric(38,0)", "double", "long", "date", "timestamp"},
-			"timestamp": {"string"},
-			"date":      {"string"},
+		MigratableTypes: sql.MigrationSpecs{
+			"decimal":   {sql.NewMigrationSpec([]string{"string"})},
+			"long":      {sql.NewMigrationSpec([]string{"string"})},
+			"double":    {sql.NewMigrationSpec([]string{"string"})},
+			"timestamp": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
+			"date":      {sql.NewMigrationSpec([]string{"string"})},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -111,6 +111,10 @@ var databricksDialect = func() sql.Dialect {
 		CaseInsensitiveColumns: true,
 	}
 }()
+
+func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`date_format(from_utc_timestamp(%s, 'UTC'), "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")`, migration.Identifier)
+}
 
 var (
 	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
