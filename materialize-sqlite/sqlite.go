@@ -156,7 +156,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-) (_ m.Transactor, err error) {
+) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var d = &transactor{
 		dialect: &sqliteDialect,
 	}
@@ -166,34 +166,34 @@ func newTransactor(
 
 	// Establish connections.
 	if db, err := stdsql.Open("sqlite3", cfg.path); err != nil {
-		return nil, fmt.Errorf("load DB.Open: %w", err)
+		return nil, nil, fmt.Errorf("load DB.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("load DB.Conn: %w", err)
+		return nil, nil, fmt.Errorf("load DB.Conn: %w", err)
 	}
 	if db, err := stdsql.Open("sqlite3", cfg.path); err != nil {
-		return nil, fmt.Errorf("store DB.Open: %w", err)
+		return nil, nil, fmt.Errorf("store DB.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("store DB.Conn: %w", err)
+		return nil, nil, fmt.Errorf("store DB.Conn: %w", err)
 	}
 
 	// Attach temporary DB used for staging keys to load.
 	if _, err = d.load.conn.ExecContext(ctx, attachSQL); err != nil {
-		return nil, fmt.Errorf("Exec(%s): %w", attachSQL, err)
+		return nil, nil, fmt.Errorf("Exec(%s): %w", attachSQL, err)
 	}
 
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding); err != nil {
-			return nil, fmt.Errorf("adding binding: %w", err)
+			return nil, nil, fmt.Errorf("adding binding: %w", err)
 		}
 	}
 
 	// Since sqlite is ephemeral, we have to re-create tables before transactions
 	for _, table := range bindings {
 		if statement, err := sql.RenderTableTemplate(table, ep.CreateTableTemplate); err != nil {
-			return nil, err
+			return nil, nil, err
 		} else {
 			if _, err := d.store.conn.ExecContext(ctx, statement); err != nil {
-				return nil, fmt.Errorf("applying schema updates: %w", err)
+				return nil, nil, fmt.Errorf("applying schema updates: %w", err)
 			}
 		}
 	}
@@ -205,7 +205,7 @@ func newTransactor(
 	}
 	d.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-	return d, nil
+	return d, nil, nil
 }
 
 type transactor struct {

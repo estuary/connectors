@@ -225,24 +225,24 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint, constrainter{dialect: endpoint.Dialect}), is, endpoint.ConcurrentApply)
 }
 
-func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var loadedVersion string
 	var conf = d.EndpointSpecType
 
 	if err := json.Unmarshal(open.Materialization.ConfigJson, conf); err != nil {
-		return nil, nil, fmt.Errorf("parsing endpoint configuration: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing endpoint configuration: %w", err)
 	} else if err := d.StartTunnel(ctx, conf); err != nil {
-		return nil, nil, fmt.Errorf("starting network tunnel: %w", err)
+		return nil, nil, nil, fmt.Errorf("starting network tunnel: %w", err)
 	}
 
 	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.Name.String()))
 	if err != nil {
-		return nil, nil, fmt.Errorf("building endpoint: %w", err)
+		return nil, nil, nil, fmt.Errorf("building endpoint: %w", err)
 	}
 
 	client, err := endpoint.NewClient(ctx, endpoint)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating client: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating client: %w", err)
 	}
 	defer client.Close()
 
@@ -251,11 +251,11 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
 
 		if _, loadedVersion, err = loadSpec(ctx, client, endpoint, open.Materialization.Name); err != nil {
-			return nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
+			return nil, nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
 		} else if loadedVersion == "" {
-			return nil, nil, fmt.Errorf("materialization has not been applied")
+			return nil, nil, nil, fmt.Errorf("materialization has not been applied")
 		} else if loadedVersion != open.Version {
-			return nil, nil, fmt.Errorf(
+			return nil, nil, nil, fmt.Errorf(
 				"applied and current materializations are different versions (applied: %s vs current: %s)",
 				loadedVersion, open.Version)
 		}
@@ -267,12 +267,12 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 		var resource = endpoint.NewResource(endpoint)
 
 		if err := pf.UnmarshalStrict(spec.ResourceConfigJson, resource); err != nil {
-			return nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Name, err)
+			return nil, nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Name, err)
 		}
 		var shape = BuildTableShape(open.Materialization, index, resource)
 
 		if table, err := ResolveTable(shape, endpoint.Dialect); err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		} else {
 			table.StateKey = spec.StateKey
 			tables = append(tables, table)
@@ -295,7 +295,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 		// materialization from committing further transactions.
 		var metaCheckpoints, err = ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect)
 		if err != nil {
-			return nil, nil, fmt.Errorf("resolving checkpoints table: %w", err)
+			return nil, nil, nil, fmt.Errorf("resolving checkpoints table: %w", err)
 		}
 
 		// Initialize a checkpoint such that the materialization starts from scratch,
@@ -305,29 +305,29 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 
 		fence, err = client.InstallFence(ctx, metaCheckpoints, fence)
 		if err != nil {
-			return nil, nil, fmt.Errorf("installing checkpoints fence: %w", err)
+			return nil, nil, nil, fmt.Errorf("installing checkpoints fence: %w", err)
 		}
 	}
 
 	is, err := client.InfoSchema(ctx, resourcePaths)
 	if err != nil {
-		return nil, nil, fmt.Errorf("getting info schema: %w", err)
+		return nil, nil, nil, fmt.Errorf("getting info schema: %w", err)
 	}
 
-	transactor, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open, is)
+	transactor, options, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open, is)
 	if err != nil {
-		return nil, nil, fmt.Errorf("building transactor: %w", err)
+		return nil, nil, nil, fmt.Errorf("building transactor: %w", err)
 	}
 
 	var cp *protocol.Checkpoint
 	if len(fence.Checkpoint) > 0 {
 		cp = new(protocol.Checkpoint)
 		if err := cp.Unmarshal(fence.Checkpoint); err != nil {
-			return nil, nil, fmt.Errorf("unmarshalling fence.Checkpoint, %w", err)
+			return nil, nil, nil, fmt.Errorf("unmarshalling fence.Checkpoint, %w", err)
 		}
 	}
 
-	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, nil
+	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, options, nil
 }
 
 func mustGetTenantNameFromTaskName(taskName string) string {

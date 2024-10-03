@@ -180,22 +180,22 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, is, true)
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	client, err := d.connect(ctx, cfg)
 	if err != nil {
-		return nil, nil, fmt.Errorf("connecting to database: %w", err)
+		return nil, nil, nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
 	var bindings []*binding
 	for _, b := range open.Materialization.Bindings {
 		res, err := resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		var collection = client.Database(cfg.Database).Collection(res.Collection)
 
@@ -209,7 +209,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		cfg:      &cfg,
 		client:   client,
 		bindings: bindings,
-	}, &pm.Response_Opened{}, nil
+	}, &pm.Response_Opened{}, nil, nil
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {

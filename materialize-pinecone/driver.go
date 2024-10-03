@@ -238,32 +238,32 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	pc, err := cfg.pineconeClient()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	idx, err := pc.DescribeIndex(ctx, cfg.Index)
 	if err != nil {
-		return nil, nil, fmt.Errorf("describing index: %w", err)
+		return nil, nil, nil, fmt.Errorf("describing index: %w", err)
 	}
 
 	var bindings []binding
 	for _, b := range open.Materialization.Bindings {
 		res, err := resolveResourceConfig(b.ResourceConfigJson)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		conn, err := pc.Index(pinecone.NewIndexConnParams{Host: idx.Host, Namespace: res.Namespace})
 		if err != nil {
-			return nil, nil, fmt.Errorf("creating index connection: %w", err)
+			return nil, nil, nil, fmt.Errorf("creating index connection: %w", err)
 		}
 
 		bindings = append(bindings, binding{
@@ -275,7 +275,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	return &transactor{
 		openAiClient: cfg.openAiClient(),
 		bindings:     bindings,
-	}, &pm.Response_Opened{}, nil
+	}, &pm.Response_Opened{}, nil, nil
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {

@@ -16,7 +16,6 @@ import (
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
-	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -108,8 +107,6 @@ func newDatabricksDriver() *sql.Driver {
 	}
 }
 
-var _ m.DelayedCommitter = (*transactor)(nil)
-
 type transactor struct {
 	cfg              *config
 	cp               checkpoint
@@ -117,7 +114,6 @@ type transactor struct {
 	wsClient         *databricks.WorkspaceClient
 	localStagingPath string
 	bindings         []*binding
-	sched            schedule.Schedule
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -136,7 +132,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-) (_ m.Transactor, err error) {
+) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
@@ -146,7 +142,7 @@ func newTransactor(
 		HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
 	})
 	if err != nil {
-		return nil, fmt.Errorf("initialising workspace client: %w", err)
+		return nil, nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
 
 	var d = &transactor{cfg: cfg, wsClient: wsClient}
@@ -154,22 +150,16 @@ func newTransactor(
 	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(warehouseId)); err != nil {
-		return nil, err
-	} else if useSched {
-		d.sched = sched
-	}
-
 	db, err := stdsql.Open("databricks", d.cfg.ToURI())
 	if err != nil {
-		return nil, fmt.Errorf("sql.Open: %w", err)
+		return nil, nil, fmt.Errorf("sql.Open: %w", err)
 	}
 	defer db.Close()
 
 	schemas := map[string]struct{}{cfg.SchemaName: {}}
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding, open.Range); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 
 		schemas[binding.Path[0]] = struct{}{}
@@ -182,17 +172,25 @@ func newTransactor(
 			"volumeName": volumeName,
 		}).Debug("creating volume for schema if it doesn't already exist")
 		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", sch, volumeName)); err != nil {
-			return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
+			return nil, nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
 		}
 	}
 
 	if tempDir, err := os.MkdirTemp("", "staging"); err != nil {
-		return nil, err
+		return nil, nil, err
 	} else {
 		d.localStagingPath = tempDir
 	}
 
-	return d, nil
+	opts := &boilerplate.MaterializeOptions{
+		ExtendedLogging: true,
+		AckSchedule: &boilerplate.AckScheduleOption{
+			Config: cfg.Schedule,
+			Jitter: []byte(warehouseId),
+		},
+	}
+
+	return d, opts, nil
 }
 
 type binding struct {
@@ -230,13 +228,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 	t.bindings = append(t.bindings, b)
 
 	return nil
-}
-
-func (t *transactor) Schedule() (schedule.Schedule, bool) {
-	if t.sched != nil {
-		return t.sched, true
-	}
-	return nil, false
 }
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
