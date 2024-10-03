@@ -25,6 +25,7 @@ from .api import (
 
 from .resources import (
     all_resources,
+    enabled_resources,
     validate_flashback
 )
 from .models import (
@@ -98,7 +99,7 @@ class Connector(
             )
         self.pool = create_pool(log, validate.config)
         await validate_flashback(log, validate.config, self.pool, is_rds)
-        resources = await all_resources(log, self, validate.config, self.pool, is_rds)
+        resources = await enabled_resources(log, self, validate.config, self.pool, is_rds, validate.bindings)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
@@ -125,7 +126,7 @@ class Connector(
             )
         self.pool = create_pool(log, open.capture.config)
         await validate_flashback(log, open.capture.config, self.pool, is_rds)
-        resources = await all_resources(log, self, open.capture.config, self.pool, is_rds)
+        resources = await enabled_resources(log, self, open.capture.config, self.pool, is_rds, open.capture.bindings)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)
 
