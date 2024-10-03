@@ -161,12 +161,12 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 				options = &MaterializeOptions{}
 			}
 
-			aux, err := newAuxStream(ctx, stream, lvl, *options)
+			ts, err := newTransactionsStream(ctx, stream, lvl, *options)
 			if err != nil {
-				return fmt.Errorf("creating aux stream: %w", err)
+				return fmt.Errorf("creating transactions stream: %w", err)
 			}
 
-			return m.RunTransactions(ctx, aux, *request.Open, *opened, transactor)
+			return m.RunTransactions(ctx, ts, *request.Open, *opened, transactor)
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
