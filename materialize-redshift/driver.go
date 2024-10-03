@@ -17,7 +17,6 @@ import (
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
-	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -271,21 +270,18 @@ func newRedshiftDriver() *sql.Driver {
 	}
 }
 
-var _ m.DelayedCommitter = (*transactor)(nil)
-
 type transactor struct {
 	templates templates
 	dialect   sql.Dialect
 	fence     sql.Fence
 	bindings  []*binding
 	cfg       *config
-	sched     schedule.Schedule
 }
 
 func prepareNewTransactor(
 	templates templates,
 	caseSensitiveIdentifierEnabled bool,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
@@ -293,7 +289,7 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
-	) (_ m.Transactor, err error) {
+	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 		var cfg = ep.Config.(*config)
 
 		var d = &transactor{
@@ -303,15 +299,9 @@ func prepareNewTransactor(
 			cfg:       cfg,
 		}
 
-		if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Address)); err != nil {
-			return nil, err
-		} else if useSched {
-			d.sched = sched
-		}
-
 		s3client, err := d.cfg.toS3Client(ctx)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		for idx, target := range bindings {
@@ -322,11 +312,19 @@ func prepareNewTransactor(
 				is,
 				caseSensitiveIdentifierEnabled,
 			); err != nil {
-				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+				return nil, nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
 		}
 
-		return d, nil
+		opts := &boilerplate.MaterializeOptions{
+			ExtendedLogging: true,
+			AckSchedule: &boilerplate.AckScheduleOption{
+				Config: cfg.Schedule,
+				Jitter: []byte(cfg.Address),
+			},
+		}
+
+		return d, opts, nil
 	}
 }
 
@@ -462,13 +460,6 @@ func (t *transactor) addBinding(
 
 	t.bindings = append(t.bindings, b)
 	return nil
-}
-
-func (t *transactor) Schedule() (schedule.Schedule, bool) {
-	if t.sched != nil {
-		return t.sched, true
-	}
-	return nil, false
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }

@@ -379,7 +379,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates templates,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
@@ -387,26 +387,26 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
-	) (_ m.Transactor, err error) {
+	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 		var cfg = ep.Config.(*config)
 		var d = &transactor{dialect: dialect, templates: templates, cfg: cfg}
 		d.store.fence = fence
 
 		// Establish connections.
 		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-			return nil, fmt.Errorf("load sql.Open: %w", err)
+			return nil, nil, fmt.Errorf("load sql.Open: %w", err)
 		} else if d.load.conn, err = db.Conn(ctx); err != nil {
-			return nil, fmt.Errorf("load db.Conn: %w", err)
+			return nil, nil, fmt.Errorf("load db.Conn: %w", err)
 		}
 		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-			return nil, fmt.Errorf("store sql.Open: %w", err)
+			return nil, nil, fmt.Errorf("store sql.Open: %w", err)
 		} else if d.store.conn, err = db.Conn(ctx); err != nil {
-			return nil, fmt.Errorf("store db.Conn: %w", err)
+			return nil, nil, fmt.Errorf("store db.Conn: %w", err)
 		}
 
 		for _, binding := range bindings {
 			if err = d.addBinding(ctx, binding, is); err != nil {
-				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+				return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
 
@@ -422,7 +422,7 @@ func prepareNewTransactor(
 		}
 		d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-		return d, nil
+		return d, nil, nil
 	}
 }
 

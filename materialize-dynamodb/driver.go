@@ -272,15 +272,15 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}, is, true)
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	client, err := cfg.client(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating client: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating client: %w", err)
 	}
 
 	var bindings []binding
@@ -298,7 +298,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		client:           client,
 		bindings:         bindings,
 		tablesToBindings: tablesToBindings,
-	}, &pm.Response_Opened{}, nil
+	}, &pm.Response_Opened{}, nil, nil
 }
 
 func resolveEndpointConfig(specJson json.RawMessage) (config, error) {

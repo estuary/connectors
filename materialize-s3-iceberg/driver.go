@@ -333,10 +333,10 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return boilerplate.ApplyChanges(ctx, req, catalog, is, false)
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("unmarshalling endpoint config: %w", err)
+		return nil, nil, nil, fmt.Errorf("unmarshalling endpoint config: %w", err)
 	}
 
 	var resourcePaths [][]string
@@ -344,12 +344,12 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	for _, b := range open.Materialization.Bindings {
 		res := newResource(cfg)
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return nil, nil, fmt.Errorf("unmarshalling resource config: %w", err)
+			return nil, nil, nil, fmt.Errorf("unmarshalling resource config: %w", err)
 		}
 
 		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 
 		resourcePaths = append(resourcePaths, res.path())
@@ -365,7 +365,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 	for idx := range bindings {
 		catalogTablePath, err := catalog.tablePath(bindings[idx].path)
 		if err != nil {
-			return nil, nil, fmt.Errorf("getting catalog table path: %w", err)
+			return nil, nil, nil, fmt.Errorf("getting catalog table path: %w", err)
 		}
 
 		bindings[idx].catalogTablePath = catalogTablePath
@@ -378,12 +378,20 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		Region:             cfg.Region,
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating s3 store: %w", err)
+		return nil, nil, nil, fmt.Errorf("creating s3 store: %w", err)
 	}
 
 	interval, err := parse8601(cfg.UploadInterval)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
+	}
+
+	opts := &boilerplate.MaterializeOptions{
+		AckSchedule: &boilerplate.AckScheduleOption{
+			Config: boilerplate.ScheduleConfig{
+				SyncFrequency: interval.String(),
+			},
+		},
 	}
 
 	return &transactor{
@@ -393,8 +401,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		bucket:          cfg.Bucket,
 		prefix:          cfg.Prefix,
 		store:           s3store,
-		uploadInterval:  interval,
-	}, &pm.Response_Opened{}, nil
+	}, &pm.Response_Opened{}, opts, nil
 }
 
 func main() { boilerplate.RunMain(new(driver)) }

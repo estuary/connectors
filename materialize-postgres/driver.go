@@ -267,7 +267,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-) (_ m.Transactor, err error) {
+) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 
 	var d = &transactor{cfg: cfg}
@@ -275,23 +275,23 @@ func newTransactor(
 
 	// Establish connections.
 	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("load pgx.Connect: %w", err)
+		return nil, nil, fmt.Errorf("load pgx.Connect: %w", err)
 	}
 	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
-		return nil, fmt.Errorf("store pgx.Connect: %w", err)
+		return nil, nil, fmt.Errorf("store pgx.Connect: %w", err)
 	}
 
 	// Override statement_timeout with a session-level setting to never timeout
 	// statements.
 	if _, err := d.load.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
-		return nil, fmt.Errorf("load set statement_timeout: %w", err)
+		return nil, nil, fmt.Errorf("load set statement_timeout: %w", err)
 	} else if _, err := d.store.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
-		return nil, fmt.Errorf("store set statement_timeout: %w", err)
+		return nil, nil, fmt.Errorf("store set statement_timeout: %w", err)
 	}
 
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding, is); err != nil {
-			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
 
@@ -302,7 +302,7 @@ func newTransactor(
 	}
 	d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-	return d, nil
+	return d, nil, nil
 }
 
 type binding struct {

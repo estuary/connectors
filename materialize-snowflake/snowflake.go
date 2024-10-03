@@ -14,7 +14,6 @@ import (
 
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
-	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -168,8 +167,6 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 	return m, nil
 }
 
-var _ m.DelayedCommitter = (*transactor)(nil)
-
 type transactor struct {
 	cfg        *config
 	ep         *sql.Endpoint
@@ -187,19 +184,11 @@ type transactor struct {
 	}
 	templates templates
 	bindings  []*binding
-	sched     schedule.Schedule
 	cp        checkpoint
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
 	version string
-}
-
-func (t *transactor) Schedule() (schedule.Schedule, bool) {
-	if t.sched != nil {
-		return t.sched, true
-	}
-	return nil, false
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -217,28 +206,28 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-) (_ m.Transactor, err error) {
+) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 
 	dsn, err := cfg.toURI(ep.Tenant)
 	if err != nil {
-		return nil, fmt.Errorf("building snowflake dsn: %w", err)
+		return nil, nil, fmt.Errorf("building snowflake dsn: %w", err)
 	}
 
 	db, err := stdsql.Open("snowflake", dsn)
 	if err != nil {
-		return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
+		return nil, nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 	}
 
 	var pipeClient *PipeClient
 	if cfg.Credentials.AuthType == JWT {
 		var accountName string
 		if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
-			return nil, fmt.Errorf("fetching current account name: %w", err)
+			return nil, nil, fmt.Errorf("fetching current account name: %w", err)
 		}
 		pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
 		if err != nil {
-			return nil, fmt.Errorf("NewPipeClient: %w", err)
+			return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 	}
 
@@ -252,39 +241,41 @@ func newTransactor(
 		version:    open.Version,
 	}
 
-	if sched, useSched, err := boilerplate.CreateSchedule(cfg.Schedule, []byte(cfg.Host+cfg.Warehouse)); err != nil {
-		return nil, err
-	} else if useSched {
-		d.sched = sched
-	}
-
 	d.store.fence = &fence
 
 	// Establish connections.
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
-		return nil, fmt.Errorf("load stdsql.Open: %w", err)
+		return nil, nil, fmt.Errorf("load stdsql.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("load db.Conn: %w", err)
+		return nil, nil, fmt.Errorf("load db.Conn: %w", err)
 	}
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
-		return nil, fmt.Errorf("store stdsql.Open: %w", err)
+		return nil, nil, fmt.Errorf("store stdsql.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, fmt.Errorf("store db.Conn: %w", err)
+		return nil, nil, fmt.Errorf("store db.Conn: %w", err)
 	}
 
 	// Create stage for file-based transfers.
 	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
-		return nil, fmt.Errorf("creating transfer stage : %w", err)
+		return nil, nil, fmt.Errorf("creating transfer stage : %w", err)
 	}
 
 	for _, binding := range bindings {
 		if err = d.addBinding(binding); err != nil {
-			return nil, fmt.Errorf("%v: %w", binding, err)
+			return nil, nil, fmt.Errorf("%v: %w", binding, err)
 		}
 	}
 
-	return d, nil
+	opts := &boilerplate.MaterializeOptions{
+		ExtendedLogging: true,
+		AckSchedule: &boilerplate.AckScheduleOption{
+			Config: cfg.Schedule,
+			Jitter: []byte(cfg.Host + cfg.Warehouse),
+		},
+	}
+
+	return d, opts, nil
 }
 
 type binding struct {
