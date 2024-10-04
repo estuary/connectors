@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -10,7 +9,9 @@ import (
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/pinecone-io/go-pinecone/pinecone"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/structpb"
 )
 
 // TODO(whb): These may need tuning based on real-world use.
@@ -20,16 +21,15 @@ var (
 )
 
 type transactor struct {
-	pineconeClient *client.PineconeClient
-	openAiClient   *client.OpenAiClient
-	bindings       []binding
+	openAiClient *client.OpenAiClient
+	bindings     []binding
 
 	group    *errgroup.Group
 	groupCtx context.Context
 }
 
 type binding struct {
-	namespace   string
+	conn        *pinecone.IndexConnection
 	dataHeaders []string
 }
 
@@ -55,9 +55,22 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	t.group, t.groupCtx = errgroup.WithContext(ctx)
 	t.group.SetLimit(concurrentWorkers)
 
-	batches := make(map[string][]upsertDoc)
+	var batch []upsertDoc
 
+	lastBinding := -1
 	for it.Next() {
+		if lastBinding == -1 {
+			lastBinding = it.Binding
+		}
+
+		if it.Binding != lastBinding {
+			if err := t.sendBatch(t.bindings[lastBinding], batch); err != nil {
+				return nil, fmt.Errorf("sending batch of documents: %w", err)
+			}
+			batch = nil
+			lastBinding = it.Binding
+		}
+
 		b := t.bindings[it.Binding]
 
 		allFields := append(it.Key, it.Values...)
@@ -74,31 +87,26 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, err
 		}
 
-		namespace := t.bindings[it.Binding].namespace
-
-		batches[namespace] = append(batches[namespace], upsertDoc{
+		batch = append(batch, upsertDoc{
 			input: embeddingInput,
-			key:   base64.RawURLEncoding.EncodeToString(it.PackedKey),
+			key:   fmt.Sprintf("%x", it.PackedKey),
 			// Only the document is included as metadata.
 			metadata: map[string]interface{}{
 				"flow_document": string(it.RawJSON),
 			},
 		})
 
-		if len(batches[namespace]) >= batchSize {
-			if err := t.sendBatch(namespace, batches[namespace]); err != nil {
+		if len(batch) >= batchSize {
+			if err := t.sendBatch(b, batch); err != nil {
 				return nil, fmt.Errorf("sending batch of documents: %w", err)
 			}
-			batches[namespace] = nil
+			batch = nil
 		}
 	}
 
-	// Flush remaining partial batches.
-	for namespace, batch := range batches {
-		if len(batch) > 0 {
-			if err := t.sendBatch(namespace, batch); err != nil {
-				return nil, fmt.Errorf("flushing documents batch: %w", err)
-			}
+	if len(batch) != 0 {
+		if err := t.sendBatch(t.bindings[lastBinding], batch); err != nil {
+			return nil, fmt.Errorf("sending batch of documents: %w", err)
 		}
 	}
 
@@ -134,7 +142,7 @@ func makeInput(fields map[string]interface{}) (string, error) {
 	return out.String(), nil
 }
 
-func (t *transactor) sendBatch(namespace string, batch []upsertDoc) error {
+func (t *transactor) sendBatch(b binding, batch []upsertDoc) error {
 	select {
 	case <-t.groupCtx.Done():
 		return t.group.Wait()
@@ -150,22 +158,27 @@ func (t *transactor) sendBatch(namespace string, batch []upsertDoc) error {
 				return fmt.Errorf("openAI creating embeddings: %w", err)
 			}
 
-			upsert := client.PineconeUpsertRequest{
-				Vectors:   []client.Vector{},
-				Namespace: namespace,
-			}
+			var vecs []*pinecone.Vector
 
 			for _, e := range embeddings {
-				thisMeta := batch[e.Index]
-				upsert.Vectors = append(upsert.Vectors, client.Vector{
-					Id:       thisMeta.key,
+				thisUpsert := batch[e.Index]
+
+				metadata, err := structpb.NewStruct(thisUpsert.metadata)
+				if err != nil {
+					return fmt.Errorf("creating metadata: %w", err)
+				}
+
+				vecs = append(vecs, &pinecone.Vector{
+					Id:       thisUpsert.key,
 					Values:   e.Embedding,
-					Metadata: thisMeta.metadata,
+					Metadata: metadata,
 				})
 			}
 
-			if err := t.pineconeClient.Upsert(t.groupCtx, upsert); err != nil {
+			if count, err := b.conn.UpsertVectors(t.groupCtx, vecs); err != nil {
 				return fmt.Errorf("pinecone upserting batch: %w", err)
+			} else if int(count) != len(batch) {
+				return fmt.Errorf("pinecone upserted %d vectors vs. expected %d", count, len(batch))
 			}
 			return nil
 		})
