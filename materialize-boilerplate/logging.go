@@ -10,12 +10,12 @@ import (
 
 const (
 	// How often various the various async loggers will report their status.
-	loggingFrequency = 5 * time.Second
+	loggingFrequency = 5 * time.Minute
 
 	// When the "basic" logger is being used, how long a commit must be in
 	// progress or how long the connector must be waiting for documents from the
 	// runtime before it logs something about that.
-	slowOperationThreshold = 15 * time.Second
+	slowOperationThreshold = 15 * time.Minute
 )
 
 // loggerAtLevel wraps a logrus logger to always log at the configured level.
