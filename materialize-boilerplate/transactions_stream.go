@@ -168,10 +168,10 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 	// lastAckTime at a zero value means this is the recovery commit, and we
 	// never delay on the recovery commit.
 	if l.ackSchedule != nil && !l.lastAckTime.IsZero() {
-		aboveThreshold := false
+		belowThreshold := len(l.storedHistory) == storedHistorySize // require at least 5 commits before applying delay
 		for _, v := range l.storedHistory {
 			if v >= storeThreshold {
-				aboveThreshold = true
+				belowThreshold = false
 				break
 			}
 		}
@@ -185,13 +185,13 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 			"storedHistory":    l.storedHistory,
 		})
 
-		if aboveThreshold {
+		if !belowThreshold {
 			ll.Info("not delaying commit acknowledgement based on stored history")
 		} else if d <= 0 {
 			ll.Info("not delaying commit acknowledgement since current time is after next scheduled acknowledgement")
 		} else {
 			l.handler(startedAckDelay)
-			ll.WithField("delay", d.Truncate(time.Second).String()).Info("delaying before acknowledging commit")
+			ll.WithField("delay", d.String()).Info("delaying before acknowledging commit")
 
 			select {
 			case <-l.ctx.Done():
