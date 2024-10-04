@@ -237,11 +237,12 @@ type transactor struct {
 		fence sql.Fence
 	}
 	bindings []*binding
+	be       *boilerplate.BindingEvents
 }
 
 func prepareNewTransactor(
 	templates templates,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
@@ -249,9 +250,10 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
+		be *boilerplate.BindingEvents,
 	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 		var cfg = ep.Config.(*config)
-		var d = &transactor{templates: templates, cfg: cfg}
+		var d = &transactor{templates: templates, cfg: cfg, be: be}
 		d.store.fence = fence
 
 		// Establish connections.
@@ -291,6 +293,7 @@ type binding struct {
 	// into the target table. Note that in case of delta updates, "needsMerge"
 	// will always be false
 	needsMerge bool
+	hasData    bool
 
 	createLoadTableSQL string
 	loadQuerySQL       string
@@ -409,11 +412,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
+	d.be.StartedEvaluatingLoads()
 	rows, err := txn.QueryContext(ctx, d.load.unionSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
 	defer rows.Close()
+	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
 		var binding int
@@ -521,6 +526,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("store writing data to batch on %q: %w", b.tempStoreTableName, err)
 		}
 
+		b.hasData = true
 		if it.Exists {
 			b.needsMerge = true
 		}
@@ -535,26 +541,29 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			defer txn.Rollback()
 
 			for _, b := range d.bindings {
+				if !b.hasData {
+					continue
+				}
+
+				d.be.StartedResourceCommit(b.target.Path)
 				if b.needsMerge {
-					log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 					if _, err := txn.ExecContext(ctx, b.mergeInto); err != nil {
 						return fmt.Errorf("store batch merge on %q: %w", b.target.Identifier, err)
 					}
-					log.WithField("table", b.target.Identifier).Info("store: finishing merging data into table")
 				} else {
-					log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 					if _, err := txn.ExecContext(ctx, b.directCopy); err != nil {
 						return fmt.Errorf("store batch direct insert on %q: %w", b.target.Identifier, err)
 					}
-					log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 				}
 
 				if _, err = txn.ExecContext(ctx, b.tempStoreTruncate); err != nil {
 					return fmt.Errorf("truncating store table: %w", err)
 				}
+				d.be.FinishedResourceCommit(b.target.Path)
 
 				// reset the value for next transaction
 				b.needsMerge = false
+				b.hasData = false
 			}
 
 			var err error

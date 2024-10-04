@@ -155,7 +155,8 @@ func newTransactor(
 	_ sql.Fence,
 	tables []sql.Table,
 	open pm.Request_Open,
-	is *boilerplate.InfoSchema,
+	_ *boilerplate.InfoSchema,
+	_ *boilerplate.BindingEvents,
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 	var templates = renderTemplates(starburstTrinoDialect)
@@ -391,7 +392,6 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 	defer fileProcessor.Destroy()
 
-	log.Info("store: starting committing changes")
 	for stateKey, item := range t.cp {
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
@@ -417,7 +417,6 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			return nil, fmt.Errorf("deleting files on cloud failed: %w", err)
 		}
 	}
-	log.Info("store: finished committing changes")
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again

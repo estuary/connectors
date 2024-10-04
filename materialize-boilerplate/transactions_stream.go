@@ -3,12 +3,14 @@ package boilerplate
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -66,6 +68,15 @@ type transactionsStream struct {
 	storedHistory []int
 }
 
+// loggerAtLevel wraps a logrus logger to always log at the configured level.
+type loggerAtLevel struct {
+	lvl log.Level
+}
+
+func (l loggerAtLevel) log(fields logrus.Fields, msg string) {
+	log.WithFields(fields).Log(l.lvl, msg)
+}
+
 // newTransactionsStream wraps a base stream MaterializeStream with extra
 // capabilities via specific handling for events.
 func newTransactionsStream(
@@ -73,12 +84,16 @@ func newTransactionsStream(
 	stream m.MaterializeStream,
 	lvl log.Level,
 	options MaterializeOptions,
+	bl *BindingEvents,
 ) (*transactionsStream, error) {
 	s := &transactionsStream{stream: stream, ctx: ctx}
 
 	var loggingHandler func(transactionsEvent)
-	if options.ExtendedLogging || lvl > log.InfoLevel {
-		l := newExtendedLogger(log.InfoLevel)
+	if options.ExtendedLogging {
+		l := newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, bl)
+		loggingHandler = l.handler()
+	} else if lvl > log.DebugLevel {
+		l := newExtendedLogger(loggerAtLevel{lvl: lvl}, bl)
 		loggingHandler = l.handler()
 	} else {
 		l := newBasicLogger()
@@ -303,7 +318,8 @@ func (l *basicLogger) handler() func(transactionsEvent) {
 }
 
 type extendedLogger struct {
-	lvl log.Level
+	bl  *BindingEvents
+	log func(logrus.Fields, string)
 
 	mu                  sync.Mutex
 	round               int
@@ -319,11 +335,10 @@ type extendedLogger struct {
 }
 
 // newExtendedLogger returns a logger than logs detailed information about the
-// materialization as it progresses through transaction steps. It can log at
-// INFO or DEBUG levels, which may be useful for materializations that always
-// what detailed logs, or only if debug logging is enabled.
-func newExtendedLogger(lvl log.Level) *extendedLogger {
-	return &extendedLogger{lvl: lvl}
+// materialization as it progresses through transaction steps.
+func newExtendedLogger(ll loggerAtLevel, bl *BindingEvents) *extendedLogger {
+	bl.activate(ll)
+	return &extendedLogger{bl: bl, log: ll.log}
 }
 
 // logCb logs something when called. It's a bit frivolous as a type definition,
@@ -392,6 +407,7 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 		case sentStartedCommit:
 			loadPhaseStarted = false
 			l.round++
+			l.bl.round++
 		case sentAcknowledged:
 			if !loadPhaseStarted {
 				stopWaitingForDocsLogger = l.logAsync(l.waitingForDocsLogFn())
@@ -464,20 +480,14 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 
 func (l *extendedLogger) readingLoadsLogFn() logCb {
 	l.readingLoadsStart = time.Now()
-	log.WithField("round", l.round).Log(l.lvl, "started reading load requests")
+	l.log(logrus.Fields{"round": l.round}, "started reading load requests")
 	lastLoadCount := l.readLoads
 
 	return func() {
 		if l.readLoads == lastLoadCount {
-			log.WithFields(log.Fields{
-				"round": l.round,
-				"count": l.readLoads,
-			}).Log(l.lvl, "waiting for more load requests")
+			l.log(log.Fields{"round": l.round, "count": l.readLoads}, "waiting for more load requests")
 		} else {
-			log.WithFields(log.Fields{
-				"round": l.round,
-				"count": l.readLoads,
-			}).Log(l.lvl, "reading load requests")
+			l.log(log.Fields{"round": l.round, "count": l.readLoads}, "reading load requests")
 		}
 		lastLoadCount = l.readLoads
 	}
@@ -485,122 +495,206 @@ func (l *extendedLogger) readingLoadsLogFn() logCb {
 
 func (l *extendedLogger) finishedReadingLoadsLogFn() logCb {
 	return func() {
-		log.WithFields(log.Fields{
+		l.log(log.Fields{
 			"round": l.round,
 			"took":  time.Since(l.readingLoadsStart).String(),
 			"count": l.readLoads,
-		}).Log(l.lvl, "finished reading load requests")
+		}, "finished reading load requests")
 	}
 }
 
 func (l *extendedLogger) processingLoadedsLogFn() logCb {
 	l.sendingLoadedsStart = time.Now()
-	log.WithField("round", l.round).Log(l.lvl, "started processing loaded documents")
+	l.log(log.Fields{"round": l.round}, "started processing loaded documents")
 	return func() {
-		log.WithFields(log.Fields{
-			"round": l.round,
-			"count": l.sentLoaded,
-		}).Log(l.lvl, "processing loaded documents")
+		l.log(log.Fields{"round": l.round, "count": l.sentLoaded}, "processing loaded documents")
 	}
 }
 
 func (l *extendedLogger) finishedProcessingLoadedsLogFn() logCb {
 	return func() {
-		log.WithFields(log.Fields{
+		l.log(log.Fields{
 			"round": l.round,
 			"took":  time.Since(l.sendingLoadedsStart).String(),
 			"count": l.sentLoaded,
-		}).Log(l.lvl, "finished processing loaded documents")
+		}, "finished processing loaded documents")
 	}
 }
 
 func (l *extendedLogger) readingStoresLogFn() logCb {
 	l.readingStoresStart = time.Now()
-	log.WithField("round", l.round).Log(l.lvl, "started reading store requests")
+	l.log(log.Fields{"round": l.round}, "started reading store requests")
 	return func() {
-		log.WithFields(log.Fields{
-			"round": l.round,
-			"count": l.readStores,
-		}).Log(l.lvl, "reading store requests")
+		l.log(log.Fields{"round": l.round, "count": l.readStores}, "reading store requests")
 	}
 }
 
 func (l *extendedLogger) finishedReadingStoresLogFn() logCb {
 	return func() {
-		log.WithFields(log.Fields{
+		l.log(log.Fields{
 			"round": l.round,
 			"took":  time.Since(l.readingStoresStart).String(),
 			"count": l.readStores,
-		}).Log(l.lvl, "finished reading store requests")
+		}, "finished reading store requests")
 	}
 }
 
 func (l *extendedLogger) runningCommitLogFn(round int) logCb {
 	l.commitStart = time.Now()
-	log.WithField("round", round).Log(l.lvl, "started materialization commit")
+	l.log(log.Fields{"round": round}, "started materialization commit")
 	return func() {
-		log.WithFields(log.Fields{
-			"round": round,
-		}).Log(l.lvl, "materialization commit in progress")
+		l.log(log.Fields{"round": round}, "materialization commit in progress")
 	}
 }
 
 func (l *extendedLogger) finishedCommitLogFn(round int) logCb {
 	return func() {
-		log.WithFields(log.Fields{
-			"round": round,
-			"took":  time.Since(l.commitStart).String(),
-		}).Log(l.lvl, "finished materialization commit")
+		l.log(log.Fields{"round": round, "took": time.Since(l.commitStart).String()}, "finished materialization commit")
 	}
 }
 
 func (l *extendedLogger) waitingForAckDelayLogFn(round int) logCb {
 	l.ackDelayStart = time.Now()
 	return func() {
-		log.WithFields(log.Fields{
-			"round": round,
-		}).Log(l.lvl, "waiting to acknowledge materialization commit")
+		l.log(log.Fields{"round": round}, "waiting to acknowledge materialization commit")
 	}
 }
 
 func (l *extendedLogger) finishedAckDelayLogFn(round int) logCb {
 	return func() {
-		log.WithFields(log.Fields{
+		l.log(log.Fields{
 			"round": round,
 			"took":  time.Since(l.ackDelayStart).String(),
-		}).Log(l.lvl, "acknowledged materialization commit after configured delay")
+		}, "acknowledged materialization commit after configured delay")
 	}
 }
 
 func (l *extendedLogger) runningRecoveryCommitLogFn() logCb {
 	l.commitStart = time.Now()
-	log.Info("started materialization recovery commit")
-	return func() { log.Info("materialization recovery commit in progress") }
+	l.log(log.Fields{"round": 0}, "started materialization recovery commit")
+	return func() {
+		l.log(log.Fields{"round": 0}, "materialization recovery commit in progress")
+	}
 }
 
 func (l *extendedLogger) finishedRecoveryCommitLogFn() logCb {
 	return func() {
-		log.WithFields(log.Fields{
-			"took": time.Since(l.commitStart).String(),
-		}).Info("finished materialization recovery commit")
+		l.log(log.Fields{"round": 0, "took": time.Since(l.commitStart).String()}, "finished materialization recovery commit")
 	}
 }
 
 func (l *extendedLogger) waitingForDocsLogFn() logCb {
 	l.waitingForDocsStart = time.Now()
-	log.Info("started waiting for documents")
+	l.log(log.Fields{"round": l.round}, "started waiting for documents")
 	return func() {
-		log.WithFields(log.Fields{
-			"round": l.round,
-		}).Info("waiting for documents")
+		l.log(log.Fields{"round": l.round}, "waiting for documents")
 	}
 }
 
 func (l *extendedLogger) finishedWaitingForDocsLogFn() logCb {
 	return func() {
-		log.WithFields(log.Fields{
-			"round": l.round,
-			"took":  time.Since(l.waitingForDocsStart).String(),
-		}).Info("finished waiting for documents")
+		l.log(log.Fields{"round": l.round, "took": time.Since(l.waitingForDocsStart).String()}, "finished waiting for documents")
 	}
+}
+
+// BindingEvents is used to log when certain events happen in the course of
+// processing materialization transactions. Its usage is not necessary, but it
+// may provide useful diagnostic information for materializations that support
+// it these events.
+//
+// It is not activate unless the materialization is configured to use
+// ExtendedLogging, or unless debug logging is enabled for the task.
+type BindingEvents struct {
+	enabled              bool
+	log                  func(logrus.Fields, string)
+	wg                   sync.WaitGroup
+	stopLogger           chan struct{}
+	round                int
+	evaluatingLoadsStart time.Time
+
+	mu           sync.Mutex
+	activeStores map[string]time.Time
+}
+
+func newBindingEvents() *BindingEvents {
+	return &BindingEvents{activeStores: make(map[string]time.Time)}
+}
+
+func (l *BindingEvents) activate(ll loggerAtLevel) {
+	l.enabled = true
+	l.log = ll.log
+}
+
+func (l *BindingEvents) do(fn func()) {
+	if !l.enabled {
+		return
+	}
+	fn()
+}
+
+// StartedEvaluatingLoads should be called when a materialization that stages
+// request load keys for later evaluation begins evaluating those loads. For
+// example, this would be called when a load query is issued against a
+// destination database.
+func (l *BindingEvents) StartedEvaluatingLoads() {
+	l.do(func() {
+		l.evaluatingLoadsStart = time.Now()
+
+		l.stopLogger = make(chan struct{})
+		l.wg.Add(1)
+		go func() {
+			ticker := time.NewTicker(loggingFrequency)
+			defer func() {
+				l.wg.Done()
+				ticker.Stop()
+			}()
+
+			for {
+				select {
+				case <-ticker.C:
+					l.log(log.Fields{"round": l.round}, "evaluting loads")
+				case <-l.stopLogger:
+					l.log(log.Fields{"round": l.round, "took": time.Since(l.evaluatingLoadsStart).String()}, "finished evaluating loads")
+					return
+				}
+			}
+		}()
+	})
+}
+
+// FinishedEvaluatingLoads should be called when evaluation of loads is
+// complete, but prior to starting to process the loaded document response.
+func (l *BindingEvents) FinishedEvaluatingLoads() {
+	l.do(func() {
+		close(l.stopLogger)
+		l.wg.Wait()
+	})
+}
+
+// StartedResourceCommit reports when documents are being committed to a
+// specific binding.
+func (l *BindingEvents) StartedResourceCommit(path []string) {
+	l.do(func() {
+		l.mu.Lock()
+		l.activeStores[strings.Join(path, ".")] = time.Now()
+		l.mu.Unlock()
+
+		l.log(log.Fields{"round": l.round, "resourcePath": path}, "started commiting documents to resource")
+	})
+}
+
+// FinishedResourceCommit reports when documents finish being committed to a
+// specific binding.
+func (l *BindingEvents) FinishedResourceCommit(path []string) {
+	l.do(func() {
+		l.mu.Lock()
+		took := time.Since(l.activeStores[strings.Join(path, ".")])
+		l.mu.Unlock()
+
+		l.log(log.Fields{
+			"round":        l.round,
+			"resourcePath": path,
+			"took":         took.String(),
+		}, "finished commiting documents to resource")
+	})
 }

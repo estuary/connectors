@@ -258,6 +258,7 @@ type transactor struct {
 		fence sql.Fence
 	}
 	bindings []*binding
+	be       *boilerplate.BindingEvents
 }
 
 func newTransactor(
@@ -267,10 +268,11 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
+	be *boilerplate.BindingEvents,
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 
-	var d = &transactor{cfg: cfg}
+	var d = &transactor{cfg: cfg, be: be}
 	d.store.fence = fence
 
 	// Establish connections.
@@ -407,11 +409,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
+	d.be.StartedEvaluatingLoads()
 	rows, err := txn.Query(ctx, d.load.unionSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
 	defer rows.Close()
+	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
 		var binding int
