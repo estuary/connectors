@@ -156,6 +156,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
+	_ *boilerplate.BindingEvents,
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var d = &transactor{
 		dialect: &sqliteDialect,

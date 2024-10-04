@@ -59,7 +59,7 @@ type Connector interface {
 	Spec(context.Context, *pm.Request_Spec) (*pm.Response_Spec, error)
 	Validate(context.Context, *pm.Request_Validate) (*pm.Response_Validated, error)
 	Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error)
-	NewTransactor(context.Context, pm.Request_Open) (m.Transactor, *pm.Response_Opened, *MaterializeOptions, error)
+	NewTransactor(context.Context, pm.Request_Open, *BindingEvents) (m.Transactor, *pm.Response_Opened, *MaterializeOptions, error)
 }
 
 // RunMain is the boilerplate main function of a materialization connector.
@@ -152,7 +152,9 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 				return err
 			}
 		case request.Open != nil:
-			transactor, opened, options, err := connector.NewTransactor(ctx, *request.Open)
+			bl := newBindingEvents()
+
+			transactor, opened, options, err := connector.NewTransactor(ctx, *request.Open, bl)
 			if err != nil {
 				return err
 			}
@@ -161,7 +163,7 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 				options = &MaterializeOptions{}
 			}
 
-			ts, err := newTransactionsStream(ctx, stream, lvl, *options)
+			ts, err := newTransactionsStream(ctx, stream, lvl, *options, bl)
 			if err != nil {
 				return fmt.Errorf("creating transactions stream: %w", err)
 			}

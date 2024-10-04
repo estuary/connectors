@@ -333,7 +333,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return boilerplate.ApplyChanges(ctx, req, catalog, is, false)
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
 		return nil, nil, nil, fmt.Errorf("unmarshalling endpoint config: %w", err)
