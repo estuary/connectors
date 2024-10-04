@@ -190,6 +190,7 @@ type transactor struct {
 	s3client *s3.Client
 
 	bindings []*binding
+	be       *boilerplate.BindingEvents
 }
 
 func newTransactor(
@@ -199,6 +200,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
+	be *boilerplate.BindingEvents,
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	cfg := ep.Config.(*config)
 
@@ -222,6 +224,7 @@ func newTransactor(
 		conn:     conn,
 		s3client: s3client,
 		fence:    fence,
+		be:       be,
 	}
 
 	for _, b := range bindings {
@@ -306,11 +309,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		Key:    aws.String(loadResKey),
 	})
 
+	d.be.StartedEvaluatingLoads()
 	rows, err := d.conn.QueryContext(ctx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, fmt.Sprintf("s3://%s/%s", d.cfg.Bucket, loadResKey)))
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
 	defer rows.Close()
+	d.be.FinishedEvaluatingLoads()
 
 	var loadQueryCount int
 	for rows.Next() {
@@ -430,6 +435,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 				params := &queryParams{Table: b.target, Files: b.storeFile.allFiles()}
 
+				d.be.StartedResourceCommit(b.target.Path)
 				if b.mustMerge {
 					// In-place updates are accomplished by deleting the
 					// existing row and inserting the updated row.
@@ -448,6 +454,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				} else if _, err := txn.ExecContext(ctx, storeQuery.String()); err != nil {
 					return fmt.Errorf("executing store query for binding[%d]: %w", idx, err)
 				}
+				d.be.FinishedResourceCommit(b.target.Path)
 
 				// Reset for next round.
 				b.mustMerge = false

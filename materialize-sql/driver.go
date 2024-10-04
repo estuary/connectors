@@ -225,7 +225,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint), is, endpoint.ConcurrentApply)
 }
 
-func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var loadedVersion string
 	var conf = d.EndpointSpecType
 
@@ -314,7 +314,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tra
 		return nil, nil, nil, fmt.Errorf("getting info schema: %w", err)
 	}
 
-	transactor, options, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open, is)
+	transactor, options, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open, is, be)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("building transactor: %w", err)
 	}

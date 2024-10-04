@@ -184,6 +184,7 @@ type transactor struct {
 	}
 	templates templates
 	bindings  []*binding
+	be        *boilerplate.BindingEvents
 	cp        checkpoint
 
 	// this shard's range spec and version, used to key pipes so they don't collide
@@ -206,6 +207,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
+	be *boilerplate.BindingEvents,
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 
@@ -239,6 +241,7 @@ func newTransactor(
 		pipeClient: pipeClient,
 		_range:     open.Range,
 		version:    open.Version,
+		be:         be,
 	}
 
 	d.store.fence = &fence
@@ -323,7 +326,6 @@ const MaxConcurrentQueries = 5
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	log.Info("load: starting encoding and uploading of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -354,8 +356,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 	defer d.deleteFiles(ctx, filesToCleanup)
 
-	log.Info("load: finished encoding and uploading of files")
-
 	if len(subqueries) == 0 {
 		return nil // Nothing to load.
 	}
@@ -367,14 +367,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// In order for the concurrent requests below to be actually run concurrently we need
 	// a separate connection for each
-
-	for iLoop, queryLoop := range subqueries {
+	for _, queryLoop := range subqueries {
 		var query = queryLoop
-		var i = iLoop
 		group.Go(func() error {
-			var b = d.bindings[i]
-
-			log.WithField("table", b.target.Identifier).Info("load: starting querying documents")
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the |loaded| callback.
 			rows, err := d.db.QueryContext(sf.WithStreamDownloader(groupCtx), query)
@@ -385,8 +380,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 			var binding int
 			var document stdsql.RawBytes
-
-			log.WithField("table", b.target.Identifier).Info("load: finished querying documents")
 
 			mutex.Lock()
 			defer mutex.Unlock()
@@ -402,17 +395,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				return fmt.Errorf("querying Loads: %w", err)
 			}
 
-			log.WithField("table", b.target.Identifier).Info("load: flushed documents to runtime")
-
 			return nil
 		})
 	}
-
 	if err := group.Wait(); err != nil {
 		return err
 	}
-
-	log.Info("load: finished loading")
 
 	return nil
 }
@@ -441,7 +429,6 @@ type checkpoint = map[string]*checkpointItem
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -640,25 +627,23 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries)
 
-	log.Info("store: starting committing changes")
-
 	var pipes = make(map[string]*pipeRecord)
 	for stateKey, item := range d.cp {
+		path := d.pathForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if !d.hasStateKey(stateKey) {
+		if len(path) == 0 {
 			continue
 		}
 
 		if len(item.Query) > 0 {
 			item := item
 			group.Go(func() error {
-				log.WithField("table", item.Table).Info("store: starting query")
+				d.be.StartedResourceCommit(path)
 				if _, err := d.db.ExecContext(groupCtx, item.Query); err != nil {
 					return fmt.Errorf("query %q failed: %w", item.Query, err)
 				}
-
-				log.WithField("table", item.Table).Info("store: finished query")
+				d.be.FinishedResourceCommit(path)
 				d.deleteFiles(ctx, []string{item.StagedDir})
 
 				return nil
@@ -819,8 +804,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 	}
 
-	log.Info("store: finished committing changes")
-
 	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
 		log.Info("store: dbt job trigger")
 		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
@@ -865,14 +848,13 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-func (d *transactor) hasStateKey(stateKey string) bool {
+func (d *transactor) pathForStateKey(stateKey string) []string {
 	for _, b := range d.bindings {
 		if b.target.StateKey == stateKey {
-			return true
+			return b.target.Path
 		}
 	}
-
-	return false
+	return nil
 }
 
 func (d *transactor) deleteFiles(ctx context.Context, files []string) {
