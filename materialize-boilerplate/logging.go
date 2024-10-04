@@ -9,13 +9,18 @@ import (
 )
 
 const (
-	// How often various the various async loggers will report their status.
-	loggingFrequency = 5 * time.Second
+	// How often the various async loggers will report their status. When
+	// "extended" logging is enabled, transitions of interest will always be
+	// logged immediately, and only after loggingFrequency will status updates
+	// be logged if nothing else has happened. When extended logging is not
+	// enabled, there will be a more generic status update logged out at this
+	// frequency.
+	loggingFrequency = 5 * time.Minute
 
 	// When the "basic" logger is being used, how long a commit must be in
 	// progress or how long the connector must be waiting for documents from the
 	// runtime before it logs something about that.
-	slowOperationThreshold = 15 * time.Second
+	slowOperationThreshold = 15 * time.Minute
 )
 
 // loggerAtLevel wraps a logrus logger to always log at the configured level.
