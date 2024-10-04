@@ -275,13 +275,14 @@ type transactor struct {
 	dialect   sql.Dialect
 	fence     sql.Fence
 	bindings  []*binding
+	be        *boilerplate.BindingEvents
 	cfg       *config
 }
 
 func prepareNewTransactor(
 	templates templates,
 	caseSensitiveIdentifierEnabled bool,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
@@ -289,6 +290,7 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
+		be *boilerplate.BindingEvents,
 	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 		var cfg = ep.Config.(*config)
 
@@ -297,6 +299,7 @@ func prepareNewTransactor(
 			dialect:   ep.Dialect,
 			fence:     fence,
 			cfg:       cfg,
+			be:        be,
 		}
 
 		s3client, err := d.cfg.toS3Client(ctx)
@@ -473,7 +476,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// can be created with long enough string columns.
 	maxStringLengths := make([]int, len(d.bindings))
 
-	log.Info("load: starting encoding and uploading of files")
 	for it.Next() {
 		gotLoads = true
 
@@ -562,16 +564,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	log.Info("load: finished encoding and uploading of files")
-
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
 	loadAllSQL := strings.Join(subqueries, "\nUNION ALL\n") + ";"
+	d.be.StartedEvaluatingLoads()
 	rows, err := txn.Query(ctx, loadAllSQL)
 	if err != nil {
 		return fmt.Errorf("querying load documents: %w", err)
 	}
 	defer rows.Close()
+	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
 		var binding int
@@ -590,8 +592,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if err := txn.Commit(ctx); err != nil {
 		return fmt.Errorf("commiting load transaction: %w", err)
 	}
-
-	log.Info("load: finished loading")
 
 	return nil
 }
@@ -622,7 +622,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil
 	}
 
-	log.Info("store: starting encoding and uploading of files")
 	var lastBinding = -1
 	for it.Next() {
 		if lastBinding == -1 {
@@ -724,7 +723,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		log.Info("store: starting commit phase")
 		var err error
 		if d.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
@@ -813,8 +811,11 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 		return fmt.Errorf("obtaining checkpoints table lock: %w", err)
 	}
 
-	log.Info("store: starting copying of files into tables")
 	for _, b := range d.bindings {
+		if b.hasDeletes || b.hasStores {
+			d.be.StartedResourceCommit(b.target.Path)
+		}
+
 		if b.hasDeletes {
 			// Create the temporary table for staging values to delete from the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
@@ -823,17 +824,15 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return fmt.Errorf("creating delete table: %w", err)
 			}
 
-			log.WithField("table", b.target.Identifier).Info("store: starting deleting from table")
-
 			if _, err := txn.Exec(ctx, b.copyIntoDeleteTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.deleteFile.prefix, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.deleteQuerySQL); err != nil {
 				return fmt.Errorf("deleting from table '%s': %w", b.target.Identifier, err)
 			}
-			log.WithField("table", b.target.Identifier).Info("store: finished deleting from table")
 		}
 
 		if !b.hasStores {
+			d.be.FinishedResourceCommit(b.target.Path)
 			continue
 		}
 
@@ -845,24 +844,19 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
-			log.WithField("table", b.target.Identifier).Info("store: starting merging data into table")
 			if _, err := txn.Exec(ctx, b.copyIntoMergeTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			}
-			log.WithField("table", b.target.Identifier).Info("store: finished merging data into table")
 		} else {
-			log.WithField("table", b.target.Identifier).Info("store: starting direct copying data into table")
 			// Can copy directly into the target table since all values are new.
 			if _, err := txn.Exec(ctx, b.copyIntoTargetTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			}
-			log.WithField("table", b.target.Identifier).Info("store: finishing direct copying data into table")
 		}
+		d.be.FinishedResourceCommit(b.target.Path)
 	}
-
-	log.Info("store: finished encoding and uploading of files")
 
 	if err := updateFence(ctx, txn, d.dialect, d.fence); err != nil {
 		return err
@@ -877,7 +871,6 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 		}
 	}
 
-	log.Info("store: finished commit")
 	return nil
 }
 
