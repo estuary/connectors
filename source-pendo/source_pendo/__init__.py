@@ -14,7 +14,7 @@ from estuary_cdk.capture import (
 )
 from estuary_cdk.http import HTTPMixin
 
-from .resources import all_resources
+from .resources import all_resources, validate_api_key
 from .models import (
     ConnectorState,
     EndpointConfig,
@@ -48,6 +48,7 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
+        await validate_api_key(log, self, validate.config)
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
