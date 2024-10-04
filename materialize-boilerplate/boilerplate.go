@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -152,18 +153,24 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 				return err
 			}
 		case request.Open != nil:
-			bl := newBindingEvents()
+			be := newBindingEvents()
 
-			transactor, opened, options, err := connector.NewTransactor(ctx, *request.Open, bl)
+			openStart := time.Now()
+			log.Info("requesting materialization Open")
+			stop := repeatAsync(func() { log.Info("materialization Open in progress") }, loggingFrequency)
+			transactor, opened, options, err := connector.NewTransactor(ctx, *request.Open, be)
 			if err != nil {
 				return err
 			}
+			stop(func() {
+				log.WithFields(log.Fields{"took": time.Since(openStart).String()}).Info("finished waiting for materialization Open")
+			})
 
 			if options == nil {
 				options = &MaterializeOptions{}
 			}
 
-			ts, err := newTransactionsStream(ctx, stream, lvl, *options, bl)
+			ts, err := newTransactionsStream(ctx, stream, lvl, *options, be)
 			if err != nil {
 				return fmt.Errorf("creating transactions stream: %w", err)
 			}
