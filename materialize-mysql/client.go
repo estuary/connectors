@@ -102,40 +102,38 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, "def", resourcePaths)
 }
 
-func (c *client) columnMigrationSteps(ctx context.Context) []sql.ColumnMigrationStep {
-	return []sql.ColumnMigrationStep{
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-			return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
-				table.Identifier,
-				tempColumnIdentifier,
-				migration.DDL,
-			), nil
-		},
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-			return fmt.Sprintf(
-				"UPDATE %s SET %s = %s;",
-				table.Identifier,
-				tempColumnIdentifier,
-				migration.CastSQL(migration),
-			), nil
-		},
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
-			return fmt.Sprintf(
-				"ALTER TABLE %s DROP COLUMN %s;",
-				table.Identifier,
-				migration.Identifier,
-			), nil
-		},
-		func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-			return fmt.Sprintf(
-				"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
-				table.Identifier,
-				tempColumnIdentifier,
-				migration.Identifier,
-				migration.DDL,
-			), nil
-		},
-	}
+var migrationSteps = []sql.ColumnMigrationStep{
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
+			table.Identifier,
+			tempColumnIdentifier,
+			migration.DDL,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf(
+			"UPDATE %s SET %s = %s;",
+			table.Identifier,
+			tempColumnIdentifier,
+			migration.CastSQL(migration),
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s DROP COLUMN %s;",
+			table.Identifier,
+			migration.Identifier,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
+			table.Identifier,
+			tempColumnIdentifier,
+			migration.Identifier,
+			migration.DDL,
+		), nil
+	},
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
@@ -195,7 +193,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.ColumnTypeChanges) > 0 {
 		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, c.columnMigrationSteps(ctx)...); err != nil {
+			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, migrationSteps...); err != nil {
 				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 			} else {
 				stmts = append(stmts, steps...)

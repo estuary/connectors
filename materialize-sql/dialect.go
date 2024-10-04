@@ -19,7 +19,7 @@ type Dialect struct {
 	// CaseInsensitiveColumns is provided as the "caseInsensitiveFields" parameter to boilerplate.NewValidator.
 	CaseInsensitiveColumns bool
 
-	// MigratableTypes is a mapp of current column DDL as key, and a slice of DDLs
+	// MigratableTypes is a map of current column DDL as key, and a slice of DDLs
 	// which the key type can be migrated to.
 	// For example, "decimal": {"string"} means decimal columns can be migrated to string type
 	MigratableTypes MigrationSpecs
