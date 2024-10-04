@@ -9,8 +9,10 @@ import (
 type MigrationSpecs map[string][]MigrationSpec
 
 func (ms MigrationSpecs) FindMigrationSpec(sourceType string, targetDDL string) *MigrationSpec {
+	var target = strings.ToLower(targetDDL)
+
 	for _, m := range ms[strings.ToLower(sourceType)] {
-		if slices.Contains(m.TargetDDLs, strings.ToLower(targetDDL)) {
+		if slices.ContainsFunc(m.targetDDLs, func(ddl string) bool { return strings.ToLower(ddl) == target }) {
 			return &m
 		}
 	}
@@ -21,13 +23,13 @@ func (ms MigrationSpecs) FindMigrationSpec(sourceType string, targetDDL string) 
 type CastSQLFunc func(migration ColumnTypeMigration) string
 
 type MigrationSpec struct {
-	TargetDDLs []string
+	targetDDLs []string
 	CastSQL    CastSQLFunc
 }
 
 func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) MigrationSpec {
 	out := MigrationSpec{
-		TargetDDLs: targetDDLs,
+		targetDDLs: targetDDLs,
 		CastSQL: func(m ColumnTypeMigration) string {
 			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.DDL)
 		},

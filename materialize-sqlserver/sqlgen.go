@@ -40,8 +40,8 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 		stringType = "nvarchar"
 	}
 
-	var textType = fmt.Sprintf("%s(max) collate %s", stringType, strings.ToLower(collation))
-	var textPKType = fmt.Sprintf("%s(900) collate %s", stringType, strings.ToLower(collation))
+	var textType = fmt.Sprintf("%s(MAX) COLLATE %s", stringType, collation)
+	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -123,7 +123,7 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 	}
 }
 
-// by default we don't want to do `CAST(%s AS %s)` for MySQL
+// by default we don't want to do `CAST(%s AS %s)` for SQLserver
 func migrationIdentifier(migration sql.ColumnTypeMigration) string {
 	return migration.Identifier
 }
@@ -206,13 +206,11 @@ END;
 -- Server does not support modifying multiple columns in a single statement.
 
 {{ define "alterTableColumns" }}
-{{- if $.AddColumns }}
 ALTER TABLE {{$.Identifier}} ADD
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }};
-{{- end }}
 {{ end }}
 
 -- Templated creation of a temporary load table:
