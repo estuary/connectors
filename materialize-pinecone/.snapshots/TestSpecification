@@ -9,12 +9,6 @@
         "description": "Pinecone index for this materialization. Must already exist and have appropriate dimensions for the embedding model used.",
         "order": 0
       },
-      "environment": {
-        "type": "string",
-        "title": "Pinecone Environment",
-        "description": "Cloud region for your Pinecone project. Example: us-central1-gcp",
-        "order": 1
-      },
       "pineconeApiKey": {
         "type": "string",
         "title": "Pinecone API Key",
@@ -53,7 +47,6 @@
     "type": "object",
     "required": [
       "index",
-      "environment",
       "pineconeApiKey",
       "openAiApiKey"
     ],
@@ -66,11 +59,14 @@
       "namespace": {
         "type": "string",
         "title": "Pinecone Namespace",
-        "description": "Name of the Pinecone namespace that this collection will materialize vectors into. For Pinecone starter plans, leave blank to use no namespace. Only a single binding can have a blank namespace, and Pinecone starter plans can only materialize a single binding.",
+        "description": "Name of the Pinecone namespace that this collection will materialize vectors into.",
         "x-collection-name": true
       }
     },
     "type": "object",
+    "required": [
+      "namespace"
+    ],
     "title": "Pinecone Collection"
   },
   "documentation_url": "https://go.estuary.dev/materialize-pinecone"

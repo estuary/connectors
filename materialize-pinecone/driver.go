@@ -12,19 +12,17 @@ import (
 	"github.com/estuary/connectors/materialize-pinecone/client"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/pinecone-io/go-pinecone/pinecone"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
-	textEmbeddingAda002                = "text-embedding-ada-002"
-	textEmbeddingAda002VectorLength    = 1536
-	starterPodType                     = "starter"
-	emptyNamespaceResourcePathSentinel = "FLOW_EMPTY_NAMESPACE"
+	textEmbeddingAda002             = "text-embedding-ada-002"
+	textEmbeddingAda002VectorLength = 1536
 )
 
 type config struct {
 	Index          string         `json:"index" jsonschema:"title=Pinecone Index" jsonschema_extras:"order=0"`
-	Environment    string         `json:"environment" jsonschema:"title=Pinecone Environment" jsonschema_extras:"order=1"`
 	PineconeApiKey string         `json:"pineconeApiKey" jsonschema:"title=Pinecone API Key" jsonschema_extras:"secret=true,order=2"`
 	OpenAiApiKey   string         `json:"openAiApiKey" jsonschema:"title=OpenAI API Key" jsonschema_extras:"secret=true,order=3"`
 	EmbeddingModel string         `json:"embeddingModel,omitempty" jsonschema:"title=Embedding Model ID,default=text-embedding-ada-002" jsonschema_extras:"order=4"`
@@ -66,7 +64,6 @@ func (advancedConfig) GetFieldDocString(fieldName string) string {
 func (c *config) Validate() error {
 	var requiredProperties = [][]string{
 		{"index", c.Index},
-		{"environment", c.Environment},
 		{"pineconeApiKey", c.PineconeApiKey},
 		{"openAiApiKey", c.OpenAiApiKey},
 	}
@@ -79,8 +76,11 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) pineconeClient(ctx context.Context) (*client.PineconeClient, error) {
-	return client.NewPineconeClient(ctx, c.Index, c.Environment, c.PineconeApiKey)
+func (c *config) pineconeClient() (*pinecone.Client, error) {
+	return pinecone.NewClient(pinecone.NewClientParams{
+		ApiKey:    c.PineconeApiKey,
+		SourceTag: "estuary",
+	})
 }
 
 func (c *config) openAiClient() *client.OpenAiClient {
@@ -93,19 +93,23 @@ func (c *config) openAiClient() *client.OpenAiClient {
 }
 
 type resource struct {
-	Namespace string `json:"namespace,omitempty" jsonschema:"title=Pinecone Namespace" jsonschema_extras:"x-collection-name=true"`
+	Namespace string `json:"namespace" jsonschema:"title=Pinecone Namespace" jsonschema_extras:"x-collection-name=true"`
 }
 
 func (resource) GetFieldDocString(fieldName string) string {
 	switch fieldName {
 	case "Namespace":
-		return "Name of the Pinecone namespace that this collection will materialize vectors into. For Pinecone starter plans, leave blank to use no namespace. Only a single binding can have a blank namespace, and Pinecone starter plans can only materialize a single binding."
+		return "Name of the Pinecone namespace that this collection will materialize vectors into."
 	default:
 		return ""
 	}
 }
 
 func (r resource) Validate() error {
+	if r.Namespace == "" {
+		return fmt.Errorf("missing namespace")
+	}
+
 	return nil
 }
 
@@ -142,17 +146,21 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 	}
 
 	// Validate connectivity and that the index exists and is appropriately dimensioned.
-	pc, err := cfg.pineconeClient(ctx)
+	pc, err := cfg.pineconeClient()
 	if err != nil {
 		return nil, err
 	}
-	if indexStats, err := pc.DescribeIndexStats(ctx); err != nil {
-		return nil, fmt.Errorf("connecting to Pinecone: %w", err)
-	} else if cfg.EmbeddingModel == textEmbeddingAda002 && indexStats.Dimension != textEmbeddingAda002VectorLength {
+
+	idx, err := pc.DescribeIndex(ctx, cfg.Index)
+	if err != nil {
+		return nil, fmt.Errorf("describing index: %w", err)
+	}
+
+	if cfg.EmbeddingModel == textEmbeddingAda002 && idx.Dimension != textEmbeddingAda002VectorLength {
 		return nil, fmt.Errorf(
 			"index '%s' has dimensions of %d but must be %d for embedding model '%s'",
 			cfg.Index,
-			indexStats.Dimension,
+			idx.Dimension,
 			textEmbeddingAda002VectorLength,
 			textEmbeddingAda002,
 		)
@@ -160,48 +168,24 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		return nil, err
 	}
 
-	// Log a warning message if the 'flow_document' metadata field has not been excluded from
-	// metadata indexing. This is a high cardinality field and is potentially large, and such fields
-	// are not recommended to be indexed.
-	indexDescribe, err := pc.DescribeIndex(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("describing index: %w", err)
-	}
-	entry := log.WithFields(log.Fields{
-		"index":       cfg.Index,
-		"environment": cfg.Environment,
-	})
-	if indexDescribe.Database.MetadataConfig.Indexed == nil {
-		// If no explicit metadata configuration for which fields are indexed has been provided all fields are indexed.
-		entry.Warn("Metadata field 'flow_document' will be indexed since this index is not configured with selective metadata indexing. Consider using selective metadata indexing to prevent this field from being indexed to optimize memory utilization.")
-	} else if slices.Contains(indexDescribe.Database.MetadataConfig.Indexed, "flow_document") {
-		entry.Warn("Metadata field 'flow_document' will be indexed. This may not result in optimal memory utilization for the index.")
-	}
-
-	if indexDescribe.Database.PodType == starterPodType {
-		// "Starter" pod types on the free tier cannot use namespaces. Namespaces are required for
-		// differentiating multiple bindings in the same index, so starter pods cannot have more
-		// than 1 binding, and the binding can't have a namespace set.
-		if len(req.Bindings) > 1 {
-			return nil, fmt.Errorf(
-				"Your Pinecone index '%s' is of type '%s', which cannot use Pinecone's namespace feature. This materialization is thus unable to have more than one bound collection. Consider removing bindings, or upgrade your Pinecone plan.",
-				cfg.Index,
-				starterPodType,
-			)
+	// Log a warning message if the 'flow_document' metadata field has not been
+	// excluded from metadata indexing for pod-based indices. This is a high
+	// cardinality field and is potentially large, and such fields are not
+	// recommended to be indexed.
+	if idx.Spec.Pod != nil {
+		var indexed []string
+		if idx.Spec.Pod.MetadataConfig != nil && idx.Spec.Pod.MetadataConfig.Indexed != nil {
+			indexed = *idx.Spec.Pod.MetadataConfig.Indexed
 		}
 
-		if len(req.Bindings) == 1 {
-			res, err := resolveResourceConfig(req.Bindings[0].ResourceConfigJson)
-			if err != nil {
-				return nil, fmt.Errorf("resolving resource config for single starter plan index binding: %w", err)
-			}
-			if res.Namespace != "" {
-				return nil, fmt.Errorf(
-					"Your Pinecone index '%s' is of type '%s', which cannot use Pinecone's namespace feature. You can still proceed by removing the Pinecone Namespace from your bound collection's Resource Configuration, or by upgrading your Pinecone plan.",
-					cfg.Index,
-					starterPodType,
-				)
-			}
+		entry := log.WithFields(log.Fields{
+			"index": cfg.Index,
+		})
+		if len(indexed) == 0 {
+			// If no explicit metadata configuration for which fields are indexed has been provided all fields are indexed.
+			entry.Warn("Metadata field 'flow_document' will be indexed since this index is not configured with selective metadata indexing. Consider using selective metadata indexing to prevent this field from being indexed to optimize memory utilization.")
+		} else if slices.Contains(indexed, "flow_document") {
+			entry.Warn("Metadata field 'flow_document' will be indexed. This may not result in optimal memory utilization for the index.")
 		}
 	}
 
@@ -237,15 +221,10 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			constraints[projection.Field] = constraint
 		}
 
-		nsPath := res.Namespace
-		if res.Namespace == "" {
-			nsPath = emptyNamespaceResourcePathSentinel
-		}
-
 		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			DeltaUpdates: true,
-			ResourcePath: []string{nsPath},
+			ResourcePath: []string{cfg.Index, res.Namespace},
 		})
 	}
 
@@ -265,6 +244,16 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 		return nil, nil, err
 	}
 
+	pc, err := cfg.pineconeClient()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	idx, err := pc.DescribeIndex(ctx, cfg.Index)
+	if err != nil {
+		return nil, nil, fmt.Errorf("describing index: %w", err)
+	}
+
 	var bindings []binding
 	for _, b := range open.Materialization.Bindings {
 		res, err := resolveResourceConfig(b.ResourceConfigJson)
@@ -272,26 +261,20 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open) (m.Tran
 			return nil, nil, err
 		}
 
+		conn, err := pc.Index(pinecone.NewIndexConnParams{Host: idx.Host, Namespace: res.Namespace})
+		if err != nil {
+			return nil, nil, fmt.Errorf("creating index connection: %w", err)
+		}
+
 		bindings = append(bindings, binding{
-			namespace:   res.Namespace,
+			conn:        conn,
 			dataHeaders: b.FieldSelection.AllFields(),
 		})
 	}
 
-	pc, err := cfg.pineconeClient(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	log.WithFields(log.Fields{
-		"index":       cfg.Index,
-		"environment": cfg.Environment,
-	}).Info("starting materialize-pinecone")
-
 	return &transactor{
-		pineconeClient: pc,
-		openAiClient:   cfg.openAiClient(),
-		bindings:       bindings,
+		openAiClient: cfg.openAiClient(),
+		bindings:     bindings,
 	}, &pm.Response_Opened{}, nil
 }
 
