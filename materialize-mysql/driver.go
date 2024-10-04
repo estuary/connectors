@@ -371,6 +371,7 @@ type transactor struct {
 		deleteInfile *infile
 	}
 	bindings []*binding
+	be       *boilerplate.BindingEvents
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -379,7 +380,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates templates,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	return func(
 		ctx context.Context,
 		ep *sql.Endpoint,
@@ -387,9 +388,10 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
+		be *boilerplate.BindingEvents,
 	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 		var cfg = ep.Config.(*config)
-		var d = &transactor{dialect: dialect, templates: templates, cfg: cfg}
+		var d = &transactor{dialect: dialect, templates: templates, cfg: cfg, be: be}
 		d.store.fence = fence
 
 		// Establish connections.
@@ -624,11 +626,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
+	d.be.StartedEvaluatingLoads()
 	rows, err := txn.QueryContext(ctx, d.load.unionSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
 	defer rows.Close()
+	d.be.FinishedEvaluatingLoads()
 
 	for rows.Next() {
 		var binding int
@@ -774,6 +778,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			defer txn.Rollback()
 
 			for _, b := range d.bindings {
+				d.be.StartedResourceCommit(b.target.Path)
 				if b.mustDelete {
 					// Apply any deletions
 					if _, err := txn.ExecContext(ctx, b.deleteQuerySQL); err != nil {
@@ -797,6 +802,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 					// Reset for the next round.
 					b.mustMerge = false
 				}
+				d.be.FinishedResourceCommit(b.target.Path)
 			}
 
 			var err error

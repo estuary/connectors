@@ -28,6 +28,7 @@ type transactor struct {
 	bucket     string
 
 	bindings []*binding
+	be       *boilerplate.BindingEvents
 }
 
 func newTransactor(
@@ -37,6 +38,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
+	be *boilerplate.BindingEvents,
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	cfg := ep.Config.(*config)
 
@@ -51,6 +53,7 @@ func newTransactor(
 		client:     client,
 		bucketPath: cfg.BucketPath,
 		bucket:     cfg.Bucket,
+		be:         be,
 	}
 
 	for _, binding := range bindings {
@@ -163,7 +166,6 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	log.Info("load: starting encoding and uploading of files")
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 		b.loadFile.start()
@@ -202,7 +204,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		edcTableDefs[b.tempTableName] = b.loadFile.edc()
 	}
-	log.Info("load: finished encoding and uploading files")
 
 	if len(subqueries) == 0 {
 		return nil // Nothing to load.
@@ -214,6 +215,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
 	ll := log.WithField("query", queryStr)
 
+	t.be.StartedEvaluatingLoads()
 	job, err := t.client.runQuery(ctx, query)
 	if err != nil {
 		ll.WithError(err).Error("client runQuery failed")
@@ -225,6 +227,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		ll.WithError(err).Error("job read failed")
 		return fmt.Errorf("load job read: %w", err)
 	}
+	t.be.FinishedEvaluatingLoads()
 
 	for {
 		var bd bindingDocument
@@ -240,15 +243,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	log.Info("load: finished loading")
-
 	return nil
 }
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	log.Info("store: starting encoding and uploading of files")
 	for it.Next() {
 		var b = t.bindings[it.Binding]
 
@@ -275,7 +275,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		log.Info("store: starting commit phase")
 		var err error
 		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
@@ -325,8 +324,6 @@ func (t *transactor) commit(ctx context.Context) error {
 		}
 	}
 
-	log.Info("store: finished encoding and uploading of files")
-
 	// Complete the transaction and return the appropriate error.
 	subqueries = append(subqueries, `
 	COMMIT TRANSACTION;
@@ -350,8 +347,6 @@ func (t *transactor) commit(ctx context.Context) error {
 			return fmt.Errorf("triggering dbt job: %w", err)
 		}
 	}
-
-	log.Info("store: finished commit")
 
 	return nil
 }

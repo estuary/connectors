@@ -114,6 +114,7 @@ type transactor struct {
 	wsClient         *databricks.WorkspaceClient
 	localStagingPath string
 	bindings         []*binding
+	be               *boilerplate.BindingEvents
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -132,6 +133,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
+	be *boilerplate.BindingEvents,
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	var cfg = ep.Config.(*config)
 
@@ -145,7 +147,7 @@ func newTransactor(
 		return nil, nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
 
-	var d = &transactor{cfg: cfg, wsClient: wsClient}
+	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be}
 
 	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
@@ -158,7 +160,7 @@ func newTransactor(
 
 	schemas := map[string]struct{}{cfg.SchemaName: {}}
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, open.Range); err != nil {
+		if err = d.addBinding(binding); err != nil {
 			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 
@@ -209,7 +211,7 @@ type binding struct {
 	needsMerge bool
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *pf.RangeSpec) error {
+func (t *transactor) addBinding(target sql.Table) error {
 	var b = &binding{target: target}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
@@ -233,7 +235,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, _range *p
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	log.Info("load: starting upload and copying of files")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -275,10 +276,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
-	log.Info("load: finished upload and copying of files")
-
-	log.Info("load: starting join query")
-
 	if len(queries) > 0 {
 		db, err := stdsql.Open("databricks", d.cfg.ToURI())
 		if err != nil {
@@ -288,12 +285,14 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		// Issue a union join of the target tables and their (now staged) load keys,
 		// and send results to the |loaded| callback.
+		d.be.StartedEvaluatingLoads()
 		var unionQuery = strings.Join(queries, "\nUNION ALL\n")
 		rows, err := db.QueryContext(ctx, unionQuery)
 		if err != nil {
 			return fmt.Errorf("querying Load documents: %w", err)
 		}
 		defer rows.Close()
+		d.be.FinishedEvaluatingLoads()
 
 		for rows.Next() {
 			var binding int
@@ -312,7 +311,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("querying Loads: %w", err)
 		}
 	}
-	log.Info("load: finished join query")
 
 	return nil
 }
@@ -345,7 +343,6 @@ const queryBatchSize = 128
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-	log.Info("store: starting file upload and copies")
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -430,8 +427,6 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
-	log.Info("store: finished file upload and copies")
-
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var checkpointJSON, err = json.Marshal(d.cp)
 		if err != nil {
@@ -445,8 +440,6 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 // Acknowledge merges data from temporary table to main table
 // TODO: run these queries concurrently for improved performance
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	log.Info("store: starting committing changes")
-
 	var db *stdsql.DB
 	if len(d.cp) > 0 {
 		var err error
@@ -458,9 +451,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 
 	for stateKey, item := range d.cp {
+		path := d.pathForStateKey(stateKey)
 		// we skip queries that belong to tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if !d.hasStateKey(stateKey) {
+		if len(path) == 0 {
 			continue
 		}
 
@@ -472,6 +466,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			queries = []string{item.Query}
 		}
 		for _, query := range queries {
+			d.be.StartedResourceCommit(path)
 			if _, err := db.ExecContext(ctx, query); err != nil {
 				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 				// it is okay to skip them in this case
@@ -482,6 +477,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				}
 				return nil, fmt.Errorf("query %q failed: %w", query, err)
 			}
+			d.be.FinishedResourceCommit(path)
 		}
 
 		// Cleanup files.
@@ -515,17 +511,16 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
 	}
 
-	log.Info("store: finished committing changes")
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
-func (d *transactor) hasStateKey(stateKey string) bool {
+func (d *transactor) pathForStateKey(stateKey string) []string {
 	for _, b := range d.bindings {
 		if b.target.StateKey == stateKey {
-			return true
+			return b.target.Path
 		}
 	}
-	return false
+	return nil
 }
 
 func pathsWithRoot(root string, paths []string) []string {
