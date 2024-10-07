@@ -41,7 +41,7 @@ type PersistentState struct {
 }
 
 // Validate performs basic sanity-checking after a state has been parsed from JSON. More
-// detailed checks are performed by UpdateState.
+// detailed checks are performed later on.
 func (ps *PersistentState) Validate() error {
 	return nil
 }
@@ -159,8 +159,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}).Debug("discovered table")
 	}
 
-	if err := c.updateState(ctx); err != nil {
-		return fmt.Errorf("error updating capture state: %w", err)
+	if err := c.reconcileStateWithBindings(ctx); err != nil {
+		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
 	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
@@ -191,27 +191,144 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 	}()
 
-	// Perform an initial "catch-up" stream-to-fence before transitioning
-	// any "Pending" streams into the "Backfill" state. This helps ensure that
-	// a given stream only ever observes replication events which occur *after*
-	// the connector was started.
+	// Perform an initial "catch-up" stream-to-fence before entering the main capture loop.
 	if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
+
+	for ctx.Err() == nil {
+		// If any streams are currently pending, initialize them so they can start backfilling.
+		// TODO(wgd): This will ultimately have to take into account the latest discovery info
+		// so that we can establish whether a dropped-and-recreated table is ready to backfill
+		// again. At that time we might want to add some sort of timer controlling when we run
+		// this process so it doesn't happen too often.
+		if err := c.activatePendingStreams(ctx, replStream); err != nil {
+			return fmt.Errorf("error initializing pending streams: %w", err)
+		}
+
+		// If any tables are currently backfilling, go perform another backfill iteration.
+		if c.BindingsCurrentlyBackfilling() != nil {
+			if err := c.backfillStreams(ctx); err != nil {
+				return fmt.Errorf("error performing backfill: %w", err)
+			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
+				return fmt.Errorf("error streaming until fence: %w", err)
+			} else if err := c.emitState(); err != nil {
+				return err
+			}
+
+			if TestShutdownAfterBackfill {
+				return nil // In tests we sometimes want to shut down here
+			}
+			continue // Repeat the main loop from the top
+		}
+
+		// We often want to shut down at this point in tests. Before doing so, we emit
+		// a state checkpoint to ensure that streams reliably transition into the Active
+		// state during tests even if there is no backfill work to do.
+		if TestShutdownAfterCaughtUp {
+			return c.emitState()
+		}
+
+		// Finally, since there's no other work to do right now, we just stream changes for a period of time.
+		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
+			return err
+		}
+	}
+	return ctx.Err()
+}
+
+// reconcileStateWithBindings updates the capture's state to reflect any added or removed bindings.
+func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
+	// Create the Streams map if nil
+	if c.State.Streams == nil {
+		c.State.Streams = make(map[boilerplate.StateKey]*TableState)
+	}
+
+	// Add a state entry for any new bindings, initially "Pending"
+	allStreamsAreNew := true
+	for _, binding := range c.Bindings {
+		var stateKey = binding.StateKey
+
+		// See if the stream is already initialized. If it's not, then create it.
+		var streamState, ok = c.State.Streams[stateKey]
+		if ok && streamState.Mode != TableModeIgnore {
+			allStreamsAreNew = false
+			continue
+		}
+
+		logrus.WithField("stateKey", stateKey).Info("binding added to capture")
+		c.State.Streams[stateKey] = &TableState{Mode: TableModePending, dirty: true}
+	}
+
+	// When a binding is removed we change the table state to "Ignore
+	streamExistsInCatalog := func(sk boilerplate.StateKey) bool {
+		for _, b := range c.Bindings {
+			if b.StateKey == sk {
+				return true
+			}
+		}
+		return false
+	}
+	for stateKey, state := range c.State.Streams {
+		if state.Mode != TableModeIgnore && !streamExistsInCatalog(stateKey) {
+			logrus.WithField("stateKey", stateKey).Info("binding removed from capture")
+			c.State.Streams[stateKey] = &TableState{Mode: TableModeIgnore, dirty: true}
+		}
+	}
+
+	// If all bindings are new (or there are no bindings), reset the replication cursor. This is
+	// safe because logically if no streams are currently active then we can't miss any events of
+	// interest when the replication stream jumps ahead, and doing this allows the user an easy
+	// recovery path after WAL deletion, just hit the "Backfill Everything" button in the UI.
+	if allStreamsAreNew {
+		if len(c.Bindings) > 0 {
+			logrus.Info("all bindings are new, resetting replication cursor")
+		} else {
+			logrus.Info("capture has no bindings, resetting replication cursor")
+		}
+		c.State.Cursor = ""
+	}
+
+	// Emit the new state to stdout. This isn't strictly necessary but it helps to make
+	// the emitted sequence of state updates a lot more readable.
+	return c.emitState()
+}
+
+// activatePendingStreams transitions streams from a "Pending" state to being captured once they're eligible.
+func (c *Capture) activatePendingStreams(ctx context.Context, replStream ReplicationStream) error {
 	for _, binding := range c.BindingsInState(TableModePending) {
 		var streamID = binding.StreamID
 		var stateKey = binding.StateKey
 
-		logrus.WithFields(logrus.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
-
+		// Look up the stream state and mark it dirty since we intend to update it immediately.
 		var state = c.State.Streams[stateKey]
+		state.dirty = true
+
 		var discoveryInfo = c.discovery[streamID]
+		if discoveryInfo == nil {
+			return fmt.Errorf("stream %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
+		}
+
+		// Only real tables with table_type = 'BASE TABLE' can be captured via replication.
+		// Discovery should not suggest capturing from views, but there are an unknown
+		// number of preexisting captures which may have views in their bindings, and we
+		// would rather silently start ignoring these rather than making them immediately
+		// be errors.
+		//
+		// This bit of logic is part of a bugfix in August 2023 and we would like to
+		// remove it in the future once it will not break any otherwise-successful
+		// captures.
+		if !discoveryInfo.BaseTable {
+			logrus.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
+			state.Mode = TableModeIgnore
+			continue
+		}
+
+		// Select the appropriate state transition depending on the backfill mode in the resource config.
+		logrus.WithFields(logrus.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
 		switch binding.Resource.Mode {
 		case BackfillModeAutomatic:
-			if len(state.KeyColumns) == 0 {
-				logrus.WithField("stream", streamID).Info("autoselected keyless backfill mode (table has no primary key)")
-				state.Mode = TableModeKeylessBackfill
-			} else if discoveryInfo != nil && discoveryInfo.UnpredictableKeyOrdering {
+			if discoveryInfo.UnpredictableKeyOrdering {
 				logrus.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
 				state.Mode = TableModeUnfilteredBackfill
 			} else {
@@ -233,10 +350,30 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		default:
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
 		}
-		state.dirty = true
-		c.State.Streams[stateKey] = state
 
-		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
+		// When initializing a binding with the precise or unfiltered backfill modes, we'll need a primary key.
+		if state.Mode == TableModePreciseBackfill || state.Mode == TableModeUnfilteredBackfill {
+			if len(binding.Resource.PrimaryKey) > 0 {
+				logrus.WithFields(logrus.Fields{"stream": streamID, "key": binding.Resource.PrimaryKey}).Debug("backfill key overriden by resource config")
+				state.KeyColumns = binding.Resource.PrimaryKey
+			} else {
+				logrus.WithFields(logrus.Fields{"stream": streamID, "key": binding.CollectionKey}).Debug("using collection primary key as backfill key")
+				state.KeyColumns = nil
+				for _, ptr := range binding.CollectionKey {
+					state.KeyColumns = append(state.KeyColumns, collectionKeyToPrimaryKey(ptr))
+				}
+			}
+
+			if !slices.Equal(state.KeyColumns, discoveryInfo.PrimaryKey) {
+				logrus.WithFields(logrus.Fields{
+					"stream":      streamID,
+					"backfillKey": state.KeyColumns,
+					"databaseKey": discoveryInfo.PrimaryKey,
+				}).Warn("backfill key differs from database table primary key")
+			}
+		}
+
+		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, discoveryInfo, state.Metadata); err != nil {
 			return fmt.Errorf("error activating replication for table %q: %w", streamID, err)
 		}
 	}
@@ -256,199 +393,19 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// to deprecate the whole 'SkipBackfills' configuration property in the near future
 	// so I have left this little blob of logic nicely self-contained here.
 	for _, binding := range c.BindingsCurrentlyBackfilling() {
-		var streamID = binding.StreamID
-		var stateKey = binding.StateKey
-		if !c.Database.ShouldBackfill(streamID) {
-			var state = c.State.Streams[stateKey]
-			if state.Scanned == nil {
-				logrus.WithField("stream", streamID).Info("skipping backfill for stream")
-			} else {
-				logrus.WithFields(logrus.Fields{
-					"stream":  streamID,
-					"scanned": state.Scanned,
-				}).Info("terminating backfill early for stream")
-			}
+		if !c.Database.ShouldBackfill(binding.StreamID) {
+			var state = c.State.Streams[binding.StateKey]
+			logrus.WithFields(logrus.Fields{
+				"stream":  binding.StreamID,
+				"scanned": state.Scanned,
+			}).Info("skipping backfill for stream")
 			state.Mode = TableModeActive
 			state.Scanned = nil
 			state.dirty = true
-			c.State.Streams[stateKey] = state
+			c.State.Streams[binding.StateKey] = state
 		}
-	}
-
-	// Backfill any tables which require it.
-	for c.BindingsCurrentlyBackfilling() != nil {
-		if err := c.backfillStreams(ctx); err != nil {
-			return fmt.Errorf("error performing backfill: %w", err)
-		} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
-			return fmt.Errorf("error streaming until fence: %w", err)
-		} else if err := c.emitState(); err != nil {
-			return err
-		}
-
-		if TestShutdownAfterBackfill {
-			return nil // In tests we sometimes want to shut down here
-		}
-	}
-
-	// Once all backfills are complete, make sure an up-to-date state checkpoint
-	// gets emitted. This ensures that streams reliably transition into the Active
-	// state during tests even if there is no backfill work to do.
-	logrus.Info("no tables currently require backfilling")
-	if err := c.emitState(); err != nil {
-		return err
-	}
-	if TestShutdownAfterCaughtUp {
-		return nil // In tests we typically want to shut down at this point
-	}
-
-	// Finally, we can just stream changes indefinitely, emitting state updates on every transaction commit.
-	if err := c.streamForever(ctx, replStream); err != nil {
-		return err
 	}
 	return nil
-}
-
-func (c *Capture) updateState(_ context.Context) error {
-	// Create the Streams map if nil
-	if c.State.Streams == nil {
-		c.State.Streams = make(map[boilerplate.StateKey]*TableState)
-	}
-
-	// Streams may be added to the catalog at various times. We need to
-	// initialize new state entries for these streams, and while we're at
-	// it this is a good time to sanity-check the primary key configuration.
-	allStreamsAreNew := true
-	for streamID, binding := range c.Bindings {
-		var stateKey = binding.StateKey
-		var discoveryInfo = c.discovery[streamID]
-		if discoveryInfo == nil {
-			return fmt.Errorf("table %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
-		}
-
-		// Only real tables with table_type = 'BASE TABLE' can be captured via replication.
-		// Discovery should not suggest capturing from views, but there are an unknown
-		// number of preexisting captures which may have views in their bindings, and we
-		// would rather silently start ignoring these rather than making them immediately
-		// be errors.
-		//
-		// This bit of logic is part of a bugfix in August 2023 and we would like to
-		// remove it in the future once it will not break any otherwise-successful
-		// captures.
-		if !discoveryInfo.BaseTable {
-			logrus.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
-			if _, ok := c.State.Streams[stateKey]; ok {
-				c.State.Streams[stateKey] = &TableState{Mode: TableModeIgnore, dirty: true}
-			}
-			continue
-		}
-
-		// Select the primary key from the first available source. In order of priority:
-		//   - If the resource config specifies a primary key override then we'll use that.
-		//   - Normally we'll use the primary key from the collection spec.
-		//   - And as a fallback which *should* no longer be reachable, we'll use the
-		//     primary key from the startup discovery run.
-		logrus.WithFields(logrus.Fields{
-			"stream":     streamID,
-			"resource":   binding.Resource.PrimaryKey,
-			"collection": binding.CollectionKey,
-			"discovery":  discoveryInfo.PrimaryKey,
-		}).Debug("selecting primary key")
-		var primaryKey []string
-		if binding.Resource.Mode == BackfillModeOnlyChanges || binding.Resource.Mode == BackfillModeWithoutKey {
-			logrus.WithFields(logrus.Fields{"stream": streamID}).Debug("initializing stream state without primary key")
-		} else if len(binding.Resource.PrimaryKey) > 0 {
-			primaryKey = binding.Resource.PrimaryKey
-			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Debug("using resource primary key")
-		} else if len(binding.CollectionKey) > 0 {
-			for _, ptr := range binding.CollectionKey {
-				primaryKey = append(primaryKey, collectionKeyToPrimaryKey(ptr))
-			}
-			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Debug("using collection primary key")
-		} else if len(discoveryInfo.PrimaryKey) > 0 {
-			primaryKey = discoveryInfo.PrimaryKey
-			logrus.WithFields(logrus.Fields{"stream": streamID, "key": primaryKey}).Warn("using discovery primary key -- this is DEPRECATED and also shouldn't be possible")
-		} else {
-			return fmt.Errorf("stream %q: primary key must be specified", streamID)
-		}
-
-		// See if the stream is already initialized. If it's not, then create it.
-		var streamState, ok = c.State.Streams[stateKey]
-		if !ok || streamState.Mode == TableModeIgnore {
-			c.State.Streams[stateKey] = &TableState{Mode: TableModePending, KeyColumns: primaryKey, dirty: true}
-			continue
-		}
-		allStreamsAreNew = false
-
-		// The following safety checks only matter if we're actively backfilling the table or
-		// intend to start backfilling it shortly. But checking for that would risk silently
-		// failing if a new keyed backfill mode were added in the future, so instead we check
-		// for the set of known-to-be-fine situations here.
-		var notBackfilling = (streamState.Mode == TableModeIgnore) ||
-			(streamState.Mode == TableModeActive) ||
-			(streamState.Mode == TableModeKeylessBackfill) ||
-			(streamState.Mode == TableModePending && binding.Resource.Mode == BackfillModeOnlyChanges) ||
-			(streamState.Mode == TableModePending && binding.Resource.Mode == BackfillModeWithoutKey)
-		if notBackfilling {
-			continue
-		}
-
-		// Print a warning if the primary key we'll be using differs from the database's primary key.
-		if strings.Join(primaryKey, ",") != strings.Join(discoveryInfo.PrimaryKey, ",") {
-			logrus.WithFields(logrus.Fields{
-				"stream":      streamID,
-				"backfillKey": primaryKey,
-				"databaseKey": discoveryInfo.PrimaryKey,
-			}).Warn("primary key for backfill differs from database table primary key")
-		}
-
-		// Error out if the stream state was previously initialized with a different key
-		if strings.Join(streamState.KeyColumns, ",") != strings.Join(primaryKey, ",") {
-			return fmt.Errorf("stream %q: primary key %q doesn't match initialized scan key %q", streamID, primaryKey, streamState.KeyColumns)
-		}
-	}
-
-	// Likewise streams may be removed from the catalog, and we need to forget
-	// the corresponding state information.
-	streamExistsInCatalog := func(sk boilerplate.StateKey) bool {
-		for _, b := range c.Bindings {
-			if b.StateKey == sk {
-				return true
-			}
-		}
-		return false
-	}
-	for stateKey, state := range c.State.Streams {
-		if !streamExistsInCatalog(stateKey) && state.Mode != TableModeIgnore {
-			logrus.WithField("stateKey", stateKey).Info("stream removed from catalog")
-			c.State.Streams[stateKey] = &TableState{Mode: TableModeIgnore, dirty: true}
-		}
-	}
-
-	// If all bindings have been removed or had their backfill counter incremented, forget the old
-	// replication cursor. This is safe because logically if no streams are active or a re-backfill
-	// has been requested for them then we can't miss any events of interest when the replication
-	// stream jumps ahead, and doing this allows the user an easy recovery path after WAL deletion,
-	// they just need to either increment the backfill counter for all bindings, or disable all
-	// bindings and then re-enable them (which will cause them all to get backfilled anew, as they
-	// should after such an event).
-	if allStreamsAreNew {
-		logrus.Info("all bindings are new, resetting replication cursor")
-		c.State.Cursor = ""
-	}
-
-	// Emit the new state to stdout. This isn't strictly necessary but it helps to make
-	// the emitted sequence of state updates a lot more readable.
-	return c.emitState()
-}
-
-func (c *Capture) streamForever(ctx context.Context, replStream ReplicationStream) error {
-	logrus.Info("streaming replication events indefinitely")
-	for ctx.Err() == nil {
-		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
-			return err
-		}
-	}
-	return ctx.Err()
 }
 
 // streamToFence processes replication events until after a new fence is reached.
