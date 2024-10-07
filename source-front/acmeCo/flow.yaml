@@ -1,0 +1,767 @@
+---
+collections:
+  acmeCo/accounts:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/accounts_contacts:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/channels:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/company_tags:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/contact_groups:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/contacts:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/contacts_notes:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        created_at:
+          type: number
+        contact_id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - created_at
+        - contact_id
+      type: object
+      x-infer-schema: true
+    key:
+      - /contact_id
+  acmeCo/conversations:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        created_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - created_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/conversations_drafts:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        created_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - created_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/conversations_events:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        emitted_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - emitted_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/conversations_followers:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/conversations_inboxes:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type:
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/conversations_messages:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        created_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - created_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/events:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        emitted_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - emitted_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/inboxes:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/inboxes_channels:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/inboxes_conversations:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        created_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - created_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/inboxes_teammates:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/knowledge_bases:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/knowledge_bases_articles:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        updated_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/knowledge_bases_categories:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        updated_at:
+          type: number
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/links:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/message_template_folders:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/message_templates:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/tags:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/tags_children:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teammates:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teammates_contact_groups:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teammates_message_templates:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teammates_tags:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teams:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teams_contact_groups:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type:
+            - string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      required:
+        - id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teams_message_templates:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teams_signatures:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/teams_tags:
+    schema:
+      $schema: "http://json-schema.org/schema#"
+      additionalProperties: true
+      properties:
+        id:
+          type: string
+        updated_at:
+          type: number
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      required:
+        - id
+        - updated_at
+      type: object
+      x-infer-schema: true
+    key:
+      - /id
