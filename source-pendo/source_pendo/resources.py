@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, UTC
 import functools
 from logging import Logger
 
@@ -20,12 +20,20 @@ from .models import (
 )
 from .api import (
     fetch_resources,
+    backfill_events,
     fetch_events,
+    backfill_aggregated_events,
     fetch_aggregated_events,
     fetch_metadata,
+    _dt_to_ms,
     API,
 )
 
+# Event data for a given hour isn't available via the API until ~4-6 hours afterwards.
+# This isn't mentioned in Pendo's docs but has been observed empirically. We shift the
+# cutoff between backfills & incremental replication back multiple hours to ensure we're
+# only backfilling date windows where event data should be available in the API.
+API_EVENT_LAG = 12
 
 AUTHORIZATION_HEADER = "x-pendo-integration-key"
 
@@ -138,6 +146,7 @@ def events(
     def open(
         entity: str,
         model: type[common.BaseDocument],
+        identifying_field: str,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -154,17 +163,29 @@ def events(
                 http,
                 entity,
                 model,
+                identifying_field,
+            ),
+            fetch_page=functools.partial(
+                backfill_events,
+                http,
+                entity,
+                model,
+                identifying_field,
             )
         )
+
+    backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
+    cutoff = datetime.now(tz=UTC) - timedelta(hours=API_EVENT_LAG)
 
     events = [
         common.Resource(
             name=resource_name,
-            key=["/appId", "/guideTimestamp", "/remoteIp", identifying_field],
+            key=["/appId", "/guideTimestamp", "/remoteIp", f"/{identifying_field}"],
             model=model,
-            open=functools.partial(open, entity, model),
+            open=functools.partial(open, entity, model, identifying_field),
             initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=config.startDate) # type: ignore
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
                 name=resource_name, interval=timedelta(seconds=0)
@@ -183,6 +204,7 @@ def aggregated_events(
     def open(
         entity: str,
         model: type[common.BaseDocument],
+        identifying_field: str,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -199,17 +221,29 @@ def aggregated_events(
                 http,
                 entity,
                 model,
+                identifying_field,
+            ),
+            fetch_page=functools.partial(
+                backfill_aggregated_events,
+                http,
+                entity,
+                model,
+                identifying_field,
             )
         )
+
+    backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
+    cutoff = datetime.now(tz=UTC) - timedelta(hours=API_EVENT_LAG) 
 
     events = [
         common.Resource(
             name=resource_name,
-            key=["/appId", "/hour", "/remoteIp", identifying_field],
+            key=["/appId", "/hour", "/remoteIp", f"/{identifying_field}"],
             model=model,
-            open=functools.partial(open, entity, model),
+            open=functools.partial(open, entity, model, identifying_field),
             initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=config.startDate) # type: ignore
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
                 name=resource_name, interval=timedelta(minutes=5)

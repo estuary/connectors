@@ -108,14 +108,14 @@ METADATA_TYPES: list[tuple[str, str]] = [
 
 # Supported event types, their corresponding name, their keys, and their model.
 EVENT_TYPES: list[tuple[str, str, str, type[BaseDocument]]] = [
-    ("guideEvents", "GuideEvents", "/guideId", GuideEvent),
-    ("pollEvents", "PollEvents", "/pollId", PollEvent),
+    ("guideEvents", "GuideEvents", "guideId", GuideEvent),
+    ("pollEvents", "PollEvents", "pollId", PollEvent),
 ]
 
 
 # Supported aggregated event types, their corresponding resource name, their keys, and their model.
 AGGREGATED_EVENT_TYPES: list[tuple[str, str, str, type[BaseDocument]]] = [
-    ("pageEvents", "PageEvents", "/pageId", PageEvent),
-    ("featureEvents", "FeatureEvents", "/featureId", FeatureEvent),
-    ("trackEvents", "TrackEvents", "/trackTypeId", TrackEvent),
+    ("pageEvents", "PageEvents", "pageId", PageEvent),
+    ("featureEvents", "FeatureEvents", "featureId", FeatureEvent),
+    ("trackEvents", "TrackEvents", "trackTypeId", TrackEvent),
 ]
