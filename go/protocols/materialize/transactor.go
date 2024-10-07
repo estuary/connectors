@@ -112,7 +112,7 @@ func RunTransactions(
 	opened pm.Response_Opened,
 	transactor Transactor,
 ) (_err error) {
-	defer func() { transactor.Destroy() }()
+	defer transactor.Destroy()
 
 	if err := open.Validate(); err != nil {
 		return fmt.Errorf("open is invalid: %w", err)
@@ -127,7 +127,7 @@ func RunTransactions(
 	}
 
 	var rxRequest = pm.Request{Open: &open}
-	var txResponse, err = WriteOpened(stream, &opened)
+	var txResponse, err = writeOpened(stream, &opened)
 	if err != nil {
 		return err
 	}
@@ -169,7 +169,7 @@ func RunTransactions(
 
 		if ackState, err := transactor.Acknowledge(ctx); err != nil {
 			return err
-		} else if err := WriteAcknowledged(stream, ackState, &txResponse); err != nil {
+		} else if err := writeAcknowledged(stream, ackState, &txResponse); err != nil {
 			return err
 		}
 
@@ -200,7 +200,7 @@ func RunTransactions(
 			}
 
 			loaded++
-			return WriteLoaded(stream, &txResponse, binding, doc)
+			return writeLoaded(stream, &txResponse, binding, doc)
 		})
 
 		if it.awaitDoneCh == nil && awaitErr != nil {
@@ -225,7 +225,7 @@ func RunTransactions(
 			loadIt      = LoadIterator{stream: stream, request: &rxRequest, awaitDoneCh: awaitDoneCh, ctx: loadCtx}
 		)
 
-		if err = ReadAcknowledge(stream, &rxRequest); err != nil {
+		if err = readAcknowledge(stream, &rxRequest); err != nil {
 			return err
 		}
 
@@ -263,9 +263,9 @@ func RunTransactions(
 			return nil // Graceful shutdown.
 		}
 
-		if err = ReadFlush(&rxRequest); err != nil {
+		if err = validateIsFlush(&rxRequest); err != nil {
 			return err
-		} else if err = WriteFlushed(stream, &txResponse); err != nil {
+		} else if err = writeFlushed(stream, &txResponse); err != nil {
 			return err
 		}
 
@@ -279,7 +279,7 @@ func RunTransactions(
 			return fmt.Errorf("transactor.Store: %w", err)
 		}
 		var runtimeCheckpoint *pc.Checkpoint
-		if runtimeCheckpoint, err = ReadStartCommit(&rxRequest); err != nil {
+		if runtimeCheckpoint, err = checkpointFromStartCommit(&rxRequest); err != nil {
 			return err
 		}
 
@@ -304,7 +304,7 @@ func RunTransactions(
 		default:
 		}
 
-		if err = WriteStartedCommit(stream, &txResponse, stateUpdate); err != nil {
+		if err = writeStartedCommit(stream, &txResponse, stateUpdate); err != nil {
 			return err
 		}
 	}
