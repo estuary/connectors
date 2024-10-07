@@ -188,7 +188,7 @@ def events(
                 backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
-                name=resource_name, interval=timedelta(seconds=0)
+                name=resource_name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
         )
