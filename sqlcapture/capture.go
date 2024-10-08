@@ -119,8 +119,6 @@ type Capture struct {
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
 
-	discovery map[string]*DiscoveryInfo // Cached result of the most recent table discovery request
-
 	// A mutex-guarded list of checkpoint cursor values. Values are appended by
 	// emitState() whenever it outputs a checkpoint and removed whenever the
 	// acknowledgement-relaying goroutine receives an Acknowledge message.
@@ -141,17 +139,15 @@ var (
 )
 
 // Run is the top level entry point of the capture process.
-func (c *Capture) Run(ctx context.Context) (err error) {
-	// Perform discovery and cache the result. This is used at startup when
-	// updating the state to reflect catalog changes, and then later it is
-	// plumbed through so that value translation can take column types into
-	// account.
+func (c *Capture) Run(ctx context.Context) error {
+	// Perform discovery and log the full results for convenience. This info
+	// will be needed when activating all currently-active bindings below.
 	logrus.Info("discovering tables")
-	c.discovery, err = c.Database.DiscoverTables(ctx)
+	var discovery, err = c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	}
-	for streamID, discoveryInfo := range c.discovery {
+	for streamID, discoveryInfo := range discovery {
 		logrus.WithFields(logrus.Fields{
 			"table":      streamID,
 			"primaryKey": discoveryInfo.PrimaryKey,
@@ -170,7 +166,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	for _, binding := range c.BindingsCurrentlyActive() {
 		var state = c.State.Streams[binding.StateKey]
 		var streamID = binding.StreamID
-		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, c.discovery[streamID], state.Metadata); err != nil {
+		if err := replStream.ActivateTable(ctx, streamID, state.KeyColumns, discovery[streamID], state.Metadata); err != nil {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
@@ -304,7 +300,11 @@ func (c *Capture) activatePendingStreams(ctx context.Context, replStream Replica
 		var state = c.State.Streams[stateKey]
 		state.dirty = true
 
-		var discoveryInfo = c.discovery[streamID]
+		var discovery, err = c.Database.DiscoverTables(ctx)
+		if err != nil {
+			return err
+		}
+		var discoveryInfo = discovery[streamID]
 		if discoveryInfo == nil {
 			return fmt.Errorf("stream %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
 		}
@@ -547,7 +547,11 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	var stateKey = c.Bindings[streamID].StateKey
 	var streamState = c.State.Streams[stateKey]
 
-	discoveryInfo, ok := c.discovery[streamID]
+	var discovery, err = c.Database.DiscoverTables(ctx)
+	if err != nil {
+		return err
+	}
+	discoveryInfo, ok := discovery[streamID]
 	if !ok {
 		return fmt.Errorf("unknown table %q", streamID)
 	}
@@ -555,7 +559,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	// Process backfill query results as a callback-driven stream.
 	var lastRowKey = streamState.Scanned
 	var eventCount int
-	var backfillComplete, err = c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
+	backfillComplete, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
 		if streamState.Mode == TableModePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
