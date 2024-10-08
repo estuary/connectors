@@ -91,6 +91,7 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		log.WithField("addr", cfg.Address).Info("connected without TLS")
 		conn = connWithoutTLS
 	} else {
+		log.WithFields(log.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		var mysqlErr *mysql.MyError
 		if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 			return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")

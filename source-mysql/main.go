@@ -222,6 +222,7 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = connWithoutTLS
 	} else {
+		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		var mysqlErr *mysql.MyError
 		if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 			return cerrors.NewUserError(mysqlErr, "incorrect username or password")
