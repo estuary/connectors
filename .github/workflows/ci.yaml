@@ -118,6 +118,7 @@ jobs:
           - materialize-sqlite
           - materialize-webhook
           - materialize-sqlserver
+          - materialize-slack
         include:
           - connector: source-criteo
             connector_type: capture
