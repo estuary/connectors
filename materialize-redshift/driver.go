@@ -812,9 +812,10 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 	}
 
 	for _, b := range d.bindings {
-		if b.hasDeletes || b.hasStores {
-			d.be.StartedResourceCommit(b.target.Path)
+		if !b.hasDeletes && !b.hasStores {
+			continue
 		}
+		d.be.StartedResourceCommit(b.target.Path)
 
 		if b.hasDeletes {
 			// Create the temporary table for staging values to delete from the target table.
@@ -832,11 +833,8 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 		}
 
 		if !b.hasStores {
-			d.be.FinishedResourceCommit(b.target.Path)
-			continue
-		}
-
-		if b.mustMerge {
+			// Pass.
+		} else if b.mustMerge {
 			// Create the temporary table for staging values to merge into the target table.
 			// Redshift actually supports transactional DDL for creating tables, so this can be
 			// executed within the transaction.
@@ -855,6 +853,7 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			}
 		}
+
 		d.be.FinishedResourceCommit(b.target.Path)
 	}
 
