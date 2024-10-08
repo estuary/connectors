@@ -159,6 +159,7 @@ require (
 	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.2 // indirect
 	github.com/googleapis/gax-go/v2 v2.12.4 // indirect
+	github.com/gorilla/websocket v1.5.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 // indirect
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0 // indirect
 	github.com/gsterjov/go-libsecret v0.0.0-20161001094733-a6f4afe4910c // indirect
@@ -202,6 +203,7 @@ require (
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
 	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed // indirect
+	github.com/slack-go/slack v0.14.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
