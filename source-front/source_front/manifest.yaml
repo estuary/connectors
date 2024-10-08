@@ -2087,290 +2087,7 @@ description: 'Website: https://app.frontapp.com/
   Auth page: https://dev.frontapp.com/docs/create-and-revoke-api-tokens
 
   API Docs: https://dev.frontapp.com/reference/introduction'
-metadata:
-  assist: {}
-  autoImportSchema:
-    accounts: true
-    accounts_contacts: true
-    channels: true
-    company_tags: true
-    contact_groups: true
-    contacts: true
-    contacts_notes: true
-    conversations: true
-    conversations_drafts: true
-    conversations_events: true
-    conversations_followers: true
-    conversations_inboxes: true
-    conversations_messages: true
-    events: true
-    inboxes: true
-    inboxes_channels: true
-    inboxes_conversations: true
-    inboxes_teammates: true
-    knowledge_bases: true
-    knowledge_bases_articles: true
-    knowledge_bases_categories: true
-    links: true
-    message_template_folders: true
-    message_templates: true
-    tags: true
-    tags_children: true
-    teammates: true
-    teammates_contact_groups: true
-    teammates_message_templates: true
-    teammates_tags: true
-    teams: true
-    teams_contact_groups: true
-    teams_message_templates: true
-    teams_signatures: true
-    teams_tags: true
-  testedStreams:
-    accounts:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 6bfc980bc1097267f5d4a738bad844e028174436
-    accounts_contacts:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 3314e83f63586e0ecc021e372a21339eb9e1708a
-    channels:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 7bce9c3212161c97afe70093b60b48c87b12cdf9
-    company_tags:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: c20a9a13efdf976b95d3d6786a56bf10257d8ef1
-    contact_groups:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: afe88d167d005fe56aa9cc567e959e44acbee34e
-    contacts:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 4b9188d48d7d3675fd70701cc13fa0974abbeaf3
-    contacts_notes:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 2ea6410e6225b8b10b746cfbb9f3080ea4a3381d
-    conversations:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 3fe9feed03dd9e4f80add7d2023211adb3bbc731
-    conversations_drafts:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: f150684526dd62b12908cef47811b557a8c120ad
-    conversations_events:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 9d38e704e3059709b92097df3bcecd1d46c42c55
-    conversations_followers:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 3f7c7abd4a90eb3ccbe9fe574d3e85d995e284bf
-    conversations_inboxes:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: c04fac92a2a79f256e7fcddee9f0ac1ebe5ca72a
-    conversations_messages:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 4c9117b15f2e568d8a7fc964fc50eeb17c5a7d0e
-    events:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 8763b24a8a4fab0ee36210fe4dea6df6704a58ad
-    inboxes:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: ccfafe04fab65a323c5f128f449015e3138932e8
-    inboxes_channels:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 776006ec048015c5050bb4ba116d444fdd41f0a3
-    inboxes_conversations:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 7f3768152ece70759ab54e87551029dac6554e9e
-    inboxes_teammates:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 759d4aa9072b9a27a0c8f0a749dbd9ed3480d42f
-    knowledge_bases:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 969d9bc06efb925b396134d4acb3329c834ad341
-    knowledge_bases_articles:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 53782f24dcf75ceff43cde4f51678fa0edc2d77d
-    knowledge_bases_categories:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 6752124f21596f2f347f2b7bcfcec6256cca7a47
-    links:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 349ff49de35c11125591b0f5153f98bf62a84e8d
-    message_template_folders:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 21e43119af71f2d313786e94e014602f9d161ef9
-    message_templates:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 087a259777fdcf9ad6325035dd332e807ea739a1
-    tags:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: ec297329b1fb74a54021e37ead7eca7e35f37fe7
-    tags_children:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: bb92b7d7bcfb19be47abb15916b44b18bd1a745d
-    teammates:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 80da0a398e42e31a10dae69ec8f034e65915a082
-    teammates_contact_groups:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: b95815402d33cf05192216d5029922c6878d5184
-    teammates_message_templates:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: a41b9efbf0680193347303f2212d8592b984c6b2
-    teammates_tags:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: b746adcba31f8842964b5388d911f50050eb4089
-    teams:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: ef84a17900406262094001a6c1e4157a639cb9b6
-    teams_contact_groups:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 1fb134248abefda30e4f3a90d583b5fbe4f3d4a1
-    teams_message_templates:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: 912c3b103e8d6a9d3f0cc05871a09b50e31c4cbf
-    teams_signatures:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: e52e4696f894fc4674b443c416fbf8e2796b6150
-    teams_tags:
-      hasRecords: true
-      hasResponse: true
-      primaryKeysArePresent: true
-      primaryKeysAreUnique: true
-      responsesAreSuccessful: true
-      streamHash: ab51090dff3c43d8708771fcf6b54dd4a524c976
+
 schemas:
   accounts:
     $schema: http://json-schema.org/schema#
@@ -2378,11 +2095,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   accounts_contacts:
     $schema: http://json-schema.org/schema#
@@ -2390,11 +2104,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   channels:
     $schema: http://json-schema.org/schema#
@@ -2411,11 +2122,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   contact_groups:
     $schema: http://json-schema.org/schema#
@@ -2432,59 +2140,44 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   contacts_notes:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      created_at:
-        type: number
       contact_id:
         type: string
     required:
-    - created_at
     - contact_id
     type: object
   conversations:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      created_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - created_at
     type: object
   conversations_drafts:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      created_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - created_at
     type: object
   conversations_events:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      emitted_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - emitted_at
     type: object
   conversations_followers:
     $schema: http://json-schema.org/schema#
@@ -2509,25 +2202,19 @@ schemas:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      created_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - created_at
     type: object
   events:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      emitted_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - emitted_at
     type: object
   inboxes:
     $schema: http://json-schema.org/schema#
@@ -2551,13 +2238,10 @@ schemas:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      created_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - created_at
     type: object
   inboxes_teammates:
     $schema: http://json-schema.org/schema#
@@ -2574,35 +2258,26 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   knowledge_bases_articles:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      updated_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - updated_at
     type: object
   knowledge_bases_categories:
     $schema: http://json-schema.org/schema#
     additionalProperties: true
     properties:
-      updated_at:
-        type: number
       id:
         type: string
     required:
     - id
-    - updated_at
     type: object
   links:
     $schema: http://json-schema.org/schema#
@@ -2619,11 +2294,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   message_templates:
     $schema: http://json-schema.org/schema#
@@ -2631,11 +2303,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   tags:
     $schema: http://json-schema.org/schema#
@@ -2643,11 +2312,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   tags_children:
     $schema: http://json-schema.org/schema#
@@ -2655,11 +2321,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   teammates:
     $schema: http://json-schema.org/schema#
@@ -2694,11 +2357,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   teams:
     $schema: http://json-schema.org/schema#
@@ -2725,11 +2385,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
   teams_signatures:
     $schema: http://json-schema.org/schema#
@@ -2746,11 +2403,8 @@ schemas:
     properties:
       id:
         type: string
-      updated_at:
-        type: number
     required:
     - id
-    - updated_at
     type: object
 spec:
   connection_specification:

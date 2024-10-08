@@ -7,8 +7,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -18,7 +16,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -30,8 +27,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -41,7 +36,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -73,8 +67,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -84,7 +76,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -116,8 +107,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -127,7 +116,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -137,8 +125,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        created_at:
-          type: number
         contact_id:
           type: string
         _meta:
@@ -149,7 +135,6 @@ collections:
           required:
             - row_id
       required:
-        - created_at
         - contact_id
       type: object
       x-infer-schema: true
@@ -160,8 +145,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        created_at:
-          type: number
         id:
           type: string
         _meta:
@@ -173,7 +156,6 @@ collections:
             - row_id
       required:
         - id
-        - created_at
       type: object
       x-infer-schema: true
     key:
@@ -183,8 +165,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        created_at:
-          type: number
         id:
           type: string
         _meta:
@@ -196,7 +176,6 @@ collections:
             - row_id
       required:
         - id
-        - created_at
       type: object
       x-infer-schema: true
     key:
@@ -206,8 +185,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        emitted_at:
-          type: number
         id:
           type: string
         _meta:
@@ -219,7 +196,6 @@ collections:
             - row_id
       required:
         - id
-        - emitted_at
       type: object
       x-infer-schema: true
     key:
@@ -270,8 +246,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        created_at:
-          type: number
         id:
           type: string
         _meta:
@@ -283,7 +257,6 @@ collections:
             - row_id
       required:
         - id
-        - created_at
       type: object
       x-infer-schema: true
     key:
@@ -293,8 +266,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        emitted_at:
-          type: number
         id:
           type: string
         _meta:
@@ -306,7 +277,6 @@ collections:
             - row_id
       required:
         - id
-        - emitted_at
       type: object
       x-infer-schema: true
     key:
@@ -356,8 +326,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        created_at:
-          type: number
         id:
           type: string
         _meta:
@@ -369,7 +337,6 @@ collections:
             - row_id
       required:
         - id
-        - created_at
       type: object
       x-infer-schema: true
     key:
@@ -401,8 +368,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -412,7 +377,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -422,8 +386,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        updated_at:
-          type: number
         id:
           type: string
         _meta:
@@ -435,7 +397,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -445,8 +406,6 @@ collections:
       $schema: "http://json-schema.org/schema#"
       additionalProperties: true
       properties:
-        updated_at:
-          type: number
         id:
           type: string
         _meta:
@@ -458,7 +417,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -490,8 +448,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -501,7 +457,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -513,8 +468,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -524,7 +477,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -536,8 +488,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -547,7 +497,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -559,8 +508,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -570,7 +517,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -642,8 +588,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -653,7 +597,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -706,8 +649,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -717,7 +658,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
@@ -749,8 +689,6 @@ collections:
       properties:
         id:
           type: string
-        updated_at:
-          type: number
         _meta:
           type: object
           properties:
@@ -760,7 +698,6 @@ collections:
             - row_id
       required:
         - id
-        - updated_at
       type: object
       x-infer-schema: true
     key:
