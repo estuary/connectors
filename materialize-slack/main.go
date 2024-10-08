@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -101,7 +102,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 				}
 			case projection.Field == "blocks":
 				constraint = pm.Response_Validated_Constraint{
-					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+					Type:   pm.Response_Validated_Constraint_FIELD_OPTIONAL,
 					Reason: "The Slack materialization would like 'blocks'",
 				}
 			case projection.IsPrimaryKey:
@@ -167,23 +168,22 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 }
 
 // Transactions implements the DriverServer interface.
-func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Transactor, *pm.Response_Opened, error) {
-
+func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
 	var cfg config
 	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
 	api, err := cfg.buildAPI()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 
 	var bindings []*binding
 	for _, b := range open.Materialization.Bindings {
 		var res resource
 		if err := json.Unmarshal(b.ResourceConfigJson, &res); err != nil {
-			return nil, nil, fmt.Errorf("unable to parse resource config: %w", err)
+			return nil, nil, nil, fmt.Errorf("unable to parse resource config: %w", err)
 		}
 		bindings = append(bindings, &binding{
 			resource:   res,
@@ -197,7 +197,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open) (pm.Trans
 		bindings: bindings,
 	}
 
-	return transactor, &pm.Response_Opened{}, nil
+	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 type transactor struct {
@@ -233,14 +233,14 @@ func buildDocument(b *binding, keys, values tuple.Tuple) map[string]interface{} 
 	return document
 }
 
-func (d *transactor) Load(it *pm.LoadIterator, loaded func(int, json.RawMessage) error) error {
+func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("Load should never be called for materialize-slack")
 	}
 	return nil
 }
 
-func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
+func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	for it.Next() {
 		var b = t.bindings[it.Binding]
@@ -285,7 +285,7 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 			}
 			time.Sleep(time.Second * 10)
 		} else {
-			log.Warn(fmt.Sprintf("Ignoring message from the past: %q", ts))
+			log.WithField("ts", ts).Debug("ignoring message from the past")
 		}
 	}
 
@@ -293,6 +293,14 @@ func (t *transactor) Store(it *pm.StoreIterator) (pm.StartCommitFunc, error) {
 }
 
 func (transactor) Destroy() {
+}
+
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	return nil, nil
+}
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error {
+	return nil
 }
 
 func main() {
