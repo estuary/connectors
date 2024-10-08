@@ -13,7 +13,6 @@ import (
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
-	"github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
 
@@ -50,19 +49,7 @@ func TestTrickyTableNames(t *testing.T) {
 	t.Run("Discover", func(t *testing.T) {
 		cs.VerifyDiscover(ctx, t, regexp.MustCompile(`(?i:users)`))
 	})
-	var resourceSpecJSON, err = json.Marshal(sqlcapture.Resource{
-		Namespace: testSchemaName,
-		Stream:    "UsErS!@#$",
-	})
-	require.NoError(t, err)
-	cs.Bindings = []*flow.CaptureSpec_Binding{{
-		// Because we're explicitly constructing the collection spec here this test accidentally
-		// exercises the "legacy collection without a /_meta/source/txid property" case, so we
-		// may as well leave it like that.
-		Collection:         flow.CollectionSpec{Name: flow.Collection("acmeCo/test/users____")},
-		ResourceConfigJson: resourceSpecJSON,
-		ResourcePath:       []string{testSchemaName, "UsErS!@#$"},
-	}}
+	cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(`(?i:users)`))
 	t.Run("Validate", func(t *testing.T) {
 		var _, err = cs.Validate(ctx, t)
 		require.NoError(t, err)
