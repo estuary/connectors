@@ -4,27 +4,6 @@
   "additionalProperties": true,
   "required": ["id"],
   "properties": {
-    "type": { "type": "string" },
-    "id": { "type": "string" },
-    "updated": { "type": "string", "format": "date-time" },
-    "attributes": {
-      "type": ["null", "object"],
-      "properties": {
-        "name": { "type": "string" },
-        "created": { "type": "string", "format": "date-time" },
-        "updated": { "type": "string", "format": "date-time" },
-        "integration": {
-          "type": ["null", "object"],
-          "additionalProperties": true
-        }
-      }
-    },
-    "links": {
-      "type": ["null", "object"],
-      "additionalProperties": true,
-      "properties": {
-        "self": { "type": "string" }
-      }
-    }
+    "id": { "type": "string" }
   }
 }
