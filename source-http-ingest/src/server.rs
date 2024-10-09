@@ -95,7 +95,9 @@ async fn handle_webhook(
     {
         Ok(resp) => resp,
         Err(err) => {
-            tracing::error!(error = %err, "failed to handle request");
+            // Format the error to include causes when rendering to the logs.
+            let error_str = format!("{err:?}");
+            tracing::error!(error = %error_str, "failed to handle request");
             let body = serde_json::json!({ "error": err.to_string() });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(body))
         }
@@ -281,8 +283,13 @@ impl Handler {
 
             let schema_value = serde_json::from_str::<Value>(&binding.collection.write_schema_json)
                 .context("parsing write_schema_json")?;
-            let uri = url::Url::parse("http://not.areal.host/").unwrap();
-            let schema = json::schema::build::build_schema(uri.clone(), &schema_value)?;
+            let schema = json::schema::build::build_schema(
+                url::Url::parse("http://not.areal.host/").unwrap(),
+                &schema_value,
+            )?;
+            // We must get the resolved uri after building the schema, since the one we pass in is
+            // only used for schemas that don't already have an absolute url as their `$id`.
+            let schema_url = schema.curi.clone();
 
             // We intentionally leak the memory here in order to get a `&'static Schema`, because
             // the schema index only works with references. The workaround would be to add a
@@ -299,7 +306,7 @@ impl Handler {
             collections_by_path.insert(
                 path,
                 CollectionHandler {
-                    schema_url: uri,
+                    schema_url,
                     schema_index: index,
                     binding_index,
                     id_header: binding.resource_config.id_from_header,
