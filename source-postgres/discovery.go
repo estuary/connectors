@@ -182,7 +182,7 @@ func predictableColumnOrder(colType any) bool {
 	// Currently all textual primary key columns are considered to be 'unpredictable' so that backfills
 	// will default to using the 'imprecise' ordering semantics which avoids full-table sorts. Refer to
 	// https://github.com/estuary/connectors/issues/1343 for more details.
-	if colType == "varchar" || colType == "bpchar" || colType == "text" {
+	if colType == "varchar" || colType == "bpchar" || colType == "text" || colType == "citext" {
 		return false
 	} else if _, ok := colType.(postgresEnumType); ok {
 		return false
@@ -314,6 +314,7 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"varchar": {jsonTypes: []string{"string"}},
 	"bpchar":  {jsonTypes: []string{"string"}},
 	"text":    {jsonTypes: []string{"string"}},
+	"citext":  {jsonTypes: []string{"string"}}, // From the 'citext' extension so we don't test it by default, but it hurts nothing to support it here
 	"bytea":   {jsonTypes: []string{"string"}, contentEncoding: "base64"},
 	"xml":     {jsonTypes: []string{"string"}},
 	"bit":     {jsonTypes: []string{"string"}},
