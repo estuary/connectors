@@ -1,34 +1,162 @@
 ---
 collections:
   acmeCo/campaigns:
-    schema: campaigns.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/email_templates:
-    schema: email_templates.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/events:
-    schema: events.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/flows:
-    schema: flows.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/global_exclusions:
-    schema: global_exclusions.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/lists:
-    schema: lists.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/metrics:
-    schema: metrics.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
   acmeCo/profiles:
-    schema: profiles.schema.yaml
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      additionalProperties: true
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
     key:
       - /id
