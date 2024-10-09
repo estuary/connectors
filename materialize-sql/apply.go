@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -257,10 +258,18 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 
 	var binding = spec.Bindings[bindingIndex]
 	var collection = binding.Collection
-	for _, proposed := range collection.Projections {
+	for _, field := range binding.FieldSelection.AllFields() {
+		proposed := *collection.GetProjection(field)
+		if slices.ContainsFunc(bindingUpdate.NewProjections, func(p pf.Projection) bool {
+			return p.Field == proposed.Field
+		}) {
+			// Migration does not apply to newly included projections.
+			continue
+		}
+
 		existing, err := a.is.GetField(table.Path, proposed.Field)
 		if err != nil {
-			continue
+			return "", nil, fmt.Errorf("getting existing field information for migration %q: %w", proposed.Field, err)
 		}
 
 		var rawFieldConfig = binding.FieldSelection.FieldConfigJsonMap[proposed.Field]
