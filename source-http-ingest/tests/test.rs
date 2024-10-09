@@ -291,6 +291,7 @@ fn open_json() -> serde_json::Value {
                         "collection": {
                             "name": "aliceCo/test/webhook-data",
                             "write_schema_json": {
+                                "$id": "file:///some/fake/path.json",
                                 "type": "object",
                                 "properties": {
                                     "_meta": {
