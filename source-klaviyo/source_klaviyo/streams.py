@@ -176,7 +176,7 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
                 # Setting a minimum value of at least 3 seconds from the current time ensures this will never happen,
                 # and allows our 'abnormal_state' acceptance test to pass.
                 latest_cursor = min(latest_cursor, pendulum.now().subtract(seconds=3))
-                params["filter"] = f"greater-than({self.cursor_field},{latest_cursor.isoformat()})"
+                params["filter"] = f"greater-or-equal({self.cursor_field},{latest_cursor.isoformat()})"
             params["sort"] = self.cursor_field
         return params
 
