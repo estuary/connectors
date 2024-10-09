@@ -247,7 +247,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var parsed = buildDocument(b, it.Key, it.Values)
 		var tsStr, tsOk = parsed["ts"].(string)
 		var text, textOk = parsed["text"].(string)
-		var blocks = parsed["blocks"].(json.RawMessage)
 
 		if !tsOk {
 			return nil, fmt.Errorf("missing timestamp")
@@ -263,24 +262,31 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("invalid timestamp %q", tsStr)
 		}
 
-		var blocksParsed slack.Blocks
+		var blockSet []slack.Block
 
-		// Is this jank? This should really be taken care of by the
-		// serialization logic in slack.Block, but it can't be _that_
-		// bad to do it here... right? see below:
-		// https://api.slack.com/reference/surfaces/formatting#escaping
-		var escaped_blocks = string(blocks)
-		escaped_blocks = strings.ReplaceAll(escaped_blocks, "&", "&amp;")
-		escaped_blocks = strings.ReplaceAll(escaped_blocks, "<", "&lt;")
-		escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
+		if parsed["blocks"] != nil {
+			var blocks = parsed["blocks"].(json.RawMessage)
+			var blocksParsed slack.Blocks
 
-		if err := json.Unmarshal([]byte(escaped_blocks), &blocksParsed); err != nil {
-			return nil, fmt.Errorf("invalid blocks value %q, %q: %w", reflect.TypeOf(blocks), string(blocks), err)
+			// Is this jank? This should really be taken care of by the
+			// serialization logic in slack.Block, but it can't be _that_
+			// bad to do it here... right? see below:
+			// https://api.slack.com/reference/surfaces/formatting#escaping
+			var escaped_blocks = string(blocks)
+			escaped_blocks = strings.ReplaceAll(escaped_blocks, "&", "&amp;")
+			escaped_blocks = strings.ReplaceAll(escaped_blocks, "<", "&lt;")
+			escaped_blocks = strings.ReplaceAll(escaped_blocks, ">", "&gt;")
+
+			if err := json.Unmarshal([]byte(escaped_blocks), &blocksParsed); err != nil {
+				return nil, fmt.Errorf("invalid blocks value %q, %q: %w", reflect.TypeOf(blocks), string(blocks), err)
+			}
+
+			blockSet = blocksParsed.BlockSet
 		}
 
 		// Accept messages from at most 10 minutes in the past
 		if time.Since(ts).Minutes() < 10 {
-			if err := t.api.PostMessage(b.resource.Channel, text, blocksParsed.BlockSet, b.resource.SenderConfig); err != nil {
+			if err := t.api.PostMessage(b.resource.Channel, text, blockSet, b.resource.SenderConfig); err != nil {
 				return nil, fmt.Errorf("error sending message (%q): %w", ts, err)
 			}
 			time.Sleep(time.Second * 10)
