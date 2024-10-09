@@ -168,7 +168,7 @@ class TestIncrementalKlaviyoStream:
                 {"updated": "2023-01-01T00:00:00+00:00"},
                 {"page[cursor]": "aaA0aAo0aAA0AaAaAaa0AaaAAAaaA00AAAa0AA00A0AAAaAa"},
                 {
-                    "filter": "greater-than(updated,2023-01-01T00:00:00+00:00)",
+                    "filter": "greater-or-equal(updated,2023-01-01T00:00:00+00:00)",
                     "page[cursor]": "aaA0aAo0aAA0AaAaAaa0AaaAAAaaA00AAAa0AA00A0AAAaAa",
                     "sort": "updated",
                 },
@@ -178,7 +178,7 @@ class TestIncrementalKlaviyoStream:
                 None,
                 {"page[cursor]": "aaA0aAo0aAA0AaAaAaa0AaaAAAaaA00AAAa0AA00A0AAAaAa"},
                 {
-                    "filter": "greater-than(updated,2020-10-10T00:00:00+00:00)",
+                    "filter": "greater-or-equal(updated,2020-10-10T00:00:00+00:00)",
                     "page[cursor]": "aaA0aAo0aAA0AaAaAaa0AaaAAAaaA00AAAa0AA00A0AAAaAa",
                     "sort": "updated",
                 },
@@ -203,7 +203,7 @@ class TestIncrementalKlaviyoStream:
                 {"updated": "2023-01-01T00:00:00+00:00"},
                 {"page[cursor]": "aaA0aAo0aAA0AaAaAaa0AaaAAAaaA00AAAa0AA00A0AAAaAa"},
                 {
-                    "filter": "greater-than(updated,2023-01-01T00:00:00+00:00)",
+                    "filter": "greater-or-equal(updated,2023-01-01T00:00:00+00:00)",
                     "page[cursor]": "aaA0aAo0aAA0AaAaAaa0AaaAAAaaA00AAAa0AA00A0AAAaAa",
                     "sort": "updated",
                 },
@@ -504,17 +504,17 @@ class TestArchivedRecordsStream:
             (
                 {"archived": {"updated_at": "2023-10-10 00:00:00"}},
                 None,
-                {"filter": "and(greater-than(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))", "sort": "updated_at"},
+                {"filter": "and(greater-or-equal(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))", "sort": "updated_at"},
             ),
             (
                 {"archived": {"updated_at": "2023-10-10 00:00:00"}},
                 {
-                    "filter": "and(greater-than(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
+                    "filter": "and(greater-or-equal(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
                     "sort": "updated_at",
                     "page[cursor]": "next_page_cursor",
                 },
                 {
-                    "filter": "and(greater-than(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
+                    "filter": "and(greater-or-equal(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
                     "sort": "updated_at",
                     "page[cursor]": "next_page_cursor",
                 },
@@ -522,12 +522,12 @@ class TestArchivedRecordsStream:
             (
                 {},
                 {
-                    "filter": "and(greater-than(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
+                    "filter": "and(greater-or-equal(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
                     "sort": "updated_at",
                     "page[cursor]": "next_page_cursor",
                 },
                 {
-                    "filter": "and(greater-than(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
+                    "filter": "and(greater-or-equal(updated_at,2023-10-10T00:00:00+00:00),equals(archived,true))",
                     "sort": "updated_at",
                     "page[cursor]": "next_page_cursor",
                 },
