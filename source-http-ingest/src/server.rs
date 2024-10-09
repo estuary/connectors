@@ -95,7 +95,7 @@ async fn handle_webhook(
     {
         Ok(resp) => resp,
         Err(err) => {
-            tracing::error!(error = %err, "failed to handle request");
+            tracing::error!(error = ?err, "failed to handle request");
             let body = serde_json::json!({ "error": err.to_string() });
             (StatusCode::INTERNAL_SERVER_ERROR, Json(body))
         }
