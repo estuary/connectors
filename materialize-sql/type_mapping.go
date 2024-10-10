@@ -480,7 +480,7 @@ func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *p
 		return false, nil, fmt.Errorf("mapping type: %w", err)
 	}
 
-	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, mapped.DDL); migrationSpec != nil {
+	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, mapped.NullableDDL); migrationSpec != nil {
 		return true, migrationSpec, nil
 	}
 
