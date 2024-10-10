@@ -14,7 +14,8 @@ collections:
         datetimeValue: { type: string, format: date-time }
         timeValue: { type: string, format: time }
         int64: { type: integer }
-      required: [key, scalarValue]
+        requiredNumeric: { type: [integer, string], format: integer }
+      required: [key, scalarValue, requiredNumeric]
     key: [/key]
     projections:
       flow_document: ""
