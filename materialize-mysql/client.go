@@ -107,7 +107,7 @@ var migrationSteps = []sql.ColumnMigrationStep{
 		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
 			table.Identifier,
 			tempColumnIdentifier,
-			migration.DDL,
+			migration.NullableDDL,
 		), nil
 	},
 	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
@@ -130,6 +130,19 @@ var migrationSteps = []sql.ColumnMigrationStep{
 			"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
 			table.Identifier,
 			tempColumnIdentifier,
+			migration.Identifier,
+			migration.DDL,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
+		// If column was originally not nullable, we fix its DDL
+		if migration.NullableDDL == migration.DDL {
+			return "", nil
+		}
+
+		return fmt.Sprintf(
+			"ALTER TABLE %s MODIFY %s %s;",
+			table.Identifier,
 			migration.Identifier,
 			migration.DDL,
 		), nil

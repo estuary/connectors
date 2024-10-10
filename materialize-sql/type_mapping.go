@@ -475,12 +475,19 @@ func (c constrainter) compatibleType(existing boilerplate.EndpointField, propose
 
 func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
 	proj := buildProjection(proposed, rawFieldConfig)
+	// We check migratability against nullable DDLs, as we also cast
+	// the type to the nullable form of the DDL, however the final new column will be
+	// created as non-nullable if the proposed projection requests it
+	if proj.Inference.Exists == pf.Inference_MUST {
+		proj.Inference.Exists = pf.Inference_MAY
+	}
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
 		return false, nil, fmt.Errorf("mapping type: %w", err)
 	}
 
-	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, mapped.DDL); migrationSpec != nil {
+	var targetDDL = mapped.DDL
+	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, targetDDL); migrationSpec != nil {
 		return true, migrationSpec, nil
 	}
 

@@ -17,6 +17,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 
 	_ "github.com/marcboeker/go-duckdb"
 )

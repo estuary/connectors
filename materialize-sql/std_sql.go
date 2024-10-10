@@ -475,7 +475,8 @@ var StdMigrationSteps = []ColumnMigrationStep{
 		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
 			table.Identifier,
 			tempColumnIdentifier,
-			migration.DDL,
+			// Always create these new columns as nullable
+			migration.NullableDDL,
 		), nil
 	},
 	func(dialect Dialect, table Table, migration ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
@@ -499,6 +500,18 @@ var StdMigrationSteps = []ColumnMigrationStep{
 			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
 			table.Identifier,
 			tempColumnIdentifier,
+			migration.Identifier,
+		), nil
+	},
+	func(dialect Dialect, table Table, migration ColumnTypeMigration, _ string) (string, error) {
+		// If column was originally not nullable, we fix its DDL
+		if migration.NullableDDL == migration.DDL {
+			return "", nil
+		}
+
+		return fmt.Sprintf(
+			"ALTER TABLE %s ALTER COLUMN %s SET NOT NULL;",
+			table.Identifier,
 			migration.Identifier,
 		), nil
 	},
@@ -531,13 +544,17 @@ func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, m
 
 	var tempColumnIdentifier = dialect.Identifier(migration.Field + ColumnMigrationTemporarySuffix)
 
-	var renderedSteps = make([]string, len(steps)-step)
+	var renderedSteps []string
 	for i, s := range steps[step:] {
-		var err error
-		renderedSteps[i], err = s(dialect, table, migration, tempColumnIdentifier)
+		newStep, err := s(dialect, table, migration, tempColumnIdentifier)
 		if err != nil {
 			return nil, fmt.Errorf("rendering step %d: %w", i, err)
 		}
+		if newStep == "" {
+			continue
+		}
+
+		renderedSteps = append(renderedSteps, newStep)
 	}
 
 	return renderedSteps, nil
