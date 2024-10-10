@@ -12,7 +12,7 @@
       "position": 1,
       "product_id": 8907741167926,
       "sort_value": "0000000001",
-      "updated_at": "2023-11-09T13:19:30-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -29,7 +29,7 @@
       "position": 1,
       "product_id": 8907741430070,
       "sort_value": "0000000001",
-      "updated_at": "2023-11-09T13:19:36-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -46,7 +46,7 @@
       "position": 2,
       "product_id": 8907741692214,
       "sort_value": "0000000002",
-      "updated_at": "2023-11-09T13:19:36-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -63,7 +63,7 @@
       "position": 3,
       "product_id": 8907741724982,
       "sort_value": "0000000003",
-      "updated_at": "2023-11-09T13:19:37-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -83,7 +83,7 @@
       "sort_order": "best-selling",
       "template_suffix": null,
       "title": "Home page",
-      "updated_at": "2023-11-09T13:19:30-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -103,7 +103,7 @@
       "sort_order": "best-selling",
       "template_suffix": null,
       "title": "Hydrogen",
-      "updated_at": "2023-11-09T13:19:37-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -117,7 +117,7 @@
       "available": 50,
       "inventory_item_id": 49446550077750,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -131,7 +131,7 @@
       "available": 50,
       "inventory_item_id": 49446550176054,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:31-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -145,7 +145,7 @@
       "available": 50,
       "inventory_item_id": 49446550372662,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -159,7 +159,7 @@
       "available": 20,
       "inventory_item_id": 49446550405430,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -173,7 +173,7 @@
       "available": 50,
       "inventory_item_id": 49446550438198,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -187,7 +187,7 @@
       "available": 10,
       "inventory_item_id": 49446550470966,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -201,7 +201,7 @@
       "available": 10,
       "inventory_item_id": 49446550503734,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -215,7 +215,7 @@
       "available": 10,
       "inventory_item_id": 49446550536502,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -229,7 +229,7 @@
       "available": 10,
       "inventory_item_id": 49446550569270,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -243,7 +243,7 @@
       "available": 10,
       "inventory_item_id": 49446550602038,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -257,7 +257,7 @@
       "available": 50,
       "inventory_item_id": 49446550634806,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -271,7 +271,7 @@
       "available": null,
       "inventory_item_id": 49446550667574,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:31-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -285,7 +285,7 @@
       "available": 0,
       "inventory_item_id": 49446550700342,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:31-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -299,7 +299,7 @@
       "available": 10,
       "inventory_item_id": 49446550733110,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -313,7 +313,7 @@
       "available": null,
       "inventory_item_id": 49446550765878,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:32-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -327,7 +327,7 @@
       "available": null,
       "inventory_item_id": 49446550798646,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:32-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -341,7 +341,7 @@
       "available": null,
       "inventory_item_id": 49446550831414,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:32-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -355,7 +355,7 @@
       "available": null,
       "inventory_item_id": 49446550864182,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:32-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -369,7 +369,7 @@
       "available": 20,
       "inventory_item_id": 49446550896950,
       "location_id": 94210228534,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -383,7 +383,7 @@
       "available": 50,
       "inventory_item_id": 49446550929718,
       "location_id": 94210195766,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -397,7 +397,7 @@
       "available": 50,
       "inventory_item_id": 49446550929718,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -411,7 +411,7 @@
       "available": 50,
       "inventory_item_id": 49446550995254,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:36-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -425,7 +425,7 @@
       "available": 50,
       "inventory_item_id": 49446550995254,
       "location_id": 94210228534,
-      "updated_at": "2023-11-09T13:19:36-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -439,7 +439,7 @@
       "available": 50,
       "inventory_item_id": 49446551028022,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -453,7 +453,7 @@
       "available": 50,
       "inventory_item_id": 49446551060790,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -467,7 +467,7 @@
       "available": 10,
       "inventory_item_id": 49446551093558,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -481,7 +481,7 @@
       "available": 10,
       "inventory_item_id": 49446551126326,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -495,7 +495,7 @@
       "available": 10,
       "inventory_item_id": 49446551159094,
       "location_id": 94210130230,
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
   ],
@@ -523,7 +523,7 @@
       "phone": null,
       "province": null,
       "province_code": null,
-      "updated_at": "2023-11-09T13:19:15-05:00",
+      "updated_at": "redacted",
       "zip": null,
       "ts": "redacted-timestamp"
     }
@@ -552,7 +552,7 @@
       "phone": "555-5555",
       "province": "Ontario",
       "province_code": "ON",
-      "updated_at": "2023-11-09T13:19:30-05:00",
+      "updated_at": "redacted",
       "zip": "A1A 1A1",
       "ts": "redacted-timestamp"
     }
@@ -581,7 +581,7 @@
       "phone": null,
       "province": null,
       "province_code": null,
-      "updated_at": "2023-11-09T13:19:30-05:00",
+      "updated_at": "redacted",
       "zip": null,
       "ts": "redacted-timestamp"
     }
@@ -601,7 +601,7 @@
       "owner_id": 84816101686,
       "owner_resource": "shop",
       "type": "string",
-      "updated_at": "2023-11-09T13:19:20-05:00",
+      "updated_at": "redacted",
       "value": true,
       "ts": "redacted-timestamp"
     }
@@ -621,7 +621,7 @@
       "owner_id": 84816101686,
       "owner_resource": "shop",
       "type": "list.single_line_text_field",
-      "updated_at": "2023-11-09T13:19:30-05:00",
+      "updated_at": "redacted",
       "value": true,
       "ts": "redacted-timestamp"
     }
@@ -658,7 +658,7 @@
       "tags": "",
       "template_suffix": null,
       "title": "The Minimal Snowboard",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025694006",
@@ -751,7 +751,7 @@
       "tags": "",
       "template_suffix": null,
       "title": "The Videographer Snowboard",
-      "updated_at": "2023-11-09T13:19:32-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025726774",
@@ -844,7 +844,7 @@
       "tags": "Archived, Premium, Snow, Snowboard, Sport, Winter",
       "template_suffix": null,
       "title": "The Archived Snowboard",
-      "updated_at": "2023-11-09T13:19:36-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025923382",
@@ -937,7 +937,7 @@
       "tags": "",
       "template_suffix": null,
       "title": "The Draft Snowboard",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025956150",
@@ -1034,7 +1034,7 @@
       "tags": "Premium, Snow, Snowboard, Sport, Winter",
       "template_suffix": null,
       "title": "The Complete Snowboard",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429025988918",
@@ -1239,7 +1239,7 @@
       "tags": "Premium, Snow, Snowboard, Sport, Winter",
       "template_suffix": null,
       "title": "The Hidden Snowboard",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026119990",
@@ -1332,7 +1332,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "The Collection Snowboard: Hydrogen",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026185526",
@@ -1425,7 +1425,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "The Inventory Not Tracked Snowboard",
-      "updated_at": "2023-11-09T13:19:32-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026218294",
@@ -1518,7 +1518,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "The Out of Stock Snowboard",
-      "updated_at": "2023-11-09T13:19:32-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026251062",
@@ -1611,7 +1611,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "The Compare at Price Snowboard",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026283830",
@@ -1707,7 +1707,7 @@
       "tags": "",
       "template_suffix": null,
       "title": "Gift Card",
-      "updated_at": "2024-04-19T06:20:35-04:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026316598",
@@ -1884,7 +1884,7 @@
       "tags": "Premium, Snow, Snowboard, Sport, Winter",
       "template_suffix": null,
       "title": "The Multi-location Snowboard",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026447670",
@@ -1977,7 +1977,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "The 3p Fulfilled Snowboard",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026480438",
@@ -2070,7 +2070,7 @@
       "tags": "Premium, Snow, Snowboard, Sport, Winter",
       "template_suffix": null,
       "title": "The Multi-managed Snowboard",
-      "updated_at": "2023-11-09T13:19:36-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026545974",
@@ -2163,7 +2163,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "The Collection Snowboard: Oxygen",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026578742",
@@ -2256,7 +2256,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "The Collection Snowboard: Liquid",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026611510",
@@ -2385,7 +2385,7 @@
       "tags": "Accessory, Sport, Winter",
       "template_suffix": null,
       "title": "Selling Plans Ski Wax",
-      "updated_at": "2023-11-09T13:19:35-05:00",
+      "updated_at": "redacted",
       "variants": [
         {
           "admin_graphql_api_id": "gid://shopify/ProductVariant/47429026644278",
