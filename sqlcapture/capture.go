@@ -2,6 +2,7 @@ package sqlcapture
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -139,11 +140,11 @@ var (
 )
 
 // Run is the top level entry point of the capture process.
-func (c *Capture) Run(ctx context.Context) error {
+func (c *Capture) Run(ctx context.Context) (err error) {
 	// Perform discovery and log the full results for convenience. This info
 	// will be needed when activating all currently-active bindings below.
 	logrus.Info("discovering tables")
-	var discovery, err = c.Database.DiscoverTables(ctx)
+	discovery, err := c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	}
@@ -174,7 +175,7 @@ func (c *Capture) Run(ctx context.Context) error {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
 	defer func() {
-		if streamErr := replStream.Close(ctx); streamErr != nil {
+		if streamErr := replStream.Close(ctx); streamErr != nil && errors.Is(err, ErrFenceNotReached) {
 			err = streamErr
 		}
 	}()
