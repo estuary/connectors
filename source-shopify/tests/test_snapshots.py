@@ -8,7 +8,7 @@ def test_capture(request, snapshot):
             "flowctl",
             "preview",
             "--source",
-            request.config.rootdir + "/source-shopify/test.flow.yaml",
+            request.fspath.dirname + "/../test.flow.yaml",
             "--sessions",
             "1",
             "--delay",
@@ -21,7 +21,11 @@ def test_capture(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
     for l in lines:
-        l[1]["ts"] = "redacted-timestamp"
+        stream, rec = l[0], l[1]
+
+        rec["ts"] = "redacted-timestamp"
+        if "updated_at" in rec:
+            rec["updated_at"] = "redacted"
 
     assert snapshot("capture.stdout.json") == lines
 
@@ -32,7 +36,7 @@ def test_discover(request, snapshot):
             "raw",
             "discover",
             "--source",
-            request.config.rootdir + "/source-shopify/test.flow.yaml",
+            request.fspath.dirname + "/../test.flow.yaml",
             "-o",
             "json",
             "--emit-raw"
@@ -52,7 +56,7 @@ def test_spec(request, snapshot):
             "raw",
             "spec",
             "--source",
-            request.config.rootdir + "/source-shopify/test.flow.yaml"
+            request.fspath.dirname + "/../test.flow.yaml"
         ],
         stdout=subprocess.PIPE,
         text=True,
