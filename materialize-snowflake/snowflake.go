@@ -355,7 +355,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 	defer func() {
-		returnErr = d.deleteFiles(ctx, filesToCleanup)
+		// If there was an error during processing, report that as the final
+		// error and log any error from deleting the temporary files.
+		if deleteErr := d.deleteFiles(ctx, filesToCleanup); deleteErr != nil && returnErr == nil {
+			returnErr = deleteErr
+		} else if deleteErr != nil {
+			log.WithError(deleteErr).Error("failed to delete temporary files")
+		}
 	}()
 
 	if len(subqueries) == 0 {
