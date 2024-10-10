@@ -132,6 +132,48 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
+var columnMigrationSteps = []sql.ColumnMigrationStep{
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
+			table.Identifier,
+			tempColumnIdentifier,
+			// Always create these new columns as nullable
+			migration.NullableDDL,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf(
+			// The WHERE filter is required by some warehouses (bigquery)
+			"UPDATE %s SET %s = %s WHERE true;",
+			table.Identifier,
+			tempColumnIdentifier,
+			migration.CastSQL(migration),
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s DROP COLUMN %s;",
+			table.Identifier,
+			migration.Identifier,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
+		return fmt.Sprintf(
+			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
+			table.Identifier,
+			tempColumnIdentifier,
+			migration.Identifier,
+		), nil
+	},
+	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
+		// BigQuery does not support making a column REQUIRED when it is NULLABLE
+		// TODO: do we prefer to backfill in these instances for BigQuery, or just continue
+		// with this no-op as-is?
+
+		return "", nil
+	},
+}
+
 // TODO(whb): In display of needless cruelty, BigQuery will throw an error if you try to use an
 // ALTER TABLE sql statement to add columns to a table with no pre-existing columns, claiming that
 // it does not have a schema. I believe the client API would allow us to set the schema, but this
@@ -152,7 +194,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.ColumnTypeChanges) > 0 {
 		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, bqDialect, ta.Table, m); err != nil {
+			if steps, err := sql.StdColumnTypeMigration(ctx, bqDialect, ta.Table, m, columnMigrationSteps...); err != nil {
 				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 			} else {
 				stmts = append(stmts, steps...)
