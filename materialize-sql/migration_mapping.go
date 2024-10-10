@@ -12,7 +12,9 @@ func (ms MigrationSpecs) FindMigrationSpec(sourceType string, targetDDL string) 
 	var target = strings.ToLower(targetDDL)
 
 	for _, m := range ms[strings.ToLower(sourceType)] {
-		if slices.ContainsFunc(m.targetDDLs, func(ddl string) bool { return strings.ToLower(ddl) == target }) {
+		if slices.ContainsFunc(m.targetDDLs, func(ddl string) bool {
+			return strings.ToLower(ddl) == target
+		}) {
 			return &m
 		}
 	}
@@ -31,7 +33,7 @@ func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) Migratio
 	out := MigrationSpec{
 		targetDDLs: targetDDLs,
 		CastSQL: func(m ColumnTypeMigration) string {
-			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.DDL)
+			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.NullableDDL)
 		},
 	}
 
