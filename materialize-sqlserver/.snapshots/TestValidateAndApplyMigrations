@@ -11,6 +11,7 @@ Base Initial Constraints:
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
 {"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -27,14 +28,15 @@ Migratable Changes Before Apply Schema:
 {"Name":"nonScalarValue","Nullable":"YES","Type":"varchar"}
 {"Name":"numericString","Nullable":"YES","Type":"bigint"}
 {"Name":"optional","Nullable":"YES","Type":"varchar"}
+{"Name":"requiredNumeric","Nullable":"NO","Type":"bigint"}
 {"Name":"scalarValue","Nullable":"NO","Type":"varchar"}
 {"Name":"timeValue","Nullable":"YES","Type":"time"}
 
 
 Migratable Changes Before Apply Data:
-key (NVARCHAR), _meta/flow_truncated (BIT), dateValue (DATE), datetimeValue (DATETIME2), flow_published_at (DATETIME2), int64 (BIGINT), multiple (NVARCHAR), nonScalarValue (NVARCHAR), numericString (BIGINT), optional (NVARCHAR), scalarValue (NVARCHAR), timeValue (TIME), flow_document (NVARCHAR)
+key (NVARCHAR), _meta/flow_truncated (BIT), dateValue (DATE), datetimeValue (DATETIME2), flow_published_at (DATETIME2), int64 (BIGINT), multiple (NVARCHAR), nonScalarValue (NVARCHAR), numericString (BIGINT), optional (NVARCHAR), requiredNumeric (BIGINT), scalarValue (NVARCHAR), timeValue (TIME), flow_document (NVARCHAR)
 
-1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.1111111 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, 123, <nil>, test, 0001-01-01 01:01:01 +0000 UTC, {}
+1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.1111111 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, 123, <nil>, 456, test, 0001-01-01 01:01:01 +0000 UTC, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -49,6 +51,7 @@ Migratable Changes Constraints:
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
 {"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -65,12 +68,13 @@ Migratable Changes Applied Schema:
 {"Name":"nonScalarValue","Nullable":"YES","Type":"varchar"}
 {"Name":"numericString","Nullable":"YES","Type":"varchar"}
 {"Name":"optional","Nullable":"YES","Type":"varchar"}
+{"Name":"requiredNumeric","Nullable":"NO","Type":"varchar"}
 {"Name":"scalarValue","Nullable":"NO","Type":"varchar"}
 {"Name":"timeValue","Nullable":"YES","Type":"varchar"}
 
 
 Migratable Changes Applied Data:
-key (NVARCHAR), _meta/flow_truncated (BIT), flow_published_at (DATETIME2), int64 (BIGINT), multiple (NVARCHAR), nonScalarValue (NVARCHAR), optional (NVARCHAR), scalarValue (NVARCHAR), flow_document (NVARCHAR), dateValue (NVARCHAR), datetimeValue (NVARCHAR), numericString (NVARCHAR), timeValue (NVARCHAR)
+key (NVARCHAR), _meta/flow_truncated (BIT), flow_published_at (DATETIME2), int64 (BIGINT), multiple (NVARCHAR), nonScalarValue (NVARCHAR), optional (NVARCHAR), scalarValue (NVARCHAR), flow_document (NVARCHAR), dateValue (NVARCHAR), datetimeValue (NVARCHAR), numericString (NVARCHAR), requiredNumeric (NVARCHAR), timeValue (NVARCHAR)
 
-1, false, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, {}, 2024-01-01, 2024-01-01T01:01:01.1111111Z, 123, 01:01:01.0000000
+1, false, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, {}, 2024-01-01, 2024-01-01T01:01:01.1111111Z, 123, 456, 01:01:01.0000000
 
