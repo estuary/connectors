@@ -213,15 +213,11 @@ func (db *postgresDatabase) prerequisiteWatermarksInPublication(ctx context.Cont
 	// table and publication have already attempted to be created if they don't exist. If either the
 	// watermarks table or publication doesn't exist another error will be generated here which is a
 	// bit redundant.
-
-	var pubName = db.config.Advanced.PublicationName
-	var watermarks = db.config.Advanced.WatermarksTable
-
+	//
 	// (*Config).Validate() has previously verified that this value contains a period. The first
 	// part is the schema and the second part is the table.
-	tableParts := strings.Split(watermarks, ".")
-
-	return db.addTableToPublication(ctx, pubName, tableParts[0], tableParts[1])
+	tableParts := strings.Split(db.config.Advanced.WatermarksTable, ".")
+	return db.addTableToPublication(ctx, tableParts[0], tableParts[1])
 }
 
 func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
@@ -232,12 +228,13 @@ func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, schema,
 		return fmt.Errorf("user %q cannot read from table %q", db.config.User, streamID)
 	}
 
-	return db.addTableToPublication(ctx, db.config.Advanced.PublicationName, schema, table)
+	return db.addTableToPublication(ctx, schema, table)
 }
 
 // addTableToPublication adds a table to a publication if it isn't already part of that publication.
-func (db *postgresDatabase) addTableToPublication(ctx context.Context, pubName string, schema string, table string) error {
+func (db *postgresDatabase) addTableToPublication(ctx context.Context, schema string, table string) error {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
+	var pubName = db.config.Advanced.PublicationName
 	var logEntry = logrus.WithFields(logrus.Fields{
 		"publication": pubName,
 		"schema":      schema,
@@ -245,7 +242,7 @@ func (db *postgresDatabase) addTableToPublication(ctx context.Context, pubName s
 	})
 
 	// If the table is already published, do nothing.
-	if pub, err := db.isTablePublished(ctx, pubName, schema, table); err != nil {
+	if pub, err := db.isTablePublished(ctx, schema, table); err != nil {
 		return fmt.Errorf("error checking publication status for table %q: %w", streamID, err)
 	} else if pub {
 		logEntry.Debug("table is already part of publication")
@@ -266,30 +263,15 @@ func (db *postgresDatabase) addTableToPublication(ctx context.Context, pubName s
 // isTablePublished checks whether a particular table is published via the named publication. It caches
 // the database query results so that only a single round-trip is required no matter how many tables we
 // end up checking.
-func (db *postgresDatabase) isTablePublished(ctx context.Context, pubName string, schema string, table string) (bool, error) {
-	// First check the cache to see if the table is published.
-	var streamID = sqlcapture.JoinStreamID(schema, table)
+func (db *postgresDatabase) isTablePublished(ctx context.Context, schema string, table string) (bool, error) {
 	if db.tablesPublished == nil {
-		db.tablesPublished = make(map[string]bool)
-	}
-	if pub, ok := db.tablesPublished[streamID]; ok {
-		return pub, nil
-	}
-
-	// If we don't have any cached information, query the database and cache the results.
-	var rows, err = db.conn.Query(ctx, `SELECT schemaname, tablename FROM pg_catalog.pg_publication_tables WHERE pubname = $1`, pubName)
-	if err != nil {
-		return false, fmt.Errorf("error querying publication %q: %w", pubName, err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var schema, table string
-		if err := rows.Scan(&schema, &table); err != nil {
-			return false, fmt.Errorf("error querying publication %q: %w", pubName, err)
+		var tablesPublished, err = listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
+		if err != nil {
+			return false, err
 		}
-		var id = sqlcapture.JoinStreamID(schema, table)
-		db.tablesPublished[id] = true
+		db.tablesPublished = tablesPublished
 	}
 
+	var streamID = sqlcapture.JoinStreamID(schema, table)
 	return db.tablesPublished[streamID], nil
 }
