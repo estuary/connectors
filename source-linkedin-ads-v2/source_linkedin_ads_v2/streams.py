@@ -408,13 +408,15 @@ class Creatives(IncrementalLinkedinAdsStream, ABC):
             child_stream_slice = super().read_records(stream_slice=get_parent_stream_values(record, self.parent_values_map), **kwargs)
             for child_records in child_stream_slice:
                 try:
-                    account_id = child_records.get('account').split(":")[-1]
-                    url_creative = f"https://api.linkedin.com/rest/adAccounts/{account_id}/creatives/{child_records['id']}"
+                    creative_id = child_records.get('id').split(":")[-1]
+                    url_creative = f"https://api.linkedin.com/v2/adCreativesV2/{creative_id}?projection=(variables(data(*,com.linkedin.ads.SponsoredUpdateCreativeVariables(*,share~(subject,text(text),content(contentEntities(*(description,entityLocation,title))))))))"
                     headers = super().request_headers(stream_state)
                     headers.update({"Authorization": f"Bearer {self.config['authenticator']._access_token}"})
                     response_creative = requests.get(url=url_creative,headers=headers).json()
-                    if response_creative["content"].get("textAd"):
-                        child_records["creative_name"] = response_creative["content"]["textAd"].get("headline")
+                    if response_creative["variables"]["data"].get("com.linkedin.ads.TextAdCreativeVariables"):
+                        child_records["creative_name"] = response_creative["variables"]["data"]["com.linkedin.ads.TextAdCreativeVariables"]["title"]
+                    elif response_creative["variables"]["data"]["com.linkedin.ads.SponsoredUpdateCreativeVariables"]["share~"].get("subject"):
+                        child_records["creative_name"] = response_creative["variables"]["data"]["com.linkedin.ads.SponsoredUpdateCreativeVariables"]["share~"]["subject"]
                     if stream_state:
                         if child_records[self.cursor_field] >= stream_state.get(self.cursor_field):
                             yield child_records
