@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["user_id", "starred_at"],
+  "properties": {
+    "user_id": {
+      "type": "integer"
+    },
+    "starred_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}
