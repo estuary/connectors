@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5"
 )
@@ -38,4 +39,23 @@ func queryReplicationSlotInfo(ctx context.Context, conn *pgx.Conn, slotName stri
 		return nil, fmt.Errorf("error querying replication slots: %w", err)
 	}
 	return &info, nil
+}
+
+// listPublishedTables returns a map from stream IDs to whether they are present in the specified publication.
+func listPublishedTables(ctx context.Context, conn *pgx.Conn, publicationName string) (map[sqlcapture.StreamID]bool, error) {
+	var rows, err = conn.Query(ctx, `SELECT schemaname, tablename FROM pg_catalog.pg_publication_tables WHERE pubname = $1`, publicationName)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tables in publication %q: %w", publicationName, err)
+	}
+	defer rows.Close()
+
+	var publicationStatus = make(map[sqlcapture.StreamID]bool)
+	for rows.Next() {
+		var schema, table string
+		if err := rows.Scan(&schema, &table); err != nil {
+			return nil, fmt.Errorf("error listing tables in publication %q: %w", publicationName, err)
+		}
+		publicationStatus[sqlcapture.JoinStreamID(schema, table)] = true
+	}
+	return publicationStatus, nil
 }
