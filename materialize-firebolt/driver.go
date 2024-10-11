@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"strings"
 
+	"database/sql"
+
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/connectors/materialize-firebolt/firebolt"
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	_ "github.com/firebolt-db/firebolt-go-sdk"
 )
 
 // driver implements the DriverServer interface.
@@ -108,12 +110,13 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var fb, err = firebolt.New(firebolt.Config{
-		EngineURL: cfg.EngineURL,
-		Database:  cfg.Database,
-		Username:  cfg.Username,
-		Password:  cfg.Password,
-	})
+	dsn := fmt.Sprintf("firebolt:///%s?account_name=%s&client_id=%s&client_secret=%s&engine=%s", cfg.Database, cfg.AccountName, cfg.ClientId, cfg.ClientSecret, cfg.EngineName)
+
+	// opening the firebolt driver
+	db, err := sql.Open("firebolt", dsn)
+	if err != nil {
+		fmt.Printf("error during opening a driver: %v\n", err)
+	}
 
 	if err != nil {
 		return nil, fmt.Errorf("creating firebolt client: %w", err)
@@ -151,12 +154,12 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}
 
 	for i, bundle := range queries.Bindings {
-		_, err := fb.Query(bundle.CreateExternalTable)
+		_, err := db.Query(bundle.CreateExternalTable)
 		if err != nil {
 			return nil, fmt.Errorf("running external table creation query: %w", err)
 		}
 
-		_, err = fb.Query(bundle.CreateTable)
+		_, err = db.Query(bundle.CreateTable)
 		if err != nil {
 			return nil, fmt.Errorf("running table creation query: %w", err)
 		}

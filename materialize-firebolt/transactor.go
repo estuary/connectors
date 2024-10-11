@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/estuary/connectors/materialize-firebolt/firebolt"
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -29,12 +29,10 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boiler
 		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	var fb, err = firebolt.New(firebolt.Config{
-		EngineURL: cfg.EngineURL,
-		Database:  cfg.Database,
-		Username:  cfg.Username,
-		Password:  cfg.Password,
-	})
+	dsn := fmt.Sprintf("firebolt:///%s?account_name=%s&client_id=%s&client_secret=%s&engine=%s", cfg.Database, cfg.AccountName, cfg.ClientId, cfg.ClientSecret, cfg.EngineName)
+
+	// opening the firebolt driver
+	db, err := sql.Open("firebolt", dsn)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("creating firebolt client: %w", err)
 	}
@@ -58,7 +56,7 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boiler
 	}
 
 	var transactor = &transactor{
-		fb:           fb,
+		fb:           db,
 		queries:      queries,
 		bindings:     bindings,
 		awsKeyId:     cfg.AWSKeyId,
@@ -87,7 +85,7 @@ type FireboltCheckpoint struct {
 }
 
 type transactor struct {
-	fb           *firebolt.Client
+	fb           *sql.DB
 	queries      *schemalate.QueriesBundle
 	awsKeyId     string
 	awsSecretKey string
