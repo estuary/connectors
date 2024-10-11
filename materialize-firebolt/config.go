@@ -6,29 +6,33 @@ import (
 )
 
 type config struct {
-	EngineURL    string `json:"engine_url" jsonschema:"title=Engine URL,example=engine-name.organisation.region.app.firebolt.io" jsonschema_extras:"order=0"`
-	Username     string `json:"username" jsonschema:"title=Username" jsonschema_extras:"order=1"`
-	Password     string `json:"password" jsonschema:"title=Password" jsonschema_extras:"secret=true,order=2"`
-	Database     string `json:"database" jsonschema:"title=Database" jsonschema_extras:"order=3"`
-	S3Bucket     string `json:"s3_bucket" jsonschema:"title=S3 Bucket" jsonschema_extras:"order=4"`
-	S3Prefix     string `json:"s3_prefix,omitempty" jsonschema:"title=S3 Prefix,default=/" jsonschema_extras:"order=5"`
-	AWSKeyId     string `json:"aws_key_id,omitempty" jsonschema:"title=AWS Key ID" jsonschema_extras:"order=6"`
-	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema:"title=AWS Secret Key" jsonschema_extras:"secret=true,order=7"`
-	AWSRegion    string `json:"aws_region,omitempty" jsonschema:"title=AWS Region" jsonschema_extras:"order=8"`
+	ClientId     string `json:"client_id" jsonschema:"title=Client ID" jsonschema_extras:"order=0"`
+	ClientSecret string `json:"client_secret" jsonschema:"title=Client Secret" jsonschema_extras:"secret=true,order=1"`
+	AccountName  string `json:"account_name" jsonschema:"title=Account Name" jsonschema_extras:"order=2"`
+	EngineName   string `json:"engine_name" jsonschema:"title=Engine Name" jsonschema_extras:"order=3"`
+	Database     string `json:"database" jsonschema:"title=Database" jsonschema_extras:"order=4"`
+	S3Bucket     string `json:"s3_bucket" jsonschema:"title=S3 Bucket" jsonschema_extras:"order=5"`
+	S3Prefix     string `json:"s3_prefix,omitempty" jsonschema:"title=S3 Prefix,default=/" jsonschema_extras:"order=6"`
+	AWSKeyId     string `json:"aws_key_id,omitempty" jsonschema:"title=AWS Key ID" jsonschema_extras:"order=7"`
+	AWSSecretKey string `json:"aws_secret_key,omitempty" jsonschema:"title=AWS Secret Key" jsonschema_extras:"secret=true,order=8"`
+	AWSRegion    string `json:"aws_region,omitempty" jsonschema:"title=AWS Region" jsonschema_extras:"order=9"`
 }
 
 func (c config) Validate() error {
-	if c.EngineURL == "" {
-		return fmt.Errorf("missing required engine_url")
+	if c.EngineName == "" {
+		return fmt.Errorf("missing required engine_name")
 	}
 	if c.Database == "" {
 		return fmt.Errorf("missing required database")
 	}
-	if c.Username == "" {
-		return fmt.Errorf("missing required username")
+	if c.AccountName == "" {
+		return fmt.Errorf("missing required account_name")
 	}
-	if c.Password == "" {
-		return fmt.Errorf("missing required password")
+	if c.ClientId == "" {
+		return fmt.Errorf("missing required client_id")
+	}
+	if c.ClientSecret == "" {
+		return fmt.Errorf("missing required client_secret")
 	}
 	if c.S3Bucket == "" {
 		return fmt.Errorf("missing required bucket")
@@ -40,14 +44,16 @@ func (c config) Validate() error {
 // which provides the jsonschema description of the fields
 func (config) GetFieldDocString(fieldName string) string {
 	switch fieldName {
-	case "EngineURL":
-		return "Engine URL of the Firebolt database, in the format: `<engine-name>.<organisation>.<region>.app.firebolt.io`."
+	case "EngineName":
+		return "Engine Name to process your queries."
 	case "Database":
 		return "Name of the Firebolt database."
-	case "Username":
-		return "Firebolt username."
-	case "Password":
-		return "Firebolt password."
+	case "ClientID":
+		return "ID of your Firebolt service account."
+	case "ClientSecret":
+		return "Secret key of your Firebolt service account."
+	case "AccountName":
+		return "Firebolt account within your organization."
 	case "S3Bucket":
 		return "Name of S3 bucket where the intermediate files for external table will be stored."
 	case "S3Prefix":

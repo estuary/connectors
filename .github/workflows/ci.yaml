@@ -266,6 +266,7 @@ jobs:
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
+              "materialize-firebolt",
               "materialize-dynamodb",
               "materialize-elasticsearch",
               "materialize-google-sheets",
