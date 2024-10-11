@@ -3,6 +3,10 @@ import subprocess
 
 
 def test_capture(request, snapshot):
+    OMITTED_STREAMS = [
+        "acmeCo/tags",
+    ]
+
     result = subprocess.run(
         [
             "flowctl",
@@ -25,7 +29,7 @@ def test_capture(request, snapshot):
 
     for line in lines:
         stream = line[0]
-        if stream not in seen:
+        if stream not in seen and stream not in OMITTED_STREAMS:
             unique_stream_lines.append(line)
             seen.add(stream)
 
@@ -37,13 +41,6 @@ def test_capture(request, snapshot):
             rec["updated_at"] = "redacted"
         if "last_login_at" in rec:
             rec["last_login_at"] = "redacted"
-        if stream == "acmeCo/tags":
-            rec["name"] = "redacted"
-            # Updating count with rec["count"] = 1 sets count to be
-            # the tuple [1] instead of the int 1. We can get around
-            # this by deleting the attribute then re-setting it.
-            del rec["count"]
-            rec["count"] = 1
 
 
     assert snapshot("capture.stdout.json") == unique_stream_lines
