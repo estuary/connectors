@@ -25,6 +25,8 @@ function kctl() {
   docker run -i --network flow-test --mount "type=bind,src=$kafkactl_config,target=/kafkactl.yaml" deviceinsight/kafkactl --config-file=/kafkactl.yaml $@
 }
 
+docker compose -f source-kafka/docker-compose.yaml up --detach
+
 # Ensure we can connect to a broker.
 for i in $(seq 1 10); do
   if [ -n "$(kctl get topics)" ]; then

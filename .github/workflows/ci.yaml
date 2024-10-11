@@ -232,11 +232,6 @@ jobs:
           cd ..;
           pytest ${{matrix.connector}}/tests;
 
-      - name: Start Dockerized test infrastructure
-        if: matrix.connector == 'source-kafka'
-        run: |
-          docker compose --file infra/docker-compose.yaml up --wait
-
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
