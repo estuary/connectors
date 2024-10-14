@@ -510,7 +510,7 @@ class Events(IterableStream):
     https://api.iterable.com/api/docs#export_exportUserEvents
     """
 
-    primary_key = None
+    primary_key = ["email", "createdAt"]
     data_field = "events"
     common_fields = ("itblInternal", "_type", "createdAt", "email")
 

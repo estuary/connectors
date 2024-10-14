@@ -1,7 +1,19 @@
 ---
 collections:
   acmeCo/campaigns:
-    schema: campaigns.schema.yaml
+    schema:
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /id
   acmeCo/campaigns_metrics:
@@ -32,18 +44,6 @@ collections:
       properties:
         id:
           type: integer
-        name:
-          type:
-            - "null"
-            - string
-        channelType:
-          type:
-            - "null"
-            - string
-        messageMedium:
-          type:
-            - "null"
-            - string
         _meta:
           type: object
           properties:
@@ -56,100 +56,392 @@ collections:
     key:
       - /id
   acmeCo/custom_event:
-    schema: custom_event.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/email_bounce:
-    schema: email_bounce.schema.yaml
+    schema:
+      properties:
+        messageId:
+          type: string
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /messageId
       - /email
   acmeCo/email_click:
-    schema: email_click.schema.yaml
+    schema:
+      properties:
+        messageId:
+          type: string
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /messageId
       - /email
   acmeCo/email_complaint:
-    schema: email_complaint.schema.yaml
+    schema:
+      properties:
+        messageId:
+          type: string
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /messageId
       - /email
   acmeCo/email_open:
-    schema: email_open.schema.yaml
+    schema:
+      properties:
+        messageId:
+          type: string
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /messageId
       - /email
   acmeCo/email_send:
-    schema: email_send.schema.yaml
+    schema:
+      properties:
+        messageId:
+          type: string
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /messageId
       - /email
   acmeCo/email_send_skip:
-    schema: email_send_skip.schema.yaml
+    schema:
+      properties:
+        messageId:
+          type: string
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /messageId
       - /email
   acmeCo/email_subscribe:
-    schema: email_subscribe.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/email_unsubscribe:
-    schema: email_unsubscribe.schema.yaml
+    schema:
+      properties:
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
   acmeCo/events:
-    schema: events.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
-      - /_meta/row_id
+      - /email
+      - /createdAt
   acmeCo/hosted_unsubscribe_click:
-    schema: hosted_unsubscribe_click.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/in_app_click:
-    schema: in_app_click.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/in_app_close:
-    schema: in_app_close.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/in_app_delete:
-    schema: in_app_delete.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/in_app_delivery:
-    schema: in_app_delivery.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/in_app_open:
-    schema: in_app_open.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/in_app_send:
-    schema: in_app_send.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/in_app_send_skip:
-    schema: in_app_send_skip.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/inbox_message_impression:
-    schema: inbox_message_impression.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/inbox_session:
-    schema: inbox_session.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
@@ -175,21 +467,7 @@ collections:
     schema:
       properties:
         id:
-          type:
-            - "null"
-            - integer
-        name:
-          type:
-            - "null"
-            - string
-        createdAt:
-          type:
-            - "null"
-            - integer
-        listType:
-          type:
-            - "null"
-            - string
+          type: integer
         _meta:
           type: object
           properties:
@@ -206,14 +484,6 @@ collections:
       properties:
         id:
           type: integer
-        name:
-          type:
-            - "null"
-            - string
-        channelId:
-          type:
-            - "null"
-            - number
         _meta:
           type: object
           properties:
@@ -242,85 +512,334 @@ collections:
     key:
       - /_meta/row_id
   acmeCo/purchase:
-    schema: purchase.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/push_bounce:
-    schema: push_bounce.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/push_open:
-    schema: push_open.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/push_send:
-    schema: push_send.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/push_send_skip:
-    schema: push_send_skip.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/push_uninstall:
-    schema: push_uninstall.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/sms_bounce:
-    schema: sms_bounce.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/sms_click:
-    schema: sms_click.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/sms_received:
-    schema: sms_received.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/sms_send:
-    schema: sms_send.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/sms_send_skip:
-    schema: sms_send_skip.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/sms_usage_info:
-    schema: sms_usage_info.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/templates:
-    schema: templates.schema.yaml
+    schema:
+      properties:
+        templateId:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /templateId
   acmeCo/users:
-    schema: users.schema.yaml
+    schema:
+      properties:
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
   acmeCo/web_push_click:
-    schema: web_push_click.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/web_push_send:
-    schema: web_push_send.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
   acmeCo/web_push_send_skip:
-    schema: web_push_send_skip.schema.yaml
+    schema:
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        email:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      type: object
+      x-infer-schema: true
     key:
       - /email
       - /createdAt
