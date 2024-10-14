@@ -91,8 +91,8 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 			"float":     {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
-			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
 			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {

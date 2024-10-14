@@ -95,6 +95,9 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			"date":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 			"time":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 			"datetime": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(prepareDatetimeToStringCast(tzLocation)))},
+			"varchar":  {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))},
+			"longtext": {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))},
+			"*":        {sql.NewMigrationSpec([]string{"json"})},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
@@ -137,6 +140,10 @@ func formatOffset(loc *time.Location) string {
 // by default we don't want to do `CAST(%s AS %s)` for MySQL
 func migrationIdentifier(migration sql.ColumnTypeMigration) string {
 	return migration.Identifier
+}
+
+func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`JSON_QUOTE(%s)`, migration.Identifier)
 }
 
 func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {

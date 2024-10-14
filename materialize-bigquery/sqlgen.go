@@ -104,6 +104,7 @@ var bqDialect = func() sql.Dialect {
 			"float":      {sql.NewMigrationSpec([]string{"string"})},
 			"date":       {sql.NewMigrationSpec([]string{"string"})},
 			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
+			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -133,6 +134,10 @@ var bqDialect = func() sql.Dialect {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`FORMAT_TIMESTAMP('%%Y-%%m-%%dT%%H:%%M:%%E*SZ', %s, 'UTC') `, migration.Identifier)
+}
+
+func toJsonCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
 }
 
 var (

@@ -11,7 +11,14 @@ type MigrationSpecs map[string][]MigrationSpec
 func (ms MigrationSpecs) FindMigrationSpec(sourceType string, targetDDL string) *MigrationSpec {
 	var target = strings.ToLower(targetDDL)
 
-	for _, m := range ms[strings.ToLower(sourceType)] {
+	var specs []MigrationSpec
+	if matched, ok := ms[strings.ToLower(sourceType)]; ok {
+		specs = append(specs, matched...)
+	}
+	if wildcard, ok := ms["*"]; ok {
+		specs = append(specs, wildcard...)
+	}
+	for _, m := range specs {
 		if slices.ContainsFunc(m.targetDDLs, func(ddl string) bool {
 			return strings.ToLower(ddl) == target
 		}) {
