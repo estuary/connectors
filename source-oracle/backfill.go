@@ -30,7 +30,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	var query string
 	var args []any
 	switch state.Mode {
-	case sqlcapture.TableModeKeylessBackfill:
+	case sqlcapture.TableStateKeylessBackfill:
 		// A is the lexicographically smallest character in base64 encoding, so this is the smallest possible base64 encoded string
 		var afterRowID = "AAAAAAAAAAAAAAAAAA"
 		if resumeAfter != nil {
@@ -40,7 +40,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterRowID}
 
-	case sqlcapture.TableModePreciseBackfill:
+	case sqlcapture.TableStatePreciseBackfill:
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
@@ -93,7 +93,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		}
 
 		var rowKey []byte
-		if state.Mode == sqlcapture.TableModeKeylessBackfill {
+		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			rowKey = []byte(rowid)
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)

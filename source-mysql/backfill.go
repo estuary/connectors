@@ -26,15 +26,15 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	var args []any
 
 	switch state.Mode {
-	case sqlcapture.TableModeKeylessBackfill:
+	case sqlcapture.TableStateKeylessBackfill:
 		logrus.WithFields(logrus.Fields{
 			"stream": streamID,
 			"offset": state.BackfilledCount,
 		}).Debug("scanning keyless table chunk")
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{state.BackfilledCount}
-	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
-		var isPrecise = (state.Mode == sqlcapture.TableModePreciseBackfill)
+	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
+		var isPrecise = (state.Mode == sqlcapture.TableStatePreciseBackfill)
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
@@ -95,7 +95,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		}
 
 		var rowKey []byte
-		if state.Mode == sqlcapture.TableModeKeylessBackfill {
+		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
