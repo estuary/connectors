@@ -209,10 +209,6 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 	for ctx.Err() == nil {
 		// If any streams are currently pending, initialize them so they can start backfilling.
-		// TODO(wgd): This will ultimately have to take into account the latest discovery info
-		// so that we can establish whether a dropped-and-recreated table is ready to backfill
-		// again. At that time we might want to add some sort of timer controlling when we run
-		// this process so it doesn't happen too often.
 		if err := c.activatePendingStreams(ctx, replStream); err != nil {
 			return fmt.Errorf("error initializing pending streams: %w", err)
 		}
@@ -311,19 +307,26 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 
 // activatePendingStreams transitions streams from a "Pending" state to being captured once they're eligible.
 func (c *Capture) activatePendingStreams(ctx context.Context, replStream ReplicationStream) error {
+	// Fast path for the common case, so we can just run this function at the top of the main loop
+	// and rely on it normally exiting quickly without doing any unnecessary work.
+	if len(c.BindingsInState(TableModeMissing, TableModePending)) == 0 {
+		return nil
+	}
+
 	// Get the latest discovery information.
 	var discovery, err = c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return err
 	}
 
-	// See if any missing tables have since reappeared, and if so mark them as pending.
+	// See if any missing tables have since reappeared, and if so mark them as pending again.
 	for _, binding := range c.BindingsInState(TableModeMissing) {
 		if _, ok := discovery[binding.StreamID]; ok {
 			c.State.Streams[binding.StateKey] = &TableState{Mode: TableModePending, dirty: true}
 		}
 	}
 
+	// Initialize all pending streams to an appropriate backfill or active state.
 	for _, binding := range c.BindingsInState(TableModePending) {
 		var streamID = binding.StreamID
 		var stateKey = binding.StateKey
