@@ -171,6 +171,8 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 }
 
 func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
+	log.Warn("running prereq checks")
+
 	errs := &sql.PrereqErr{}
 
 	cfg := conf.(*config)
@@ -187,6 +189,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
+	log.Warn("will ping database")
 	if err := db.PingContext(pingCtx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var pgErr *pgconn.PgError
@@ -217,6 +220,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 
 		errs.Err(err)
 	}
+	log.Warn("did ping database")
 
 	s3client, err := cfg.toS3Client(ctx)
 	if err != nil {
@@ -229,6 +233,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
 	testKey := path.Join(cfg.BucketPath, uuid.NewString())
 
+	log.Warn("will do object storage checks")
 	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(cfg.Bucket),
@@ -262,6 +267,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 		}
 		errs.Err(err)
 	}
+	log.Warn("finished object storage checks")
 
 	return errs
 }
