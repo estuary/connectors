@@ -184,12 +184,15 @@ type mysqlDatabase struct {
 	versionProduct             string // Usually either "MySQL" or "MariaDB"
 	versionMajor, versionMinor int    // The major/minor version the server is running
 
-	config           *Config
-	conn             *client.Conn
-	discovery        map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
-	explained        map[string]struct{}                               // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
-	datetimeLocation *time.Location                                    // The location in which to interpret DATETIME column values as timestamps.
-	includeTxIDs     map[string]bool                                   // Tracks which tables should have XID properties in their replication metadata.
+	config *Config
+	conn   *client.Conn
+
+	discovery     map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
+	discoveryTime time.Time                                         // The time at which the cached discovery info was last updated.
+
+	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
+	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
+	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
 }
 
 func (db *mysqlDatabase) HistoryMode() bool {
