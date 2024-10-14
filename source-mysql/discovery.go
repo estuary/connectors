@@ -475,6 +475,15 @@ func getTables(_ context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInf
 }
 
 func charsetFromCollation(name string) string {
+	// TODO(wgd): The only way we can end up with an empty collation name here is if the
+	// TABLE_COLLATION column of INFORMATION_SCHEMA.TABLES is empty. For now we can just
+	// assume it's UTF-8 compatible, but for perfect correctness we need to keep track of
+	// the server's default collation setting and use that here.
+	if name == "" {
+		logrus.Debug("assuming UTF-8 for unspecified collation(s)")
+		return mysqlDefaultCharset
+	}
+
 	// According to https://dev.mysql.com/doc/refman/8.4/en/information-schema-tables-table.html:
 	//
 	//     The output does not explicitly list the table default character set, but the collation
