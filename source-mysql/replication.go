@@ -597,7 +597,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 					Cause:    fmt.Sprintf("table %q was dropped by query %q", streamID, query),
 				}); err != nil {
 					return err
-				} else if err := rs.deactivateTable(ctx, streamID); err != nil {
+				} else if err := rs.deactivateTable(streamID); err != nil {
 					return err
 				}
 			}
@@ -620,7 +620,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 					Cause:    fmt.Sprintf("table %q was renamed by query %q", streamID, query),
 				}); err != nil {
 					return err
-				} else if err := rs.deactivateTable(ctx, streamID); err != nil {
+				} else if err := rs.deactivateTable(streamID); err != nil {
 					return err
 				}
 			}
@@ -975,7 +975,7 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 	return nil
 }
 
-func (rs *mysqlReplicationStream) deactivateTable(ctx context.Context, streamID string) error {
+func (rs *mysqlReplicationStream) deactivateTable(streamID string) error {
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
 

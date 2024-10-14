@@ -32,7 +32,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var query string
 	var args []any
 	switch state.Mode {
-	case sqlcapture.TableModeKeylessBackfill:
+	case sqlcapture.TableStateKeylessBackfill:
 		var afterCTID = "(0,0)"
 		if resumeAfter != nil {
 			afterCTID = string(resumeAfter)
@@ -41,8 +41,8 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterCTID}
 		disableParallelWorkers = true
-	case sqlcapture.TableModePreciseBackfill, sqlcapture.TableModeUnfilteredBackfill:
-		var isPrecise = (state.Mode == sqlcapture.TableModePreciseBackfill)
+	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
+		var isPrecise = (state.Mode == sqlcapture.TableStatePreciseBackfill)
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
@@ -110,7 +110,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
 		var rowKey []byte
-		if state.Mode == sqlcapture.TableModeKeylessBackfill {
+		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			var ctid = fields["ctid"].(pgtype.TID)
 			delete(fields, "ctid")
 

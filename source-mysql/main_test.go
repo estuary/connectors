@@ -573,7 +573,7 @@ func TestComplexDataset(t *testing.T) {
 		var state sqlcapture.PersistentState
 		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
 		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 130
-		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableStateUnfilteredBackfill
 		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0x94, 0x01, 0x4e, 0x56, 0x00}
 		var bs, err = json.Marshal(&state)
 		require.NoError(t, err)
@@ -593,7 +593,7 @@ func TestComplexDataset(t *testing.T) {
 		var state sqlcapture.PersistentState
 		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
 		state.Streams["test%2FComplexDataset_56015963"].BackfilledCount = 230
-		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableModeUnfilteredBackfill
+		state.Streams["test%2FComplexDataset_56015963"].Mode = sqlcapture.TableStateUnfilteredBackfill
 		state.Streams["test%2FComplexDataset_56015963"].Scanned = []byte{0x16, 0x07, 0xbc, 0x01, 0x4e, 0x48, 0x00}
 		var bs, err = json.Marshal(&state)
 		require.NoError(t, err)
