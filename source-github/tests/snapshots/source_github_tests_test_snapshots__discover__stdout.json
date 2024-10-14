@@ -1,0 +1,1421 @@
+[
+  {
+    "recommendedName": "issue_timeline_events",
+    "resourceConfig": {
+      "stream": "issue_timeline_events",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "issue_number"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "issue_number": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/issue_number"
+    ]
+  },
+  {
+    "recommendedName": "assignees",
+    "resourceConfig": {
+      "stream": "assignees",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "branches",
+    "resourceConfig": {
+      "stream": "branches",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/name"
+    ]
+  },
+  {
+    "recommendedName": "collaborators",
+    "resourceConfig": {
+      "stream": "collaborators",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "comments",
+    "resourceConfig": {
+      "stream": "comments",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "commit_comment_reactions",
+    "resourceConfig": {
+      "stream": "commit_comment_reactions",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "commit_comments",
+    "resourceConfig": {
+      "stream": "commit_comments",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "commits",
+    "resourceConfig": {
+      "stream": "commits",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "sha"
+      ],
+      "properties": {
+        "sha": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/sha"
+    ]
+  },
+  {
+    "recommendedName": "contributor_activity",
+    "resourceConfig": {
+      "stream": "contributor_activity",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "title": "Contributor Activity",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "deployments",
+    "resourceConfig": {
+      "stream": "deployments",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "events",
+    "resourceConfig": {
+      "stream": "events",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "issue_comment_reactions",
+    "resourceConfig": {
+      "stream": "issue_comment_reactions",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "issue_events",
+    "resourceConfig": {
+      "stream": "issue_events",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "issue_labels",
+    "resourceConfig": {
+      "stream": "issue_labels",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "issue_milestones",
+    "resourceConfig": {
+      "stream": "issue_milestones",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "issue_reactions",
+    "resourceConfig": {
+      "stream": "issue_reactions",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "issues",
+    "resourceConfig": {
+      "stream": "issues",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "organizations",
+    "resourceConfig": {
+      "stream": "organizations",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "project_cards",
+    "resourceConfig": {
+      "stream": "project_cards",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "project_columns",
+    "resourceConfig": {
+      "stream": "project_columns",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "projects",
+    "resourceConfig": {
+      "stream": "projects",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "pull_request_comment_reactions",
+    "resourceConfig": {
+      "stream": "pull_request_comment_reactions",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "pull_request_commits",
+    "resourceConfig": {
+      "stream": "pull_request_commits",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "sha"
+      ],
+      "properties": {
+        "sha": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/sha"
+    ]
+  },
+  {
+    "recommendedName": "pull_request_stats",
+    "resourceConfig": {
+      "stream": "pull_request_stats",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "projects_v2",
+    "resourceConfig": {
+      "stream": "projects_v2",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "pull_requests",
+    "resourceConfig": {
+      "stream": "pull_requests",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "releases",
+    "resourceConfig": {
+      "stream": "releases",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "repositories",
+    "resourceConfig": {
+      "stream": "repositories",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "review_comments",
+    "resourceConfig": {
+      "stream": "review_comments",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "reviews",
+    "resourceConfig": {
+      "stream": "reviews",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "stargazers",
+    "resourceConfig": {
+      "stream": "stargazers",
+      "syncMode": "incremental",
+      "cursorField": [
+        "starred_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "user_id",
+        "starred_at"
+      ],
+      "properties": {
+        "user_id": {
+          "type": "integer"
+        },
+        "starred_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/user_id"
+    ]
+  },
+  {
+    "recommendedName": "tags",
+    "resourceConfig": {
+      "stream": "tags",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/name"
+    ]
+  },
+  {
+    "recommendedName": "teams",
+    "resourceConfig": {
+      "stream": "teams",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "team_members",
+    "resourceConfig": {
+      "stream": "team_members",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id",
+        "team_slug"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "team_slug": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id",
+      "/team_slug"
+    ]
+  },
+  {
+    "recommendedName": "users",
+    "resourceConfig": {
+      "stream": "users",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "workflows",
+    "resourceConfig": {
+      "stream": "workflows",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-04/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "workflow_runs",
+    "resourceConfig": {
+      "stream": "workflow_runs",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-04/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "workflow_jobs",
+    "resourceConfig": {
+      "stream": "workflow_jobs",
+      "syncMode": "incremental",
+      "cursorField": [
+        "completed_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-04/schema#",
+      "type": "object",
+      "required": [
+        "id",
+        "run_id"
+      ],
+      "properties": {
+        "id": {
+          "type": "integer"
+        },
+        "run_id": {
+          "type": "integer"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "team_memberships",
+    "resourceConfig": {
+      "stream": "team_memberships",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "https://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "url"
+      ],
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/url"
+    ]
+  }
+]

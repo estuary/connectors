@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft-04/schema#",
+  "type": "object",
+  "required": ["id", "run_id"],
+  "properties": {
+    "id": {
+      "type": "integer"
+    },
+    "run_id": {
+      "type": "integer"
+    }
+  }
+}

@@ -1,0 +1,755 @@
+---
+collections:
+  acmeCo/assignees:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/branches:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /name
+  acmeCo/collaborators:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/comments:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/commit_comment_reactions:
+    schema:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/commit_comments:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/commits:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - sha
+      properties:
+        sha:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /sha
+  acmeCo/contributor_activity:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      title: Contributor Activity
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/deployments:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/events:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/issue_comment_reactions:
+    schema:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/issue_events:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/issue_labels:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/issue_milestones:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/issue_reactions:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/issue_timeline_events:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - issue_number
+      additionalProperties: true
+      properties:
+        issue_number:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /issue_number
+  acmeCo/issues:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      additionalProperties: true
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/organizations:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/project_cards:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/project_columns:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/projects:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/projects_v2:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/pull_request_comment_reactions:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/pull_request_commits:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - sha
+      properties:
+        sha:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /sha
+  acmeCo/pull_request_stats:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/pull_requests:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/releases:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/repositories:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/review_comments:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/reviews:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/stargazers:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - user_id
+        - starred_at
+      properties:
+        user_id:
+          type: integer
+        starred_at:
+          type: string
+          format: date-time
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /user_id
+  acmeCo/tags:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /name
+  acmeCo/team_members:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+        - team_slug
+      properties:
+        id:
+          type: integer
+        team_slug:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+      - /team_slug
+  acmeCo/team_memberships:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /url
+  acmeCo/teams:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/users:
+    schema:
+      $schema: "https://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/workflow_jobs:
+    schema:
+      $schema: "https://json-schema.org/draft-04/schema#"
+      type: object
+      required:
+        - id
+        - run_id
+      properties:
+        id:
+          type: integer
+        run_id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/workflow_runs:
+    schema:
+      $schema: "https://json-schema.org/draft-04/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
+  acmeCo/workflows:
+    schema:
+      $schema: "https://json-schema.org/draft-04/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: integer
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+      x-infer-schema: true
+    key:
+      - /id
