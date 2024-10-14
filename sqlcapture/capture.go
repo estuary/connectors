@@ -94,21 +94,35 @@ type TableState struct {
 	dirty bool
 }
 
-// The table's mode can be one of:
-//
-//	Ignore: The table is being deliberately ignored.
-//	Pending: The table is new, and will start being backfilled soon.
-//	PreciseBackfill: The table's rows are being backfilled and replication events will only be emitted for the already-backfilled portion.
-//	UnfilteredBackfill: The table's rows are being backfilled as normal but all replication events will be emitted.
-//	KeylessBackfill: The table's rows are being backfilled with a non-primary-key based strategy and all replication events will be emitted.
-//	Active: The table finished backfilling and replication events are emitted for the entire table.
 const (
-	TableModeIgnore             = "Ignore"
-	TableModePending            = "Pending"
-	TableModePreciseBackfill    = "Backfill" // Short name for historical reasons, this used to be the only backfill mode
+	// The table is not being captured, but it used to be. Since JSON-patch
+	// deletion is tricky we represent this explicitly.
+	TableModeIgnore = "Ignore"
+
+	// The table is going to be backfilled and/or activated in the near future
+	// when we reach a suitable point.
+	TableModePending = "Pending"
+
+	// A backfill is currently ongoing with the keyed backfill strategy and a
+	// replication event filter so that only rows in the backfilled region of
+	// the table will be emitted. Uses a short name for historical reasons,
+	// this used to be the only backfill mode.
+	TableModePreciseBackfill = "Backfill"
+
+	// A backfill is currently ongoing with the keyed backfill strategy and no
+	// replication event filter.
 	TableModeUnfilteredBackfill = "UnfilteredBackfill"
-	TableModeKeylessBackfill    = "KeylessBackfill"
-	TableModeActive             = "Active"
+
+	// A backfill is currently ongoing with the keyless backfill strategy and
+	// no replication event filter.
+	TableModeKeylessBackfill = "KeylessBackfill"
+
+	// The table is fully backfilled and we're just streaming replication events.
+	TableModeActive = "Active"
+
+	// The table is supposed to be captured, but went missing. We're waiting for
+	// it to come back at some point in order to mark it as pending again.
+	TableModeMissing = "Missing"
 )
 
 // Capture encapsulates the generic process of capturing data from a SQL database
@@ -269,7 +283,11 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	for stateKey, state := range c.State.Streams {
 		if state.Mode != TableModeIgnore && !streamExistsInCatalog(stateKey) {
 			logrus.WithField("stateKey", stateKey).Info("binding removed from capture")
-			c.State.Streams[stateKey] = &TableState{Mode: TableModeIgnore, dirty: true}
+			c.State.Streams[stateKey] = &TableState{
+				Mode:     TableModeIgnore,
+				Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
+				dirty:    true,
+			}
 		}
 	}
 
@@ -293,6 +311,19 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 
 // activatePendingStreams transitions streams from a "Pending" state to being captured once they're eligible.
 func (c *Capture) activatePendingStreams(ctx context.Context, replStream ReplicationStream) error {
+	// Get the latest discovery information.
+	var discovery, err = c.Database.DiscoverTables(ctx)
+	if err != nil {
+		return err
+	}
+
+	// See if any missing tables have since reappeared, and if so mark them as pending.
+	for _, binding := range c.BindingsInState(TableModeMissing) {
+		if _, ok := discovery[binding.StreamID]; ok {
+			c.State.Streams[binding.StateKey] = &TableState{Mode: TableModePending, dirty: true}
+		}
+	}
+
 	for _, binding := range c.BindingsInState(TableModePending) {
 		var streamID = binding.StreamID
 		var stateKey = binding.StateKey
@@ -301,10 +332,6 @@ func (c *Capture) activatePendingStreams(ctx context.Context, replStream Replica
 		var state = c.State.Streams[stateKey]
 		state.dirty = true
 
-		var discovery, err = c.Database.DiscoverTables(ctx)
-		if err != nil {
-			return err
-		}
 		var discoveryInfo = discovery[streamID]
 		if discoveryInfo == nil {
 			return fmt.Errorf("stream %q is a configured binding of this capture, but doesn't exist or isn't visible with current permissions", streamID)
@@ -438,11 +465,6 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		eventCount++
 
-		// Keepalive events do nothing other than increment the event count.
-		if _, ok := event.(*KeepaliveEvent); ok {
-			return nil
-		}
-
 		// Flush events update the checkpoint LSN and may trigger a state update.
 		if event, ok := event.(*FlushEvent); ok {
 			c.State.Cursor = event.Cursor
@@ -459,6 +481,26 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
+	// Keepalive events do nothing.
+	if _, ok := event.(*KeepaliveEvent); ok {
+		return nil
+	}
+
+	// Table drop events indicate that the table has disappeared during replication.
+	if event, ok := event.(*TableDropEvent); ok {
+		var binding = c.Bindings[event.StreamID]
+		if binding == nil {
+			return nil // Should be impossible, but safe to ignore
+		}
+		logrus.WithFields(logrus.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("table dropped and marked as missing")
+		c.State.Streams[binding.StateKey] = &TableState{
+			Mode:     TableModeMissing,
+			Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
+			dirty:    true,
+		}
+		return nil
+	}
+
 	// Metadata events update the per-table metadata and dirty flag.
 	// They have no other effect, the new metadata will only be written
 	// as part of a subsequent state checkpoint.

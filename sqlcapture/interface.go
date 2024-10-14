@@ -3,6 +3,7 @@ package sqlcapture
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/invopop/jsonschema"
@@ -92,6 +93,13 @@ type MetadataEvent struct {
 // is still active and processing WAL entries which don't require other events.
 type KeepaliveEvent struct{}
 
+// TableDropEvent informs the generic sqlcapture logic that the table in question
+// has been dropped and will not be producing any further changes.
+type TableDropEvent struct {
+	StreamID StreamID
+	Cause    string // Informational description of what happened
+}
+
 // A DatabaseEvent can be a ChangeEvent, FlushEvent, MetadataEvent, or KeepaliveEvent.
 type DatabaseEvent interface {
 	isDatabaseEvent()
@@ -102,11 +110,15 @@ func (*ChangeEvent) isDatabaseEvent()    {}
 func (*FlushEvent) isDatabaseEvent()     {}
 func (*MetadataEvent) isDatabaseEvent()  {}
 func (*KeepaliveEvent) isDatabaseEvent() {}
+func (*TableDropEvent) isDatabaseEvent() {}
 
-func (*ChangeEvent) String() string    { return "ChangeEvent" }
-func (evt *FlushEvent) String() string { return "FlushEvent" }
-func (*MetadataEvent) String() string  { return "MetadataEvent" }
-func (*KeepaliveEvent) String() string { return "KeepaliveEvent" }
+func (evt *ChangeEvent) String() string {
+	return fmt.Sprintf("ChangeEvent(%q)", evt.Source.Common().StreamID())
+}
+func (evt *FlushEvent) String() string     { return fmt.Sprintf("FlushEvent(%q)", evt.Cursor) }
+func (evt *MetadataEvent) String() string  { return fmt.Sprintf("MetadataEvent(%q)", evt.StreamID) }
+func (*KeepaliveEvent) String() string     { return "KeepaliveEvent" }
+func (evt *TableDropEvent) String() string { return fmt.Sprintf("TableDropEvent(%q)", evt.StreamID) }
 
 // KeyFields returns suitable fields for extracting the event primary key.
 func (e *ChangeEvent) KeyFields() map[string]interface{} {
@@ -129,8 +141,12 @@ type Database interface {
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
 	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, err error)
-	// DiscoverTables queries the database for information about tables available for capture.
+
+	// DiscoverTables queries the database for information about tables available for capture. The
+	// database is expected to cache this for some unspecified length of time, and is permitted to
+	// cache it indefinitely for a single connector run (though a time-based TTL is preferable).
 	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
+
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
