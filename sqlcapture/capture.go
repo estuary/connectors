@@ -62,12 +62,12 @@ func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
 
 // BindingsCurrentlyActive returns all the bindings currently being captured.
 func (c *Capture) BindingsCurrentlyActive() []*Binding {
-	return c.BindingsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill, TableModeActive)
+	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill, TableStateActive)
 }
 
 // BindingsCurrentlyBackfilling returns all the bindings undergoing some sort of backfill.
 func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
-	return c.BindingsInState(TableModePreciseBackfill, TableModeUnfilteredBackfill, TableModeKeylessBackfill)
+	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
 }
 
 // TableState represents the serializable/resumable state of a particular table's capture.
@@ -97,32 +97,32 @@ type TableState struct {
 const (
 	// The table is not being captured, but it used to be. Since JSON-patch
 	// deletion is tricky we represent this explicitly.
-	TableModeIgnore = "Ignore"
+	TableStateIgnore = "Ignore"
 
 	// The table is going to be backfilled and/or activated in the near future
 	// when we reach a suitable point.
-	TableModePending = "Pending"
+	TableStatePending = "Pending"
 
 	// A backfill is currently ongoing with the keyed backfill strategy and a
 	// replication event filter so that only rows in the backfilled region of
 	// the table will be emitted. Uses a short name for historical reasons,
 	// this used to be the only backfill mode.
-	TableModePreciseBackfill = "Backfill"
+	TableStatePreciseBackfill = "Backfill"
 
 	// A backfill is currently ongoing with the keyed backfill strategy and no
 	// replication event filter.
-	TableModeUnfilteredBackfill = "UnfilteredBackfill"
+	TableStateUnfilteredBackfill = "UnfilteredBackfill"
 
 	// A backfill is currently ongoing with the keyless backfill strategy and
 	// no replication event filter.
-	TableModeKeylessBackfill = "KeylessBackfill"
+	TableStateKeylessBackfill = "KeylessBackfill"
 
 	// The table is fully backfilled and we're just streaming replication events.
-	TableModeActive = "Active"
+	TableStateActive = "Active"
 
 	// The table is supposed to be captured, but went missing. We're waiting for
 	// it to come back at some point in order to mark it as pending again.
-	TableModeMissing = "Missing"
+	TableStateMissing = "Missing"
 )
 
 // Capture encapsulates the generic process of capturing data from a SQL database
@@ -258,13 +258,13 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 
 		// See if the stream is already initialized. If it's not, then create it.
 		var streamState, ok = c.State.Streams[stateKey]
-		if ok && streamState.Mode != TableModeIgnore {
+		if ok && streamState.Mode != TableStateIgnore {
 			allStreamsAreNew = false
 			continue
 		}
 
 		logrus.WithField("stateKey", stateKey).Info("binding added to capture")
-		c.State.Streams[stateKey] = &TableState{Mode: TableModePending, dirty: true}
+		c.State.Streams[stateKey] = &TableState{Mode: TableStatePending, dirty: true}
 	}
 
 	// When a binding is removed we change the table state to "Ignore
@@ -277,10 +277,10 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 		return false
 	}
 	for stateKey, state := range c.State.Streams {
-		if state.Mode != TableModeIgnore && !streamExistsInCatalog(stateKey) {
+		if state.Mode != TableStateIgnore && !streamExistsInCatalog(stateKey) {
 			logrus.WithField("stateKey", stateKey).Info("binding removed from capture")
 			c.State.Streams[stateKey] = &TableState{
-				Mode:     TableModeIgnore,
+				Mode:     TableStateIgnore,
 				Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
 				dirty:    true,
 			}
@@ -309,7 +309,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 func (c *Capture) activatePendingStreams(ctx context.Context, replStream ReplicationStream) error {
 	// Fast path for the common case, so we can just run this function at the top of the main loop
 	// and rely on it normally exiting quickly without doing any unnecessary work.
-	if len(c.BindingsInState(TableModeMissing, TableModePending)) == 0 {
+	if len(c.BindingsInState(TableStateMissing, TableStatePending)) == 0 {
 		return nil
 	}
 
@@ -320,14 +320,14 @@ func (c *Capture) activatePendingStreams(ctx context.Context, replStream Replica
 	}
 
 	// See if any missing tables have since reappeared, and if so mark them as pending again.
-	for _, binding := range c.BindingsInState(TableModeMissing) {
+	for _, binding := range c.BindingsInState(TableStateMissing) {
 		if _, ok := discovery[binding.StreamID]; ok {
-			c.State.Streams[binding.StateKey] = &TableState{Mode: TableModePending, dirty: true}
+			c.State.Streams[binding.StateKey] = &TableState{Mode: TableStatePending, dirty: true}
 		}
 	}
 
 	// Initialize all pending streams to an appropriate backfill or active state.
-	for _, binding := range c.BindingsInState(TableModePending) {
+	for _, binding := range c.BindingsInState(TableStatePending) {
 		var streamID = binding.StreamID
 		var stateKey = binding.StateKey
 
@@ -351,7 +351,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, replStream Replica
 		// captures.
 		if !discoveryInfo.BaseTable {
 			logrus.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
-			state.Mode = TableModeIgnore
+			state.Mode = TableStateIgnore
 			continue
 		}
 
@@ -361,29 +361,29 @@ func (c *Capture) activatePendingStreams(ctx context.Context, replStream Replica
 		case BackfillModeAutomatic:
 			if discoveryInfo.UnpredictableKeyOrdering {
 				logrus.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
-				state.Mode = TableModeUnfilteredBackfill
+				state.Mode = TableStateUnfilteredBackfill
 			} else {
 				logrus.WithField("stream", streamID).Info("autoselected precise backfill mode")
-				state.Mode = TableModePreciseBackfill
+				state.Mode = TableStatePreciseBackfill
 			}
 		case BackfillModePrecise:
 			logrus.WithField("stream", streamID).Info("user selected precise backfill mode")
-			state.Mode = TableModePreciseBackfill
+			state.Mode = TableStatePreciseBackfill
 		case BackfillModeNormal:
 			logrus.WithField("stream", streamID).Info("user selected unfiltered (normal) backfill mode")
-			state.Mode = TableModeUnfilteredBackfill
+			state.Mode = TableStateUnfilteredBackfill
 		case BackfillModeWithoutKey:
 			logrus.WithField("stream", streamID).Info("user selected keyless backfill mode")
-			state.Mode = TableModeKeylessBackfill
+			state.Mode = TableStateKeylessBackfill
 		case BackfillModeOnlyChanges:
 			logrus.WithField("stream", streamID).Info("user selected only changes, skipping backfill")
-			state.Mode = TableModeActive
+			state.Mode = TableStateActive
 		default:
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
 		}
 
 		// When initializing a binding with the precise or unfiltered backfill modes, we'll need a primary key.
-		if state.Mode == TableModePreciseBackfill || state.Mode == TableModeUnfilteredBackfill {
+		if state.Mode == TableStatePreciseBackfill || state.Mode == TableStateUnfilteredBackfill {
 			if len(binding.Resource.PrimaryKey) > 0 {
 				logrus.WithFields(logrus.Fields{"stream": streamID, "key": binding.Resource.PrimaryKey}).Debug("backfill key overriden by resource config")
 				state.KeyColumns = binding.Resource.PrimaryKey
@@ -430,7 +430,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, replStream Replica
 				"stream":  binding.StreamID,
 				"scanned": state.Scanned,
 			}).Info("skipping backfill for stream")
-			state.Mode = TableModeActive
+			state.Mode = TableStateActive
 			state.Scanned = nil
 			state.dirty = true
 			c.State.Streams[binding.StateKey] = state
@@ -497,7 +497,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		}
 		logrus.WithFields(logrus.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("table dropped and marked as missing")
 		c.State.Streams[binding.StateKey] = &TableState{
-			Mode:     TableModeMissing,
+			Mode:     TableStateMissing,
 			Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
 			dirty:    true,
 		}
@@ -537,20 +537,20 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 	}
 
 	// Decide what to do with the change event based on the state of the table.
-	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableModeIgnore {
+	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableStateIgnore {
 		logrus.WithFields(logrus.Fields{
 			"stream": streamID,
 			"op":     change.Operation,
 		}).Debug("ignoring stream")
 		return nil
 	}
-	if tableState.Mode == TableModeActive || tableState.Mode == TableModeKeylessBackfill || tableState.Mode == TableModeUnfilteredBackfill {
+	if tableState.Mode == TableStateActive || tableState.Mode == TableStateKeylessBackfill || tableState.Mode == TableStateUnfilteredBackfill {
 		if err := c.emitChange(change); err != nil {
 			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 		}
 		return nil
 	}
-	if tableState.Mode == TableModePreciseBackfill {
+	if tableState.Mode == TableStatePreciseBackfill {
 		// When a table is being backfilled precisely, replication events lying within the
 		// already-backfilled portion of the table should be emitted, while replication events
 		// beyond that point should be ignored (since we'll reach that row later in the backfill).
@@ -606,7 +606,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	var lastRowKey = streamState.Scanned
 	var eventCount int
 	backfillComplete, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
-		if streamState.Mode == TableModePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
+		if streamState.Mode == TableStatePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
 			// row keys.
@@ -644,7 +644,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
 	state.BackfilledCount += eventCount
 	if backfillComplete {
 		logrus.WithField("stream", streamID).Info("backfill completed")
-		state.Mode = TableModeActive
+		state.Mode = TableStateActive
 		state.Scanned = nil
 	} else {
 		state.Scanned = lastRowKey
