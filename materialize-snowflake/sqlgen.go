@@ -94,6 +94,7 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 			"timestamp_ntz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeNoTzToStringCast))},
 			"timestamp_tz":  {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 			"timestamp_ltz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
+			"*":             {sql.NewMigrationSpec([]string{"variant"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -136,6 +137,10 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 
 func datetimeNoTzToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_VARCHAR(%s, 'YYYY-MM-DD"T"HH24:MI:SS.FF3')`, migration.Identifier)
+}
+
+func toJsonCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_VARIANT(%s)`, migration.Identifier)
 }
 
 type templates struct {

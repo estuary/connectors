@@ -347,8 +347,8 @@ func RunValidateAndApplyMigrationsTests(
 		require.NoError(t, err)
 
 		insertData(t,
-			[]string{"key", "scalarValue", "numericString", "dateValue", "datetimeValue", "timeValue", "int64", "requiredNumeric"},
-			[]string{"'1'", "'test'", "123", "'2024-01-01'", "'2024-01-01 01:01:01.111111111'", "'01:01:01'", "1", "456"})
+			[]string{"key", "scalarValue", "numericString", "dateValue", "datetimeValue", "timeValue", "int64", "requiredNumeric", "stringWidenedToJson", "intWidenedToJson"},
+			[]string{"'1'", "'test'", "123", "'2024-01-01'", "'2024-01-01 01:01:01.111111111'", "'01:01:01'", "1", "456", "'hello'", "999"})
 
 		snap.WriteString("\nMigratable Changes Before Apply Schema:\n")
 		snap.WriteString(dumpSchema(t) + "\n")

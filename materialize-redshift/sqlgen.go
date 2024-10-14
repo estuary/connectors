@@ -104,6 +104,8 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
+			"character varying":        {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast))},
+			"*":                        {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -148,6 +150,14 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, migration.Identifier)
+}
+
+func toJsonCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`json_parse(%s)`, migration.Identifier)
+}
+
+func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`json_parse('"' || %s || '"')`, migration.Identifier)
 }
 
 type copyFromS3Params struct {
