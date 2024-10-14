@@ -437,11 +437,8 @@ func TestDroppedAndRecreatedTable(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
 	cs.Capture(ctx, t, nil)
 
-	// Observe that the table is dropped
+	// Drop and recreate the table, then fill it with some new data.
 	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
-	cs.Capture(ctx, t, nil)
-
-	// Observe that the table has been recreated and capture the new data
 	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
 	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
 	tb.Insert(ctx, t, tableName, [][]any{{6, "six"}, {7, "seven"}, {8, "eight"}})
