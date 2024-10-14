@@ -591,20 +591,38 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	case *sqlparser.DropTable:
 		for _, table := range stmt.FromTables {
 			if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
-				return fmt.Errorf("unsupported operation (go.estuary.dev/eVVwet): %s", query)
+				// Indicate that change streaming for this table has failed.
+				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+					StreamID: streamID,
+					Cause:    fmt.Sprintf("table %q was dropped by query %q", streamID, query),
+				}); err != nil {
+					return err
+				} else if err := rs.deactivateTable(ctx, streamID); err != nil {
+					return err
+				}
 			}
 		}
 	case *sqlparser.TruncateTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
+			// Once we have a concept of collection-level truncation we will probably
+			// want to either handle this like a dropped-and-recreated table or else
+			// use another mechanism to produce the appropriate "the collection is
+			// now truncated" signals here. But for now ignoring is still the best
+			// we can do.
 			logrus.WithField("table", streamID).Warn("ignoring TRUNCATE on active table")
 		}
 	case *sqlparser.RenameTable:
 		for _, pair := range stmt.TablePairs {
 			if streamID := resolveTableName(schema, pair.FromTable); rs.tableActive(streamID) {
-				return fmt.Errorf("operation conflicts with %s (go.estuary.dev/eVVwet): %s", streamID, query)
-			}
-			if streamID := resolveTableName(schema, pair.ToTable); rs.tableActive(streamID) {
-				return fmt.Errorf("operation conflicts with %s (go.estuary.dev/eVVwet): %s", streamID, query)
+				// Indicate that change streaming for this table has failed.
+				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+					StreamID: streamID,
+					Cause:    fmt.Sprintf("table %q was renamed by query %q", streamID, query),
+				}); err != nil {
+					return err
+				} else if err := rs.deactivateTable(ctx, streamID); err != nil {
+					return err
+				}
 			}
 		}
 	case *sqlparser.Insert:
@@ -954,6 +972,17 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 	rs.tables.metadata[streamID] = metadata
 	rs.tables.nonTransactional[streamID] = nonTransactional
 	rs.tables.dirtyMetadata = append(rs.tables.dirtyMetadata, streamID)
+	return nil
+}
+
+func (rs *mysqlReplicationStream) deactivateTable(ctx context.Context, streamID string) error {
+	rs.tables.Lock()
+	defer rs.tables.Unlock()
+
+	delete(rs.tables.active, streamID)
+	delete(rs.tables.keyColumns, streamID)
+	delete(rs.tables.metadata, streamID) // No need to mark metadata as dirty, just forget it
+	delete(rs.tables.nonTransactional, streamID)
 	return nil
 }
 
