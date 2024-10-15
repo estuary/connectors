@@ -16,6 +16,21 @@ services:
     ports:
       - "3306:3306"
 
+  mariadb:
+    image: 'mariadb:11.5'
+    platform: linux/amd64
+    environment: {"MYSQL_DATABASE": "flow", "MYSQL_USER": "flow", "MYSQL_PASSWORD": "flow", "MYSQL_ROOT_PASSWORD": "flow"}
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    networks:
+      - flow-test
+    healthcheck:
+      test: [ "CMD", "mysql", "-h", "127.0.0.1", "-u", "$MYSQL_USER", "--password=$MYSQL_PASSWORD", "--port", "3306", "--execute", "SHOW DATABASES;"]
+      interval: 1s
+      retries: 30
+    ports:
+      - "3305:3306"
+
 networks:
   flow-test:
     name: flow-test
@@ -23,3 +38,4 @@ networks:
 
 volumes:
   mysql_data: {}
+  mariadb_data: {}

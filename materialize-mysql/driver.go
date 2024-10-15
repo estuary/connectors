@@ -314,7 +314,12 @@ func newMysqlDriver() *sql.Driver {
 				}
 			}
 
-			var dialect = mysqlDialect(tzLocation, cfg.Database)
+			var product string
+			if product, err = queryDatabaseProduct(ctx, conn); err != nil {
+				return nil, err
+			}
+
+			var dialect = mysqlDialect(tzLocation, cfg.Database, product)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
@@ -332,6 +337,30 @@ func newMysqlDriver() *sql.Driver {
 		},
 		PreReqs: preReqs,
 	}
+}
+
+// queryDatabaseFlavor examines the server version string to figure out what product
+// we're talking to
+func queryDatabaseProduct(ctx context.Context, conn *stdsql.Conn) (string, error) {
+	var rawVersionString string
+	var row = conn.QueryRowContext(ctx, `SELECT @@GLOBAL.version;`)
+	if err := row.Err(); err != nil {
+		return "", fmt.Errorf("unable to query database version: %w", err)
+	} else if err := row.Scan(&rawVersionString); err != nil {
+		return "", fmt.Errorf("unable to query database version: malformed response")
+	}
+
+	var product = "mysql"
+	if strings.Contains(strings.ToLower(rawVersionString), "mariadb") {
+		product = "mariadb"
+	}
+
+	log.WithFields(log.Fields{
+		"version": rawVersionString,
+		"product": product,
+	}).Info("queried database version")
+
+	return product, nil
 }
 
 var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' or timezone from capture configuration must contain a valid IANA time zone name or +HH:MM offset")

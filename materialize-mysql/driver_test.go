@@ -35,6 +35,16 @@ func testConfig() *config {
 	}
 }
 
+func testMariaConfig() *config {
+	return &config{
+		Address:  "localhost:3305",
+		User:     "flow",
+		Password: "flow",
+		Database: "flow",
+		Timezone: "UTC",
+	}
+}
+
 func TestValidateAndApply(t *testing.T) {
 	ctx := context.Background()
 
@@ -78,6 +88,73 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := testConfig()
+
+	resourceConfig := tableConfig{
+		Table: "target",
+	}
+
+	db, err := stdsql.Open("mysql", cfg.ToURI())
+	require.NoError(t, err)
+	defer db.Close()
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newMysqlDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := sql.StdGetSchema(ctx, db, "def", cfg.Database, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, cols []string, values []string) {
+			t.Helper()
+
+			var keys = make([]string, len(cols))
+			for i, col := range cols {
+				keys[i] = testDialect.Identifier(col)
+			}
+			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
+			values = append(values, "0")
+			keys = append(keys, testDialect.Identifier("flow_published_at"))
+			values = append(values, "'2024-09-13 01:01:01'")
+			keys = append(keys, testDialect.Identifier("flow_document"))
+			values = append(values, "'{}'")
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			_, err = db.ExecContext(ctx, q)
+
+			require.NoError(t, err)
+		},
+		func(t *testing.T) string {
+			t.Helper()
+
+			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Table))
+
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T, materialization pf.Materialization) {
+			t.Helper()
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
+
+			_, _ = db.ExecContext(ctx, fmt.Sprintf(
+				"delete from %s where materialization = %s",
+				testDialect.Identifier(sql.DefaultFlowMaterializations),
+				testDialect.Literal(materialization.String()),
+			))
+		},
+	)
+}
+
+func TestValidateAndApplyMigrationsMariaDB(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := testMariaConfig()
 
 	resourceConfig := tableConfig{
 		Table: "target",
