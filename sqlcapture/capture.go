@@ -276,7 +276,10 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 		c.State.Streams[stateKey] = &TableState{Mode: TableStatePending, dirty: true}
 	}
 
-	// When a binding is removed we change the table state to "Ignore
+	// When a binding is removed we change the table state to "Ignore". The way our dirty-
+	// flag update logic works makes a JSON-patch deletion of the whole thing tricky, but
+	// we could theoretically change this someday if "excessive size of state checkpoints
+	// due to deleted bindings" ever becomes an actual issue in practice.
 	streamExistsInCatalog := func(sk boilerplate.StateKey) bool {
 		for _, b := range c.Bindings {
 			if b.StateKey == sk {
