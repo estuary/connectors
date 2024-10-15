@@ -391,6 +391,7 @@ func (l *BindingEvents) do(fn func()) {
 // destination database.
 func (l *BindingEvents) StartedEvaluatingLoads() {
 	l.do(func() {
+		l.log(log.Fields{"round": l.round}, "started evaluating loads")
 		l.evaluatingLoadsStart = time.Now()
 
 		l.stopLogger = make(chan struct{})
