@@ -505,3 +505,36 @@ func TestComputedColumn(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+func TestDroppedAndRecreatedTable(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "37815596"
+	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Initial backfill
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	cs.Capture(ctx, t, nil)
+
+	// Some replication
+	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+	cs.Capture(ctx, t, nil)
+
+	// Drop and recreate the table, then fill it with some new data.
+	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
+	tb.CreateTable(ctx, t, uniqueID, tableDef)
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	tb.Insert(ctx, t, tableName, [][]any{{6, "six"}, {7, "seven"}, {8, "eight"}})
+	cs.Capture(ctx, t, nil)
+
+	// Followed by some more replication
+	tb.Insert(ctx, t, tableName, [][]any{{9, "nine"}, {10, "ten"}, {11, "eleven"}})
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}

@@ -495,7 +495,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		if binding == nil {
 			return nil // Should be impossible, but safe to ignore
 		}
-		logrus.WithFields(logrus.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("table dropped and marked as missing")
+		logrus.WithFields(logrus.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("marking table as missing")
 		c.State.Streams[binding.StateKey] = &TableState{
 			Mode:     TableStateMissing,
 			Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
