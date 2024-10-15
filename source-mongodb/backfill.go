@@ -206,12 +206,16 @@ func (c *capture) doBackfill(
 
 	cursorField := binding.resource.getCursorField()
 	var opts *options.FindOptions
-	if cursorField == idProperty {
+	if cursorField == idProperty && binding.resource.getMode() == captureModeChangeStream {
 		// By not specifying a sort parameter, MongoDB uses natural sort to order documents. Natural
 		// sort is approximately insertion order (but not guaranteed). We hint to MongoDB to use the _id
 		// index (an index that always exists) to speed up the process. Note that if we specify the sort
 		// explicitly by { $natural: 1 }, then the database will disregard any indices and do a full
 		// collection scan. See https://www.mongodb.com/docs/manual/reference/method/cursor.hint
+
+		// Note: This assumption is only true for "standard" MongoDB instances that support change
+		// streams. For other flavors of MongoDB that do not support change streams and/or we are using
+		// a batch capture mode, a sort will be required.
 		opts = options.Find().SetHint(bson.M{idProperty: 1})
 	} else {
 		// Other cursor fields require a sort.
@@ -339,7 +343,7 @@ func (c *capture) pullCursor(
 		var doc bson.M
 		var err error
 		if lastCursor, err = cursor.Current.LookupErr(cursorField); err != nil {
-			return 0, fmt.Errorf("looking up idProperty: %w", err)
+			return 0, fmt.Errorf("looking up cursor field '%s': %w", cursorField, err)
 		} else if err = cursor.Decode(&doc); err != nil {
 			return 0, fmt.Errorf("backfill decoding document: %w", err)
 		}
