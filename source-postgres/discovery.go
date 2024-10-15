@@ -13,7 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// discoverTables queries the database for information about tables available for capture.
+// DiscoverTables queries the database for information about tables available for capture.
 func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	// Get lists of all tables, columns and primary keys in the database
 	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
