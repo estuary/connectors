@@ -187,9 +187,6 @@ type mysqlDatabase struct {
 	config *Config
 	conn   *client.Conn
 
-	discovery     map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
-	discoveryTime time.Time                                         // The time at which the cached discovery info was last updated.
-
 	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
 	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
 	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.

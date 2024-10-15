@@ -14,21 +14,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// DiscoverTables queries the database for information about tables available for capture, and may
-// cache the results when successful.
+// DiscoverTables queries the database for information about tables available for capture.
 func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
-	if db.discovery == nil {
-		var discovery, err = db.discoverTables(ctx)
-		if err != nil {
-			return nil, err
-		}
-		db.discovery = discovery
-	}
-	return db.discovery, nil
-}
-
-// discoverTables queries the database for information about tables available for capture, without any caching.
-func (db *oracleDatabase) discoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	// Get lists of all tables, columns and primary keys in the database
 	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
