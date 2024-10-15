@@ -145,6 +145,13 @@ func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamI
 	return nil
 }
 
+func (rs *sqlserverReplicationStream) deactivateTable(streamID string) error {
+	rs.tables.Lock()
+	defer rs.tables.Unlock()
+	delete(rs.tables.info, streamID)
+	return nil
+}
+
 func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context) error {
 	// Activate replication for the watermarks table.
 	var discovery, err = rs.db.DiscoverTables(ctx)
@@ -334,12 +341,14 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 
 	// Put together a work queue of CDC polling operations to perform
 	var queue []*tablePollInfo
+	var failed []sqlcapture.StreamID
 	rs.tables.RLock()
 	for streamID, info := range rs.tables.info {
 		// Figure out which capture instance to use for the current polling cycle.
 		var instance = newestValidInstance(captureInstances[streamID], rs.fromLSN)
 		if instance == nil {
-			return fmt.Errorf("no valid capture instances for stream %q: considered %d candidates", streamID, len(captureInstances[streamID]))
+			failed = append(failed, streamID)
+			continue
 		}
 
 		// Skip polling a particular capture instance if its maximum LSN is less than or
@@ -374,6 +383,19 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		})
 	}
 	rs.tables.RUnlock()
+
+	// For any streams without a valid capture instance to use, emit TableDropEvents and deactivate.
+	for _, streamID := range failed {
+		log.WithFields(log.Fields{"stream": streamID, "pollFromLSN": rs.fromLSN}).Info("dropping stream with no valid capture instance(s)")
+		if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+			StreamID: streamID,
+			Cause:    fmt.Sprintf("table %q has no (valid) capture instances", streamID),
+		}); err != nil {
+			return err
+		} else if err := rs.deactivateTable(streamID); err != nil {
+			return err
+		}
+	}
 
 	// Execute all polling operations in the work queue
 	var workers, workerContext = errgroup.WithContext(ctx)
