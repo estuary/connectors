@@ -221,10 +221,9 @@ func configSchema() json.RawMessage {
 type postgresDatabase struct {
 	config          *Config
 	conn            *pgx.Conn
-	discovery       map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
-	explained       map[sqlcapture.StreamID]struct{}                  // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
-	includeTxIDs    map[sqlcapture.StreamID]bool                      // Tracks which tables should have XID properties in their replication metadata
-	tablesPublished map[sqlcapture.StreamID]bool                      // Tracks which tables are part of the configured publication
+	explained       map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	includeTxIDs    map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
+	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
 }
 
 func (db *postgresDatabase) HistoryMode() bool {

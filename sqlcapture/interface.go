@@ -192,7 +192,7 @@ type Database interface {
 // tables before starting replication.
 type ReplicationStream interface {
 	ActivateTable(ctx context.Context, streamID string, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
-	StartReplication(ctx context.Context) error
+	StartReplication(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error
 
 	// StreamToFence yields via the provided callback all change events between the
 	// current stream position and a new "fence" position which is guaranteed to be

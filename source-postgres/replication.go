@@ -288,16 +288,12 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 	}
 }
 
-func (s *replicationStream) StartReplication(ctx context.Context) error {
+func (s *replicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
 	// Activate replication for the watermarks table.
-	var discovery, err = s.db.DiscoverTables(ctx)
-	if err != nil {
-		return err
-	}
 	var watermarks = s.db.config.Advanced.WatermarksTable
 	var watermarksInfo = discovery[watermarks]
 	if watermarksInfo == nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
+		return fmt.Errorf("error activating replication for watermarks table %q: table missing from latest autodiscovery", watermarks)
 	}
 	if err := s.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)

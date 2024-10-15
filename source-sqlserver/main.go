@@ -194,8 +194,7 @@ type sqlserverDatabase struct {
 	config *Config
 	conn   *sql.DB
 
-	discovery        map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
-	datetimeLocation *time.Location                                    // The location in which to interpret DATETIME column values as timestamps.
+	datetimeLocation *time.Location // The location in which to interpret DATETIME column values as timestamps.
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {

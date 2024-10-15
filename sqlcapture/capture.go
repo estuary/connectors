@@ -147,6 +147,7 @@ const (
 	automatedDiagnosticsTimeout = 60 * time.Second // How long to wait *after the point where the fence was requested* before triggering automated diagnostics.
 	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
 	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
+	rediscoverInterval          = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
 )
 
 var (
@@ -185,7 +186,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			return fmt.Errorf("error activating table %q: %w", streamID, err)
 		}
 	}
-	if err := replStream.StartReplication(ctx); err != nil {
+	if err := replStream.StartReplication(ctx, discovery); err != nil {
 		return fmt.Errorf("error starting replication: %w", err)
 	}
 	defer func() {
@@ -207,15 +208,23 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 
+	var rediscoverAfter time.Time
 	for ctx.Err() == nil {
-		// If any streams are currently pending, initialize them so they can start backfilling.
-		if err := c.activatePendingStreams(ctx, replStream); err != nil {
-			return fmt.Errorf("error initializing pending streams: %w", err)
+		if time.Now().After(rediscoverAfter) {
+			discovery, err = c.Database.DiscoverTables(ctx)
+			if err != nil {
+				return fmt.Errorf("error discovering database tables: %w", err)
+			}
+			// If any streams are currently pending, initialize them so they can start backfilling.
+			if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
+				return fmt.Errorf("error initializing pending streams: %w", err)
+			}
+			rediscoverAfter = time.Now().Add(rediscoverInterval)
 		}
 
 		// If any tables are currently backfilling, go perform another backfill iteration.
 		if c.BindingsCurrentlyBackfilling() != nil {
-			if err := c.backfillStreams(ctx); err != nil {
+			if err := c.backfillStreams(ctx, discovery); err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
 			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
 				return fmt.Errorf("error streaming until fence: %w", err)
@@ -306,19 +315,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 }
 
 // activatePendingStreams transitions streams from a "Pending" state to being captured once they're eligible.
-func (c *Capture) activatePendingStreams(ctx context.Context, replStream ReplicationStream) error {
-	// Fast path for the common case, so we can just run this function at the top of the main loop
-	// and rely on it normally exiting quickly without doing any unnecessary work.
-	if len(c.BindingsInState(TableStateMissing, TableStatePending)) == 0 {
-		return nil
-	}
-
-	// Get the latest discovery information.
-	var discovery, err = c.Database.DiscoverTables(ctx)
-	if err != nil {
-		return err
-	}
-
+func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo, replStream ReplicationStream) error {
 	// See if any missing tables have since reappeared, and if so mark them as pending again.
 	for _, binding := range c.BindingsInState(TableStateMissing) {
 		if _, ok := discovery[binding.StreamID]; ok {
@@ -565,7 +562,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 	return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
 }
 
-func (c *Capture) backfillStreams(ctx context.Context) error {
+func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
 	var bindings = c.BindingsCurrentlyBackfilling()
 	var streams = make([]string, 0, len(bindings))
 	for _, b := range bindings {
@@ -582,25 +579,18 @@ func (c *Capture) backfillStreams(ctx context.Context) error {
 			"count":    len(streams),
 			"selected": streamID,
 		}).Info("backfilling streams")
-		if err := c.backfillStream(ctx, streamID); err != nil {
+		if discoveryInfo, ok := discovery[streamID]; !ok {
+			return fmt.Errorf("table %q missing from latest autodiscovery", streamID)
+		} else if err := c.backfillStream(ctx, streamID, discoveryInfo); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (c *Capture) backfillStream(ctx context.Context, streamID string) error {
+func (c *Capture) backfillStream(ctx context.Context, streamID string, discoveryInfo *DiscoveryInfo) error {
 	var stateKey = c.Bindings[streamID].StateKey
 	var streamState = c.State.Streams[stateKey]
-
-	var discovery, err = c.Database.DiscoverTables(ctx)
-	if err != nil {
-		return err
-	}
-	discoveryInfo, ok := discovery[streamID]
-	if !ok {
-		return fmt.Errorf("unknown table %q", streamID)
-	}
 
 	// Process backfill query results as a callback-driven stream.
 	var lastRowKey = streamState.Scanned

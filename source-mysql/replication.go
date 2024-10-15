@@ -197,7 +197,7 @@ type mysqlTableSchema struct {
 	ColumnTypes map[string]interface{} `json:"types"`
 }
 
-func (rs *mysqlReplicationStream) StartReplication(ctx context.Context) error {
+func (rs *mysqlReplicationStream) StartReplication(ctx context.Context, _ map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
 	if rs.cancel != nil {
 		return fmt.Errorf("internal error: replication stream already started")
 	}

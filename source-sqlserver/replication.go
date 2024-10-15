@@ -152,16 +152,12 @@ func (rs *sqlserverReplicationStream) deactivateTable(streamID string) error {
 	return nil
 }
 
-func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context) error {
+func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
 	// Activate replication for the watermarks table.
-	var discovery, err = rs.db.DiscoverTables(ctx)
-	if err != nil {
-		return err
-	}
 	var watermarks = rs.db.config.Advanced.WatermarksTable
 	var watermarksInfo = discovery[watermarks]
 	if watermarksInfo == nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: table was not observed by autodiscovery", watermarks)
+		return fmt.Errorf("error activating replication for watermarks table %q: table missing from latest autodiscovery", watermarks)
 	}
 	if err := rs.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)

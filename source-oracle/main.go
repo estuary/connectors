@@ -205,10 +205,9 @@ type oracleDatabase struct {
 	config             *Config
 	conn               *sql.DB
 	tunnel             *networkTunnel.SshTunnel
-	discovery          map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Cached discovery info after the first DiscoverTables() call.
-	explained          map[sqlcapture.StreamID]struct{}                  // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
-	includeTxIDs       map[sqlcapture.StreamID]bool                      // Tracks which tables should have XID properties in their replication metadata
-	tableObjectMapping map[string]tableObject                            // A mapping from streamID to objectID, dataObjectID
+	explained          map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
+	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
+	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
 }
 
 func (db *oracleDatabase) IsRDS() bool {
