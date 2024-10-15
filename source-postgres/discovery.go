@@ -592,6 +592,7 @@ const queryColumnDescriptions = `
 			isc.column_name,
 			pg_catalog.col_description(format('"%s"."%s"',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
 		FROM information_schema.columns isc
+		WHERE isc.table_schema NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron', 'pglogical')
 	) as descriptions WHERE description != '';
 `
 
