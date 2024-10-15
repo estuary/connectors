@@ -42,7 +42,13 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 	}
 }
 
-var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect {
+var mysqlDialect = func(tzLocation *time.Location, database string, product string) sql.Dialect {
+	var jsonType = "JSON"
+	var jsonMapper = sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	if product == "mariadb" {
+		jsonType = "LONGTEXT"
+		jsonMapper = sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToJsonString))
+	}
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -51,10 +57,10 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 			),
 			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
-			sql.OBJECT:   sql.MapStatic("JSON"),
-			sql.ARRAY:    sql.MapStatic("JSON"),
+			sql.OBJECT:   sql.MapStatic(jsonType),
+			sql.ARRAY:    sql.MapStatic(jsonType),
 			sql.BINARY:   sql.MapStatic("LONGTEXT"),
-			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.MULTIPLE: jsonMapper,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
 				sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToStr)),
@@ -87,18 +93,25 @@ var mysqlDialect = func(tzLocation *time.Location, database string) sql.Dialect 
 
 	var nocast = sql.WithCastSQL(migrationIdentifier)
 
+	var migrationSpecs = sql.MigrationSpecs{
+		"decimal":  {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+		"bigint":   {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+		"double":   {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+		"date":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+		"time":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
+		"datetime": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(prepareDatetimeToStringCast(tzLocation)))},
+	}
+
+	// MariaDB uses longtext for JSON type, so migrating to JSON on MariaDB is not distinguishable from migrating
+	// to a normal longtext
+	if product != "mariadb" {
+		migrationSpecs["varchar"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))}
+		migrationSpecs["longtext"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))}
+		migrationSpecs["*"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"})}
+	}
+
 	return sql.Dialect{
-		MigratableTypes: sql.MigrationSpecs{
-			"decimal":  {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
-			"bigint":   {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
-			"double":   {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
-			"date":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
-			"time":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
-			"datetime": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(prepareDatetimeToStringCast(tzLocation)))},
-			"varchar":  {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))},
-			"longtext": {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))},
-			"*":        {sql.NewMigrationSpec([]string{"json"})},
-		},
+		MigratableTypes: migrationSpecs,
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			// For MySQL, the table_catalog is always "def", and table_schema is the name of the
 			// database. This is sort of weird, since in most other systems the table_catalog is the
