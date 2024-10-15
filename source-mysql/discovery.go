@@ -22,25 +22,10 @@ import (
 
 const (
 	truncateColumnThreshold = 8 * 1024 * 1024 // Arbitrarily selected value
-	discoveryCacheTTL       = 5 * time.Minute
 )
 
-// DiscoverTables queries the database for information about tables available for capture, and may
-// cache the results when successful.
+// DiscoverTables queries the database for information about tables available for capture.
 func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
-	if db.discovery == nil || time.Since(db.discoveryTime) > discoveryCacheTTL {
-		var discovery, err = db.discoverTables(ctx)
-		if err != nil {
-			return nil, err
-		}
-		db.discovery = discovery
-		db.discoveryTime = time.Now()
-	}
-	return db.discovery, nil
-}
-
-// discoverTables queries the database for information about tables available for capture, without any caching.
-func (db *mysqlDatabase) discoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
 	var tables, err = getTables(ctx, db.conn)
 	if err != nil {
