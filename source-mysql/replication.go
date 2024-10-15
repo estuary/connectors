@@ -108,7 +108,7 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		syncConfig.TLSConfig = nil
 		syncer = replication.NewBinlogSyncer(syncConfig)
 		if streamer, err = syncer.StartSync(pos); err == nil {
-			logrus.Warn("replication connected without TLS")
+			logrus.Info("replication connected without TLS")
 		} else {
 			return nil, fmt.Errorf("error starting binlog sync: %w", err)
 		}

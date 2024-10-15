@@ -478,7 +478,7 @@ func charsetFromCollation(name string) string {
 	//
 	// We rely on this assumption to identify known charsets based on the decoders table here.
 	for charset := range mysqlStringDecoders {
-		if strings.HasPrefix(name, charset) {
+		if strings.HasPrefix(name, charset+"_") {
 			return charset
 		}
 	}
@@ -702,6 +702,8 @@ func decodeBytesToString(charset string, bs []byte) (string, error) {
 }
 
 var mysqlStringDecoders = map[string]func([]byte) (string, error){
+	"utf8":    decodeUTF8, // MariaDB alias for utf8mb3 or utf8mb4 depending on config. We don't care, it's all UTF-8 text to us.
+	"ascii":   decodeUTF8, // Guaranteed only ASCII characters (8-bit clean), meaning we can still treat it as UTF-8.
 	"utf8mb3": decodeUTF8,
 	"utf8mb4": decodeUTF8,
 	"latin1":  decodeLatin1,
