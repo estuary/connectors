@@ -22,8 +22,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-08-25T06:31:24Z"
-    mac: ENC[AES256_GCM,data:b1xGx2t6eZ+xRb7hljIhZKQ8aKQgzdY1DUZjwioBMHO0CF6+7GobXeNgDgJQ/i/nPthU7oDpyUJFYJOGhWzNODP5CgEoMJdlGn8/+qFzprzODxXflkH4k4AiVvrrEFphvMIRxt98Z+vHmhhMY40dLch6kfXClxeiBdpF3Jsq1D0=,iv:pTDoakL/hGXDI/k+KcLrVZK070nu51KoDtiB6XBj924=,tag:+IOi6V5b4jqNzcyikzNQUw==,type:str]
+    lastmodified: "2024-10-16T11:20:22Z"
+    mac: ENC[AES256_GCM,data:SGN6RYWnIxGbG+SGVYctEbV1er6Rg271Rnd3nLdOSpIffR5AN2CY7IdCGrb6qAkTwIaG0ks2w3pDjgxtnjYLG3KvCEu2ee0yLJc0nZ2ShVfLyunrLpYXaGzORUYj4BMriDrs1fUIuovSDvFqTI1ApSnf7YJuqvXfjj7L0JdJ9Vw=,iv:PVNe9PfQkQOSJ8kAGLtinb/LPafb2ihYxbivZW+x9R4=,tag:DKgrACz46b5DJTLx4L9H/w==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

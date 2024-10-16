@@ -21,14 +21,7 @@
               "type": "string"
             },
             "source": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/Source"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/$defs/Source"
             }
           },
           "required": [
@@ -80,10 +73,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "source": null
-          },
           "description": "Document metadata"
         },
         "ID": {
@@ -369,6 +358,7 @@
         }
       },
       "required": [
+        "_meta",
         "ID"
       ],
       "title": "TEST_ALL_TYPES",
@@ -400,14 +390,7 @@
               "type": "string"
             },
             "source": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/Source"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/$defs/Source"
             }
           },
           "required": [
@@ -459,10 +442,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "source": null
-          },
           "description": "Document metadata"
         },
         "ID": {
@@ -485,6 +464,7 @@
         }
       },
       "required": [
+        "_meta",
         "ID"
       ],
       "title": "TEST_CHANGES",
@@ -516,14 +496,7 @@
               "type": "string"
             },
             "source": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/Source"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/$defs/Source"
             }
           },
           "required": [
@@ -575,10 +548,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "source": null
-          },
           "description": "Document metadata"
         },
         "ID": {
@@ -595,6 +564,9 @@
           "title": "Id"
         }
       },
+      "required": [
+        "_meta"
+      ],
       "title": "TEST",
       "type": "object"
     },
@@ -624,14 +596,7 @@
               "type": "string"
             },
             "source": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/Source"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/$defs/Source"
             }
           },
           "required": [
@@ -683,10 +648,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "source": null
-          },
           "description": "Document metadata"
         },
         "ID": {
@@ -703,6 +664,9 @@
           "title": "Id"
         }
       },
+      "required": [
+        "_meta"
+      ],
       "title": "TEST_EMPTY",
       "type": "object"
     },

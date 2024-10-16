@@ -154,10 +154,10 @@ class Document(BaseDocument, extra="allow"):
                 description="Database System Change Number, available for incremental events"
             )
 
-        source: Source | None = Field(alias="source")
+        source: Source = Field(alias="source")
 
     meta_: Meta = Field(
-        default=Meta(op="u", source=None), alias="_meta", description="Document metadata"
+        alias="_meta", description="Document metadata"
     )
 
     pass
