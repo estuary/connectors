@@ -433,7 +433,7 @@ func (l *BindingEvents) StartedResourceCommit(path []string) {
 		l.activeStores[strings.Join(path, ".")] = time.Now()
 		l.mu.Unlock()
 
-		l.log(log.Fields{"round": l.round, "resourcePath": path}, "started commiting documents for resource")
+		l.log(log.Fields{"round": l.round - 1, "resourcePath": path}, "started commiting documents for resource")
 	})
 }
 
@@ -446,7 +446,7 @@ func (l *BindingEvents) FinishedResourceCommit(path []string) {
 		l.mu.Unlock()
 
 		l.log(log.Fields{
-			"round":        l.round,
+			"round":        l.round - 1,
 			"resourcePath": path,
 			"took":         took.String(),
 		}, "finished commiting documents for resource")
