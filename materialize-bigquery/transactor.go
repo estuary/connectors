@@ -249,7 +249,31 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
+	cleanupFiles := []func(context.Context){}
+
+	var lastBinding = -1
 	for it.Next() {
+		if lastBinding == -1 {
+			lastBinding = it.Binding
+		}
+
+		if lastBinding != it.Binding {
+			// Flush the staged file(s) for the binding now that it's stores are
+			// fully processed.
+			var b = t.bindings[lastBinding]
+			// There may be no staged file if the binding has received nothing
+			// but hard deletion requests for keys that aren't in the
+			// destination table.
+			if b.storeFile.started {
+				cleanupFn, err := b.storeFile.flush()
+				if err != nil {
+					return nil, fmt.Errorf("flushing staged files for collection %q: %w", b.target.Source.String(), err)
+				}
+				cleanupFiles = append(cleanupFiles, cleanupFn)
+			}
+			lastBinding = it.Binding
+		}
+
 		var b = t.bindings[it.Binding]
 
 		var flowDocument = it.RawJSON
@@ -263,15 +287,25 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		b.storeFile.start()
-
-		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
-		if err != nil {
+		b.hasData = true
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		}
-
-		if err = b.storeFile.encodeRow(ctx, converted); err != nil {
+		} else if err = b.storeFile.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
+	}
+	if it.Err() != nil {
+		return nil, it.Err()
+	}
+
+	// Flush the final binding.
+	if lastBinding != -1 {
+		var b = t.bindings[lastBinding]
+		cleanupFn, err := b.storeFile.flush()
+		if err != nil {
+			return nil, fmt.Errorf("final binding flushing staged files for collection %q: %w", b.target.Source.String(), err)
+		}
+		cleanupFiles = append(cleanupFiles, cleanupFn)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -280,11 +314,17 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
+		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx, cleanupFiles) })
 	}, nil
 }
 
-func (t *transactor) commit(ctx context.Context) error {
+func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Context)) error {
+	defer func() {
+		for _, f := range cleanupFiles {
+			f(ctx)
+		}
+	}()
+
 	// Build the slice of transactions required for a commit.
 	var subqueries []string
 
@@ -303,17 +343,11 @@ func (t *transactor) commit(ctx context.Context) error {
 	// This is the map of external table references we will populate. Loop through the bindings and
 	// append the SQL for that table.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
-	for idx, b := range t.bindings {
-		if !b.storeFile.started {
+	for _, b := range t.bindings {
+		if !b.hasData {
 			// No stores for this binding.
 			continue
 		}
-
-		delete, err := b.storeFile.flush()
-		if err != nil {
-			return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
-		}
-		defer delete(ctx)
 
 		edcTableDefs[b.tempTableName] = b.storeFile.edc()
 
@@ -322,6 +356,9 @@ func (t *transactor) commit(ctx context.Context) error {
 		} else {
 			subqueries = append(subqueries, b.storeUpdateSQL)
 		}
+
+		// Reset for the next round.
+		b.hasData = false
 	}
 
 	// Complete the transaction and return the appropriate error.
