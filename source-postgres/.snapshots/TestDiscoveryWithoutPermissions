@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "discoverywithoutpermissions_117535",
+    "recommended_name": "public/discoverywithoutpermissions_117535",
     "resource_config_json": {
       "namespace": "public",
       "stream": "discoverywithoutpermissions_117535"
