@@ -217,6 +217,8 @@ func newRedshiftDriver() *sql.Driver {
 			return nil
 		},
 		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
+			log.Warn("in new endpoint")
+
 			var cfg = new(config)
 			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
 				return nil, fmt.Errorf("could not parse endpoint configuration: %w", err)
@@ -226,7 +228,7 @@ func newRedshiftDriver() *sql.Driver {
 				"database": cfg.Database,
 				"address":  cfg.Address,
 				"user":     cfg.User,
-			}).Info("opening database")
+			}).Warn("opening database")
 
 			var metaBase sql.TablePath
 			if cfg.Schema != "" {
@@ -240,10 +242,12 @@ func newRedshiftDriver() *sql.Driver {
 			}
 			defer db.Close()
 
+			log.Warn("querying enable_case_sensitive_identifier")
 			var caseSensitiveIdentifier string
 			if err := db.QueryRowContext(ctx, "SHOW enable_case_sensitive_identifier;").Scan(&caseSensitiveIdentifier); err != nil {
 				return nil, fmt.Errorf("querying enable_case_sensitive_identifier: %w", err)
 			}
+			log.Warn("finished querying enable_case_sensitive_identifier")
 
 			var caseSensitiveIdentifierEnabled = strings.EqualFold(caseSensitiveIdentifier, "on")
 			var dialect = rsDialect(caseSensitiveIdentifierEnabled)
