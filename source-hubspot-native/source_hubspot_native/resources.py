@@ -64,25 +64,31 @@ async def all_resources(
     ]
 
     custom_object_names = await list_custom_objects(log, http)
+    # Some HubSpot endpoints like /v3/properties/{objectType} do not work for every custom object type.
+    # However, these endpoints do work if we prepend a "p_" to the beginning of the custom object name
+    # and use that in the path instead. 
+    # Docs reference: https://developers.hubspot.com/docs/api/crm/crm-custom-objects#retrieve-existing-custom-objects
+    custom_object_path_components = [f"p_{n}" for n in custom_object_names]
 
     custom_object_resources = [
         crm_object_with_associations(
             CustomObject,
             n,
+            custom_object_path_components[index],
             http,
-            functools.partial(fetch_recent_custom_objects, n),
-            functools.partial(fetch_delayed_custom_objects, n),
+            functools.partial(fetch_recent_custom_objects, custom_object_path_components[index]),
+            functools.partial(fetch_delayed_custom_objects, custom_object_path_components[index]),
         )
-        for n in custom_object_names
+        for index, n in enumerate(custom_object_names)
     ]
 
     return [
-        crm_object_with_associations(Company, Names.companies, http, fetch_recent_companies, fetch_delayed_companies),
-        crm_object_with_associations(Contact, Names.contacts, http, fetch_recent_contacts, fetch_delayed_contacts),
-        crm_object_with_associations(Deal, Names.deals, http, fetch_recent_deals, fetch_delayed_deals),
-        crm_object_with_associations(Engagement, Names.engagements, http, fetch_recent_engagements, fetch_delayed_engagements),
-        crm_object_with_associations(Ticket, Names.tickets, http, fetch_recent_tickets, fetch_delayed_tickets),
-        properties(http, itertools.chain(standard_object_names, custom_object_names)),
+        crm_object_with_associations(Company, Names.companies, Names.companies, http, fetch_recent_companies, fetch_delayed_companies),
+        crm_object_with_associations(Contact, Names.contacts, Names.contacts, http, fetch_recent_contacts, fetch_delayed_contacts),
+        crm_object_with_associations(Deal, Names.deals, Names.deals, http, fetch_recent_deals, fetch_delayed_deals),
+        crm_object_with_associations(Engagement, Names.engagements, Names.engagements, http, fetch_recent_engagements, fetch_delayed_engagements),
+        crm_object_with_associations(Ticket, Names.tickets, Names.tickets, http, fetch_recent_tickets, fetch_delayed_tickets),
+        properties(http, itertools.chain(standard_object_names, custom_object_path_components)),
         email_events(http),
         *custom_object_resources,
     ]
@@ -90,6 +96,7 @@ async def all_resources(
 def crm_object_with_associations(
     cls: type[CRMObject],
     object_name: str,
+    path_component: str,
     http: HTTPSession,
     fetch_recent: FetchRecentFn,
     fetch_delayed: FetchDelayedFn,
@@ -109,12 +116,12 @@ def crm_object_with_associations(
             task,
             fetch_changes=functools.partial(
                 process_changes,
-                object_name,
+                path_component,
                 fetch_recent,
                 fetch_delayed,
                 http,
             ),
-            fetch_page=functools.partial(fetch_page_with_associations, cls, http, object_name),
+            fetch_page=functools.partial(fetch_page_with_associations, cls, http, path_component),
         )
 
     started_at = datetime.now(tz=UTC)
