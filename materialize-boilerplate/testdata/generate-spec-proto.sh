@@ -33,4 +33,10 @@ flowctl raw build \
     --db-path ${TEMP_DIR}/build.db \
     --source $1
 
+errors=$(sqlite3 ${TEMP_DIR}/build.db "select * from errors")
+if [[ -n "$errors" ]]; then
+    echo "$errors" >&2
+    exit 1
+fi
+
 sqlite3 ${TEMP_DIR}/build.db "select writefile('${OUTPUT}', spec) from built_materializations;"
