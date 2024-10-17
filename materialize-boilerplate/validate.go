@@ -136,19 +136,24 @@ func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUp
 			}
 			sawRoot = true
 		} else if ambiguousFields := v.ambiguousFields(p, boundCollection.Projections); len(ambiguousFields) > 0 && c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED {
-			// Any fields that would be ambiguous to materialize should be marked as optional if
-			// they would otherwise be recommended. Only one of these fields should be selected to
-			// materialize.
-			c = &pm.Response_Validated_Constraint{
-				Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-				Reason: fmt.Sprintf(
-					// See identical "reason" text in validateMatchesExistingBinding for optional
-					// ambiguous field constraints. These two messages should be kept in sync.
-					"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
-					p.Field,
-					v.is.translateField(p.Field),
-					strings.Join(ambiguousFields, ","),
-				),
+			if p.Explicit {
+				// User-defined projections of ambiguous fields are allowed as-is.
+			} else {
+				// Any other fields that would be ambiguous to materialize are
+				// marked as optional if they would otherwise be recommended.
+				// Only one of these fields should be selected to materialize,
+				// and that will require manual field selection.
+				c = &pm.Response_Validated_Constraint{
+					Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
+					Reason: fmt.Sprintf(
+						// See identical "reason" text in validateMatchesExistingBinding for optional
+						// ambiguous field constraints. These two messages should be kept in sync.
+						"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
+						p.Field,
+						v.is.translateField(p.Field),
+						strings.Join(ambiguousFields, ","),
+					),
+				}
 			}
 		}
 
@@ -227,16 +232,20 @@ func (v Validator) validateMatchesExistingBinding(
 			} else if c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED || c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
 				// None of these ambiguous fields have been selected yet, so it's still possible to
 				// pick one.
-				c = &pm.Response_Validated_Constraint{
-					Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-					Reason: fmt.Sprintf(
-						// See identical "reason" text in validateNewBinding for optional ambiguous
-						// field constraints. These two messages should be kept in sync.
-						"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
-						p.Field,
-						v.is.translateField(p.Field),
-						strings.Join(ambiguousFields, ","),
-					),
+				if p.Explicit {
+					// User-defined projections of ambiguous fields are allowed as-is.
+				} else {
+					c = &pm.Response_Validated_Constraint{
+						Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
+						Reason: fmt.Sprintf(
+							// See identical "reason" text in validateNewBinding for optional ambiguous
+							// field constraints. These two messages should be kept in sync.
+							"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
+							p.Field,
+							v.is.translateField(p.Field),
+							strings.Join(ambiguousFields, ","),
+						),
+					}
 				}
 			}
 		} else if existingField, err := v.is.GetField(path, p.Field); err == nil {

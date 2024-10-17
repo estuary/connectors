@@ -11,7 +11,12 @@ collections:
         secondBadField: { type: string }
         secondbadfield: { type: string }
         SECONDBADFIELD: { type: string }
+        thirdBadField: { type: string }
+        thirdbadfield: { type: string }
+        THIRDBADFIELD: { type: string }
       required: [key]
+    projections:
+      tHiRdBaDfIeLd: /THIRDBADFIELD
     key: [/key]
 
 materializations:
@@ -29,3 +34,4 @@ materializations:
             key: {}
             goodField: {}
             firstBadField: {}
+            thirdbadfield: {} # Note: not the explicit projection
