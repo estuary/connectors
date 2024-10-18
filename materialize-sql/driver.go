@@ -71,6 +71,11 @@ func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_S
 }
 
 func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+	log.Warn("running validate")
+	defer func() {
+		log.Warn("finished validate")
+	}()
+
 	var (
 		err        error
 		endpoint   *Endpoint
@@ -88,7 +93,10 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	} else if prereqErrs := d.PreReqs(ctx, conf, mustGetTenantNameFromTaskName(req.Name.String())); prereqErrs.Len() != 0 {
 		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
-	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
+	}
+
+	log.Warn("finished prereqs; will run NewEndpoint")
+	if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
 		return nil, fmt.Errorf("building endpoint: %w", err)
 	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
@@ -164,6 +172,11 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 }
 
 func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	log.Warn("running apply")
+	defer func() {
+		log.Warn("finished apply")
+	}()
+
 	var (
 		endpoint *Endpoint
 		client   Client
