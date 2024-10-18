@@ -1015,6 +1015,7 @@ func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
 
 	query("SELECT * FROM sys.dm_server_services;")
 	query("SELECT * FROM sys.dm_cdc_log_scan_sessions;")
+	query("SELECT * FROM sys.dm_cdc_errors;")
 	query("EXEC msdb.dbo.sp_help_job;")
 	query("EXEC sys.sp_cdc_help_jobs;")
 	query("SELECT * FROM msdb.dbo.cdc_jobs;")
