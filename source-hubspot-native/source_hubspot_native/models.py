@@ -390,10 +390,12 @@ class EmailEvent(BaseDocument, extra="allow"):
         "BOUNCE",
         "OPEN",
         "CLICK",
+        "PRINT",
         "FORWARD",
         "STATUSCHANGE",
         "SPAMREPORT",
         "SUPPRESSED",
+        "SUPPRESSION", # "SUPPRESSION" is documented in HubSpot's docs, but "SUPPRESSED" isn't. We've seen "SUPPRESSED" events, so "SUPPRESSION" events might not actually occur.
         "UNBOUNCE", # This is not actually a type reported by HubSpot, but the absence of the "type" field means its an UNBOUNCE type.
     ] = Field(
         default="UNBOUNCE",
