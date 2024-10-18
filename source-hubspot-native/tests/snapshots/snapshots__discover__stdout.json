@@ -1128,10 +1128,12 @@
             "BOUNCE",
             "OPEN",
             "CLICK",
+            "PRINT",
             "FORWARD",
             "STATUSCHANGE",
             "SPAMREPORT",
             "SUPPRESSED",
+            "SUPPRESSION",
             "UNBOUNCE"
           ],
           "title": "Type",
