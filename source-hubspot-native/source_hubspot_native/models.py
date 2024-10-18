@@ -390,6 +390,7 @@ class EmailEvent(BaseDocument, extra="allow"):
         "BOUNCE",
         "OPEN",
         "CLICK",
+        "FORWARD",
         "STATUSCHANGE",
         "SPAMREPORT",
         "SUPPRESSED",

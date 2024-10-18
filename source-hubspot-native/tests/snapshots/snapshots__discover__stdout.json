@@ -1128,6 +1128,7 @@
             "BOUNCE",
             "OPEN",
             "CLICK",
+            "FORWARD",
             "STATUSCHANGE",
             "SPAMREPORT",
             "SUPPRESSED",
