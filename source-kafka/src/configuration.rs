@@ -221,7 +221,7 @@ impl Display for SaslMechanism {
 ///
 /// The information necessary to connect to Kafka.
 #[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag="auth_type")]
+#[serde(tag = "auth_type")]
 pub enum Credentials {
     UserPassword {
         /// # Sasl Mechanism
@@ -233,12 +233,12 @@ pub enum Credentials {
     },
 
     AWS {
-        #[serde(rename="aws_access_key_id")]
+        #[serde(rename = "aws_access_key_id")]
         access_key_id: String,
-        #[serde(rename="aws_secret_access_key")]
+        #[serde(rename = "aws_secret_access_key")]
         secret_access_key: String,
         region: String,
-    }
+    },
 }
 
 /// # TLS Settings
@@ -254,8 +254,6 @@ pub enum TlsSettings {
     // TODO: allow the user to specify custom TLS certs, authorities, etc.
     // CustomCertificates(CustomTlsSettings),
 }
-
-
 
 #[cfg(test)]
 mod test {
