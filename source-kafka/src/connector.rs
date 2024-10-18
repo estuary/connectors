@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use proto_flow::capture::{Response, request};
+use proto_flow::capture::{request, Response};
 use proto_flow::flow::{CaptureSpec, RangeSpec};
 
 pub trait ConnectorConfig: Sized {
@@ -35,12 +35,8 @@ pub enum StdoutError {
     OutputNewline(#[source] std::io::Error),
 }
 
-pub fn write_message(
-    mut output: &mut dyn Write,
-    message: Response,
-) -> Result<(), StdoutError> {
-    serde_json::to_writer(&mut output, &message)
-        .map_err(StdoutError::Output)?;
+pub fn write_message(mut output: &mut dyn Write, message: Response) -> Result<(), StdoutError> {
+    serde_json::to_writer(&mut output, &message).map_err(StdoutError::Output)?;
 
     // Include a newline to break up the document stream.
     writeln!(&mut output).map_err(StdoutError::OutputNewline)?;

@@ -3,12 +3,12 @@ use std::time::Duration;
 
 use proto_flow::capture::{request, response, Response};
 use proto_flow::flow::capture_spec::Binding;
+use rdkafka::client::{ClientContext, OAuthToken};
 use rdkafka::consumer::{BaseConsumer, Consumer, ConsumerContext};
 use rdkafka::error::KafkaError;
 use rdkafka::message::BorrowedMessage;
 use rdkafka::metadata::{Metadata, MetadataPartition, MetadataTopic};
 use rdkafka::{ClientConfig, Message, TopicPartitionList};
-use rdkafka::client::{OAuthToken, ClientContext};
 use serde_json::json;
 
 use crate::catalog::Resource;
@@ -42,24 +42,35 @@ pub struct FlowConsumerContext {
 impl ClientContext for FlowConsumerContext {
     const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
 
-    fn generate_oauth_token(&self, _oauthbearer_config: Option<&str>) -> Result<OAuthToken, Box<dyn StdError>>  {
-        if let Some(Credentials::AWS { region, access_key_id, secret_access_key }) = &self.auth {
-            let (token, lifetime_ms) = crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
+    fn generate_oauth_token(
+        &self,
+        _oauthbearer_config: Option<&str>,
+    ) -> Result<OAuthToken, Box<dyn StdError>> {
+        if let Some(Credentials::AWS {
+            region,
+            access_key_id,
+            secret_access_key,
+        }) = &self.auth
+        {
+            let (token, lifetime_ms) =
+                crate::msk_oauthbearer::token(region, access_key_id, secret_access_key)?;
             return Ok(OAuthToken {
                 // This is just a descriptive name of the principal which is accessing
                 // the resource, not a specific constant
                 principal_name: "flow-kafka-capture".to_string(),
                 token,
                 lifetime_ms,
-            })
+            });
         } else {
-            return Err(eyre::eyre!("generate_oauth_token called without AWS credentials").into())
+            return Err(eyre::eyre!("generate_oauth_token called without AWS credentials").into());
         }
     }
 }
 impl ConsumerContext for FlowConsumerContext {}
 
-pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseConsumer<FlowConsumerContext>> {
+pub fn consumer_from_config(
+    configuration: &Configuration,
+) -> eyre::Result<BaseConsumer<FlowConsumerContext>> {
     let mut config = ClientConfig::new();
 
     config.set("bootstrap.servers", configuration.brokers());
@@ -76,9 +87,16 @@ pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseC
 
     config.set("security.protocol", configuration.security_protocol());
 
-    let ctx = FlowConsumerContext { auth: configuration.credentials.clone() };
+    let ctx = FlowConsumerContext {
+        auth: configuration.credentials.clone(),
+    };
 
-    if let Some(Credentials::UserPassword { mechanism, username, password }) = &configuration.credentials {
+    if let Some(Credentials::UserPassword {
+        mechanism,
+        username,
+        password,
+    }) = &configuration.credentials
+    {
         config.set("sasl.mechanism", mechanism.to_string());
         config.set("sasl.username", username);
         config.set("sasl.password", password);
@@ -86,11 +104,12 @@ pub fn consumer_from_config(configuration: &Configuration) -> eyre::Result<BaseC
         config.set("sasl.mechanism", "OAUTHBEARER");
 
         if configuration.security_protocol() != "SASL_SSL" {
-            return Err(eyre::eyre!("must use tls=system_certificates for AWS").into())
+            return Err(eyre::eyre!("must use tls=system_certificates for AWS").into());
         }
     }
 
-    let consumer: BaseConsumer<FlowConsumerContext> = config.create_with_context(ctx).map_err(Error::Config)?;
+    let consumer: BaseConsumer<FlowConsumerContext> =
+        config.create_with_context(ctx).map_err(Error::Config)?;
 
     if let Some(Credentials::AWS { .. }) = &configuration.credentials {
         // In order to generate an initial OAuth Bearer token to be used by the consumer

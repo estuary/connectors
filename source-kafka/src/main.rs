@@ -1,7 +1,7 @@
-use std::io::{stdout, stdin};
+use std::io::{stdin, stdout};
 
 use proto_flow::capture::Request;
-use source_kafka::connector::{Connector, StdoutError, ConnectorConfig};
+use source_kafka::connector::{Connector, ConnectorConfig, StdoutError};
 use source_kafka::KafkaConnector;
 use tracing_subscriber::fmt::format::FmtSpan;
 use tracing_subscriber::EnvFilter;
@@ -25,7 +25,10 @@ fn main() -> eyre::Result<()> {
             <KafkaConnector as Connector>::discover(&mut stdout, discover)
         } else if let Some(apply) = request.apply {
             let capture = apply.capture.expect("empty capture");
-            <KafkaConnector as Connector>::apply(&mut stdout, <KafkaConnector as Connector>::Config::parse(&capture.config_json)?)
+            <KafkaConnector as Connector>::apply(
+                &mut stdout,
+                <KafkaConnector as Connector>::Config::parse(&capture.config_json)?,
+            )
         } else if let Some(open) = request.open {
             let state = <KafkaConnector as Connector>::State::parse(&open.state_json)?;
             let capture = open.capture.expect("empty capture");
