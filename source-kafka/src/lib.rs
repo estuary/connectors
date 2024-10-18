@@ -13,8 +13,8 @@ pub mod catalog;
 pub mod configuration;
 pub mod connector;
 pub mod kafka;
-pub mod state;
 pub mod msk_oauthbearer;
+pub mod state;
 
 pub struct KafkaConnector;
 

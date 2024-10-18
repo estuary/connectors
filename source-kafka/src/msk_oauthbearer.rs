@@ -1,9 +1,11 @@
-use base64::prelude::{Engine as _, BASE64_URL_SAFE_NO_PAD};
 use aws_sdk_iam::config::Credentials;
-use aws_sigv4::http_request::{sign, SigningSettings, SignableBody, SignableRequest, SignatureLocation};
+use aws_sigv4::http_request::{
+    sign, SignableBody, SignableRequest, SignatureLocation, SigningSettings,
+};
 use aws_sigv4::sign::v4;
+use base64::prelude::{Engine as _, BASE64_URL_SAFE_NO_PAD};
 use http;
-use std::time::{SystemTime, Duration};
+use std::time::{Duration, SystemTime};
 
 /* Generate a token for Amazon Streaming Kafka service.
  * This is based on AWS V4: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html
@@ -24,8 +26,15 @@ use std::time::{SystemTime, Duration};
 // Taken from the Go SDK's implementation
 // https://github.com/aws/aws-msk-iam-sasl-signer-go/blob/main/signer/msk_auth_token_provider.go#L33
 const DEFAULT_EXPIRY_SECONDS: u64 = 900;
-pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> eyre::Result::<(String, i64)> {
-    let endpoint = format!("https://kafka.{}.amazonaws.com/?Action=kafka-cluster%3AConnect", region);
+pub fn token(
+    region: &str,
+    access_key_id: &str,
+    secret_access_key: &str,
+) -> eyre::Result<(String, i64)> {
+    let endpoint = format!(
+        "https://kafka.{}.amazonaws.com/?Action=kafka-cluster%3AConnect",
+        region
+    );
     let expiry_duration = Duration::new(DEFAULT_EXPIRY_SECONDS, 0);
     let now = SystemTime::now();
 
@@ -35,8 +44,9 @@ pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> eyre
         secret_access_key,
         None,
         None,
-        "user credentials"
-    ).into();
+        "user credentials",
+    )
+    .into();
     let mut signing_settings = SigningSettings::default();
 
     // The default behaviour of the signing library is to put the signature in headers.
@@ -62,8 +72,9 @@ pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> eyre
         "GET",
         &endpoint,
         std::iter::empty(),
-        SignableBody::Bytes(&[])
-    ).expect("signable request");
+        SignableBody::Bytes(&[]),
+    )
+    .expect("signable request");
 
     // Create an empty draft HTTP request. The `sign` function provides us with a bunch of
     // "signing instructions" which we then apply to this draft HTTP request. The signing
@@ -81,10 +92,16 @@ pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> eyre
 
     // Finally add User Agent to the final signed url. This is based on the Go SDK that does this
     // after signing: https://github.com/aws/aws-msk-iam-sasl-signer-go/blob/main/signer/msk_auth_token_provider.go#L188
-    let signed_url = format!("{}&User-Agent=EstuaryFlowCapture", signed_req.uri().to_string());
+    let signed_url = format!(
+        "{}&User-Agent=EstuaryFlowCapture",
+        signed_req.uri().to_string()
+    );
 
     let token = BASE64_URL_SAFE_NO_PAD.encode(signed_url);
-    let expires_in = (now + expiry_duration).duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis();
+    let expires_in = (now + expiry_duration)
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap()
+        .as_millis();
 
-    return Ok((token, expires_in.try_into()?))
+    return Ok((token, expires_in.try_into()?));
 }

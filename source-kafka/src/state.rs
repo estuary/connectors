@@ -6,7 +6,10 @@ use rdkafka::metadata::Metadata;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
-use crate::{catalog::{self, Resource, responsible_for_shard}, connector, kafka};
+use crate::{
+    catalog::{self, responsible_for_shard, Resource},
+    connector, kafka,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -154,9 +157,7 @@ impl CheckpointSet {
                     }
                 }
             } else {
-                return Err(catalog::Error::MissingStream(
-                    res.stream.clone(),
-                ));
+                return Err(catalog::Error::MissingStream(res.stream.clone()));
             }
         }
 
@@ -201,11 +202,9 @@ mod test {
             assert_eq!(checkpoints.0["bar"][&0], bar0);
         };
 
-        let update_offset = |checkpoint, new_offset| {
-            Checkpoint {
-                offset: new_offset,
-                ..checkpoint
-            }
+        let update_offset = |checkpoint, new_offset| Checkpoint {
+            offset: new_offset,
+            ..checkpoint
         };
 
         let mut checkpoints = CheckpointSet::default();
