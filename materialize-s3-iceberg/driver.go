@@ -362,13 +362,13 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 	}
 
 	catalog := newCatalog(cfg, resourcePaths, open.Materialization)
-	for idx := range bindings {
-		catalogTablePath, err := catalog.tablePath(bindings[idx].path)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("getting catalog table path: %w", err)
-		}
+	tablePaths, err := catalog.tablePaths(resourcePaths)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("looking up table paths: %w", err)
+	}
 
-		bindings[idx].catalogTablePath = catalogTablePath
+	for idx := range bindings {
+		bindings[idx].catalogTablePath = tablePaths[idx]
 	}
 
 	s3store, err := filesink.NewS3Store(ctx, filesink.S3StoreConfig{
