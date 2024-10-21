@@ -73,13 +73,35 @@ func (c *catalog) infoSchema() (*boilerplate.InfoSchema, error) {
 	return is, nil
 }
 
-func (c *catalog) tablePath(resourcePath []string) (string, error) {
-	b, err := runIcebergctl(c.cfg, "table-path", pathToFQN(resourcePath))
-	if err != nil {
-		return "", err
+// Table paths returns the registered storage path for each resource path in a
+// list having the order corresponding to the input list of resource paths.
+func (c *catalog) tablePaths(resourcePaths [][]string) ([]string, error) {
+	tableNames := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		tableNames = append(tableNames, pathToFQN(p))
 	}
 
-	return string(b), nil
+	tableNamesJson, err := json.Marshal(tableNames)
+	if err != nil {
+		return nil, err
+	}
+
+	b, err := runIcebergctl(c.cfg, "table-paths", string(tableNamesJson))
+	if err != nil {
+		return nil, err
+	}
+
+	fqnToPath := make(map[string]string)
+	if err := json.Unmarshal(b, &fqnToPath); err != nil {
+		return nil, err
+	}
+
+	out := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		out = append(out, fqnToPath[pathToFQN(p)])
+	}
+
+	return out, nil
 }
 
 func (c *catalog) listNamespaces() ([]string, error) {
