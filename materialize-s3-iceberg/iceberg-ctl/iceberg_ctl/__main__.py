@@ -1,3 +1,4 @@
+import asyncio
 import json
 from typing import Any, Literal
 
@@ -169,17 +170,30 @@ def info_schema(
     print(TypeAdapter(dict[str, list[IcebergColumn]]).dump_json(tables).decode())
 
 
+async def fetch_table_paths(catalog: Catalog, tables: list[str]) -> dict[str, str]:
+    sem = asyncio.Semaphore(10)
+
+    async def fetch_table_path(table: str) -> tuple[str, str]:
+        async with sem:
+            return (table, catalog.load_table(table).location())
+
+    return dict(await asyncio.gather(
+        *(fetch_table_path(table) for table in tables)
+    ))
+
+
 @run.command()
 @click.pass_context
-@click.argument("table", type=str)
-def table_path(
+@click.argument("tables", type=str)
+def table_paths(
     ctx: Context,
-    table: str,
+    tables: str,
 ):
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
 
-    print(catalog.load_table(table).location())
+    res = asyncio.run(fetch_table_paths(catalog, TypeAdapter(list[str]).validate_json(tables)))
+    print(json.dumps(res))
 
 
 @run.command()
