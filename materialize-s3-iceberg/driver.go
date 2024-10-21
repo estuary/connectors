@@ -392,6 +392,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 				SyncFrequency: interval.String(),
 			},
 		},
+		ExtendedLogging: true,
 	}
 
 	return &transactor{
