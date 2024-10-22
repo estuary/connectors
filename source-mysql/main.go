@@ -215,15 +215,10 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 		return nil
 	}
-	var withTimeouts = func(c *client.Conn) error {
-		c.ReadTimeout = 60 * time.Second
-		c.WriteTimeout = 60 * time.Second
-		return nil
-	}
-	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTimeouts, withTLS); errWithTLS == nil {
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
 		db.conn = connWithTLS
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTimeouts); errWithoutTLS == nil {
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = connWithoutTLS
 	} else {
