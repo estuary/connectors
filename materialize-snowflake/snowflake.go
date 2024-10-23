@@ -144,6 +144,7 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 
 	type paramRow struct {
 		Value string `db:"value"`
+		Level string `db:"level"`
 	}
 
 	got := paramRow{}
@@ -156,11 +157,11 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 		return "", fmt.Errorf("invalid timestamp type mapping: %s", got.Value)
 	}
 
-	log.WithField("value", got.Value).Debug("queried TIMESTAMP_TYPE_MAPPING")
+	log.WithFields(log.Fields{"value": got.Value, "level": got.Level}).Debug("queried TIMESTAMP_TYPE_MAPPING")
 
-	if m == timestampNTZ {
-		// Default to LTZ if the TIMESTAMP_TYPE_MAPPING is set to NTZ, either
-		// explicitly or via the default.
+	if m == timestampNTZ && got.Level == "" {
+		// Default to LTZ if the TIMESTAMP_TYPE_MAPPING parameter is using the
+		// default and has not been explicitly set to use TIMESTAMP_NTZ.
 		m = timestampLTZ
 	}
 
