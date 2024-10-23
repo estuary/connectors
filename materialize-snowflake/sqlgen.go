@@ -30,7 +30,7 @@ var (
 	// NTZ is the default type if it hasn't been otherwise set for the database,
 	// but it's generally not a very good choice since it ignores timezone
 	// information and stores the time directly as a wallclock time without
-	// adjusting it to UTC. We never create columns with this type.
+	// adjusting it to UTC.
 	timestampNTZ timestampTypeMapping = "TIMESTAMP_NTZ"
 
 	// LTZ stores the time in Snowflake as UTC and performs operations on it
