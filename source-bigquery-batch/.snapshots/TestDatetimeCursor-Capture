@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/datetime_cursor_132448": 3 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row \"2023-08-10T07:54:54.123\"","id":"2023-08-10T07:54:54.123000"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row \"2024-10-23T03:22:31.456\"","id":"2024-10-23T03:22:31.456000"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row \"2024-10-23T03:23:00.789\"","id":"2024-10-23T03:23:00.789000"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"datetime_cursor_132448":{"CursorNames":["id"],"CursorValues":["2024-10-23T03:23:00.789000"],"LastPolled":"<TIMESTAMP>"}}}
+

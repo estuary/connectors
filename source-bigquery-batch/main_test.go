@@ -133,6 +133,34 @@ func TestBasicCapture(t *testing.T) {
 	})
 }
 
+func TestDatetimeCursor(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var client = testBigQueryClient(ctx, t)
+	var uniqueID = "132448"
+	var tableName = fmt.Sprintf("testdata.datetime_cursor_%s", uniqueID)
+
+	createTestTable(ctx, t, client, tableName, "(id DATETIME, data STRING)")
+	for _, x := range []string{"2023-08-10T07:54:54.123", "2024-10-23T03:22:31.456", "2024-10-23T03:23:00.789"} {
+		executeSetupQuery(ctx, t, client, fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1)", tableName), x, fmt.Sprintf("Value for row %q", x))
+	}
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	setShutdownAfterQuery(t, true)
+	setCursorColumns(t, cs.Bindings[0], "id")
+	setQueryLimit(t, cs.Bindings[0], 1)
+
+	t.Run("Capture", func(t *testing.T) {
+		var deadline = time.Now().Add(10 * time.Second)
+		for time.Now().Before(deadline) {
+			cs.Capture(ctx, t, nil)
+		}
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 func testBigQueryClient(ctx context.Context, t testing.TB) *bigquery.Client {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
