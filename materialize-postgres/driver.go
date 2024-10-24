@@ -304,7 +304,11 @@ func newTransactor(
 	}
 	d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-	return d, nil, nil
+	opts := &boilerplate.MaterializeOptions{
+		DBTJobTrigger: &cfg.DBTJobTrigger,
+	}
+
+	return d, opts, nil
 }
 
 type binding struct {
@@ -523,13 +527,6 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			if err := txn.Commit(ctx); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
-			}
-
-			if d.cfg.DBTJobTrigger.Enabled() {
-				log.Info("store: dbt job trigger")
-				if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
-					return fmt.Errorf("triggering dbt job: %w", err)
-				}
 			}
 
 			return nil
