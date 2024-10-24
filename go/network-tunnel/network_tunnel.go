@@ -108,8 +108,14 @@ func (t *SshTunnel) Start() error {
 	var readyBuf = make([]byte, 5)
 	var ready = []byte("READY")
 	if _, err = io.ReadFull(stdout, readyBuf); err != nil {
+		// EOF means the underlying process exit without writing READY, this is most likely
+		// an error that we would like to surface to the user without logging anything further
+		// ourselves
+		if err == io.EOF {
+			os.Exit(1)
+		}
 		return fmt.Errorf("reading READY signal from network-tunnel: %w", err)
-	} else if bytes.Compare(readyBuf, ready) != 0 {
+	} else if !bytes.Equal(readyBuf, ready) {
 		return fmt.Errorf("network-tunnel returned %v instead of READY", readyBuf)
 	}
 
