@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -276,6 +275,7 @@ func newTransactor(
 			Config: cfg.Schedule,
 			Jitter: []byte(cfg.Host + cfg.Warehouse),
 		},
+		DBTJobTrigger: &cfg.DBTJobTrigger,
 	}
 
 	return d, opts, nil
@@ -816,13 +816,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					time.Sleep(retryDelay)
 				}
 			}
-		}
-	}
-
-	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
-		log.Info("store: dbt job trigger")
-		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
-			return nil, fmt.Errorf("triggering dbt job: %w", err)
 		}
 	}
 

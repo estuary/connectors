@@ -123,7 +123,7 @@ func JobTrigger(config JobConfig) error {
 	}
 
 	if !response.Status.IsSuccess {
-		return fmt.Errorf(response.Status.UserMessage)
+		return fmt.Errorf("%s", response.Status.UserMessage)
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func CurrentRuns(config JobConfig) ([]RunResponseData, error) {
 	}
 
 	if !response.Status.IsSuccess {
-		return nil, fmt.Errorf(response.Status.UserMessage)
+		return nil, fmt.Errorf("%s", response.Status.UserMessage)
 	}
 
 	var runs []RunResponseData
@@ -168,7 +168,7 @@ func CancelRun(config JobConfig, runId int) error {
 	}
 
 	if !response.Status.IsSuccess {
-		return fmt.Errorf(response.Status.UserMessage)
+		return fmt.Errorf("%s", response.Status.UserMessage)
 	}
 
 	return nil

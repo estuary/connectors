@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -56,6 +57,8 @@ type transactionsStream struct {
 	ackSchedule   schedule.Schedule
 	lastAckTime   time.Time
 	storedHistory []int
+
+	dbtJobTrigger *dbt.JobConfig
 }
 
 // newTransactionsStream wraps a base stream MaterializeStream with extra
@@ -87,6 +90,10 @@ func newTransactionsStream(
 			return nil, fmt.Errorf("creating ack schedule: %w", err)
 		}
 		s.ackSchedule = sched
+	}
+
+	if options.DBTJobTrigger != nil && options.DBTJobTrigger.Enabled() {
+		s.dbtJobTrigger = options.DBTJobTrigger
 	}
 
 	// ackSchedule may be `nil` even if options.AckSchedule was not if the
@@ -199,6 +206,19 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 				return l.ctx.Err()
 			case <-time.After(d):
 			}
+
+			// We trigger dbt job only if the delay is taking effect, to avoid bursting
+			// dbt job triggers during backfills
+			if l.dbtJobTrigger != nil {
+				if err := dbt.JobTrigger(*l.dbtJobTrigger); err != nil {
+					return fmt.Errorf("triggering dbt job: %w", err)
+				}
+			}
+		}
+	} else if l.dbtJobTrigger != nil {
+		// We also trigger dbt jobs if there is no sync frequency at all
+		if err := dbt.JobTrigger(*l.dbtJobTrigger); err != nil {
+			return fmt.Errorf("triggering dbt job: %w", err)
 		}
 	}
 
