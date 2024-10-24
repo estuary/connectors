@@ -752,9 +752,14 @@ class Stream(HttpStream, ABC):
                 f"to be able to fetch all properties available."
             )
             return props
-        data, response = self._api.get(f"/properties/v2/{self.entity}/properties")
-        for row in data:
+        if self.__class__ is CustomObject:
+            data, response = self._api.get(f"/crm/v3/properties/p_{self.entity}")
+        else:
+            data, response = self._api.get(f"/crm/v3/properties/{self.entity}")
+        if not data.get("results"):
+            return props
 
+        for row in data["results"]:
             #TODO(johnny): This is kicking the can on a schema mistake that we should fix.
             if self.name == "contacts" and row["name"] == "hs_latest_source_timestamp":
                 props[row["name"]] = {"type": ["null", "string"], "format": "date"}
