@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"cloud.google.com/go/bigquery"
+	"cloud.google.com/go/civil"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -62,8 +64,15 @@ func (c *Config) SetDefaults() {
 	}
 }
 
+const (
+	// Google Cloud DATETIME columns support microsecond precision at most
+	datetimeFormatMicros = "2006-01-02T15:04:05.000000"
+)
+
 func translateBigQueryValue(val any, fieldType bigquery.FieldType) (any, error) {
 	switch val := val.(type) {
+	case civil.DateTime:
+		return val.In(time.UTC).Format(datetimeFormatMicros), nil
 	case string:
 		if fieldType == "JSON" && json.Valid([]byte(val)) {
 			return json.RawMessage([]byte(val)), nil
