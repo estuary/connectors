@@ -58,7 +58,8 @@ type transactionsStream struct {
 	lastAckTime   time.Time
 	storedHistory []int
 
-	dbtJobTrigger *dbt.JobConfig
+	dbtJobTriggerConfig *dbt.JobConfig
+	dbtJobTriggerCh     chan bool
 }
 
 // newTransactionsStream wraps a base stream MaterializeStream with extra
@@ -70,7 +71,7 @@ func newTransactionsStream(
 	options MaterializeOptions,
 	be *BindingEvents,
 ) (*transactionsStream, error) {
-	s := &transactionsStream{stream: stream, ctx: ctx}
+	s := &transactionsStream{stream: stream, ctx: ctx, dbtJobTriggerCh: make(chan bool)}
 
 	var loggingHandler func(transactionsEvent)
 	if options.ExtendedLogging {
@@ -93,7 +94,7 @@ func newTransactionsStream(
 	}
 
 	if options.DBTJobTrigger != nil && options.DBTJobTrigger.Enabled() {
-		s.dbtJobTrigger = options.DBTJobTrigger
+		s.dbtJobTriggerConfig = options.DBTJobTrigger
 	}
 
 	// ackSchedule may be `nil` even if options.AckSchedule was not if the
@@ -104,7 +105,60 @@ func newTransactionsStream(
 		s.handler = loggingHandler
 	}
 
+	// NOTE: This delay is set based on the default value of `maxTxnDuration` being 5 minutes, which means that we are guaranteed
+	// to receive a new transaction from the runtime if data exists.
+	// If a task has `maxTxnDuration` higher than 5 minutes, and there has been no delay in the last transaction, we will
+	// trigger a dbt job 5 minutes after the last transaction. To avoid this users can set a different SafetyTriggerDelay to a value
+	// higher than the maxTxnDuration
+	delay := time.Duration(5*time.Minute + 15*time.Second)
+	if s.dbtJobTriggerConfig != nil && s.dbtJobTriggerConfig.SafetyTriggerDelay != "" {
+		var err error
+		delay, err = time.ParseDuration(s.dbtJobTriggerConfig.SafetyTriggerDelay)
+		if err != nil {
+			return nil, fmt.Errorf("parsing dbt safety trigger delay: %w", err)
+		}
+	}
+	go s.dbtJobTriggerHandler(ctx, delay)
+
 	return s, nil
+}
+
+func (l *transactionsStream) dbtJobTriggerHandler(ctx context.Context, delay time.Duration) {
+	timer := time.NewTimer(delay)
+	timer.Stop()
+
+	for {
+		select {
+		case trigger := <-l.dbtJobTriggerCh:
+			// If we haven't processed anything yet, don't schedule a job
+			if len(l.storedHistory) == 0 {
+				continue
+			}
+
+			// A new transaction has happened, reset the timer
+			if !timer.Stop() {
+				// Drain the timer channel to prevent leaks.
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+
+			if trigger {
+				timer.Reset(delay)
+				log.Debug("resetting background dbt job trigger timer")
+			}
+			continue
+		case <-timer.C:
+			log.Debug("triggering background dbt job")
+			if err := l.triggerDBTJob(); err != nil {
+				log.WithField("err", err).Error("background dbt job trigger failed")
+			}
+			continue
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // storedHistoryHandler updates the stored history accounting for calculating an
@@ -136,6 +190,11 @@ func (l *transactionsStream) storedHistoryHandler(delegate func(transactionsEven
 }
 
 func (l *transactionsStream) Send(m *pm.Response) error {
+	// Every time there is some activity, we send a signal to
+	// the dbt job trigger channel to postpone the trigger another 5 minutes
+	// we only want to trigger the job after minutes of inactivity by the connector
+	l.dbtJobTriggerCh <- true
+
 	if m.Loaded != nil {
 		l.handler(sentLoaded)
 	} else if m.Flushed != nil {
@@ -172,6 +231,15 @@ func (l *transactionsStream) RecvMsg(m *pm.Request) error {
 	return nil
 }
 
+func (l *transactionsStream) triggerDBTJob() error {
+	if l.dbtJobTriggerConfig != nil {
+		if err := dbt.JobTrigger(*l.dbtJobTriggerConfig); err != nil {
+			return fmt.Errorf("triggering dbt job: %w", err)
+		}
+	}
+	return nil
+}
+
 func (l *transactionsStream) maybeDelayAcknowledgement() error {
 	// lastAckTime at a zero value means this is the recovery commit, and we
 	// never delay on the recovery commit.
@@ -201,12 +269,10 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 			l.handler(startedAckDelay)
 			ll.WithField("delay", d.String()).Info("delaying before acknowledging commit")
 
-			// We trigger dbt job only if the delay is taking effect, to avoid bursting
-			// dbt job triggers during backfills
-			if l.dbtJobTrigger != nil {
-				if err := dbt.JobTrigger(*l.dbtJobTrigger); err != nil {
-					return fmt.Errorf("triggering dbt job: %w", err)
-				}
+			// Cancel the timer since we are triggering a job directly here
+			l.dbtJobTriggerCh <- false
+			if err := l.triggerDBTJob(); err != nil {
+				return err
 			}
 
 			select {
@@ -215,10 +281,11 @@ func (l *transactionsStream) maybeDelayAcknowledgement() error {
 			case <-time.After(d):
 			}
 		}
-	} else if l.dbtJobTrigger != nil {
-		// We also trigger dbt jobs if there is no sync frequency at all
-		if err := dbt.JobTrigger(*l.dbtJobTrigger); err != nil {
-			return fmt.Errorf("triggering dbt job: %w", err)
+	} else if !l.lastAckTime.IsZero() && l.dbtJobTriggerConfig != nil {
+		// Cancel the timer since we are triggering a job directly here
+		l.dbtJobTriggerCh <- false
+		if err := l.triggerDBTJob(); err != nil {
+			return err
 		}
 	}
 
