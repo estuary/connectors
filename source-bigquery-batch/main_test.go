@@ -100,34 +100,12 @@ func TestBasicCapture(t *testing.T) {
 	var uniqueID = "826935"
 	var tableName = fmt.Sprintf("testdata.basic_capture_%s", uniqueID)
 
-	executeSetupQuery(ctx, t, client, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
-	t.Cleanup(func() { executeSetupQuery(ctx, t, client, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
-	executeSetupQuery(ctx, t, client, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY NOT ENFORCED, data STRING)", tableName))
-
-	// Discover the table and verify discovery snapshot
+	createTestTable(ctx, t, client, tableName, "(id INTEGER PRIMARY KEY NOT ENFORCED, data STRING)")
 	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
-	t.Run("Discovery", func(t *testing.T) {
-		var summary = new(strings.Builder)
-		for idx, binding := range cs.Bindings {
-			fmt.Fprintf(summary, "Binding %d:\n", idx)
-			bs, err := json.MarshalIndent(binding, "  ", "  ")
-			require.NoError(t, err)
-			io.Copy(summary, bytes.NewReader(bs))
-			fmt.Fprintf(summary, "\n")
-		}
-		if len(cs.Bindings) == 0 {
-			fmt.Fprintf(summary, "(no output)")
-		}
-		cupaloy.SnapshotT(t, summary.String())
-	})
 
-	// Edit the discovered binding to use the ID column as a cursor
-	var res Resource
-	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
-	res.Cursor = []string{"id"}
-	resourceConfigBytes, err := json.Marshal(res)
-	require.NoError(t, err)
-	cs.Bindings[0].ResourceConfigJson = resourceConfigBytes
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	setCursorColumns(t, cs.Bindings[0], "id")
 
 	t.Run("Capture", func(t *testing.T) {
 		// Spawn a worker thread which will insert 10 rows of data as distinct inserts.
@@ -195,7 +173,8 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	}
 
 	var sanitizers = make(map[string]*regexp.Regexp)
-	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
+	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
+	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|-[0-9]+:[0-9]+)"`)
 	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
 
 	return &st.CaptureSpec{
@@ -245,4 +224,51 @@ func executeSetupQuery(ctx context.Context, t testing.TB, client *bigquery.Clien
 	status, err := job.Wait(ctx)
 	require.NoError(t, err)
 	require.NoError(t, status.Err())
+}
+
+func createTestTable(ctx context.Context, t testing.TB, client *bigquery.Client, tableName, tableDef string) {
+	t.Helper()
+	executeSetupQuery(ctx, t, client, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeSetupQuery(ctx, t, client, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeSetupQuery(ctx, t, client, fmt.Sprintf("CREATE TABLE %s%s", tableName, tableDef))
+}
+
+func summarizeBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) string {
+	t.Helper()
+	var summary = new(strings.Builder)
+	for idx, binding := range bindings {
+		fmt.Fprintf(summary, "Binding %d:\n", idx)
+		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		require.NoError(t, err)
+		io.Copy(summary, bytes.NewReader(bs))
+		fmt.Fprintf(summary, "\n")
+	}
+	if len(bindings) == 0 {
+		fmt.Fprintf(summary, "(no output)")
+	}
+	return summary.String()
+}
+
+func setCursorColumns(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...string) {
+	var res Resource
+	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
+	res.Cursor = cursor
+	resourceConfigBytes, err := json.Marshal(res)
+	require.NoError(t, err)
+	binding.ResourceConfigJson = resourceConfigBytes
+}
+
+func setQueryLimit(t testing.TB, binding *pf.CaptureSpec_Binding, limit int) {
+	var res Resource
+	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
+	res.Template = strings.ReplaceAll(res.Template, ";", fmt.Sprintf(" LIMIT %d;", limit))
+	resourceConfigBytes, err := json.Marshal(res)
+	require.NoError(t, err)
+	binding.ResourceConfigJson = resourceConfigBytes
+}
+
+func setShutdownAfterQuery(t testing.TB, setting bool) {
+	var oldSetting = TestShutdownAfterQuery
+	TestShutdownAfterQuery = setting
+	t.Cleanup(func() { TestShutdownAfterQuery = oldSetting })
 }
