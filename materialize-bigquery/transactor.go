@@ -98,6 +98,7 @@ func newTransactor(
 			Config: cfg.Schedule,
 			Jitter: []byte(cfg.ProjectID + cfg.Dataset),
 		},
+		DBTJobTrigger: &cfg.DBTJobTrigger,
 	}
 
 	return t, opts, nil
@@ -376,13 +377,6 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 	if _, err := t.client.runQuery(ctx, query); err != nil {
 		log.WithField("query", queryString).Error("query failed")
 		return fmt.Errorf("commit query: %w", err)
-	}
-
-	if t.cfg.DBTJobTrigger.Enabled() {
-		log.Info("store: dbt job trigger")
-		if err := dbt.JobTrigger(t.cfg.DBTJobTrigger); err != nil {
-			return fmt.Errorf("triggering dbt job: %w", err)
-		}
 	}
 
 	return nil
