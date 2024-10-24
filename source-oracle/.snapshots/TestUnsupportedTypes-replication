@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t18110541": 1 Documents
+# Collection "acmeCo/test/flow_test_logminer/t18110541": 1 Documents
 # ================================
 {"NVCHAR2":"nvarchar2 value with unicode characters ❤️ \\ 🔥️')","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"},"before":{"NVCHAR2":"nvarchar2 value with unicode characters ❤️ \\ 🔥️')"}}}
 # ================================
