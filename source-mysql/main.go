@@ -215,10 +215,15 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 		return nil
 	}
-	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
+	var withTimeouts = func(c *client.Conn) error {
+		c.ReadTimeout = 60 * time.Second
+		c.WriteTimeout = 60 * time.Second
+		return nil
+	}
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTimeouts, withTLS); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
 		db.conn = connWithTLS
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTimeouts); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = connWithoutTLS
 	} else {
@@ -230,6 +235,21 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 			return fmt.Errorf("unable to connect to database: %w", errWithTLS)
 		}
 	}
+
+	// This is a workaround for a bug in the MySQL client library. When connecting with TLS,
+	// the packet connection is recreated but in the process it loses the read/write timeout
+	// values. And since the client library code interprets a timeout of zero as "don't set
+	// a deadline" but doesn't unset any previous deadlines, this means that if you set a
+	// read/write timeout and then connect with TLS your connection will become unusable and
+	// die exactly one timeout-length after the initial connection handshake.
+	//
+	// To work around this, we explicitly unset the deadline here. We have also submitted a
+	// proper bugfix (to preserve the timeouts when recreating the TLS connection) upstream
+	// and this workaround can be removed once that's upstreamed and we upgrade to a client
+	// library release which includes it.
+	//
+	// Upstream PR: github.com/go-mysql-org/go-mysql/pull/925
+	db.conn.SetDeadline(time.Time{})
 
 	// Debug logging hook so we can get the server config variables when needed
 	if err := db.logServerVariables(); err != nil {
