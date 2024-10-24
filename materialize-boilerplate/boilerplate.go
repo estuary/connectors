@@ -18,6 +18,7 @@ import (
 	_ "net/http/pprof"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
@@ -35,6 +36,9 @@ type MaterializeOptions struct {
 	// AckSchedule is configuration for scheduling of runtime acknowledgements
 	// sent from the connector at the completion of its commits.
 	AckSchedule *AckScheduleOption
+
+	// DBTJobTrigger is configuration for enabling DBT job triggers after commits
+	DBTJobTrigger *dbt.JobConfig
 }
 
 // AckScheduleOption enables a schedule for acknowledgements of the

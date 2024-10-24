@@ -14,7 +14,6 @@ import (
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
-	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -190,6 +189,7 @@ func newTransactor(
 			Config: cfg.Schedule,
 			Jitter: []byte(warehouseId),
 		},
+		DBTJobTrigger: &cfg.DBTJobTrigger,
 	}
 
 	return d, opts, nil
@@ -485,13 +485,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 
 	d.cpRecovery = false
-
-	if d.cfg.DBTJobTrigger.Enabled() && len(d.cp) > 0 {
-		log.Info("store: dbt job trigger")
-		if err := dbt.JobTrigger(d.cfg.DBTJobTrigger); err != nil {
-			return nil, fmt.Errorf("triggering dbt job: %w", err)
-		}
-	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
 	// so that a restart of the connector does not need to run the same queries again
