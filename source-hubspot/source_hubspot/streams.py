@@ -756,6 +756,8 @@ class Stream(HttpStream, ABC):
             data, response = self._api.get(f"/crm/v3/properties/p_{self.entity}")
         else:
             data, response = self._api.get(f"/crm/v3/properties/{self.entity}")
+
+        self.logger.debug(data)
         if not data.get("results"):
             return props
 

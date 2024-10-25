@@ -31,10 +31,10 @@ def time_sleep_mock(mocker):
 
 def test_check_connection_ok(requests_mock, config):
     responses = [
-        {"json": [], "status_code": 200},
+        {"json": {"results": []}, "status_code": 200},
     ]
 
-    requests_mock.register_uri("GET", "/properties/v2/contact/properties", responses)
+    requests_mock.register_uri("GET", "/crm/v3/properties/contact", responses)
     ok, error_msg = SourceHubspot().check_connection(logger, config=config)
 
     assert ok
@@ -119,10 +119,10 @@ def test_check_connection_backoff_on_limit_reached(requests_mock, config):
     """Error once, check that we retry and not fail"""
     responses = [
         {"json": {"error": "limit reached"}, "status_code": 429, "headers": {"Retry-After": "0"}},
-        {"json": [], "status_code": 200},
+        {"json": {"results": []}, "status_code": 200},
     ]
 
-    requests_mock.register_uri("GET", "/properties/v2/contact/properties", responses)
+    requests_mock.register_uri("GET", "/crm/v3/properties/contact", responses)
     source = SourceHubspot()
     alive, error = source.check_connection(logger=logger, config=config)
 
@@ -134,9 +134,9 @@ def test_check_connection_backoff_on_server_error(requests_mock, config):
     """Error once, check that we retry and not fail"""
     responses = [
         {"json": {"error": "something bad"}, "status_code": 500},
-        {"json": [], "status_code": 200},
+        {"json": {"results": []}, "status_code": 200},
     ]
-    requests_mock.register_uri("GET", "/properties/v2/contact/properties", responses)
+    requests_mock.register_uri("GET", "/crm/v3/properties/contact", responses)
     source = SourceHubspot()
     alive, error = source.check_connection(logger=logger, config=config)
 
@@ -182,14 +182,14 @@ def test_parent_stream_forbidden(requests_mock, config, caplog, fake_properties_
     requests_mock.get("https://api.hubapi.com/marketing/v3/forms", json=json, status_code=403)
     properties_response = [
         {
-            "json": [
+            "json": { "results": [
                 {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
                 for property_name in fake_properties_list
-            ],
+            ]},
             "status_code": 200,
         }
     ]
-    requests_mock.get("https://api.hubapi.com/properties/v2/form/properties", properties_response)
+    requests_mock.get("https://api.hubapi.com/crm/v3/properties/form", properties_response)
     requests_mock.get("https://api.hubapi.com/crm/v3/schemas", json=json, status_code=403)
 
     catalog = ConfiguredAirbyteCatalog.parse_obj(
@@ -225,10 +225,10 @@ class TestSplittingPropertiesFunctionality:
     def set_mock_properties(requests_mock, url, fake_properties_list):
         properties_response = [
             {
-                "json": [
+                "json": {"results": [
                     {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
                     for property_name in fake_properties_list
-                ],
+                ]},
                 "status_code": 200,
             },
         ]
@@ -246,7 +246,7 @@ class TestSplittingPropertiesFunctionality:
         test_stream = Companies(**common_params)
 
         parsed_properties = list(APIv3Property(fake_properties_list).split())
-        self.set_mock_properties(requests_mock, "/properties/v2/company/properties", fake_properties_list)
+        self.set_mock_properties(requests_mock, "/crm/v3/properties/company", fake_properties_list)
 
         record_ids_paginated = [list(map(str, range(100))), list(map(str, range(100, 150, 1)))]
 
@@ -291,7 +291,7 @@ class TestSplittingPropertiesFunctionality:
         """
 
         parsed_properties = list(APIv3Property(fake_properties_list).split())
-        self.set_mock_properties(requests_mock, "/properties/v2/product/properties", fake_properties_list)
+        self.set_mock_properties(requests_mock, "/crm/v3/properties/product", fake_properties_list)
 
         test_stream = Products(**common_params)
 
@@ -323,7 +323,7 @@ class TestSplittingPropertiesFunctionality:
         """
 
         parsed_properties = list(APIv3Property(fake_properties_list).split())
-        self.set_mock_properties(requests_mock, "/properties/v2/deal/properties", fake_properties_list)
+        self.set_mock_properties(requests_mock, "/crm/v3/properties/deal", fake_properties_list)
 
         test_stream = Deals(**common_params)
 
@@ -420,10 +420,10 @@ def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(req
 
     properties_response = [
         {
-            "json": [
+            "json": {"results": [
                 {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
                 for property_name in fake_properties_list
-            ],
+            ]},
             "status_code": 200,
         }
     ]
@@ -437,7 +437,7 @@ def test_search_based_stream_should_not_attempt_to_get_more_than_10k_records(req
     test_stream._sync_mode = SyncMode.incremental
     requests_mock.register_uri("POST", test_stream.url, responses)
     test_stream._sync_mode = None
-    requests_mock.register_uri("GET", "/properties/v2/company/properties", properties_response)
+    requests_mock.register_uri("GET", "/crm/v3/properties/company", properties_response)
     requests_mock.register_uri("POST", "/crm/v4/associations/company/contacts/batch/read", [{"status_code": 200, "json": {"results": []}}])
 
     records, _ = read_incremental(test_stream, {})
