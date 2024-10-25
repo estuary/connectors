@@ -1,0 +1,37 @@
+services:
+  db:
+    image: confluentinc/confluent-local:7.7.1
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://db:29092,PLAINTEXT_HOST://source-kafka-db-1.flow-test:9092'
+      # Replace the line above with the one below for running tests locally:
+      # KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://db:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@db:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://db:29092,CONTROLLER://db:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      KAFKA_REST_HOST_NAME: rest-proxy
+      KAFKA_REST_BOOTSTRAP_SERVERS: 'db:29092'
+      KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
+      CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
+    healthcheck:
+      test: /bin/kafka-cluster cluster-id --bootstrap-server localhost:9092
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    ports:
+      - 9092:9092
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

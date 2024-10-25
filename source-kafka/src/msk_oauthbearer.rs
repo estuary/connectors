@@ -1,3 +1,4 @@
+use anyhow::Result;
 use aws_sdk_iam::config::Credentials;
 use aws_sigv4::http_request::{
     sign, SignableBody, SignableRequest, SignatureLocation, SigningSettings,
@@ -26,11 +27,7 @@ use std::time::{Duration, SystemTime};
 // Taken from the Go SDK's implementation
 // https://github.com/aws/aws-msk-iam-sasl-signer-go/blob/main/signer/msk_auth_token_provider.go#L33
 const DEFAULT_EXPIRY_SECONDS: u64 = 900;
-pub fn token(
-    region: &str,
-    access_key_id: &str,
-    secret_access_key: &str,
-) -> eyre::Result<(String, i64)> {
+pub fn token(region: &str, access_key_id: &str, secret_access_key: &str) -> Result<(String, i64)> {
     let endpoint = format!(
         "https://kafka.{}.amazonaws.com/?Action=kafka-cluster%3AConnect",
         region
@@ -92,10 +89,7 @@ pub fn token(
 
     // Finally add User Agent to the final signed url. This is based on the Go SDK that does this
     // after signing: https://github.com/aws/aws-msk-iam-sasl-signer-go/blob/main/signer/msk_auth_token_provider.go#L188
-    let signed_url = format!(
-        "{}&User-Agent=EstuaryFlowCapture",
-        signed_req.uri().to_string()
-    );
+    let signed_url = format!("{}&User-Agent=EstuaryFlowCapture", signed_req.uri());
 
     let token = BASE64_URL_SAFE_NO_PAD.encode(signed_url);
     let expires_in = (now + expiry_duration)
@@ -103,5 +97,5 @@ pub fn token(
         .unwrap()
         .as_millis();
 
-    return Ok((token, expires_in.try_into()?));
+    Ok((token, expires_in.try_into()?))
 }
