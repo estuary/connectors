@@ -1,0 +1,77 @@
+---
+collections:
+  acmeCo/test-topic-1:
+    schema:
+      properties:
+        _meta:
+          properties:
+            offset:
+              description: The offset of the message within the partition
+              type: integer
+            partition:
+              description: The partition the message was read from
+              type: integer
+            topic:
+              description: The topic the message was read from
+              type: string
+          required:
+            - partition
+            - offset
+          type: object
+      required:
+        - _meta
+      type: object
+      x-infer-schema: true
+    key:
+      - /_meta/partition
+      - /_meta/offset
+  acmeCo/test-topic-2:
+    schema:
+      properties:
+        _meta:
+          properties:
+            offset:
+              description: The offset of the message within the partition
+              type: integer
+            partition:
+              description: The partition the message was read from
+              type: integer
+            topic:
+              description: The topic the message was read from
+              type: string
+          required:
+            - partition
+            - offset
+          type: object
+      required:
+        - _meta
+      type: object
+      x-infer-schema: true
+    key:
+      - /_meta/partition
+      - /_meta/offset
+  acmeCo/test-topic-3:
+    schema:
+      properties:
+        _meta:
+          properties:
+            offset:
+              description: The offset of the message within the partition
+              type: integer
+            partition:
+              description: The partition the message was read from
+              type: integer
+            topic:
+              description: The topic the message was read from
+              type: string
+          required:
+            - partition
+            - offset
+          type: object
+      required:
+        - _meta
+      type: object
+      x-infer-schema: true
+    key:
+      - /_meta/partition
+      - /_meta/offset

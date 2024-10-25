@@ -1,0 +1,133 @@
+---
+source: tests/test.rs
+expression: snap
+---
+{
+  "documentSchema": {
+    "properties": {
+      "_meta": {
+        "properties": {
+          "offset": {
+            "description": "The offset of the message within the partition",
+            "type": "integer"
+          },
+          "partition": {
+            "description": "The partition the message was read from",
+            "type": "integer"
+          },
+          "topic": {
+            "description": "The topic the message was read from",
+            "type": "string"
+          }
+        },
+        "required": [
+          "partition",
+          "offset"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "_meta"
+    ],
+    "type": "object",
+    "x-infer-schema": true
+  },
+  "key": [
+    "/_meta/partition",
+    "/_meta/offset"
+  ],
+  "recommendedName": "test-topic-1",
+  "resourceConfig": {
+    "topic": "test-topic-1"
+  },
+  "resourcePath": [
+    "test-topic-1"
+  ]
+}
+{
+  "documentSchema": {
+    "properties": {
+      "_meta": {
+        "properties": {
+          "offset": {
+            "description": "The offset of the message within the partition",
+            "type": "integer"
+          },
+          "partition": {
+            "description": "The partition the message was read from",
+            "type": "integer"
+          },
+          "topic": {
+            "description": "The topic the message was read from",
+            "type": "string"
+          }
+        },
+        "required": [
+          "partition",
+          "offset"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "_meta"
+    ],
+    "type": "object",
+    "x-infer-schema": true
+  },
+  "key": [
+    "/_meta/partition",
+    "/_meta/offset"
+  ],
+  "recommendedName": "test-topic-2",
+  "resourceConfig": {
+    "topic": "test-topic-2"
+  },
+  "resourcePath": [
+    "test-topic-2"
+  ]
+}
+{
+  "documentSchema": {
+    "properties": {
+      "_meta": {
+        "properties": {
+          "offset": {
+            "description": "The offset of the message within the partition",
+            "type": "integer"
+          },
+          "partition": {
+            "description": "The partition the message was read from",
+            "type": "integer"
+          },
+          "topic": {
+            "description": "The topic the message was read from",
+            "type": "string"
+          }
+        },
+        "required": [
+          "partition",
+          "offset"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "_meta"
+    ],
+    "type": "object",
+    "x-infer-schema": true
+  },
+  "key": [
+    "/_meta/partition",
+    "/_meta/offset"
+  ],
+  "recommendedName": "test-topic-3",
+  "resourceConfig": {
+    "topic": "test-topic-3"
+  },
+  "resourcePath": [
+    "test-topic-3"
+  ]
+}
