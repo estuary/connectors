@@ -34,7 +34,7 @@ require (
 	github.com/estuary/flow v0.4.1-0.20240815183205-bba5ae475f12
 	github.com/estuary/vitess v0.15.10
 	github.com/evanphx/json-patch/v5 v5.9.0
-	github.com/go-mysql-org/go-mysql v1.8.1-0.20240805131754-ccf204bf2b2a
+	github.com/go-mysql-org/go-mysql v1.9.2-0.20241024113125-ff1dab44f445
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang-jwt/jwt/v5 v5.2.1
