@@ -2,37 +2,37 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
 # Build Stage
 ################################################################################
-FROM rust:1.70-slim-bullseye as builder
-
-RUN rustup component add clippy
+FROM golang:1.22-bullseye as builder
 
 RUN apt-get update \
-    && apt-get install -y ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev \
+    && apt-get install -y curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev \
     && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.80
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN rustup component add clippy
 
 WORKDIR /connector
 
-ENV CARGO_HOME /connector/cargo
-ENV CARGO_TARGET_DIR /connector/target
-
-RUN mkdir /connector/src/
-RUN touch /connector/src/lib.rs
-RUN echo "fn main() {}" > /connector/src/main.rs
-
 COPY source-kafka/Cargo.* /connector/
 
-RUN cargo build --release \
-    && cargo test --release
+# Avoid having to install/build all dependencies by copying the Cargo files and
+# making a dummy src/main.rs and empty lib.rs files.
+RUN mkdir src \
+    && echo "fn main() {}" > src/main.rs \
+    && touch src/lib.rs \
+    && cargo test --locked \
+    && cargo build --release --locked \
+    && rm -r src
 
-RUN rm -r /connector/src
+COPY source-kafka/src ./src
 
-COPY source-kafka/src /connector/src
-
-RUN touch /connector/src/main.rs \
-    && touch /connector/src/lib.rs \
-    && cargo build --offline --release \
-    && cargo test --release \
-    && cargo clippy --release
+# This touch prevents Docker from using a cached empty main.rs file.
+RUN touch src/main.rs \
+    && touch src/lib.rs \
+    && cargo test --release --locked --offline \
+    && cargo clippy --locked --offline --no-deps \
+    && cargo build --release --locked --offline
 
 # Runtime Stage
 ################################################################################
@@ -51,7 +51,7 @@ COPY --from=builder /usr/lib/x86_64-linux-gnu/libssl.so.1* /usr/lib/x86_64-linux
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libcrypto.so.1* /usr/lib/x86_64-linux-gnu/
 
 # Copy in the connector artifact.
-COPY --from=builder /connector/target/release/source-kafka ./source-kafka
+COPY --from=builder /connector/target/release/source-kafka ./
 
 # Avoid running the connector as root.
 USER nonroot:nonroot
@@ -59,5 +59,5 @@ USER nonroot:nonroot
 ENTRYPOINT ["/connector/source-kafka"]
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture
-LABEL CONNECTOR_PROTOCOL=flow-capture
 LABEL FLOW_RUNTIME_CODEC=json
+LABEL CONNECTOR_PROTOCOL=flow-capture

@@ -1,65 +1,56 @@
-use std::io::{stdin, stdout};
+use anyhow::Context;
+use source_kafka::run_connector;
+use tokio::io;
 
-use proto_flow::capture::Request;
-use source_kafka::connector::{Connector, ConnectorConfig, StdoutError};
-use source_kafka::KafkaConnector;
-use tracing_subscriber::fmt::format::FmtSpan;
-use tracing_subscriber::EnvFilter;
+fn main() -> anyhow::Result<()> {
+    let runtime = start_runtime()?;
 
-fn main() -> eyre::Result<()> {
-    setup_tracing();
+    let stdin = io::BufReader::new(io::stdin());
+    let stdout = io::stdout();
 
-    let stdout_guard = stdout();
-    let mut stdout = Box::new(stdout_guard.lock());
+    let result = runtime.block_on(run_connector(stdin, stdout));
 
-    let lines = stdin().lines();
-
-    for line in lines {
-        let request: Request = serde_json::from_str(&line.unwrap())?;
-
-        let result = if let Some(_spec) = request.spec {
-            <KafkaConnector as Connector>::spec(&mut stdout)
-        } else if let Some(validate) = request.validate {
-            <KafkaConnector as Connector>::validate(&mut stdout, validate)
-        } else if let Some(discover) = request.discover {
-            <KafkaConnector as Connector>::discover(&mut stdout, discover)
-        } else if let Some(apply) = request.apply {
-            let capture = apply.capture.expect("empty capture");
-            <KafkaConnector as Connector>::apply(
-                &mut stdout,
-                <KafkaConnector as Connector>::Config::parse(&capture.config_json)?,
-            )
-        } else if let Some(open) = request.open {
-            let state = <KafkaConnector as Connector>::State::parse(&open.state_json)?;
-            let capture = open.capture.expect("empty capture");
-
-            <KafkaConnector as Connector>::read(
-                &mut stdout,
-                <KafkaConnector as Connector>::Config::parse(&capture.config_json)?,
-                capture,
-                open.range,
-                Some(state),
-            )
-        } else {
-            Ok(())
-        };
-
-        match result {
-            Err(e) if e.is::<StdoutError>() => {
-                // Stdout has been closed, so we should gracefully shut down rather than panicking.
-                return Ok(());
-            }
-            otherwise => otherwise.expect("error"),
-        }
+    if let Err(err) = result.as_ref() {
+        tracing::error!(error = %err, "operation failed");
+    } else {
+        tracing::debug!("connector run successful");
     }
 
-    Ok(())
+    runtime.shutdown_background();
+
+    tracing::info!(success = %result.is_ok(), "connector exiting");
+    result
 }
 
-pub fn setup_tracing() {
+fn start_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
+    // The level string "debug" results in enabling debug logging for all the crates
+    // in the dependency tree, which produces a ridiculous amount of output.
+    // So map the debug level to a filter that will still use info level for other crates.
+    let level_str = match std::env::var("LOG_LEVEL").ok() {
+        Some(lvl) if lvl.as_str() == "debug" => "source_kafka=debug,info".to_string(),
+        Some(other) => other,
+        None => "info".to_string(),
+    };
+
+    let log_level = tracing_subscriber::EnvFilter::builder().parse_lossy(level_str);
     tracing_subscriber::fmt()
-        .with_span_events(FmtSpan::ENTER | FmtSpan::EXIT)
         .with_writer(std::io::stderr)
-        .with_env_filter(EnvFilter::from_default_env())
+        .with_env_filter(log_level)
+        .json()
+        .flatten_event(true)
+        .with_timer(tracing_subscriber::fmt::time::UtcTime::rfc_3339())
+        .with_span_events(tracing_subscriber::fmt::format::FmtSpan::CLOSE)
+        .with_current_span(true)
+        .with_span_list(false)
+        .with_thread_ids(false)
+        .with_thread_names(false)
+        .with_target(false)
         .init();
+
+    // These bits about the runtime and shutdown were cargo-culted over from connector-init
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .context("building tokio runtime")?;
+    Ok(runtime)
 }
