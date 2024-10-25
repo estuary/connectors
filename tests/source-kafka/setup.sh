@@ -2,49 +2,11 @@
 set -e
 
 export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
-export RESOURCE="{ \"stream\": \"${TEST_STREAM}\", \"syncMode\": \"incremental\" }"
+export RESOURCE="{\"topic\": \"${TEST_STREAM}\"}"
+export CONNECTOR_CONFIG='{"bootstrap_servers": "source-kafka-db-1.flow-test:9092"}'
 
-# Because Flow uses network=host, the port exposed to Flow is different than the
-# one we use when running `docker exec` below.
-export CONNECTOR_CONFIG='{
-  "bootstrap_servers": "infra-kafka-1.flow-test:9092",
-  "credentials": {
-    "auth_type": "UserPassword",
-    "mechanism": "SCRAM-SHA-256",
-    "username": "alice",
-    "password": "alice-pass"
-  },
-  "tls": null
-}'
+LISTENER_HOST="source-kafka-db-1.flow-test" docker compose -f source-kafka/docker-compose.yaml up --wait --detach
 
-root_dir="$(git rev-parse --show-toplevel)"
-kafkactl_config="$root_dir/tests/source-kafka/kafkactl.yaml"
-TOTAL_PARTITIONS=4
-
-function kctl() {
-  docker run -i --network flow-test --mount "type=bind,src=$kafkactl_config,target=/kafkactl.yaml" deviceinsight/kafkactl --config-file=/kafkactl.yaml $@
-}
-
-# Ensure we can connect to a broker.
-for i in $(seq 1 10); do
-  if [ -n "$(kctl get topics)" ]; then
-    break
-  else
-    if [ $i -ge 10 ]; then
-      echo "Can't connect to Kafka. Is the kafkactl config correct?"
-      kctl config view
-      exit 1
-    fi
-    sleep 2
-  fi
-done
-
-# Create the topic with n partitions
-kctl create topic $TEST_STREAM --partitions $TOTAL_PARTITIONS
-
-# Seed the topic with documents
-for i in $(seq 1 $TOTAL_PARTITIONS); do
-  cat $root_dir/tests/files/d.jsonl |
-    jq -cs "map(select(.id % $TOTAL_PARTITIONS == $i - 1)) | .[]" |
-    kctl produce $TEST_STREAM
-done
+docker exec source-kafka-db-1 sh -c "/bin/kafka-topics --create --topic ${TEST_STREAM} --bootstrap-server localhost:9092"
+docker cp tests/files/d.jsonl source-kafka-db-1:/
+docker exec source-kafka-db-1 sh -c "cat /d.jsonl | /bin/kafka-console-producer --topic ${TEST_STREAM} --bootstrap-server localhost:9092"
