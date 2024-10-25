@@ -174,6 +174,7 @@ jobs:
             "materialize-dynamodb",
             "materialize-elasticsearch",
             "source-dynamodb",
+            "source-kafka",
             "source-kinesis",
             "source-mysql",
             "source-postgres",
@@ -231,11 +232,6 @@ jobs:
           source $(poetry env info --path)/bin/activate
           cd ..;
           pytest ${{matrix.connector}}/tests;
-
-      - name: Start Dockerized test infrastructure
-        if: matrix.connector == 'source-kafka'
-        run: |
-          docker compose --file infra/docker-compose.yaml up --wait
 
       - name: Source connector ${{ matrix.connector }} integration tests
         if: |
