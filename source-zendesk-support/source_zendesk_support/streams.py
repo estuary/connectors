@@ -209,6 +209,8 @@ class BaseSourceZendeskSupportStream(HttpStream, ABC):
             self.logger.error(f"Skipping stream {self.name}: Check permissions, error message: {error}.")
             setattr(self, "raise_on_http_errors", False)
             return False
+        if response.status_code != 200:
+            self.logger.warning(f"Received a {response.status_code} response.")
         return super().should_retry(response)
 
 
@@ -671,6 +673,8 @@ class SourceZendeskSupportTicketEventsExportStream(SourceZendeskIncrementalExpor
     @ param event_type : specific event_type to check ["Audit", "Change", "Comment", etc]
     """
 
+    state_checkpoint_interval = 1000
+
     cursor_field = "created_at"
     response_list_name: str = "ticket_events"
     response_target_entity: str = "child_events"
@@ -707,6 +711,14 @@ class SourceZendeskSupportTicketEventsExportStream(SourceZendeskIncrementalExpor
         Otherwise, returns the start time param from the stream's state/config and the sideload param.
         """
         if next_page_token:
+            # Check if the next_page_token's start time is the the same or earlier than
+            # the previous request's / checkpointed state's start time.
+            next_page_start_time = int(next_page_token.get("start_time"))
+            checkpointed_start_time = self.check_stream_state(stream_state=stream_state)
+
+            if next_page_start_time <= checkpointed_start_time:
+                self.logger.warning(f"start_time query param {next_page_start_time} is less than or equal to the previous start_time param {checkpointed_start_time}. Check if the stream is stuck in a loop.")
+
             return next_page_token
 
         start_time = self.check_stream_state(stream_state=stream_state)
