@@ -1,0 +1,22 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-hubspot:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        config:
+          bootstrap_servers: "localhost:9092"
+    bindings:
+      - resource:
+          topic: test-topic-1
+        target: acmeCo/test-topic-1
+      - resource:
+          topic: test-topic-2
+        target: acmeCo/test-topic-2
+      - resource:
+          topic: test-topic-3
+        target: acmeCo/test-topic-3
