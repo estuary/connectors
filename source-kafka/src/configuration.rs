@@ -1,61 +1,61 @@
-use std::fmt::Display;
-
-use schemars::JsonSchema;
+use anyhow::Result;
+use rdkafka::client::{ClientContext, OAuthToken};
+use rdkafka::consumer::{ConsumerContext, StreamConsumer};
+use rdkafka::ClientConfig;
+use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-use crate::connector;
-
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("failed to read the configuration file")]
-    File(#[from] std::io::Error),
-
-    #[error("failed to parse the file as valid json")]
-    Parsing(#[from] serde_json::Error),
-
-    #[error("bootstrap servers are required to make the initial connection")]
-    NoBootstrapServersGiven,
+#[derive(Serialize, Deserialize, Default)]
+pub struct EndpointConfig {
+    bootstrap_servers: String,
+    credentials: Option<Credentials>,
+    tls: Option<TlsSettings>,
 }
 
-/// # Kafka Source Configuration
-#[derive(Deserialize, Default, Debug, Serialize)]
-pub struct Configuration {
-    /// # Bootstrap Servers
-    ///
-    /// The initial servers in the Kafka cluster to initially connect to. The Kafka
-    /// client will be informed of the rest of the cluster nodes by connecting to
-    /// one of these nodes.
-    pub bootstrap_servers: String,
-
-    /// # Credentials
-    ///
-    /// The connection details for authenticating a client connection to Kafka via SASL.
-    /// When not provided, the client connection will attempt to use PLAINTEXT
-    /// (insecure) protocol. This must only be used in dev/test environments.
-    pub credentials: Option<Credentials>,
-
-    /// # TLS connection settings.
-    pub tls: Option<TlsSettings>,
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(tag = "auth_type")]
+#[serde(rename_all = "snake_case")]
+pub enum Credentials {
+    UserPassword {
+        mechanism: SaslMechanism,
+        username: String,
+        password: String,
+    },
+    #[serde(rename = "aws")]
+    AWS {
+        aws_access_key_id: String,
+        aws_secret_access_key: String,
+        region: String,
+    },
 }
 
-impl Configuration {
-    pub fn brokers(&self) -> String {
-        self.bootstrap_servers.clone()
-    }
+#[derive(Serialize, Deserialize, Clone)]
+#[serde(rename_all = "SCREAMING-KEBAB-CASE")]
+pub enum SaslMechanism {
+    Plain,
+    ScramSha256,
+    ScramSha512,
+}
 
-    pub fn security_protocol(&self) -> &'static str {
-        match (&self.credentials, &self.tls) {
-            (None, Some(TlsSettings::SystemCertificates)) => "SSL",
-            (None, None) => "PLAINTEXT",
-            (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
-            (Some(_), None) => "SASL_PLAINTEXT",
+impl std::fmt::Display for SaslMechanism {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SaslMechanism::Plain => write!(f, "PLAIN"),
+            SaslMechanism::ScramSha256 => write!(f, "SCRAM-SHA-256"),
+            SaslMechanism::ScramSha512 => write!(f, "SCRAM-SHA-512"),
         }
     }
 }
 
-impl JsonSchema for Configuration {
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TlsSettings {
+    SystemCertificates,
+}
+
+impl JsonSchema for EndpointConfig {
     fn schema_name() -> String {
-        "Configuration".to_owned()
+        "EndpointConfig".to_owned()
     }
 
     fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
@@ -68,6 +68,12 @@ impl JsonSchema for Configuration {
                 "credentials"
             ],
             "properties": {
+                "bootstrap_servers": {
+                    "title": "Bootstrap Servers",
+                    "description": "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
+                    "type": "string",
+                    "order": 0
+                },
                 "credentials": {
                     "title": "Credentials",
                     "description": "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
@@ -81,8 +87,8 @@ impl JsonSchema for Configuration {
                         "properties": {
                             "auth_type": {
                                 "type": "string",
-                                "default": "UserPassword",
-                                "const": "UserPassword"
+                                "default": "user_password",
+                                "const": "user_password"
                             },
                             "mechanism": {
                                 "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
@@ -95,16 +101,16 @@ impl JsonSchema for Configuration {
                                 "type": "string",
                                 "order": 0
                             },
-                            "password": {
-                                "order": 2,
-                                "secret": true,
-                                "title": "Password",
-                                "type": "string"
-                            },
                             "username": {
                                 "order": 1,
                                 "secret": true,
                                 "title": "Username",
+                                "type": "string"
+                            },
+                            "password": {
+                                "order": 2,
+                                "secret": true,
+                                "title": "Password",
                                 "type": "string"
                             }
                         },
@@ -147,12 +153,6 @@ impl JsonSchema for Configuration {
                         ]
                     }]
                 },
-                "bootstrap_servers": {
-                    "title": "Bootstrap Servers",
-                    "description": "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
-                    "type": "string",
-                    "order": 0
-                },
                 "tls": {
                     "default": "system_certificates",
                     "description": "Controls how should TLS certificates be found or used.",
@@ -169,143 +169,107 @@ impl JsonSchema for Configuration {
     }
 }
 
-impl connector::ConnectorConfig for Configuration {
-    type Error = Error;
-
-    fn parse(reader: &str) -> Result<Self, Self::Error> {
-        let configuration: Configuration = serde_json::from_str(reader)?;
-
-        if configuration.bootstrap_servers.is_empty() {
-            return Err(Error::NoBootstrapServersGiven);
-        }
-
-        Ok(configuration)
-    }
+pub struct FlowConsumerContext {
+    auth: Option<Credentials>,
 }
 
-/// # SASL Mechanism
-///
-/// The SASL Mechanism describes _how_ to exchange and authenticate
-/// clients/servers. For secure communication, TLS is **required** for all
-/// supported mechanisms.
-///
-/// For more information about the Simple Authentication and Security Layer (SASL), see RFC 4422:
-/// https://datatracker.ietf.org/doc/html/rfc4422
-/// For more information about Salted Challenge Response Authentication
-/// Mechanism (SCRAM), see RFC 7677.
-/// https://datatracker.ietf.org/doc/html/rfc7677
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "SCREAMING-KEBAB-CASE")]
-pub enum SaslMechanism {
-    /// The username and password are sent to the server in the clear.
-    Plain,
-    /// SCRAM using SHA-256.
-    #[serde(rename = "SCRAM-SHA-256")]
-    ScramSha256,
-    /// SCRAM using SHA-512.
-    #[serde(rename = "SCRAM-SHA-512")]
-    ScramSha512,
-}
+impl ClientContext for FlowConsumerContext {
+    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
 
-impl Display for SaslMechanism {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SaslMechanism::Plain => write!(f, "PLAIN"),
-            SaslMechanism::ScramSha256 => write!(f, "SCRAM-SHA-256"),
-            SaslMechanism::ScramSha512 => write!(f, "SCRAM-SHA-512"),
+    fn generate_oauth_token(
+        &self,
+        _oauthbearer_config: Option<&str>,
+    ) -> Result<OAuthToken, Box<dyn std::error::Error>> {
+        match &self.auth {
+            Some(Credentials::AWS {
+                aws_access_key_id,
+                aws_secret_access_key,
+                region,
+            }) => {
+                let (token, lifetime_ms) = crate::msk_oauthbearer::token(
+                    region,
+                    aws_access_key_id,
+                    aws_secret_access_key,
+                )?;
+                Ok(OAuthToken {
+                    // This is just a descriptive name of the principal which is
+                    // accessing the resource, not a specific constant
+                    principal_name: "flow-kafka-capture".to_string(),
+                    token,
+                    lifetime_ms,
+                })
+            }
+            _ => Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into()),
         }
     }
 }
 
-/// # Credentials
-///
-/// The information necessary to connect to Kafka.
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(tag = "auth_type")]
-pub enum Credentials {
-    UserPassword {
-        /// # Sasl Mechanism
-        mechanism: SaslMechanism,
-        /// # Username
-        username: String,
-        /// # Password
-        password: String,
-    },
+impl ConsumerContext for FlowConsumerContext {}
 
-    AWS {
-        #[serde(rename = "aws_access_key_id")]
-        access_key_id: String,
-        #[serde(rename = "aws_secret_access_key")]
-        secret_access_key: String,
-        region: String,
-    },
+impl EndpointConfig {
+    pub async fn to_consumer(&self) -> Result<StreamConsumer<FlowConsumerContext>> {
+        let mut config = ClientConfig::new();
+
+        config.set("bootstrap.servers", self.bootstrap_servers.clone());
+        config.set("enable.auto.commit", "false");
+        config.set("group.id", "source-kafka"); // librdkafka will throw an error if this is left blank
+        config.set("security.protocol", self.security_protocol());
+
+        match &self.credentials {
+            Some(Credentials::UserPassword {
+                mechanism,
+                username,
+                password,
+            }) => {
+                config.set("sasl.mechanism", mechanism.to_string());
+                config.set("sasl.username", username);
+                config.set("sasl.password", password);
+            }
+            Some(Credentials::AWS { .. }) => {
+                if self.security_protocol() != "SASL_SSL" {
+                    anyhow::bail!("must use tls=system_certificates for AWS")
+                }
+                config.set("sasl.mechanism", "OAUTHBEARER");
+            }
+            None => (),
+        }
+
+        let ctx = FlowConsumerContext {
+            auth: self.credentials.clone(),
+        };
+
+        let consumer: StreamConsumer<FlowConsumerContext> = config.create_with_context(ctx)?;
+
+        if let Some(Credentials::AWS { .. }) = &self.credentials {
+            // In order to generate an initial OAuth Bearer token to be used by the consumer
+            // we need to call poll once.
+            // See https://docs.confluent.io/platform/current/clients/librdkafka/html/classRdKafka_1_1OAuthBearerTokenRefreshCb.html
+            // Note that this is expected to return an error since we have no topic assignments yet
+            // hence the ignoring of the result
+            let _ = consumer.recv().await;
+        }
+
+        Ok(consumer)
+    }
+
+    fn security_protocol(&self) -> &'static str {
+        match (&self.credentials, &self.tls) {
+            (None, Some(TlsSettings::SystemCertificates)) => "SSL",
+            (None, None) => "PLAINTEXT",
+            (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
+            (Some(_), None) => "SASL_PLAINTEXT",
+        }
+    }
 }
 
-/// # TLS Settings
-///
-/// Controls how should TLS certificates be found or used.
-#[derive(Debug, Deserialize, Serialize)]
-#[serde(rename_all = "snake_case")]
-#[derive(Default)]
-pub enum TlsSettings {
-    /// Use the TLS certificates bundled with openssl.
-    #[default]
-    SystemCertificates,
-    // TODO: allow the user to specify custom TLS certs, authorities, etc.
-    // CustomCertificates(CustomTlsSettings),
+#[derive(Serialize, Deserialize, JsonSchema)]
+pub struct Resource {
+    #[schemars(title = "Topic", description = "Kafka topic to capture messages from.")]
+    pub topic: String,
 }
 
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn empty_brokers_test() {
-        let config = Configuration::default();
-        let brokers = config.brokers();
-        assert_eq!("", brokers);
-    }
-
-    #[test]
-    fn many_brokers_test() {
-        let config: Configuration = serde_json::from_str(
-            r#"{
-            "bootstrap_servers": "localhost:9092,172.22.36.2:9093,localhost:9094",
-            "tls": "system_certificates"
-        }"#,
-        )
-        .expect("to parse the config");
-
-        let brokers = config.brokers();
-        assert_eq!("localhost:9092,172.22.36.2:9093,localhost:9094", brokers);
-    }
-
-    #[test]
-    fn parse_config_file_test() {
-        use connector::ConnectorConfig;
-
-        let input = r#"
-        {
-            "bootstrap_servers": "localhost:9093",
-            "tls": "system_certificates"
-        }
-        "#;
-
-        Configuration::parse(input).expect("to parse");
-
-        let input = r#"
-        {
-            "bootstrap_servers": "localhost:9093",
-            "credentials": {
-                "auth_type": "UserPassword",
-                "mechanism": "SCRAM-SHA-256",
-                "username": "user",
-                "password": "password"
-            },
-            "tls": null
-        }
-        "#;
-
-        Configuration::parse(input).expect("to parse");
-    }
+pub fn schema_for<T: JsonSchema>() -> RootSchema {
+    schemars::gen::SchemaSettings::draft2019_09()
+        .into_generator()
+        .into_root_schema_for::<T>()
 }

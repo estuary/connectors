@@ -1,172 +1,145 @@
-extern crate serde_with;
+use anyhow::{Context, Result};
+use configuration::{schema_for, EndpointConfig, Resource};
+use discover::do_discover;
+use proto_flow::capture::{
+    request::Validate,
+    response::{
+        validated::Binding as ValidatedBinding, Applied, Discovered, Opened, Spec, Validated,
+    },
+    Request, Response,
+};
+use pull::do_pull;
+use rdkafka::consumer::Consumer;
+use tokio::io::AsyncWriteExt;
+use tokio::io::{self, AsyncBufReadExt};
 
-use crate::connector::ConnectorConfig;
-use proto_flow::capture::{request, response, Response};
-use proto_flow::flow::{CaptureSpec, ConnectorState, RangeSpec};
-use schemars::schema_for;
-use serde_json::json;
-
-use std::fmt::Debug;
-use std::io::Write;
-
-pub mod catalog;
 pub mod configuration;
-pub mod connector;
-pub mod kafka;
+pub mod discover;
 pub mod msk_oauthbearer;
-pub mod state;
+pub mod pull;
 
-pub struct KafkaConnector;
+const KAFKA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
-const PROTOCOL_VERSION: u32 = 3032023;
+pub async fn run_connector(
+    mut stdin: io::BufReader<io::Stdin>,
+    mut stdout: io::Stdout,
+) -> Result<(), anyhow::Error> {
+    tracing::info!("running connector");
 
-impl connector::Connector for KafkaConnector {
-    type Config = configuration::Configuration;
-    type State = state::CheckpointSet;
+    let mut line = String::new();
 
-    fn spec(output: &mut dyn Write) -> eyre::Result<()> {
-        let message = Response {
-            spec: Some(response::Spec {
-                protocol: PROTOCOL_VERSION,
-                config_schema_json: serde_json::to_string(&schema_for!(
-                    configuration::Configuration
-                ))?,
-                resource_config_schema_json: serde_json::to_string(&json!({
-                    "type": "object",
-                    "properties": {
-                        "stream": {
-                            "type": "string",
-                            "x-collection-name": true,
-                        }
-                    }
-                }))?,
+    if stdin.read_line(&mut line).await? == 0 {
+        return Ok(()); // Clean EOF.
+    };
+    let request: Request = serde_json::from_str(&line)?;
+
+    if request.spec.is_some() {
+        let res = Response {
+            spec: Some(Spec {
+                protocol: 3032023,
+                config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?,
+                resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?,
                 documentation_url: "https://go.estuary.dev/source-kafka".to_string(),
                 oauth2: None,
-                resource_path_pointers: vec!["/stream".to_string()],
+                resource_path_pointers: vec!["/topic".to_string()],
             }),
             ..Default::default()
         };
 
-        connector::write_message(output, message)?;
-        Ok(())
-    }
-
-    fn validate(output: &mut dyn Write, mut validate: request::Validate) -> eyre::Result<()> {
-        let config = Self::Config::parse(&validate.config_json)?;
-        let consumer = kafka::consumer_from_config(&config)?;
-        // This is because validate implements drop (see: `rustc --explain E0509`)
-        let bindings = std::mem::take(&mut validate.bindings);
-        let message = kafka::test_connection(&config, &consumer, bindings)?;
-
-        connector::write_message(output, message)?;
-        Ok(())
-    }
-
-    fn discover(output: &mut dyn Write, discover: request::Discover) -> eyre::Result<()> {
-        let config = Self::Config::parse(&discover.config_json)?;
-        let consumer = kafka::consumer_from_config(&config)?;
-        let metadata = kafka::fetch_metadata(&config, &consumer)?;
-        let bindings = kafka::available_streams(&metadata);
-        let message = Response {
-            discovered: Some(response::Discovered { bindings }),
+        write_capture_response(res, &mut stdout).await?;
+    } else if let Some(req) = request.discover {
+        let res = Response {
+            discovered: Some(Discovered {
+                bindings: do_discover(req).await?,
+            }),
             ..Default::default()
         };
 
-        connector::write_message(output, message)?;
-        Ok(())
-    }
+        write_capture_response(res, &mut stdout).await?;
+    } else if let Some(req) = request.validate {
+        let res = Response {
+            validated: Some(Validated {
+                bindings: do_validate(req).await?,
+            }),
+            ..Default::default()
+        };
 
-    fn apply(output: &mut dyn Write, _config: Self::Config) -> eyre::Result<()> {
-        connector::write_message(
-            output,
+        write_capture_response(res, &mut stdout).await?;
+    } else if request.apply.is_some() {
+        let res = Response {
+            applied: Some(Applied {
+                action_description: String::new(),
+            }),
+            ..Default::default()
+        };
+
+        write_capture_response(res, &mut stdout).await?;
+    } else if let Some(req) = request.open {
+        write_capture_response(
             Response {
-                applied: Some(response::Applied {
-                    action_description: "".to_string(),
-                }),
-                ..Default::default()
-            },
-        )?;
-
-        Ok(())
-    }
-
-    fn read(
-        output: &mut dyn Write,
-        config: Self::Config,
-        capture: CaptureSpec,
-        range: Option<RangeSpec>,
-        persisted_state: Option<Self::State>,
-    ) -> eyre::Result<()> {
-        let consumer = kafka::consumer_from_config(&config)?;
-        let metadata = kafka::fetch_metadata(&config, &consumer)?;
-
-        let mut checkpoints = state::CheckpointSet::reconcile_catalog_state(
-            &metadata,
-            &capture,
-            range.as_ref(),
-            &persisted_state.unwrap_or_default(),
-        )?;
-        kafka::subscribe(&consumer, &checkpoints)?;
-
-        connector::write_message(
-            output,
-            Response {
-                opened: Some(response::Opened {
+                opened: Some(Opened {
                     explicit_acknowledgements: false,
                 }),
                 ..Default::default()
             },
-        )?;
+            &mut stdout,
+        )
+        .await?;
 
-        loop {
-            let msg = consumer
-                .poll(None)
-                .expect("Polling without a timeout should always produce a message")
-                .map_err(kafka::Error::Read)?;
+        let eof = tokio::spawn(async move {
+            match stdin.read_line(&mut line).await? {
+                0 => Ok(()),
+                n => anyhow::bail!(
+                    "read {} bytes from stdin when explicit acknowledgements were not requested",
+                    n
+                ),
+            }
+        });
 
-            let (record, checkpoint) = kafka::process_message(&msg, &capture.bindings)?;
+        let pull = tokio::spawn(do_pull(req, stdout));
 
-            let delta_state = response::Checkpoint {
-                state: Some(ConnectorState {
-                    updated_json: serde_json::to_string(&json!({
-                        checkpoint.topic.clone(): {
-                            checkpoint.partition.to_string(): checkpoint.offset
-                        }
-                    }))?,
-                    merge_patch: false,
-                }),
-            };
-            checkpoints.add(checkpoint);
-
-            connector::write_message(
-                output,
-                Response {
-                    captured: Some(record),
-                    ..Default::default()
-                },
-            )?;
-            connector::write_message(
-                output,
-                Response {
-                    checkpoint: Some(delta_state),
-                    ..Default::default()
-                },
-            )?;
+        tokio::select! {
+            pull_res = pull => pull_res??,
+            eof_res = eof => eof_res??,
         }
+    } else {
+        anyhow::bail!("invalid request, expected spec|discover|validate|apply|open");
     }
+
+    Ok(())
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum Error {
-    #[error("failed when interacting with kafka")]
-    Kafka(#[from] kafka::Error),
+pub async fn write_capture_response(
+    response: Response,
+    stdout: &mut io::Stdout,
+) -> anyhow::Result<()> {
+    let resp = serde_json::to_vec(&response).context("serializing response")?;
+    stdout.write_all(&resp).await.context("writing response")?;
+    stdout
+        .write_u8(b'\n')
+        .await
+        .context("writing response newline")?;
+    if response.captured.is_none() {
+        stdout.flush().await?;
+    }
+    Ok(())
+}
 
-    #[error("failed to process message")]
-    Message(#[from] kafka::ProcessingError),
+async fn do_validate(req: Validate) -> Result<Vec<ValidatedBinding>> {
+    let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
+    let consumer = config.to_consumer().await?;
 
-    #[error("failed to execute catalog")]
-    Catalog(#[from] catalog::Error),
+    consumer.fetch_metadata(None, KAFKA_TIMEOUT)?;
 
-    #[error("failed to track state")]
-    State(#[from] state::Error),
+    let mut out = vec![];
+
+    for b in &req.bindings {
+        let res: Resource = serde_json::from_str(&b.resource_config_json)?;
+        let validated = ValidatedBinding {
+            resource_path: vec![res.topic],
+        };
+        out.push(validated);
+    }
+
+    Ok(out)
 }

@@ -3,33 +3,30 @@ name = "source-kafka"
 version = "0.1.0"
 edition = "2021"
 
-[lib]
-doctest = false
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-proto-flow = { git = "https://github.com/estuary/flow", version = "0.0.0" }
+proto-flow = { git = "https://github.com/estuary/flow" }
 
-chrono = { version = "0.4.19", features = ["serde"] }
-eyre = "0.6.5"
-base64 = "0.21.5"
-highway = "0.6.4"
-http = "*"
-aws-sdk-iam = "1.7.0"
-aws-smithy-runtime-api = "1.1.1"
-aws-sigv4 = { version = "1.1.1", features = ["sign-http", "http0-compat"] }
-rdkafka = { version = "0.36", features = ["cmake-build", "gssapi", "libz", "sasl", "ssl"], default-features = false }
-#rdkafka = { version = "0.36", features = ["dynamic-linking", "gssapi", "libz", "sasl", "ssl"], default-features = false }
-#sasl2-sys = { version = "0.1.14", features = ["vendored" ] }
-schemars = "0.8.3"
-serde = { version = "1.0.96", features = ["derive"] }
-serde_json = "1.0.96"
-serde_with = { version = "1.9.4", features = [ "hex", "macros" ] }
-structopt = "0.3.22"
-thiserror = "1.0.26"
+anyhow = "1.0"
+aws-sdk-iam = "1.48.0"
+aws-sigv4 = { version = "1.2.4", features = ["sign-http", "http0-compat"] }
+base64 = "0.22"
+hex = "0.4"
+highway = "1.2"
+http = "0.2" # 0.2x version is needed for MSK token signing via aws-sigv4
+lazy_static = "1.5"
+rdkafka = { version = "0.36", features = ["cmake-build", "sasl", "ssl"] }
+schemars = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3", features = [
+    "json",
+    "env-filter",
+    "time",
+] }
+
 
 [dev-dependencies]
-insta = { version = "1.8.0", features = ["redactions", "yaml"] }
+insta = { version = "1", features = ["json", "serde"] }
