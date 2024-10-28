@@ -379,14 +379,7 @@ func (db *mysqlDatabase) translateRecordField(isBackfill bool, columnType interf
 				}
 				return t.UTC().Format(time.RFC3339Nano), nil
 			case "date":
-				// See note above in the "timestamp" case about replacing the zero value with one
-				// which is valid according to the RFC3339 'full-time' rule / the 'date' format in
-				// a JSON schema.
-				if string(val) == "0000-00-00" {
-					return "0001-01-01", nil
-				}
-				return string(val), nil
-
+				return normalizeMySQLDate(string(val)), nil
 			}
 		}
 		if len(val) > truncateColumnThreshold {
@@ -407,23 +400,8 @@ func normalizeMySQLTimestamp(ts string) string {
 	if len(tsBits) != 2 {
 		return ts
 	}
-	// Split "YYYY-MM-DD" into "YYYY" "MM" and "DD" portions
-	var ymdBits = strings.Split(tsBits[0], "-")
-	if len(ymdBits) != 3 {
-		return ts
-	}
-	// Replace zero-valued year/month/day with ones instead
-	if ymdBits[0] == "0000" {
-		ymdBits[0] = "0001"
-	}
-	if ymdBits[1] == "00" {
-		ymdBits[1] = "01"
-	}
-	if ymdBits[2] == "00" {
-		ymdBits[2] = "01"
-	}
-	// Reassemble the Year/Month/Day and tack on the rest of the original timestamp
-	var normalized = fmt.Sprintf("%s-%s-%s %s", ymdBits[0], ymdBits[1], ymdBits[2], tsBits[1])
+	tsBits[0] = normalizeMySQLDate(tsBits[0])    // Normalize the date
+	var normalized = tsBits[0] + " " + tsBits[1] // Reassemble date + time
 	if normalized != ts {
 		logrus.WithFields(logrus.Fields{
 			"input":  ts,
@@ -431,6 +409,25 @@ func normalizeMySQLTimestamp(ts string) string {
 		}).Debug("normalized illegal timestamp")
 	}
 	return normalized
+}
+
+func normalizeMySQLDate(str string) string {
+	// Split "YYYY-MM-DD" into "YYYY" "MM" and "DD" portions
+	var bits = strings.Split(str, "-")
+	if len(bits) != 3 {
+		return str
+	}
+	// Replace zero-valued year/month/day with ones instead
+	if bits[0] == "0000" {
+		bits[0] = "0001"
+	}
+	if bits[1] == "00" {
+		bits[1] = "01"
+	}
+	if bits[2] == "00" {
+		bits[2] = "01"
+	}
+	return bits[0] + "-" + bits[1] + "-" + bits[2]
 }
 
 const queryDiscoverTables = `
