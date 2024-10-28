@@ -103,12 +103,12 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		log.WithField("addr", cfg.Address).Info("connected without TLS")
 		conn = connWithoutTLS
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
-		log.WithField("withTLS", errWithTLS).Warn("connecting with TLS failed for an unrelated reason")
+		log.WithFields(log.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
 		return nil, fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
-		return nil, fmt.Errorf("unable to connect to database: failed with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
+		return nil, fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
 	}
 
 	if _, err := conn.Execute("SELECT true;"); err != nil {
