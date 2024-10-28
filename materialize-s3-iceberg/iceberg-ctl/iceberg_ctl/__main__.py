@@ -354,7 +354,11 @@ def append_files(
     if cp == next_checkpoint:
         print(f"checkpoint is already '{next_checkpoint}'")
         return  # already appended these files
-    elif cp != prev_checkpoint:
+    elif cp != "" and cp != prev_checkpoint:
+        # An absent checkpoint table property is allowed to accommodate cases
+        # where the user may have manually dropped the table and the
+        # materialization automatically re-created it, outside the normal
+        # backfill counter increment process.
         raise Exception(
             f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
         )
