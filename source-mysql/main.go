@@ -233,12 +233,12 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = connWithoutTLS
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
-		logrus.WithField("withTLS", errWithTLS).Warn("connecting with TLS failed for an unrelated reason")
+		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
 		return fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
-		return fmt.Errorf("unable to connect to database: failed with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
+		return fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
 	}
 
 	// Debug logging hook so we can get the server config variables when needed
