@@ -154,6 +154,43 @@ func TestDatetimeNormalization(t *testing.T) {
 	})
 }
 
+func TestDateNormalization(t *testing.T) {
+	// Create a table with some 'difficult' column names (a reserved word, a capitalized
+	// name, and one containing special characters which also happens to be the primary key).
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "44310403"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, x DATE)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Permit arbitrarily crazy date values
+	tb.Query(ctx, t, "SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'NO_ZERO_DATE',''));")
+	tb.Query(ctx, t, "SET SESSION sql_mode=(SELECT REPLACE(@@sql_mode,'NO_ZERO_IN_DATE',''));")
+	tb.Query(ctx, t, "SET SESSION sql_mode=(SELECT CONCAT(@@sql_mode, ',ALLOW_INVALID_DATES'));")
+
+	// Insert various test dates
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{100, "1991-08-31"},
+		{101, "0000-00-00"},
+		{102, "2023-00-00"},
+		{103, "2023-07-00"},
+	})
+	cs.Capture(ctx, t, nil)
+
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{200, "1991-08-31"},
+		{201, "0000-00-00"},
+		{202, "2023-00-00"},
+		{203, "2023-07-00"},
+	})
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
 func TestEnumPrimaryKey(t *testing.T) {
 	// Create a table whose primary key includes an enum value (whose cases are specified
 	// in non-alphabetical order).
