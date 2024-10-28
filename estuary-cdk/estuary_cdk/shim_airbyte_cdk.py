@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from logging import Logger
 from pydantic import Field
 from typing import Any, ClassVar, Annotated, Callable, Awaitable, List, Literal
+import asyncio
 import logging
 import os
 
@@ -271,7 +272,13 @@ class CaptureShim(BaseCaptureConnector):
         resolved = common.resolve_bindings(open.capture.bindings, resources)
 
         async def _run(task: Task) -> None:
-            await self._run(task, resolved, open.capture.config, open.state)
+            async def closure(task: Task):
+                await self._run(
+                    task, resolved, open.capture.config, open.state,
+                )
+
+            task.spawn_child("airbyte_shim", closure)
+
 
         return (response.Opened(explicitAcknowledgements=False), _run)
 
@@ -332,6 +339,13 @@ class CaptureShim(BaseCaptureConnector):
         for message in self.delegate.read(
             task.log, config, airbyte_catalog, airbyte_states
         ):
+            # Yield to the event loop to allow SIGQUIT signals to stop shimmed captures.
+            await asyncio.sleep(0)
+
+            if task.stopping.event.is_set():
+                task.log.debug(f"Airbyte shim is yielding to stop.")
+                return
+
             if record := message.record:
                 entry = index.get((record.namespace, record.stream), None)
                 if entry is None:
