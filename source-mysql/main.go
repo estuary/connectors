@@ -238,7 +238,7 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
 		return fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
-		return fmt.Errorf("unable to connect to database: failed with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
+		return fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
 	}
 
 	// Debug logging hook so we can get the server config variables when needed

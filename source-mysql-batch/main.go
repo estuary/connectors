@@ -108,7 +108,7 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
 		return nil, fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
-		return nil, fmt.Errorf("unable to connect to database: failed with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
+		return nil, fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
 	}
 
 	if _, err := conn.Execute("SELECT true;"); err != nil {
