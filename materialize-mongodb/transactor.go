@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	idField = "_id"
+	idField    = "_id"
+	idFieldAlt = "_flow" + idField
 
 	batchByteLimit = 5 * 1024 * 1024
 
@@ -147,6 +148,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := json.Unmarshal(it.RawJSON, &doc); err != nil {
 				return nil, fmt.Errorf("bson unmarshalling json doc: %w", err)
 			}
+			if idVal, ok := doc[idField]; ok {
+				// Preserve the original value of a collection field with a name
+				// that collides with the MongoDB _id field by materializing it
+				// with an alternate name.
+				doc[idFieldAlt] = idVal
+				delete(doc, idField)
+			}
+
 			// In case of delta updates, we don't want to set the _id. We want MongoDB to generate a new
 			// _id for each record we insert
 			if !t.bindings[it.Binding].deltaUpdates {
@@ -217,7 +226,7 @@ func (t *transactor) loadWorker(
 						return fmt.Errorf("decoding document in collection %s: %w", collection.Name(), err)
 					}
 
-					js, err := json.Marshal(sanitizeDocument(doc))
+					js, err := json.Marshal(sanitizedLoadedDocument(doc))
 					if err != nil {
 						return fmt.Errorf("encoding document in collection %s as json: %w", collection.Name(), err)
 					} else if err := loaded(batch.binding, js); err != nil {
@@ -307,11 +316,20 @@ func (t *transactor) storeWorker(
 	}
 }
 
-func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
-	// We need to remove the _id property from loaded documents because the
-	// Flow collection schemas may forbid that property. If we left it in, it
-	// could cause validation errors on loaded documents.
-	delete(doc, idField)
+func sanitizedLoadedDocument(doc map[string]interface{}) map[string]interface{} {
+	if idValAlt, ok := doc[idFieldAlt]; ok {
+		// Reverse the renaming of a collection's _id field to _flow_id by
+		// putting the original value back as _id and removing the alternate
+		// field.
+		doc[idField] = idValAlt
+		delete(doc, idFieldAlt)
+	} else {
+		// Otherwise we need to remove the _id property from loaded documents
+		// because the Flow collection schemas may forbid that property. If we
+		// left it in, it could cause validation errors on loaded documents.
+		delete(doc, idField)
+	}
+
 	return sanitizeDocumentInner(doc)
 }
 
