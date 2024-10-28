@@ -211,24 +211,34 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		address = "localhost:3306"
 	}
 
+	const mysqlErrorCodeSecureTransportRequired = 3159 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
+	var mysqlErr *mysql.MyError
 	var withTLS = func(c *client.Conn) error {
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 		return nil
 	}
+	// The following if-else chain looks somewhat complicated but it's really very simple.
+	// * We'd prefer to use TLS, so we first try to connect with TLS, and then if that fails
+	//   we try again without.
+	// * If either error is an incorrect username/password then we just report that.
+	// * Otherwise we report both errors because it's better to be clear what failed and how.
+	// * Except if the non-TLS connection specifically failed because TLS is required then
+	//   we don't need to mention that and just return the with-TLS error.
 	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
 		db.conn = connWithTLS
+	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = connWithoutTLS
+	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
+		logrus.WithField("withTLS", errWithTLS).Warn("connecting with TLS failed for an unrelated reason")
+		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
+	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysqlErrorCodeSecureTransportRequired {
+		return fmt.Errorf("unable to connect to database: %w", errWithTLS)
 	} else {
-		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
-		var mysqlErr *mysql.MyError
-		if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
-			return cerrors.NewUserError(mysqlErr, "incorrect username or password")
-		} else {
-			return fmt.Errorf("unable to connect to database: %w", errWithTLS)
-		}
+		return fmt.Errorf("unable to connect to database: failed with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
 	}
 
 	// Debug logging hook so we can get the server config variables when needed
