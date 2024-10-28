@@ -1,0 +1,16 @@
+# ================================
+# Collection "acmeCo/test/test_datenormalization_44310403": 8 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DateNormalization_44310403","cursor":"backfill:0"}},"id":100,"x":"1991-08-31"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DateNormalization_44310403","cursor":"backfill:1"}},"id":101,"x":"0001-01-01"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DateNormalization_44310403","cursor":"backfill:2"}},"id":102,"x":"2023-00-00"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DateNormalization_44310403","cursor":"backfill:3"}},"id":103,"x":"2023-07-00"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DateNormalization_44310403","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":200,"x":"1991-08-31"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DateNormalization_44310403","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":201,"x":"0001-01-01"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DateNormalization_44310403","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":202,"x":"2023-00-00"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"DateNormalization_44310403","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":203,"x":"2023-07-00"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FDateNormalization_44310403":{"backfilled":4,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","x"],"types":{"id":{"type":"int"},"x":"date"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
