@@ -44,7 +44,7 @@ func (d *driver) connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		var tunnel = sshConfig.CreateTunnel()
 
 		if err := tunnel.Start(); err != nil {
-			return nil, fmt.Errorf("error starting network tunnel: %w", err)
+			return nil, err
 		}
 	}
 

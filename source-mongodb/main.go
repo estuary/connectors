@@ -228,7 +228,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		var tunnel = sshConfig.CreateTunnel()
 
 		if err := tunnel.Start(); err != nil {
-			return nil, fmt.Errorf("error starting network tunnel: %w", err)
+			return nil, err
 		}
 	} else if isDocDB {
 		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", cfg.Address)
