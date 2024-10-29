@@ -73,7 +73,7 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 		db.tunnel = sshConfig.CreateTunnel()
 
 		if err := db.tunnel.Start(); err != nil {
-			return nil, fmt.Errorf("error starting network tunnel: %w", err)
+			return nil, err
 		}
 	}
 

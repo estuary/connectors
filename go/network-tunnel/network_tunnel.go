@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"syscall"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -112,7 +113,7 @@ func (t *SshTunnel) Start() error {
 		// an error that we would like to surface to the user without logging anything further
 		// ourselves
 		if err == io.EOF {
-			os.Exit(1)
+			return cerrors.NewTransparentError(err)
 		}
 		return fmt.Errorf("reading READY signal from network-tunnel: %w", err)
 	} else if !bytes.Equal(readyBuf, ready) {
