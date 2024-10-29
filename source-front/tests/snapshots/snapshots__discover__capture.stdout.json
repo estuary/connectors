@@ -12,9 +12,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "emitted_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -31,8 +28,7 @@
         }
       },
       "required": [
-        "id",
-        "emitted_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -124,9 +120,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "created_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -143,8 +136,7 @@
         }
       },
       "required": [
-        "id",
-        "created_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -201,9 +193,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "created_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -220,8 +209,7 @@
         }
       },
       "required": [
-        "id",
-        "created_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -243,9 +231,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "emitted_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -262,8 +247,7 @@
         }
       },
       "required": [
-        "id",
-        "emitted_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -357,9 +341,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "created_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -376,8 +357,7 @@
         }
       },
       "required": [
-        "id",
-        "created_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -437,9 +417,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -453,8 +430,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -479,9 +455,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -495,8 +468,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -521,9 +493,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -537,8 +506,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -598,9 +566,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -614,8 +579,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -675,9 +639,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -691,8 +652,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -717,9 +677,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -733,8 +690,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -759,9 +715,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -775,8 +728,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -836,9 +788,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -852,8 +801,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -910,9 +858,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "created_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -929,8 +874,7 @@
         }
       },
       "required": [
-        "id",
-        "created_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -952,9 +896,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "created_at": {
-          "type": "number"
-        },
         "contact_id": {
           "type": "string"
         },
@@ -971,7 +912,6 @@
         }
       },
       "required": [
-        "created_at",
         "contact_id"
       ],
       "type": "object",
@@ -1069,9 +1009,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -1085,8 +1022,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -1108,9 +1044,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "updated_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -1127,8 +1060,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -1150,9 +1082,6 @@
       "$schema": "http://json-schema.org/schema#",
       "additionalProperties": true,
       "properties": {
-        "updated_at": {
-          "type": "number"
-        },
         "id": {
           "type": "string"
         },
@@ -1169,8 +1098,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -1195,9 +1123,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -1211,8 +1136,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -1272,9 +1196,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -1288,8 +1209,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
@@ -1349,9 +1269,6 @@
         "id": {
           "type": "string"
         },
-        "updated_at": {
-          "type": "number"
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -1365,8 +1282,7 @@
         }
       },
       "required": [
-        "id",
-        "updated_at"
+        "id"
       ],
       "type": "object",
       "x-infer-schema": true
