@@ -240,7 +240,7 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 		var tunnel = sshConfig.CreateTunnel()
 
 		if err := tunnel.Start(); err != nil {
-			return nil, fmt.Errorf("error starting network tunnel: %w", err)
+			return nil, err
 		}
 
 		// If SSH Tunnel is configured, we are going to create a tunnel from localhost:9200 to
