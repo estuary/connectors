@@ -21,21 +21,37 @@ expression: snap
           }
         },
         "required": [
-          "partition",
-          "offset"
+          "offset",
+          "partition"
+        ],
+        "type": "object"
+      },
+      "idx": {
+        "type": "integer"
+      },
+      "nested": {
+        "properties": {
+          "sub_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sub_id"
         ],
         "type": "object"
       }
     },
     "required": [
-      "_meta"
+      "_meta",
+      "idx",
+      "nested"
     ],
     "type": "object",
     "x-infer-schema": true
   },
   "key": [
-    "/_meta/partition",
-    "/_meta/offset"
+    "/idx",
+    "/nested/sub_id"
   ],
   "recommendedName": "test-topic-1",
   "resourceConfig": {
@@ -64,8 +80,8 @@ expression: snap
           }
         },
         "required": [
-          "partition",
-          "offset"
+          "offset",
+          "partition"
         ],
         "type": "object"
       }
@@ -107,8 +123,8 @@ expression: snap
           }
         },
         "required": [
-          "partition",
-          "offset"
+          "offset",
+          "partition"
         ],
         "type": "object"
       }

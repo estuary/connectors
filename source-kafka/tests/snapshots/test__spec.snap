@@ -1,6 +1,6 @@
 ---
 source: tests/test.rs
-expression: "serde_json::to_string_pretty(&thing).unwrap()"
+expression: "serde_json::to_string_pretty(&got).unwrap()"
 ---
 {
   "configSchema": {
@@ -92,6 +92,38 @@ expression: "serde_json::to_string_pretty(&thing).unwrap()"
         ],
         "order": 1,
         "title": "Credentials",
+        "type": "object"
+      },
+      "schema_registry": {
+        "description": "Connection details for interacting with a schema registry. This is necessary for processing messages encoded with Avro.",
+        "order": 3,
+        "properties": {
+          "endpoint": {
+            "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
+            "order": 0,
+            "title": "Schema Registry Endpoint",
+            "type": "string"
+          },
+          "password": {
+            "description": "Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key.",
+            "order": 2,
+            "secret": true,
+            "title": "Schema Registry Password",
+            "type": "string"
+          },
+          "username": {
+            "description": "Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.",
+            "order": 1,
+            "title": "Schema Registry Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "password",
+          "username"
+        ],
+        "title": "Schema Registry",
         "type": "object"
       },
       "tls": {
