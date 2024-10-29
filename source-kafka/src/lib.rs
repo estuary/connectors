@@ -17,6 +17,7 @@ pub mod configuration;
 pub mod discover;
 pub mod msk_oauthbearer;
 pub mod pull;
+pub mod schema_registry;
 
 const KAFKA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 

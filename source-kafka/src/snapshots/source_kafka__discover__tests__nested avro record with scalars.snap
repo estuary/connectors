@@ -1,0 +1,59 @@
+---
+source: src/discover.rs
+expression: snap
+---
+["/firstKey","/nestedRecord/secondKeyNested","/nestedRecord/thirdKeyNested"]
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "firstKey",
+    "nestedRecord"
+  ],
+  "properties": {
+    "_meta": {
+      "type": "object",
+      "required": [
+        "offset",
+        "partition"
+      ],
+      "properties": {
+        "offset": {
+          "description": "The offset of the message within the partition",
+          "type": "integer"
+        },
+        "partition": {
+          "description": "The partition the message was read from",
+          "type": "integer"
+        },
+        "topic": {
+          "description": "The topic the message was read from",
+          "type": "string"
+        }
+      }
+    },
+    "firstKey": {
+      "description": "the first key field",
+      "type": "string"
+    },
+    "nestedRecord": {
+      "type": "object",
+      "required": [
+        "secondKeyNested",
+        "thirdKeyNested"
+      ],
+      "properties": {
+        "secondKeyNested": {
+          "description": "the second key field",
+          "type": "integer"
+        },
+        "thirdKeyNested": {
+          "description": "the third key field",
+          "type": "string",
+          "contentEncoding": "base64"
+        }
+      }
+    }
+  },
+  "x-infer-schema": true
+}

@@ -5,6 +5,8 @@ edition = "2021"
 
 
 [dependencies]
+doc = { git = "https://github.com/estuary/flow" }
+json = { git = "https://github.com/estuary/flow" }
 proto-flow = { git = "https://github.com/estuary/flow" }
 
 anyhow = "1.0"
@@ -26,7 +28,11 @@ tracing-subscriber = { version = "0.3", features = [
     "env-filter",
     "time",
 ] }
+reqwest = { version = "0.12", features = ["json"] }
+futures = "0.3"
+apache-avro = "0.17"
 
 
 [dev-dependencies]
 insta = { version = "1", features = ["json", "serde"] }
+schema_registry_converter = { version = "4.2.0", features = ["avro"] }

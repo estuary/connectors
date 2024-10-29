@@ -10,6 +10,7 @@ pub struct EndpointConfig {
     bootstrap_servers: String,
     credentials: Option<Credentials>,
     tls: Option<TlsSettings>,
+    pub schema_registry: Option<SchemaRegistryConfig>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -51,6 +52,13 @@ impl std::fmt::Display for SaslMechanism {
 #[serde(rename_all = "snake_case")]
 pub enum TlsSettings {
     SystemCertificates,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SchemaRegistryConfig {
+    pub endpoint: String,
+    pub username: String,
+    pub password: String,
 }
 
 impl JsonSchema for EndpointConfig {
@@ -162,6 +170,38 @@ impl JsonSchema for EndpointConfig {
                     "title": "TLS Settings",
                     "type": "string",
                     "order": 2
+                },
+                "schema_registry": {
+                    "title": "Schema Registry",
+                    "description": "Connection details for interacting with a schema registry. This is necessary for processing messages encoded with Avro.",
+                    "type": "object",
+                    "properties": {
+                        "endpoint": {
+                            "type": "string",
+                            "title": "Schema Registry Endpoint",
+                            "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
+                            "order": 0 
+                        },
+                        "username": {
+                            "type": "string",
+                            "title": "Schema Registry Username",
+                            "description": "Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.",
+                            "order": 1
+                        },
+                        "password": {
+                            "type": "string",
+                            "title": "Schema Registry Password",
+                            "description": "Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key.",
+                            "order": 2,
+                            "secret": true
+                        }
+                    },
+                    "required": [
+                        "endpoint",
+                        "username",
+                        "password"
+                    ],
+                    "order": 3
                 }
             }
         }))
