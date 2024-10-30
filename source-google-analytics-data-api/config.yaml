@@ -5,7 +5,8 @@ credentials:
     client_secret_sops: ENC[AES256_GCM,data:lTaxOBRDGT1FzNcwhEjPZzB1UJhOdjpFsWviEEMfXkkCdd4=,iv:SzIH9vkXctgh9EO/NAeUfPgZBWRv/0QQyBoVG+b6AQE=,tag:OYcbeln0r4QQhhZWndWuwg==,type:str]
     refresh_token_sops: ENC[AES256_GCM,data:S4bW08hyZuMnB+VIExQHon5cAED+CKUw015ZLjw1NGKHwJqYNuhMwhEDwS0Vr4TCq/a5/eJa7vVbJldGZbLvo8b3aJtOSXLmylOt66Gq4TZYXoE1DVAQqIJMAlQg/fO59UsoSXkt2g==,iv:GmgFm8/zEs2/EX8nipgJ65DO2JjGqpqUqTuxbzEpnF4=,tag:1oXaulNxwVcc7VDTn+LwiA==,type:str]
 date_ranges_start_date: "2024-04-01"
-property_id: "431462875"
+property_ids:
+    - "431462875"
 window_in_days: 1
 sops:
     kms: []
@@ -16,8 +17,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-04-08T20:17:08Z"
-    mac: ENC[AES256_GCM,data:4cGuunX3pZZu90iOAYn70+BijSebkzHogwGsb0tmCmkSSuDUTecS76lwUtWoEzG3mUpjtA5QdkTlcuG699tL7anjVQp/nm6UONaQM1YKHgGpYjZsiYuZaOrD92v8LKhEIbNxzlU+se0/ahRUKrQzYeSLX4Juprr50H4SQG6PZ4A=,iv:oO6vY8QqzU17j2Ou6DAiiZTSFu4fCedFMRpOyAFfLs4=,tag:wrD0ttB5AoNRg0hvVn2itw==,type:str]
+    lastmodified: "2024-10-28T17:05:38Z"
+    mac: ENC[AES256_GCM,data:eRNatGgoun98ysvSSMINp6vAPL+S6R8npa6ae9fup2BmC2VPcyOl2pP4FBDz6geIgXOT57fggcWPh/Bdb/Ft4ugH78CIa4WHBWl2/jfhtwTWl8sCetJa18EGHqaqzhkvZIX7Ak26pXMCdv817fm0k30ZLlbeyOUU3eexmD7DpTQ=,iv:QnIpctu6M4AvZ44DGcKfxxO6QWKrwiJffK37ze7aW98=,tag:Y3eYu+S9oBmOXF+QDmA+Fw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

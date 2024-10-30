@@ -39,6 +39,7 @@ def patch_base_class(mocker):
 
     return {
         "config": {
+            "property_ids": ["496180525"],
             "property_id": "496180525",
             "credentials": {"auth_type": "Service", "credentials_json": json_credentials},
             "dimensions": ["date", "deviceCategory", "operatingSystem", "browser"],
