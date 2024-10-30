@@ -795,6 +795,14 @@ func translateDataType(meta *mysqlTableMetadata, t sqlparser.ColumnType) any {
 			charset = mysqlDefaultCharset // Finally fall back to UTF-8 if nothing else supersedes that
 		}
 		return &mysqlColumnType{Type: typeName, Charset: charset}
+	case "binary":
+		var columnLength int
+		if t.Length == nil {
+			columnLength = 1 // A type of just 'BINARY' is allowed and is a synonym for 'BINARY(1)'
+		} else if n, err := strconv.Atoi(t.Length.Val); err == nil {
+			columnLength = n // Otherwise if a length is specified we should be able to parse that as an integer and use that
+		}
+		return &mysqlColumnType{Type: typeName, MaxLength: columnLength}
 	default:
 		return typeName
 	}
