@@ -72,10 +72,10 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "mediumtext", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},
 		{ColumnType: "longtext", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},
 
-		// TODO(wgd): The BINARY(n) type has a mild inconsistency in its treatment of trailing null bytes
-		// between backfill and replication.
 		{ColumnType: "binary(5)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78, 0x9A}, ExpectValue: `"EjRWeJo="`},
+		{ColumnType: "binary(8)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0xE2, 0x28, 0xA1, 0x00, 0x00}, ExpectValue: `"4iihAAAAAAA="`},
 		{ColumnType: "varbinary(5)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
+		{ColumnType: "varbinary(8)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0xE2, 0x28, 0xA1, 0x00, 0x00}, ExpectValue: `"4iihAAA="`},
 		{ColumnType: "tinyblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 		{ColumnType: "blob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 		{ColumnType: "mediumblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},

@@ -305,6 +305,10 @@ func (db *mysqlDatabase) translateRecordField(isBackfill bool, columnType interf
 				}
 				return acc, nil
 			case "binary", "varbinary":
+				// Unlike BINARY(N) columns, VARBINARY(N) doesn't play around with adding or removing
+				// trailing null bytes so we don't have to do anything to correct for that here. The
+				// "binary" case here is a fallback for captures whose metadata predates the change
+				// to discover binary columns as a complex type with length property.
 				if len(val) > truncateColumnThreshold {
 					val = val[:truncateColumnThreshold]
 				}
@@ -489,7 +493,7 @@ type mysqlTableDiscoveryDetails struct {
 }
 
 const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name
+  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name, character_maximum_length
   FROM information_schema.columns
   WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
   ORDER BY table_schema, table_name, ordinal_position;`
@@ -507,6 +511,7 @@ func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, 
 		var columnName = string(row[3].AsString())
 		var dataType, fullColumnType = string(row[5].AsString()), string(row[6].AsString())
 		var charsetName = string(row[7].AsString())
+		var maxLength = int(row[8].AsInt64())
 		logrus.WithFields(logrus.Fields{
 			"schema":     tableSchema,
 			"table":      tableName,
@@ -514,6 +519,7 @@ func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, 
 			"dataType":   dataType,
 			"columnType": fullColumnType,
 			"charset":    charsetName,
+			"maxLength":  maxLength,
 		}).Debug("discovered column")
 		columns = append(columns, sqlcapture.ColumnInfo{
 			TableSchema: tableSchema,
@@ -521,13 +527,13 @@ func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, 
 			Index:       int(row[2].AsInt64()),
 			Name:        columnName,
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    parseDataType(dataType, fullColumnType, charsetName),
+			DataType:    parseDataType(dataType, fullColumnType, charsetName, maxLength),
 		})
 	}
 	return columns, err
 }
 
-func parseDataType(typeName, fullColumnType, charset string) any {
+func parseDataType(typeName, fullColumnType, charset string, maxLength int) any {
 	switch typeName {
 	case "enum":
 		// Illegal values are represented internally by MySQL as the integer 0. Adding
@@ -539,6 +545,8 @@ func parseDataType(typeName, fullColumnType, charset string) any {
 		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
 		return &mysqlColumnType{Type: typeName, Charset: charset}
+	case "binary":
+		return &mysqlColumnType{Type: typeName, MaxLength: maxLength}
 	}
 	return typeName
 }
@@ -548,6 +556,7 @@ type mysqlColumnType struct {
 	EnumValues []string `json:"enum,omitempty" mapstructure:"enum"`         // The list of values which an enum (or set) column can contain.
 	Unsigned   bool     `json:"unsigned,omitempty" mapstructure:"unsigned"` // True IFF an integer type is unsigned
 	Charset    string   `json:"charset,omitempty" mapstructure:"charset"`   // The character set of a text column.
+	MaxLength  int      `json:"maxlen,omitempty" mapstructure:"maxlen"`     // The maximum length of a binary column
 }
 
 func (t *mysqlColumnType) String() string {
@@ -556,6 +565,9 @@ func (t *mysqlColumnType) String() string {
 	}
 	if t.Charset != "" && t.Charset != mysqlDefaultCharset {
 		return t.Type + " with charset " + t.Charset
+	}
+	if t.Type == "binary" {
+		return fmt.Sprintf("%s(%d)", t.Type, t.MaxLength)
 	}
 	return t.Type
 }
@@ -628,6 +640,28 @@ func (t *mysqlColumnType) translateRecordField(isBackfill bool, val interface{})
 			return nil, nil
 		}
 		return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
+	case "binary":
+		if str, ok := val.(string); ok {
+			// Binary column values arriving via replication are decoded into a string (which
+			// is not valid UTF-8, it's just an immutable sequence of bytes), so we cast that
+			// back to []byte so we can handle backfill / replication values consistently.
+			val = []byte(str)
+		}
+		if bs, ok := val.([]byte); ok {
+			if len(bs) < t.MaxLength {
+				// Binary column values are stored in the binlog with trailing nulls removed,
+				// and returned from backfill queries with the trailing nulls. We have to either
+				// strip or pad the values to make these match, and since BINARY(N) is a fixed-
+				// length column type the obvious most-correct answer is probably to zero-pad
+				// the replicated values back up to the column size.
+				bs = append(bs, make([]byte, t.MaxLength-len(bs))...)
+			}
+			if len(bs) > truncateColumnThreshold {
+				bs = bs[:truncateColumnThreshold]
+			}
+			return bs, nil
+		}
+		return val, nil
 	}
 	return val, fmt.Errorf("error translating value of complex column type %q", t.Type)
 }
