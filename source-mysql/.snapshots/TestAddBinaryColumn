@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/test_addbinarycolumn_58901622": 6 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddBinaryColumn_58901622","cursor":"backfill:0"}},"id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddBinaryColumn_58901622","cursor":"backfill:1"}},"id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddBinaryColumn_58901622","cursor":"backfill:2"}},"id":3}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddBinaryColumn_58901622","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"AQIDBAUGBwg=","id":4}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddBinaryColumn_58901622","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"AQIDBAAAAAA=","id":5}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"AddBinaryColumn_58901622","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"AQIDAAAAAAA=","id":6}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FAddBinaryColumn_58901622":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"maxlen":8,"type":"binary"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
