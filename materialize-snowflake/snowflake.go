@@ -392,6 +392,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 			mutex.Lock()
 			defer mutex.Unlock()
+			log.WithFields(log.Fields{
+				"query": query,
+			}).Debug("sending Loaded documents from query")
 			for rows.Next() {
 				if err = rows.Scan(&binding, &document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)
