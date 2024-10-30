@@ -1,6 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Result;
+use apache_avro::types::{Record, Value};
 use apache_avro::Schema;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::message::{Header, OwnedHeaders};
@@ -9,7 +10,6 @@ use rdkafka::ClientConfig;
 use schema_registry_converter::async_impl::avro::AvroEncoder;
 use schema_registry_converter::async_impl::schema_registry::SrSettings;
 use schema_registry_converter::schema_registry_common::SubjectNameStrategy;
-use serde::Serialize;
 use serde_json::json;
 
 #[test]
@@ -129,50 +129,7 @@ async fn test_capture_resume() {
     insta::assert_snapshot!(snap);
 }
 
-#[derive(Serialize)]
-struct AvroKey {
-    idx: i32,
-    nested: NestedAvroRecord,
-}
-
-#[derive(Serialize)]
-struct NestedAvroRecord {
-    sub_id: i32,
-}
-
 async fn setup_topics(bootstrap_servers: &str) {
-    let avro_key_schema = json!({
-      "type": "record",
-      "name": "AvroKey",
-      "fields": [
-        {"name": "idx", "type": "int"},
-        {
-          "name": "nested",
-          "type": {
-            "type": "record",
-            "name": "NestedAvroRecord",
-            "fields": [
-              {"name": "sub_id", "type": "int"}
-            ]
-          }
-        }
-      ]
-    });
-
-    let avro_key_schema = Schema::parse(&avro_key_schema).unwrap();
-
-    let http = reqwest::Client::default();
-    assert!(http
-        .post("http://localhost:8081/subjects/test-topic-1-key/versions")
-        .json(&json!({"schema": avro_key_schema.canonical_form()}))
-        .send()
-        .await
-        .unwrap()
-        .status()
-        .is_success());
-
-    let avro_encoder = AvroEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
-
     let admin: AdminClient<_> = ClientConfig::new()
         .set("bootstrap.servers", bootstrap_servers)
         .create()
@@ -205,34 +162,7 @@ async fn setup_topics(bootstrap_servers: &str) {
         .create()
         .unwrap();
 
-    for idx in 0..9 {
-        let topic = "test-topic-1";
-        let key = avro_encoder
-            .encode_struct(
-                AvroKey {
-                    idx,
-                    nested: NestedAvroRecord { sub_id: idx },
-                },
-                &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
-            )
-            .await
-            .unwrap();
-
-        producer
-            .send(
-                FutureRecord::to(topic)
-                    .partition(idx % 3)
-                    .key(&key)
-                    .payload(&json!({"payload": idx}).to_string())
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })),
-                None,
-            )
-            .await
-            .unwrap();
-    }
+    write_avro_test_data("test-topic-1", 9, 3, &producer).await;
 
     for topic in ["test-topic-2", "test-topic-3"] {
         for idx in 0..9 {
@@ -251,5 +181,123 @@ async fn setup_topics(bootstrap_servers: &str) {
                 .await
                 .unwrap();
         }
+    }
+}
+
+async fn write_avro_test_data(topic: &str, n: usize, partitions: i32, producer: &FutureProducer) {
+    let avro_key_raw_schema = json!({
+      "type": "record",
+      "name": "AvroKey",
+      "fields": [
+        {
+          "name": "idx",
+          "type": "int"
+        },
+        {
+          "name": "nested",
+          "type": {
+            "type": "record",
+            "name": "NestedAvroKeyRecord",
+            "fields": [
+              {
+                "name": "sub_id",
+                "type": "int"
+              }
+            ]
+          }
+        }
+      ]
+    });
+
+    let avro_value_raw_schema = json!({
+      "type": "record",
+      "name": "AvroValue",
+      "fields": [
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ]
+    });
+
+    let key_schema = Schema::parse(&avro_key_raw_schema).unwrap();
+    let value_schema = Schema::parse(&avro_value_raw_schema).unwrap();
+
+    let http = reqwest::Client::default();
+    for (topic, suffix, schema) in [(topic, "key", &key_schema), (topic, "value", &value_schema)] {
+        // Try to delete the existing schema if it exists.
+        http.delete(format!(
+            "http://localhost:8081/subjects/{}-{}",
+            topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        http.delete(format!(
+            "http://localhost:8081/subjects/{}-{}?permanent=true",
+            topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        // Register the schema, which must be successful.
+        assert!(http
+            .post(format!(
+                "http://localhost:8081/subjects/{}-{}/versions",
+                topic, suffix
+            ))
+            .json(&json!({"schema": schema.canonical_form()}))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success());
+    }
+
+    let avro_encoder = AvroEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
+
+    for idx in 0..n {
+        let mut key = Record::new(&key_schema).unwrap();
+        let mut value = Record::new(&value_schema).unwrap();
+
+        key.put("idx", Value::Int(idx as i32));
+        key.put(
+            "nested",
+            Value::Record(vec![("sub_id".to_string(), Value::Int(idx as i32))]),
+        );
+        value.put("value", Value::String(format!("value-{}", idx)));
+
+        let key_encoded = avro_encoder
+            .encode_value(
+                key.into(),
+                &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
+            )
+            .await
+            .unwrap();
+
+        let value_encoded = avro_encoder
+            .encode_value(
+                value.into(),
+                &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), false),
+            )
+            .await
+            .unwrap();
+
+        producer
+            .send(
+                FutureRecord::to(topic)
+                    .partition(idx as i32 % partitions)
+                    .key(&key_encoded)
+                    .payload(&value_encoded)
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: "header-key",
+                        value: Some(&format!("header-value-{}", idx)),
+                    })),
+                None,
+            )
+            .await
+            .unwrap();
     }
 }

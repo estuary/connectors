@@ -82,7 +82,7 @@ version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aef82843a0ec9f8b19567445ad2421ceeb1d711514384bdd3d49fe37102ee13"
 dependencies = [
- "bigdecimal 0.4.5",
+ "bigdecimal 0.4.6",
  "digest",
  "libflate",
  "log",
@@ -394,9 +394,9 @@ dependencies = [
 
 [[package]]
 name = "bigdecimal"
-version = "0.4.5"
+version = "0.4.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51d712318a27c7150326677b321a5fa91b55f6d9034ffd67f20319e147d40cee"
+checksum = "8f850665a0385e070b64c38d2354e6c104c8479c59868d1e48a0c13ee2c7a1c1"
 dependencies = [
  "autocfg",
  "libm",
@@ -2507,6 +2507,7 @@ dependencies = [
  "aws-sdk-iam",
  "aws-sigv4",
  "base64 0.22.1",
+ "bigdecimal 0.4.6",
  "doc",
  "futures",
  "hex",
@@ -2522,9 +2523,11 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "time",
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
