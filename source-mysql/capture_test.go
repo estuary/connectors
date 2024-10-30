@@ -436,6 +436,28 @@ func TestAddLegacyTextColumn(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
+func TestAddBinaryColumn(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "58901622"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY)")
+	tb.Insert(ctx, t, table, [][]any{{1}, {2}, {3}})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	cs.Capture(ctx, t, nil)
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN data BINARY(8);", table))
+	tb.Insert(ctx, t, table, [][]any{
+		{4, []byte{1, 2, 3, 4, 5, 6, 7, 8}},
+		{5, []byte{1, 2, 3, 4, 0, 0}},
+		{6, []byte{1, 2, 3, 0, 0, 0, 0, 0}},
+	})
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
 func TestBackfillLegacyTextKey(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var uniqueID = "83451544"
