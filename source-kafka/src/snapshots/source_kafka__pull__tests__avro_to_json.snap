@@ -1,0 +1,45 @@
+---
+source: src/pull.rs
+expression: "avro_to_json(record.into(), &record_schema_parsed).unwrap()"
+---
+{
+  "arrayField": [
+    "first",
+    "second"
+  ],
+  "boolField": true,
+  "bytesField": "aGVsbG8=",
+  "dateField": 123,
+  "decimalField": "-32.442",
+  "doubleField": 340282346638528860000000000000000000000.0,
+  "doubleFieldNaN": "NaN",
+  "doubleFieldNegInf": "-inf",
+  "doubleFieldPosInf": "inf",
+  "durationField": "P6M14DT20H30M",
+  "enumField": "b",
+  "fixedBytesField": "aGVsbG8=",
+  "fixedDecimalField": "99.36",
+  "floatField": 340282346638528860000000000000000000000.0,
+  "floatFieldNaN": "NaN",
+  "floatFieldNegInf": "-inf",
+  "floatFieldPosInf": "inf",
+  "intField": 2147483647,
+  "localTimestampMicrosField": "2024-10-29T20:26:46Z",
+  "localTimestampMillisField": "2024-10-29T20:26:46Z",
+  "longField": 9223372036854775807,
+  "mapField": {
+    "key": "value"
+  },
+  "nestedRecordField": {
+    "nestedLongField": 123,
+    "nestedStringField": "nested string value"
+  },
+  "nullField": null,
+  "nullableStringField": null,
+  "stringField": "hello",
+  "timeMicrosField": "20:30:00.000000",
+  "timeMillisField": "20:30:00.000",
+  "timestampMicrosField": "2024-10-29T20:26:46Z",
+  "timestampMillisField": "2024-10-29T20:26:46Z",
+  "uuidField": "00000000-0000-0000-0000-000000000000"
+}

@@ -3,10 +3,7 @@ use futures::stream::{self, StreamExt};
 use reqwest::Client;
 use schemars::schema::RootSchema;
 use serde::Deserialize;
-use std::{
-    collections::{HashMap, HashSet},
-    u32,
-};
+use std::collections::{HashMap, HashSet};
 
 const TOPIC_KEY_SUFFIX: &str = "-key";
 const TOPIC_VALUE_SUFFIX: &str = "-value";
@@ -35,14 +32,14 @@ struct FetchedLatestVersion {
 
 #[derive(Deserialize, Debug)]
 enum SchemaType {
-    AVRO,
-    JSON,
-    PROTOBUF,
+    Avro,
+    Json,
+    Protobuf,
 }
 
 impl SchemaType {
     fn default() -> Self {
-        SchemaType::AVRO
+        SchemaType::Avro
     }
 }
 
@@ -126,10 +123,10 @@ impl SchemaRegistryClient {
                     };
 
                     if need_key {
-                        schema.key = Some(self.fetch_latest_schema(&topic, true).await?)
+                        schema.key = Some(self.fetch_latest_schema(topic, true).await?)
                     }
                     if need_value {
-                        schema.value = Some(self.fetch_latest_schema(&topic, false).await?)
+                        schema.value = Some(self.fetch_latest_schema(topic, false).await?)
                     }
 
                     Ok::<(String, TopicSchema), anyhow::Error>((topic.to_owned(), schema))
@@ -137,15 +134,15 @@ impl SchemaRegistryClient {
             })
             .collect();
 
-        Ok(stream::iter(schema_futures)
+        stream::iter(schema_futures)
             .buffer_unordered(CONCURRENT_SCHEMA_REQUESTS)
             .collect::<Vec<_>>()
             .await
             .into_iter()
-            .collect::<Result<HashMap<String, TopicSchema>>>()?)
+            .collect::<Result<HashMap<String, TopicSchema>>>()
     }
 
-    async fn fetch_schema(&self, id: u32) -> Result<RegisteredSchema> {
+    pub async fn fetch_schema(&self, id: u32) -> Result<RegisteredSchema> {
         let fetched: FetchedSchema = self
             .http
             .get(format!("{}/schemas/ids/{}", self.endpoint, id))
@@ -156,18 +153,18 @@ impl SchemaRegistryClient {
             .await?;
 
         match fetched.schema_type {
-            SchemaType::AVRO => {
+            SchemaType::Avro => {
                 // TODO(whb): Resolve references.
                 let schema = apache_avro::Schema::parse_str(&fetched.schema)
                     .expect("failed to parse avro schema");
                 Ok(RegisteredSchema::Avro(schema))
             }
-            SchemaType::JSON => {
+            SchemaType::Json => {
                 let schema: RootSchema =
                     serde_json::from_str(&fetched.schema).expect("failed to parse json schema");
                 Ok(RegisteredSchema::Json(schema))
             }
-            SchemaType::PROTOBUF => Ok(RegisteredSchema::Protobuf),
+            SchemaType::Protobuf => Ok(RegisteredSchema::Protobuf),
         }
     }
 
