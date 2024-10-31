@@ -5,13 +5,15 @@
 
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional
+from typing import Any, Dict, Iterable, Mapping, MutableMapping, Optional, List
 from urllib.parse import quote, urlencode
 
 import pendulum
 import requests
+from airbyte_cdk.sources.streams.core import StreamData
 from airbyte_cdk.sources.streams.http import HttpStream
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
+from airbyte_protocol.models import SyncMode
 
 from .utils import get_parent_stream_values, transform_data
 
@@ -115,6 +117,18 @@ class LinkedinAdsStream(HttpStream, ABC):
             )
             self.logger.error(error_message)
         return super().should_retry(response)
+
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: Optional[List[str]] = None,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Optional[Mapping[str, Any]] = None,
+        **kwargs,
+    ) -> Iterable[StreamData]:
+        yield from self._read_pages(
+            lambda req, res, state, _slice: self.parse_response(res, stream_slice=_slice, stream_state=state), stream_slice, stream_state
+        )
 
 
 class OffsetPaginationMixin:
@@ -399,35 +413,61 @@ class Creatives(IncrementalLinkedinAdsStream, ABC):
         return {self.cursor_field: max(latest_record.get(self.cursor_field), int(current_stream_state.get(self.cursor_field)))}
     
 
+    def _fetch_creative_name(self, record: StreamData, stream_state: Mapping[str, Any] = None) -> str | None:
+        # We try to add a creative_name field to each record. LinkedIn does not always
+        # include this data in the /rest/adAccounts/{account_id}/creative endpoint's
+        # response depending on the creative's type. If that's the case, we try to
+        # get the creative name from /rest/post/{encoded_share_urn}.
+
+        creative_name = None
+        # Check if the creative name is already in the in record.
+        # We may need to handle more types of creatives like this beyond just text ads.
+        text_ad_name = record.get('content', {}).get('textAd', {}).get('headline', None)
+        if text_ad_name:
+            creative_name = text_ad_name
+        # Otherwise, we check /rest/post/{encoded_share_urn} for the creative_name.
+        else:
+            share_urn = record.get('content', {}).get('reference', None)
+            if share_urn:
+                url = f"{self.url_base}posts/{quote(share_urn)}"
+                headers = super().request_headers(stream_state)
+                # Get the access token directly from the config or via the Oauth2Authenticator.
+                access_token = self.config.get('credentials', {}).get('access_token', None) or self.config.get('authenticator', None)._access_token
+                headers.update({"Authorization": f"Bearer {access_token}"})
+                try:
+                    response = requests.request(method='GET', url=url, headers=headers)
+                    if response.status_code != 200:
+                        raise RuntimeError(response.text)
+                    dsc_name = response.json().get('adContext', {}).get('dscName', None)
+                    if dsc_name:
+                        creative_name = dsc_name
+                except RuntimeError as err:
+                    # Some creatives won't have names due to LinkedIn's data retention limits. We notify that we couldn't
+                    # retrieve the creative name, and still emit the record.
+                    self.logger.warning(f"Encountered error when fetching creative name for creative {record.get('id')} : {err}")
+
+        return creative_name
+
     def read_records(
-        self, stream_state: Mapping[str, Any] = None, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs
+        self, stream_state: Mapping[str, Any] = None, stream_slice: Optional[Mapping[str, Any]] = None, fetch_additional_fields: bool = True, **kwargs
     ) -> Iterable[Mapping[str, Any]]:
         stream_state = stream_state or {}
         parent_stream = self.parent_stream(config=self.config)
         for record in parent_stream.read_records(**kwargs):
             child_stream_slice = super().read_records(stream_slice=get_parent_stream_values(record, self.parent_values_map), **kwargs)
-            for child_records in child_stream_slice:
-                try:
-                    creative_id = child_records.get('id').split(":")[-1]
-                    url_creative = f"https://api.linkedin.com/v2/adCreativesV2/{creative_id}?projection=(variables(data(*,com.linkedin.ads.SponsoredUpdateCreativeVariables(*,share~(subject,text(text),content(contentEntities(*(description,entityLocation,title))))))))"
-                    headers = super().request_headers(stream_state)
-                    headers.update({"Authorization": f"Bearer {self.config['authenticator']._access_token}"})
-                    response_creative = requests.get(url=url_creative,headers=headers).json()
-                    if response_creative["variables"]["data"].get("com.linkedin.ads.TextAdCreativeVariables"):
-                        child_records["creative_name"] = response_creative["variables"]["data"]["com.linkedin.ads.TextAdCreativeVariables"]["title"]
-                    elif response_creative["variables"]["data"]["com.linkedin.ads.SponsoredUpdateCreativeVariables"]["share~"].get("subject"):
-                        child_records["creative_name"] = response_creative["variables"]["data"]["com.linkedin.ads.SponsoredUpdateCreativeVariables"]["share~"]["subject"]
-                    if stream_state:
-                        if child_records[self.cursor_field] >= stream_state.get(self.cursor_field):
-                            yield child_records
-                        else:
-                            continue
-                    else:
-                        yield child_records
-                except Exception as e:
-                    self.logger.error(f"{e}")
+            for child_record in child_stream_slice:
+
+                # Do not emit records that have a cursor value earlier than the last cursor we've seen.
+                if stream_state and child_record[self.cursor_field] < stream_state.get(self.cursor_field):
                     continue
 
+                if fetch_additional_fields:
+                    creative_name = self._fetch_creative_name(record=child_record, stream_state=stream_state)
+
+                    if creative_name:
+                        child_record["creative_name"] = creative_name
+
+                yield child_record
 
 
 class Conversions(OffsetPaginationMixin, LinkedInAdsStreamSlicing):
