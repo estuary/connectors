@@ -6,14 +6,15 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any, Iterable, List, Mapping, MutableMapping, Optional
 from urllib.parse import urlencode
+from datetime import datetime, UTC, timedelta
 
 import pendulum
 import requests
-from airbyte_cdk.sources.streams.core import package_name_from_class
+from airbyte_cdk.sources.streams.core import package_name_from_class, IncrementalMixin
 from airbyte_cdk.sources.utils import casing
 from airbyte_cdk.sources.utils.schema_helpers import ResourceSchemaLoader
 from airbyte_protocol.models import SyncMode
-from source_linkedin_ads_v2.streams import Campaigns, Creatives, IncrementalLinkedinAdsStream
+from source_linkedin_ads_v2.streams import Campaigns, Creatives, LinkedinAdsStream
 
 from .utils import get_parent_stream_values, transform_data
 
@@ -119,7 +120,7 @@ ANALYTICS_FIELDS_V2: List = [
 ]
 
 
-class LinkedInAdsAnalyticsStream(IncrementalLinkedinAdsStream, ABC):
+class LinkedInAdsAnalyticsStream(LinkedinAdsStream, IncrementalMixin, ABC):
     """
     AdAnalytics Streams more info:
     https://learn.microsoft.com/en-us/linkedin/marketing/integrations/ads-reporting/ads-reporting?tabs=curl&view=li-lms-2023-05#analytics-finder
@@ -128,9 +129,38 @@ class LinkedInAdsAnalyticsStream(IncrementalLinkedinAdsStream, ABC):
     endpoint = "adAnalytics"
     # For Analytics streams, the primary_key is the entity of the pivot [Campaign URN, Creative URN, etc.] + `end_date`
     primary_key = ["string_of_pivot_values", "end_date"]
-    cursor_field = "end_date"
     records_limit = 15000
     FIELDS_CHUNK_SIZE = 18
+
+    _cursor_value = ""
+
+    @property
+    def cursor_field(self) -> str:
+        """Name of the field associated with the state"""
+        return "end_date"
+
+    @property
+    def state(self) -> Mapping[str, Any]:
+        return {self.cursor_field: self._cursor_value}
+
+    @state.setter
+    def state(self, value: Mapping[str, Any]):
+        self._cursor_value = value[self.cursor_field]
+
+    @property
+    def primary_slice_key(self) -> str:
+        """
+        Define the main slice_key from `slice_key_value_map`. Always the first element.
+        EXAMPLE:
+            in : {"k1": "v1", "k2": "v2", ...}
+            out : "k1"
+        """
+        return list(self.parent_values_map.keys())[0]
+
+    @property
+    @abstractmethod
+    def parent_stream(self) -> LinkedinAdsStream:
+        """Defines the parent stream for slicing, the class object should be provided."""
 
     def get_json_schema(self) -> Mapping[str, Any]:
         schema = ResourceSchemaLoader(package_name_from_class(self.__class__)).get_schema("ad_analytics")
@@ -270,15 +300,41 @@ class LinkedInAdsAnalyticsStream(IncrementalLinkedinAdsStream, ABC):
         }
         """
         parent_stream = self.parent_stream(config=self.config)
-        stream_state = stream_state or {self.cursor_field: self.config.get("start_date")}
-        for record in parent_stream.read_records(sync_mode=sync_mode):
-            base_slice = get_parent_stream_values(record, self.parent_values_map)
-            for date_slice in self.get_date_slices(stream_state.get(self.cursor_field), self.config.get("end_date")):
-                date_slice_with_fields: List = []
-                for fields_set in self.chunk_analytics_fields():
-                    base_slice["fields"] = ",".join(fields_set)
-                    date_slice_with_fields.append(base_slice | date_slice)
-                yield {"field_date_chunks": date_slice_with_fields}
+
+        stream_state = {
+            self.cursor_field: self.state.get(self.cursor_field, None) or self.config.get('start_date')
+        }
+
+        base_slices = []
+        for record in parent_stream.read_records(sync_mode=sync_mode, fetch_additional_fields=False):
+            base_slices.append(get_parent_stream_values(record, self.parent_values_map))
+
+        date_slices = []
+        for date_slice in self.get_date_slices(stream_state.get(self.cursor_field), self.config.get("end_date")):
+            date_slices.append(date_slice)
+
+        for date_slice in date_slices:
+            for base_slice in base_slices:
+                base_with_date_and_fields_slices = []
+                for field_set in self.chunk_analytics_fields():
+                    base_slice["fields"] = ",".join(field_set)
+                    base_with_date_and_fields_slices.append(base_slice | date_slice)
+                yield {"field_date_chunks": base_with_date_and_fields_slices}
+
+            # After reading an entire date slice, we update state to the next start date for the next date slice.
+            last_end_dt = datetime(
+                year = date_slice.get('dateRange').get('end.year'),
+                month = date_slice.get('dateRange').get('end.month'),
+                day = date_slice.get('dateRange').get('end.day'),
+                tzinfo=UTC
+            )
+
+            # Move the current datetime back 2 hours to catch the final metrics for the previous day.
+            current_dt = datetime.now(tz=UTC) - timedelta(hours=2)
+
+            new_cursor = min(last_end_dt, current_dt).strftime('%Y-%m-%d')
+            self.logger.info(f'Updating cursor to {new_cursor}.')
+            self.state = {self.cursor_field: new_cursor}
 
     @staticmethod
     def get_date_slices(start_date: str, end_date: str = None, window_in_days: int = WINDOW_IN_DAYS) -> Iterable[Mapping[str, Any]]:
