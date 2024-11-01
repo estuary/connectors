@@ -76,7 +76,7 @@ func TestValidateAndApply(t *testing.T) {
 		cfg,
 		resourceConfig,
 		func(t *testing.T) string {
-			is, err := catalog.infoSchema()
+			is, err := catalog.infoSchema(ctx)
 			require.NoError(t, err)
 
 			fields, err := is.FieldsForResource(resourceConfig.path())
