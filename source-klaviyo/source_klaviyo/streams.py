@@ -154,6 +154,10 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
         :return str: The name of the cursor field.
         """
 
+    # comparison_operator is used to filter what results we receive from Klaviyo. Some endpoints support "greater-or-equal" (preferred)
+    # and others only support "greater-than". comparison_operator must be specified for each incremental stream.
+    comparison_operator: str = "greater-or-equal"
+
     def request_params(
         self,
         stream_state: Optional[Mapping[str, Any]],
@@ -172,11 +176,17 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
                 latest_cursor = pendulum.parse(latest_cursor)
                 if stream_state_cursor_value:
                     latest_cursor = max(latest_cursor, pendulum.parse(stream_state_cursor_value))
+
+                    # For streams that can only filter with a "greater-than" comparison, we subtract
+                    # one second so we do not miss records updated in the same second.
+                    if self.comparison_operator == 'greater-than':
+                        latest_cursor = latest_cursor.subtract(seconds=1)
+
                 # Klaviyo API will throw an error if the request filter is set too close to the current time.
                 # Setting a minimum value of at least 3 seconds from the current time ensures this will never happen,
                 # and allows our 'abnormal_state' acceptance test to pass.
                 latest_cursor = min(latest_cursor, pendulum.now().subtract(seconds=3))
-                params["filter"] = f"greater-or-equal({self.cursor_field},{latest_cursor.isoformat()})"
+                params["filter"] = f"{self.comparison_operator}({self.cursor_field},{latest_cursor.isoformat()})"
             params["sort"] = self.cursor_field
         return params
 
@@ -279,6 +289,7 @@ class Profiles(IncrementalKlaviyoStream):
     transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
 
     cursor_field = "updated"
+    comparison_operator = 'greater-than'
     api_revision = "2023-02-22"
     page_size = 100
     state_checkpoint_interval = 100  # API can return maximum 100 records per page
