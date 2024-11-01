@@ -226,7 +226,7 @@ func (e *ParquetEncoder) Encode(row []any) error {
 	if e.scratch.writer == nil {
 		// Either the very first row, or the first one after flushing the scratch file.
 		if e.scratch.file, err = os.CreateTemp("", "parquet-scratch-*"); err != nil {
-			return fmt.Errorf("encode creating scratch file: %W", err)
+			return fmt.Errorf("encode creating scratch file: %w", err)
 		}
 		e.scratch.writer = file.NewParquetWriter(e.scratch.file, e.schemaRoot)
 	}
@@ -238,7 +238,7 @@ func (e *ParquetEncoder) Encode(row []any) error {
 	if e.bufferSizeBytes >= maxBufferSize {
 		// Write out the buffer as a single row group to the scratch file.
 		if err := e.flushBuffer(); err != nil {
-			return fmt.Errorf("encode flushing buffer based on buffer size: %W", err)
+			return fmt.Errorf("encode flushing buffer based on buffer size: %w", err)
 		}
 	}
 
@@ -329,50 +329,50 @@ func (e *ParquetEncoder) flushBuffer() error {
 		switch f.DataType {
 		case PrimitiveTypeInteger:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getIntVal); err != nil {
-				return fmt.Errorf("writing integer column: %w", err)
+				return fmt.Errorf("writing integer column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeNumber:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.Float64ColumnChunkWriter), getNumberVal); err != nil {
-				return fmt.Errorf("writing number column: %w", err)
+				return fmt.Errorf("writing number column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBoolean:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.BooleanColumnChunkWriter), getBooleanVal); err != nil {
-				return fmt.Errorf("writing boolean column: %w", err)
+				return fmt.Errorf("writing boolean column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBinary:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getBinaryVal); err != nil {
-				return fmt.Errorf("writing byte array column: %w", err)
+				return fmt.Errorf("writing byte array column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeJson:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getJsonVal); err != nil {
-				return fmt.Errorf("writing byte array (json) column: %w", err)
+				return fmt.Errorf("writing byte array (json) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeString:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getStringVal); err != nil {
-				return fmt.Errorf("writing byte array (string) column: %w", err)
+				return fmt.Errorf("writing byte array (string) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeUuid:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getUuidVal); err != nil {
-				return fmt.Errorf("writing uuid column: %w", err)
+				return fmt.Errorf("writing uuid column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDate:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int32ColumnChunkWriter), getDateVal); err != nil {
-				return fmt.Errorf("writing date column: %w", err)
+				return fmt.Errorf("writing date column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTime:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getTimeVal); err != nil {
-				return fmt.Errorf("writing time column: %w", err)
+				return fmt.Errorf("writing time column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTimestamp:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
-				return fmt.Errorf("writing timestamp column: %w", err)
+				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeInterval:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getIntervalVal); err != nil {
-				return fmt.Errorf("writing interval column: %w", err)
+				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
 			}
 		default:
-			panic(fmt.Sprintf("attempted to encode unknown type: %d", f.DataType))
+			panic(fmt.Sprintf("attempted to encode unknown type of column '%s': %d", f.Name, f.DataType))
 		}
 
 		if err := cw.Close(); err != nil {
