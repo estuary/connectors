@@ -29,7 +29,7 @@ func newCatalog(cfg config, resourcePaths [][]string, lastSpec *pf.Materializati
 	}
 }
 
-func (c *catalog) infoSchema() (*boilerplate.InfoSchema, error) {
+func (c *catalog) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error) {
 	is := boilerplate.NewInfoSchema(
 		func(rp []string) []string { return rp },
 		func(f string) string { return f },
@@ -45,7 +45,7 @@ func (c *catalog) infoSchema() (*boilerplate.InfoSchema, error) {
 		return nil, fmt.Errorf("marshaling paths: %w", err)
 	}
 
-	b, err := runIcebergctl(c.cfg, "info-schema", string(pathsJson))
+	b, err := runIcebergctl(ctx, c.cfg, "info-schema", string(pathsJson))
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (c *catalog) infoSchema() (*boilerplate.InfoSchema, error) {
 
 // Table paths returns the registered storage path for each resource path in a
 // list having the order corresponding to the input list of resource paths.
-func (c *catalog) tablePaths(resourcePaths [][]string) ([]string, error) {
+func (c *catalog) tablePaths(ctx context.Context, resourcePaths [][]string) ([]string, error) {
 	tableNames := make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
 		tableNames = append(tableNames, pathToFQN(p))
@@ -86,7 +86,7 @@ func (c *catalog) tablePaths(resourcePaths [][]string) ([]string, error) {
 		return nil, err
 	}
 
-	b, err := runIcebergctl(c.cfg, "table-paths", string(tableNamesJson))
+	b, err := runIcebergctl(ctx, c.cfg, "table-paths", string(tableNamesJson))
 	if err != nil {
 		return nil, err
 	}
@@ -104,10 +104,10 @@ func (c *catalog) tablePaths(resourcePaths [][]string) ([]string, error) {
 	return out, nil
 }
 
-func (c *catalog) listNamespaces() ([]string, error) {
+func (c *catalog) listNamespaces(ctx context.Context) ([]string, error) {
 	var got []string
 
-	if b, err := runIcebergctl(c.cfg, "list-namespaces"); err != nil {
+	if b, err := runIcebergctl(ctx, c.cfg, "list-namespaces"); err != nil {
 		return nil, err
 	} else if err := json.Unmarshal(b, &got); err != nil {
 		return nil, err
@@ -116,12 +116,12 @@ func (c *catalog) listNamespaces() ([]string, error) {
 	return got, nil
 }
 
-func (c *catalog) createNamespace(namespace string) error {
-	_, err := runIcebergctl(c.cfg, "create-namespace", namespace)
+func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
+	_, err := runIcebergctl(ctx, c.cfg, "create-namespace", namespace)
 	return err
 }
 
-func (c *catalog) CreateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
 	b := spec.Bindings[bindingIndex]
 
 	tc := tableCreate{Location: tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1])}
@@ -146,8 +146,8 @@ func (c *catalog) CreateResource(_ context.Context, spec *pf.MaterializationSpec
 
 	fqn := pathToFQN(b.ResourcePath)
 
-	return fmt.Sprintf("create table %q", fqn), func(_ context.Context) error {
-		if _, err := runIcebergctl(c.cfg, "create-table", fqn, string(input)); err != nil {
+	return fmt.Sprintf("create table %q", fqn), func(ctx context.Context) error {
+		if _, err := runIcebergctl(ctx, c.cfg, "create-table", fqn, string(input)); err != nil {
 			return fmt.Errorf("creating table %q: %w", fqn, err)
 		}
 
@@ -155,11 +155,11 @@ func (c *catalog) CreateResource(_ context.Context, spec *pf.MaterializationSpec
 	}, nil
 }
 
-func (c *catalog) DeleteResource(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
 	fqn := pathToFQN(path)
 
-	return fmt.Sprintf("drop table %q", fqn), func(_ context.Context) error {
-		if _, err := runIcebergctl(c.cfg, "drop-table", fqn); err != nil {
+	return fmt.Sprintf("drop table %q", fqn), func(ctx context.Context) error {
+		if _, err := runIcebergctl(ctx, c.cfg, "drop-table", fqn); err != nil {
 			return fmt.Errorf("dropping table %q: %w", fqn, err)
 		}
 
@@ -202,8 +202,8 @@ func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec
 
 	fqn := pathToFQN(b.ResourcePath)
 
-	return fmt.Sprintf("alter table %q", fqn), func(_ context.Context) error {
-		if _, err := runIcebergctl(c.cfg, "alter-table", fqn, string(input)); err != nil {
+	return fmt.Sprintf("alter table %q", fqn), func(ctx context.Context) error {
+		if _, err := runIcebergctl(ctx, c.cfg, "alter-table", fqn, string(input)); err != nil {
 			return fmt.Errorf("altering table %q: %w", fqn, err)
 		}
 
@@ -212,6 +212,7 @@ func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec
 }
 
 func (c *catalog) appendFiles(
+	ctx context.Context,
 	materialization string,
 	tablePath []string,
 	filePaths []string,
@@ -221,6 +222,7 @@ func (c *catalog) appendFiles(
 	fqn := pathToFQN(tablePath)
 
 	b, err := runIcebergctl(
+		ctx,
 		c.cfg,
 		"append-files",
 		materialization,

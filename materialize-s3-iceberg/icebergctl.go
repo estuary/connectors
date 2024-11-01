@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -40,8 +41,8 @@ type tableAlter struct {
 
 // Run a command with iceberg-ctl. The config is required for every command other than
 // `print-config-schema`, currently.
-func runIcebergctl(cfg *config, args ...string) ([]byte, error) {
-	cmd := exec.Command(pythonPath, append([]string{"iceberg-ctl/iceberg_ctl"}, args...)...)
+func runIcebergctl(ctx context.Context, cfg *config, args ...string) ([]byte, error) {
+	cmd := exec.CommandContext(ctx, pythonPath, append([]string{"iceberg-ctl/iceberg_ctl"}, args...)...)
 
 	if cfg != nil {
 		configJson, err := json.Marshal(cfg)

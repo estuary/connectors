@@ -168,7 +168,7 @@ func (r resource) Validate() error {
 type driver struct{}
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := runIcebergctl(nil, "print-config-schema")
+	endpointSchema, err := runIcebergctl(ctx, nil, "print-config-schema")
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -258,7 +258,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 
 	catalog := newCatalog(cfg, resourcePaths, req.LastMaterialization)
 
-	is, err := catalog.infoSchema()
+	is, err := catalog.infoSchema(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -306,7 +306,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 
 	catalog := newCatalog(cfg, resourcePaths, req.LastMaterialization)
 
-	existingNamespaces, err := catalog.listNamespaces()
+	existingNamespaces, err := catalog.listNamespaces(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -318,14 +318,14 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 
 	for r := range requiredNamespaces {
 		if !slices.Contains(existingNamespaces, r) {
-			if err := catalog.createNamespace(r); err != nil {
+			if err := catalog.createNamespace(ctx, r); err != nil {
 				return nil, fmt.Errorf("catalog creating namespace '%s': %w", r, err)
 			}
 			log.WithField("namespace", r).Info("created namespace")
 		}
 	}
 
-	is, err := catalog.infoSchema()
+	is, err := catalog.infoSchema(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -362,7 +362,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 	}
 
 	catalog := newCatalog(cfg, resourcePaths, open.Materialization)
-	tablePaths, err := catalog.tablePaths(resourcePaths)
+	tablePaths, err := catalog.tablePaths(ctx, resourcePaths)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("looking up table paths: %w", err)
 	}
