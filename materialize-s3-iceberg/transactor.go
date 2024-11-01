@@ -8,6 +8,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/filesink"
@@ -260,7 +261,9 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		})
 
 		ll.Info("starting appendFiles for table")
-		if err := t.catalog.appendFiles(t.materialization, b.path, bindingState.FileKeys, bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint); err != nil {
+		appendCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
+		defer cancel()
+		if err := t.catalog.appendFiles(appendCtx, t.materialization, b.path, bindingState.FileKeys, bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint); err != nil {
 			return nil, fmt.Errorf("appendFiles for %s: %w", b.path, err)
 		}
 		ll.Info("finished appendFiles for table")
