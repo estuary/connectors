@@ -143,6 +143,12 @@
             "title": "Job Trigger Mode",
             "description": "Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.",
             "default": "skip"
+          },
+          "interval": {
+            "type": "string",
+            "title": "Run Interval",
+            "description": "How frequently should the DBT job run? This interval is only triggered if data has been materialized by your task",
+            "default": "30m"
           }
         },
         "additionalProperties": false,
