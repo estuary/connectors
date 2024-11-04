@@ -33,6 +33,7 @@ WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
 COPY --from=builder /builder/connector ./materialize-postgres
+COPY --from=gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.0 /cloud-sql-proxy /usr/bin/cloud-sql-proxy
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.

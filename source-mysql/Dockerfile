@@ -37,6 +37,7 @@ COPY --from=busybox:latest /bin/sh /bin/sh
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
+COPY --from=gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.14.0 /cloud-sql-proxy /usr/bin/cloud-sql-proxy
 COPY --from=builder /builder/connector ./source-mysql
 
 # Avoid running the connector as root.

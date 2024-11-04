@@ -36,10 +36,6 @@ func TestMySQLConfig(t *testing.T) {
 	noUser.User = ""
 	require.Error(t, noUser.Validate(), "expected validation error")
 
-	var noPass = validConfig
-	noPass.Password = ""
-	require.Error(t, noPass.Validate(), "expected validation error")
-
 	var noDatabase = validConfig
 	noDatabase.Database = ""
 	require.Error(t, noDatabase.Validate(), "expected validation error")

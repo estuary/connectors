@@ -165,6 +165,29 @@
               "privateKey"
             ],
             "title": "SSH Forwarding"
+          },
+          "cloud_sql_proxy": {
+            "properties": {
+              "instance_connection_name": {
+                "type": "string",
+                "title": "Instance Connection Name",
+                "description": "In the format of PROJECT:REGION:INSTANCE."
+              },
+              "credentials": {
+                "type": "string",
+                "title": "Service Account Credentials",
+                "description": "Credentials JSON file of a service account with access to the instance.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "instance_connection_name",
+              "credentials"
+            ],
+            "title": "Cloud SQL Proxy"
           }
         },
         "additionalProperties": false,
@@ -177,7 +200,6 @@
     "required": [
       "address",
       "user",
-      "password",
       "database"
     ],
     "title": "SQL Connection"

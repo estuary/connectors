@@ -44,8 +44,14 @@ type sshForwarding struct {
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
 }
 
+type cloudSQLProxy struct {
+	InstanceConnectionName string `json:"instance_connection_name" jsonschema:"title=Instance Connection Name,description=In the format of PROJECT:REGION:INSTANCE."`
+	Credentials            string `json:"credentials" jsonschema:"title=Service Account Credentials,description=Credentials JSON file of a service account with access to the instance." jsonschema_extras:"secret=true,multiline=true"`
+}
+
 type tunnelConfig struct {
 	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
+	CloudSQLProxy *cloudSQLProxy `json:"cloud_sql_proxy,omitempty" jsonschema:"title=Cloud SQL Proxy"`
 }
 
 // config represents the endpoint configuration for postgres.
@@ -197,6 +203,19 @@ func newPostgresDriver() *sql.Driver {
 					ForwardHost: host,
 					ForwardPort: port,
 					LocalPort:   "5432",
+				}
+				var tunnel = sshConfig.CreateTunnel()
+
+				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+				if err := tunnel.Start(); err != nil {
+					return err
+				}
+			} else if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.CloudSQLProxy != nil && cfg.NetworkTunnel.CloudSQLProxy.InstanceConnectionName != "" {
+				var sshConfig = &networkTunnel.CloudSQLProxyConfig{
+					InstanceConnectionName: cfg.NetworkTunnel.CloudSQLProxy.InstanceConnectionName,
+					Credentials:            []byte(cfg.NetworkTunnel.CloudSQLProxy.Credentials),
+					Port:                   "5432",
 				}
 				var tunnel = sshConfig.CreateTunnel()
 
