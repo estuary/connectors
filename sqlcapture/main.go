@@ -309,9 +309,6 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	// scoped.
 	var hackyCursorReplacements = map[string]map[string]string{
 		"TASKHASH415b69936fe1324600d67943e50235fc57fb7e0196b8f5f0TASKHASH": {"binlog.000123:456789": "binlog.000123:456789"}, // Example
-
-		// Added 2024-11-04
-		"f976b2fd842a663be34d55f54bf0cabd9d85c4abf62d37345dc082b37ddd1d78": {"bin.062538:2559773736": "bin.062537:590483005"},
 	}
 	var hasher = sha256.New()
 	hasher.Write([]byte(open.Capture.Name))
