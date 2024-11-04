@@ -21,8 +21,9 @@ use proto_flow::{
 };
 use rdkafka::{
     consumer::{Consumer, StreamConsumer},
+    message::Headers,
     metadata::MetadataPartition,
-    Message, Offset, TopicPartitionList,
+    Message, Offset, Timestamp, TopicPartitionList,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map};
@@ -54,6 +55,23 @@ struct ResourceState {
 struct BindingInfo {
     binding_index: u32,
     state_key: String,
+}
+
+#[derive(Serialize, Deserialize, Default)]
+struct Meta {
+    topic: String,
+    partition: i32,
+    offset: i64,
+    op: String,
+    headers: Option<serde_json::Map<String, serde_json::Value>>,
+    timestamp: Option<MetaTimestamp>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+enum MetaTimestamp {
+    CreationTime(String),
+    LogAppendTime(String),
 }
 
 pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
@@ -97,16 +115,44 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
             }
         };
 
+        let mut meta = Meta {
+            topic: msg.topic().to_string(),
+            partition: msg.partition(),
+            offset: msg.offset(),
+            op: op.to_string(),
+            ..Default::default()
+        };
+
+        if let Some(headers) = msg.headers() {
+            meta.headers = Some(
+                headers
+                    .iter()
+                    .map(|h| {
+                        let value = match h.value {
+                            Some(v) => match std::str::from_utf8(v) {
+                                Ok(v) => json!(v),
+                                Err(_) => json!(base64.encode(v)),
+                            },
+                            None => json!(null),
+                        };
+                        (h.key.to_string(), value)
+                    })
+                    .collect(),
+            )
+        }
+
+        meta.timestamp = match msg.timestamp() {
+            Timestamp::NotAvailable => None,
+            Timestamp::CreateTime(ts) => {
+                Some(MetaTimestamp::CreationTime(unix_millis_to_rfc3339(ts)?))
+            }
+            Timestamp::LogAppendTime(ts) => {
+                Some(MetaTimestamp::LogAppendTime(unix_millis_to_rfc3339(ts)?))
+            }
+        };
+
         let captured = doc.as_object_mut().unwrap();
-        captured.insert(
-            "_meta".to_string(),
-            json!({
-                "topic": msg.topic(),
-                "partition": msg.partition(),
-                "offset": msg.offset(),
-                "op": op,
-            }),
-        );
+        captured.insert("_meta".to_string(), serde_json::to_value(meta).unwrap());
 
         if let Some(key_bytes) = msg.key() {
             let mut key_parsed =
@@ -153,6 +199,11 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
         )
         .await?;
     }
+}
+
+fn unix_millis_to_rfc3339(millis: i64) -> Result<String> {
+    let time = OffsetDateTime::UNIX_EPOCH + time::Duration::milliseconds(millis);
+    Ok(time.format(&format_description::well_known::Rfc3339)?)
 }
 
 async fn setup_consumer(

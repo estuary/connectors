@@ -11,6 +11,14 @@ expression: snap
             "description": "The offset of the message within the partition",
             "type": "integer"
           },
+          "op": {
+            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+            "enum": [
+              "c",
+              "u",
+              "d"
+            ]
+          },
           "partition": {
             "description": "The partition the message was read from",
             "type": "integer"
@@ -22,7 +30,9 @@ expression: snap
         },
         "required": [
           "offset",
-          "partition"
+          "op",
+          "partition",
+          "topic"
         ],
         "type": "object"
       },
@@ -70,6 +80,14 @@ expression: snap
             "description": "The offset of the message within the partition",
             "type": "integer"
           },
+          "op": {
+            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+            "enum": [
+              "c",
+              "u",
+              "d"
+            ]
+          },
           "partition": {
             "description": "The partition the message was read from",
             "type": "integer"
@@ -81,7 +99,9 @@ expression: snap
         },
         "required": [
           "offset",
-          "partition"
+          "op",
+          "partition",
+          "topic"
         ],
         "type": "object"
       },
@@ -130,6 +150,14 @@ expression: snap
             "description": "The offset of the message within the partition",
             "type": "integer"
           },
+          "op": {
+            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+            "enum": [
+              "c",
+              "u",
+              "d"
+            ]
+          },
           "partition": {
             "description": "The partition the message was read from",
             "type": "integer"
@@ -141,7 +169,9 @@ expression: snap
         },
         "required": [
           "offset",
-          "partition"
+          "op",
+          "partition",
+          "topic"
         ],
         "type": "object"
       }

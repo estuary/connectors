@@ -112,9 +112,13 @@ fn topic_schema_to_collection_spec(
                     "offset": {
                         "description": "The offset of the message within the partition",
                         "type": "integer",
+                    },
+                    "op": {
+                        "enum": ["c", "u", "d"],
+                        "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
                     }
                 },
-                "required": ["offset", "partition"]
+                "required": ["offset", "op", "partition", "topic"]
             }
         },
         "required": ["_meta"]
