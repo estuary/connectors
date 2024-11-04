@@ -6,7 +6,7 @@ use doc::{
     shape::{schema::to_schema, ObjProperty},
     Shape,
 };
-use json::schema as JsonSchema;
+use json::schema::{self as JsonSchema, types};
 use proto_flow::capture::{request::Discover, response::discovered};
 use rdkafka::consumer::Consumer;
 use schemars::schema::RootSchema;
@@ -15,7 +15,7 @@ use serde_json::json;
 use crate::{
     configuration::{EndpointConfig, Resource},
     schema_registry::{
-        RegisteredSchema::Avro, RegisteredSchema::Json, RegisteredSchema::Protobuf,
+        RegisteredSchema::{Avro, Json, Protobuf},
         SchemaRegistryClient, TopicSchema,
     },
     KAFKA_TIMEOUT,
@@ -52,7 +52,7 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
         None => HashMap::new(),
     };
 
-    Ok(all_topics
+    all_topics
         .into_iter()
         .filter_map(|topic| {
             let registered_schema = match registered_schemas.get(&topic) {
@@ -60,18 +60,21 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
                 None => &TopicSchema::default(),
             };
 
-            match (&registered_schema.key, &registered_schema.value) {
-                (None, None) => (),
-                (Some(Avro(_)), Some(Avro(_))) => (),
-                (None, Some(Avro(_))) => (),
-                (Some(Avro(_)), None) => (),
-                // TODO(whb): Support JSON and Protobuf.
-                _ => return None,
-            };
+            if matches!(&registered_schema.key, Some(Protobuf))
+                || matches!(&registered_schema.value, Some(Protobuf))
+            {
+                // TODO(whb): At some point we may want to support protobuf
+                // schemas.
+                return None;
+            }
 
-            let (collection_schema, key_ptrs) = topic_schema_to_collection_spec(registered_schema);
+            let (collection_schema, key_ptrs) =
+                match topic_schema_to_collection_spec(registered_schema) {
+                    Ok(s) => s,
+                    Err(e) => return Some(Err(e)),
+                };
 
-            Some(discovered::Binding {
+            Some(Ok(discovered::Binding {
                 recommended_name: topic.to_owned(),
                 resource_config_json: serde_json::to_string(&Resource {
                     topic: topic.to_owned(),
@@ -82,12 +85,14 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
                 key: key_ptrs,
                 resource_path: vec![topic.to_owned()],
                 ..Default::default()
-            })
+            }))
         })
-        .collect())
+        .collect::<Result<Vec<_>>>()
 }
 
-fn topic_schema_to_collection_spec(topic_schema: &TopicSchema) -> (RootSchema, Vec<String>) {
+fn topic_schema_to_collection_spec(
+    topic_schema: &TopicSchema,
+) -> Result<(RootSchema, Vec<String>)> {
     let mut collection_key = vec!["/_meta/partition".to_string(), "/_meta/offset".to_string()];
     let doc_schema_json = json!({
         "x-infer-schema": true,
@@ -117,13 +122,15 @@ fn topic_schema_to_collection_spec(topic_schema: &TopicSchema) -> (RootSchema, V
 
     let mut collection_schema: RootSchema = serde_json::from_value(doc_schema_json).unwrap();
 
-    if let Some(mut key_shape) = match &topic_schema.key {
-        Some(Avro(schema)) => avro_key_schema_to_shape(schema),
-        Some(Json(_)) => todo!(),
-        Some(Protobuf) => todo!(),
-        None => None,
-    } {
-        if !key_shape.type_.overlaps(JsonSchema::types::OBJECT) {
+    let mut key_shape = match &topic_schema.key {
+        Some(Avro(schema)) => avro_key_schema_to_shape(schema)?,
+        Some(Json(schema)) => json_key_schema_to_shape(schema)?,
+        Some(Protobuf) => todo!("protobuf schemas are not yet supported"),
+        None => Shape::nothing(),
+    };
+
+    if usable_key_shape(&key_shape) {
+        if key_shape.type_ != JsonSchema::types::OBJECT {
             // The topic key is a single value not part of a record, and
             // that cannot be represented as a JSON document. There has
             // to be a key/value pair in the document, so transmute this
@@ -161,10 +168,10 @@ fn topic_schema_to_collection_spec(topic_schema: &TopicSchema) -> (RootSchema, V
             .append(&mut key_schema.schema.object().required);
     }
 
-    (collection_schema, collection_key)
+    Ok((collection_schema, collection_key))
 }
 
-fn avro_key_schema_to_shape(schema: &AvroSchema) -> Option<Shape> {
+fn avro_key_schema_to_shape(schema: &AvroSchema) -> Result<Shape> {
     let mut shape = Shape::nothing();
 
     shape.type_ = match schema {
@@ -224,46 +231,66 @@ fn avro_key_schema_to_shape(schema: &AvroSchema) -> Option<Shape> {
                     if let Some(doc) = &field.doc {
                         field_shape.description = Some(doc.to_string().into());
                     }
-
                     if let Some(default) = &field.default {
                         field_shape.default = Some((default.to_owned(), None).into());
                     }
 
-                    Some(ObjProperty {
+                    Ok(ObjProperty {
                         name: field.name.clone().into(),
                         is_required: field.default.is_none(),
                         shape: field_shape,
                     })
                 })
-                .collect::<Option<Vec<_>>>()?;
+                .collect::<Result<Vec<_>>>()?;
             JsonSchema::types::OBJECT
         }
 
         // Schemas that allow 'null' are not schematized as keys since
         // nullable keys are not very useful in practice.
-        AvroSchema::Null => return None,
+        AvroSchema::Null => JsonSchema::types::INVALID,
 
         // Similarly, schemas with multiple types or a single type with an
         // additional explicit 'null' are not very useful in practice,
         // although technically allowed by Flow, so they won't be
         // schematized.
-        AvroSchema::Union(_) => return None,
+        AvroSchema::Union(_) => JsonSchema::types::INVALID,
 
         // We could perhaps treat floating points as string-encoded numbers,
         // but if that's what they were then they should probably specified
         // as decimals. And this is more consistent with what is achievable
         // with JSON schemas.
-        AvroSchema::Float => return None,
-        AvroSchema::Double => return None,
+        AvroSchema::Float => JsonSchema::types::INVALID,
+        AvroSchema::Double => JsonSchema::types::INVALID,
 
         // Arrays and maps just don't make any sense as key schemas.
-        AvroSchema::Array(_) => return None,
-        AvroSchema::Map(_) => return None,
+        AvroSchema::Array(_) => JsonSchema::types::INVALID,
+        AvroSchema::Map(_) => JsonSchema::types::INVALID,
 
-        AvroSchema::Ref { name } => panic!("key schema contains ref {}", name),
+        AvroSchema::Ref { name } => anyhow::bail!("Avro key schema contains reference {}", name),
     };
 
-    Some(shape)
+    Ok(shape)
+}
+
+fn json_key_schema_to_shape(schema: &serde_json::Value) -> Result<Shape> {
+    let json_schema = doc::validation::build_bundle(&schema.to_string())?;
+    let validator = doc::Validator::new(json_schema)?;
+    Ok(doc::Shape::infer(
+        &validator.schemas()[0],
+        validator.schema_index(),
+    ))
+}
+
+fn usable_key_shape(shape: &Shape) -> bool {
+    // Schemas may be valid keys if all the properties are keyable and
+    // non-nullable, including nested properties. Non-nullable here means they
+    // can't be an explicit null, and either must exist or have a default value.
+    shape.locations().iter().all(|(_, pattern, shape, exists)| {
+        !pattern
+            && (exists.must() || shape.default.is_some())
+            && !shape.type_.overlaps(JsonSchema::types::NULL)
+            && (shape.type_.is_keyable_type() || shape.type_ == types::OBJECT)
+    })
 }
 
 #[cfg(test)]
@@ -358,10 +385,46 @@ mod tests {
                     ..Default::default()
                 },
             ),
+            (
+                "single scalar json key",
+                &TopicSchema {
+                    key: Some(Json(json!({"type": "string"}))),
+                    ..Default::default()
+                },
+            ),
+            (
+                "single nullable scalar json key",
+                &TopicSchema {
+                    key: Some(Json(json!({"type": ["null", "string"]}))),
+                    ..Default::default()
+                },
+            ),
+            (
+                "nested json object",
+                &TopicSchema {
+                    key: Some(Json(json!({
+                        "type": "object",
+                        "properties": {
+                            "firstKey": {"type": "string"},
+                            "nestedObject": {
+                                "type": "object",
+                                "properties": {
+                                    "secondKeyNested": {"type": "integer"},
+                                    "thirdKeyNested": {"type": "boolean"},
+                                },
+                                "required": ["secondKeyNested", "thirdKeyNested"],
+                            },
+                        },
+                        "required": ["firstKey", "nestedObject"],
+                    }))),
+                    ..Default::default()
+                },
+            ),
         ];
 
         for (name, input) in test_cases {
-            let (discovered_schema, discovered_key) = topic_schema_to_collection_spec(input);
+            let (discovered_schema, discovered_key) =
+                topic_schema_to_collection_spec(input).unwrap();
             let mut snap = String::new();
             snap.push_str(&serde_json::to_string(&discovered_key).unwrap());
             snap.push_str("\n");
@@ -453,14 +516,15 @@ mod tests {
 
         for (schema_jsons, want) in test_cases {
             for schema_json in schema_jsons {
-                match avro_key_schema_to_shape(&AvroSchema::parse(&schema_json).unwrap()) {
-                    Some(shape) => {
-                        assert_eq!(
-                            serde_json::to_value(&to_schema(shape).schema).unwrap(),
-                            serde_json::to_value(&want.clone().unwrap()).unwrap()
-                        )
-                    }
-                    None => assert!(want.is_none()),
+                let shape =
+                    avro_key_schema_to_shape(&AvroSchema::parse(&schema_json).unwrap()).unwrap();
+                if usable_key_shape(&shape) {
+                    assert_eq!(
+                        serde_json::to_value(&to_schema(shape).schema).unwrap(),
+                        serde_json::to_value(&want.clone().unwrap()).unwrap()
+                    )
+                } else {
+                    assert!(want.is_none())
                 }
             }
         }

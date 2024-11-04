@@ -37,5 +37,5 @@ time = "0.3"
 
 [dev-dependencies]
 insta = { version = "1", features = ["json", "serde"] }
-schema_registry_converter = { version = "4.2.0", features = ["avro"] }
+schema_registry_converter = { version = "4.2.0", features = ["avro", "json"] }
 uuid = "1.11"
