@@ -84,17 +84,34 @@ expression: snap
           "partition"
         ],
         "type": "object"
+      },
+      "idx": {
+        "type": "integer"
+      },
+      "nested": {
+        "properties": {
+          "sub_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sub_id"
+        ],
+        "title": "NestedJsonKeyRecord",
+        "type": "object"
       }
     },
     "required": [
-      "_meta"
+      "_meta",
+      "idx",
+      "nested"
     ],
     "type": "object",
     "x-infer-schema": true
   },
   "key": [
-    "/_meta/partition",
-    "/_meta/offset"
+    "/idx",
+    "/nested/sub_id"
   ],
   "recommendedName": "test-topic-2",
   "resourceConfig": {

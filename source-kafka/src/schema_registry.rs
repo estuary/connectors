@@ -1,7 +1,6 @@
 use anyhow::Result;
 use futures::stream::{self, StreamExt};
 use reqwest::Client;
-use schemars::schema::RootSchema;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
@@ -31,6 +30,7 @@ struct FetchedLatestVersion {
 }
 
 #[derive(Deserialize, Debug)]
+#[serde(rename_all = "UPPERCASE")]
 enum SchemaType {
     Avro,
     Json,
@@ -46,7 +46,7 @@ impl SchemaType {
 #[derive(Debug)]
 pub enum RegisteredSchema {
     Avro(apache_avro::Schema),
-    Json(RootSchema),
+    Json(serde_json::Value),
     Protobuf, // TODO(whb): Protobuf support.
 }
 
@@ -160,7 +160,8 @@ impl SchemaRegistryClient {
                 Ok(RegisteredSchema::Avro(schema))
             }
             SchemaType::Json => {
-                let schema: RootSchema =
+                // TODO(whb): Resolve references for JSON too.
+                let schema =
                     serde_json::from_str(&fetched.schema).expect("failed to parse json schema");
                 Ok(RegisteredSchema::Json(schema))
             }
