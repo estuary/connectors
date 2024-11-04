@@ -645,18 +645,6 @@ async def fetch_search_objects_modified_at(
             "limit": limit,
         }
 
-        # Log every 10,000 returned records, since there are 200 per page.
-        if round % 50 == 0:
-            log.info(
-                "fetching ids for records modified at instant",
-                {
-                    "object_name": object_name,
-                    "instant": modified,
-                    "count": len(output_items),
-                    "remaining": result.total,
-                }
-            )
-
         result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[CustomObjectSearchResult].model_validate_json(
             await http.request(log, url, method="POST", json=input)
         )
@@ -669,6 +657,18 @@ async def fetch_search_objects_modified_at(
                 raise Exception(f"unexpected id order: {r.id} <= {id_cursor}")
             id_cursor = r.id
             output_items.add((r.properties.hs_lastmodifieddate, str(r.id)))
+
+        # Log every 10,000 returned records, since there are 200 per page.
+        if round % 50 == 0:
+            log.info(
+                "fetching ids for records modified at instant",
+                {
+                    "object_name": object_name,
+                    "instant": modified,
+                    "count": len(output_items),
+                    "remaining": result.total,
+                }
+            )
 
         if not result.paging:
             break
