@@ -275,6 +275,8 @@ async fn write_avro_test_data(topic: &str, n: usize, partitions: i32, producer: 
                     .partition(idx as i32 % partitions)
                     .key(&key_encoded)
                     .payload(&value_encoded)
+                    .timestamp(idx as i64)
+                    .timestamp(unix_millis_fixture(idx))
                     .headers(OwnedHeaders::new().insert(Header {
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
@@ -308,6 +310,7 @@ async fn write_avro_test_data(topic: &str, n: usize, partitions: i32, producer: 
                 FutureRecord::to(topic)
                     .partition(idx as i32 % partitions)
                     .key(&key_encoded)
+                    .timestamp(unix_millis_fixture(idx as usize))
                     .headers(OwnedHeaders::new().insert(Header {
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
@@ -430,6 +433,7 @@ async fn write_schema_json_test_data(
                     .partition(idx as i32 % partitions)
                     .key(&key_encoded)
                     .payload(&value_encoded)
+                    .timestamp(unix_millis_fixture(idx))
                     .headers(OwnedHeaders::new().insert(Header {
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
@@ -462,6 +466,7 @@ async fn write_schema_json_test_data(
                 FutureRecord::to(topic)
                     .partition(idx as i32 % partitions)
                     .key(&key_encoded)
+                    .timestamp(unix_millis_fixture(idx as usize))
                     .headers(OwnedHeaders::new().insert(Header {
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
@@ -486,6 +491,7 @@ async fn write_raw_json_test_data(
                     .partition(idx as i32 % partitions)
                     .key(&json!({"key": idx}).to_string())
                     .payload(&json!({"payload": idx}).to_string())
+                    .timestamp(unix_millis_fixture(idx))
                     .headers(OwnedHeaders::new().insert(Header {
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
@@ -503,6 +509,7 @@ async fn write_raw_json_test_data(
                 FutureRecord::to(topic)
                     .partition(idx as i32 % partitions)
                     .key(&json!({"key": idx}).to_string())
+                    .timestamp(unix_millis_fixture(idx as usize))
                     .headers(OwnedHeaders::new().insert(Header {
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
@@ -512,4 +519,8 @@ async fn write_raw_json_test_data(
             .await
             .unwrap();
     }
+}
+
+fn unix_millis_fixture(idx: usize) -> i64 {
+    ((idx + 1) * 86_400_000) as i64
 }
