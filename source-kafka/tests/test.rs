@@ -165,24 +165,7 @@ async fn setup_topics(bootstrap_servers: &str) {
 
     write_avro_test_data("test-topic-1", 9, 3, &producer).await;
     write_schema_json_test_data("test-topic-2", 9, 3, &producer).await;
-
-    // Also read some raw JSON data, written without a schema.
-    for idx in 0..9 {
-        producer
-            .send(
-                FutureRecord::to("test-topic-3")
-                    .partition(idx % 3)
-                    .key(&json!({"key": idx}).to_string())
-                    .payload(&json!({"payload": idx}).to_string())
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })),
-                None,
-            )
-            .await
-            .unwrap();
-    }
+    write_raw_json_test_data("test-topic-3", 9, 3, &producer).await;
 }
 
 async fn write_avro_test_data(topic: &str, n: usize, partitions: i32, producer: &FutureProducer) {
@@ -296,6 +279,39 @@ async fn write_avro_test_data(topic: &str, n: usize, partitions: i32, producer: 
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
                     })),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+
+    // Deletion records.
+    for idx in 0..partitions {
+        let mut key = Record::new(&key_schema).unwrap();
+
+        key.put("idx", Value::Int(idx as i32));
+        key.put(
+            "nested",
+            Value::Record(vec![("sub_id".to_string(), Value::Int(idx as i32))]),
+        );
+
+        let key_encoded = avro_encoder
+            .encode_value(
+                key.into(),
+                &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
+            )
+            .await
+            .unwrap();
+
+        producer
+            .send(
+                FutureRecord::to(topic)
+                    .partition(idx as i32 % partitions)
+                    .key(&key_encoded)
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: "header-key",
+                        value: Some(&format!("header-value-{}", idx)),
+                    })) as FutureRecord<'_, Vec<u8>, Vec<u8>>,
                 None,
             )
             .await
@@ -418,6 +434,79 @@ async fn write_schema_json_test_data(
                         key: "header-key",
                         value: Some(&format!("header-value-{}", idx)),
                     })),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+
+    // Deletion records.
+    for idx in 0..partitions {
+        let key = json!({
+            "idx": idx,
+            "nested": {
+                "sub_id": idx
+            },
+        });
+
+        let key_encoded = json_encoder
+            .encode(
+                &key,
+                SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
+            )
+            .await
+            .unwrap();
+
+        producer
+            .send(
+                FutureRecord::to(topic)
+                    .partition(idx as i32 % partitions)
+                    .key(&key_encoded)
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: "header-key",
+                        value: Some(&format!("header-value-{}", idx)),
+                    })) as FutureRecord<'_, Vec<u8>, Vec<u8>>,
+                None,
+            )
+            .await
+            .unwrap();
+    }
+}
+
+async fn write_raw_json_test_data(
+    topic: &str,
+    n: usize,
+    partitions: i32,
+    producer: &FutureProducer,
+) {
+    for idx in 0..n {
+        producer
+            .send(
+                FutureRecord::to(topic)
+                    .partition(idx as i32 % partitions)
+                    .key(&json!({"key": idx}).to_string())
+                    .payload(&json!({"payload": idx}).to_string())
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: "header-key",
+                        value: Some(&format!("header-value-{}", idx)),
+                    })),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+
+    // Deletion records.
+    for idx in 0..partitions {
+        producer
+            .send(
+                FutureRecord::to(topic)
+                    .partition(idx as i32 % partitions)
+                    .key(&json!({"key": idx}).to_string())
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: "header-key",
+                        value: Some(&format!("header-value-{}", idx)),
+                    })) as FutureRecord<'_, String, String>,
                 None,
             )
             .await
