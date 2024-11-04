@@ -83,18 +83,13 @@
           },
           "interval": {
             "type": "string",
-            "title": "Run Interval",
-            "description": "How frequently should the DBT job run? This interval is only triggered if data has been materialized by your task",
+            "title": "Minimum Run Interval",
+            "description": "Minimum time between dbt job triggers. This interval is only triggered if data has been materialized by your task.",
             "default": "30m"
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "required": [
-          "job_id",
-          "account_id",
-          "api_key"
-        ],
         "title": "dbt Cloud Job Trigger",
         "description": "Trigger a dbt Job when new data is available"
       },
