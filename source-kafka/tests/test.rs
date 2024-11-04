@@ -8,6 +8,7 @@ use rdkafka::message::{Header, OwnedHeaders};
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
 use schema_registry_converter::async_impl::avro::AvroEncoder;
+use schema_registry_converter::async_impl::json::JsonEncoder;
 use schema_registry_converter::async_impl::schema_registry::SrSettings;
 use schema_registry_converter::schema_registry_common::SubjectNameStrategy;
 use serde_json::json;
@@ -163,24 +164,24 @@ async fn setup_topics(bootstrap_servers: &str) {
         .unwrap();
 
     write_avro_test_data("test-topic-1", 9, 3, &producer).await;
+    write_schema_json_test_data("test-topic-2", 9, 3, &producer).await;
 
-    for topic in ["test-topic-2", "test-topic-3"] {
-        for idx in 0..9 {
-            producer
-                .send(
-                    FutureRecord::to(topic)
-                        .partition(idx % 3)
-                        .key(&json!({"key": idx}).to_string())
-                        .payload(&json!({"payload": idx}).to_string())
-                        .headers(OwnedHeaders::new().insert(Header {
-                            key: "header-key",
-                            value: Some(&format!("header-value-{}", idx)),
-                        })),
-                    None,
-                )
-                .await
-                .unwrap();
-        }
+    // Also read some raw JSON data, written without a schema.
+    for idx in 0..9 {
+        producer
+            .send(
+                FutureRecord::to("test-topic-3")
+                    .partition(idx % 3)
+                    .key(&json!({"key": idx}).to_string())
+                    .payload(&json!({"payload": idx}).to_string())
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: "header-key",
+                        value: Some(&format!("header-value-{}", idx)),
+                    })),
+                None,
+            )
+            .await
+            .unwrap();
     }
 }
 
@@ -281,6 +282,128 @@ async fn write_avro_test_data(topic: &str, n: usize, partitions: i32, producer: 
             .encode_value(
                 value.into(),
                 &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), false),
+            )
+            .await
+            .unwrap();
+
+        producer
+            .send(
+                FutureRecord::to(topic)
+                    .partition(idx as i32 % partitions)
+                    .key(&key_encoded)
+                    .payload(&value_encoded)
+                    .headers(OwnedHeaders::new().insert(Header {
+                        key: "header-key",
+                        value: Some(&format!("header-value-{}", idx)),
+                    })),
+                None,
+            )
+            .await
+            .unwrap();
+    }
+}
+
+async fn write_schema_json_test_data(
+    topic: &str,
+    n: usize,
+    partitions: i32,
+    producer: &FutureProducer,
+) {
+    let json_key_raw_schema = json!({
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "JsonKey",
+        "type": "object",
+        "properties": {
+          "idx": {
+            "type": "integer"
+          },
+          "nested": {
+            "type": "object",
+            "title": "NestedJsonKeyRecord",
+            "properties": {
+              "sub_id": {
+                "type": "integer"
+              }
+            },
+            "required": ["sub_id"]
+          }
+        },
+        "required": ["idx", "nested"]
+    });
+
+    let json_value_raw_schema = json!({
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "JsonValue",
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": ["value"]
+    });
+
+    let http = reqwest::Client::default();
+    for (topic, suffix, schema) in [
+        (topic, "key", &json_key_raw_schema),
+        (topic, "value", &json_value_raw_schema),
+    ] {
+        // Try to delete the existing schema if it exists.
+        http.delete(format!(
+            "http://localhost:8081/subjects/{}-{}",
+            topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        http.delete(format!(
+            "http://localhost:8081/subjects/{}-{}?permanent=true",
+            topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        // Register the schema, which must be successful.
+        assert!(http
+            .post(format!(
+                "http://localhost:8081/subjects/{}-{}/versions",
+                topic, suffix
+            ))
+            .json(&json!({"schema": schema.to_string(), "schemaType": "JSON"}))
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .is_success());
+    }
+
+    let json_encoder = JsonEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
+
+    for idx in 0..n {
+        let key = json!({
+            "idx": idx,
+            "nested": {
+                "sub_id": idx
+            },
+        });
+        let value = json!({
+            "value": format!("value-{}", idx),
+        });
+
+        let key_encoded = json_encoder
+            .encode(
+                &key,
+                SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
+            )
+            .await
+            .unwrap();
+
+        let value_encoded = json_encoder
+            .encode(
+                &value,
+                SubjectNameStrategy::TopicNameStrategy(topic.to_string(), false),
             )
             .await
             .unwrap();
