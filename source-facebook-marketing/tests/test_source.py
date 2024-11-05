@@ -10,6 +10,7 @@ from airbyte_cdk.models import AirbyteConnectionStatus, ConnectorSpecification, 
 from facebook_business import FacebookAdsApi, FacebookSession
 from source_facebook_marketing import SourceFacebookMarketing
 from source_facebook_marketing.spec import ConnectorConfig
+from unittest.mock import call
 
 from .utils import command_check
 
@@ -17,7 +18,7 @@ from .utils import command_check
 @pytest.fixture(name="config")
 def config_fixture():
     config = {
-        "account_id": "123",
+        "account_ids": ["123"],
         "credentials": {
             "access_token": "TOKEN",
             "client_id": "an-id",
@@ -44,7 +45,7 @@ def config_gen(config):
 @pytest.fixture(name="api")
 def api_fixture(mocker):
     api_mock = mocker.patch("source_facebook_marketing.source.API")
-    api_mock.return_value = mocker.Mock(account=123)
+    api_mock.return_value = mocker.Mock(account=mocker.Mock(return_value=123))
     return api_mock
 
 

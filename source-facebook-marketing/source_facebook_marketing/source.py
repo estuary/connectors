@@ -66,8 +66,7 @@ class SourceFacebookMarketing(AbstractSource):
             if config.end_date < config.start_date:
                 return False, "end_date must be equal or after start_date."
 
-            api = API(account_id=config.account_id, access_token=config.credentials.access_token)
-            logger.info(f"Select account {api.account}")
+            api = API(access_token=config.credentials.access_token)
         except (requests.exceptions.RequestException, ValidationError) as e:
             return False, e
 
@@ -89,19 +88,21 @@ class SourceFacebookMarketing(AbstractSource):
         config.start_date = validate_start_date(config.start_date)
         config.end_date = validate_end_date(config.start_date, config.end_date)
 
-        api = API(account_id=config.account_id, access_token=config.credentials.access_token)
+        api = API(access_token=config.credentials.access_token)
 
         insights_args = dict(
-            api=api, start_date=config.start_date, end_date=config.end_date, insights_lookback_window=config.insights_lookback_window
+            api=api, start_date=config.start_date, end_date=config.end_date, insights_lookback_window=config.insights_lookback_window, account_ids=config.account_ids,
         )
         streams = [
             AdAccount(
                 api=api,
+                account_ids=config.account_ids,
                 source_defined_primary_key=["account_id"],
             ),
             AdSets(
                 api=api,
                 start_date=config.start_date,
+                account_ids=config.account_ids,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
                 page_size=config.page_size,
@@ -111,6 +112,7 @@ class SourceFacebookMarketing(AbstractSource):
             Ads(
                 api=api,
                 start_date=config.start_date,
+                account_ids=config.account_ids,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
                 page_size=config.page_size,
@@ -120,19 +122,21 @@ class SourceFacebookMarketing(AbstractSource):
             AdCreatives(
                 api=api,
                 fetch_thumbnail_images=config.fetch_thumbnail_images,
+                account_ids=config.account_ids,
                 page_size=config.page_size,
                 max_batch_size=config.max_batch_size,
                 source_defined_primary_key=["id"],
             ),
-            AdsInsights(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsAgeAndGender(page_size=config.page_size, max_batch_size=config.max_batch_size,source_defined_primary_key=["id"], **insights_args),
-            AdsInsightsCountry(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsRegion(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsDma(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsPlatformAndDevice(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsActionType(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
+            AdsInsights(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsAgeAndGender(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size,source_defined_primary_key=["id"], **insights_args),
+            AdsInsightsCountry(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsRegion(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsDma(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsPlatformAndDevice(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsActionType(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
             Campaigns(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -142,6 +146,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             CustomConversions(
                 api=api,
+                account_ids=config.account_ids,
                 include_deleted=config.include_deleted,
                 page_size=config.page_size,
                 max_batch_size=config.max_batch_size,
@@ -149,6 +154,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             Images(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -158,6 +164,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             Videos(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -167,6 +174,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             Activities(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -206,6 +214,7 @@ class SourceFacebookMarketing(AbstractSource):
                 raise ValueError(mes)
             stream = AdsInsights(
                 api=api,
+                account_ids=config.account_ids,
                 name=f"Custom{insight.name}",
                 fields=list(insight_fields),
                 breakdowns=list(set(insight.breakdowns)),

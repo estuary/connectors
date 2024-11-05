@@ -1,4 +1,5 @@
-account_id_sops: ENC[AES256_GCM,data:DuMXhQYiyxxthsOHllmw,iv:wNw1RFVBe/AWvY6uycliIY3nPpzBiz+P4UBDr6f4nLI=,tag:7s2DQ+ApVrcfjMBNqOK+/w==,type:int]
+account_ids:
+    - 196765372540622
 credentials:
     access_token_sops: ENC[AES256_GCM,data:Re73N0PHhhJs7Umo5ONjzSXdb4xKe+XtOBI3r1padMyQo5Bki3bW7l+1+/v4ifQuq4RypBwxQOAXdJfarwqLMW6vKCpxzq+kcbEHkvFd+NTJIWduYl8lC5bbFHT6uTrBNMxaTv/N7LNTwohBss+iKc9kf+Dp7dwpUqikOohnvOZ9y6C4+p2lvanOUpVfw7mGL52uW8VALPiLWh1hgbn6ZXlk7MOAjZAboIzf2bCzkzZQIiTz/4NYVLcmbFbPx8DRjrUd6XU1yeLsfXbT3CNRbAJyNWwDJN9vwKErGQIKcfsXsP5hVb0rpFuSW+WBvpJ0avCR6N8vvM8I8mc5W47EMuMTAxI=,iv:hWmqMuuIUBm8Vm30DVzv5jkesBAIuxZnCzn2h/ysUZ8=,tag:uKzEZpI3M4IWiXGXIqncZQ==,type:str]
     auth_type: OAuth Credentials
@@ -44,8 +45,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-02-05T23:41:33Z"
-    mac: ENC[AES256_GCM,data:ByAdg0VEy2xMpZXxAwa5oKB7CfG+eSA5ej/TJ2g9ZsIR+XhwJklI1XBW62VvahoGeC2AP9wYC/Mk7bP03914JZCz1v2gsbn6nL4WVuooIt0XMFgaquwWjoVrDa7Hy3iTHvr2Uwf4YcBWI/M3NwKpD/3f9TpNQRstrJq8pw6AC0k=,iv:Spd541rsKs5Si4AAdtxxB/muD9XiokkyEGBC8/wqAsg=,tag:eXTEjYrz/Vq4526D3E6whw==,type:str]
+    lastmodified: "2024-10-30T19:01:21Z"
+    mac: ENC[AES256_GCM,data:lksew6RnULnIZyMc5HZCDRo8bpjO3kX/9gh3ev5Xgmyd7QTG/rO2HCpeIsC77Gw4vco6trl2F/7U6r0ICl0UBHlLHgCAAAVLkXzadhM7Ty8xkW+cpo6VoL9HAKdaFZchT8dJlv2zOXDNWuPg5RF5dBxk97SZqkRMR8ekNKiAErQ=,iv:kL9jIUkCTrPgX6bZ07IPtXfHIYAt09Tvu+7zmherbnQ=,tag:ypP4PbGgLIzPVxkLe/DbrQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

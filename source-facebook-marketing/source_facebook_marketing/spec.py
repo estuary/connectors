@@ -5,11 +5,11 @@
 import logging
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional, Type, Annotated, Union
+from typing import Any, Dict, List, Optional, Type, Annotated, Union, Set
 
 from airbyte_cdk.sources.config import BaseConfig
 from facebook_business.adobjects.adsinsights import AdsInsights
-from pydantic import BaseModel, Field, PositiveInt, ConfigDict
+from pydantic import BaseModel, Field, PositiveInt, ConfigDict, constr
 
 logger = logging.getLogger("airbyte")
 
@@ -131,8 +131,8 @@ class ConnectorConfig(BaseConfig):
         def schema_extra(schema: Dict[str, Any], model: Type["ConnectorConfig"]) -> None:
             schema["properties"]["end_date"].pop("format")
 
-    account_id: str = Field(
-        title="Account ID",
+    account_ids: Set[constr(regex="^[0-9]+$")] = Field(
+        title="Account IDs",
         order=0,
         description=(
             "The Facebook Ad account ID to use when pulling data from the Facebook Marketing API."
