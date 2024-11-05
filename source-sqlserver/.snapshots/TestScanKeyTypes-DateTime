@@ -1,0 +1,49 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_datetime_889298060005": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 0"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTEwAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
+
+
+####################################
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTEwAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_datetime_889298060005": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 1"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMzMzAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
+
+
+####################################
+### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMzMzAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test_scankeytypes_datetime_889298060005": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 2"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
+
+
+####################################
+### Capture from Key "AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwAA=="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":3,"key_columns":["k"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+
+
+
