@@ -15,6 +15,12 @@ const (
 	// thus it can be sorted lexicographically as bytes.
 	sortableRFC3339Nano = "2006-01-02T15:04:05.000000000Z07:00"
 
+	// In order to be round-tripped successfully as a backfill key, datetimes must be
+	// serialized to a string with three decimal digits of precision and no time zone.
+	// This is only done for row key serialization, not the actual values in a capture's
+	// output documents.
+	datetimeKeyEncoding = "2006-01-02T15:04:05.000"
+
 	// SQL Server sort ordering for `uniqueidentifier` columns is absolutely insane,
 	// so we have to reshuffle the underlying bytes pretty hard to produce a row key
 	// whose bytewise lexicographic ordering matches SQL Server sorting rules.
@@ -35,7 +41,12 @@ const (
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case time.Time:
-		return key.Format(sortableRFC3339Nano), nil
+		switch ktype {
+		case "datetime":
+			return key.Format(datetimeKeyEncoding), nil
+		default:
+			return key.Format(sortableRFC3339Nano), nil
+		}
 	case []byte:
 		switch ktype {
 		case "uniqueidentifier":
