@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use futures::stream::{self, StreamExt};
 use reqwest::Client;
 use serde::Deserialize;
@@ -14,14 +14,7 @@ struct FetchedSchema {
     #[serde(default = "SchemaType::default")]
     schema_type: SchemaType,
     schema: String,
-    reference: Option<SchemaReference>,
-}
-
-#[derive(Deserialize, Debug)]
-struct SchemaReference {
-    name: String,
-    subject: String,
-    version: u32,
+    references: Option<serde_json::Value>, // TODO(whb): Schema reference support is not yet implemented.
 }
 
 #[derive(Deserialize, Debug)]
@@ -47,7 +40,7 @@ impl SchemaType {
 pub enum RegisteredSchema {
     Avro(apache_avro::Schema),
     Json(serde_json::Value),
-    Protobuf, // TODO(whb): Protobuf support.
+    Protobuf, // TODO(whb): Protobuf support is not yet implemented.
 }
 
 #[derive(Debug, Default)]
@@ -148,21 +141,24 @@ impl SchemaRegistryClient {
             .get(format!("{}/schemas/ids/{}", self.endpoint, id))
             .basic_auth(&self.username, Some(&self.password))
             .send()
-            .await?
+            .await
+            .context("fetching schema")?
             .json()
             .await?;
 
+        if fetched.references.is_some() {
+            anyhow::bail!("schema references are not yet supported, and requested schema with id {} has references", id);
+        }
+
         match fetched.schema_type {
             SchemaType::Avro => {
-                // TODO(whb): Resolve references.
                 let schema = apache_avro::Schema::parse_str(&fetched.schema)
-                    .expect("failed to parse avro schema");
+                    .context("failed to parse fetched avro schema")?;
                 Ok(RegisteredSchema::Avro(schema))
             }
             SchemaType::Json => {
-                // TODO(whb): Resolve references for JSON too.
-                let schema =
-                    serde_json::from_str(&fetched.schema).expect("failed to parse json schema");
+                let schema = serde_json::from_str(&fetched.schema)
+                    .context("failed to parse fetched json schema")?;
                 Ok(RegisteredSchema::Json(schema))
             }
             SchemaType::Protobuf => Ok(RegisteredSchema::Protobuf),
@@ -178,7 +174,8 @@ impl SchemaRegistryClient {
             ))
             .basic_auth(&self.username, Some(&self.password))
             .send()
-            .await?
+            .await
+            .context("fetching latest schema version for subject")?
             .json()
             .await?;
         Ok(fetched.id)
