@@ -21,8 +21,27 @@ import (
 // driver implements the pm.DriverServer interface.
 type driver struct{}
 
+type CustomHeader struct {
+	Name  string `json:"name,omitempty" jsonschema:"title=Name"`
+	Value string `json:"value,omitempty" jsonschema:"title=Value"`
+}
+
+func (h CustomHeader) Validate() error {
+	if h.Name == "" {
+		return fmt.Errorf("header name must not be empty")
+	} else if h.Value == "" {
+		return fmt.Errorf("value for header %v must not be empty", h.Name)
+	}
+	return nil
+}
+
+type headers struct {
+	CustomHeaders []CustomHeader `json:"customHeaders,omitempty" jsonschema:"title=Custom Headers"`
+}
+
 type config struct {
 	Address pf.Endpoint `json:"address" jsonschema:"title=Address,description=Base address URL. Must end in a trailing '/'."`
+	Headers headers     `json:"headers,omitempty"`
 }
 
 // Validate returns an error if the config is not well-formed.
@@ -31,6 +50,13 @@ func (c config) Validate() error {
 		return fmt.Errorf("address: %w", err)
 	} else if !strings.HasSuffix(string(c.Address), "/") {
 		return fmt.Errorf("address must end in a trailing '/'")
+	}
+
+	for i := range c.Headers.CustomHeaders {
+		header := c.Headers.CustomHeaders[i]
+		if err := header.Validate(); err != nil {
+			return fmt.Errorf("header: %w", err)
+		}
 	}
 	return nil
 }
@@ -141,13 +167,15 @@ func (driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boiler
 	}
 
 	var transactor = &transactor{
-		addresses: addresses,
+		addresses:     addresses,
+		customHeaders: cfg.Headers.CustomHeaders,
 	}
 	return transactor, &pm.Response_Opened{}, nil, nil
 }
 
 type transactor struct {
-	addresses []*url.URL
+	addresses     []*url.URL
+	customHeaders []CustomHeader
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -201,6 +229,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				return nil, fmt.Errorf("http.NewRequest(%s): %w", address, err)
 			}
 			request.Header.Add("Content-Type", "application/json")
+
+			for i := range d.customHeaders {
+				header := d.customHeaders[i]
+				request.Header.Add(header.Name, header.Value)
+			}
 
 			response, err := http.DefaultClient.Do(request)
 			if err == nil {
