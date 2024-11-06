@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use apache_avro::schema::Schema as AvroSchema;
 use doc::{
     shape::{schema::to_schema, ObjProperty},
@@ -27,7 +27,9 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
     let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
     let consumer = config.to_consumer().await?;
 
-    let meta = consumer.fetch_metadata(None, KAFKA_TIMEOUT)?;
+    let meta = consumer
+        .fetch_metadata(None, KAFKA_TIMEOUT)
+        .context("could not fetch cluster metadata - double check your configuration")?;
 
     let mut all_topics: Vec<String> = meta
         .topics()
@@ -47,7 +49,10 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
     let registered_schemas = match config.schema_registry {
         Some(cfg) => {
             let client = SchemaRegistryClient::new(cfg.endpoint, cfg.username, cfg.password);
-            client.schemas_for_topics(&all_topics).await?
+            client
+                .schemas_for_topics(&all_topics)
+                .await
+                .context("fetching topic schemas from schema registry")?
         }
         None => HashMap::new(),
     };

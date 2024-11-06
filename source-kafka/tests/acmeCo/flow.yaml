@@ -1,6 +1,6 @@
 ---
 collections:
-  acmeCo/test-topic-1:
+  acmeCo/avro-topic:
     schema:
       properties:
         _meta:
@@ -25,7 +25,7 @@ collections:
     key:
       - /_meta/partition
       - /_meta/offset
-  acmeCo/test-topic-2:
+  acmeCo/json-schema-topic:
     schema:
       properties:
         _meta:
@@ -50,7 +50,7 @@ collections:
     key:
       - /_meta/partition
       - /_meta/offset
-  acmeCo/test-topic-3:
+  acmeCo/json-raw-topic:
     schema:
       properties:
         _meta:

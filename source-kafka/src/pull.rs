@@ -3,7 +3,7 @@ use crate::{
     schema_registry::{RegisteredSchema, SchemaRegistryClient},
     write_capture_response,
 };
-use anyhow::{Context, Result};
+use anyhow::{anyhow, Context, Result};
 use apache_avro::{types::Value as AvroValue, Schema as AvroSchema};
 use base64::engine::general_purpose::STANDARD as base64;
 use base64::Engine;
@@ -99,13 +99,13 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
 
     loop {
-        let msg = consumer.recv().await?;
+        let msg = consumer.recv().await.context("receiving next message")?;
 
         let mut op = "u";
         let mut doc = match msg.payload() {
-            Some(bytes) => {
-                parse_datum(bytes, false, &mut schema_cache, schema_client.as_ref()).await?
-            }
+            Some(bytes) => parse_datum(bytes, false, &mut schema_cache, schema_client.as_ref())
+                .await
+                .with_context(|| format!("parsing message payload for topic {}", msg.topic()))?,
             None => {
                 // We interpret an absent message payload as a deletion
                 // tombstone. The captured document will otherwise be empty
@@ -130,6 +130,9 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
                     .map(|h| {
                         let value = match h.value {
                             Some(v) => match std::str::from_utf8(v) {
+                                // Prefer capturing header byte values as UTF-8
+                                // strings if possible, otherwise base64 encode
+                                // them.
                                 Ok(v) => json!(v),
                                 Err(_) => json!(base64.encode(v)),
                             },
@@ -156,7 +159,9 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
 
         if let Some(key_bytes) = msg.key() {
             let mut key_parsed =
-                parse_datum(key_bytes, true, &mut schema_cache, schema_client.as_ref()).await?;
+                parse_datum(key_bytes, true, &mut schema_cache, schema_client.as_ref())
+                    .await
+                    .with_context(|| format!("parsing message key for topic {}", msg.topic()))?;
 
             // Add key/val pairs from the "key" to root of the captured
             // document, which will clobber any collisions with keys from
@@ -166,7 +171,7 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
 
         let binding_info = topics_to_bindings
             .get(msg.topic())
-            .expect("got a message for an unknown binding");
+            .with_context(|| format!("got a message for unknown topic {}", msg.topic()))?;
 
         let message = response::Captured {
             binding: binding_info.binding_index,
@@ -234,7 +239,7 @@ async fn setup_consumer(
 
         let partition_info = extant_partitions
             .get(topic)
-            .expect("expected configured topic to exist");
+            .ok_or(anyhow!("configured topic {} does not exist", topic))?;
 
         for partition in partition_info.iter() {
             let partition = partition.id();
@@ -258,7 +263,9 @@ async fn setup_consumer(
         );
     }
 
-    consumer.assign(&topic_partition_list)?;
+    consumer
+        .assign(&topic_partition_list)
+        .context("could not assign consumer to topic_partition_list")?;
 
     Ok(topics_to_bindings)
 }
@@ -311,7 +318,7 @@ async fn parse_datum(
             if let Entry::Vacant(e) = schema_cache.entry(schema_id) {
                 e.insert(schema_client
                     .as_ref()
-                    .expect("schema registry configuration must be provided to parse Kafka messages encoded with schema registry")
+                    .ok_or(anyhow!("schema registry configuration must be provided to parse Kafka messages encoded with schema registry"))?
                     .fetch_schema(schema_id)
                     .await?);
             }
@@ -334,7 +341,9 @@ async fn parse_datum(
                     }
                 }
                 RegisteredSchema::Json(_) => Ok(serde_json::from_slice(&datum[5..])?),
-                RegisteredSchema::Protobuf => todo!(),
+                RegisteredSchema::Protobuf => {
+                    anyhow::bail!("decoding protobuf messages is not yet supported")
+                }
             }
         }
 

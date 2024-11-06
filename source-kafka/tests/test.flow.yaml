@@ -2,7 +2,7 @@
 import:
   - acmeCo/flow.yaml
 captures:
-  acmeCo/source-hubspot:
+  acmeCo/source-kafka:
     endpoint:
       local:
         command:
@@ -16,11 +16,11 @@ captures:
             password: password
     bindings:
       - resource:
-          topic: test-topic-1
-        target: acmeCo/test-topic-1
+          topic: avro-topic
+        target: acmeCo/avro-topic
       - resource:
-          topic: test-topic-2
-        target: acmeCo/test-topic-2
+          topic: json-schema-topic
+        target: acmeCo/json-schema-topic
       - resource:
-          topic: test-topic-3
-        target: acmeCo/test-topic-3
+          topic: json-raw-topic
+        target: acmeCo/json-raw-topic

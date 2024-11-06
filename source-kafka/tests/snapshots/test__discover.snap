@@ -63,12 +63,65 @@ expression: snap
     "/idx",
     "/nested/sub_id"
   ],
-  "recommendedName": "test-topic-1",
+  "recommendedName": "avro-topic",
   "resourceConfig": {
-    "topic": "test-topic-1"
+    "topic": "avro-topic"
   },
   "resourcePath": [
-    "test-topic-1"
+    "avro-topic"
+  ]
+}
+{
+  "documentSchema": {
+    "properties": {
+      "_meta": {
+        "properties": {
+          "offset": {
+            "description": "The offset of the message within the partition",
+            "type": "integer"
+          },
+          "op": {
+            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+            "enum": [
+              "c",
+              "u",
+              "d"
+            ]
+          },
+          "partition": {
+            "description": "The partition the message was read from",
+            "type": "integer"
+          },
+          "topic": {
+            "description": "The topic the message was read from",
+            "type": "string"
+          }
+        },
+        "required": [
+          "offset",
+          "op",
+          "partition",
+          "topic"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "_meta"
+    ],
+    "type": "object",
+    "x-infer-schema": true
+  },
+  "key": [
+    "/_meta/partition",
+    "/_meta/offset"
+  ],
+  "recommendedName": "json-raw-topic",
+  "resourceConfig": {
+    "topic": "json-raw-topic"
+  },
+  "resourcePath": [
+    "json-raw-topic"
   ]
 }
 {
@@ -133,64 +186,11 @@ expression: snap
     "/idx",
     "/nested/sub_id"
   ],
-  "recommendedName": "test-topic-2",
+  "recommendedName": "json-schema-topic",
   "resourceConfig": {
-    "topic": "test-topic-2"
+    "topic": "json-schema-topic"
   },
   "resourcePath": [
-    "test-topic-2"
-  ]
-}
-{
-  "documentSchema": {
-    "properties": {
-      "_meta": {
-        "properties": {
-          "offset": {
-            "description": "The offset of the message within the partition",
-            "type": "integer"
-          },
-          "op": {
-            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
-            "enum": [
-              "c",
-              "u",
-              "d"
-            ]
-          },
-          "partition": {
-            "description": "The partition the message was read from",
-            "type": "integer"
-          },
-          "topic": {
-            "description": "The topic the message was read from",
-            "type": "string"
-          }
-        },
-        "required": [
-          "offset",
-          "op",
-          "partition",
-          "topic"
-        ],
-        "type": "object"
-      }
-    },
-    "required": [
-      "_meta"
-    ],
-    "type": "object",
-    "x-infer-schema": true
-  },
-  "key": [
-    "/_meta/partition",
-    "/_meta/offset"
-  ],
-  "recommendedName": "test-topic-3",
-  "resourceConfig": {
-    "topic": "test-topic-3"
-  },
-  "resourcePath": [
-    "test-topic-3"
+    "json-schema-topic"
   ]
 }
