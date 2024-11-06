@@ -175,7 +175,9 @@ fn topic_schema_to_collection_spec(
         collection_key = key_shape
             .locations()
             .into_iter()
-            .filter(|(_, _, shape, ..)| !shape.type_.overlaps(JsonSchema::types::OBJECT))
+            .filter(|(ptr, _, shape, ..)| {
+                !shape.type_.overlaps(JsonSchema::types::OBJECT) && ptr.to_string() != "/*"
+            })
             .map(|(ptr, ..)| ptr.to_string())
             .collect();
 
@@ -311,12 +313,21 @@ fn usable_key_shape(shape: &Shape) -> bool {
     // Schemas may be valid keys if all the properties are keyable and
     // non-nullable, including nested properties. Non-nullable here means they
     // can't be an explicit null, and either must exist or have a default value.
-    shape.locations().iter().all(|(_, pattern, shape, exists)| {
-        !pattern
-            && (exists.must() || shape.default.is_some())
-            && !shape.type_.overlaps(JsonSchema::types::NULL)
-            && (shape.type_.is_keyable_type() || shape.type_ == types::OBJECT)
-    })
+    shape
+        .locations()
+        .iter()
+        .all(|(ptr, pattern, shape, exists)| {
+            if ptr.to_string() == "/*" && shape.type_ == types::INVALID {
+                // This represents an "additionalProperties: false"
+                // configuration, which must be the case for a valid key schema.
+                return true;
+            }
+
+            !pattern
+                && (exists.must() || shape.default.is_some())
+                && !shape.type_.overlaps(JsonSchema::types::NULL)
+                && (shape.type_.is_keyable_type() || shape.type_ == types::OBJECT)
+        })
 }
 
 #[cfg(test)]
@@ -442,6 +453,7 @@ mod tests {
                             },
                         },
                         "required": ["firstKey", "nestedObject"],
+                        "additionalProperties": false
                     }))),
                     ..Default::default()
                 },
