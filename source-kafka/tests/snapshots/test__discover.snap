@@ -4,6 +4,17 @@ expression: snap
 ---
 {
   "documentSchema": {
+    "if": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "op": {
+              "const": "d"
+            }
+          }
+        }
+      }
+    },
     "properties": {
       "_meta": {
         "properties": {
@@ -56,6 +67,12 @@ expression: snap
       "idx",
       "nested"
     ],
+    "then": {
+      "reduce": {
+        "delete": true,
+        "strategy": "merge"
+      }
+    },
     "type": "object",
     "x-infer-schema": true
   },
@@ -73,6 +90,17 @@ expression: snap
 }
 {
   "documentSchema": {
+    "if": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "op": {
+              "const": "d"
+            }
+          }
+        }
+      }
+    },
     "properties": {
       "_meta": {
         "properties": {
@@ -109,6 +137,12 @@ expression: snap
     "required": [
       "_meta"
     ],
+    "then": {
+      "reduce": {
+        "delete": true,
+        "strategy": "merge"
+      }
+    },
     "type": "object",
     "x-infer-schema": true
   },
@@ -126,6 +160,17 @@ expression: snap
 }
 {
   "documentSchema": {
+    "if": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "op": {
+              "const": "d"
+            }
+          }
+        }
+      }
+    },
     "properties": {
       "_meta": {
         "properties": {
@@ -179,6 +224,12 @@ expression: snap
       "idx",
       "nested"
     ],
+    "then": {
+      "reduce": {
+        "delete": true,
+        "strategy": "merge"
+      }
+    },
     "type": "object",
     "x-infer-schema": true
   },

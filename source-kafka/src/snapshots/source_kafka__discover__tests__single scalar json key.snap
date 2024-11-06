@@ -5,6 +5,23 @@ expression: snap
 ["/_key"]
 {
   "type": "object",
+  "if": {
+    "properties": {
+      "_meta": {
+        "properties": {
+          "op": {
+            "const": "d"
+          }
+        }
+      }
+    }
+  },
+  "then": {
+    "reduce": {
+      "delete": true,
+      "strategy": "merge"
+    }
+  },
   "required": [
     "_key",
     "_meta"
