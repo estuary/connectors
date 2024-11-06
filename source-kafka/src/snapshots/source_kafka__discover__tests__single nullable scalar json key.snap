@@ -5,6 +5,23 @@ expression: snap
 ["/_meta/partition","/_meta/offset"]
 {
   "type": "object",
+  "if": {
+    "properties": {
+      "_meta": {
+        "properties": {
+          "op": {
+            "const": "d"
+          }
+        }
+      }
+    }
+  },
+  "then": {
+    "reduce": {
+      "delete": true,
+      "strategy": "merge"
+    }
+  },
   "required": [
     "_meta"
   ],

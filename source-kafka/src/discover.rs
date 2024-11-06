@@ -101,6 +101,23 @@ fn topic_schema_to_collection_spec(
     let mut collection_key = vec!["/_meta/partition".to_string(), "/_meta/offset".to_string()];
     let doc_schema_json = json!({
         "x-infer-schema": true,
+        "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+        "then": {
+            "reduce": {
+                "delete": true,
+                "strategy": "merge"
+            }
+        },
         "type": "object",
         "properties": {
             "_meta": {
