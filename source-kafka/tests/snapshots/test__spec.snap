@@ -23,27 +23,29 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
               "auth_type": {
                 "const": "user_password",
                 "default": "user_password",
+                "order": 0,
                 "type": "string"
               },
               "mechanism": {
+                "default": "PLAIN",
                 "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
                 "enum": [
                   "PLAIN",
                   "SCRAM-SHA-256",
                   "SCRAM-SHA-512"
                 ],
-                "order": 0,
+                "order": 1,
                 "title": "SASL Mechanism",
                 "type": "string"
               },
               "password": {
-                "order": 2,
+                "order": 3,
                 "secret": true,
                 "title": "Password",
                 "type": "string"
               },
               "username": {
-                "order": 1,
+                "order": 2,
                 "secret": true,
                 "title": "Username",
                 "type": "string"

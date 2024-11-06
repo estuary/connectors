@@ -17,7 +17,12 @@ hex = "0.4"
 highway = "1.2"
 http = "0.2" # 0.2x version is needed for MSK token signing via aws-sigv4
 lazy_static = "1.5"
-rdkafka = { version = "0.36", features = ["cmake-build", "sasl", "ssl"] }
+rdkafka = { version = "0.36", features = [
+    "cmake-build",
+    "sasl",
+    "ssl",
+    "zstd",
+] }
 schemars = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
