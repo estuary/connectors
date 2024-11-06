@@ -1,3 +1,5 @@
+use std::io::Write;
+
 use anyhow::{Context, Result};
 use configuration::{schema_for, EndpointConfig, Resource};
 use discover::do_discover;
@@ -10,7 +12,6 @@ use proto_flow::capture::{
 };
 use pull::do_pull;
 use rdkafka::consumer::Consumer;
-use tokio::io::AsyncWriteExt;
 use tokio::io::{self, AsyncBufReadExt};
 
 pub mod configuration;
@@ -23,7 +24,7 @@ const KAFKA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
 pub async fn run_connector(
     mut stdin: io::BufReader<io::Stdin>,
-    mut stdout: io::Stdout,
+    mut stdout: std::io::Stdout,
 ) -> Result<(), anyhow::Error> {
     tracing::info!("running connector");
 
@@ -47,7 +48,7 @@ pub async fn run_connector(
             ..Default::default()
         };
 
-        write_capture_response(res, &mut stdout).await?;
+        write_capture_response(res, &mut stdout)?;
     } else if let Some(req) = request.discover {
         let res = Response {
             discovered: Some(Discovered {
@@ -56,7 +57,7 @@ pub async fn run_connector(
             ..Default::default()
         };
 
-        write_capture_response(res, &mut stdout).await?;
+        write_capture_response(res, &mut stdout)?;
     } else if let Some(req) = request.validate {
         let res = Response {
             validated: Some(Validated {
@@ -65,7 +66,7 @@ pub async fn run_connector(
             ..Default::default()
         };
 
-        write_capture_response(res, &mut stdout).await?;
+        write_capture_response(res, &mut stdout)?;
     } else if request.apply.is_some() {
         let res = Response {
             applied: Some(Applied {
@@ -74,7 +75,7 @@ pub async fn run_connector(
             ..Default::default()
         };
 
-        write_capture_response(res, &mut stdout).await?;
+        write_capture_response(res, &mut stdout)?;
     } else if let Some(req) = request.open {
         write_capture_response(
             Response {
@@ -84,8 +85,7 @@ pub async fn run_connector(
                 ..Default::default()
             },
             &mut stdout,
-        )
-        .await?;
+        )?;
 
         let eof = tokio::spawn(async move {
             match stdin.read_line(&mut line).await? {
@@ -110,18 +110,15 @@ pub async fn run_connector(
     Ok(())
 }
 
-pub async fn write_capture_response(
+pub fn write_capture_response(
     response: Response,
-    stdout: &mut io::Stdout,
+    stdout: &mut std::io::Stdout,
 ) -> anyhow::Result<()> {
-    let resp = serde_json::to_vec(&response).context("serializing response")?;
-    stdout.write_all(&resp).await.context("writing response")?;
-    stdout
-        .write_u8(b'\n')
-        .await
-        .context("writing response newline")?;
+    serde_json::to_writer(&mut *stdout, &response).context("serializing response")?;
+    writeln!(stdout).context("writing response newline")?;
+
     if response.captured.is_none() {
-        stdout.flush().await?;
+        stdout.flush().context("flushing stdout")?;
     }
     Ok(())
 }

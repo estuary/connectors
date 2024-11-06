@@ -6,7 +6,7 @@ fn main() -> anyhow::Result<()> {
     let runtime = start_runtime()?;
 
     let stdin = io::BufReader::new(io::stdin());
-    let stdout = io::stdout();
+    let stdout = std::io::stdout();
 
     let result = runtime.block_on(run_connector(stdin, stdout));
 
