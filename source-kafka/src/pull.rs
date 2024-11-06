@@ -29,7 +29,6 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map};
 use std::collections::{hash_map::Entry, HashMap};
 use time::{format_description, OffsetDateTime};
-use tokio::io::{self};
 
 #[derive(Debug, Deserialize, Serialize, Default)]
 struct CaptureState {
@@ -74,7 +73,7 @@ enum MetaTimestamp {
     LogAppendTime(String),
 }
 
-pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
+pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
     let spec = req.capture.expect("open must contain a capture spec");
 
     let state = if req.state_json == "{}" {
@@ -187,8 +186,7 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
                 ..Default::default()
             },
             &mut stdout,
-        )
-        .await?;
+        )?;
 
         write_capture_response(
             Response {
@@ -201,8 +199,7 @@ pub async fn do_pull(req: Open, mut stdout: io::Stdout) -> Result<()> {
                 ..Default::default()
             },
             &mut stdout,
-        )
-        .await?;
+        )?;
     }
 }
 
