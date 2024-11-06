@@ -130,17 +130,17 @@ async fn do_validate(req: Validate) -> Result<Vec<ValidatedBinding>> {
     let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
     let consumer = config.to_consumer().await?;
 
-    consumer.fetch_metadata(None, KAFKA_TIMEOUT)?;
+    consumer
+        .fetch_metadata(None, KAFKA_TIMEOUT)
+        .context("could not fetch cluster metadata - double check your configuration")?;
 
-    let mut out = vec![];
-
-    for b in &req.bindings {
-        let res: Resource = serde_json::from_str(&b.resource_config_json)?;
-        let validated = ValidatedBinding {
-            resource_path: vec![res.topic],
-        };
-        out.push(validated);
-    }
-
-    Ok(out)
+    req.bindings
+        .iter()
+        .map(|binding| {
+            let res: Resource = serde_json::from_str(&binding.resource_config_json)?;
+            Ok(ValidatedBinding {
+                resource_path: vec![res.topic],
+            })
+        })
+        .collect()
 }

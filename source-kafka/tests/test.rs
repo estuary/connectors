@@ -4,7 +4,7 @@ use anyhow::Result;
 use apache_avro::types::{Record, Value};
 use apache_avro::Schema;
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
-use rdkafka::message::{Header, OwnedHeaders};
+use rdkafka::message::{Header, OwnedHeaders, ToBytes};
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use rdkafka::ClientConfig;
 use schema_registry_converter::async_impl::avro::AvroEncoder;
@@ -27,7 +27,7 @@ fn test_spec() {
 
 #[tokio::test]
 async fn test_discover() {
-    setup_topics("localhost:9092").await;
+    setup_test().await;
 
     let output = std::process::Command::new("flowctl")
         .args([
@@ -57,7 +57,7 @@ async fn test_discover() {
 
 #[tokio::test]
 async fn test_capture() {
-    setup_topics("localhost:9092").await;
+    setup_test().await;
 
     let output = std::process::Command::new("flowctl")
         .args([
@@ -73,6 +73,8 @@ async fn test_capture() {
         .output()
         .unwrap();
 
+    println!("{}", std::str::from_utf8(&output.stderr).unwrap());
+
     assert!(output.status.success());
 
     let snap = std::str::from_utf8(&output.stdout).unwrap();
@@ -82,23 +84,23 @@ async fn test_capture() {
 
 #[tokio::test]
 async fn test_capture_resume() {
-    setup_topics("localhost:9092").await;
+    setup_test().await;
 
     let initial_state = json!({
       "bindingStateV1": {
-        "test-topic-1": {
+        "avro-topic": {
           "partitions": {
             "1": 1,
             "2": 1
           }
         },
-        "test-topic-2": {
+        "json-schema-topic": {
           "partitions": {
             "1": 1,
             "2": 1
           }
         },
-        "test-topic-3": {
+        "json-raw-topic": {
           "partitions": {
             "1": 1,
             "2": 1
@@ -130,32 +132,24 @@ async fn test_capture_resume() {
     insta::assert_snapshot!(snap);
 }
 
-async fn setup_topics(bootstrap_servers: &str) {
+async fn setup_test() {
+    let bootstrap_servers = "localhost:9092";
+    let schema_registry_endpoint = "http://localhost:8081";
+    let num_messages = 9;
+    let num_partitions = 3;
+    let topic_replication = 1;
+
+    let test_cases: &[(&dyn TestDataEncoder, &str)] = &[
+        (&AvroTestDataEncoder::new(), "avro-topic"),
+        (&JsonSchemaTestDataEncoder::new(), "json-schema-topic"),
+        (&JsonRawTestDataEncoder::new(), "json-raw-topic"),
+    ];
+
+    let http = reqwest::Client::default();
+
     let admin: AdminClient<_> = ClientConfig::new()
         .set("bootstrap.servers", bootstrap_servers)
         .create()
-        .unwrap();
-
-    let opts = AdminOptions::default().request_timeout(Some(Duration::from_secs(1)));
-
-    admin
-        .delete_topics(&vec!["test-topic-1", "test-topic-2", "test-topic-3"], &opts)
-        .await
-        .unwrap();
-
-    admin
-        .create_topics(
-            vec![
-                &NewTopic::new("test-topic-1", 3, TopicReplication::Fixed(1)),
-                &NewTopic::new("test-topic-2", 3, TopicReplication::Fixed(1)),
-                &NewTopic::new("test-topic-3", 3, TopicReplication::Fixed(1)),
-            ],
-            &opts,
-        )
-        .await
-        .unwrap()
-        .into_iter()
-        .collect::<Result<Vec<_>, _>>()
         .unwrap();
 
     let producer: FutureProducer = ClientConfig::new()
@@ -163,364 +157,344 @@ async fn setup_topics(bootstrap_servers: &str) {
         .create()
         .unwrap();
 
-    write_avro_test_data("test-topic-1", 9, 3, &producer).await;
-    write_schema_json_test_data("test-topic-2", 9, 3, &producer).await;
-    write_raw_json_test_data("test-topic-3", 9, 3, &producer).await;
-}
+    let opts = AdminOptions::default().request_timeout(Some(Duration::from_secs(1)));
 
-async fn write_avro_test_data(topic: &str, n: usize, partitions: i32, producer: &FutureProducer) {
-    let avro_key_raw_schema = json!({
-      "type": "record",
-      "name": "AvroKey",
-      "fields": [
-        {
-          "name": "idx",
-          "type": "int"
-        },
-        {
-          "name": "nested",
-          "type": {
-            "type": "record",
-            "name": "NestedAvroKeyRecord",
-            "fields": [
-              {
-                "name": "sub_id",
-                "type": "int"
-              }
-            ]
-          }
-        }
-      ]
-    });
-
-    let avro_value_raw_schema = json!({
-      "type": "record",
-      "name": "AvroValue",
-      "fields": [
-        {
-          "name": "value",
-          "type": "string"
-        }
-      ]
-    });
-
-    let key_schema = Schema::parse(&avro_key_raw_schema).unwrap();
-    let value_schema = Schema::parse(&avro_value_raw_schema).unwrap();
-
-    let http = reqwest::Client::default();
-    for (topic, suffix, schema) in [(topic, "key", &key_schema), (topic, "value", &value_schema)] {
-        // Try to delete the existing schema if it exists.
-        http.delete(format!(
-            "http://localhost:8081/subjects/{}-{}",
-            topic, suffix
-        ))
-        .send()
-        .await
-        .unwrap();
-
-        http.delete(format!(
-            "http://localhost:8081/subjects/{}-{}?permanent=true",
-            topic, suffix
-        ))
-        .send()
-        .await
-        .unwrap();
-
-        // Register the schema, which must be successful.
-        assert!(http
-            .post(format!(
-                "http://localhost:8081/subjects/{}-{}/versions",
-                topic, suffix
-            ))
-            .json(&json!({"schema": schema.canonical_form()}))
-            .send()
+    for (enc, topic) in test_cases {
+        admin.delete_topics(&[topic], &opts).await.unwrap();
+        admin
+            .create_topics(
+                &[NewTopic::new(
+                    topic,
+                    num_partitions,
+                    TopicReplication::Fixed(topic_replication),
+                )],
+                &opts,
+            )
             .await
             .unwrap()
-            .status()
-            .is_success());
-    }
-
-    let avro_encoder = AvroEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
-
-    for idx in 0..n {
-        let mut key = Record::new(&key_schema).unwrap();
-        let mut value = Record::new(&value_schema).unwrap();
-
-        key.put("idx", Value::Int(idx as i32));
-        key.put(
-            "nested",
-            Value::Record(vec![("sub_id".to_string(), Value::Int(idx as i32))]),
-        );
-        value.put("value", Value::String(format!("value-{}", idx)));
-
-        let key_encoded = avro_encoder
-            .encode_value(
-                key.into(),
-                &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
-            )
-            .await
+            .into_iter()
+            .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        let value_encoded = avro_encoder
-            .encode_value(
-                value.into(),
-                &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), false),
-            )
-            .await
-            .unwrap();
+        // Registry schemas if the encoder uses schemas.
+        if let Some(schema_type) = enc.schema_type_string() {
+            for (topic, suffix, schema) in [
+                (topic, "key", &enc.key_schema_string()),
+                (topic, "value", &enc.payload_schema_string()),
+            ] {
+                // Try to delete the existing schema if it exists, ignoring any errors
+                // that are returned, which may be 404's.
+                http.delete(format!(
+                    "{}/subjects/{}-{}",
+                    schema_registry_endpoint, topic, suffix
+                ))
+                .send()
+                .await
+                .unwrap();
 
-        producer
-            .send(
-                FutureRecord::to(topic)
-                    .partition(idx as i32 % partitions)
-                    .key(&key_encoded)
-                    .payload(&value_encoded)
-                    .timestamp(idx as i64)
-                    .timestamp(unix_millis_fixture(idx))
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })),
-                None,
-            )
-            .await
-            .unwrap();
-    }
+                // You have to do a "soft" delete before a permanent "hard" delete.
+                http.delete(format!(
+                    "{}/subjects/{}-{}?permanent=true",
+                    schema_registry_endpoint, topic, suffix
+                ))
+                .send()
+                .await
+                .unwrap();
 
-    // Deletion records.
-    for idx in 0..partitions {
-        let mut key = Record::new(&key_schema).unwrap();
-
-        key.put("idx", Value::Int(idx as i32));
-        key.put(
-            "nested",
-            Value::Record(vec![("sub_id".to_string(), Value::Int(idx as i32))]),
-        );
-
-        let key_encoded = avro_encoder
-            .encode_value(
-                key.into(),
-                &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
-            )
-            .await
-            .unwrap();
-
-        producer
-            .send(
-                FutureRecord::to(topic)
-                    .partition(idx as i32 % partitions)
-                    .key(&key_encoded)
-                    .timestamp(unix_millis_fixture(idx as usize))
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })) as FutureRecord<'_, Vec<u8>, Vec<u8>>,
-                None,
-            )
-            .await
-            .unwrap();
-    }
-}
-
-async fn write_schema_json_test_data(
-    topic: &str,
-    n: usize,
-    partitions: i32,
-    producer: &FutureProducer,
-) {
-    let json_key_raw_schema = json!({
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "JsonKey",
-        "type": "object",
-        "properties": {
-          "idx": {
-            "type": "integer"
-          },
-          "nested": {
-            "type": "object",
-            "title": "NestedJsonKeyRecord",
-            "properties": {
-              "sub_id": {
-                "type": "integer"
-              }
-            },
-            "required": ["sub_id"]
-          }
-        },
-        "required": ["idx", "nested"]
-    });
-
-    let json_value_raw_schema = json!({
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "JsonValue",
-      "type": "object",
-      "properties": {
-        "value": {
-          "type": "string"
+                // Register the schema, which must be successful.
+                assert!(http
+                    .post(format!(
+                        "{}/subjects/{}-{}/versions",
+                        schema_registry_endpoint, topic, suffix
+                    ))
+                    .json(&json!({"schema": schema, "schemaType": schema_type}))
+                    .send()
+                    .await
+                    .unwrap()
+                    .status()
+                    .is_success());
+            }
         }
-      },
-      "required": ["value"]
-    });
 
-    let http = reqwest::Client::default();
-    for (topic, suffix, schema) in [
-        (topic, "key", &json_key_raw_schema),
-        (topic, "value", &json_value_raw_schema),
-    ] {
-        // Try to delete the existing schema if it exists.
-        http.delete(format!(
-            "http://localhost:8081/subjects/{}-{}",
-            topic, suffix
-        ))
-        .send()
-        .await
-        .unwrap();
-
-        http.delete(format!(
-            "http://localhost:8081/subjects/{}-{}?permanent=true",
-            topic, suffix
-        ))
-        .send()
-        .await
-        .unwrap();
-
-        // Register the schema, which must be successful.
-        assert!(http
-            .post(format!(
-                "http://localhost:8081/subjects/{}-{}/versions",
-                topic, suffix
-            ))
-            .json(&json!({"schema": schema.to_string(), "schemaType": "JSON"}))
-            .send()
-            .await
-            .unwrap()
-            .status()
-            .is_success());
-    }
-
-    let json_encoder = JsonEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
-
-    for idx in 0..n {
-        let key = json!({
-            "idx": idx,
-            "nested": {
-                "sub_id": idx
-            },
-        });
-        let value = json!({
-            "value": format!("value-{}", idx),
-        });
-
-        let key_encoded = json_encoder
-            .encode(
-                &key,
-                SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
+        // Populate regular "data" records.
+        for idx in 0..num_messages {
+            send_message(
+                topic,
+                &enc.key_for_idx(idx, topic).await,
+                Some(&enc.payload_for_idx(idx, topic).await),
+                idx,
+                num_partitions,
+                &producer,
             )
-            .await
-            .unwrap();
+            .await;
+        }
 
-        let value_encoded = json_encoder
-            .encode(
-                &value,
-                SubjectNameStrategy::TopicNameStrategy(topic.to_string(), false),
+        // Populate deletion records.
+        for idx in 0..num_partitions {
+            send_message(
+                topic,
+                &enc.key_for_idx(idx as usize, topic).await,
+                None::<&[u8]>,
+                idx as usize,
+                num_partitions,
+                &producer,
             )
-            .await
-            .unwrap();
-
-        producer
-            .send(
-                FutureRecord::to(topic)
-                    .partition(idx as i32 % partitions)
-                    .key(&key_encoded)
-                    .payload(&value_encoded)
-                    .timestamp(unix_millis_fixture(idx))
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })),
-                None,
-            )
-            .await
-            .unwrap();
-    }
-
-    // Deletion records.
-    for idx in 0..partitions {
-        let key = json!({
-            "idx": idx,
-            "nested": {
-                "sub_id": idx
-            },
-        });
-
-        let key_encoded = json_encoder
-            .encode(
-                &key,
-                SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
-            )
-            .await
-            .unwrap();
-
-        producer
-            .send(
-                FutureRecord::to(topic)
-                    .partition(idx as i32 % partitions)
-                    .key(&key_encoded)
-                    .timestamp(unix_millis_fixture(idx as usize))
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })) as FutureRecord<'_, Vec<u8>, Vec<u8>>,
-                None,
-            )
-            .await
-            .unwrap();
+            .await;
+        }
     }
 }
 
-async fn write_raw_json_test_data(
+async fn send_message<K, P>(
     topic: &str,
-    n: usize,
-    partitions: i32,
+    key: &K,
+    payload: Option<&P>,
+    idx: usize,
+    num_partitions: i32,
     producer: &FutureProducer,
-) {
-    for idx in 0..n {
-        producer
-            .send(
-                FutureRecord::to(topic)
-                    .partition(idx as i32 % partitions)
-                    .key(&json!({"key": idx}).to_string())
-                    .payload(&json!({"payload": idx}).to_string())
-                    .timestamp(unix_millis_fixture(idx))
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })),
-                None,
-            )
-            .await
-            .unwrap();
+) where
+    K: ToBytes + ?Sized,
+    P: ToBytes + ?Sized,
+{
+    let mut rec = FutureRecord::to(topic)
+        .partition(idx as i32 % num_partitions)
+        .key(key)
+        .timestamp(unix_millis_fixture(idx))
+        .headers(OwnedHeaders::new().insert(Header {
+            key: "header-key",
+            value: Some(&format!("header-value-{}", idx)),
+        }));
+
+    if let Some(payload) = payload {
+        rec = rec.payload(payload);
     }
 
-    // Deletion records.
-    for idx in 0..partitions {
-        producer
-            .send(
-                FutureRecord::to(topic)
-                    .partition(idx as i32 % partitions)
-                    .key(&json!({"key": idx}).to_string())
-                    .timestamp(unix_millis_fixture(idx as usize))
-                    .headers(OwnedHeaders::new().insert(Header {
-                        key: "header-key",
-                        value: Some(&format!("header-value-{}", idx)),
-                    })) as FutureRecord<'_, String, String>,
-                None,
-            )
-            .await
-            .unwrap();
-    }
+    producer.send(rec, None).await.unwrap();
 }
 
 fn unix_millis_fixture(idx: usize) -> i64 {
     ((idx + 1) * 86_400_000) as i64
+}
+
+#[async_trait::async_trait]
+trait TestDataEncoder {
+    async fn key_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8>;
+    async fn payload_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8>;
+    fn key_schema_string(&self) -> String;
+    fn payload_schema_string(&self) -> String;
+    fn schema_type_string(&self) -> Option<String>;
+}
+
+struct AvroTestDataEncoder {}
+
+impl AvroTestDataEncoder {
+    fn new() -> Self {
+        AvroTestDataEncoder {}
+    }
+}
+
+#[async_trait::async_trait]
+impl TestDataEncoder for AvroTestDataEncoder {
+    async fn key_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
+        let enc = AvroEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
+        let schema =
+            Schema::parse(&serde_json::from_str(&self.key_schema_string()).unwrap()).unwrap();
+
+        let mut key = Record::new(&schema).unwrap();
+        key.put("idx", Value::Int(idx as i32));
+        key.put(
+            "nested",
+            Value::Record(vec![("sub_id".to_string(), Value::Int(idx as i32))]),
+        );
+
+        enc.encode_value(
+            key.into(),
+            &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
+        )
+        .await
+        .unwrap()
+    }
+
+    async fn payload_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
+        let enc = AvroEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
+        let schema =
+            Schema::parse(&serde_json::from_str(&self.payload_schema_string()).unwrap()).unwrap();
+
+        let mut value = Record::new(&schema).unwrap();
+        value.put("value", Value::String(format!("value-{}", idx)));
+
+        enc.encode_value(
+            value.into(),
+            &SubjectNameStrategy::TopicNameStrategy(topic.to_string(), false),
+        )
+        .await
+        .unwrap()
+    }
+
+    fn key_schema_string(&self) -> String {
+        let parsed = Schema::parse(&json!({
+          "type": "record",
+          "name": "AvroKey",
+          "fields": [
+            {
+              "name": "idx",
+              "type": "int"
+            },
+            {
+              "name": "nested",
+              "type": {
+                "type": "record",
+                "name": "NestedAvroKeyRecord",
+                "fields": [
+                  {
+                    "name": "sub_id",
+                    "type": "int"
+                  }
+                ]
+              }
+            }
+          ]
+        }))
+        .unwrap();
+
+        parsed.canonical_form()
+    }
+
+    fn payload_schema_string(&self) -> String {
+        let parsed = Schema::parse(&json!({
+          "type": "record",
+          "name": "AvroValue",
+          "fields": [
+            {
+              "name": "value",
+              "type": "string"
+            }
+          ]
+        }))
+        .unwrap();
+
+        parsed.canonical_form()
+    }
+
+    fn schema_type_string(&self) -> Option<String> {
+        Some("AVRO".to_string())
+    }
+}
+
+struct JsonSchemaTestDataEncoder {}
+
+impl JsonSchemaTestDataEncoder {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait::async_trait]
+impl TestDataEncoder for JsonSchemaTestDataEncoder {
+    async fn key_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
+        let enc = JsonEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
+        enc.encode(
+            &json!({
+                "idx": idx,
+                "nested": {
+                    "sub_id": idx
+                },
+            }),
+            SubjectNameStrategy::TopicNameStrategy(topic.to_string(), true),
+        )
+        .await
+        .unwrap()
+    }
+
+    async fn payload_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
+        let enc = JsonEncoder::new(SrSettings::new(String::from("http://localhost:8081")));
+        enc.encode(
+            &json!({
+                "value": format!("value-{}", idx),
+            }),
+            SubjectNameStrategy::TopicNameStrategy(topic.to_string(), false),
+        )
+        .await
+        .unwrap()
+    }
+
+    fn key_schema_string(&self) -> String {
+        serde_json::to_string(&json!({
+            "$schema": "http://json-schema.org/draft-07/schema#",
+            "title": "JsonKey",
+            "type": "object",
+            "properties": {
+              "idx": {
+                "type": "integer"
+              },
+              "nested": {
+                "type": "object",
+                "title": "NestedJsonKeyRecord",
+                "properties": {
+                  "sub_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["sub_id"]
+              }
+            },
+            "required": ["idx", "nested"]
+        }))
+        .unwrap()
+    }
+
+    fn payload_schema_string(&self) -> String {
+        serde_json::to_string(&json!({
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "title": "JsonValue",
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": ["value"]
+        }))
+        .unwrap()
+    }
+
+    fn schema_type_string(&self) -> Option<String> {
+        Some("JSON".to_string())
+    }
+}
+
+struct JsonRawTestDataEncoder {}
+
+impl JsonRawTestDataEncoder {
+    fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait::async_trait]
+impl TestDataEncoder for JsonRawTestDataEncoder {
+    async fn key_for_idx<'a>(&'a self, idx: usize, _: &'a str) -> Vec<u8> {
+        serde_json::to_vec(&json!({
+            "key": idx,
+        }))
+        .unwrap()
+    }
+
+    async fn payload_for_idx<'a>(&'a self, idx: usize, _: &'a str) -> Vec<u8> {
+        serde_json::to_vec(&json!({
+            "payload": idx,
+        }))
+        .unwrap()
+    }
+
+    fn key_schema_string(&self) -> String {
+        panic!("not implemented")
+    }
+
+    fn payload_schema_string(&self) -> String {
+        panic!("not implemented")
+    }
+
+    fn schema_type_string(&self) -> Option<String> {
+        None
+    }
 }
