@@ -96,7 +96,8 @@ impl JsonSchema for EndpointConfig {
                             "auth_type": {
                                 "type": "string",
                                 "default": "user_password",
-                                "const": "user_password"
+                                "const": "user_password",
+                                "order": 0
                             },
                             "mechanism": {
                                 "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
@@ -107,16 +108,17 @@ impl JsonSchema for EndpointConfig {
                                 ],
                                 "title": "SASL Mechanism",
                                 "type": "string",
-                                "order": 0
+                                "default": "PLAIN",
+                                "order": 1
                             },
                             "username": {
-                                "order": 1,
+                                "order": 2,
                                 "secret": true,
                                 "title": "Username",
                                 "type": "string"
                             },
                             "password": {
-                                "order": 2,
+                                "order": 3,
                                 "secret": true,
                                 "title": "Password",
                                 "type": "string"

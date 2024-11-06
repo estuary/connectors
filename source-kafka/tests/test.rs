@@ -437,7 +437,8 @@ impl TestDataEncoder for JsonSchemaTestDataEncoder {
                 "required": ["sub_id"]
               }
             },
-            "required": ["idx", "nested"]
+            "required": ["idx", "nested"],
+            "additionalProperties": false
         }))
         .unwrap()
     }
@@ -452,7 +453,8 @@ impl TestDataEncoder for JsonSchemaTestDataEncoder {
               "type": "string"
             }
           },
-          "required": ["value"]
+          "required": ["value"],
+          "additionalProperties": false
         }))
         .unwrap()
     }
