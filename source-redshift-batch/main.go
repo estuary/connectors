@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"net/url"
 	"strings"
 
@@ -151,6 +152,16 @@ func translateRedshiftValue(val any, databaseTypeName string) (any, error) {
 		case strings.EqualFold(databaseTypeName, "JSONB"):
 			return json.RawMessage(val), nil
 		}
+	}
+	if val, ok := val.(float64); ok { // Both FLOAT4 and FLOAT8 columns are float64's here
+		if math.IsNaN(val) {
+			return "NaN", nil
+		} else if math.IsInf(val, +1) {
+			return "Infinity", nil
+		} else if math.IsInf(val, -1) {
+			return "-Infinity", nil
+		}
+		return val, nil
 	}
 	return val, nil
 }
