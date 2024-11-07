@@ -157,6 +157,31 @@ func TestJSONColumn(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
+func TestFloatNaNs(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "10511"
+	var tableName = fmt.Sprintf("test.float_nans_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, a_real REAL, a_double DOUBLE PRECISION)", tableName))
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
+
+	t.Run("Capture", func(t *testing.T) {
+		executeControlQuery(ctx, t, control, fmt.Sprintf(`INSERT INTO %s VALUES (0, 2.0, 'NaN'), (1, 'NaN', 3.0), (2, 'Infinity', '-Infinity')`, tableName))
+
+		// Run the capture for 1 second, which should be plenty to pull down a few rows.
+		var captureCtx, cancelCapture = context.WithCancel(ctx)
+		time.AfterFunc(1*time.Second, cancelCapture)
+		cs.Capture(captureCtx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 func TestSchemaFilter(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
