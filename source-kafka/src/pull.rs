@@ -20,7 +20,7 @@ use proto_flow::{
     flow::{capture_spec::Binding, ConnectorState, RangeSpec},
 };
 use rdkafka::{
-    consumer::{Consumer, StreamConsumer},
+    consumer::{BaseConsumer, Consumer},
     message::Headers,
     metadata::MetadataPartition,
     Message, Offset, Timestamp, TopicPartitionList,
@@ -98,7 +98,10 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
         setup_consumer(&mut consumer, state, &spec.bindings, &req.range).await?;
 
     loop {
-        let msg = consumer.recv().await.context("receiving next message")?;
+        let msg = consumer
+            .poll(None)
+            .expect("polling without a timeout should always produce a message")
+            .context("receiving next message")?;
 
         let mut op = "u";
         let mut doc = match msg.payload() {
@@ -209,7 +212,7 @@ fn unix_millis_to_rfc3339(millis: i64) -> Result<String> {
 }
 
 async fn setup_consumer(
-    consumer: &mut StreamConsumer<FlowConsumerContext>,
+    consumer: &mut BaseConsumer<FlowConsumerContext>,
     state: CaptureState,
     bindings: &[Binding],
     range: &Option<RangeSpec>,
