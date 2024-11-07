@@ -64,21 +64,22 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
               "auth_type": {
                 "const": "AWS",
                 "default": "AWS",
+                "order": 0,
                 "type": "string"
               },
               "aws_access_key_id": {
-                "order": 0,
+                "order": 1,
                 "title": "AWS Access Key ID",
                 "type": "string"
               },
               "aws_secret_access_key": {
-                "order": 1,
+                "order": 2,
                 "secret": true,
                 "title": "AWS Secret Access Key",
                 "type": "string"
               },
               "region": {
-                "order": 2,
+                "order": 3,
                 "title": "AWS Region",
                 "type": "string"
               }

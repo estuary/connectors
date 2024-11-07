@@ -1,6 +1,6 @@
 use anyhow::Result;
 use rdkafka::client::{ClientContext, OAuthToken};
-use rdkafka::consumer::{ConsumerContext, StreamConsumer};
+use rdkafka::consumer::{BaseConsumer, ConsumerContext};
 use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -22,7 +22,7 @@ pub enum Credentials {
         username: String,
         password: String,
     },
-    #[serde(rename = "aws")]
+    #[serde(rename = "AWS")]
     AWS {
         aws_access_key_id: String,
         aws_secret_access_key: String,
@@ -136,21 +136,22 @@ impl JsonSchema for EndpointConfig {
                             "auth_type": {
                                 "type": "string",
                                 "default": "AWS",
-                                "const": "AWS"
+                                "const": "AWS",
+                                "order": 0
                             },
                             "aws_access_key_id": {
                                 "title": "AWS Access Key ID",
                                 "type": "string",
-                                "order": 0
+                                "order": 1
                             },
                             "aws_secret_access_key": {
-                                "order": 1,
+                                "order": 2,
                                 "secret": true,
                                 "title": "AWS Secret Access Key",
                                 "type": "string"
                             },
                             "region": {
-                                "order": 2,
+                                "order": 3,
                                 "title": "AWS Region",
                                 "type": "string"
                             }
@@ -249,7 +250,7 @@ impl ClientContext for FlowConsumerContext {
 impl ConsumerContext for FlowConsumerContext {}
 
 impl EndpointConfig {
-    pub async fn to_consumer(&self) -> Result<StreamConsumer<FlowConsumerContext>> {
+    pub async fn to_consumer(&self) -> Result<BaseConsumer<FlowConsumerContext>> {
         let mut config = ClientConfig::new();
 
         config.set("bootstrap.servers", self.bootstrap_servers.clone());
@@ -280,7 +281,7 @@ impl EndpointConfig {
             auth: self.credentials.clone(),
         };
 
-        let consumer: StreamConsumer<FlowConsumerContext> = config.create_with_context(ctx)?;
+        let consumer: BaseConsumer<FlowConsumerContext> = config.create_with_context(ctx)?;
 
         if let Some(Credentials::AWS { .. }) = &self.credentials {
             // In order to generate an initial OAuth Bearer token to be used by the consumer
@@ -288,7 +289,7 @@ impl EndpointConfig {
             // See https://docs.confluent.io/platform/current/clients/librdkafka/html/classRdKafka_1_1OAuthBearerTokenRefreshCb.html
             // Note that this is expected to return an error since we have no topic assignments yet
             // hence the ignoring of the result
-            let _ = consumer.recv().await;
+            let _ = consumer.poll(Some(std::time::Duration::ZERO));
         }
 
         Ok(consumer)
