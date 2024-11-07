@@ -311,16 +311,13 @@ async fn parse_datum(
     schema_cache: &mut HashMap<u32, RegisteredSchema>,
     schema_client: Option<&SchemaRegistryClient>,
 ) -> Result<serde_json::Value> {
-    match datum[0] {
-        0 => {
-            // Magic byte indicating that this message was encoded with a schema registry.
+    match (schema_client, datum[0]) {
+        (Some(schema_client), 0) => {
+            // Schema registry is available, and this message was encoded with a
+            // schema.
             let schema_id = u32::from_be_bytes(datum[1..5].try_into()?);
             if let Entry::Vacant(e) = schema_cache.entry(schema_id) {
-                e.insert(schema_client
-                    .as_ref()
-                    .ok_or(anyhow!("schema registry configuration must be provided to parse Kafka messages encoded with schema registry"))?
-                    .fetch_schema(schema_id)
-                    .await?);
+                e.insert(schema_client.fetch_schema(schema_id).await?);
             }
 
             match schema_cache.get(&schema_id).unwrap() {
@@ -346,8 +343,15 @@ async fn parse_datum(
                 }
             }
         }
-
-        _ => {
+        (None, 0) => {
+            // Schema registry is not available, but the data was encoded with a
+            // schema. We might as well try to see if the data is a valid JSON
+            // document.
+            Ok(serde_json::from_slice(&datum[5..]).context(
+                "received a message with a schema magic byte, but schema registry is not configured and the message is not valid JSON"
+            )?)
+        }
+        (_, _) => {
             // If there is no schema information available for how to parse the
             // document, we make our best guess at parsing into something that
             // would be useful. A present key will always be able to be captured
