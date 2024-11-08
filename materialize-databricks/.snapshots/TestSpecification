@@ -167,6 +167,11 @@
         },
         "additionalProperties": false,
         "type": "object",
+        "required": [
+          "job_id",
+          "account_id",
+          "api_key"
+        ],
         "title": "dbt Cloud Job Trigger",
         "description": "Trigger a dbt Job when new data is available"
       }
