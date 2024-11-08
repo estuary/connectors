@@ -355,6 +355,8 @@ const queryDiscoverTables = `
   JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
   WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron', 'pglogical')
     AND NOT c.relispartition
+    -- exclude temporary tables ('t') and unlogged tables ('u')
+    AND c.relpersistence = 'p'
     AND c.relkind IN ('r', 'p');` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
 
 func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
