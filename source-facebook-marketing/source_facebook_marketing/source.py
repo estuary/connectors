@@ -70,12 +70,6 @@ class SourceFacebookMarketing(AbstractSource):
         except (requests.exceptions.RequestException, ValidationError) as e:
             return False, e
 
-        # make sure that we have valid combination of "action_breakdowns" and "breakdowns" parameters
-        for stream in self.get_custom_insights_streams(api, config):
-            try:
-                stream.check_breakdowns()
-            except facebook_business.exceptions.FacebookRequestError as e:
-                return False, e._api_error_message
         return True, None
 
     def streams(self, config: Mapping[str, Any]) -> List[Type[Stream]]:
@@ -127,13 +121,13 @@ class SourceFacebookMarketing(AbstractSource):
                 max_batch_size=config.max_batch_size,
                 source_defined_primary_key=["id"],
             ),
-            AdsInsights(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsAgeAndGender(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size,source_defined_primary_key=["id"], **insights_args),
-            AdsInsightsCountry(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsRegion(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsDma(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsPlatformAndDevice(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
-            AdsInsightsActionType(page_size=config.page_size, account_ids=config.account_ids, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
+            AdsInsights(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsAgeAndGender(page_size=config.page_size, max_batch_size=config.max_batch_size,source_defined_primary_key=["id"], **insights_args),
+            AdsInsightsCountry(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsRegion(page_size=config.page_size,  max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsDma(page_size=config.page_size,  max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsPlatformAndDevice(page_size=config.page_size,  max_batch_size=config.max_batch_size, source_defined_primary_key=["date_start", "account_id", "ad_id"], **insights_args),
+            AdsInsightsActionType(page_size=config.page_size,  max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
             Campaigns(
                 api=api,
                 account_ids=config.account_ids,

@@ -323,7 +323,7 @@ class AdsInsights(FBMarketingIncrementalStream):
         schema = loader.get_schema("ads_insights")
         if self._custom_fields:
             custom_fields = set(self._custom_fields + [self.cursor_field, "date_stop", "account_id", "ad_id"])
-            schema["properties"] = {k: v for k, v in schema["properties"].items() if k in self._fields + [self.cursor_field]}
+            schema["properties"] = {k: v for k, v in schema["properties"].items() if k in custom_fields}
         if self.breakdowns:
             breakdowns_properties = loader.get_schema("ads_insights_breakdowns")["properties"]
             schema["properties"].update({prop: breakdowns_properties[prop] for prop in self.breakdowns})

@@ -165,8 +165,7 @@ class API:
         self.api = MyFacebookAdsApi.init(access_token=access_token, crash_log=False, api_version="v19.0")
         FacebookAdsApi.set_default_api(self.api)
 
-    @cached_property
-    def get_account(self, account_id) -> AdAccount:
+    def get_account(self, account_id: str) -> AdAccount:
         """Find current account"""
         if account_id in self._account_ids:
             return self._account_ids[account_id]

@@ -130,12 +130,14 @@ class FBMarketingStream(Stream, ABC):
         else:
             return {}
 
-    def _transform_state_from_old_format(self, state: Mapping[str, Any], move_fields: List[str] = None) -> Mapping[str, Any]:
+    def _transform_state_from_one_account_format(self, state: Mapping[str, Any], move_fields: List[str] = None) -> Mapping[str, Any]:
         """
         Transforms the state from an old format to a new format based on account IDs.
+
         This method transforms the old state to be a dictionary where the keys are account IDs.
         If the state is in the old format (not keyed by account IDs), it will transform the state
         by nesting it under the account ID.
+
         :param state: The original state dictionary to transform.
         :param move_fields: A list of field names whose values should be moved to the top level of the new state dictionary.
         :return: The transformed state dictionary.
@@ -163,6 +165,19 @@ class FBMarketingStream(Stream, ABC):
         # If the state is empty or there are multiple account IDs, return an empty dictionary.
         return {}
 
+    def _transform_state_from_old_deleted_format(self, state: Mapping[str, Any]):
+        # transform from the old format with `include_deleted`
+        for account_id in self._account_ids:
+            account_state = state.get(account_id, {})
+            # check if the state for this account id is in the old format
+            if "filter_statuses" not in account_state and "include_deleted" in account_state:
+                if account_state["include_deleted"]:
+                    account_state["filter_statuses"] = self.valid_statuses
+                else:
+                    account_state["filter_statuses"] = []
+                state[account_id] = account_state
+        return state
+
     def read_records(
         self,
         sync_mode: SyncMode,
@@ -172,19 +187,33 @@ class FBMarketingStream(Stream, ABC):
     ) -> Iterable[Mapping[str, Any]]:
         """Main read method used by CDK"""
 
-        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state))
+        account_id = stream_slice["account_id"]
+        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state), account_id=account_id)
         loaded_records_iter = (record.api_get(fields=self.fields, pending=self.use_batch) for record in records_iter)
-        if self.use_batch:
-            loaded_records_iter = self.execute_in_batch(loaded_records_iter)
+        try:
+            for record in self.list_objects(
+                params=self.request_params(stream_state=stream_state),
+                account_id=account_id,
+            ):
+                if isinstance(record, AbstractObject):
+                    record = record.export_all_data()  # convert FB object to dict
+                self.add_account_id(record, stream_slice["account_id"])
+                yield record
+        except Exception as e:
+            self.logger.error(f"{e}")
+            raise 
 
-        for record in loaded_records_iter:
-            if isinstance(record, AbstractObject):
-                yield record.export_all_data()  # convert FB object to dict
-            else:
-                yield record  # execute_in_batch will emmit dicts
+    def stream_slices(self, stream_state: Mapping[str, Any] = None, **kwargs) -> Iterable[Optional[Mapping[str, any]]]:
+        if stream_state:
+            stream_state = self._transform_state_from_one_account_format(stream_state, ["include_deleted"])
+            stream_state = self._transform_state_from_old_deleted_format(stream_state)
+
+        for account_id in self._account_ids:
+            account_state = self.get_account_state(account_id, stream_state)
+            yield {"account_id": account_id, "stream_state": account_state}
 
     @abstractmethod
-    def list_objects(self, params: Mapping[str, Any]) -> Iterable:
+    def list_objects(self, params: Mapping[str, Any], account_id) -> Iterable:
         """List FB objects, these objects will be loaded in read_records later with their details.
 
         :param params: params to make request
