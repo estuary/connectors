@@ -81,15 +81,12 @@ class UserResponse(BaseModel, extra="forbid"):
 class Conversation(BaseDocument, extra="allow"):
     conversationId: str
     conversationStart: AwareDatetime
-
-
-class EndedConversation(Conversation):
-    conversationEnd: AwareDatetime
-
-
-class ConversationQueryResponse(BaseModel, extra="forbid"):
-    conversations: list[Conversation] | None = None # If there are no conversations in the requested range, the conversations field is omitted from the response.
-    totalHits: int
+    # Conversations that have not ended do not have a conversationEnd field.
+    conversationEnd: AwareDatetime = Field(
+        default=None,
+        # Don't schematize the default value.
+        json_schema_extra=lambda x: x.pop('default') # type: ignore
+    )
 
 
 class CreateJobResponse(BaseModel, extra="forbid"):
