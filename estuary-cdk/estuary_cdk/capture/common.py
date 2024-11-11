@@ -22,6 +22,8 @@ from ..flow import (
     AccessToken,
     BaseOAuth2Credentials,
     CaptureBinding,
+    ClientCredentialsOAuth2Credentials,
+    ClientCredentialsOAuth2Spec,
     OAuth2Spec,
     ValidationError,
     BasicAuth,
