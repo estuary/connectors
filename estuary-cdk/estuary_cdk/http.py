@@ -9,7 +9,14 @@ import base64
 import time
 
 from . import Mixin
-from .flow import BaseOAuth2Credentials, AccessToken, OAuth2Spec, BasicAuth
+from .flow import (
+    AccessToken,
+    BasicAuth,
+    BaseOAuth2Credentials,
+    ClientCredentialsOAuth2Credentials,
+    ClientCredentialsOAuth2Spec,
+    OAuth2Spec,
+)
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 
@@ -120,8 +127,8 @@ class TokenSource:
         refresh_token: str = ""
         scope: str = ""
 
-    oauth_spec: OAuth2Spec | None
-    credentials: BaseOAuth2Credentials | AccessToken | BasicAuth
+    oauth_spec: OAuth2Spec | ClientCredentialsOAuth2Spec | None
+    credentials: BaseOAuth2Credentials | ClientCredentialsOAuth2Credentials | AccessToken | BasicAuth
     authorization_header: str = DEFAULT_AUTHORIZATION_HEADER
     _access_token: AccessTokenResponse | None = None
     _fetched_at: int = 0
@@ -137,7 +144,7 @@ class TokenSource:
                 ).decode(),
             )
 
-        assert isinstance(self.credentials, BaseOAuth2Credentials)
+        assert isinstance(self.credentials, BaseOAuth2Credentials) or isinstance(self.credentials, ClientCredentialsOAuth2Credentials)
         current_time = time.time()
 
         if self._access_token is not None:
@@ -158,20 +165,39 @@ class TokenSource:
         return ("Bearer", self._access_token.access_token)
 
     async def _fetch_oauth2_token(
-        self, log: Logger, session: HTTPSession, credentials: BaseOAuth2Credentials
+        self, log: Logger, session: HTTPSession, credentials: BaseOAuth2Credentials | ClientCredentialsOAuth2Credentials
     ) -> AccessTokenResponse:
         assert self.oauth_spec
+
+        headers = {}
+        form = {}
+
+        match credentials:
+            case BaseOAuth2Credentials():
+                form = {
+                    "grant_type": "refresh_token",
+                    "client_id": credentials.client_id,
+                    "client_secret": credentials.client_secret,
+                    "refresh_token": credentials.refresh_token,
+                }
+            case ClientCredentialsOAuth2Credentials():
+                form = {
+                    "grant_type": "client_credentials",
+                }
+                headers = {
+                    "Authorization": "Basic " + base64.b64encode(
+                        f"{credentials.client_id}:{credentials.client_secret}".encode()
+                    ).decode()
+                }
+            case _:
+                raise TypeError(f"Unsupported credentials type: {type(credentials)}.")
 
         response = await session.request(
             log,
             self.oauth_spec.accessTokenUrlTemplate,
             method="POST",
-            form={
-                "grant_type": "refresh_token",
-                "client_id": credentials.client_id,
-                "client_secret": credentials.client_secret,
-                "refresh_token": credentials.refresh_token,
-            },
+            headers=headers,
+            form=form,
             _with_token=False,
         )
         return self.AccessTokenResponse.model_validate_json(response)
