@@ -1,4 +1,4 @@
-from datetime import timedelta, datetime, UTC
+from datetime import timedelta
 import functools
 from logging import Logger
 
@@ -18,16 +18,8 @@ from .models import (
 from .api import (
     snapshot_users,
     fetch_conversations,
-    backfill_conversations,
-    _dt_to_str,
     COMMON_API,
 )
-
-# The backing data set for Genesys' asynchronous analytics jobs is not updated in real-time.
-# It can take hours to a day for the data to be available. We shift the cutoff between backfills
-# & incremental replication two days to ensure we're only backfilling over a data range where
-# data is available.
-ASYNC_JOB_DATA_AVAILABILITY_DELAY = 2
 
 
 def update_oauth2spec_with_domain(config: EndpointConfig):
@@ -120,15 +112,7 @@ def conversations(
                 http,
                 config.genesys_cloud_domain,
             ),
-            fetch_page=functools.partial(
-                backfill_conversations,
-                http,
-                config.genesys_cloud_domain,
-            )
         )
-
-    backfill_start = _dt_to_str(config.start_date)
-    cutoff = datetime.now(tz=UTC) - timedelta(days=ASYNC_JOB_DATA_AVAILABILITY_DELAY)
 
     return common.Resource(
         name='conversations',
@@ -136,8 +120,7 @@ def conversations(
         model=Conversation,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=backfill_start, cutoff=cutoff)
+            inc=ResourceState.Incremental(cursor=config.start_date),
         ),
         initial_config=ResourceConfig(
             name='conversations', interval=timedelta(minutes=5)

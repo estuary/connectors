@@ -49,6 +49,11 @@
           "format": "date-time",
           "title": "Conversationstart",
           "type": "string"
+        },
+        "conversationEnd": {
+          "format": "date-time",
+          "title": "Conversationend",
+          "type": "string"
         }
       },
       "required": [
