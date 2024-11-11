@@ -359,7 +359,9 @@ class FBMarketingReversedIncrementalStream(FBMarketingIncrementalStream, ABC):
         - update state only when we reach the end
         - stop reading when we reached the end
         """
-        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state))
+        account_id = stream_slice["account_id"]
+
+        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state), account_id=account_id)
         for record in records_iter:
             record_cursor_value = pendulum.parse(record[self.cursor_field])
             if self._cursor_value and record_cursor_value < self._cursor_value:

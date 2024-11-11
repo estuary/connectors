@@ -145,24 +145,12 @@ class Activities(FBMarketingIncrementalStream):
     def _state_filter(self, stream_state: Mapping[str, Any]) -> Mapping[str, Any]:
         """Additional filters associated with state if any set"""
         state_value = stream_state.get(self.cursor_field)
-        if stream_state:
-            since = pendulum.parse(state_value)
-        elif self._start_date:
-            since = self._start_date
-        else:
-            # if start_date is not specified then do not use date filters
-            return {}
+        since = self._start_date if not state_value else pendulum.parse(state_value)
 
-        potentially_new_records_in_the_past = self._filter_statuses and (
-            set(self._filter_statuses) - set(stream_state.get("filter_statuses", []))
-        )
+        potentially_new_records_in_the_past = self._include_deleted and not stream_state.get("include_deleted", False)
         if potentially_new_records_in_the_past:
-            self.logger.info(f"Ignoring bookmark for {self.name} because of enabled `filter_statuses` option")
-            if self._start_date:
-                since = self._start_date
-            else:
-                # if start_date is not specified then do not use date filters
-                return {}
+            self.logger.info(f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option")
+            since = self._start_date
 
         return {"since": since.int_timestamp}
 

@@ -12,7 +12,7 @@ types-requests = "^2.31"
 facebook-business = "19.0.0"
 pydantic = "==1.10.14"
 cached-property = "^1.5.2"
-pendulum = "^3"
+pendulum = "==2.1.2"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"

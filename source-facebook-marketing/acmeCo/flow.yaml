@@ -3,11 +3,7 @@ collections:
   acmeCo/activities:
     schema: activities.schema.yaml
     key:
-      - /object_id
       - /actor_id
-      - /application_id
-      - /event_time
-      - /event_type
   acmeCo/ad_account:
     schema: ad_account.schema.yaml
     key:

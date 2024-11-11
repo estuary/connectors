@@ -29,13 +29,13 @@ custom_insights:
       level: ad
       name: ads_insights_publisher_platform
       start_date: "2021-11-01T00:00:00Z"
-      time_increment: 1
+      time_increment: 360
 fetch_thumbnail_images: false
 include_deleted: true
 insights_lookback_window: 28
 max_batch_size: 50
 page_size: 100
-start_date: "2021-11-01T00:00:00Z"
+start_date: "2024-11-01T00:00:00Z"
 sops:
     kms: []
     gcp_kms:
@@ -45,8 +45,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-10-30T19:01:21Z"
-    mac: ENC[AES256_GCM,data:lksew6RnULnIZyMc5HZCDRo8bpjO3kX/9gh3ev5Xgmyd7QTG/rO2HCpeIsC77Gw4vco6trl2F/7U6r0ICl0UBHlLHgCAAAVLkXzadhM7Ty8xkW+cpo6VoL9HAKdaFZchT8dJlv2zOXDNWuPg5RF5dBxk97SZqkRMR8ekNKiAErQ=,iv:kL9jIUkCTrPgX6bZ07IPtXfHIYAt09Tvu+7zmherbnQ=,tag:ypP4PbGgLIzPVxkLe/DbrQ==,type:str]
+    lastmodified: "2024-11-11T19:07:30Z"
+    mac: ENC[AES256_GCM,data:DnjkguTUM5RBYREQlUp9UJTbdQ1N8DNfTLWeF+ZYSPRzMGrfwYsAhrE/08GYy3/4mAJSOTvMVRnqc0FArZ5MxIl5ttgyEZpRWMA/Z2x7BQAlByvBO2FZcsv+PdmSbtThYO/9jLeAeCCyl6LUvguiUkHxCB4HMUdHTXbLCnQYe1w=,iv:nabT9Nmhz/hTHzM+8NLTFDNIQmciFAtpMxf9/P49b4A=,tag:qeFSf7/FvFI6md+fb7TVRg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

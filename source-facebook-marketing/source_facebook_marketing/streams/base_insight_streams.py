@@ -59,6 +59,7 @@ class AdsInsights(FBMarketingIncrementalStream):
         breakdowns: List[str] = None,
         action_breakdowns: List[str] = None,
         action_breakdowns_allow_empty: bool = False,
+        insights_job_timeout: int = 60,
         time_increment: Optional[int] = None,
         insights_lookback_window: int = None,
         level: str = "ad",
@@ -80,7 +81,7 @@ class AdsInsights(FBMarketingIncrementalStream):
         self._new_class_name = name
         self._insights_lookback_window = insights_lookback_window
         self.level = level
-
+        self._insights_job_timeout = insights_job_timeout
         # state
         self._cursor_values: Optional[Mapping[str, pendulum.Date]] = None 
         self._next_cursor_values = self._get_start_date()
@@ -106,6 +107,10 @@ class AdsInsights(FBMarketingIncrementalStream):
         why the value for `insights_lookback_window` is set throught config.
         """
         return pendulum.duration(days=self._insights_lookback_window)
+
+    @property
+    def insights_job_timeout(self):
+        return pendulum.duration(minutes=self._insights_job_timeout)
 
     def list_objects(self, params: Mapping[str, Any]) -> Iterable:
         """Because insights has very different read_records we don't need this method anymore"""
@@ -225,7 +230,6 @@ class AdsInsights(FBMarketingIncrementalStream):
                 edge_object=self._api.get_account(account_id=account_id),
                 interval=interval,
                 params=params,
-                job_timeout=self.insights_job_timeout,
             )
 
     def check_breakdowns(self, account_id):
@@ -258,9 +262,17 @@ class AdsInsights(FBMarketingIncrementalStream):
         if stream_state:
             self.state = stream_state
 
-        manager = InsightAsyncJobManager(api=self._api, jobs=self._generate_async_jobs(params=self.request_params()))
-        for job in manager.completed_jobs():
-            yield {"insight_job": job}
+        for account_id in self._account_ids:
+            try:
+                manager = InsightAsyncJobManager(
+                    api=self._api,
+                    jobs=self._generate_async_jobs(params=self.request_params(), account_id=account_id),
+                    account_id=account_id,
+                )
+                for job in manager.completed_jobs():
+                    yield {"insight_job": job, "account_id": account_id}
+            except Exception as e:
+                raise e
 
     def _get_start_date(self) -> pendulum.Date:
         """Get start date to begin sync with. It is not that trivial as it might seem.
