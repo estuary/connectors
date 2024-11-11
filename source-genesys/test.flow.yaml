@@ -1,0 +1,17 @@
+---
+captures:
+  acmeCo/source-genesys:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_genesys
+        config: 
+          genesys_cloud_domain: mypurecloud.com
+          start_date: "2024-11-11T00:00:00Z"
+          credentials:
+            client_id: my_client_id
+            client_secret: my_client_secret
+            credentials_title: OAuth Credentials
+    bindings: []
