@@ -62,33 +62,33 @@ func RunValidateAndApplyTestCases(
 		fixture := loadSpec(t, "big-schema.flow.proto")
 
 		// Initial validation with no previously existing table.
-		validateRes, err := driver.Validate(ctx, ValidateReq(fixture, configJson, resourceConfigJson))
+		validateRes, err := driver.Validate(ctx, ValidateReq(fixture, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
 		snap.WriteString("Big Schema Initial Constraints:\n")
 		snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 		// Initial apply with no previously existing table.
-		_, err = driver.Apply(ctx, ApplyReq(fixture, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		sch := dumpSchema(t)
 
 		// Validate again.
-		validateRes, err = driver.Validate(ctx, ValidateReq(fixture, configJson, resourceConfigJson))
+		validateRes, err = driver.Validate(ctx, ValidateReq(fixture, fixture, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
 		snap.WriteString("\nBig Schema Re-validated Constraints:\n")
 		snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 		// Apply again - this should be a no-op.
-		_, err = driver.Apply(ctx, ApplyReq(fixture, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, ApplyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 		require.Equal(t, sch, dumpSchema(t))
 
 		// Validate with most of the field types changed somewhat randomly.
 		changed := loadSpec(t, "big-schema-changed.flow.proto")
-		validateRes, err = driver.Validate(ctx, ValidateReq(changed, configJson, resourceConfigJson))
+		validateRes, err = driver.Validate(ctx, ValidateReq(changed, fixture, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
 		snap.WriteString("\nBig Schema Changed Types Constraints:\n")
@@ -100,15 +100,15 @@ func RunValidateAndApplyTestCases(
 		// Validate and apply the schema with all fields removed from required and snapshot the
 		// table output.
 		nullable := loadSpec(t, "big-schema-nullable.flow.proto")
-		validateRes, err = driver.Validate(ctx, ValidateReq(nullable, configJson, resourceConfigJson))
+		validateRes, err = driver.Validate(ctx, ValidateReq(nullable, fixture, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
-		_, err = driver.Apply(ctx, ApplyReq(nullable, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, ApplyReq(nullable, fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		// A second apply of the nullable schema should be a no-op.
 		sch = dumpSchema(t)
-		_, err = driver.Apply(ctx, ApplyReq(nullable, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, ApplyReq(nullable, nullable, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 		require.Equal(t, sch, dumpSchema(t))
 
@@ -118,13 +118,13 @@ func RunValidateAndApplyTestCases(
 		// Apply the spec with the randomly changed types, but this time with a backfill that will
 		// cause the table to be replaced.
 		changed.Bindings[0].Backfill = 1
-		validateRes, err = driver.Validate(ctx, ValidateReq(changed, configJson, resourceConfigJson))
+		validateRes, err = driver.Validate(ctx, ValidateReq(changed, nullable, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
 		snap.WriteString("\nBig Schema Changed Types With Table Replacement Constraints:\n")
 		snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
-		_, err = driver.Apply(ctx, ApplyReq(changed, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, ApplyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 		snap.WriteString("\nBig Schema Materialized Resource Schema Changed Types With Table Replacement:\n")
 		snap.WriteString(dumpSchema(t) + "\n")
@@ -160,15 +160,15 @@ func RunValidateAndApplyTestCases(
 				initial := loadSpec(t, "base.flow.proto")
 
 				// Validate and Apply the base spec.
-				validateRes, err := driver.Validate(ctx, ValidateReq(initial, configJson, resourceConfigJson))
+				validateRes, err := driver.Validate(ctx, ValidateReq(initial, nil, configJson, resourceConfigJson))
 				require.NoError(t, err)
-				_, err = driver.Apply(ctx, ApplyReq(initial, configJson, resourceConfigJson, validateRes, true))
+				_, err = driver.Apply(ctx, ApplyReq(initial, nil, configJson, resourceConfigJson, validateRes, true))
 				require.NoError(t, err)
 
 				// Validate and Apply the updated spec.
-				validateRes, err = driver.Validate(ctx, ValidateReq(tt.newSpec, configJson, resourceConfigJson))
+				validateRes, err = driver.Validate(ctx, ValidateReq(tt.newSpec, initial, configJson, resourceConfigJson))
 				require.NoError(t, err)
-				_, err = driver.Apply(ctx, ApplyReq(tt.newSpec, configJson, resourceConfigJson, validateRes, true))
+				_, err = driver.Apply(ctx, ApplyReq(tt.newSpec, initial, configJson, resourceConfigJson, validateRes, true))
 				require.NoError(t, err)
 
 				snap.WriteString(tt.name + ":\n")
@@ -186,9 +186,9 @@ func RunValidateAndApplyTestCases(
 		// any columns. This makes sure we are able to read back the schema we have created
 		// correctly.
 		for idx := 0; idx < 2; idx++ {
-			validateRes, err := driver.Validate(ctx, ValidateReq(fixture, configJson, resourceConfigJson))
+			validateRes, err := driver.Validate(ctx, ValidateReq(fixture, nil, configJson, resourceConfigJson))
 			require.NoError(t, err)
-			_, err = driver.Apply(ctx, ApplyReq(fixture, configJson, resourceConfigJson, validateRes, false))
+			_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, false))
 			require.NoError(t, err)
 		}
 
@@ -201,7 +201,7 @@ func RunValidateAndApplyTestCases(
 
 // validateReq makes a mock Validate request object from a built spec fixture. It only works with a
 // single binding.
-func ValidateReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
+func ValidateReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
 	req := &pm.Request_Validate{
 		Name:          spec.Name,
 		ConnectorType: spec.ConnectorType,
@@ -212,13 +212,14 @@ func ValidateReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceC
 			FieldConfigJsonMap: spec.Bindings[0].FieldSelection.FieldConfigJsonMap,
 			Backfill:           spec.Bindings[0].Backfill,
 		}},
+		LastMaterialization: lastSpec,
 	}
 
 	return req
 }
 
 // applyReq conjures a pm.Request_Apply from a spec and validate response.
-func ApplyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
+func ApplyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
 	spec.ConfigJson = config
 	spec.Bindings[0].ResourceConfigJson = resourceConfig
 	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
@@ -226,8 +227,9 @@ func ApplyReq(spec *pf.MaterializationSpec, config json.RawMessage, resourceConf
 	spec.Bindings[0].FieldSelection = SelectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, includeOptional)
 
 	req := &pm.Request_Apply{
-		Materialization: spec,
-		Version:         "someVersion",
+		Materialization:     spec,
+		Version:             "someVersion",
+		LastMaterialization: lastSpec,
 	}
 
 	return req
