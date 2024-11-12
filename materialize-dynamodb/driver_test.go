@@ -74,7 +74,7 @@ func TestValidateAndApply(t *testing.T) {
 		func(t *testing.T, materialization pf.Materialization) {
 			t.Helper()
 
-			for _, table := range []string{resourceConfig.Table, metaTableName} {
+			for _, table := range []string{resourceConfig.Table} {
 				_, err := client.db.DeleteTable(ctx, &dynamodb.DeleteTableInput{
 					TableName: aws.String(table),
 				})
