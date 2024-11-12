@@ -100,6 +100,8 @@ async def _perform_conversation_job(
         "interval": f"{_dt_to_str(start_date)}/{_dt_to_str(end_date)}",
     }
 
+    log.info(f"Submitting Genesys analytics job for conversations between {start_date} and {end_date}.")
+
     response = CreateJobResponse.model_validate_json(
         await http.request(log, url, method="POST", json=body)
     )
@@ -115,8 +117,8 @@ async def _perform_conversation_job(
     rate_limiter.delay = 3.0 
     while state != "FULFILLED":
         delay = rate_limiter.delay
+        log.info(f"Sleeping for {delay} seconds while Genesys analytics job completes. Current Genesys job status is {state}.")
         await asyncio.sleep(delay)
-
         response = CheckJobStatusResponse.model_validate_json(
             await http.request(log, url)
         )
@@ -137,14 +139,21 @@ async def _perform_conversation_job(
         "pageSize": 1000,
     }
 
+    pageCount = 0
+    most_recent_start = start_date
+
     while True:
         response = JobResultsResponse.model_validate_json(
             await http.request(log, url, params=params)
         )
+        pageCount += 1
 
         conversations = response.conversations
         for conversation in conversations:
+            most_recent_start = conversation.conversationStart
             yield conversation
+
+        log.info(f"Processed page {pageCount} containing conversations starting on or before {most_recent_start}.")
 
         cursor = response.cursor
         if not cursor:
