@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -15,33 +14,17 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var (
-	metaTableName = "flow_materializations_v2"
-
-	metaTableAttrs = []types.AttributeDefinition{
-		{
-			AttributeName: aws.String("materialization"),
-			AttributeType: types.ScalarAttributeTypeS,
-		},
-	}
-
-	metaTableSchema = []types.KeySchemaElement{
-		{
-			AttributeName: aws.String("materialization"),
-			KeyType:       types.KeyTypeHash,
-		},
-	}
-)
-
 type ddbApplier struct {
 	client *client
 	cfg    config
+	// TODO(whb): Including the lastSpec from the validate or apply request is a
+	// temporary hack until we get around to removing the "load/persist a spec
+	// in the destination" concept more thoroughly.
+	lastSpec *pf.MaterializationSpec
 }
 
 func (e *ddbApplier) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, boilerplate.ActionApplyFn, error) {
-	return fmt.Sprintf("create table %q", metaTableName), func(ctx context.Context) error {
-		return createTable(ctx, e.client, metaTableName, metaTableAttrs, metaTableSchema)
-	}, nil
+	return "", nil, nil
 }
 
 func (e *ddbApplier) CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
@@ -56,30 +39,11 @@ func (e *ddbApplier) CreateResource(ctx context.Context, spec *pf.Materializatio
 }
 
 func (e *ddbApplier) LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
-	return getSpec(ctx, e.client, materialization.String())
+	return e.lastSpec, nil
 }
 
 func (e *ddbApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, _ bool) (string, boilerplate.ActionApplyFn, error) {
-	return fmt.Sprintf("update stored materialization spec and set version = %s", version), func(ctx context.Context) error {
-		specBytes, err := spec.Marshal()
-		if err != nil {
-			return fmt.Errorf("marshalling spec: %w", err)
-		}
-
-		if _, err := e.client.db.PutItem(ctx, &dynamodb.PutItemInput{
-			Item: map[string]types.AttributeValue{
-				"materialization": &types.AttributeValueMemberS{Value: spec.Name.String()},
-				"spec":            &types.AttributeValueMemberB{Value: specBytes},
-				"version":         &types.AttributeValueMemberS{Value: version},
-			},
-			TableName: aws.String(metaTableName),
-		}); err != nil {
-			return fmt.Errorf("PutItem for updated spec: %w", err)
-		}
-
-		return nil
-	}, nil
-
+	return "", nil, nil
 }
 
 func (e *ddbApplier) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
@@ -93,37 +57,6 @@ func (e *ddbApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 	// change the key of an established collection, and the Validation constraints don't allow
 	// changing the type of a key field in a way that would change its materialized type.
 	return "", nil, nil
-}
-
-func getSpec(ctx context.Context, client *client, materialization string) (*pf.MaterializationSpec, error) {
-	item, err := client.db.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(metaTableName),
-		Key: map[string]types.AttributeValue{
-			"materialization": &types.AttributeValueMemberS{Value: materialization},
-		},
-		ConsistentRead: aws.Bool(true),
-	})
-	if err != nil {
-		var errNotFound *types.ResourceNotFoundException
-		if errors.As(err, &errNotFound) {
-			// Metadata table doesn't exist yet.
-			return nil, nil
-		}
-
-		return nil, fmt.Errorf("getItem: %w", err)
-	}
-
-	ss := []byte{}
-	if err := attributevalue.Unmarshal(item.Item["spec"], &ss); err != nil {
-		return nil, err
-	}
-
-	spec := &pf.MaterializationSpec{}
-	if err := spec.Unmarshal(ss); err != nil {
-		return nil, fmt.Errorf("unmarshalling spec: %w", err)
-	}
-
-	return spec, nil
 }
 
 func createTable(

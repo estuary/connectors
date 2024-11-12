@@ -336,14 +336,14 @@ func RunValidateAndApplyMigrationsTests(
 		fixture := loadValidateSpec(t, "base.flow.proto")
 
 		// Initial validation with no previously existing table.
-		validateRes, err := driver.Validate(ctx, boilerplate.ValidateReq(fixture, configJson, resourceConfigJson))
+		validateRes, err := driver.Validate(ctx, boilerplate.ValidateReq(fixture, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
 		snap.WriteString("Base Initial Constraints:\n")
 		snap.WriteString(boilerplate.SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 		// Initial apply with no previously existing table.
-		_, err = driver.Apply(ctx, boilerplate.ApplyReq(fixture, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, boilerplate.ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		insertData(t,
@@ -357,13 +357,13 @@ func RunValidateAndApplyMigrationsTests(
 
 		// Validate with migratable changes
 		changed := loadValidateSpec(t, "migratable-changes.flow.proto")
-		validateRes, err = driver.Validate(ctx, boilerplate.ValidateReq(changed, configJson, resourceConfigJson))
+		validateRes, err = driver.Validate(ctx, boilerplate.ValidateReq(changed, fixture, configJson, resourceConfigJson))
 		require.NoError(t, err)
 
 		snap.WriteString("\nMigratable Changes Constraints:\n")
 		snap.WriteString(boilerplate.SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
-		_, err = driver.Apply(ctx, boilerplate.ApplyReq(changed, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, boilerplate.ApplyReq(changed, fixture, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		snap.WriteString("\nMigratable Changes Applied Schema:\n")

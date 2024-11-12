@@ -176,11 +176,6 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		return nil, err
 	}
 
-	storedSpec, err := getSpec(ctx, client, req.Name.String())
-	if err != nil {
-		return nil, err
-	}
-
 	tableNames := make([]string, 0, len(req.Bindings))
 	for _, binding := range req.Bindings {
 		res, err := resolveResourceConfig(binding.ResourceConfigJson)
@@ -228,7 +223,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 			binding.Backfill,
 			binding.Collection,
 			binding.FieldConfigJsonMap,
-			storedSpec,
+			req.LastMaterialization,
 		)
 		if err != nil {
 			return nil, err
@@ -267,8 +262,9 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}
 
 	return boilerplate.ApplyChanges(ctx, req, &ddbApplier{
-		client: client,
-		cfg:    cfg,
+		client:   client,
+		cfg:      cfg,
+		lastSpec: req.LastMaterialization,
 	}, is, true)
 }
 
