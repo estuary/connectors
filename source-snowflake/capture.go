@@ -243,7 +243,7 @@ func (c *capture) updateState(ctx context.Context) error {
 				"uid":   uniqueID,
 			}).Info("binding added")
 
-			var isDynamic = dynamicTables[binding.Table]
+			var _, isDynamic = dynamicTables[binding.Table] // Any table with an entry in the dynamicTables map must be a dynamic table
 
 			streamName, err := createChangeStream(ctx, c.Config, c.DB, binding.Table, isDynamic, uniqueID)
 			if err != nil {
