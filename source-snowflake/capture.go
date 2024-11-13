@@ -229,6 +229,11 @@ func (c *capture) updateState(ctx context.Context) error {
 		}
 	}
 
+	dynamicTables, err := listDynamicTables(ctx, c.DB)
+	if err != nil {
+		return fmt.Errorf("error listing dynamic tables: %w", err)
+	}
+
 	// Identify newly added streams, clone initial table contents, and initialize stream state.
 	for stateKey, binding := range c.Bindings {
 		if prevState, ok := c.State.Streams[stateKey]; !ok || prevState.Disabled {
@@ -238,13 +243,15 @@ func (c *capture) updateState(ctx context.Context) error {
 				"uid":   uniqueID,
 			}).Info("binding added")
 
-			streamName, err := createChangeStream(ctx, c.Config, c.DB, binding.Table, uniqueID)
+			var isDynamic = dynamicTables[binding.Table]
+
+			streamName, err := createChangeStream(ctx, c.Config, c.DB, binding.Table, isDynamic, uniqueID)
 			if err != nil {
 				return err
 			}
 			log.WithField("stream", streamName.String()).Debug("created change stream")
 
-			stagingName, err := createInitialCloneTable(ctx, c.Config, c.DB, binding.Table, uniqueID, initialCloneSequenceNumber)
+			stagingName, err := createInitialCloneTable(ctx, c.Config, c.DB, binding.Table, isDynamic, uniqueID, initialCloneSequenceNumber)
 			if err != nil {
 				return err
 			}
@@ -421,10 +428,15 @@ func (c *capture) captureStagingTable(ctx context.Context, stateKey boilerplate.
 		"seq":   streamState.SequenceNumber,
 	})
 
-	// Ensure that the staging table exists by creating it if necessary. Since
-	// the creation is done IF NOT EXISTS this is a no-op if it already does.
-	if _, err := createStagingTable(ctx, c.Config, c.DB, streamState.UniqueID, streamState.SequenceNumber); err != nil {
-		return err
+	// Ensure that the staging table exists by creating it if necessary. Since the creation
+	// is done IF NOT EXISTS this is a no-op if it already does.
+	//
+	// Staging table zero is special, because it's created using createInitialCloneTable when
+	// the binding state is initialized, and we don't ever want to recreate it here.
+	if streamState.SequenceNumber > 0 {
+		if _, err := createStagingTable(ctx, c.Config, c.DB, streamState.UniqueID, streamState.SequenceNumber); err != nil {
+			return err
+		}
 	}
 
 	// Generate a query to read the staging table contents.

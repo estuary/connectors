@@ -12,4 +12,20 @@ Useful commands:
 
     $ docker build -t ghcr.io/estuary/source-snowflake:local -f source-snowflake/Dockerfile .
     $ flowctl raw discover --source acmeCo/flow.yaml
-    $ flowctl raw capture acmeCo/flow.yaml
+    $ flowctl raw capture --source acmeCo/flow.yaml
+
+Example `flow.yaml` for discovery:
+
+    captures:
+      acmeCo/source-snowflake:
+        endpoint:
+          connector:
+            image: "ghcr.io/estuary/source-snowflake:v1"
+            config:
+              host: bn92689.us-central1.gcp.snowflakecomputing.com
+              account: bn92689
+              user: USERNAME
+              password: secret1234
+              database: CONNECTOR_TESTING
+              warehouse: COMPUTE_WH
+        bindings: []
