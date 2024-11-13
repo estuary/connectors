@@ -20,6 +20,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/alternate-root.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/increment-backfill.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-fields.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-fields-incompatible.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullable-key.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/long-fields.flow.yaml
 
@@ -172,6 +173,15 @@ func TestValidate(t *testing.T) {
 			specForInfoSchema:  loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			existingSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			fieldNameTransform: ambiguousTestTransform,
+			maxFieldLength:     0,
+		},
+		{
+			name:               "update an existing materialization with ambiguous fields in an incompatbile way",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "ambiguous-fields-incompatible.flow.proto"),
 			fieldNameTransform: ambiguousTestTransform,
 			maxFieldLength:     0,
 		},
