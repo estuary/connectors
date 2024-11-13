@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
 	"github.com/snowflakedb/gosnowflake"
 )
@@ -95,13 +96,20 @@ func createStagingTable(ctx context.Context, cfg *config, db *sql.DB, uniqueID s
 	return stagingTable, nil
 }
 
-func createChangeStream(ctx context.Context, cfg *config, db *sql.DB, sourceTable snowflakeObject, uniqueID string) (snowflakeObject, error) {
+func createChangeStream(ctx context.Context, cfg *config, db *sql.DB, sourceTable snowflakeObject, isDynamic bool, uniqueID string) (snowflakeObject, error) {
 	var changeStream = changeStreamName(cfg, uniqueID)
 	var createStreamQuery = fmt.Sprintf(
 		`CREATE STREAM IF NOT EXISTS %s ON TABLE %s;`,
 		changeStream.QuotedName(),
 		sourceTable.QuotedName(),
 	)
+	if isDynamic {
+		createStreamQuery = fmt.Sprintf(
+			`CREATE STREAM IF NOT EXISTS %s ON DYNAMIC TABLE %s;`,
+			changeStream.QuotedName(),
+			sourceTable.QuotedName(),
+		)
+	}
 	log.WithField("query", createStreamQuery).Debug("creating change stream")
 	if _, err := db.ExecContext(ctx, createStreamQuery); err != nil {
 		return changeStream, fmt.Errorf("error creating stream %s for table %s: %w", changeStream, sourceTable, err)
@@ -112,17 +120,40 @@ func createChangeStream(ctx context.Context, cfg *config, db *sql.DB, sourceTabl
 // createInitialCloneTable clones the current state of the source table into a staging table
 // with the specified sequence number. The operation is idempotent, if a staging table with
 // the desired sequence number already exists then this does nothing.
-func createInitialCloneTable(ctx context.Context, cfg *config, db *sql.DB, sourceTable snowflakeObject, uniqueID string, seqno int) (snowflakeObject, error) {
+func createInitialCloneTable(ctx context.Context, cfg *config, db *sql.DB, sourceTable snowflakeObject, isDynamic bool, uniqueID string, seqno int) (snowflakeObject, error) {
 	var stagingTable = stagingTableName(cfg, uniqueID, seqno)
 	var createStagingTableQuery = fmt.Sprintf(
 		`CREATE TRANSIENT TABLE IF NOT EXISTS %s CLONE %s;`,
 		stagingTable.QuotedName(),
 		sourceTable.QuotedName(),
 	)
+	if isDynamic {
+		createStagingTableQuery = fmt.Sprintf(
+			`CREATE TRANSIENT DYNAMIC TABLE IF NOT EXISTS %s CLONE %s;`,
+			stagingTable.QuotedName(),
+			sourceTable.QuotedName(),
+		)
+	}
 	if _, err := db.ExecContext(ctx, createStagingTableQuery); err != nil {
 		return stagingTable, fmt.Errorf("error cloning source table %q into staging table %q: %w", sourceTable, stagingTable, err)
 	}
 	return stagingTable, nil
+}
+
+func listDynamicTables(ctx context.Context, db *sql.DB) (map[snowflakeObject]bool, error) {
+	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
+	var tables []*snowflakeDiscoveryTable
+	if err := xdb.SelectContext(ctx, &tables, "SHOW TABLES;"); err != nil {
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+
+	var dynamicTables = make(map[snowflakeObject]bool)
+	for _, table := range tables {
+		var tableID = snowflakeObject{table.Schema, table.Name}
+		var isDynamic = (table.IsDynamic == "Y")
+		dynamicTables[tableID] = isDynamic
+	}
+	return dynamicTables, nil
 }
 
 // changeStream returns the table name of the change stream which corresponds to a
