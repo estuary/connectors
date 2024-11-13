@@ -140,20 +140,26 @@ func createInitialCloneTable(ctx context.Context, cfg *config, db *sql.DB, sourc
 	return stagingTable, nil
 }
 
-func listDynamicTables(ctx context.Context, db *sql.DB) (map[snowflakeObject]bool, error) {
+type snowflakeDynamicTable struct {
+	Database    string `db:"database_name"`
+	Schema      string `db:"schema_name"`
+	Name        string `db:"name"`
+	RefreshMode string `db:"refresh_mode"`
+}
+
+func listDynamicTables(ctx context.Context, db *sql.DB) (map[snowflakeObject]*snowflakeDynamicTable, error) {
 	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
-	var tables []*snowflakeDiscoveryTable
-	if err := xdb.SelectContext(ctx, &tables, "SHOW TABLES;"); err != nil {
+	var tables []*snowflakeDynamicTable
+	if err := xdb.SelectContext(ctx, &tables, "SHOW DYNAMIC TABLES IN ACCOUNT;"); err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
 
-	var dynamicTables = make(map[snowflakeObject]bool)
+	var result = make(map[snowflakeObject]*snowflakeDynamicTable)
 	for _, table := range tables {
 		var tableID = snowflakeObject{table.Schema, table.Name}
-		var isDynamic = (table.IsDynamic == "Y")
-		dynamicTables[tableID] = isDynamic
+		result[tableID] = table
 	}
-	return dynamicTables, nil
+	return result, nil
 }
 
 // changeStream returns the table name of the change stream which corresponds to a

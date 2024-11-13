@@ -46,18 +46,18 @@ func (snowflakeDriver) Discover(ctx context.Context, req *pc.Request_Discover) (
 }
 
 type snowflakeDiscoveryResults struct {
-	Tables      []*snowflakeDiscoveryTable
-	Columns     []*snowflakeDiscoveryColumn
-	PrimaryKeys []*snowflakeDiscoveryPrimaryKey
+	Tables        []*snowflakeDiscoveryTable
+	Columns       []*snowflakeDiscoveryColumn
+	PrimaryKeys   []*snowflakeDiscoveryPrimaryKey
+	DynamicTables map[snowflakeObject]*snowflakeDynamicTable
 }
 
 type snowflakeDiscoveryTable struct {
-	Database  string `db:"database_name"`
-	Schema    string `db:"schema_name"`
-	Name      string `db:"name"`
-	Kind      string `db:"kind"`
-	Comment   string `db:"comment"`
-	IsDynamic string `db:"is_dynamic"`
+	Database string `db:"database_name"`
+	Schema   string `db:"schema_name"`
+	Name     string `db:"name"`
+	Kind     string `db:"kind"`
+	Comment  string `db:"comment"`
 }
 
 type snowflakeDiscoveryColumn struct {
@@ -103,6 +103,10 @@ func performSnowflakeDiscovery(ctx context.Context, cfg *config, db *sql.DB) (*s
 	if err := xdb.Select(&tables, "SHOW TABLES;"); err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
+	var dynamicTables, err = listDynamicTables(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("error listing dynamic tables: %w", err)
+	}
 	var columns []*snowflakeDiscoveryColumn
 	if err := xdb.Select(&columns, "SELECT * FROM information_schema.columns;"); err != nil {
 		return nil, fmt.Errorf("error listing columns: %w", err)
@@ -119,9 +123,10 @@ func performSnowflakeDiscovery(ctx context.Context, cfg *config, db *sql.DB) (*s
 		return cmp.Compare(a.KeySeq, b.KeySeq)
 	})
 	return &snowflakeDiscoveryResults{
-		Tables:      tables,
-		Columns:     columns,
-		PrimaryKeys: primaryKeys,
+		Tables:        tables,
+		Columns:       columns,
+		PrimaryKeys:   primaryKeys,
+		DynamicTables: dynamicTables,
 	}, nil
 }
 
@@ -157,6 +162,18 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 			continue
 		}
 		streams[tableID] = &snowflakeDiscoveryInfo{Table: discoveredTable}
+	}
+	for tableID, dynamicTable := range info.DynamicTables {
+		// As of November 2024, attempting to create a stream based on a full-refresh dynamic table fails with
+		// an error message reading "Change tracking is not supported on dynamic tables with 'FULL' REFRESH_MODE".
+		//
+		// This limitation is not explicitly mentioned in any Snowflake documentation that I have found, so it's
+		// possible they will lift it at some point in the future, but for now this means that we cannot capture
+		// from a full-refresh dynamic table and we need to filter them out at discovery time in order to return
+		// only entities we can actually capture from.
+		if !strings.EqualFold(dynamicTable.RefreshMode, "INCREMENTAL") {
+			delete(streams, tableID)
+		}
 	}
 	for _, discoveredColumn := range info.Columns {
 		if discoveredColumn.Database != cfg.Database {
