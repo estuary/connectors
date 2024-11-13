@@ -70,7 +70,7 @@ func TestBasicDatatypes(t *testing.T) {
 
 	tb.Insert(ctx, t, tableName, [][]any{
 		{3, "DCBA", []byte{0xEE, 0x5A, 0x11, 0xA5}, 2.64, false, 0, 0},
-		{4, "    ", []byte{0xFF}, 0.00001, false, -9999, 99.999},
+		{4, "    ", []byte{0xFF}, 0.00001, false, -9999, -0.99},
 		{5, nil, nil, nil, nil, nil, nil},
 	})
 	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
