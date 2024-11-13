@@ -215,9 +215,17 @@ func (v Validator) validateMatchesExistingBinding(
 			// yet been selected.
 			if existing != nil && slices.Contains(existing.FieldSelection.AllFields(), p.Field) {
 				// This field has already been selected as the ambiguous field to materialize.
-				c = &pm.Response_Validated_Constraint{
-					Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
-					Reason: "This location is part of the current materialization",
+				if existingField, err := v.is.GetField(path, p.Field); err == nil {
+					// If the field already exists in the destination, make sure
+					// the new projection is compatible.
+					if c, err = v.constraintForExistingField(boundCollection, p, existingField, fieldConfigJsonMap); err != nil {
+						return nil, fmt.Errorf("evaluating constraint for existing ambiguous field: %w", err)
+					}
+				} else {
+					c = &pm.Response_Validated_Constraint{
+						Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+						Reason: "This location is part of the current materialization",
+					}
 				}
 			} else if existing != nil && v.ambiguousFieldIsSelected(p, existing.FieldSelection.AllFields()) {
 				// A different field has been selected, so this one can't be.
@@ -251,40 +259,8 @@ func (v Validator) validateMatchesExistingBinding(
 		} else if existingField, err := v.is.GetField(path, p.Field); err == nil {
 			// All other fields that are already being materialized. Any error from GetField is
 			// because the field does not already exist.
-			rawConfig := fieldConfigJsonMap[p.Field]
-			if compatible, err := v.c.Compatible(existingField, &p, rawConfig); err != nil {
-				return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", existingField.Name, p.Field, err)
-			} else if compatible {
-				if p.IsPrimaryKey {
-					c = &pm.Response_Validated_Constraint{
-						Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
-						Reason: "This field is a key in the current materialization",
-					}
-				} else {
-					// TODO(whb): Really this should be "FIELD_RECOMMENDED", but that is not a
-					// constraint that has been implemented currently. This would be an issue if there
-					// are multiple projections of the same location.
-					c = &pm.Response_Validated_Constraint{
-						Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
-						Reason: "This location is part of the current materialization",
-					}
-				}
-			} else {
-				newDesc, err := v.c.DescriptionForType(&p, rawConfig)
-				if err != nil {
-					return nil, fmt.Errorf("getting description for field %q of bound collection %q: %w", p.Field, boundCollection.Name.String(), err)
-				}
-
-				c = &pm.Response_Validated_Constraint{
-					Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
-					Reason: fmt.Sprintf(
-						"Field '%s' is already being materialized as endpoint type '%s' but endpoint type '%s' is required by its schema '%s'",
-						p.Field,
-						strings.ToUpper(existingField.Type),
-						strings.ToUpper(newDesc),
-						fieldSchema(p),
-					),
-				}
+			if c, err = v.constraintForExistingField(boundCollection, p, existingField, fieldConfigJsonMap); err != nil {
+				return nil, err
 			}
 		}
 
@@ -319,6 +295,53 @@ func (v Validator) validateMatchesExistingBinding(
 	}
 
 	return constraints, nil
+}
+
+func (v Validator) constraintForExistingField(
+	boundCollection pf.CollectionSpec,
+	p pf.Projection,
+	existingField EndpointField,
+	fieldConfigJsonMap map[string]json.RawMessage,
+) (*pm.Response_Validated_Constraint, error) {
+	var out *pm.Response_Validated_Constraint
+
+	rawConfig := fieldConfigJsonMap[p.Field]
+	if compatible, err := v.c.Compatible(existingField, &p, rawConfig); err != nil {
+		return nil, fmt.Errorf("determining compatibility for endpoint field %q vs. selected field %q: %w", existingField.Name, p.Field, err)
+	} else if compatible {
+		if p.IsPrimaryKey {
+			out = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
+				Reason: "This field is a key in the current materialization",
+			}
+		} else {
+			// TODO(whb): Really this should be "FIELD_RECOMMENDED", but that is not a
+			// constraint that has been implemented currently. This would be an issue if there
+			// are multiple projections of the same location.
+			out = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+				Reason: "This location is part of the current materialization",
+			}
+		}
+	} else {
+		newDesc, err := v.c.DescriptionForType(&p, rawConfig)
+		if err != nil {
+			return nil, fmt.Errorf("getting description for field %q of bound collection %q: %w", p.Field, boundCollection.Name.String(), err)
+		}
+
+		out = &pm.Response_Validated_Constraint{
+			Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
+			Reason: fmt.Sprintf(
+				"Field '%s' is already being materialized as endpoint type '%s' but endpoint type '%s' is required by its schema '%s'",
+				p.Field,
+				strings.ToUpper(existingField.Type),
+				strings.ToUpper(newDesc),
+				fieldSchema(p),
+			),
+		}
+	}
+
+	return out, nil
 }
 
 // ambiguousFields determines if the given projection is part of a set of projections that would
