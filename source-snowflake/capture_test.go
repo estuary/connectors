@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
@@ -241,4 +242,27 @@ func TestAddingAndRemovingBindings(t *testing.T) {
 	cs.Capture(ctx, t, summarize)
 
 	cupaloy.SnapshotT(t, summary.String())
+}
+
+func TestDynamicTable(t *testing.T) {
+	var ctx, tb = context.Background(), snowflakeTestBackend(t)
+	var uniqueA, uniqueB = "81804963", "99720399"
+
+	// Create the base table and put a few rows in
+	var baseTable = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.Insert(ctx, t, baseTable, [][]any{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
+
+	// Create a dynamic table from the base table
+	var dynamicTable = snowflakeObject{*dbSchema, "test_" + strings.TrimPrefix(t.Name(), "Test") + "_" + uniqueB}.QuotedName()
+	tb.Query(ctx, t, fmt.Sprintf("CREATE OR REPLACE DYNAMIC TABLE %s TARGET_LAG = '60 seconds' WAREHOUSE = '%s' REFRESH_MODE = INCREMENTAL AS SELECT id, data FROM %s;", dynamicTable, *dbWarehouse, baseTable))
+	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("DROP DYNAMIC TABLE IF EXISTS %s;", dynamicTable)) })
+
+	t.Run("discovery", func(t *testing.T) { tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueB)) })
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueB))
+	t.Run("initial", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+
+	tb.Insert(ctx, t, baseTable, [][]any{{6, "F"}, {7, "ggg"}, {8, "QRSTUVWXYZ"}, {9, "Ten"}, {10, "11"}})
+	time.Sleep(61 * time.Second) // Wait for the dynamic table to refresh
+	t.Run("subsequent", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
 }

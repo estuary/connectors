@@ -52,11 +52,12 @@ type snowflakeDiscoveryResults struct {
 }
 
 type snowflakeDiscoveryTable struct {
-	Database string `db:"database_name"`
-	Schema   string `db:"schema_name"`
-	Name     string `db:"name"`
-	Kind     string `db:"kind"`
-	Comment  string `db:"comment"`
+	Database  string `db:"database_name"`
+	Schema    string `db:"schema_name"`
+	Name      string `db:"name"`
+	Kind      string `db:"kind"`
+	Comment   string `db:"comment"`
+	IsDynamic string `db:"is_dynamic"`
 }
 
 type snowflakeDiscoveryColumn struct {
