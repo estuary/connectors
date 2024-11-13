@@ -22,7 +22,10 @@ OAUTH2_SPEC = ClientCredentialsOAuth2Spec(
     }
 )
 
-OAuth2Credentials = ClientCredentialsOAuth2Credentials
+# The class name appears in the UI's Authentication section, so we wrap the non-user friendly name in a slighly better name.
+# TODO(alex): figure out why the class name is appearing in the UI & determine if there's some property to set that overrides it.
+class OAuth(ClientCredentialsOAuth2Credentials):
+    pass
 
 
 def default_start_date():
@@ -55,8 +58,9 @@ class EndpointConfig(BaseModel):
     ] = Field(
         title="Genesys Cloud Domain"
     )
-    credentials: OAuth2Credentials = Field(
+    credentials: OAuth = Field(
         title="Authentication",
+        discriminator="credentials_title"
     )
 
 
