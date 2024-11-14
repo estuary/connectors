@@ -9,189 +9,37 @@ captures:
           - python
           - "-m"
           - source_front
-        config:
-          api_key: redacted
-          start_date: "2024-01-01T12:00:00Z"
+        config: config.yaml
     bindings:
       - resource:
-          stream: events
-          syncMode: incremental
-          cursorField:
-            - emitted_at
-        target: acmeCo/events
-      - resource:
-          stream: inboxes
-          syncMode: full_refresh
-        target: acmeCo/inboxes
-      - resource:
-          stream: inboxes_channels
-          syncMode: full_refresh
-        target: acmeCo/inboxes_channels
-      - resource:
-          stream: inboxes_conversations
-          syncMode: incremental
-          cursorField:
-            - created_at
-        target: acmeCo/inboxes_conversations
-      - resource:
-          stream: inboxes_teammates
-          syncMode: full_refresh
-        target: acmeCo/inboxes_teammates
-      - resource:
-          stream: conversations
-          syncMode: incremental
-          cursorField:
-            - created_at
-        target: acmeCo/conversations
-      - resource:
-          stream: conversations_events
-          syncMode: incremental
-          cursorField:
-            - emitted_at
-        target: acmeCo/conversations_events
-      - resource:
-          stream: conversations_followers
-          syncMode: full_refresh
-        target: acmeCo/conversations_followers
-      - resource:
-          stream: conversations_inboxes
-          syncMode: full_refresh
-        target: acmeCo/conversations_inboxes
-      - resource:
-          stream: conversations_messages
-          syncMode: incremental
-          cursorField:
-            - created_at
-        target: acmeCo/conversations_messages
-      - resource:
-          stream: links
-          syncMode: full_refresh
-        target: acmeCo/links
-      - resource:
-          stream: accounts
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/accounts
-      - resource:
-          stream: accounts_contacts
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/accounts_contacts
-      - resource:
-          stream: contacts
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/contacts
-      - resource:
-          stream: channels
-          syncMode: full_refresh
+          name: channels
+          interval: PT5M
         target: acmeCo/channels
       - resource:
-          stream: company_tags
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/company_tags
+          name: inboxes
+          interval: PT5M
+        target: acmeCo/inboxes
       - resource:
-          stream: teammates
-          syncMode: full_refresh
-        target: acmeCo/teammates
-      - resource:
-          stream: tags
-          syncMode: incremental
-          cursorField:
-            - updated_at
+          name: tags
+          interval: PT5M
         target: acmeCo/tags
       - resource:
-          stream: tags_children
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/tags_children
+          name: teammates
+          interval: PT5M
+        target: acmeCo/teammates
       - resource:
-          stream: teammates_tags
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/teammates_tags
-      - resource:
-          stream: teams
-          syncMode: full_refresh
+          name: teams
+          interval: PT5M
         target: acmeCo/teams
       - resource:
-          stream: teams_tags
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/teams_tags
+          name: events
+          interval: PT5M
+        target: acmeCo/events
       - resource:
-          stream: contact_groups
-          syncMode: full_refresh
-        target: acmeCo/contact_groups
+          name: contacts
+          interval: PT5M
+        target: acmeCo/contacts
       - resource:
-          stream: conversations_drafts
-          syncMode: incremental
-          cursorField:
-            - created_at
-        target: acmeCo/conversations_drafts
-      - resource:
-          stream: contacts_notes
-          syncMode: incremental
-          cursorField:
-            - created_at
-        target: acmeCo/contacts_notes
-      - resource:
-          stream: teammates_contact_groups
-          syncMode: full_refresh
-        target: acmeCo/teammates_contact_groups
-      - resource:
-          stream: teams_contact_groups
-          syncMode: full_refresh
-        target: acmeCo/teams_contact_groups
-      - resource:
-          stream: knowledge_bases
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/knowledge_bases
-      - resource:
-          stream: knowledge_bases_articles
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/knowledge_bases_articles
-      - resource:
-          stream: knowledge_bases_categories
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/knowledge_bases_categories
-      - resource:
-          stream: message_template_folders
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/message_template_folders
-      - resource:
-          stream: teams_signatures
-          syncMode: full_refresh
-        target: acmeCo/teams_signatures
-      - resource:
-          stream: message_templates
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/message_templates
-      - resource:
-          stream: teammates_message_templates
-          syncMode: full_refresh
-        target: acmeCo/teammates_message_templates
-      - resource:
-          stream: teams_message_templates
-          syncMode: incremental
-          cursorField:
-            - updated_at
-        target: acmeCo/teams_message_templates
+          name: conversations
+          interval: PT7M
+        target: acmeCo/conversations

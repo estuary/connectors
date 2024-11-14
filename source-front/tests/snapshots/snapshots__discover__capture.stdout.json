@@ -1,475 +1,315 @@
 [
   {
-    "recommendedName": "events",
+    "recommendedName": "channels",
     "resourceConfig": {
-      "stream": "events",
-      "syncMode": "incremental",
-      "cursorField": [
-        "emitted_at"
-      ]
+      "name": "channels",
+      "interval": "PT5M"
     },
     "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FrontResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
     "recommendedName": "inboxes",
     "resourceConfig": {
-      "stream": "inboxes",
-      "syncMode": "full_refresh"
+      "name": "inboxes",
+      "interval": "PT5M"
     },
     "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FrontResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
-    "recommendedName": "inboxes_channels",
+    "recommendedName": "tags",
     "resourceConfig": {
-      "stream": "inboxes_channels",
-      "syncMode": "full_refresh"
+      "name": "tags",
+      "interval": "PT5M"
     },
     "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FrontResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
-    "recommendedName": "inboxes_conversations",
+    "recommendedName": "teammates",
     "resourceConfig": {
-      "stream": "inboxes_conversations",
-      "syncMode": "incremental",
-      "cursorField": [
-        "created_at"
-      ]
+      "name": "teammates",
+      "interval": "PT5M"
     },
     "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FrontResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
-    "recommendedName": "inboxes_teammates",
+    "recommendedName": "teams",
     "resourceConfig": {
-      "stream": "inboxes_teammates",
-      "syncMode": "full_refresh"
+      "name": "teams",
+      "interval": "PT5M"
     },
     "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
         }
       },
-      "required": [
-        "id"
-      ],
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FrontResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
-    "recommendedName": "conversations",
+    "recommendedName": "events",
     "resourceConfig": {
-      "stream": "conversations",
-      "syncMode": "incremental",
-      "cursorField": [
-        "created_at"
-      ]
+      "name": "events",
+      "interval": "PT5M"
     },
     "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "emitted_at": {
+          "title": "Emitted At",
+          "type": "number"
         }
       },
       "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "conversations_events",
-    "resourceConfig": {
-      "stream": "conversations_events",
-      "syncMode": "incremental",
-      "cursorField": [
+        "id",
         "emitted_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
       ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "conversations_followers",
-    "resourceConfig": {
-      "stream": "conversations_followers",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "conversations_inboxes",
-    "resourceConfig": {
-      "stream": "conversations_inboxes",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": [
-            "string"
-          ]
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "conversations_messages",
-    "resourceConfig": {
-      "stream": "conversations_messages",
-      "syncMode": "incremental",
-      "cursorField": [
-        "created_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "links",
-    "resourceConfig": {
-      "stream": "links",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "accounts",
-    "resourceConfig": {
-      "stream": "accounts",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "accounts_contacts",
-    "resourceConfig": {
-      "stream": "accounts_contacts",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
+      "title": "Event",
       "type": "object",
       "x-infer-schema": true
     },
@@ -480,34 +320,59 @@
   {
     "recommendedName": "contacts",
     "resourceConfig": {
-      "stream": "contacts",
-      "syncMode": "incremental",
-      "cursorField": [
+      "name": "contacts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "title": "Updated At",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
         "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
       ],
+      "title": "Contact",
       "type": "object",
       "x-infer-schema": true
     },
@@ -516,774 +381,56 @@
     ]
   },
   {
-    "recommendedName": "channels",
+    "recommendedName": "conversations",
     "resourceConfig": {
-      "stream": "channels",
-      "syncMode": "full_refresh"
+      "name": "conversations",
+      "interval": "PT7M"
     },
     "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
+      "$defs": {
+        "Meta": {
           "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
             "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
               "type": "integer"
             }
           },
-          "required": [
-            "row_id"
-          ]
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
         }
       },
       "required": [
         "id"
       ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "company_tags",
-    "resourceConfig": {
-      "stream": "company_tags",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teammates",
-    "resourceConfig": {
-      "stream": "teammates",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "tags",
-    "resourceConfig": {
-      "stream": "tags",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "tags_children",
-    "resourceConfig": {
-      "stream": "tags_children",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teammates_tags",
-    "resourceConfig": {
-      "stream": "teammates_tags",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teams",
-    "resourceConfig": {
-      "stream": "teams",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teams_tags",
-    "resourceConfig": {
-      "stream": "teams_tags",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "contact_groups",
-    "resourceConfig": {
-      "stream": "contact_groups",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "conversations_drafts",
-    "resourceConfig": {
-      "stream": "conversations_drafts",
-      "syncMode": "incremental",
-      "cursorField": [
-        "created_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "contacts_notes",
-    "resourceConfig": {
-      "stream": "contacts_notes",
-      "syncMode": "incremental",
-      "cursorField": [
-        "created_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "contact_id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "contact_id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/contact_id"
-    ]
-  },
-  {
-    "recommendedName": "teammates_contact_groups",
-    "resourceConfig": {
-      "stream": "teammates_contact_groups",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teams_contact_groups",
-    "resourceConfig": {
-      "stream": "teams_contact_groups",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": [
-            "string"
-          ]
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "type": "object",
-      "required": [
-        "id"
-      ],
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "knowledge_bases",
-    "resourceConfig": {
-      "stream": "knowledge_bases",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "knowledge_bases_articles",
-    "resourceConfig": {
-      "stream": "knowledge_bases_articles",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "knowledge_bases_categories",
-    "resourceConfig": {
-      "stream": "knowledge_bases_categories",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "message_template_folders",
-    "resourceConfig": {
-      "stream": "message_template_folders",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teams_signatures",
-    "resourceConfig": {
-      "stream": "teams_signatures",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "message_templates",
-    "resourceConfig": {
-      "stream": "message_templates",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teammates_message_templates",
-    "resourceConfig": {
-      "stream": "teammates_message_templates",
-      "syncMode": "full_refresh"
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "teams_message_templates",
-    "resourceConfig": {
-      "stream": "teams_message_templates",
-      "syncMode": "incremental",
-      "cursorField": [
-        "updated_at"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/schema#",
-      "additionalProperties": true,
-      "properties": {
-        "id": {
-          "type": "string"
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
+      "title": "Conversation",
       "type": "object",
       "x-infer-schema": true
     },
