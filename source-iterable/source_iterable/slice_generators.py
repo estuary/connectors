@@ -130,7 +130,7 @@ class AdjustableSliceGenerator(SliceGenerator):
         processing time.
         """
         minutes_spent = previous_request_time.total_minutes()
-        if minutes_spent == 0:
+        if minutes_spent < 1:
             self._current_range = self.DEFAULT_RANGE_DAYS
         else:
             days_per_minute = self._current_range / minutes_spent
