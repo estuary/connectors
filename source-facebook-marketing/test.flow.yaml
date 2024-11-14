@@ -27,62 +27,62 @@ captures:
           cursorField:
             - updated_time
         target: acmeCo/ads
-      # - resource:
-      #     stream: ad_creatives
-      #     syncMode: full_refresh
-      #   target: acmeCo/ad_creatives
-      # - resource:
-      #     stream: ads_insights
-      #     syncMode: incremental
-      #     cursorField:
-      #       - date_start
-      #   target: acmeCo/ads_insights
-      # - resource:
-      #     stream: ads_insights_age_and_gender
-      #     syncMode: incremental
-      #     cursorField:
-      #       - date_start
-      #   target: acmeCo/ads_insights_age_and_gender
-      # - resource:
-      #     stream: ads_insights_country
-      #     syncMode: incremental
-      #     cursorField:
-      #       - date_start
-      #   target: acmeCo/ads_insights_country
-      # - resource:
-      #     stream: ads_insights_region
-      #     syncMode: incremental
-      #     cursorField:
-      #       - date_start
-      #   target: acmeCo/ads_insights_region
-      # - resource:
-      #     stream: ads_insights_dma
-      #     syncMode: incremental
-      #     cursorField:
-      #       - date_start
-      #   target: acmeCo/ads_insights_dma
-      # - resource:
-      #     stream: ads_insights_platform_and_device
-      #     syncMode: incremental
-      #     cursorField:
-      #       - date_start
-      #   target: acmeCo/ads_insights_platform_and_device
-      # - resource:
-      #     stream: ads_insights_action_type
-      #     syncMode: incremental
-      #     cursorField:
-      #       - date_start
-      #   target: acmeCo/ads_insights_action_type
+      - resource:
+          stream: ad_creatives
+          syncMode: full_refresh
+        target: acmeCo/ad_creatives
+      - resource:
+          stream: ads_insights
+          syncMode: incremental
+          cursorField:
+            - date_start
+        target: acmeCo/ads_insights
+      - resource:
+          stream: ads_insights_age_and_gender
+          syncMode: incremental
+          cursorField:
+            - date_start
+        target: acmeCo/ads_insights_age_and_gender
+      - resource:
+          stream: ads_insights_country
+          syncMode: incremental
+          cursorField:
+            - date_start
+        target: acmeCo/ads_insights_country
+      - resource:
+          stream: ads_insights_region
+          syncMode: incremental
+          cursorField:
+            - date_start
+        target: acmeCo/ads_insights_region
+      - resource:
+          stream: ads_insights_dma
+          syncMode: incremental
+          cursorField:
+            - date_start
+        target: acmeCo/ads_insights_dma
+      - resource:
+          stream: ads_insights_platform_and_device
+          syncMode: incremental
+          cursorField:
+            - date_start
+        target: acmeCo/ads_insights_platform_and_device
+      - resource:
+          stream: ads_insights_action_type
+          syncMode: incremental
+          cursorField:
+            - date_start
+        target: acmeCo/ads_insights_action_type
       - resource:
           stream: campaigns
           syncMode: incremental
           cursorField:
             - updated_time
         target: acmeCo/campaigns
-      # - resource:
-      #     stream: custom_conversions
-      #     syncMode: full_refresh
-      #   target: acmeCo/custom_conversions
+      - resource:
+          stream: custom_conversions
+          syncMode: full_refresh
+        target: acmeCo/custom_conversions
       - resource:
           stream: images
           syncMode: incremental

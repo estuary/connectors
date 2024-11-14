@@ -38852,11 +38852,7 @@
       ]
     },
     "key": [
-      "/object_id",
-      "/actor_id",
-      "/application_id",
-      "/event_time",
-      "/event_type"
+      "/actor_id"
     ]
   },
   {
