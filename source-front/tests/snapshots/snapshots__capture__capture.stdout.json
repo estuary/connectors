@@ -1,0 +1,177 @@
+[
+  [
+    "acmeCo/channels",
+    {
+      "_links": {
+        "related": {
+          "inbox": "https://estuary3f31.api.frontapp.com/inboxes/inb_fa4ym",
+          "owner": "https://estuary3f31.api.frontapp.com/teams/tim_77yhq"
+        },
+        "self": "https://estuary3f31.api.frontapp.com/channels/cha_ilx26"
+      },
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "address": "ilx26-2c856a1064fcb617fd7f@in.frontapp.com",
+      "id": "cha_ilx26",
+      "is_private": false,
+      "is_valid": true,
+      "name": "mylittleshop@yourfictionalcompany.com",
+      "send_as": "mylittleshop@yourfictionalcompany.com",
+      "settings": {
+        "all_teammates_can_reply": false,
+        "undo_send_time": 0
+      },
+      "type": "smtp"
+    }
+  ],
+  [
+    "acmeCo/inboxes",
+    {
+      "_links": {
+        "related": {
+          "channels": "https://estuary3f31.api.frontapp.com/inboxes/inb_fa4ym/channels",
+          "conversations": "https://estuary3f31.api.frontapp.com/inboxes/inb_fa4ym/conversations",
+          "owner": "https://estuary3f31.api.frontapp.com/teams/tim_77yhq",
+          "teammates": "https://estuary3f31.api.frontapp.com/inboxes/inb_fa4ym/teammates"
+        },
+        "self": "https://estuary3f31.api.frontapp.com/inboxes/inb_fa4ym"
+      },
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "address": "ilx26-2c856a1064fcb617fd7f@in.frontapp.com",
+      "custom_fields": {},
+      "id": "inb_fa4ym",
+      "is_private": false,
+      "is_public": true,
+      "name": "[Demo] Support",
+      "send_as": "mylittleshop@yourfictionalcompany.com",
+      "type": "smtp"
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_links": {
+        "related": {
+          "children": null,
+          "conversations": "https://estuary3f31.api.frontapp.com/tags/tag_5632ou/conversations",
+          "owner": null,
+          "parent_tag": null
+        },
+        "self": "https://estuary3f31.api.frontapp.com/tags/tag_5632ou"
+      },
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": 1731619498.317,
+      "description": "Example company tag for testing",
+      "highlight": "blue",
+      "id": "tag_5632ou",
+      "is_private": false,
+      "is_visible_in_conversation_lists": true,
+      "name": "Company Tag 1",
+      "updated_at": 1731619626.677
+    }
+  ],
+  [
+    "acmeCo/teammates",
+    {
+      "_links": {
+        "related": {
+          "conversations": "https://estuary3f31.api.frontapp.com/teammates/tea_h5s7y/conversations",
+          "inboxes": "https://estuary3f31.api.frontapp.com/teammates/tea_h5s7y/inboxes"
+        },
+        "self": "https://estuary3f31.api.frontapp.com/teammates/tea_h5s7y"
+      },
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "custom_fields": {},
+      "email": "alexb@estuary.dev",
+      "first_name": "Alex",
+      "id": "tea_h5s7y",
+      "is_admin": true,
+      "is_available": true,
+      "is_blocked": false,
+      "last_name": "Bair",
+      "username": "alexb"
+    }
+  ],
+  [
+    "acmeCo/teams",
+    {
+      "_links": {
+        "self": "https://estuary3f31.api.frontapp.com/teams/tim_77yfy"
+      },
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "tim_77yfy",
+      "name": "Estuary"
+    }
+  ],
+  [
+    "acmeCo/conversations",
+    {
+      "_links": {
+        "related": {
+          "comments": "https://estuary3f31.api.frontapp.com/conversations/cnv_1dwxv53y/comments",
+          "events": "https://estuary3f31.api.frontapp.com/conversations/cnv_1dwxv53y/events",
+          "followers": "https://estuary3f31.api.frontapp.com/conversations/cnv_1dwxv53y/followers",
+          "inboxes": "https://estuary3f31.api.frontapp.com/conversations/cnv_1dwxv53y/inboxes",
+          "last_message": null,
+          "messages": "https://estuary3f31.api.frontapp.com/conversations/cnv_1dwxv53y/messages"
+        },
+        "self": "https://estuary3f31.api.frontapp.com/conversations/cnv_1dwxv53y"
+      },
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assignee": null,
+      "created_at": 1731600573.116,
+      "custom_fields": {},
+      "id": "cnv_1dwxv53y",
+      "is_private": false,
+      "links": [],
+      "metadata": {},
+      "recipient": null,
+      "scheduled_reminders": [],
+      "status": "unassigned",
+      "subject": "example subject 1",
+      "tags": [
+        {
+          "_links": {
+            "related": {
+              "children": null,
+              "conversations": "https://estuary3f31.api.frontapp.com/tags/tag_55x6hq/conversations",
+              "owner": "https://estuary3f31.api.frontapp.com/teammates/tea_h5s7y",
+              "parent_tag": null
+            },
+            "self": "https://estuary3f31.api.frontapp.com/tags/tag_55x6hq"
+          },
+          "created_at": 1731514012.364,
+          "description": null,
+          "highlight": null,
+          "id": "tag_55x6hq",
+          "is_private": true,
+          "is_visible_in_conversation_lists": false,
+          "name": "Inbox",
+          "updated_at": 1731514012.364
+        }
+      ],
+      "waiting_since": 1731600573.113
+    }
+  ]
+]
