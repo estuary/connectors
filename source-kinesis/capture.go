@@ -342,7 +342,10 @@ func (r *shardReader) readShard() {
 			return
 		} else {
 			// oh well, we tried. Time to call it a day
-
+			log.WithError(err).WithFields(log.Fields{
+				"stream":  r.source.stream,
+				"shardId": r.source.shardID,
+			}).Error("getting kinesis shard iterator failed")
 			return
 		}
 	}
@@ -491,6 +494,7 @@ func (r *shardReader) getShardIterator() (string, error) {
 		shardIterReq.ShardIteratorType = &START_AT_BEGINNING
 	}
 
+	log.WithField("shardIterReq", shardIterReq).Info("requesting shard iterator")
 	shardIterResp, err := r.parent.client.GetShardIteratorWithContext(r.parent.ctx, &shardIterReq)
 	if err != nil {
 		return "", err
