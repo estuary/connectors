@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -544,6 +546,13 @@ func doTransfer[T parquetValue](numRows int, r columnBatchReader[T], w columnBat
 // "any" values, as well as performing any processing necessary on that value to make it suitable
 // for storing in a parquet file.
 
+var (
+	// Used to verify no overflow when receiving integers encoded as 0
+	// fractional part floats.
+	minInt64 = big.NewFloat(float64(math.MinInt64))
+	maxInt64 = big.NewFloat(float64(math.MaxInt64))
+)
+
 func getIntVal(val any) (got int64, err error) {
 	switch v := val.(type) {
 	case int64:
@@ -564,6 +573,12 @@ func getIntVal(val any) (got int64, err error) {
 			err = fmt.Errorf("unable to parse string %q as integer: %w", v, parseErr)
 		} else {
 			got = int64(p)
+		}
+	case float64:
+		if f := big.NewFloat(v); f.Cmp(minInt64) < 0 || f.Cmp(maxInt64) > 0 {
+			err = fmt.Errorf("float64 value %f is out of range for int64", v)
+		} else {
+			got, _ = f.Int64()
 		}
 	default:
 		err = fmt.Errorf("getIntVal unhandled type: %T", v)
