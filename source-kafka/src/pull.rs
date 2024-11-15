@@ -1,5 +1,5 @@
 use crate::{
-    configuration::{EndpointConfig, FlowConsumerContext, Resource},
+    configuration::{EndpointConfig, FlowConsumerContext, Resource, SchemaRegistryConfig},
     schema_registry::{RegisteredSchema, SchemaRegistryClient},
     write_capture_response,
 };
@@ -85,12 +85,12 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
     let config: EndpointConfig = serde_json::from_str(&spec.config_json)?;
     let mut consumer = config.to_consumer().await?;
     let schema_client = match config.schema_registry {
-        Some(cfg) => Some(SchemaRegistryClient::new(
-            cfg.endpoint,
-            cfg.username,
-            cfg.password,
-        )),
-        None => None,
+        SchemaRegistryConfig::ConfluentSchemaRegistry {
+            endpoint,
+            username,
+            password,
+        } => Some(SchemaRegistryClient::new(endpoint, username, password)),
+        SchemaRegistryConfig::NoSchemaRegistry { .. } => None,
     };
     let mut schema_cache: HashMap<u32, RegisteredSchema> = HashMap::new();
 

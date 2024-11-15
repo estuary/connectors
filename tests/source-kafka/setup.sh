@@ -3,7 +3,7 @@ set -e
 
 export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
 export RESOURCE="{\"topic\": \"${TEST_STREAM}\"}"
-export CONNECTOR_CONFIG='{"bootstrap_servers": "source-kafka-db-1.flow-test:9092"}'
+export CONNECTOR_CONFIG='{"bootstrap_servers": "source-kafka-db-1.flow-test:9092", "schema_registry": {"schema_registry_type": "no_schema_registry", "enable_json_only": true}}'
 
 LISTENER_HOST="source-kafka-db-1.flow-test" docker compose -f source-kafka/docker-compose.yaml up --wait --detach
 

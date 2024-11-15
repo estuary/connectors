@@ -46,7 +46,6 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
               },
               "username": {
                 "order": 2,
-                "secret": true,
                 "title": "Username",
                 "type": "string"
               }
@@ -98,34 +97,68 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
         "type": "object"
       },
       "schema_registry": {
-        "description": "Connection details for interacting with a schema registry. This is necessary for processing messages encoded with Avro.",
-        "order": 3,
-        "properties": {
-          "endpoint": {
-            "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
-            "order": 0,
-            "title": "Schema Registry Endpoint",
-            "type": "string"
-          },
-          "password": {
-            "description": "Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key.",
-            "order": 2,
-            "secret": true,
-            "title": "Schema Registry Password",
-            "type": "string"
-          },
-          "username": {
-            "description": "Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.",
-            "order": 1,
-            "title": "Schema Registry Username",
-            "type": "string"
-          }
+        "description": "Connection details for interacting with a schema registry.",
+        "discriminator": {
+          "propertyName": "schema_registry_type"
         },
-        "required": [
-          "endpoint",
-          "password",
-          "username"
+        "oneOf": [
+          {
+            "properties": {
+              "endpoint": {
+                "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
+                "order": 1,
+                "title": "Schema Registry Endpoint",
+                "type": "string"
+              },
+              "password": {
+                "description": "Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key.",
+                "order": 3,
+                "secret": true,
+                "title": "Schema Registry Password",
+                "type": "string"
+              },
+              "schema_registry_type": {
+                "const": "confluent_schema_registry",
+                "default": "confluent_schema_registry",
+                "order": 0,
+                "type": "string"
+              },
+              "username": {
+                "description": "Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.",
+                "order": 2,
+                "title": "Schema Registry Username",
+                "type": "string"
+              }
+            },
+            "required": [
+              "endpoint",
+              "password",
+              "username"
+            ],
+            "title": "Confluent Schema Registry"
+          },
+          {
+            "properties": {
+              "enable_json_only": {
+                "description": "If no schema registry is configured the capture will attempt to parse all data as JSON, and discovered collections will use a key of the message partition & offset. All available topics will be discovered, but if their messages are not encoded as JSON attempting to capture them will result in errors. If your topics contain messages encoded with a schema, you should configure the connector to use the schema registry for optimal results.",
+                "order": 1,
+                "title": "Capture Messages in JSON Format Only",
+                "type": "boolean"
+              },
+              "schema_registry_type": {
+                "const": "no_schema_registry",
+                "default": "no_schema_registry",
+                "order": 0,
+                "type": "string"
+              }
+            },
+            "required": [
+              "enable_json_only"
+            ],
+            "title": "No Schema Registry"
+          }
         ],
+        "order": 3,
         "title": "Schema Registry",
         "type": "object"
       },
@@ -142,7 +175,8 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
     },
     "required": [
       "bootstrap_servers",
-      "credentials"
+      "credentials",
+      "schema_registry"
     ],
     "title": "Kafka Source Configuration",
     "type": "object"
