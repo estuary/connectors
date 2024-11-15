@@ -222,6 +222,29 @@ func (rs *mysqlReplicationStream) StartReplication(ctx context.Context, _ map[sq
 func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Position) error {
 	var cursor = startCursor
 
+	// The MySQL binlog protocol and event framing represent file offsets as 32-bit unsigned
+	// integers in several places. This is normally fine, as there's a soft limit of 1GB on
+	// binlog file sizes. Unfortunately it's a soft limit and it's possible to force MySQL
+	// to store an arbitrarily large amount of data in a single file.
+	//
+	// Thus file offsets greater than 2^32 can become a bit...difficult to work with. There
+	// are two places where we handle binlog offsets:
+	//   - A resume cursor (file+offset) is included with every state checkpoint emitted.
+	//   - A cursor value is embedded in the source metadata field of every change event,
+	//     and this value is used as the fallback collection key for keyless tables so we
+	//     need it to be, if not correct, then at least unique and monotonically increasing
+	//     within a single file.
+	//
+	// Since the COM_BINLOG_DUMP command only takes a 4-byte offset field it isn't possible
+	// to resume replication from an offset >4GB after a restart, so we shouldn't emit any
+	// checkpoints after that offset is reached in a particular binlog file.
+	//
+	// I trust our ability to detect that overflow has occurred more than I trust the
+	// correctness of our extended-binlog-offset tracking code, so the two purposes are
+	// separated as much as possible here.
+	var binlogOffsetOverflow bool
+	var binlogEstimatedOffset = uint64(cursor.Pos)
+
 	for {
 		// Process the next binlog event from the database.
 		var event, err = rs.streamer.GetEvent(ctx)
@@ -230,7 +253,32 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		}
 
 		if event.Header.LogPos > 0 {
-			cursor.Pos = event.Header.LogPos
+			// Since no single binlog event can exceed 1GB (and this unlike the binlog file
+			// size is an actual hard limit), overflow can be detected when we first see an
+			// event wrap around such that the log_pos header field is smaller than the last
+			if event.Header.LogPos < cursor.Pos && !binlogOffsetOverflow {
+				logrus.WithFields(logrus.Fields{
+					"cursor": cursor.String(),
+					"logpos": event.Header.LogPos,
+				}).Warn("binlog offset overflow detected")
+				binlogOffsetOverflow = true
+			}
+
+			// So long as the binlog hasn't exceeded 4GB then our estimated offset used in
+			// change event metadata should just be the literal position coming from the
+			// binlog. After it overflows just sum up all the event sizes after that point,
+			// which is "correct enough" for the document cursor even if I wouldn't trust
+			// it for replication resumption. But as previously noted, we can't resume from
+			// a point >4GB anyway so that's a moot point.
+			if !binlogOffsetOverflow {
+				binlogEstimatedOffset = uint64(event.Header.LogPos)
+
+				// We only update the cursor when the offset hasn't overflowed, so that the
+				// cursor value is always a valid resume point.
+				cursor.Pos = event.Header.LogPos
+			} else {
+				binlogEstimatedOffset += uint64(event.Header.EventSize)
+			}
 		}
 
 		// Events which are neither row changes nor commits need to be reported as an
@@ -296,7 +344,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					}
 					var sourceInfo = &mysqlSourceInfo{
 						SourceCommon: sourceCommon,
-						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, cursor.Pos, rowIdx),
+						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
 					}
 					if rs.db.includeTxIDs[streamID] {
 						sourceInfo.TxID = rs.gtidString
@@ -339,7 +387,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 						}
 						var sourceInfo = &mysqlSourceInfo{
 							SourceCommon: sourceCommon,
-							EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, cursor.Pos, rowIdx/2),
+							EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx/2),
 						}
 						if rs.db.includeTxIDs[streamID] {
 							sourceInfo.TxID = rs.gtidString
@@ -374,7 +422,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					}
 					var sourceInfo = &mysqlSourceInfo{
 						SourceCommon: sourceCommon,
-						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, cursor.Pos, rowIdx),
+						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
 						TxID:         rs.gtidString,
 					}
 					if rs.db.includeTxIDs[streamID] {
@@ -398,16 +446,32 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			}
 		case *replication.XIDEvent:
 			logrus.WithFields(logrus.Fields{
-				"xid":    data.XID,
-				"cursor": cursor,
+				"xid":         data.XID,
+				"cursor":      cursor,
+				"real_offset": binlogEstimatedOffset,
 			}).Trace("XID Event")
-			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-				Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
-			}); err != nil {
-				return err
+			// There are two ways we might handle a binlog offset overflow:
+			//
+			//   1. Continue emitting checkpoints, but never advance the cursor. This would
+			//      result in duplicate committed Flow changes.
+			//   2. Stop emitting checkpoints entirely. This results in exactly-once capture
+			//      of the replication events even when the offset overflows, but at the cost
+			//      of treating the whole >4GB portion of the oversize binlog file as a single
+			//      transaction.
+			//
+			// We have opted to go with option (2) here. Option (1) would be implemented by not
+			// having this condition here at all and simply continuing to emit checkpoints. We
+			// also stop advancing the cursor position during offset overflow, so that part is
+			// handled elsewhere already.
+			if !binlogOffsetOverflow {
+				if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+					Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+				}); err != nil {
+					return err
+				}
+				rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
+				rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 			}
-			rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
-			rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 		case *replication.TableMapEvent:
 			logrus.WithField("data", data).Trace("Table Map Event")
 		case *replication.GTIDEvent:
@@ -430,14 +494,17 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		case *replication.QueryEvent:
 			if string(data.Query) == "COMMIT" && rs.nonTransactionalChanges > 0 {
 				// If there are uncommitted non-transactional changes, we should treat a
-				// "COMMIT" query event as a transaction commit.
-				if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-					Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
-				}); err != nil {
-					return err
+				// "COMMIT" query event as a transaction commit. This logic should match
+				// the XIDEvent handling.
+				if !binlogOffsetOverflow {
+					if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+						Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+					}); err != nil {
+						return err
+					}
+					rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
+					rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 				}
-				rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
-				rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 			} else {
 				implicitFlush = true // Implicit FlushEvent conversion permitted
 				if err := rs.handleQuery(ctx, string(data.Schema), string(data.Query)); err != nil {
@@ -448,6 +515,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			cursor.Name = string(data.NextLogName)
 			cursor.Pos = uint32(data.Position)
+			binlogOffsetOverflow = false
+			binlogEstimatedOffset = uint64(data.Position)
 			logrus.WithFields(logrus.Fields{
 				"name": cursor.Name,
 				"pos":  cursor.Pos,
@@ -473,7 +542,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		// are no uncommitted changes currently pending (for which we would want to wait
 		// until a real commit event to flush the output) then report a new FlushEvent
 		// with the latest position.
-		if implicitFlush && rs.uncommittedChanges == 0 {
+		if implicitFlush && rs.uncommittedChanges == 0 && !binlogOffsetOverflow {
 			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
 				Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
 			}); err != nil {
