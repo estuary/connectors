@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use anyhow::{Context, Result};
-use configuration::{schema_for, EndpointConfig, Resource};
+use configuration::{schema_for, EndpointConfig, Resource, SchemaRegistryConfig};
 use discover::do_discover;
 use proto_flow::capture::{
     request::Validate,
@@ -12,6 +12,7 @@ use proto_flow::capture::{
 };
 use pull::do_pull;
 use rdkafka::consumer::Consumer;
+use schema_registry::SchemaRegistryClient;
 use tokio::io::{self, AsyncBufReadExt};
 
 pub mod configuration;
@@ -129,7 +130,22 @@ async fn do_validate(req: Validate) -> Result<Vec<ValidatedBinding>> {
 
     consumer
         .fetch_metadata(None, KAFKA_TIMEOUT)
-        .context("could not fetch cluster metadata - double check your configuration")?;
+        .context("Could not connect to bootstrap server with the provided configuration. This may be due to an incorrect configuration for authentication or bootstrap servers. Double check your configuration and try again.")?;
+
+    match config.schema_registry {
+        SchemaRegistryConfig::ConfluentSchemaRegistry {
+            endpoint,
+            username,
+            password,
+        } => {
+            let client = SchemaRegistryClient::new(endpoint, username, password);
+            client
+                .schemas_for_topics(&[])
+                .await
+                .context("Could not connect to the configured schema registry. Double check your configuration and try again.")?;
+        }
+        SchemaRegistryConfig::NoSchemaRegistry { .. } => (),
+    };
 
     req.bindings
         .iter()

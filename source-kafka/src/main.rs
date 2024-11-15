@@ -11,14 +11,13 @@ fn main() -> anyhow::Result<()> {
     let result = runtime.block_on(run_connector(stdin, stdout));
 
     if let Err(err) = result.as_ref() {
-        tracing::error!(error = %err, "operation failed");
+        tracing::error!(error = ?err, "operation failed");
     } else {
         tracing::debug!("connector run successful");
     }
 
     runtime.shutdown_background();
 
-    tracing::info!(success = %result.is_ok(), "connector exiting");
     result
 }
 
@@ -47,7 +46,6 @@ fn start_runtime() -> anyhow::Result<tokio::runtime::Runtime> {
         .with_target(false)
         .init();
 
-    // These bits about the runtime and shutdown were cargo-culted over from connector-init
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
