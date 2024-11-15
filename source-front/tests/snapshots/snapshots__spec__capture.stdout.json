@@ -68,7 +68,7 @@
       "title": "ResourceConfig",
       "type": "object"
     },
-    "documentationUrl": "https://go.estuary.dev/source-pendo",
+    "documentationUrl": "https://go.estuary.dev/source-front",
     "resourcePathPointers": [
       "/name"
     ]
