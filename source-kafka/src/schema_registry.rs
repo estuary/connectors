@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use futures::stream::{self, StreamExt};
 use reqwest::Client;
-use serde::Deserialize;
+use serde::{de::DeserializeOwned, Deserialize};
 use std::collections::{HashMap, HashSet};
 
 const TOPIC_KEY_SUFFIX: &str = "-key";
@@ -73,12 +73,7 @@ impl SchemaRegistryClient {
         let applicable_topics: HashSet<String> = topics.iter().cloned().collect();
 
         let subjects: Vec<String> = self
-            .http
-            .get(format!("{}/subjects", self.endpoint))
-            .basic_auth(&self.username, Some(&self.password))
-            .send()
-            .await?
-            .json()
+            .make_request(format!("{}/subjects", self.endpoint).as_str())
             .await?;
 
         let filter_by_suffix = |s: &str, suffix: &str| {
@@ -137,13 +132,7 @@ impl SchemaRegistryClient {
 
     pub async fn fetch_schema(&self, id: u32) -> Result<RegisteredSchema> {
         let fetched: FetchedSchema = self
-            .http
-            .get(format!("{}/schemas/ids/{}", self.endpoint, id))
-            .basic_auth(&self.username, Some(&self.password))
-            .send()
-            .await
-            .context("fetching schema")?
-            .json()
+            .make_request(format!("{}/schemas/ids/{}", self.endpoint, id).as_str())
             .await?;
 
         if fetched.references.is_some() {
@@ -167,16 +156,9 @@ impl SchemaRegistryClient {
 
     async fn fetch_latest_version(&self, subject: &str) -> Result<u32> {
         let fetched: FetchedLatestVersion = self
-            .http
-            .get(format!(
-                "{}/subjects/{}/versions/latest",
-                self.endpoint, subject
-            ))
-            .basic_auth(&self.username, Some(&self.password))
-            .send()
-            .await
-            .context("fetching latest schema version for subject")?
-            .json()
+            .make_request(
+                format!("{}/subjects/{}/versions/latest", self.endpoint, subject).as_str(),
+            )
             .await?;
         Ok(fetched.id)
     }
@@ -193,5 +175,30 @@ impl SchemaRegistryClient {
         );
         let version = self.fetch_latest_version(subject.as_str()).await?;
         self.fetch_schema(version).await
+    }
+
+    async fn make_request<T>(&self, url: &str) -> Result<T>
+    where
+        T: DeserializeOwned,
+    {
+        let res = self
+            .http
+            .get(url)
+            .basic_auth(&self.username, Some(&self.password))
+            .send()
+            .await?;
+
+        if !res.status().is_success() {
+            let status = res.status();
+            let body = res.text().await?;
+            anyhow::bail!(
+                "request GET {} failed with status {}: {}",
+                url,
+                status,
+                body
+            );
+        }
+
+        Ok(res.json().await?)
     }
 }

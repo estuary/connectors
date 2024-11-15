@@ -11,6 +11,7 @@ captures:
         config:
           bootstrap_servers: "localhost:9092"
           schema_registry:
+            schema_registry_type: confluent_schema_registry
             endpoint: http://localhost:8081
             username: user
             password: password

@@ -3,14 +3,14 @@ use rdkafka::client::{ClientContext, OAuthToken};
 use rdkafka::consumer::{BaseConsumer, ConsumerContext};
 use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
-use serde::{Deserialize, Serialize};
+use serde::{de, Deserialize, Deserializer, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct EndpointConfig {
     bootstrap_servers: String,
     credentials: Option<Credentials>,
     tls: Option<TlsSettings>,
-    pub schema_registry: Option<SchemaRegistryConfig>,
+    pub schema_registry: SchemaRegistryConfig,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -55,10 +55,31 @@ pub enum TlsSettings {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct SchemaRegistryConfig {
-    pub endpoint: String,
-    pub username: String,
-    pub password: String,
+#[serde(tag = "schema_registry_type")]
+#[serde(rename_all = "snake_case")]
+pub enum SchemaRegistryConfig {
+    ConfluentSchemaRegistry {
+        endpoint: String,
+        username: String,
+        password: String,
+    },
+    NoSchemaRegistry {
+        #[serde(deserialize_with = "validate_json_only_true")]
+        enable_json_only: bool,
+    },
+}
+
+fn validate_json_only_true<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    if bool::deserialize(deserializer)? {
+        Ok(true)
+    } else {
+        Err(de::Error::custom(
+            "'enable_json_only' must be set to true when no schema registry is configured",
+        ))
+    }
 }
 
 impl JsonSchema for EndpointConfig {
@@ -73,7 +94,8 @@ impl JsonSchema for EndpointConfig {
             "type": "object",
             "required": [
                 "bootstrap_servers",
-                "credentials"
+                "credentials",
+                "schema_registry"
             ],
             "properties": {
                 "bootstrap_servers": {
@@ -113,7 +135,6 @@ impl JsonSchema for EndpointConfig {
                             },
                             "username": {
                                 "order": 2,
-                                "secret": true,
                                 "title": "Username",
                                 "type": "string"
                             },
@@ -176,35 +197,66 @@ impl JsonSchema for EndpointConfig {
                 },
                 "schema_registry": {
                     "title": "Schema Registry",
-                    "description": "Connection details for interacting with a schema registry. This is necessary for processing messages encoded with Avro.",
+                    "description": "Connection details for interacting with a schema registry.",
                     "type": "object",
-                    "properties": {
-                        "endpoint": {
-                            "type": "string",
-                            "title": "Schema Registry Endpoint",
-                            "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
-                            "order": 0 
-                        },
-                        "username": {
-                            "type": "string",
-                            "title": "Schema Registry Username",
-                            "description": "Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.",
-                            "order": 1
-                        },
-                        "password": {
-                            "type": "string",
-                            "title": "Schema Registry Password",
-                            "description": "Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key.",
-                            "order": 2,
-                            "secret": true
-                        }
+                    "order": 3,
+                    "discriminator": {
+                        "propertyName": "schema_registry_type"
                     },
-                    "required": [
-                        "endpoint",
-                        "username",
-                        "password"
-                    ],
-                    "order": 3
+                    "oneOf": [{
+                        "title": "Confluent Schema Registry",
+                        "properties": {
+                            "schema_registry_type": {
+                                "type": "string",
+                                "default": "confluent_schema_registry",
+                                "const": "confluent_schema_registry",
+                                "order": 0
+                            },
+                            "endpoint": {
+                                "type": "string",
+                                "title": "Schema Registry Endpoint",
+                                "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
+                                "order": 1
+                            },
+                            "username": {
+                                "type": "string",
+                                "title": "Schema Registry Username",
+                                "description": "Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.",
+                                "order": 2
+                            },
+                            "password": {
+                                "type": "string",
+                                "title": "Schema Registry Password",
+                                "description": "Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key.",
+                                "order": 3,
+                                "secret": true
+                            }
+                        },
+                        "required": [
+                            "endpoint",
+                            "username",
+                            "password"
+                        ],
+                    }, {
+                        "title": "No Schema Registry",
+                        "properties": {
+                            "schema_registry_type": {
+                                "type": "string",
+                                "default": "no_schema_registry",
+                                "const": "no_schema_registry",
+                                "order": 0
+                            },
+                            "enable_json_only": {
+                                "type": "boolean",
+                                "title": "Capture Messages in JSON Format Only",
+                                "description": "If no schema registry is configured the capture will attempt to parse all data as JSON, and discovered collections will use a key of the message partition & offset. All available topics will be discovered, but if their messages are not encoded as JSON attempting to capture them will result in errors. If your topics contain messages encoded with a schema, you should configure the connector to use the schema registry for optimal results.",
+                                "order": 1
+                            }
+                        },
+                        "required": [
+                            "enable_json_only",
+                        ],
+                    }],
                 }
             }
         }))

@@ -13,7 +13,7 @@ use schemars::schema::RootSchema;
 use serde_json::json;
 
 use crate::{
-    configuration::{EndpointConfig, Resource},
+    configuration::{EndpointConfig, Resource, SchemaRegistryConfig},
     schema_registry::{
         RegisteredSchema::{Avro, Json, Protobuf},
         SchemaRegistryClient, TopicSchema,
@@ -29,7 +29,7 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
 
     let meta = consumer
         .fetch_metadata(None, KAFKA_TIMEOUT)
-        .context("could not fetch cluster metadata - double check your configuration")?;
+        .context("Could not connect to bootstrap server with the provided configuration. This may be due to an incorrect configuration for authentication or bootstrap servers. Double check your configuration and try again.")?;
 
     let mut all_topics: Vec<String> = meta
         .topics()
@@ -47,14 +47,18 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
     all_topics.sort();
 
     let registered_schemas = match config.schema_registry {
-        Some(cfg) => {
-            let client = SchemaRegistryClient::new(cfg.endpoint, cfg.username, cfg.password);
+        SchemaRegistryConfig::ConfluentSchemaRegistry {
+            endpoint,
+            username,
+            password,
+        } => {
+            let client = SchemaRegistryClient::new(endpoint, username, password);
             client
                 .schemas_for_topics(&all_topics)
                 .await
-                .context("fetching topic schemas from schema registry")?
+                .context("Could not connect to the configured schema registry. Double check your configuration and try again.")?
         }
-        None => HashMap::new(),
+        SchemaRegistryConfig::NoSchemaRegistry { .. } => HashMap::new(),
     };
 
     all_topics
