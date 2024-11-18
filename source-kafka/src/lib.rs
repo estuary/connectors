@@ -21,7 +21,7 @@ pub mod msk_oauthbearer;
 pub mod pull;
 pub mod schema_registry;
 
-const KAFKA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+const KAFKA_METADATA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 pub async fn run_connector(
     mut stdin: io::BufReader<io::Stdin>,
@@ -129,7 +129,7 @@ async fn do_validate(req: Validate) -> Result<Vec<ValidatedBinding>> {
     let consumer = config.to_consumer().await?;
 
     consumer
-        .fetch_metadata(None, KAFKA_TIMEOUT)
+        .fetch_metadata(None, KAFKA_METADATA_TIMEOUT)
         .context("Could not connect to bootstrap server with the provided configuration. This may be due to an incorrect configuration for authentication or bootstrap servers. Double check your configuration and try again.")?;
 
     match config.schema_registry {
