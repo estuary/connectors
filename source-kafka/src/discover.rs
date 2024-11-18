@@ -18,7 +18,7 @@ use crate::{
         RegisteredSchema::{Avro, Json, Protobuf},
         SchemaRegistryClient, TopicSchema,
     },
-    KAFKA_TIMEOUT,
+    KAFKA_METADATA_TIMEOUT,
 };
 
 static KAFKA_INTERNAL_TOPICS: [&str; 3] = ["__consumer_offsets", "__amazon_msk_canary", "_schemas"];
@@ -28,7 +28,7 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
     let consumer = config.to_consumer().await?;
 
     let meta = consumer
-        .fetch_metadata(None, KAFKA_TIMEOUT)
+        .fetch_metadata(None, KAFKA_METADATA_TIMEOUT)
         .context("Could not connect to bootstrap server with the provided configuration. This may be due to an incorrect configuration for authentication or bootstrap servers. Double check your configuration and try again.")?;
 
     let mut all_topics: Vec<String> = meta
