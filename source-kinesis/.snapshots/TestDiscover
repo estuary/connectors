@@ -1,0 +1,101 @@
+Binding 0:
+{
+    "recommended_name": "test-stream-1",
+    "resource_config_json": {
+      "stream": "test-stream-1"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_meta"
+      ],
+      "properties": {
+        "_meta": {
+          "type": "object",
+          "required": [
+            "sequence_number",
+            "partition_key"
+          ],
+          "properties": {
+            "partition_key": {
+              "type": "string"
+            },
+            "sequence_number": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "required": [
+                "shard",
+                "stream"
+              ],
+              "properties": {
+                "shard": {
+                  "type": "string"
+                },
+                "stream": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/sequence_number",
+      "/_meta/partition_key"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "test-stream-2",
+    "resource_config_json": {
+      "stream": "test-stream-2"
+    },
+    "document_schema_json": {
+      "type": "object",
+      "required": [
+        "_meta"
+      ],
+      "properties": {
+        "_meta": {
+          "type": "object",
+          "required": [
+            "sequence_number",
+            "partition_key"
+          ],
+          "properties": {
+            "partition_key": {
+              "type": "string"
+            },
+            "sequence_number": {
+              "type": "string"
+            },
+            "source": {
+              "type": "object",
+              "required": [
+                "shard",
+                "stream"
+              ],
+              "properties": {
+                "shard": {
+                  "type": "string"
+                },
+                "stream": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/sequence_number",
+      "/_meta/partition_key"
+    ]
+  }
+

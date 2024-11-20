@@ -7,7 +7,7 @@ export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:=test}"
 export KINESIS_ENDPOINT="${KINESIS_ENDPOINT:=http://source-kinesis-db-1.flow-test:4566}"
 
 export TEST_STREAM="estuary-test-$(shuf -zer -n6 {a..z} | tr -d '\0')"
-export RESOURCE="{ \"stream\": \"${TEST_STREAM}\", \"syncMode\": \"incremental\" }"
+export RESOURCE="{ \"stream\": \"${TEST_STREAM}\" }"
 
 export KINESIS_LOCAL_ENDPOINT="http://localhost:4566"
 
