@@ -399,6 +399,18 @@ func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 }
 
 func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
+	// As a special case, the solitary value '*.*' means that nothing should be
+	// backfilled. This makes certain sorts of operation which would otherwise
+	// require listing every single table in the database easier.
+	//
+	// Note that we are currently just matching that one specific value, it doesn't
+	// generalize in the obvious way to 'foobar.*' or to being part of a comma-
+	// separated list. This was done for expediency and should probably be thought
+	// out more if/when we add this to the other SQL CDC connectors.
+	if db.config.Advanced.SkipBackfills == "*.*" {
+		return false
+	}
+
 	if db.config.Advanced.SkipBackfills != "" {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
