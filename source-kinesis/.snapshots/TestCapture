@@ -1,0 +1,28 @@
+# ================================
+# Collection "": 20 Documents
+# ================================
+{"_meta":{"partition_key":"partitionKey-00","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-1"}},"i":"00"}
+{"_meta":{"partition_key":"partitionKey-01","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-2"}},"i":"01"}
+{"_meta":{"partition_key":"partitionKey-02","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-1"}},"i":"02"}
+{"_meta":{"partition_key":"partitionKey-03","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-2"}},"i":"03"}
+{"_meta":{"partition_key":"partitionKey-04","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-1"}},"i":"04"}
+{"_meta":{"partition_key":"partitionKey-05","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-2"}},"i":"05"}
+{"_meta":{"partition_key":"partitionKey-06","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-1"}},"i":"06"}
+{"_meta":{"partition_key":"partitionKey-07","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-2"}},"i":"07"}
+{"_meta":{"partition_key":"partitionKey-08","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-1"}},"i":"08"}
+{"_meta":{"partition_key":"partitionKey-09","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-2"}},"i":"09"}
+{"_meta":{"partition_key":"partitionKey-10","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000002","stream":"test-stream-1"}},"i":"10"}
+{"_meta":{"partition_key":"partitionKey-11","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000003","stream":"test-stream-2"}},"i":"11"}
+{"_meta":{"partition_key":"partitionKey-12","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000002","stream":"test-stream-1"}},"i":"12"}
+{"_meta":{"partition_key":"partitionKey-13","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-2"}},"i":"13"}
+{"_meta":{"partition_key":"partitionKey-14","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000002","stream":"test-stream-1"}},"i":"14"}
+{"_meta":{"partition_key":"partitionKey-15","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-2"}},"i":"15"}
+{"_meta":{"partition_key":"partitionKey-16","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000002","stream":"test-stream-1"}},"i":"16"}
+{"_meta":{"partition_key":"partitionKey-17","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000002","stream":"test-stream-2"}},"i":"17"}
+{"_meta":{"partition_key":"partitionKey-18","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000002","stream":"test-stream-1"}},"i":"18"}
+{"_meta":{"partition_key":"partitionKey-19","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000002","stream":"test-stream-2"}},"i":"19"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test-stream-1.v0":{"shardId-000000000000":"<SEQUENCE_NUM>","shardId-000000000001":"<SEQUENCE_NUM>","shardId-000000000002":"<SEQUENCE_NUM>"},"test-stream-2.v0":{"shardId-000000000000":"<SEQUENCE_NUM>","shardId-000000000001":"<SEQUENCE_NUM>","shardId-000000000002":"<SEQUENCE_NUM>","shardId-000000000003":"<SEQUENCE_NUM>"}}}
+
