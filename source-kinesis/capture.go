@@ -244,15 +244,6 @@ func (c *capture) readShard(
 		}
 	}
 
-	delayFor := func(d time.Duration) error {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(d):
-			return nil
-		}
-	}
-
 	readLog := ll
 	iteratorInput := &kinesis.GetShardIteratorInput{
 		StreamARN:         &stream.arn,
@@ -266,11 +257,28 @@ func (c *capture) readShard(
 	}
 	readLog.Info("started reading kinesis shard")
 
-	iterInit, err := c.client.GetShardIterator(ctx, iteratorInput)
-	if err != nil {
-		return fmt.Errorf("getting shard iterator: %w", err)
+	var iterator *string
+	for {
+		iterInit, err := c.client.GetShardIterator(ctx, iteratorInput)
+		if err != nil {
+			var invalidArugmentErr *types.InvalidArgumentException
+			if errors.As(err, &invalidArugmentErr) && iteratorInput.ShardIteratorType == types.ShardIteratorTypeAfterSequenceNumber {
+				// This error occurs if a stream is deleted and re-created, or
+				// if the retention limit of a sequence number is exceeded. In
+				// either case the only thing to do is start reading the shard
+				// from the beginning, which is actually the "future" relative
+				// to an expired sequence.
+				iteratorInput.ShardIteratorType = types.ShardIteratorTypeTrimHorizon
+				iteratorInput.StartingSequenceNumber = nil
+				log.WithError(invalidArugmentErr).Warn("starting sequence was invalid; will attempt to read shard from TRIM_HORIZON")
+				continue
+			}
+			return fmt.Errorf("getting shard iterator: %w", err)
+		}
+
+		iterator = iterInit.ShardIterator
+		break
 	}
-	iterator := iterInit.ShardIterator
 
 	for {
 		res, err := c.client.GetRecords(ctx, &kinesis.GetRecordsInput{
@@ -278,16 +286,7 @@ func (c *capture) readShard(
 			StreamARN:     &stream.arn,
 		})
 		if err != nil {
-			var throughputErr *types.ProvisionedThroughputExceededException
-			if errors.As(err, &throughputErr) {
-				ll.WithError(err).Info("retrying due to provisioned throughput exceeded exception")
-				if err := delayFor(5 * time.Second); err != nil {
-					return err
-				}
-				continue
-			} else {
-				return fmt.Errorf("get records: %w", err)
-			}
+			return fmt.Errorf("get records: %w", err)
 		}
 
 		if err := c.processRecords(res.Records, stream, stateKey, bindingIndex, shard); err != nil {
@@ -307,8 +306,11 @@ func (c *capture) readShard(
 		iterator = res.NextShardIterator
 
 		if *res.MillisBehindLatest == 0 && len(res.Records) == 0 {
-			if err := delayFor(1 * time.Second); err != nil {
-				return err
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-time.After(1 * time.Second):
+				// Small delay to avoid hot-looping on a shard with no new data.
 			}
 		}
 	}
