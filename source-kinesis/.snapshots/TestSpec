@@ -16,7 +16,8 @@
       "awsSecretAccessKey": {
         "type": "string",
         "title": "AWS Secret Access Key",
-        "description": "Part of the AWS credentials that will be used to connect to Kinesis"
+        "description": "Part of the AWS credentials that will be used to connect to Kinesis",
+        "secret": true
       },
       "advanced": {
         "properties": {

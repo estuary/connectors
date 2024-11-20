@@ -5,22 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"math"
 	"slices"
-	"sync"
 
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 type driver struct{}
 
 type resource struct {
-	Stream   string `json:"stream" jsonschema:"title=Stream Name"`
-	SyncMode string `json:"syncMode" jsonschema:"-"`
+	Stream string `json:"stream" jsonschema:"title=Stream Name"`
 }
 
 func (r resource) Validate() error {
@@ -48,19 +45,18 @@ func (driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec
 	}, nil
 }
 
-// Validate that store resources and proposed collection bindings are compatible.
 func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Response_Validated, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(req.ConfigJson, &config); err != nil {
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-	client, err := connect(&config)
+	client, err := connect(ctx, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	streamNames, err := listAllStreams(ctx, client)
+	streams, err := listStreams(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("listing streams: %w", err)
 	}
@@ -73,7 +69,7 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			return nil, fmt.Errorf("error parsing resource config: %w", err)
 		}
 
-		if !slices.Contains(streamNames, res.Stream) {
+		if !slices.ContainsFunc(streams, func(s kinesisStream) bool { return s.name == res.Stream }) {
 			return nil, fmt.Errorf("stream %s does not exist", res.Stream)
 		}
 
@@ -85,31 +81,32 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	return &pc.Response_Validated{Bindings: bindings}, nil
 }
 
-// Discover returns the set of resources available from this Driver.
 func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(req.ConfigJson, &config); err != nil {
 		return nil, fmt.Errorf("parsing config json: %w", err)
 	}
 
-	client, err := connect(&config)
+	client, err := connect(ctx, &config)
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
-	streamNames, err := listAllStreams(ctx, client)
+	streams, err := listStreams(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("listing streams: %w", err)
 	}
 
-	bindings := discoverStreams(ctx, client, streamNames)
+	bindings, err := discoverStreams(streams)
+	if err != nil {
+		return nil, err
+	}
 
 	return &pc.Response_Discovered{Bindings: bindings}, nil
 }
 
-// Pull is a very long lived RPC through which the Flow runtime and a
-// Driver cooperatively execute an unbounded number of transactions.
 func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
+	var ctx = stream.Context()
 	var config Config
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &config); err != nil {
 		return fmt.Errorf("parsing config json: %w", err)
@@ -122,29 +119,31 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 	if state.Streams == nil {
-		state.Streams = make(map[boilerplate.StateKey]map[string]string)
+		state.Streams = make(map[boilerplate.StateKey]map[string]*string)
 	}
 
-	client, err := connect(&config)
+	client, err := connect(ctx, &config)
 	if err != nil {
-		err = fmt.Errorf("failed to connect: %w", err)
+		return err
 	}
 
-	var dataCh = make(chan readResult, 8)
-	var ctx = stream.Context()
-	ctx, cancelFunc := context.WithCancel(ctx)
-	defer cancelFunc()
-
-	log.WithField("bindings count", open.Capture.Bindings).Info("Starting to read stream(s)")
-
-	var shardRange = open.Range
-	if shardRange.KeyBegin == 0 && shardRange.KeyEnd == 0 {
-		log.Info("using full shard range since no range was given in the catalog")
-		shardRange.KeyEnd = math.MaxUint32
+	streams, err := listStreams(ctx, client)
+	if err != nil {
+		return err
 	}
 
-	stateKeys := make([]boilerplate.StateKey, len(open.Capture.Bindings))
-	var waitGroup = new(sync.WaitGroup)
+	var c = &capture{
+		client:      client,
+		stream:      stream,
+		updateState: make(map[boilerplate.StateKey]map[string]*string),
+	}
+
+	if err := stream.Ready(false); err != nil {
+		return err
+	}
+
+	group, groupCtx := errgroup.WithContext(ctx)
+
 	for i, binding := range open.Capture.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
@@ -153,54 +152,24 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 		sk := boilerplate.StateKey(binding.StateKey)
 		if _, ok := state.Streams[sk]; !ok {
-			state.Streams[sk] = make(map[string]string)
+			state.Streams[sk] = make(map[string]*string)
 		}
-		stateKeys[i] = sk
 
-		waitGroup.Add(1)
-		go readStream(ctx, shardRange, client, i, res.Stream, maps.Clone(state.Streams[sk]), dataCh, waitGroup)
+		streamIdx := slices.IndexFunc(streams, func(s kinesisStream) bool {
+			return s.name == res.Stream
+		})
+		if streamIdx == -1 {
+			return fmt.Errorf("stream %s does not exist", res.Stream)
+		}
+
+		group.Go(func() error {
+			return c.readStream(groupCtx, streams[streamIdx], sk, i, maps.Clone(state.Streams[sk]))
+		})
 	}
 
-	go closeChannelWhenDone(dataCh, waitGroup)
-
-	if err := stream.Ready(false); err != nil {
-		return err
-	}
-
-	// We're all set to start printing data to stdout
-	for next := range dataCh {
-		if next.err != nil {
-			// time to bail
-			log.WithField("error", next.err).Error("read failed due to error")
-			err = next.err
-			break
-		}
-		for _, record := range next.records {
-			if err = stream.Documents(next.source.bindingIndex, record); err != nil {
-				break
-			}
-		}
-
-		sk := stateKeys[next.source.bindingIndex]
-		state.Streams[sk][next.source.shardID] = next.sequenceNumber
-
-		stateRaw, err := json.Marshal(state)
-		if err != nil {
-			break
-		}
-		if err = stream.Checkpoint(json.RawMessage(stateRaw), false); err != nil {
-			break
-		}
-
-		if err != nil {
-			break
-		}
-	}
-
-	return err
+	return group.Wait()
 }
 
-// ApplyUpsert applies a new or updated capture to the store.
 func (d *driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
 	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
@@ -209,12 +178,6 @@ func main() {
 	boilerplate.RunMain(new(driver))
 }
 
-func closeChannelWhenDone(dataCh chan readResult, waitGroup *sync.WaitGroup) {
-	waitGroup.Wait()
-	log.Info("All reads have completed")
-	close(dataCh)
-}
-
 type captureState struct {
-	Streams map[boilerplate.StateKey]map[string]string `json:"bindingStateV1,omitempty"`
+	Streams map[boilerplate.StateKey]map[string]*string `json:"bindingStateV1,omitempty"`
 }

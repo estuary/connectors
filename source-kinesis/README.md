@@ -20,14 +20,6 @@ This connector currently only supports JSON data. All Records in all Shards of t
 JSON documents that conform to the target collection's schema. Handling of most other data formats
 would require additional work in `flow-parser` to handle framed inputs and outputs.
 
-### Scaling
-
-The Kinesis connector automatically discovers all Kinesis Shards within the named Kinesis Stream and
-reads data from all of them. The Flow Capture Shards may also be split, in which case each Flow
-shard will read from a (possibly overlapping) subset of the Kinesis shards. It is detrimental to
-efficiency to have more Flow shards than there are Kinesis Stream Shards. A good general guideline
-is to have a number of Flow shards that is roughly half the number of Kinesis shards.
-
 ### State
 
 The Kinesis connector stores the current offset within each Kinesis Shard in its state. It prunes
