@@ -13,6 +13,7 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+      - "source-google-analytics-data-api/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
       - "source-linkedin-ads-v2/**"
@@ -43,6 +44,7 @@ on:
       - "source-google-sheets-native/**"
       - "source-hubspot-native/**"
       - "source-hubspot/**"
+      - "source-google-analytics-data-api/**"
       - "source-notion/**"
       - "source-linkedin-pages/**"
       - "source-linkedin-ads-v2/**"
@@ -109,6 +111,9 @@ jobs:
             type: capture
             version: v5
             usage_rate: "1.0"
+          - name: source-google-analytics-data-api
+            type: capture
+            version: v3
           - name: source-notion
             type: capture
             version: v2
