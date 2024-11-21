@@ -19,6 +19,7 @@ ValidBreakdowns = Enum("ValidBreakdowns", AdsInsights.Breakdowns.__dict__)
 ValidActionBreakdowns = Enum("ValidActionBreakdowns", AdsInsights.ActionBreakdowns.__dict__)
 DATE_TIME_PATTERN = "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"
 EMPTY_PATTERN = "^$"
+ACCOUNT_IDS_PATTERN = r"^\d[\d,]+$"
 
 
 class InsightConfig(BaseModel):
@@ -131,15 +132,16 @@ class ConnectorConfig(BaseConfig):
         def schema_extra(schema: Dict[str, Any], model: Type["ConnectorConfig"]) -> None:
             schema["properties"]["end_date"].pop("format")
 
-    account_id: str = Field(
-        title="Account ID",
+    account_ids: str = Field(
+        title="Account IDs",
         order=0,
         description=(
-            "The Facebook Ad account ID to use when pulling data from the Facebook Marketing API."
-            " Open your Meta Ads Manager. The Ad account ID number is in the account dropdown menu or in your browser's address bar. "
+            "A comma separated list of the Facebook Ad account ID(s) to use when pulling data from the Facebook Marketing API."
+            "Open your Meta Ads Manager. The Ad account ID number is in the account dropdown menu or in your browser's address bar. "
             'See the <a href="https://www.facebook.com/business/help/1492627900875762">docs</a> for more information.'
         ),
-        examples=["111111111111111"],
+        pattern=ACCOUNT_IDS_PATTERN,
+        examples=["111111111111111","222222222222222,333333333333333"],
     )
 
     start_date: datetime = Field(

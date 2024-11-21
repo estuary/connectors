@@ -1,4 +1,4 @@
-account_id_sops: ENC[AES256_GCM,data:DuMXhQYiyxxthsOHllmw,iv:wNw1RFVBe/AWvY6uycliIY3nPpzBiz+P4UBDr6f4nLI=,tag:7s2DQ+ApVrcfjMBNqOK+/w==,type:int]
+account_ids: "196765372540622"
 credentials:
     access_token_sops: ENC[AES256_GCM,data:Re73N0PHhhJs7Umo5ONjzSXdb4xKe+XtOBI3r1padMyQo5Bki3bW7l+1+/v4ifQuq4RypBwxQOAXdJfarwqLMW6vKCpxzq+kcbEHkvFd+NTJIWduYl8lC5bbFHT6uTrBNMxaTv/N7LNTwohBss+iKc9kf+Dp7dwpUqikOohnvOZ9y6C4+p2lvanOUpVfw7mGL52uW8VALPiLWh1hgbn6ZXlk7MOAjZAboIzf2bCzkzZQIiTz/4NYVLcmbFbPx8DRjrUd6XU1yeLsfXbT3CNRbAJyNWwDJN9vwKErGQIKcfsXsP5hVb0rpFuSW+WBvpJ0avCR6N8vvM8I8mc5W47EMuMTAxI=,iv:hWmqMuuIUBm8Vm30DVzv5jkesBAIuxZnCzn2h/ysUZ8=,tag:uKzEZpI3M4IWiXGXIqncZQ==,type:str]
     auth_type: OAuth Credentials
@@ -28,13 +28,13 @@ custom_insights:
       level: ad
       name: ads_insights_publisher_platform
       start_date: "2021-11-01T00:00:00Z"
-      time_increment: 1
+      time_increment: 360
 fetch_thumbnail_images: false
 include_deleted: true
 insights_lookback_window: 28
 max_batch_size: 50
 page_size: 100
-start_date: "2021-11-01T00:00:00Z"
+start_date: "2024-11-01T00:00:00Z"
 sops:
     kms: []
     gcp_kms:
@@ -44,8 +44,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-02-05T23:41:33Z"
-    mac: ENC[AES256_GCM,data:ByAdg0VEy2xMpZXxAwa5oKB7CfG+eSA5ej/TJ2g9ZsIR+XhwJklI1XBW62VvahoGeC2AP9wYC/Mk7bP03914JZCz1v2gsbn6nL4WVuooIt0XMFgaquwWjoVrDa7Hy3iTHvr2Uwf4YcBWI/M3NwKpD/3f9TpNQRstrJq8pw6AC0k=,iv:Spd541rsKs5Si4AAdtxxB/muD9XiokkyEGBC8/wqAsg=,tag:eXTEjYrz/Vq4526D3E6whw==,type:str]
+    lastmodified: "2024-11-11T19:07:30Z"
+    mac: ENC[AES256_GCM,data:DnjkguTUM5RBYREQlUp9UJTbdQ1N8DNfTLWeF+ZYSPRzMGrfwYsAhrE/08GYy3/4mAJSOTvMVRnqc0FArZ5MxIl5ttgyEZpRWMA/Z2x7BQAlByvBO2FZcsv+PdmSbtThYO/9jLeAeCCyl6LUvguiUkHxCB4HMUdHTXbLCnQYe1w=,iv:nabT9Nmhz/hTHzM+8NLTFDNIQmciFAtpMxf9/P49b4A=,tag:qeFSf7/FvFI6md+fb7TVRg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

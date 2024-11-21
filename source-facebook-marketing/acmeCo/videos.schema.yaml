@@ -1,6 +1,10 @@
 ---
 type: object
 properties:
+  account_id:
+    type:
+      - "null"
+      - string
   id:
     type: string
   ad_breaks:

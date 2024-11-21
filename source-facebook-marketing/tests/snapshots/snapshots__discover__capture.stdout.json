@@ -38550,6 +38550,12 @@
     "documentSchema": {
       "type": "object",
       "properties": {
+        "account_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "id": {
           "type": "string"
         },
@@ -38763,6 +38769,12 @@
     },
     "documentSchema": {
       "properties": {
+        "account_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "actor_id": {
           "type": [
             "string"
