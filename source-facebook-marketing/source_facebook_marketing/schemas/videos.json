@@ -1,6 +1,9 @@
 {
   "type": "object",
   "properties": {
+    "account_id": {
+        "type": "string"
+    },
     "id": {
       "type": "string"
     },

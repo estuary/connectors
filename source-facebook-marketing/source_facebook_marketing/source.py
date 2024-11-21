@@ -3,6 +3,7 @@
 #
 
 import logging
+import re
 from typing import Any, List, Mapping, Optional, Tuple, Type
 
 import facebook_business
@@ -40,13 +41,24 @@ UNSUPPORTED_FIELDS = {"unique_conversions", "unique_ctr", "unique_clicks",
                       "age_targeting", "gender_targeting", "labels", "location",
                       "estimated_ad_recall_rate_lower_bound", "estimated_ad_recall_rate_upper_bound", "estimated_ad_recallers_lower_bound", "estimated_ad_recallers_upper_bound" }
 
+ACCOUNT_ID_DELIMITER = r",+"
 
 class SourceFacebookMarketing(AbstractSource):
     def _validate_and_transform(self, config: Mapping[str, Any]):
         config.setdefault("action_breakdowns_allow_empty", False)
         if config.get("end_date") == "":
             config.pop("end_date")
+
+        # Backwards compatible support for configs with the older
+        # account_id field instead of the newer account_ids.
+        if not config.get("account_ids", ""):
+            config["account_ids"] = config.get("account_id")
+
         config = ConnectorConfig.parse_obj(config)
+
+        # Convert account_ids to a list so it's easier to work with throughout the connector.
+        config.account_ids = [n for n in re.split(ACCOUNT_ID_DELIMITER, config.account_ids)]
+
         config.start_date = pendulum.instance(config.start_date)
         config.end_date = pendulum.instance(config.end_date)
         return config
@@ -66,17 +78,10 @@ class SourceFacebookMarketing(AbstractSource):
             if config.end_date < config.start_date:
                 return False, "end_date must be equal or after start_date."
 
-            api = API(account_id=config.account_id, access_token=config.credentials.access_token)
-            logger.info(f"Select account {api.account}")
+            api = API(access_token=config.credentials.access_token)
         except (requests.exceptions.RequestException, ValidationError) as e:
             return False, e
 
-        # make sure that we have valid combination of "action_breakdowns" and "breakdowns" parameters
-        for stream in self.get_custom_insights_streams(api, config):
-            try:
-                stream.check_breakdowns()
-            except facebook_business.exceptions.FacebookRequestError as e:
-                return False, e._api_error_message
         return True, None
 
     def streams(self, config: Mapping[str, Any]) -> List[Type[Stream]]:
@@ -89,19 +94,21 @@ class SourceFacebookMarketing(AbstractSource):
         config.start_date = validate_start_date(config.start_date)
         config.end_date = validate_end_date(config.start_date, config.end_date)
 
-        api = API(account_id=config.account_id, access_token=config.credentials.access_token)
+        api = API(access_token=config.credentials.access_token)
 
         insights_args = dict(
-            api=api, start_date=config.start_date, end_date=config.end_date, insights_lookback_window=config.insights_lookback_window
+            api=api, start_date=config.start_date, end_date=config.end_date, insights_lookback_window=config.insights_lookback_window, account_ids=config.account_ids,
         )
         streams = [
             AdAccount(
                 api=api,
+                account_ids=config.account_ids,
                 source_defined_primary_key=["account_id"],
             ),
             AdSets(
                 api=api,
                 start_date=config.start_date,
+                account_ids=config.account_ids,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
                 page_size=config.page_size,
@@ -111,6 +118,7 @@ class SourceFacebookMarketing(AbstractSource):
             Ads(
                 api=api,
                 start_date=config.start_date,
+                account_ids=config.account_ids,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
                 page_size=config.page_size,
@@ -120,6 +128,7 @@ class SourceFacebookMarketing(AbstractSource):
             AdCreatives(
                 api=api,
                 fetch_thumbnail_images=config.fetch_thumbnail_images,
+                account_ids=config.account_ids,
                 page_size=config.page_size,
                 max_batch_size=config.max_batch_size,
                 source_defined_primary_key=["id"],
@@ -133,6 +142,7 @@ class SourceFacebookMarketing(AbstractSource):
             AdsInsightsActionType(page_size=config.page_size, max_batch_size=config.max_batch_size, source_defined_primary_key=["id"], **insights_args),
             Campaigns(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -142,6 +152,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             CustomConversions(
                 api=api,
+                account_ids=config.account_ids,
                 include_deleted=config.include_deleted,
                 page_size=config.page_size,
                 max_batch_size=config.max_batch_size,
@@ -149,6 +160,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             Images(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -158,6 +170,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             Videos(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -167,6 +180,7 @@ class SourceFacebookMarketing(AbstractSource):
             ),
             Activities(
                 api=api,
+                account_ids=config.account_ids,
                 start_date=config.start_date,
                 end_date=config.end_date,
                 include_deleted=config.include_deleted,
@@ -206,6 +220,7 @@ class SourceFacebookMarketing(AbstractSource):
                 raise ValueError(mes)
             stream = AdsInsights(
                 api=api,
+                account_ids=config.account_ids,
                 name=f"Custom{insight.name}",
                 fields=list(insight_fields),
                 breakdowns=list(set(insight.breakdowns)),
