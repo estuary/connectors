@@ -14,7 +14,6 @@ from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.availability_strategy import AvailabilityStrategy
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
-from cached_property import cached_property
 from facebook_business.adobjects.abstractobject import AbstractObject
 from facebook_business.api import FacebookAdsApiBatch, FacebookRequest, FacebookResponse
 
@@ -45,58 +44,65 @@ class FBMarketingStream(Stream, ABC):
     def availability_strategy(self) -> Optional["AvailabilityStrategy"]:
         return None
 
-    def __init__(self, api: "API", include_deleted: bool = False, page_size: int = 100, max_batch_size: int = 50, source_defined_primary_key: list | None = None, **kwargs):
+    def __init__(self, api: "API", account_ids: List[str], include_deleted: bool = False, page_size: int = 100, max_batch_size: int = 50, source_defined_primary_key: list | None = None,**kwargs):
         super().__init__(**kwargs)
         self._api = api
         self.page_size = page_size if page_size is not None else 100
+        self._account_ids = account_ids
         self._include_deleted = include_deleted if self.enable_deleted else False
         self.max_batch_size = max_batch_size if max_batch_size is not None else 50
         self.source_defined_primary_key = source_defined_primary_key if source_defined_primary_key is not None else ["id"]
 
-    @cached_property
-    def fields(self) -> List[str]:
+        self._fields = None
+
+    def fields(self, **kwargs) -> List[str]:
         """List of fields that we want to query, for now just all properties from stream's schema"""
-        return list(self.get_json_schema().get("properties", {}).keys())
+        if self._fields:
+            return self._fields
+        self._saved_fields = list(self.get_json_schema().get("properties", {}).keys())
+        return self._saved_fields
 
-    def _execute_batch(self, batch: FacebookAdsApiBatch) -> None:
-        """Execute batch, retry in case of failures"""
-        while batch:
-            batch = batch.execute()
-            if batch:
-                logger.info("Retry failed requests in batch")
+    @staticmethod
+    def add_account_id(record, account_id: str):
+        if "account_id" not in record:
+            record["account_id"] = account_id
 
-    def execute_in_batch(self, pending_requests: Iterable[FacebookRequest]) -> Iterable[MutableMapping[str, Any]]:
-        """Execute list of requests in batches"""
-        requests_q = Queue()
-        records = []
-        for r in pending_requests:
-            requests_q.put(r)
+    def get_account_state(self, account_id: str, stream_state: Mapping[str, Any] = None) -> MutableMapping[str, Any]:
+        if stream_state and account_id and account_id in stream_state:
+            account_state = stream_state.get(account_id)
 
-        def success(response: FacebookResponse):
-            records.append(response.json())
+            # copy `include_deleted` from general stream state
+            if "include_deleted" in stream_state:
+                account_state["include_deleted"] = stream_state["include_deleted"]
+            return account_state
+        elif len(self._account_ids) == 1:
+            return stream_state
+        else:
+            return {}
 
-        def failure(response: FacebookResponse, request: Optional[FacebookRequest] = None):
-            # although it is Optional in the signature for compatibility, we need it always
-            assert request, "Missing a request object"
-            resp_body = response.json()
-            if not isinstance(resp_body, dict) or resp_body.get("error", {}).get("code") != FACEBOOK_BATCH_ERROR_CODE:
-                # response body is not a json object or the error code is different
-                raise RuntimeError(f"Batch request failed with response: {resp_body}")
-            requests_q.put(request)
+    def _transform_state(self, state: Mapping[str, Any], fields_to_move: List[str] = None) -> Mapping[str, Any]:
+        """
+        Transform state from the previous format that did not include account ids
+        to the new format that contains account ids.
+        """
+        # If the state already contains any account IDs, it does not need transformed.
+        for id in self._account_ids:
+            if id in state:
+                return state
 
-        api_batch: FacebookAdsApiBatch = self._api.api.new_batch()
+        # If there is pre-existing state AND there's a single account ID,
+        # nest the existing state under that account id.
+        if state and len(self._account_ids) == 1:
+            nested_state = {self._account_ids[0]: state}
 
-        while not requests_q.empty():
-            request = requests_q.get()
-            api_batch.add_request(request, success=success, failure=partial(failure, request=request))
-            if len(api_batch) == self.max_batch_size or requests_q.empty():
-                # make a call for every max_batch_size items or less if it is the last call
-                self._execute_batch(api_batch)
-                yield from records
-                records = []
-                api_batch: FacebookAdsApiBatch = self._api.api.new_batch()
+            for field in fields_to_move:
+                if field in state:
+                    nested_state[field] = state.pop(field)
 
-        yield from records
+            return nested_state
+
+        # Otherwise, the state is empty and we should return an empty dict.
+        return {}
 
     def read_records(
         self,
@@ -105,20 +111,25 @@ class FBMarketingStream(Stream, ABC):
         stream_slice: Mapping[str, Any] = None,
         stream_state: Mapping[str, Any] = None,
     ) -> Iterable[Mapping[str, Any]]:
-        """Main read method used by CDK"""
-        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state))
-        loaded_records_iter = (record.api_get(fields=self.fields, pending=self.use_batch) for record in records_iter)
-        if self.use_batch:
-            loaded_records_iter = self.execute_in_batch(loaded_records_iter)
+        account_id = stream_slice["account_id"]
+        account_state = stream_slice.get("stream_state", {})
 
-        for record in loaded_records_iter:
+        for record in self.list_objects(
+            params=self.request_params(stream_state=account_state),
+            account_id=account_id,
+        ):
             if isinstance(record, AbstractObject):
-                yield record.export_all_data()  # convert FB object to dict
-            else:
-                yield record  # execute_in_batch will emmit dicts
+                record = record.export_all_data()
+            self.add_account_id(record, account_id)
+            yield record
+
+    def stream_slices(self, stream_state: Mapping[str, Any] = None, **kwargs) -> Iterable[Optional[Mapping[str, any]]]:
+        for account_id in self._account_ids:
+            account_state = self.get_account_state(account_id, stream_state)
+            yield {"account_id": account_id, "stream_state": account_state}
 
     @abstractmethod
-    def list_objects(self, params: Mapping[str, Any]) -> Iterable:
+    def list_objects(self, params: Mapping[str, Any], account_id: str) -> Iterable:
         """List FB objects, these objects will be loaded in read_records later with their details.
 
         :param params: params to make request
@@ -175,17 +186,24 @@ class FBMarketingIncrementalStream(FBMarketingStream, ABC):
 
     def get_updated_state(self, current_stream_state: MutableMapping[str, Any], latest_record: Mapping[str, Any]):
         """Update stream state from latest record"""
-        potentially_new_records_in_the_past = self._include_deleted and not current_stream_state.get("include_deleted", False)
+        # Get the stream state for the account associated with the latest record.
+        account_id = latest_record["account_id"]
+        stream_state = self._transform_state(current_stream_state, ["include_deleted"])
+        account_state = self.get_account_state(account_id, stream_state)
+
+        # Determine the max cursor value seen so far for this account id.
+        potentially_new_records_in_the_past = self._include_deleted and not account_state.get("include_deleted", False)
         record_value = latest_record[self.cursor_field]
-        state_value = current_stream_state.get(self.cursor_field) or record_value
+        state_value = account_state.get(self.cursor_field) or record_value
         max_cursor = max(pendulum.parse(state_value), pendulum.parse(record_value))
         if potentially_new_records_in_the_past:
             max_cursor = record_value
 
-        return {
-            self.cursor_field: str(max_cursor),
-            "include_deleted": self._include_deleted,
-        }
+        # Update the stream state.
+        stream_state.setdefault(account_id, {})[self.cursor_field] = str(max_cursor)
+        stream_state["include_deleted"] = self._include_deleted
+
+        return stream_state
 
     def request_params(self, stream_state: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
         """Include state filter"""
@@ -218,31 +236,38 @@ class FBMarketingReversedIncrementalStream(FBMarketingIncrementalStream, ABC):
     """The base class for streams that don't support filtering and return records sorted desc by cursor_value"""
 
     enable_deleted = False  # API don't have any filtering, so implement include_deleted in code
+    cursor_field: str
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        self._cursor_value = None
-        self._max_cursor_value = None
+        self._cursor_values = {}
+        # self._max_cursor_value = None
 
     @property
     def state(self) -> Mapping[str, Any]:
-        """State getter, get current state and serialize it to emmit Airbyte STATE message"""
-        if self._cursor_value:
-            return {
-                self.cursor_field: self._cursor_value,
-                "include_deleted": self._include_deleted,
-            }
+        s: dict[str, Any] = {}
 
-        return {}
+        if self._cursor_values:
+            for account_id, cursor_value in self._cursor_values.items():
+                s[account_id] = {self.cursor_field: cursor_value}
+
+            s["include_deleted"] = self._include_deleted
+
+        return s
 
     @state.setter
     def state(self, value: Mapping[str, Any]):
         """State setter, ignore state if current settings mismatch saved state"""
-        if self._include_deleted and not value.get("include_deleted"):
+        transformed_state = self._transform_state(value, ["include_deleted"])
+        if self._include_deleted and not transformed_state.get("include_deleted"):
             logger.info(f"Ignoring bookmark for {self.name} because of enabled `include_deleted` option")
             return
 
-        self._cursor_value = pendulum.parse(value[self.cursor_field])
+        self._cursor_values = {}
+        for account_id in self._account_ids:
+            cursor_value = transformed_state.get(account_id, {}).get(self.cursor_field, None)
+            if cursor_value is not None:
+                self._cursor_values[account_id] = pendulum.parse(cursor_value)
 
     def _state_filter(self, stream_state: Mapping[str, Any]) -> Mapping[str, Any]:
         """Don't have classic cursor filtering"""
@@ -264,16 +289,26 @@ class FBMarketingReversedIncrementalStream(FBMarketingIncrementalStream, ABC):
         - update state only when we reach the end
         - stop reading when we reached the end
         """
-        records_iter = self.list_objects(params=self.request_params(stream_state=stream_state))
-        for record in records_iter:
+        account_id = stream_slice["account_id"]
+        account_state = stream_slice.get("stream_state")
+
+        cursor = self._cursor_values.get(account_id)
+        max_cursor = None
+
+        for record in self.list_objects(params=self.request_params(stream_state=account_state), account_id=account_id):
             record_cursor_value = pendulum.parse(record[self.cursor_field])
-            if self._cursor_value and record_cursor_value < self._cursor_value:
+            if cursor and record_cursor_value < cursor:
                 break
             if not self._include_deleted and self.get_record_deleted_status(record):
                 continue
 
-            self._max_cursor_value = self._max_cursor_value or record_cursor_value
-            self._max_cursor_value = max(self._max_cursor_value, record_cursor_value)
-            yield record.export_all_data()
+            if max_cursor:
+                max_cursor = max(max_cursor, record_cursor_value)
+            else:
+                max_cursor = record_cursor_value
 
-        self._cursor_value = self._max_cursor_value
+            record = record.export_all_data()
+            self.add_account_id(record, account_id)
+            yield record
+
+        self._cursor_values[account_id] = max_cursor

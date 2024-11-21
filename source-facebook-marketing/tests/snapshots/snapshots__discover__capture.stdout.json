@@ -38550,6 +38550,9 @@
     "documentSchema": {
       "type": "object",
       "properties": {
+        "account_id": {
+          "type": "string"
+        },
         "id": {
           "type": "string"
         },
@@ -38763,6 +38766,9 @@
     },
     "documentSchema": {
       "properties": {
+        "account_id": {
+          "type": "string"
+        },
         "actor_id": {
           "type": [
             "string"
