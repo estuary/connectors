@@ -180,8 +180,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	// Drain the last batch.
-	if err := sendBatch(); err != nil {
-		return nil, err
+	if len(batch) > 0 {
+		if err := sendBatch(); err != nil {
+			return nil, err
+		}
 	}
 
 	close(sendBatches)
