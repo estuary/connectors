@@ -28,6 +28,10 @@ collections:
     schema: owners.schema.yaml
     key:
       - /_meta/row_id
+  acmeCo/products:
+    schema: products.schema.yaml
+    key:
+      - /id
   acmeCo/properties:
     schema: properties.schema.yaml
     key:
