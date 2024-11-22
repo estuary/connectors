@@ -3,9 +3,13 @@
 #
 
 import logging
+from typing import List
 
 import pendulum
 from pendulum import DateTime
+from estuary_cdk.flow import ValidationError
+
+from source_facebook_marketing.api import API, FacebookAPIException
 
 logger = logging.getLogger("airbyte")
 
@@ -45,3 +49,15 @@ def validate_end_date(start_date: DateTime, end_date: DateTime) -> DateTime:
         logger.warning(message)
         return start_date
     return end_date
+
+def validate_account_ids(api: API, account_ids: List[str]):
+    errs = []
+    for account_id in account_ids:
+        try:
+            api._find_account(account_id)
+        except FacebookAPIException as err:
+            msg = f"Error when validating account ID {account_id}: {err}"
+            errs.append(msg)
+
+    if len(errs) > 0:
+        raise ValidationError(errs)
