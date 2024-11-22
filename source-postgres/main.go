@@ -263,7 +263,7 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
-	if err := registerDatatypeTweaks(conn.TypeMap()); err != nil {
+	if err := registerDatatypeTweaks(ctx, conn, conn.TypeMap()); err != nil {
 		return err
 	}
 	db.conn = conn

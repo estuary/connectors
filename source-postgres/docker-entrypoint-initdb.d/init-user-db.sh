@@ -13,4 +13,6 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
 
     CREATE PUBLICATION flow_publication FOR ALL TABLES;
     ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true);
+
+    CREATE EXTENSION IF NOT EXISTS citext;
 EOSQL

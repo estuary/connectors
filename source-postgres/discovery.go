@@ -315,7 +315,7 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"varchar": {jsonTypes: []string{"string"}},
 	"bpchar":  {jsonTypes: []string{"string"}},
 	"text":    {jsonTypes: []string{"string"}},
-	"citext":  {jsonTypes: []string{"string"}}, // From the 'citext' extension so we don't test it by default, but it hurts nothing to support it here
+	"citext":  {jsonTypes: []string{"string"}}, // From the 'citext' extension, but common enough we ought to support it properly
 	"bytea":   {jsonTypes: []string{"string"}, contentEncoding: "base64"},
 	"xml":     {jsonTypes: []string{"string"}},
 	"bit":     {jsonTypes: []string{"string"}},
