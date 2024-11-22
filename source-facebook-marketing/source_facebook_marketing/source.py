@@ -34,7 +34,7 @@ from source_facebook_marketing.streams import (
     Videos,
 )
 
-from .utils import validate_end_date, validate_start_date
+from .utils import validate_end_date, validate_start_date, validate_account_ids
 
 logger = logging.getLogger("airbyte")
 UNSUPPORTED_FIELDS = {"unique_conversions", "unique_ctr", "unique_clicks",
@@ -95,6 +95,8 @@ class SourceFacebookMarketing(AbstractSource):
         config.end_date = validate_end_date(config.start_date, config.end_date)
 
         api = API(access_token=config.credentials.access_token)
+
+        validate_account_ids(api, config.account_ids)
 
         insights_args = dict(
             api=api, start_date=config.start_date, end_date=config.end_date, insights_lookback_window=config.insights_lookback_window, account_ids=config.account_ids,
