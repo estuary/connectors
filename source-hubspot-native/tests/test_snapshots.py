@@ -18,7 +18,7 @@ def test_capture(request, snapshot):
         text=True,
     )
     assert result.returncode == 0
-    lines = [json.loads(l) for l in result.stdout.splitlines()[:50]]
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
 
     for l in lines:
         _collection, record = l[0], l[1]
@@ -30,7 +30,7 @@ def test_capture(request, snapshot):
                 "hs_time_in_appointmentscheduled",
                 "hs_time_in_1",
             ]:
-                if record[m].get(prop):
+                if m in record and prop in record[m]:
                     record[m][prop] = "redacted"
 
     assert snapshot("stdout.json") == lines

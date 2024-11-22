@@ -12,6 +12,7 @@ from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
 from .api import (
     FetchDelayedFn,
     FetchRecentFn,
+    fetch_deal_pipelines,
     fetch_delayed_companies,
     fetch_delayed_contacts,
     fetch_delayed_custom_objects,
@@ -20,6 +21,7 @@ from .api import (
     fetch_delayed_engagements,
     fetch_delayed_tickets,
     fetch_email_events_page,
+    fetch_owners,
     fetch_page_with_associations,
     fetch_properties,
     fetch_recent_companies,
@@ -39,10 +41,12 @@ from .models import (
     CRMObject,
     CustomObject,
     Deal,
+    DealPipeline,
     EmailEvent,
     EndpointConfig,
     Engagement,
     Names,
+    Owner,
     Property,
     ResourceConfig,
     ResourceState,
@@ -90,6 +94,8 @@ async def all_resources(
         crm_object_with_associations(Ticket, Names.tickets, Names.tickets, http, fetch_recent_tickets, fetch_delayed_tickets),
         properties(http, itertools.chain(standard_object_names, custom_object_path_components)),
         email_events(http),
+        deal_pipelines(http),
+        owners(http),
         *custom_object_resources,
     ]
 
@@ -172,6 +178,76 @@ def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
         initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=Names.properties, interval=timedelta(days=1)
+        ),
+        schema_inference=True,
+    )
+
+def deal_pipelines(http: HTTPSession) -> Resource:
+
+    async def snapshot(log: Logger) -> AsyncGenerator[DealPipeline, None]:
+        items = await fetch_deal_pipelines(log, http)
+        for item in items.results:
+            yield item
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=snapshot,
+            tombstone=DealPipeline(_meta=DealPipeline.Meta(op="d")),
+        )
+
+    return Resource(
+        name=Names.deal_pipelines,
+        key=["/_meta/row_id"],
+        model=DealPipeline,
+        open=open,
+        initial_state=ResourceState(),
+        initial_config=ResourceConfig(
+            name=Names.deal_pipelines, interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
+def owners(http: HTTPSession) -> Resource:
+
+    async def snapshot(log: Logger) -> AsyncGenerator[Owner, None]:
+        for item in await fetch_owners(log, http):
+            yield item
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=snapshot,
+            tombstone=Owner(_meta=Owner.Meta(op="d")),
+        )
+
+    return Resource(
+        name=Names.owners,
+        key=["/_meta/row_id"],
+        model=Owner,
+        open=open,
+        initial_state=ResourceState(),
+        initial_config=ResourceConfig(
+            name=Names.owners, interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
