@@ -451,7 +451,7 @@
       ],
       "additionalProperties": false
     },
-    "documentationUrl": "https://docs.airbyte.com/integrations/sources/facebook-marketing",
+    "documentationUrl": "https://go.estuary.dev/facebook-marketing",
     "oauth2": {
       "provider": "facebook",
       "authUrlTemplate": "https://www.facebook.com/v19.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{#urlencode}}{{{  state }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management",
