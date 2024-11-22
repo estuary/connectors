@@ -584,3 +584,33 @@ func TestDroppedAndRecreatedTable(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+func TestCIText(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "58810479"
+	var tableDef = "(id INTEGER PRIMARY KEY, data CITEXT, arr CITEXT[])"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	t.Run("Discovery", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+
+	t.Run("Capture", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+		cs.Validator = &st.OrderedCaptureValidator{}
+		sqlcapture.TestShutdownAfterCaughtUp = true
+		t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+		// Initial backfill
+		tb.Insert(ctx, t, tableName, [][]any{{0, "zero", "{a,b}"}, {1, "one", "{c,d}"}, {2, "two", "{e,f}"}})
+		cs.Capture(ctx, t, nil)
+
+		// Some replication
+		tb.Insert(ctx, t, tableName, [][]any{{3, "three", "{g,h}"}, {4, "four", "{i,j}"}, {5, "five", "{k,l}"}})
+		cs.Capture(ctx, t, nil)
+
+		// Snapshot
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}

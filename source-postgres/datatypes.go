@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
@@ -13,6 +14,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -23,7 +25,7 @@ const (
 	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
 )
 
-func registerDatatypeTweaks(m *pgtype.Map) error {
+func registerDatatypeTweaks(ctx context.Context, conn *pgx.Conn, m *pgtype.Map) error {
 	// Prefer text format for 'timestamptz' column results. This is important because the
 	// text format is reported in the configured time zone of the server (since we haven't
 	// set it on our session) while the binary format is always a Unix microsecond timestamp
@@ -78,6 +80,45 @@ func registerDatatypeTweaks(m *pgtype.Map) error {
 		OID:   pgtype.JSONBOID,
 		Codec: &customDecodingCodec{decodeRawJSONB, &pgtype.JSONBCodec{Marshal: json.Marshal, Unmarshal: json.Unmarshal}},
 	})
+
+	// Query pg_catalog.pg_type for specific extension types we support, and install the
+	// appropriate scalar and array codecs for them.
+	var queryExtensionTypes = `
+		SELECT t.oid, n.nspname, t.typname, t.typarray
+		  FROM pg_catalog.pg_type t
+		  JOIN pg_catalog.pg_namespace n ON n.oid = t.typnamespace
+		  WHERE n.nspname = 'public' AND t.typname IN ('citext');
+	`
+	var extensionTypes, err = conn.Query(ctx, queryExtensionTypes)
+	if err != nil {
+		return fmt.Errorf("error querying extension types: %w", err)
+	}
+	defer extensionTypes.Close()
+	for extensionTypes.Next() {
+		var typeOID, arrayOID uint32
+		var schemaName, typeName string
+		if err := extensionTypes.Scan(&typeOID, &schemaName, &typeName, &arrayOID); err != nil {
+			return fmt.Errorf("error querying extension types: %w", err)
+		}
+
+		// Map the type name to the appropriate codec. This right here is the bit we'll need to tweak
+		// if/when we support an extension type that isn't just a glorified string.
+		//
+		// But for now 'citext' is the only one, and it's a string, so there's no need making this
+		// more complicated than it needs to be.
+		var typeCodec = pgtype.TextCodec{}
+
+		// Register mappings for the type and also arrays of that type
+		var baseType = &pgtype.Type{OID: typeOID, Name: typeName, Codec: typeCodec}
+		m.RegisterType(baseType)
+		if arrayOID != 0 {
+			var arrayCodec = &customDecodingCodec{decodeDimensionedArray, &pgtype.ArrayCodec{ElementType: baseType}}
+			m.RegisterType(&pgtype.Type{OID: arrayOID, Name: "_" + typeName, Codec: arrayCodec})
+		}
+	}
+	if extensionTypes.Err() != nil {
+		return fmt.Errorf("error querying extension types: %w", err)
+	}
 	return nil
 }
 

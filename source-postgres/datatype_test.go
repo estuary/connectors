@@ -142,6 +142,10 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `tsrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30 UTC,2010-01-01 15:00 UTC)`, ExpectValue: `"[2010-01-01T11:30:00Z,2010-01-01T15:00:00Z)"`},
 		{ColumnType: `tstzrange`, ExpectType: `{"type":["string","null"]}`, InputValue: `[2010-01-01 11:30 UTC,2010-01-01 15:00 UTC)`, ExpectValue: `"[2010-01-01T03:30:00-08:00,2010-01-01T07:00:00-08:00)"`},
 		{ColumnType: `daterange`, ExpectType: `{"type":["string","null"]}`, InputValue: `(2010-01-01,2010-01-02]`, ExpectValue: `"[2010-01-02T00:00:00Z,2010-01-03T00:00:00Z)"`},
+
+		// Extension types
+		{ColumnType: `citext`, ExpectType: `{"type":["string","null"]}`, InputValue: `Hello, world!`, ExpectValue: `"Hello, world!"`},
+		{ColumnType: `citext[]`, ExpectType: fmt.Sprintf(arraySchemaPattern, `{"type":["string","null"]}`), InputValue: `{"Hello, world!",asdf}`, ExpectValue: `{"dimensions":[2],"elements":["Hello, world!","asdf"]}`},
 	})
 }
 
