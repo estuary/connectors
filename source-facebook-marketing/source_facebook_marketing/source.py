@@ -198,8 +198,7 @@ class SourceFacebookMarketing(AbstractSource):
         (e.g: username and password) required to run this integration.
         """
         return ConnectorSpecification(
-            documentationUrl="https://docs.airbyte.com/integrations/sources/facebook-marketing",
-            changelogUrl="https://docs.airbyte.com/integrations/sources/facebook-marketing",
+            documentationUrl="https://go.estuary.dev/facebook-marketing",
             supportsIncremental=True,
             supported_destination_sync_modes=[DestinationSyncMode.append],
             connectionSpecification=ConnectorConfig.schema(),
