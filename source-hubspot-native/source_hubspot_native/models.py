@@ -97,6 +97,7 @@ class Names(StrEnum):
     engagements = auto()
     line_items = auto()
     owners = auto()
+    products = auto()
     properties = auto()
     tickets = auto()
 
@@ -116,8 +117,8 @@ class Properties(BaseDocument, extra="forbid"):
 
 class DealPipeline(BaseDocument, extra="allow"):
 
-    createdAt: AwareDatetime | None = None
-    updatedAt: AwareDatetime | None = None
+    createdAt: AwareDatetime | None
+    updatedAt: AwareDatetime | None
 
 
 class DealPipelines(BaseDocument, extra="forbid"):
@@ -126,8 +127,8 @@ class DealPipelines(BaseDocument, extra="forbid"):
 
 class Owner(BaseDocument, extra="allow"):
 
-    createdAt: AwareDatetime | None = None
-    updatedAt: AwareDatetime | None = None
+    createdAt: AwareDatetime | None
+    updatedAt: AwareDatetime | None
 
 
 # Base Struct for all CRM Objects within HubSpot.
@@ -220,6 +221,11 @@ class Ticket(BaseCRMObject):
     contacts: list[int] = []
     engagements: list[int] = []
     line_items: list[int] = []
+
+
+class Product(BaseCRMObject):
+    # Products are not associated with other objects in HubSpot.
+    ASSOCIATED_ENTITIES = []
 
 
 # An Association, as returned by the v4 associations API.
@@ -350,9 +356,9 @@ class OldRecentContacts(BaseModel):
         properties: Properties
 
     contacts: list[Item]
-    has_more: bool = Field(alias="has-more")
-    time_offset: int = Field(alias="time-offset")
-    vid_offset: int = Field(alias="vid-offset")
+    has_more: bool = Field(alias="has-more") # type: ignore
+    time_offset: int = Field(alias="time-offset") # type: ignore
+    vid_offset: int = Field(alias="vid-offset") # type: ignore
 
 
 class OldRecentDeals(BaseModel):

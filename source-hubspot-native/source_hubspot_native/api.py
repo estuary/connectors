@@ -43,6 +43,7 @@ from .models import (
     OldRecentTicket,
     Owner,
     PageResult,
+    Product,
     Properties,
     SearchPageResult,
     Ticket,
@@ -121,11 +122,12 @@ async def fetch_page_with_associations(
         property_names = ",".join(props)
 
         input = {
-            "associations": ",".join(cls.ASSOCIATED_ENTITIES),
             "limit": 50, # Maximum when requesting history.
             "properties": property_names,
             "propertiesWithHistory": property_names,
         }
+        if len(cls.ASSOCIATED_ENTITIES) > 0:
+            input["associations"] = ",".join(cls.ASSOCIATED_ENTITIES)
         if page:
             input["after"] = page
 
@@ -927,6 +929,30 @@ def fetch_delayed_tickets(
 
     return fetch_changes_with_associations(
         Names.tickets, Ticket, do_fetch, log, http, since, until
+    )
+
+
+def fetch_recent_products(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
+) -> AsyncGenerator[tuple[datetime, str, Product], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.products, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.products, Product, do_fetch, log, http, since, until
+    )
+
+
+def fetch_delayed_products(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, str, Product], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.products, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.contacts, Product, do_fetch, log, http, since, until
     )
 
 

@@ -28,13 +28,17 @@ properties:
       row_id: -1
     description: Document metadata
   createdAt:
-    format: date-time
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
     title: Createdat
-    type: string
   updatedAt:
-    format: date-time
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
     title: Updatedat
-    type: string
 required:
   - createdAt
   - updatedAt
