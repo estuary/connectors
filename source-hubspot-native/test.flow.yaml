@@ -7,11 +7,6 @@ captures:
       local:
         command:
           - python
-          # - "-m"
-          # - "debugpy"
-          # - "--listen"
-          # - "0.0.0.0:5678"
-          # - "--wait-for-client"
           - "-m"
           - source_hubspot_native
         config: config.yaml
@@ -39,6 +34,14 @@ captures:
       - resource:
           name: email_events
         target: acmeCo/email_events
+      - resource:
+          name: deal_pipelines
+          interval: PT300S
+        target: acmeCo/deal_pipelines
+      - resource:
+          name: owners
+          interval: PT300S
+        target: acmeCo/owners
     interval: 3m
     shards:
       logLevel: debug

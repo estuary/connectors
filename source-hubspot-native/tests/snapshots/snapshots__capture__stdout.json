@@ -5622,5 +5622,143 @@
       },
       "updatedAt": "2024-02-15T18:47:39.436000Z"
     }
+  ],
+  [
+    "acmeCo/deal_pipelines",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "createdAt": "1970-01-01T00:00:00Z",
+      "default": true,
+      "displayOrder": 0,
+      "label": "Prospects pipeline",
+      "objectType": "DEAL",
+      "objectTypeId": "0-3",
+      "pipelineId": "default",
+      "stages": [
+        {
+          "active": true,
+          "createdAt": 1707359677034,
+          "displayOrder": 6,
+          "label": "Closed Lost",
+          "metadata": {
+            "isClosed": "true",
+            "probability": "0.0"
+          },
+          "stageId": "closedlost",
+          "updatedAt": 1707359677034
+        },
+        {
+          "active": true,
+          "createdAt": 1707359677034,
+          "displayOrder": 2,
+          "label": "Presentation Scheduled",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.6"
+          },
+          "stageId": "presentationscheduled",
+          "updatedAt": 1707359677034
+        },
+        {
+          "active": true,
+          "createdAt": 1707359677034,
+          "displayOrder": 5,
+          "label": "Closed Won",
+          "metadata": {
+            "isClosed": "true",
+            "probability": "1.0"
+          },
+          "stageId": "closedwon",
+          "updatedAt": 1707359677034
+        },
+        {
+          "active": true,
+          "createdAt": 1707359677034,
+          "displayOrder": 0,
+          "label": "Appointment Scheduled",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.2"
+          },
+          "stageId": "appointmentscheduled",
+          "updatedAt": 1707359677034
+        },
+        {
+          "active": true,
+          "createdAt": 1707359677034,
+          "displayOrder": 4,
+          "label": "Contract Sent",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.9"
+          },
+          "stageId": "contractsent",
+          "updatedAt": 1707359677034
+        },
+        {
+          "active": true,
+          "createdAt": 1707359677034,
+          "displayOrder": 3,
+          "label": "Decision Maker Bought-In",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.8"
+          },
+          "stageId": "decisionmakerboughtin",
+          "updatedAt": 1707359677034
+        },
+        {
+          "active": true,
+          "createdAt": 1707359677034,
+          "displayOrder": 1,
+          "label": "Qualified To Buy",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.4"
+          },
+          "stageId": "qualifiedtobuy",
+          "updatedAt": 1707359677034
+        }
+      ],
+      "updatedAt": "2024-02-08T02:34:37.034000Z"
+    }
+  ],
+  [
+    "acmeCo/owners",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "activeSalesforceId": null,
+      "activeUserId": 63843671,
+      "createdAt": "2024-02-08T02:34:06.654000Z",
+      "email": "johnny@estuary.dev",
+      "firstName": "Johnny",
+      "hasContactsAccess": false,
+      "isActive": true,
+      "lastName": "Graettinger",
+      "ownerId": 722900407,
+      "portalId": 45192106,
+      "remoteList": [
+        {
+          "active": true,
+          "id": 579527292,
+          "ownerId": 722900407,
+          "portalId": 45192106,
+          "remoteId": "63843671",
+          "remoteType": "HUBSPOT"
+        }
+      ],
+      "type": "PERSON",
+      "updatedAt": "2024-02-08T04:35:51.909000Z",
+      "userIdIncludingInactive": 63843671
+    }
   ]
 ]

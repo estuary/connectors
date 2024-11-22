@@ -27,35 +27,17 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  id:
-    title: Id
-    type: string
-  created:
+  createdAt:
     format: date-time
-    title: Created
+    title: Createdat
     type: string
-  type:
-    enum:
-      - SENT
-      - DROPPED
-      - PROCESSED
-      - DELIVERED
-      - DEFERRED
-      - BOUNCE
-      - OPEN
-      - CLICK
-      - PRINT
-      - FORWARD
-      - STATUSCHANGE
-      - SPAMREPORT
-      - SUPPRESSED
-      - SUPPRESSION
-      - UNBOUNCE
-    title: Type
+  updatedAt:
+    format: date-time
+    title: Updatedat
     type: string
 required:
-  - id
-  - created
-title: EmailEvent
+  - createdAt
+  - updatedAt
+title: Owner
 type: object
 x-infer-schema: true
