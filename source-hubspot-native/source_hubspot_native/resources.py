@@ -19,6 +19,7 @@ from .api import (
     fetch_delayed_deals,
     fetch_delayed_email_events,
     fetch_delayed_engagements,
+    fetch_delayed_products,
     fetch_delayed_tickets,
     fetch_email_events_page,
     fetch_owners,
@@ -30,6 +31,7 @@ from .api import (
     fetch_recent_deals,
     fetch_recent_email_events,
     fetch_recent_engagements,
+    fetch_recent_products,
     fetch_recent_tickets,
     list_custom_objects,
     process_changes,
@@ -47,6 +49,7 @@ from .models import (
     Engagement,
     Names,
     Owner,
+    Product,
     Property,
     ResourceConfig,
     ResourceState,
@@ -92,6 +95,7 @@ async def all_resources(
         crm_object_with_associations(Deal, Names.deals, Names.deals, http, fetch_recent_deals, fetch_delayed_deals),
         crm_object_with_associations(Engagement, Names.engagements, Names.engagements, http, fetch_recent_engagements, fetch_delayed_engagements),
         crm_object_with_associations(Ticket, Names.tickets, Names.tickets, http, fetch_recent_tickets, fetch_delayed_tickets),
+        crm_object_with_associations(Product, Names.products, Names.products, http, fetch_recent_products, fetch_delayed_products),
         properties(http, itertools.chain(standard_object_names, custom_object_path_components)),
         email_events(http),
         deal_pipelines(http),
@@ -202,7 +206,7 @@ def deal_pipelines(http: HTTPSession) -> Resource:
             state,
             task,
             fetch_snapshot=snapshot,
-            tombstone=DealPipeline(_meta=DealPipeline.Meta(op="d")),
+            tombstone=DealPipeline(_meta=DealPipeline.Meta(op="d"), createdAt=None, updatedAt=None),
         )
 
     return Resource(
@@ -237,7 +241,7 @@ def owners(http: HTTPSession) -> Resource:
             state,
             task,
             fetch_snapshot=snapshot,
-            tombstone=Owner(_meta=Owner.Meta(op="d")),
+            tombstone=Owner(_meta=Owner.Meta(op="d"), createdAt=None, updatedAt=None),
         )
 
     return Resource(

@@ -27,6 +27,9 @@ captures:
           name: tickets
         target: acmeCo/tickets
       - resource:
+          name: products
+        target: acmeCo/products
+      - resource:
           name: properties
           interval: P1D
         target: acmeCo/properties
