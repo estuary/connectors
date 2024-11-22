@@ -8,6 +8,11 @@ captures:
         command:
           - python
           - "-m"
+          # - "-m"
+          # - "debugpy"
+          # - "--listen"
+          # - "0.0.0.0:5678"
+          # - "--wait-for-client"
           - source_hubspot_native
         config: config.yaml
     bindings:
@@ -29,6 +34,9 @@ captures:
       - resource:
           name: products
         target: acmeCo/products
+      - resource:
+          name: line_items
+        target: acmeCo/line_items
       - resource:
           name: properties
           interval: P1D

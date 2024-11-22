@@ -24,6 +24,10 @@ collections:
     schema: engagements.schema.yaml
     key:
       - /id
+  acmeCo/line_items:
+    schema: line_items.schema.yaml
+    key:
+      - /id
   acmeCo/owners:
     schema: owners.schema.yaml
     key:
