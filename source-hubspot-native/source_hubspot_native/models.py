@@ -89,16 +89,20 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 # Names of things within the HubSpot API domain.
 class Names(StrEnum):
+    commerce_payments = auto()
     companies = auto()
     contacts = auto()
     deal_pipelines = auto()
     deals = auto()
     email_events = auto()
     engagements = auto()
+    invoices = auto()
     line_items = auto()
     owners = auto()
     products = auto()
     properties = auto()
+    quotes = auto()
+    subscriptions = auto()
     tickets = auto()
 
 
@@ -226,6 +230,17 @@ class Ticket(BaseCRMObject):
 class Product(BaseCRMObject):
     # Products are not associated with other objects in HubSpot.
     ASSOCIATED_ENTITIES = []
+
+
+class LineItem(BaseCRMObject):
+    ASSOCIATED_ENTITIES = [Names.commerce_payments, Names.products, Names.deals, Names.invoices, Names.quotes, Names.subscriptions]
+
+    commerce_payments: list[int] = []
+    products: list[int] = []
+    deals: list[int] = []
+    invoices: list[int] = []
+    quotes: list[int] = []
+    subscriptions: list[int] = []
 
 
 # An Association, as returned by the v4 associations API.
