@@ -91,10 +91,12 @@ ConnectorState = GenericConnectorState[ResourceState]
 class Names(StrEnum):
     companies = auto()
     contacts = auto()
+    deal_pipelines = auto()
     deals = auto()
     email_events = auto()
     engagements = auto()
     line_items = auto()
+    owners = auto()
     properties = auto()
     tickets = auto()
 
@@ -110,6 +112,22 @@ class Property(BaseDocument, extra="allow"):
 
 class Properties(BaseDocument, extra="forbid"):
     results: list[Property]
+
+
+class DealPipeline(BaseDocument, extra="allow"):
+
+    createdAt: AwareDatetime | None = None
+    updatedAt: AwareDatetime | None = None
+
+
+class DealPipelines(BaseDocument, extra="forbid"):
+    results: list[DealPipeline]
+
+
+class Owner(BaseDocument, extra="allow"):
+
+    createdAt: AwareDatetime | None = None
+    updatedAt: AwareDatetime | None = None
 
 
 # Base Struct for all CRM Objects within HubSpot.

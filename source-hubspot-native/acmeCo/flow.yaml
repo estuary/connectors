@@ -8,6 +8,10 @@ collections:
     schema: contacts.schema.yaml
     key:
       - /id
+  acmeCo/deal_pipelines:
+    schema: deal_pipelines.schema.yaml
+    key:
+      - /_meta/row_id
   acmeCo/deals:
     schema: deals.schema.yaml
     key:
@@ -20,6 +24,10 @@ collections:
     schema: engagements.schema.yaml
     key:
       - /id
+  acmeCo/owners:
+    schema: owners.schema.yaml
+    key:
+      - /_meta/row_id
   acmeCo/properties:
     schema: properties.schema.yaml
     key:

@@ -2,6 +2,7 @@ import asyncio
 import functools
 import itertools
 from datetime import UTC, datetime, timedelta
+import json
 from logging import Logger
 from typing import (
     Any,
@@ -30,6 +31,7 @@ from .models import (
     CustomObjectSchema,
     CustomObjectSearchResult,
     Deal,
+    DealPipelines,
     EmailEvent,
     EmailEventsResponse,
     Engagement,
@@ -39,6 +41,7 @@ from .models import (
     OldRecentDeals,
     OldRecentEngagements,
     OldRecentTicket,
+    Owner,
     PageResult,
     Properties,
     SearchPageResult,
@@ -63,6 +66,22 @@ async def fetch_properties(
         p.hubspotObject = object_name
 
     return properties_cache[object_name]
+
+
+async def fetch_deal_pipelines(
+    log: Logger, http: HTTPSession
+) -> DealPipelines:
+    url = f"{HUB}/crm-pipelines/v1/pipelines/deals"
+
+    return DealPipelines.model_validate_json(await http.request(log, url))
+
+
+async def fetch_owners(
+    log: Logger, http: HTTPSession
+) -> list[Owner]:
+    url = f"{HUB}/owners/v2/owners/"
+
+    return TypeAdapter(list[Owner]).validate_json(await http.request(log, url))
 
 
 async def fetch_page_with_associations(
