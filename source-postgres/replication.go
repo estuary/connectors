@@ -107,7 +107,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 	}
 
 	var typeMap = pgtype.NewMap()
-	if err := registerDatatypeTweaks(typeMap); err != nil {
+	if err := registerDatatypeTweaks(ctx, db.conn, typeMap); err != nil {
 		return nil, err
 	}
 
