@@ -35,6 +35,7 @@ from .models import (
     EmailEvent,
     EmailEventsResponse,
     Engagement,
+    LineItem,
     Names,
     OldRecentCompanies,
     OldRecentContacts,
@@ -952,9 +953,32 @@ def fetch_delayed_products(
         return await fetch_search_objects(Names.products, log, http, since, until, page)
 
     return fetch_changes_with_associations(
-        Names.contacts, Product, do_fetch, log, http, since, until
+        Names.products, Product, do_fetch, log, http, since, until
     )
 
+
+def fetch_recent_line_items(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime | None
+) -> AsyncGenerator[tuple[datetime, str, LineItem], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.line_items, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.line_items, LineItem, do_fetch, log, http, since, until
+    )
+
+
+def fetch_delayed_line_items(
+    log: Logger, http: HTTPSession, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, str, LineItem], None]:
+
+    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.line_items, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.line_items, LineItem, do_fetch, log, http, since, until
+    )
 
 async def list_custom_objects(
     log: Logger,
