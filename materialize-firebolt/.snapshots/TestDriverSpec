@@ -3,16 +3,16 @@
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-firebolt/config",
     "properties": {
-      "username": {
+      "client_id": {
         "type": "string",
-        "title": "Username",
-        "description": "Firebolt username.",
+        "title": "Client ID",
+        "description": "ID of your Firebolt service account.",
         "order": 0
       },
-      "password": {
+      "client_secret": {
         "type": "string",
-        "title": "Password",
-        "description": "Firebolt password.",
+        "title": "Client Secret",
+        "description": "Secret key of your Firebolt service account.",
         "order": 1,
         "secret": true
       },
@@ -69,8 +69,8 @@
     },
     "type": "object",
     "required": [
-      "username",
-      "password",
+      "client_id",
+      "client_secret",
       "account_name",
       "engine_name",
       "database",
