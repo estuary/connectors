@@ -142,6 +142,8 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		typeMap:         typeMap,
 		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
+
+		previousFenceLSN: startLSN,
 	}
 	stream.tables.active = make(map[string]struct{})
 	stream.tables.keyColumns = make(map[string][]string)
@@ -198,6 +200,8 @@ type replicationStream struct {
 	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
 	eventBuf sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
 
+	previousFenceLSN pglogrepl.LSN // // The most recently reached fence LSN, updated at the end of each StreamToFence cycle.
+
 	ackLSN          uint64        // The most recently Ack'd LSN, passed to startReplication or updated via CommitLSN.
 	previousAckLSN  pglogrepl.LSN // The last acknowledged LSN sent to the server in a Standby Status Update. Only used to reduce log spam at INFO level.
 	lastTxnEndLSN   pglogrepl.LSN // End LSN (record + 1) of the last completed transaction.
@@ -230,22 +234,32 @@ type replicationStream struct {
 
 const standbyStatusInterval = 10 * time.Second
 
-// replicationBufferSize controls how many change events can be buffered in the
-// replicationStream before it stops receiving further events from PostgreSQL.
-// In normal use it's a constant, it's just a variable so that tests are more
-// likely to exercise blocking sends and backpressure.
-//
-// This buffer has been set to a fairly small value, because larger buffers can
-// cause OOM kills when the incoming data rate exceeds the rate at which we're
-// serializing data and getting it into Gazette journals.
-var replicationBufferSize = 16
+var (
+	// replicationBufferSize controls how many change events can be buffered in the
+	// replicationStream before it stops receiving further events from PostgreSQL.
+	// In normal use it's a constant, it's just a variable so that tests are more
+	// likely to exercise blocking sends and backpressure.
+	//
+	// This buffer has been set to a fairly small value, because larger buffers can
+	// cause OOM kills when the incoming data rate exceeds the rate at which we're
+	// serializing data and getting it into Gazette journals.
+	replicationBufferSize = 16
+
+	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
+	// operation will error out if no further events are received when there ought to be
+	// some. This should never be hit in normal operation, and exists only so that certain
+	// rare failure modes produce an error rather than blocking forever.
+	streamToFenceWatchdogTimeout = 5 * time.Minute
+)
 
 func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
 	// Time-based event streaming until the fenceAfter duration is reached.
+	var timedEventsSinceFlush int
+	var latestFlushCursor = s.previousFenceLSN.String()
 	if fenceAfter > 0 {
+		logrus.WithField("cursor", latestFlushCursor).Debug("beginning timed streaming phase")
 		var deadline = time.NewTimer(fenceAfter)
 		defer deadline.Stop()
-
 	loop:
 		for {
 			select {
@@ -259,48 +273,97 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 				} else if err := callback(event); err != nil {
 					return err
 				}
+				timedEventsSinceFlush++
+				if event, ok := event.(*sqlcapture.FlushEvent); ok {
+					latestFlushCursor = event.Cursor
+					timedEventsSinceFlush = 0
+				}
 			}
 		}
 	}
+	logrus.WithField("cursor", latestFlushCursor).Debug("finished timed streaming phase")
 
-	// Establish a watermark-based fence position.
-	var fenceWatermark = uuid.New().String()
-	if err := s.db.WriteWatermark(ctx, fenceWatermark); err != nil {
-		return fmt.Errorf("error establishing watermark fence: %w", err)
+	// Establish a fence based on the latest server LSN
+	var fenceLSN, err = queryLatestServerLSN(ctx, s.db.conn)
+	if err != nil {
+		return fmt.Errorf("error establishing WAL fence position: %w", err)
+	}
+	logrus.WithField("cursor", latestFlushCursor).WithField("target", fenceLSN.String()).Debug("beginning fenced streaming phase")
+	if latestFlushLSN, err := pglogrepl.ParseLSN(latestFlushCursor); err != nil {
+		return fmt.Errorf("internal error: failed to parse flush cursor value %q", latestFlushCursor)
+	} else if fenceLSN == latestFlushLSN {
+		// As an internal sanity check, we assert that it should never be possible
+		// to hit this early exit unless the database has been idle since the last
+		// flush event we observed.
+		if timedEventsSinceFlush > 0 {
+			return fmt.Errorf("internal error: sanity check failed: already at fence after processing %d changes during timed phase", timedEventsSinceFlush)
+		}
+
+		// Mark the position of the flush event as the latest fence before returning.
+		s.previousFenceLSN = latestFlushLSN
+
+		// Since we're still at a valid flush position and those are always between
+		// transactions, we can safely emit a synthetic FlushEvent here. This means
+		// that every StreamToFence operation ends in a flush, and is helpful since
+		// there's a lot of implicit assumptions of regular events / flushes.
+		return callback(&sqlcapture.FlushEvent{Cursor: latestFlushLSN.String()})
 	}
 
+	// After establishing a target fence position, issue a watermark write. This ensures
+	// that there will always be a change event whose commit LSN is greater than the target,
+	// which avoids certain classes of failure which could otherwise occur when capturing
+	// from an idle database on a server hosting other active databases.
+	//
+	// TODO(wgd):
+	//
+	// However, this won't work against a read replica, so we need to rethink this and/or
+	// keep it around but make it possible to disable in that context.
+	//
+	// It might also be useful to use some other "traffic generation" mechanism that doesn't
+	// require a table to exist for us to use. I think at least one other CDC solution for
+	// Postgres does that, though I don't recall which or what it does exactly. However that
+	// won't play nicely with the current transaction-commit driven logic here, unless we also
+	// add some equivalent of the "Implicit FlushEvent Conversion" that MySQL CDC does.
+	if err := s.db.WriteWatermark(ctx, uuid.New().String()); err != nil {
+		return err
+	}
+
+	// Given that the early-exit fast path was not taken, there must be further data for
+	// us to read. Thus if we sit idle for a nontrivial length of time without reaching
+	// our fence position, something is wrong and we should error out instead of blocking
+	// forever.
+	var fenceWatchdog = time.NewTimer(streamToFenceWatchdogTimeout)
+
 	// Stream replication events until the fence is reached.
-	var fenceReached = false
-	var watermarkStreamID = s.db.WatermarksTable()
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
+		case <-fenceWatchdog.C:
+			return fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
 		case event, ok := <-s.events:
+			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
 			if !ok {
 				return sqlcapture.ErrFenceNotReached
 			} else if err := callback(event); err != nil {
 				return err
 			}
 
-			// Mark the fence as reached when we observe a change event on the watermarks stream
-			// with the expected value.
-			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
-				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
-					var actual = event.After["watermark"]
-					if actual == nil {
-						actual = event.After["WATERMARK"]
-					}
-					logrus.WithFields(logrus.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
-					if actual == fenceWatermark {
-						fenceReached = true
-					}
+			// The first flush event whose cursor position is equal to or after the fence
+			// position ends the stream-to-fence operation.
+			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+				// It might be a bit inefficient to re-parse every flush cursor here, but
+				// realistically it's probably not a significant slowdown and it would be
+				// more work to preserve cursors as a typed value instead of a string.
+				var eventLSN, err = pglogrepl.ParseLSN(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
-			}
-
-			// The flush event following the watermark change ends the stream-to-fence operation.
-			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
-				return nil
+				if eventLSN >= fenceLSN {
+					logrus.WithField("cursor", event.Cursor).Debug("finished fenced streaming phase")
+					s.previousFenceLSN = eventLSN
+					return nil
+				}
 			}
 		}
 	}
@@ -580,7 +643,11 @@ func (s *replicationStream) decodeChangeEvent(
 	// further processing on it.
 	var streamID = sqlcapture.JoinStreamID(rel.Namespace, rel.RelationName)
 	if !s.tableActive(streamID) {
-		return nil, nil
+		// Return a KeepaliveEvent to indicate that we're actively receiving and discarding
+		// change data. This avoids situations where a sufficiently large transaction full
+		// of changes on a not-currently-active table causes the fenced streaming watchdog
+		// to trigger.
+		return &sqlcapture.KeepaliveEvent{}, nil
 	}
 
 	bf, err := s.decodeTuple(before, beforeType, rel, nil)

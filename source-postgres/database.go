@@ -83,3 +83,13 @@ func recreateReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName strin
 	}
 	return createReplicationSlot(ctx, conn, slotName)
 }
+
+// queryLatestServerLSN returns the latest server WAL LSN.
+func queryLatestServerLSN(ctx context.Context, conn *pgx.Conn) (pglogrepl.LSN, error) {
+	var query = "SELECT pg_current_wal_lsn()"
+	var currentLSN pglogrepl.LSN
+	if err := conn.QueryRow(ctx, query).Scan(&currentLSN); err != nil {
+		return 0, fmt.Errorf("error querying current WAL LSN: %w", err)
+	}
+	return currentLSN, nil
+}
