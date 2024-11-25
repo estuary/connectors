@@ -381,6 +381,13 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
+      "_meta/op": "c",
+      "flow_published_at": "1970-01-01T00:00:29.000000000Z",
+      "id": 1
+    },
+    {
+      "$source_file_name": "<test_file>",
+      "_meta/flow_truncated": false,
       "_meta/op": "d",
       "flow_published_at": "1970-01-01T01:00:25.000000000Z",
       "id": 1
@@ -389,21 +396,14 @@
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "c",
-      "flow_published_at": "1970-01-01T00:00:29.000000000Z",
-      "id": 1
+      "flow_published_at": "1970-01-01T00:00:30.000000000Z",
+      "id": 2
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "u",
       "flow_published_at": "1970-01-01T01:00:26.000000000Z",
-      "id": 2
-    },
-    {
-      "$source_file_name": "<test_file>",
-      "_meta/flow_truncated": false,
-      "_meta/op": "c",
-      "flow_published_at": "1970-01-01T00:00:30.000000000Z",
       "id": 2
     },
     {
