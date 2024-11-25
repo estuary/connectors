@@ -48,7 +48,7 @@ func (config) GetFieldDocString(fieldName string) string {
 		return "Engine Name to process your queries."
 	case "Database":
 		return "Name of the Firebolt database."
-	case "ClientID":
+	case "ClientId":
 		return "ID of your Firebolt service account."
 	case "ClientSecret":
 		return "Secret key of your Firebolt service account."
