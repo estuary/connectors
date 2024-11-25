@@ -61,8 +61,8 @@ resources_json_template='[
 
 export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
 export FIREBOLT_ACCOUNT="$(echo $CONNECTOR_CONFIG | jq -r .account_name)"
-export FIREBOLT_CLIENT_ID="$(echo $CONNECTOR_CONFIG | jq -r .username)"
-export FIREBOLT_CLIENT_SECRET="$(echo $CONNECTOR_CONFIG | jq -r .password)"
+export FIREBOLT_CLIENT_ID="$(echo $CONNECTOR_CONFIG | jq -r .client_id)"
+export FIREBOLT_CLIENT_SECRET="$(echo $CONNECTOR_CONFIG | jq -r .client_secret)"
 export FIREBOLT_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
 export FIREBOLT_ENGINE="$(echo $CONNECTOR_CONFIG | jq -r .engine_name)"
 export FIREBOLT_BUCKET="$(echo $CONNECTOR_CONFIG | jq -r .s3_bucket)"

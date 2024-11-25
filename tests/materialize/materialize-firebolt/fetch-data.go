@@ -90,7 +90,7 @@ func main() {
 		log.Fatal("must provide table name as an argument")
 	}
 
-	dsn := fmt.Sprintf("firebolt:///%s?engine=%s&account_name=%s&client_id=%s&client_secret=%s", databaseName, engineName, accountName, clientId, clientSecret)
+	dsn := fmt.Sprintf("firebolt:///%s?account_name=%s&client_id=%s&client_secret=%s&engine=%s", databaseName, accountName, clientId, clientSecret, engineName)
 
 	// opening the firebolt driver
 	db, err := sql.Open("firebolt", dsn)
@@ -104,7 +104,7 @@ func main() {
 			log.Fatal(fmt.Errorf("deleting table: %w", err))
 		}
 	} else {
-		rows, err := db.Query(fmt.Sprintf(`SELECT * FROM "%s" ORDER BY ID`, tables[0]))
+		rows, err := db.Query(fmt.Sprintf(`SELECT * FROM "%s" ORDER BY ID, FLOW_PUBLISHED_AT`, tables[0]))
 		if err != nil {
 			log.Fatal(fmt.Errorf("running query: %w", err))
 		}
