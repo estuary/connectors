@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"golang.org/x/sync/errgroup"
 
@@ -52,6 +53,14 @@ func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
 			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
 		),
 		awsConfig.WithRegion(cfg.Region),
+		awsConfig.WithRetryer(func() aws.Retryer {
+			// Bump up the number of retry maximum attempts from the default of 3. The maximum retry
+			// duration is 20 seconds, so this gives us around 5 minutes of retrying retryable
+			// errors before giving up and crashing the connector.
+			//
+			// Ref: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/
+			return retry.AddWithMaxAttempts(retry.NewStandard(), 20)
+		}),
 	}
 
 	if cfg.Advanced.Endpoint != "" {
