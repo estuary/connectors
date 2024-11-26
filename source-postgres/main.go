@@ -244,7 +244,7 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		return fmt.Errorf("error parsing database uri: %w", err)
 	}
 	if config.ConnectTimeout == 0 {
-		config.ConnectTimeout = 10 * time.Second
+		config.ConnectTimeout = 20 * time.Second
 	}
 	conn, err := pgx.ConnectConfig(ctx, config)
 	if err != nil {
