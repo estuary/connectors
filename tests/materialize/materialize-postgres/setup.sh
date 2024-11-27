@@ -11,9 +11,7 @@ export PGDATABASE="${PGDATABASE:=flow}"
 export PGPASSWORD="${PGPASSWORD:=flow}"
 export PGUSER="${PGUSER:=flow}"
 
-docker compose -f materialize-postgres/docker-compose.yaml up --detach
-# Give it time to start.
-sleep 5
+docker compose -f materialize-postgres/docker-compose.yaml up --detach --wait
 
 config_json_template='{
    "address":  "$PGHOST:$PGPORT",
