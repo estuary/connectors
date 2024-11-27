@@ -32,15 +32,21 @@ type sshForwarding struct {
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
 }
 
+type cloudSQLProxy struct {
+	InstanceConnectionName string `json:"instance_connection_name" jsonschema:"title=Instance Connection Name,description=In the format of PROJECT:REGION:INSTANCE."`
+	Credentials            string `json:"credentials" jsonschema:"title=Service Account Credentials,description=Credentials JSON file of a service account with access to the instance." jsonschema_extras:"secret=true,multiline=true"`
+}
+
 type tunnelConfig struct {
 	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
+	CloudSQLProxy *cloudSQLProxy `json:"cloud_sql_proxy,omitempty" jsonschema:"title=Cloud SQL Proxy"`
 }
 
 // config represents the endpoint configuration for mysql.
 type config struct {
 	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 3306 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
 	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Password   string `json:"password,omitempty" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 	Timezone   string `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when materializing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set." jsonschema_extras:"order=4"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
@@ -65,7 +71,6 @@ func (c *config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
-		{"password", c.Password},
 		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
@@ -160,7 +165,7 @@ func (c *config) ToURI() string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:3306
 	// to address through the bastion server, so we use the tunnel's address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "" {
+	if c.NetworkTunnel != nil && ((c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != "") || (c.NetworkTunnel.CloudSQLProxy != nil && c.NetworkTunnel.CloudSQLProxy.InstanceConnectionName != "")) {
 		address = "localhost:3306"
 	}
 
@@ -239,6 +244,19 @@ func newMysqlDriver() *sql.Driver {
 					ForwardHost: host,
 					ForwardPort: port,
 					LocalPort:   "3306",
+				}
+				var tunnel = sshConfig.CreateTunnel()
+
+				// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+				// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+				if err := tunnel.Start(); err != nil {
+					return err
+				}
+			} else if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.CloudSQLProxy != nil && cfg.NetworkTunnel.CloudSQLProxy.InstanceConnectionName != "" {
+				var sshConfig = &networkTunnel.CloudSQLProxyConfig{
+					InstanceConnectionName: cfg.NetworkTunnel.CloudSQLProxy.InstanceConnectionName,
+					Credentials:            []byte(cfg.NetworkTunnel.CloudSQLProxy.Credentials),
+					Port:                   "3306",
 				}
 				var tunnel = sshConfig.CreateTunnel()
 
