@@ -7,11 +7,11 @@ use axum::{
     routing, Router,
 };
 use doc::Annotation;
-use http::status::StatusCode;
+use http::{header::InvalidHeaderValue, status::StatusCode, HeaderValue};
 use json::validator::Validator;
 use models::RawValue;
 use serde_json::Value;
-use tower_http::decompression::RequestDecompressionLayer;
+use tower_http::{cors, decompression::RequestDecompressionLayer};
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder};
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -22,6 +22,27 @@ use std::{
 use tokio::io;
 use tokio::sync::Mutex;
 
+pub fn parse_cors_allowed_origins(
+    cors_allow_origins: &[String],
+) -> anyhow::Result<Option<cors::AllowOrigin>> {
+    if cors_allow_origins.is_empty() {
+        Ok(None)
+    } else if cors_allow_origins.iter().any(|o| o.trim() == "*") {
+        anyhow::ensure!(
+            cors_allow_origins.len() == 1,
+            "cannot specify multiple allowed cors origins if using '*' to allow all"
+        );
+        Ok(Some(cors::AllowOrigin::any()))
+    } else {
+        let list = cors_allow_origins
+            .iter()
+            .map(|origin| HeaderValue::from_str(origin.trim()))
+            .collect::<Result<Vec<HeaderValue>, InvalidHeaderValue>>()
+            .context("invalid cors allowed origin value")?;
+        Ok(Some(cors::AllowOrigin::list(list)))
+    }
+}
+
 pub async fn run_server(
     endpoint_config: EndpointConfig,
     bindings: Vec<Binding>,
@@ -30,10 +51,12 @@ pub async fn run_server(
 ) -> anyhow::Result<()> {
     let openapi_spec =
         openapi_spec(&endpoint_config, &bindings).context("creating openapi spec")?;
+    let cors_allow_origin = parse_cors_allowed_origins(&endpoint_config.allowed_cors_origins)
+        .expect("allowedCorsOrigins must be valid");
 
     let handler = Handler::try_new(stdin, stdout, endpoint_config, bindings)?;
 
-    let router = Router::new()
+    let mut router = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-doc/openapi.json", openapi_spec))
         // The root path redirects to the swagger ui, so that a user who clicks a link to just
         // the hostname will be redirected to a more useful page.
@@ -68,8 +91,20 @@ pub async fn run_server(
                         span.record("handler_time_ms", latency.as_millis());
                     },
                 ),
-        )
-        .with_state(Arc::new(handler));
+        );
+
+    if let Some(allowed_origins) = cors_allow_origin {
+        let cors = tower_http::cors::CorsLayer::new()
+            .allow_origin(allowed_origins)
+            .allow_methods(tower_http::cors::AllowMethods::list([
+                http::Method::POST,
+                http::Method::PUT,
+            ]))
+            .allow_headers(tower_http::cors::AllowHeaders::mirror_request());
+        router = router.layer(cors);
+    }
+
+    let router = router.with_state(Arc::new(handler));
 
     let address = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen_on_port()));
     let listener = tokio::net::TcpListener::bind(address)
@@ -618,6 +653,7 @@ mod test {
         let endpoint_config = EndpointConfig {
             require_auth_token: Some("testToken".to_string()),
             paths: Vec::new(),
+            allowed_cors_origins: Vec::new(),
         };
         let binding0 = Binding {
             collection: serde_json::from_value(serde_json::json!({
