@@ -7,6 +7,16 @@ expression: schema
   "title": "EndpointConfig",
   "type": "object",
   "properties": {
+    "allowedCorsOrigins": {
+      "title": "CORS Allowed Origins",
+      "description": "List of allowed CORS origins. If empty, then CORS will be disabled. Otherwise, each item in the list will be interpreted as a specific request origin that will be permitted by the `Access-Control-Allow-Origin` header for preflight requests coming from that origin. As a special case, the value `*` is permitted in order to allow all origins. The `*` should be used with extreme caution, however. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin",
+      "default": [],
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "order": 3
+    },
     "paths": {
       "title": "URL paths",
       "description": "List of URL paths to accept requests at.\n\nDiscovery will return a separate collection for each given path. Paths must be provided without any percent encoding, and should not include any query parameters or fragment.",
@@ -17,7 +27,8 @@ expression: schema
       "items": {
         "type": "string",
         "pattern": "/.+"
-      }
+      },
+      "order": 1
     },
     "requireAuthToken": {
       "title": "Authentication token",
@@ -27,6 +38,7 @@ expression: schema
         "string",
         "null"
       ],
+      "order": 2,
       "secret": true
     }
   }

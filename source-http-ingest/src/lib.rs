@@ -42,6 +42,15 @@ pub struct EndpointConfig {
     #[serde(default)]
     #[schemars(default = "paths_schema_default", schema_with = "paths_schema")]
     paths: Vec<String>,
+
+    /// List of allowed CORS origins. If empty, then CORS will be disabled. Otherwise, each item
+    /// in the list will be interpreted as a specific request origin that will be permitted by the
+    /// `Access-Control-Allow-Origin` header for preflight requests coming from that origin. As a special
+    /// case, the value `*` is permitted in order to allow all origins. The `*` should be used with extreme
+    /// caution, however. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
+    #[serde(default)]
+    #[schemars(default, schema_with = "cors_schema")]
+    allowed_cors_origins: Vec<String>,
 }
 
 /// Sets the default value that's used only in the JSON schema. This is _not_ the default that's used
@@ -58,7 +67,23 @@ fn paths_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
         "items": {
             "type": "string",
             "pattern": "/.+",
-        }
+        },
+        "order": 1
+    }))
+    .unwrap()
+}
+
+fn cors_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
+    // This schema is a little more permissive than would otherwise be ideal.
+    // We'd like to use something like `oneOf: [{format: hostname}, {const: '*'}]`,
+    // but the UI does not handle that construct well.
+    serde_json::from_value(serde_json::json!({
+        "title": "CORS Allowed Origins",
+        "type": "array",
+        "items": {
+            "type": "string"
+        },
+        "order": 3
     }))
     .unwrap()
 }
@@ -68,6 +93,7 @@ fn require_auth_token_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema 
         "title": "Authentication token",
         "type": ["string", "null"],
         "secret": true,
+        "order": 2
     }))
     .unwrap()
 }
@@ -302,6 +328,11 @@ async fn do_validate(
     // Check to make sure we can successfully create an openapi spec
     server::openapi_spec(&config, &typed_bindings)
         .context("cannot create openapi spec from bindings")?;
+
+    // Ensure that cors origins are valid
+    let _ = server::parse_cors_allowed_origins(&config.allowed_cors_origins)
+        .context("invalid allowedCorsOrigins value")?;
+
     let response = Response {
         validated: Some(Validated { bindings: output }),
         ..Default::default()
@@ -415,6 +446,7 @@ mod test {
         let config = EndpointConfig {
             require_auth_token: None,
             paths: vec!["/foo".to_string(), "/bar/baz".to_string()],
+            allowed_cors_origins: Vec::new(),
         };
         let result = generate_discover_response(config).unwrap();
         insta::assert_json_snapshot!(result);
