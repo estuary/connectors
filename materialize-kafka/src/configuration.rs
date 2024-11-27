@@ -2,6 +2,7 @@ use anyhow::Result;
 use rdkafka::admin::AdminClient;
 use rdkafka::client::{ClientContext, OAuthToken};
 use rdkafka::consumer::{BaseConsumer, ConsumerContext};
+use rdkafka::error::KafkaError;
 use rdkafka::producer::FutureProducer;
 use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
@@ -264,8 +265,12 @@ impl ClientContext for FlowClientContext {
         }
     }
 
-    // TODO(whb): Implement `log` to intercept log messages from librdkafka so
-    // that expected PartionEOF logs don't get emitted as scary ERROR messages.
+    fn error(&self, error: KafkaError, reason: &str) {
+        // The default `error` implementation logs errors at the `error` log
+        // level, including the expected PartitionEOF errors when reading a
+        // partition to the end.
+        tracing::debug!(%error, reason, "librdkafka error");
+    }
 }
 
 impl ConsumerContext for FlowClientContext {}
