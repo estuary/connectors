@@ -1,7 +1,5 @@
 use anyhow::{Context, Result};
 use avro::{encode, encode_key};
-use base64::engine::general_purpose::STANDARD as base64;
-use base64::Engine;
 use bytes::Bytes;
 use proto_flow::{
     flow::RangeSpec,
@@ -27,7 +25,7 @@ use xxhash_rust::xxh3::xxh3_64;
 
 use crate::{
     binding_info::{get_binding_info, BindingInfo},
-    configuration::EndpointConfig,
+    configuration::{EndpointConfig, MessageFormat},
     Input, Output, FLOW_CHECKPOINTS_TOPIC, KAFKA_TIMEOUT,
 };
 
@@ -59,7 +57,12 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
     })?;
     tracing::info!("finished recovering checkpoint");
 
-    let bindings = get_binding_info(&spec.bindings, config.schema_registry.as_ref()).await?;
+    let bindings = get_binding_info(
+        &spec.bindings,
+        &config.message_format,
+        config.schema_registry.as_ref(),
+    )
+    .await?;
 
     let mut key_buf = Vec::new();
     let mut payload_buf = Vec::new();
@@ -85,7 +88,13 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
             }
             producer
                 .send(
-                    msg_for_store(&mut key_buf, &mut payload_buf, store, &bindings)?,
+                    msg_for_store(
+                        &config.message_format,
+                        &mut key_buf,
+                        &mut payload_buf,
+                        store,
+                        &bindings,
+                    )?,
                     Timeout::Never,
                 )
                 .await
@@ -146,6 +155,7 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
 }
 
 fn msg_for_store<'a>(
+    message_format: &MessageFormat,
     key_buf: &'a mut Vec<u8>,
     payload_buf: &'a mut Vec<u8>,
     store: Store,
@@ -162,39 +172,72 @@ fn msg_for_store<'a>(
 
     let b = &bindings[binding as usize];
 
-    let mut converted = convert_tuple(&key_packed);
-    if !values_packed.is_empty() {
-        converted.append(&mut convert_tuple(&values_packed));
-    }
+    let converted_key = convert_tuple(&key_packed);
+    let mut converted_values = if !values_packed.is_empty() {
+        convert_tuple(&values_packed)
+    } else {
+        vec![]
+    };
     if !doc_json.is_empty() {
         // The root document field, if selected, is always materialized as a
         // string.
-        converted.push(serde_json::Value::String(doc_json));
+        converted_values.push(serde_json::Value::String(doc_json));
     }
 
-    let doc = converted
-        .into_iter()
-        .enumerate()
-        .map(|(i, value)| (b.field_names[i].clone(), value))
-        .collect::<serde_json::Value>();
+    Ok(match message_format {
+        MessageFormat::JSON => {
+            let key_doc = converted_key
+                .clone()
+                .into_iter()
+                .enumerate()
+                .map(|(i, value)| (b.field_names[i].clone(), value))
+                .collect::<serde_json::Value>();
 
-    // TODO(whb): Support JSON serialization without a schema, and JSON
-    // serialization with a JSON schema.
-    let schema = b.schema.as_ref().unwrap();
+            let doc = converted_key
+                .into_iter()
+                .chain(converted_values)
+                .enumerate()
+                .map(|(i, value)| (b.field_names[i].clone(), value))
+                .collect::<serde_json::Value>();
 
-    key_buf.push(0);
-    key_buf.extend(schema.key_schema_id.to_be_bytes());
-    encode_key(key_buf, &schema.key_schema, &doc, &b.key_ptr).context("encoding key")?;
-    let mut rec = FutureRecord::to(&b.topic).key(key_buf);
+            serde_json::to_writer(&mut *key_buf, &key_doc)?;
+            let mut rec = FutureRecord::to(&b.topic).key(key_buf);
 
-    if !delete {
-        payload_buf.push(0);
-        payload_buf.extend(schema.schema_id.to_be_bytes());
-        encode(payload_buf, &schema.schema, &doc).context("encoding payload")?;
-        rec = rec.payload(payload_buf);
-    }
+            if !delete {
+                serde_json::to_writer(&mut *payload_buf, &doc)?;
+                rec = rec.payload(payload_buf);
+            }
 
-    Ok(rec)
+            rec
+        }
+        MessageFormat::Avro => {
+            let doc = converted_key
+                .into_iter()
+                .chain(converted_values)
+                .enumerate()
+                .map(|(i, value)| (b.field_names[i].clone(), value))
+                .collect::<serde_json::Value>();
+
+            let schema = b
+                .schema
+                .as_ref()
+                .expect("schema must be available for Avro encoding");
+
+            key_buf.push(0);
+            key_buf.extend(schema.key_schema_id.to_be_bytes());
+            encode_key(key_buf, &schema.key_schema, &doc, &b.key_ptr).context("encoding key")?;
+            let mut rec = FutureRecord::to(&b.topic).key(key_buf);
+
+            if !delete {
+                payload_buf.push(0);
+                payload_buf.extend(schema.schema_id.to_be_bytes());
+                encode(payload_buf, &schema.schema, &doc).context("encoding payload")?;
+                rec = rec.payload(payload_buf);
+            }
+
+            rec
+        }
+    })
 }
 
 fn convert_tuple(packed: &Bytes) -> Vec<serde_json::Value> {
@@ -207,7 +250,7 @@ fn convert_tuple(packed: &Bytes) -> Vec<serde_json::Value> {
             Element::Float(v) => serde_json::json!(v),
             Element::Double(v) => serde_json::json!(v),
             Element::String(v) => serde_json::json!(v),
-            Element::Bytes(v) => serde_json::json!(base64.encode(v)),
+            Element::Bytes(v) => serde_json::from_slice(v).expect("bytes must be valid json"),
             Element::Nil => serde_json::json!(null),
             _ => panic!("received unexpected tuple element {:?}", element),
         })
@@ -265,6 +308,7 @@ fn recover_checkpoint(
     // committed after these are retrieved.
     let mut partition_high_watermarks: HashMap<i32, i64> = HashMap::new();
     assert!(topic_metadata.topics().len() == 1); // sanity check
+    assert!(topic_metadata.topics()[0].partitions().len() != 0);
     for partition in topic_metadata.topics()[0].partitions() {
         let (low, high) =
             consumer.fetch_watermarks(FLOW_CHECKPOINTS_TOPIC, partition.id(), KAFKA_TIMEOUT)?;
