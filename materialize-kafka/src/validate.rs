@@ -6,21 +6,39 @@ use proto_flow::{
         response::validated::{constraint, Binding, Constraint},
     },
 };
+use rdkafka::consumer::Consumer;
 
 use crate::{
-    configuration::{EndpointConfig, Resource},
+    configuration::{EndpointConfig, Resource, SchemaRegistryConfig},
     KAFKA_TIMEOUT,
 };
 
-pub fn do_validate(req: Validate) -> Result<Vec<Binding>> {
+pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
     let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
-    let admin = config.to_admin()?;
+    config.validate()?;
+    let consumer = config.to_consumer()?;
 
-    // Connectivity check.
-    admin
-        .inner()
+    // Kafka connectivity check.
+    consumer
         .fetch_metadata(None, KAFKA_TIMEOUT)
-        .context("could not fetch cluster metadata - double check your configuration")?;
+        .context("Could not connect to bootstrap server with the provided configuration. This may be due to an incorrect configuration for authentication or bootstrap servers. Double check your configuration and try again.")?;
+
+    // Schema registry connectivity check.
+    if let Some(SchemaRegistryConfig {
+        endpoint,
+        username,
+        password,
+    }) = config.schema_registry
+    {
+        reqwest::Client::new()
+            .get(format!("{endpoint}/config"))
+            .basic_auth(username, Some(password))
+            .timeout(KAFKA_TIMEOUT)
+            .send()
+            .await?
+            .error_for_status()
+            .context("Could not connect to the configured schema registry. Double check your configuration and try again.")?;
+    }
 
     req.bindings
         .iter()
@@ -53,6 +71,9 @@ fn constraint_for_projection(
     res: &Resource,
     last_spec: Option<&MaterializationSpec>,
 ) -> Constraint {
+    // TODO(whb): Handle top-level synthetic projections, like
+    // flow_published_at.
+
     let mut constraint = if p.is_primary_key {
         Constraint {
             r#type: constraint::Type::LocationRecommended.into(),

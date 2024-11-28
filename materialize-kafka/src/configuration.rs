@@ -8,11 +8,12 @@ use rdkafka::ClientConfig;
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize, Default)]
+#[derive(Serialize, Deserialize)]
 pub struct EndpointConfig {
     pub bootstrap_servers: String,
     pub credentials: Option<Credentials>,
     pub tls: Option<TlsSettings>,
+    pub message_format: MessageFormat,
     pub schema_registry: Option<SchemaRegistryConfig>,
     pub topic_partitions: i32,
     pub topic_replication_factor: i32,
@@ -41,6 +42,12 @@ pub enum SaslMechanism {
     Plain,
     ScramSha256,
     ScramSha512,
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum MessageFormat {
+    Avro,
+    JSON,
 }
 
 impl std::fmt::Display for SaslMechanism {
@@ -179,6 +186,16 @@ impl JsonSchema for EndpointConfig {
                     "type": "string",
                     "order": 2
                 },
+                "message_format": {
+                    "description": "Format for materialized messages. Avro format requires a schema registry configuration. Messages in JSON format do not use a schema registry.",
+                    "enum": [
+                        "Avro",
+                        "JSON",
+                    ],
+                    "title": "Message Format",
+                    "type": "string",
+                    "order": 3
+                },
                 "schema_registry": {
                     "title": "Schema Registry",
                     "description": "Connection details for interacting with a schema registry. This is necessary for materializing messages with Avro encoding.",
@@ -209,21 +226,21 @@ impl JsonSchema for EndpointConfig {
                         "username",
                         "password"
                     ],
-                    "order": 3
+                    "order": 4
                 },
                 "topic_partitions": {
                     "title": "Topic Partitions",
                     "description": "The number of partitions to create new topics with.",
                     "type": "integer",
                     "default": 6,
-                    "order": 4
+                    "order": 5
                 },
                 "topic_replication_factor": {
                     "title": "Topic Replication Factor",
                     "description": "The replication factor to create new topics with.",
                     "type": "integer",
                     "default": 3,
-                    "order": 5
+                    "order": 6
                 },
             }
         }))
@@ -276,6 +293,14 @@ impl ClientContext for FlowClientContext {
 impl ConsumerContext for FlowClientContext {}
 
 impl EndpointConfig {
+    pub fn validate(&self) -> Result<()> {
+        if matches!(self.message_format, MessageFormat::Avro) && self.schema_registry.is_none() {
+            anyhow::bail!("Avro messages require a schema registry");
+        }
+
+        Ok(())
+    }
+
     pub fn to_producer(&self, transactional_id: &str) -> Result<FutureProducer<FlowClientContext>> {
         let (mut config, ctx) = self.common_config()?;
         config.set("transactional.id", transactional_id);
