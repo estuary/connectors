@@ -1,4 +1,4 @@
-use crate::configuration::SchemaRegistryConfig;
+use crate::configuration::{MessageFormat, SchemaRegistryConfig};
 use anyhow::Result;
 use doc::{shape::ObjProperty, Pointer, Shape};
 use futures::stream::{self, StreamExt};
@@ -29,6 +29,7 @@ pub struct BindingSchema {
 
 pub async fn get_binding_info(
     bindings: &[Binding],
+    message_format: &MessageFormat,
     schema_registry_config: Option<&SchemaRegistryConfig>,
 ) -> Result<Vec<BindingInfo>> {
     let computed = bindings
@@ -36,7 +37,7 @@ pub async fn get_binding_info(
         .map(binding_info)
         .collect::<Result<Vec<_>>>()?;
 
-    if schema_registry_config.is_none() {
+    if matches!(message_format, MessageFormat::JSON) {
         return Ok(computed
             .into_iter()
             .map(|binding| BindingInfo {
@@ -49,7 +50,8 @@ pub async fn get_binding_info(
     }
 
     let http = Client::new();
-    let cfg = schema_registry_config.unwrap();
+    let cfg =
+        schema_registry_config.expect("schema registry config must be provided for Avro encoding");
 
     // Get the schema ID for each binding, registering it if necessary. The
     // subject name is synthesized from a hash of the schema itself, and uses

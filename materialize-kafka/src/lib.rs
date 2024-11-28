@@ -44,7 +44,7 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
     } else if let Some(validate) = request.validate {
         let res = Response {
             validated: Some(Validated {
-                bindings: do_validate(validate)?,
+                bindings: do_validate(validate).await?,
             }),
             ..Default::default()
         };
