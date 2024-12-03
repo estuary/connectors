@@ -126,6 +126,9 @@ func (t *SshTunnel) Start() error {
 }
 
 func (t *SshTunnel) Stop() {
+	if t == nil {
+		return
+	}
 	if t.Cmd != nil {
 		// Using the negative pid signals kill to a process group.
 		// This ensures the children of the process are also killed
