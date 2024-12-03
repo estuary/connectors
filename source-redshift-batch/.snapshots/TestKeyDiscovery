@@ -63,7 +63,8 @@ Binding 0:
           "k_str": {
             "type": "string"
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "key": [
         "/k_smallint",

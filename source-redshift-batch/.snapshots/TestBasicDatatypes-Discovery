@@ -76,7 +76,8 @@ Binding 0:
           "id": {
             "type": "integer"
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "key": [
         "/id"

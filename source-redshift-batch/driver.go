@@ -109,7 +109,8 @@ func generateCollectionSchema(keyColumns []string, columnTypes map[string]column
 		Required:             required,
 		AdditionalProperties: nil,
 		Extras: map[string]interface{}{
-			"properties": properties,
+			"properties":     properties,
+			"x-infer-schema": true,
 		},
 	}
 
