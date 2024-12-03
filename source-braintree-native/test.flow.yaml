@@ -1,0 +1,49 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-braintree:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_braintree_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: discounts
+          interval: PT5M
+        target: acmeCo/discounts
+      - resource:
+          name: add_ons
+          interval: PT5M
+        target: acmeCo/add_ons
+      - resource:
+          name: plans
+          interval: PT5M
+        target: acmeCo/plans
+      - resource:
+          name: merchant_accounts
+          interval: PT5M
+        target: acmeCo/merchant_accounts
+      - resource:
+          name: transactions
+          interval: PT5M
+        target: acmeCo/transactions
+      - resource:
+          name: disputes
+          interval: PT5M
+        target: acmeCo/disputes
+      - resource:
+          name: subscriptions
+          interval: PT5M
+        target: acmeCo/subscriptions
+      - resource:
+          name: customers
+          interval: PT5M
+        target: acmeCo/customers
+      - resource:
+          name: credit_card_verifications
+          interval: PT5M
+        target: acmeCo/credit_card_verifications

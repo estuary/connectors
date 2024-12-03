@@ -1,0 +1,253 @@
+from braintree import (
+    BraintreeGateway,
+    AddOnGateway,
+    Configuration,
+    TransactionSearch,
+    CustomerSearch,
+    CreditCardVerificationSearch,
+    DisputeSearch,
+    SubscriptionSearch,
+    )
+from braintree.attribute_getter import AttributeGetter
+from datetime import datetime, timedelta, UTC
+from logging import Logger
+from typing import AsyncGenerator
+from estuary_cdk.capture.common import LogCursor
+
+from .models import (
+    FullRefreshResource,
+    Customer,
+    Dispute,
+    Subscription,
+    Transaction,
+    CreditCardVerification,
+)
+
+
+# Searches return at most 10,000 results (50,000 for transaction searches). If we hit this limit,
+# the connector could have missed data and we'll need to use smaller date windows.
+SEARCH_LIMIT = 10_000
+TRANSACTION_SEARCH_LIMIT = 50_000
+# Incremental streams use sliding date windows to try & avoid hitting the above search limits.
+WINDOW_SIZE = 15
+
+CONVENIENCE_OBJECTS = [
+    'gateway'
+]
+
+
+def _braintree_object_to_dict(braintree_object):
+        """
+        Recursively convert a Braintree object and its nested objects to a dictionary.
+        Convenience objects intended to make subsequent Braintree requests easier are ommitted.
+        """
+        if isinstance(braintree_object, (Configuration, AddOnGateway, BraintreeGateway)):
+            return None
+        data = braintree_object.__dict__.copy()
+        # Remove convenience objects (like BraintreeGateways for making more requests).
+        for key in CONVENIENCE_OBJECTS:
+            data.pop(key, None)
+
+        for key, value in data.items():
+            if isinstance(value, AttributeGetter):
+                data[key] = _braintree_object_to_dict(value)
+            elif isinstance(value, datetime):
+                data[key] =  value.replace(tzinfo=UTC)
+            elif hasattr(value, "__dict__"):
+                data[key] = _braintree_object_to_dict(value)
+            elif isinstance(value, list):
+                new_value = []
+                for item in value:
+                    if hasattr(item, "__dict__"):
+                        new_value.append(_braintree_object_to_dict(item))
+                    elif isinstance(item, datetime):
+                        new_value.append(item.replace(tzinfo=UTC))
+                    else:
+                        new_value.append(item)
+
+                data[key] = new_value
+
+        # Remove private attributes.
+        data.pop('_setattrs', None)
+        return data
+
+
+async def snapshot_resources(
+        braintree_gateway: BraintreeGateway,
+        gateway_property: str,
+        gateway_response_field: str | None,
+        log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    resources = getattr(braintree_gateway, gateway_property).all()
+
+    iterator = getattr(resources, gateway_response_field) if gateway_response_field else resources
+    for object in iterator:
+        yield FullRefreshResource.model_validate(_braintree_object_to_dict(object))
+
+
+async def fetch_transactions(
+        braintree_gateway: BraintreeGateway,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[Transaction | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    most_recent_created_at = log_cursor
+    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    end = min(window_end, datetime.now(tz=UTC))
+
+    collection = braintree_gateway.transaction.search(
+        TransactionSearch.created_at.between(log_cursor, end)
+    )
+
+    count = 0
+
+    for object in collection.items:
+        count += 1
+        doc = Transaction.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at > log_cursor:
+            yield doc
+            most_recent_created_at = doc.created_at
+
+    if count >= TRANSACTION_SEARCH_LIMIT:
+        log.warning(f"{count} transactions returned in a single search which is greater than or equal to Braintree's documented maximum for a single transaction search.")
+
+    if end == window_end:
+        yield window_end
+    elif most_recent_created_at > log_cursor:
+        yield most_recent_created_at
+
+
+async def fetch_customers(
+        braintree_gateway: BraintreeGateway,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[Customer | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    most_recent_created_at = log_cursor
+    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    end = min(window_end, datetime.now(tz=UTC))
+
+    collection = braintree_gateway.customer.search(
+        CustomerSearch.created_at.between(log_cursor, end)
+    )
+
+    count = 0
+
+    for object in collection.items:
+        count += 1
+        doc = Customer.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at > log_cursor:
+            yield doc
+            most_recent_created_at = doc.created_at
+
+    if count >= SEARCH_LIMIT:
+        log.warning(f"{count} customers returned in a single search which is greater than or equal to Braintree's documented maximum for a single customer search.")
+
+    if end == window_end:
+        yield window_end
+    elif most_recent_created_at > log_cursor:
+        yield most_recent_created_at
+
+
+async def fetch_credit_card_verifications(
+        braintree_gateway: BraintreeGateway,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[CreditCardVerification | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    most_recent_created_at = log_cursor
+    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    end = min(window_end, datetime.now(tz=UTC))
+
+    collection = braintree_gateway.verification.search(
+        CreditCardVerificationSearch.created_at.between(log_cursor, end)
+    )
+
+    count = 0
+
+    for object in collection.items:
+        count += 1
+        doc = CreditCardVerification.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at > log_cursor:
+            yield doc
+            most_recent_created_at = doc.created_at
+
+    if count >= SEARCH_LIMIT:
+        log.warning(f"{count} credit card verifications returned in a single search which is greater than or equal to Braintree's documented maximum for a single credit card verifications search.")
+
+    if end == window_end:
+        yield window_end
+    elif most_recent_created_at > log_cursor:
+        yield most_recent_created_at
+
+
+async def fetch_subscriptions(
+        braintree_gateway: BraintreeGateway,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[Subscription | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    most_recent_created_at = log_cursor
+    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    end = min(window_end, datetime.now(tz=UTC))
+
+    collection = braintree_gateway.subscription.search(
+        SubscriptionSearch.created_at.between(log_cursor, end)
+    )
+
+    count = 0
+
+    for object in collection.items:
+        count += 1
+        doc = Subscription.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at > log_cursor:
+            yield doc
+            most_recent_created_at = doc.created_at
+
+    if count >= SEARCH_LIMIT:
+        log.warning(f"{count} subscriptions returned in a single search which is greater than or equal to Braintree's documented maximum for a single subscriptions search.")
+
+    if end == window_end:
+        yield window_end
+    elif most_recent_created_at > log_cursor:
+        yield most_recent_created_at
+
+
+async def fetch_disputes(
+        braintree_gateway: BraintreeGateway,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[Dispute | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    most_recent_created_at = log_cursor
+    # The start date must be shifted back 1 day since we have to query Braintree using the received_date field,
+    # which is less granular than the created_at cursor field (date vs. datetime).
+    start = log_cursor - timedelta(days=1)
+    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    end = min(window_end, datetime.now(tz=UTC))
+
+    collection = braintree_gateway.dispute.search(
+        DisputeSearch.received_date.between(start, end)
+    )
+
+    count = 0
+
+    for object in collection.disputes:
+        count += 1
+        doc = Dispute.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at > log_cursor:
+            yield doc
+            most_recent_created_at = doc.created_at
+
+    if count >= SEARCH_LIMIT:
+        log.warning(f"{count} disputes returned in a single search which is greater than or equal to Braintree's documented maximum for a single disputes search.")
+
+    if end == window_end:
+        yield window_end
+    elif most_recent_created_at > log_cursor:
+        yield most_recent_created_at
