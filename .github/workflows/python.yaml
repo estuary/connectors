@@ -30,6 +30,7 @@ on:
       - "source-impact-native/**"
       - "source-front/**"
       - "source-genesys/**"
+      - "source-braintree-native/**"
 
   pull_request:
     branches: [main]
@@ -62,6 +63,7 @@ on:
       - "source-impact-native/**"
       - "source-front/**"
       - "source-genesys/**"
+      - "source-braintree-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -174,6 +176,10 @@ jobs:
             version: v3
             usage_rate: "1.0"
           - name: source-genesys
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-braintree-native
             type: capture
             version: v1
             usage_rate: "1.0"
