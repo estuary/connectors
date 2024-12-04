@@ -296,6 +296,7 @@ class PaymentMethods(BaseStripeChildObject):
         "payment_method.attached": "u",
         "payment_method.automatically_updated": "u",
         "payment_method.updated": "u",
+        "payment_method.detached": "u",
     }
 
 
