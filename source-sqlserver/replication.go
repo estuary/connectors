@@ -514,7 +514,7 @@ func (rs *sqlserverReplicationStream) manageCaptureInstances(ctx context.Context
 
 	// Perform all instance creations
 	for _, create := range createInstances {
-		var instanceName, err = cdcCreateCaptureInstance(ctx, rs.conn, create.TableSchema, create.TableName, rs.cfg.User)
+		var instanceName, err = cdcCreateCaptureInstance(ctx, rs.conn, create.TableSchema, create.TableName, rs.cfg.User, rs.cfg.Advanced.Filegroup, rs.cfg.Advanced.RoleName)
 		if err != nil {
 			return err
 		}
@@ -910,7 +910,7 @@ func cdcCleanupChangeTable(ctx context.Context, conn *sql.DB, instanceName strin
 	return nil
 }
 
-func cdcCreateCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, username string) (string, error) {
+func cdcCreateCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, username, filegroup, roleName string) (string, error) {
 	// SQL Server table names may be up to 128 characters, but capture instance names must
 	// be at most 100 characters and we have other information to cram in there. The names
 	// must be unique, but other than that they might as well be random strings, the logic
@@ -931,11 +931,6 @@ func cdcCreateCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, 
 	// The full instance name is the 64 bytes prefix, 8 bytes of hash in hex, 10 bytes of Unix timestamp
 	// as a decimal number, and two underscores for a total of 84 bytes, well under the limit of 100.
 	var instanceName = fmt.Sprintf("%s_%08X_%d", prefix, hash, time.Now().Unix())
-	log.WithFields(log.Fields{
-		"schema":   schema,
-		"table":    table,
-		"instance": instanceName,
-	}).Debug("creating new capture instance")
 
 	// According to https://learn.microsoft.com/en-us/sql/relational-databases/system-stored-procedures/sys-sp-cdc-enable-table-transact-sql
 	// the `sys.sp_cdc_enable_table` procedure "Requires membership in the db_owner fixed database role."
@@ -944,8 +939,28 @@ func cdcCreateCaptureInstance(ctx context.Context, conn *sql.DB, schema, table, 
 	// this role we should expect this to fail. We always try to create capture instances during validation
 	// because it hurts nothing if we're rejected, and if the relevant table-alteration handling option is
 	// enabled we verify as a prerequisite that we have 'db_owner' so this shouldn't fail there.
-	const query = `EXEC sys.sp_cdc_enable_table @source_schema = @p1, @source_name = @p2, @role_name = @p3, @capture_instance = @p4;`
-	if _, err := conn.ExecContext(ctx, query, schema, table, username, instanceName); err != nil {
+	var args = []any{schema, table, instanceName}
+	var query = "EXEC sys.sp_cdc_enable_table @source_schema = @p1, @source_name = @p2, @capture_instance = @p3"
+	if roleName != "" {
+		args = append(args, roleName)
+	} else {
+		args = append(args, username)
+	}
+	query += fmt.Sprintf(", @role_name = @p%d", len(args))
+	if filegroup != "" {
+		args = append(args, filegroup)
+		query += fmt.Sprintf(", @filegroup_name = @p%d", len(args))
+	}
+	query += ";"
+	log.WithFields(log.Fields{
+		"schema":     schema,
+		"table":      table,
+		"instance":   instanceName,
+		"query":      query,
+		"query_args": args,
+	}).Debug("creating new capture instance")
+	if _, err := conn.ExecContext(ctx, query, args...); err != nil {
+		log.WithField("err", err).Debug("failed to create capture instance")
 		return "", fmt.Errorf("error creating capture instance %q: %w", instanceName, err)
 	}
 	return instanceName, nil

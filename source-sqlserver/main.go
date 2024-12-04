@@ -55,6 +55,8 @@ type advancedConfig struct {
 	BackfillChunkSize           int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 	AutomaticChangeTableCleanup bool   `json:"change_table_cleanup,omitempty" jsonschema:"title=Automatic Change Table Cleanup,default=false,description=When set the connector will delete CDC change table entries as soon as they are persisted into Flow. Requires DBO permissions to use."`
 	AutomaticCaptureInstances   bool   `json:"capture_instance_management,omitempty" jsonschema:"title=Automatic Capture Instance Management,default=false,description=When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use."`
+	Filegroup                   string `json:"filegroup,omitempty" jsonschema:"title=CDC Instance Filegroup,description=When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."`
+	RoleName                    string `json:"role_name,omitempty" jsonschema:"title=CDC Instance Access Role,description=When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."`
 }
 
 type tunnelConfig struct {
