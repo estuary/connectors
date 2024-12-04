@@ -538,3 +538,31 @@ func TestDroppedAndRecreatedTable(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+func TestFilegroupAndRole(t *testing.T) {
+	// Turn off the test logic that creates CDC instances when creating tables, for this one test.
+	var oldEnableCDCWhenCreatingTables = *enableCDCWhenCreatingTables
+	*enableCDCWhenCreatingTables = false
+	t.Cleanup(func() { *enableCDCWhenCreatingTables = oldEnableCDCWhenCreatingTables })
+
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "93932362"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	// Grant the 'db_owner' role, it is required to create a CDC instance automatically.
+	tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner ADD MEMBER %s", *dbCaptureUser))
+	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner DROP MEMBER %s", *dbCaptureUser)) })
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	cs.EndpointSpec.(*Config).Advanced.Filegroup = "PRIMARY"
+	cs.EndpointSpec.(*Config).Advanced.RoleName = "flow_capture"
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	cs.Capture(ctx, t, nil)
+	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}

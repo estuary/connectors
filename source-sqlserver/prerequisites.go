@@ -253,7 +253,7 @@ func (db *sqlserverDatabase) prerequisiteTableCaptureInstance(ctx context.Contex
 	}
 
 	// Otherwise we attempt to create one
-	if instanceName, err := cdcCreateCaptureInstance(ctx, db.conn, schema, table, db.config.User); err == nil {
+	if instanceName, err := cdcCreateCaptureInstance(ctx, db.conn, schema, table, db.config.User, db.config.Advanced.Filegroup, db.config.Advanced.RoleName); err == nil {
 		logEntry.WithField("instance", instanceName).Info("enabled cdc for table")
 		return nil
 	}
