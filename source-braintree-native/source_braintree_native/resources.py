@@ -15,13 +15,10 @@ from .models import (
     ResourceConfig,
     ResourceState,
     FullRefreshResource,
-    FULL_REFRESH_RESOURCES,
-    Transaction,
-    Customer,
-    Dispute,
-    Subscription,
-    CreditCardVerification,
+    IncrementalResource,
+    IncrementalResourceFetchChangesFn,
 )
+
 from .api import (
     snapshot_resources,
     fetch_transactions,
@@ -30,6 +27,24 @@ from .api import (
     fetch_disputes,
     fetch_subscriptions,
 )
+
+
+# Supported full refresh resources and their corresponding name, gateway property, and gateway response property.
+FULL_REFRESH_RESOURCES: list[tuple[str, str, str | None]] = [
+    ("merchant_accounts", "merchant_account", "merchant_accounts"),
+    ("discounts", "discount", None),
+    ("add_ons", "add_on", None),
+    ("plans", "plan", None),
+]
+
+# Supported incremental resources and their corresponding name and fetch_changes function.
+INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn]] = [
+    ("credit_card_verifications", fetch_credit_card_verifications),
+    ("customers", fetch_customers),
+    ("disputes", fetch_disputes),
+    ("subscriptions", fetch_subscriptions),
+    ("transactions", fetch_transactions),
+]
 
 
 def _create_gateway(config: EndpointConfig) -> BraintreeGateway:
@@ -100,12 +115,14 @@ def full_refresh_resources(
     ]
 
 
-def transactions(
+def incremental_resources(
         log: Logger, config: EndpointConfig
-) -> common.Resource:
+) -> list[common.Resource]:
 
     def open(
+            fetch_changes_fn: IncrementalResourceFetchChangesFn,
             gateway: BraintreeGateway,
+            window_size: int,
             binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
@@ -118,185 +135,28 @@ def transactions(
             state,
             task,
             fetch_changes=functools.partial(
-                fetch_transactions,
+                fetch_changes_fn,
                 gateway,
+                window_size,
             ),
         )
 
-    gateway = _create_gateway(config)
-
-    return common.Resource(
-        name='transactions',
-        key=["/id"],
-        model=Transaction,
-        open=functools.partial(open, gateway),
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=config.start_date),
-        ),
-        initial_config=ResourceConfig(
-            name='transactions', interval=timedelta(minutes=5)
-        ),
-        schema_inference=True,
-    )
-
-def customers(
-        log: Logger, config: EndpointConfig
-) -> common.Resource:
-
-    def open(
-            gateway: BraintreeGateway,
-            binding: CaptureBinding[ResourceConfig],
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=functools.partial(
-                fetch_customers,
-                gateway,
+    return [
+        common.Resource(
+            name=name,
+            key=["/id"],
+            model=IncrementalResource,
+            open=functools.partial(open, fetch_changes_fn, _create_gateway(config), config.advanced.window_size),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=config.start_date),
             ),
-        )
-
-    gateway = _create_gateway(config)
-
-    return common.Resource(
-        name='customers',
-        key=["/id"],
-        model=Customer,
-        open=functools.partial(open, gateway),
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=config.start_date),
-        ),
-        initial_config=ResourceConfig(
-            name='customers', interval=timedelta(minutes=5)
-        ),
-        schema_inference=True,
-    )
-
-
-def disputes(
-        log: Logger, config: EndpointConfig
-) -> common.Resource:
-
-    def open(
-            gateway: BraintreeGateway,
-            binding: CaptureBinding[ResourceConfig],
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=functools.partial(
-                fetch_disputes,
-                gateway,
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
             ),
+            schema_inference=True,
         )
-
-    gateway = _create_gateway(config)
-
-    return common.Resource(
-        name='disputes',
-        key=["/id"],
-        model=Dispute,
-        open=functools.partial(open, gateway),
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=config.start_date),
-        ),
-        initial_config=ResourceConfig(
-            name='disputes', interval=timedelta(minutes=5)
-        ),
-        schema_inference=True,
-    )
-
-
-def subscriptions(
-        log: Logger, config: EndpointConfig
-) -> common.Resource:
-
-    def open(
-            gateway: BraintreeGateway,
-            binding: CaptureBinding[ResourceConfig],
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=functools.partial(
-                fetch_subscriptions,
-                gateway,
-            ),
-        )
-
-    gateway = _create_gateway(config)
-
-    return common.Resource(
-        name='subscriptions',
-        key=["/id"],
-        model=Subscription,
-        open=functools.partial(open, gateway),
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=config.start_date),
-        ),
-        initial_config=ResourceConfig(
-            name='subscriptions', interval=timedelta(minutes=5)
-        ),
-        schema_inference=True,
-    )
-
-
-def credit_card_verifications(
-        log: Logger, config: EndpointConfig
-) -> common.Resource:
-
-    def open(
-            gateway: BraintreeGateway,
-            binding: CaptureBinding[ResourceConfig],
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=functools.partial(
-                fetch_credit_card_verifications,
-                gateway,
-            ),
-        )
-
-    gateway = _create_gateway(config)
-
-    return common.Resource(
-        name='credit_card_verifications',
-        key=["/id"],
-        model=CreditCardVerification,
-        open=functools.partial(open, gateway),
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=config.start_date),
-        ),
-        initial_config=ResourceConfig(
-            name='credit_card_verifications', interval=timedelta(minutes=5)
-        ),
-        schema_inference=True,
-    )
+        for (name, fetch_changes_fn) in INCREMENTAL_RESOURCES
+    ]
 
 
 async def all_resources(
@@ -304,9 +164,5 @@ async def all_resources(
 ) -> list[common.Resource]:
     return [
         *full_refresh_resources(log, config),
-        transactions(log, config),
-        disputes(log, config),
-        subscriptions(log, config),
-        customers(log, config),
-        credit_card_verifications(log, config),
+        *incremental_resources(log, config),
     ]

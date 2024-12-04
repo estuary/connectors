@@ -16,11 +16,7 @@ from estuary_cdk.capture.common import LogCursor
 
 from .models import (
     FullRefreshResource,
-    Customer,
-    Dispute,
-    Subscription,
-    Transaction,
-    CreditCardVerification,
+    IncrementalResource,
 )
 
 
@@ -28,12 +24,18 @@ from .models import (
 # the connector could have missed data and we'll need to use smaller date windows.
 SEARCH_LIMIT = 10_000
 TRANSACTION_SEARCH_LIMIT = 50_000
-# Incremental streams use sliding date windows to try & avoid hitting the above search limits.
-WINDOW_SIZE = 15
 
 CONVENIENCE_OBJECTS = [
     'gateway'
 ]
+
+
+def _search_limit_error_message(count: int, name: str) -> str:
+    msg = f"{count} {name} returned in a single search which is "
+    f"greater than or equal to Braintree's documented maximum for a single {name} search. "
+    "Reduce the window size and backfill this stream."
+
+    return msg
 
 
 def _braintree_object_to_dict(braintree_object):
@@ -87,12 +89,13 @@ async def snapshot_resources(
 
 async def fetch_transactions(
         braintree_gateway: BraintreeGateway,
+        window_size: int,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[Transaction | LogCursor, None]:
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    window_end = log_cursor + timedelta(days=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.transaction.search(
@@ -103,14 +106,14 @@ async def fetch_transactions(
 
     for object in collection.items:
         count += 1
-        doc = Transaction.model_validate(_braintree_object_to_dict(object))
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
 
     if count >= TRANSACTION_SEARCH_LIMIT:
-        log.warning(f"{count} transactions returned in a single search which is greater than or equal to Braintree's documented maximum for a single transaction search.")
+        raise RuntimeError(_search_limit_error_message(count, "transactions"))
 
     if end == window_end:
         yield window_end
@@ -120,12 +123,13 @@ async def fetch_transactions(
 
 async def fetch_customers(
         braintree_gateway: BraintreeGateway,
+        window_size: int,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[Customer | LogCursor, None]:
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    window_end = log_cursor + timedelta(days=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.customer.search(
@@ -136,14 +140,15 @@ async def fetch_customers(
 
     for object in collection.items:
         count += 1
-        doc = Customer.model_validate(_braintree_object_to_dict(object))
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
 
     if count >= SEARCH_LIMIT:
-        log.warning(f"{count} customers returned in a single search which is greater than or equal to Braintree's documented maximum for a single customer search.")
+        msg = f"{count} customers returned in a single search which is greater than or equal to Braintree's documented maximum for a single customer search. Reduce the window size and backfill this stream."
+        raise RuntimeError(msg)
 
     if end == window_end:
         yield window_end
@@ -153,12 +158,13 @@ async def fetch_customers(
 
 async def fetch_credit_card_verifications(
         braintree_gateway: BraintreeGateway,
+        window_size: int,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[CreditCardVerification | LogCursor, None]:
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    window_end = log_cursor + timedelta(days=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.verification.search(
@@ -169,14 +175,14 @@ async def fetch_credit_card_verifications(
 
     for object in collection.items:
         count += 1
-        doc = CreditCardVerification.model_validate(_braintree_object_to_dict(object))
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
 
     if count >= SEARCH_LIMIT:
-        log.warning(f"{count} credit card verifications returned in a single search which is greater than or equal to Braintree's documented maximum for a single credit card verifications search.")
+        raise RuntimeError(_search_limit_error_message(count, "credit card verifications"))
 
     if end == window_end:
         yield window_end
@@ -186,12 +192,13 @@ async def fetch_credit_card_verifications(
 
 async def fetch_subscriptions(
         braintree_gateway: BraintreeGateway,
+        window_size: int,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[Subscription | LogCursor, None]:
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    window_end = log_cursor + timedelta(days=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.subscription.search(
@@ -202,14 +209,14 @@ async def fetch_subscriptions(
 
     for object in collection.items:
         count += 1
-        doc = Subscription.model_validate(_braintree_object_to_dict(object))
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
 
     if count >= SEARCH_LIMIT:
-        log.warning(f"{count} subscriptions returned in a single search which is greater than or equal to Braintree's documented maximum for a single subscriptions search.")
+        raise RuntimeError(_search_limit_error_message(count, "subscriptions"))
 
     if end == window_end:
         yield window_end
@@ -219,15 +226,16 @@ async def fetch_subscriptions(
 
 async def fetch_disputes(
         braintree_gateway: BraintreeGateway,
+        window_size: int,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[Dispute | LogCursor, None]:
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     # The start date must be shifted back 1 day since we have to query Braintree using the received_date field,
     # which is less granular than the created_at cursor field (date vs. datetime).
     start = log_cursor - timedelta(days=1)
-    window_end = log_cursor + timedelta(days=WINDOW_SIZE)
+    window_end = log_cursor + timedelta(days=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.dispute.search(
@@ -238,14 +246,14 @@ async def fetch_disputes(
 
     for object in collection.disputes:
         count += 1
-        doc = Dispute.model_validate(_braintree_object_to_dict(object))
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
 
     if count >= SEARCH_LIMIT:
-        log.warning(f"{count} disputes returned in a single search which is greater than or equal to Braintree's documented maximum for a single disputes search.")
+        raise RuntimeError(_search_limit_error_message(count, "disputes"))
 
     if end == window_end:
         yield window_end
