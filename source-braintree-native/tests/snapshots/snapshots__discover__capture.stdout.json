@@ -260,9 +260,9 @@
     ]
   },
   {
-    "recommendedName": "transactions",
+    "recommendedName": "credit_card_verifications",
     "resourceConfig": {
-      "name": "transactions",
+      "name": "credit_card_verifications",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -315,135 +315,7 @@
         "id",
         "created_at"
       ],
-      "title": "Transaction",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "disputes",
-    "resourceConfig": {
-      "name": "disputes",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "created_at": {
-          "format": "date-time",
-          "title": "Created At",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "created_at"
-      ],
-      "title": "Dispute",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "subscriptions",
-    "resourceConfig": {
-      "name": "subscriptions",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "created_at": {
-          "format": "date-time",
-          "title": "Created At",
-          "type": "string"
-        }
-      },
-      "required": [
-        "id",
-        "created_at"
-      ],
-      "title": "Subscription",
+      "title": "IncrementalResource",
       "type": "object",
       "x-infer-schema": true
     },
@@ -507,7 +379,7 @@
         "id",
         "created_at"
       ],
-      "title": "Customer",
+      "title": "IncrementalResource",
       "type": "object",
       "x-infer-schema": true
     },
@@ -516,9 +388,9 @@
     ]
   },
   {
-    "recommendedName": "credit_card_verifications",
+    "recommendedName": "disputes",
     "resourceConfig": {
-      "name": "credit_card_verifications",
+      "name": "disputes",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -571,7 +443,135 @@
         "id",
         "created_at"
       ],
-      "title": "CreditCardVerification",
+      "title": "IncrementalResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "subscriptions",
+    "resourceConfig": {
+      "name": "subscriptions",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_at"
+      ],
+      "title": "IncrementalResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "transactions",
+    "resourceConfig": {
+      "name": "transactions",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "created_at": {
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "created_at"
+      ],
+      "title": "IncrementalResource",
       "type": "object",
       "x-infer-schema": true
     },

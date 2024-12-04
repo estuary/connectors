@@ -1,11 +1,13 @@
+from braintree import BraintreeGateway
 from datetime import datetime, timezone, timedelta
+from logging import Logger
 from pydantic import AwareDatetime, BaseModel, Field
-from typing import Literal
-
+from typing import Annotated, AsyncGenerator, Callable, Literal
 
 from estuary_cdk.capture.common import (
     BaseDocument,
     ConnectorState as GenericConnectorState,
+    LogCursor,
     ResourceConfig,
     ResourceState,
 )
@@ -50,9 +52,15 @@ class EndpointConfig(BaseModel):
             title="Is a Sandbox Environment",
             default=False,
         )
+        window_size: Annotated[int, Field(
+            description="Window size in days for incremental streams. This should be left as the default value unless connector errors indicate a smaller window size is required.",
+            title="Window Size",
+            default=15,
+            gt=0,
+        )]
 
     advanced: Advanced = Field(
-        default_factory=Advanced,
+        default_factory=Advanced, #type: ignore
         title="Advanced Config",
         description="Advanced settings for the connector.",
         json_schema_extra={"advanced": True},
@@ -65,35 +73,12 @@ class FullRefreshResource(BaseDocument, extra="allow"):
     id: str | None
 
 
-# Supported full refresh resources and their corresponding name, gateway property, and gateway response property.
-FULL_REFRESH_RESOURCES: list[tuple[str, str, str | None]] = [
-    ("merchant_accounts", "merchant_account", "merchant_accounts"),
-    ("discounts", "discount", None),
-    ("add_ons", "add_on", None),
-    ("plans", "plan", None),
+class IncrementalResource(BaseDocument, extra="allow"):
+    id: str
+    created_at: AwareDatetime
+
+
+IncrementalResourceFetchChangesFn = Callable[
+    [BraintreeGateway, int, Logger, LogCursor],
+    AsyncGenerator[IncrementalResource | LogCursor, None],
 ]
-
-
-class Customer(BaseDocument, extra="allow"):
-    id: str
-    created_at: AwareDatetime
-
-
-class Dispute(BaseDocument, extra="allow"):
-    id: str
-    created_at: AwareDatetime
-
-
-class Subscription(BaseDocument, extra="allow"):
-    id: str
-    created_at: AwareDatetime
-
-
-class Transaction(BaseDocument, extra="allow"):
-    id: str
-    created_at: AwareDatetime
-
-
-class CreditCardVerification(BaseDocument, extra="allow"):
-    id: str
-    created_at: AwareDatetime
