@@ -347,7 +347,7 @@ var replicationBufferSize = 16
 
 func (s *replicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
 	// Activate replication for the watermarks table.
-	var watermarks = s.db.config.Advanced.WatermarksTable
+	var watermarks = s.db.WatermarksTable()
 	var watermarksInfo = discovery[watermarks]
 	if watermarksInfo == nil {
 		return fmt.Errorf("error activating replication for watermarks table %q: table missing from latest autodiscovery", watermarks)
