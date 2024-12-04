@@ -69,6 +69,16 @@
             "title": "Automatic Capture Instance Management",
             "description": "When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use.",
             "default": false
+          },
+          "filegroup": {
+            "type": "string",
+            "title": "CDC Instance Filegroup",
+            "description": "When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."
+          },
+          "role_name": {
+            "type": "string",
+            "title": "CDC Instance Access Role",
+            "description": "When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."
           }
         },
         "additionalProperties": false,
