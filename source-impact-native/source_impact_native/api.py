@@ -202,8 +202,8 @@ async def fetch_backfill_actions(
         for start, end in dates:
             iterating = True
 
-            parameters["LockingDateStart"] = _cursor_dt(cls.NAME, start)
-            parameters["LockingDateEnd"] = _cursor_dt(cls.NAME, end)
+            parameters["ActionDateStart"] = _cursor_dt(cls.NAME, start)
+            parameters["ActionDateEnd"] = _cursor_dt(cls.NAME, end)
 
 
             while iterating:
