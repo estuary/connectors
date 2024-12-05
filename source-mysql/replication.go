@@ -375,9 +375,13 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 							return fmt.Errorf("error decoding row values: %w", err)
 						}
 						after = mergePreimage(after, before)
-						rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
+						rowKeyBefore, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
 						if err != nil {
-							return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+							return fmt.Errorf("error encoding 'before' row key for %q: %w", streamID, err)
+						}
+						rowKeyAfter, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
+						if err != nil {
+							return fmt.Errorf("error encoding 'after' row key for %q: %w", streamID, err)
 						}
 						if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
@@ -385,21 +389,58 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 						if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
 							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 						}
-						var sourceInfo = &mysqlSourceInfo{
-							SourceCommon: sourceCommon,
-							EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx/2),
-						}
+
+						var events []sqlcapture.DatabaseEvent
+						var eventTxID string
 						if rs.db.includeTxIDs[streamID] {
-							sourceInfo.TxID = rs.gtidString
+							eventTxID = rs.gtidString
 						}
-						if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
-							Operation: sqlcapture.UpdateOp,
-							RowKey:    rowKey,
-							Before:    before,
-							After:     after,
-							Source:    sourceInfo,
-						}); err != nil {
-							return err
+						if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
+							// When the row key is changed by an update, translate it into a synthetic pair: a delete
+							// event of the old row-state, plus an insert event of the new row-state.
+							events = append(events, &sqlcapture.ChangeEvent{
+								Operation: sqlcapture.DeleteOp,
+								RowKey:    rowKeyBefore,
+								Before:    before,
+								Source: &mysqlSourceInfo{
+									SourceCommon: sourceCommon,
+									// Since updates consist of paired row-states (before, then after) which we iterate
+									// over two-at-a-time, it is consistent to have the row-index portion of the event
+									// cursor be the before-state index for this deletion and the after-state index for
+									// the insert.
+									EventCursor: fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx-1),
+									TxID:        eventTxID,
+								},
+							}, &sqlcapture.ChangeEvent{
+								Operation: sqlcapture.InsertOp,
+								RowKey:    rowKeyAfter,
+								After:     after,
+								Source: &mysqlSourceInfo{
+									SourceCommon: sourceCommon,
+									EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
+									TxID:         eventTxID,
+								},
+							})
+						} else {
+							events = append(events, &sqlcapture.ChangeEvent{
+								Operation: sqlcapture.UpdateOp,
+								RowKey:    rowKeyAfter,
+								Before:    before,
+								After:     after,
+								Source: &mysqlSourceInfo{
+									SourceCommon: sourceCommon,
+									// For updates the row-index part of the event cursor has to increment by two here
+									// so that there's room for synthetic delete/insert pairs. Since this value really
+									// just needs to be unique and properly ordered this is fine.
+									EventCursor: fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
+									TxID:        eventTxID,
+								},
+							})
+						}
+						for _, event := range events {
+							if err := rs.emitEvent(ctx, event); err != nil {
+								return err
+							}
 						}
 						rs.uncommittedChanges++ // Keep a count of all uncommitted changes
 						if nonTransactionalTable {
