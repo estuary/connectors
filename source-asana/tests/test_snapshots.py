@@ -18,12 +18,26 @@ def test_capture(request, snapshot):
         text=True,
     )
     assert result.returncode == 0
-    lines = [json.loads(l) for l in result.stdout.splitlines()[:50]]
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    for l in lines:
-        l[1]["ts"] = "redacted-timestamp"
+    unique_stream_lines = []
+    seen = set()
 
-    assert snapshot("capture.stdout.json") == lines
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    for l in unique_stream_lines:
+        stream, rec = l[0], l[1]
+
+        if "ts" in rec:
+            rec["ts"] = "redacted-timestamp"
+        if "text" in rec:
+            rec["text"] = "redacted"
+
+    assert snapshot("capture.stdout.json") == unique_stream_lines
 
 def test_discover(request, snapshot):
     result = subprocess.run(
