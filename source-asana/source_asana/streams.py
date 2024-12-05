@@ -179,9 +179,13 @@ class ProjectRelatedStream(AsanaStream, ABC):
     """
 
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
-        yield from self.read_slices_from_records(
+        project_slices = self.read_slices_from_records(
             stream_class=Projects, slice_field="project_gid"
         )
+
+        for s in project_slices:
+            self.logger.info(f"Fetching {self.name} for project {s["project_gid"]}.")
+            yield s
 
 
 class AttachmentsCompact(AsanaStream):
@@ -480,8 +484,6 @@ class Tags(WorkspaceRequestParamsRelatedStream):
 
 
 class Tasks(ProjectRelatedStream):
-    use_cache = True
-
     def path(self, **kwargs) -> str:
         return "tasks"
 
