@@ -557,17 +557,23 @@ class Messages(IncrementalTwilioStream, TwilioNestedStream):
 class MessageMedia(IncrementalTwilioStream, TwilioNestedStream):
     """https://www.twilio.com/docs/sms/api/media-resource#read-multiple-media-resources"""
 
-    parent_stream = Messages
+    parent_stream: type[Messages] = Messages
     data_field = "media_list"
     subresource_uri_key = "media"
     media_exist_validation = {"num_media": "0"}
     lower_boundary_filter_field = "DateCreated>"
     upper_boundary_filter_field = "DateCreated<"
-    cursor_field = "date_created"
+    cursor_field: str = "date_created"
+    # Per the Twilio docs on updating Messages, media can't be added to/updated within a message after
+    # the message is created, so it doesn't make sense to use small date windows to check for a message's media.
+    # Making slice_step_default (i.e. the window size) really large reduces the number of requests we need
+    # to get all of a message's media without significantly rewriting how this stream works.
+    slice_step_default = pendulum.duration(years=100)
 
     @cached_property
     def parent_stream_instance(self):
-        return self.parent_stream(authenticator=self.authenticator, start_date=self._start_date, lookback_window=self._lookback_window)
+        most_recent_cursor = self.state.get(self.cursor_field, self._start_date)
+        return self.parent_stream(authenticator=self.authenticator, start_date=most_recent_cursor, lookback_window=self._lookback_window)
 
 
 class UsageNestedStream(TwilioNestedStream):
