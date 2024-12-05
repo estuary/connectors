@@ -1,107 +1,105 @@
 [
-    {
-      "protocol": 3032023,
-      "configSchema": {
-        "$defs": {
-          "BasicAuth": {
-            "properties": {
-              "credentials_title": {
-                "const": "Username & Password",
-                "default": "Username & Password",
-                "enum": [
-                  "Username & Password"
-                ],
-                "title": "Credentials Title",
-                "type": "string"
-              },
-              "username": {
-                "title": "Username",
-                "type": "string"
-              },
-              "password": {
-                "secret": true,
-                "title": "Password",
-                "type": "string"
-              }
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "BasicAuth": {
+          "properties": {
+            "credentials_title": {
+              "const": "Username & Password",
+              "default": "Username & Password",
+              "enum": [
+                "Username & Password"
+              ],
+              "title": "Credentials Title",
+              "type": "string"
             },
-            "required": [
-              "username",
-              "password"
-            ],
-            "title": "BasicAuth",
-            "type": "object"
+            "username": {
+              "title": "Username",
+              "type": "string"
+            },
+            "password": {
+              "secret": true,
+              "title": "Password",
+              "type": "string"
+            }
           },
-          "CatalogEnum": {
-            "enum": [
-              "Brand",
-              "Agency",
-              "Partners"
-            ],
-            "title": "CatalogEnum",
-            "type": "string"
-          }
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "BasicAuth",
+          "type": "object"
         },
-        "additionalProperties": true,
-        "properties": {
-          "credentials": {
-            "allOf": [
-              {
-                "$ref": "#/$defs/BasicAuth"
-              }
-            ],
-            "title": "API Key"
-          },
-          "api_catalog": {
-            "allOf": [
-              {
-                "$ref": "#/$defs/CatalogEnum"
-              }
-            ],
-            "description": "As of now, only BRAND catalogs are allowed",
-            "title": "API Catalog (Brand, Agency, Partner)"
-          },
-          "stop_date": {
-            "default": "2010-01-01T00:00:00Z",
-            "description": "Replication Stop Date. Records will only be considered for backfilling before the stop_date, similar to a start date",
-            "format": "date-time",
-            "title": "Stop Date",
-            "type": "string"
-          }
-        },
-        "required": [
-          "credentials",
-          "api_catalog"
-        ],
-        "title": "EndpointConfig",
-        "type": "object"
+        "CatalogEnum": {
+          "enum": [
+            "Brand",
+            "Agency",
+            "Partners"
+          ],
+          "title": "CatalogEnum",
+          "type": "string"
+        }
       },
-      "resourceConfigSchema": {
-        "additionalProperties": false,
-        "description": "ResourceConfig is a common resource configuration shape.",
-        "properties": {
-          "name": {
-            "description": "Name of this resource",
-            "title": "Name",
-            "type": "string"
-          },
-          "interval": {
-            "default": "PT0S",
-            "description": "Interval between updates for this resource",
-            "format": "duration",
-            "title": "Interval",
-            "type": "string"
-          }
+      "additionalProperties": true,
+      "properties": {
+        "credentials": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/BasicAuth"
+            }
+          ],
+          "title": "API Key"
         },
-        "required": [
-          "name"
-        ],
-        "title": "ResourceConfig",
-        "type": "object"
+        "api_catalog": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/CatalogEnum"
+            }
+          ],
+          "description": "As of now, only BRAND catalogs are allowed",
+          "title": "API Catalog (Brand, Agency, Partner)"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present date.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        }
       },
-      "documentationUrl": "https://docs.estuary.dev",
-      "resourcePathPointers": [
-        "/name"
-      ]
-    }
-  ]
-  
+      "required": [
+        "credentials",
+        "api_catalog"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://docs.estuary.dev",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
