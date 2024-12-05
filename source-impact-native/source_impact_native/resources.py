@@ -114,7 +114,7 @@ def base_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -154,7 +154,7 @@ def action_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -187,7 +187,7 @@ def snapshot_object(
         model=cls,
         open=open,
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -225,7 +225,7 @@ def child_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -259,6 +259,6 @@ def media_groups_object(
         model=cls,
         open=open,
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
