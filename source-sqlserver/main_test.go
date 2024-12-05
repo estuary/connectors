@@ -564,5 +564,33 @@ func TestFilegroupAndRole(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
 	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+func TestPrimaryKeyUpdate(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "63510878"
+	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Initial backfill
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	cs.Capture(ctx, t, nil)
+
+	// Some replication
+	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+	cs.Capture(ctx, t, nil)
+
+	// Primary key updates
+	tb.Update(ctx, t, tableName, "id", 1, "id", 6)
+	tb.Update(ctx, t, tableName, "id", 4, "id", 7)
+	cs.Capture(ctx, t, nil)
+
 	cupaloy.SnapshotT(t, cs.Summary())
 }
