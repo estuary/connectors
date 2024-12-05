@@ -648,11 +648,11 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string, discovery
 }
 
 func (c *Capture) emitChange(event *ChangeEvent) error {
-	var record map[string]interface{}
+	var record = make(map[string]any)
 	var meta = struct {
-		Operation ChangeOp               `json:"op"`
-		Source    SourceMetadata         `json:"source"`
-		Before    map[string]interface{} `json:"before,omitempty"`
+		Operation ChangeOp       `json:"op"`
+		Source    SourceMetadata `json:"source"`
+		Before    map[string]any `json:"before,omitempty"`
 	}{
 		Operation: event.Operation,
 		Source:    event.Source,
@@ -660,15 +660,18 @@ func (c *Capture) emitChange(event *ChangeEvent) error {
 	}
 	switch event.Operation {
 	case InsertOp:
-		record = event.After // Before is never used.
+		for k, v := range event.After {
+			record[k] = v
+		}
 	case UpdateOp:
-		meta.Before, record = event.Before, event.After
+		meta.Before = event.Before
+		for k, v := range event.After {
+			record[k] = v
+		}
 	case DeleteOp:
-		record = event.Before // After is never used.
-	}
-	if record == nil {
-		logrus.WithField("op", event.Operation).Warn("change event data map is nil")
-		record = make(map[string]interface{})
+		for k, v := range event.Before {
+			record[k] = v
+		}
 	}
 	record["_meta"] = &meta
 

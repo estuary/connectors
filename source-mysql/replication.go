@@ -375,9 +375,13 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 							return fmt.Errorf("error decoding row values: %w", err)
 						}
 						after = mergePreimage(after, before)
-						rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
+						rowKeyBefore, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
 						if err != nil {
-							return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+							return fmt.Errorf("error encoding 'before' row key for %q: %w", streamID, err)
+						}
+						rowKeyAfter, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
+						if err != nil {
+							return fmt.Errorf("error encoding 'after' row key for %q: %w", streamID, err)
 						}
 						if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
 							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
@@ -385,21 +389,40 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 						if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
 							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 						}
-						var sourceInfo = &mysqlSourceInfo{
-							SourceCommon: sourceCommon,
-							EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx/2),
-						}
+
+						var events []sqlcapture.DatabaseEvent
+						var eventTxID string
 						if rs.db.includeTxIDs[streamID] {
-							sourceInfo.TxID = rs.gtidString
+							eventTxID = rs.gtidString
 						}
-						if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
+						if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
+							// Emit a synthetic delete event of the old row-state
+							events = append(events, &sqlcapture.ChangeEvent{
+								Operation: sqlcapture.DeleteOp,
+								RowKey:    rowKeyBefore,
+								Before:    before,
+								Source: &mysqlSourceInfo{
+									SourceCommon: sourceCommon,
+									EventCursor:  fmt.Sprintf("%s:%d:%d-D", cursor.Name, binlogEstimatedOffset, rowIdx/2),
+									TxID:         eventTxID,
+								},
+							})
+						}
+						events = append(events, &sqlcapture.ChangeEvent{
 							Operation: sqlcapture.UpdateOp,
-							RowKey:    rowKey,
+							RowKey:    rowKeyAfter,
 							Before:    before,
 							After:     after,
-							Source:    sourceInfo,
-						}); err != nil {
-							return err
+							Source: &mysqlSourceInfo{
+								SourceCommon: sourceCommon,
+								EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx/2),
+								TxID:         eventTxID,
+							},
+						})
+						for _, event := range events {
+							if err := rs.emitEvent(ctx, event); err != nil {
+								return err
+							}
 						}
 						rs.uncommittedChanges++ // Keep a count of all uncommitted changes
 						if nonTransactionalTable {
