@@ -37,6 +37,8 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		return nil, fmt.Errorf("unable to connect to database for replication: %w", err)
 	}
 
+	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
+
 	var startLSN pglogrepl.LSN
 	if startCursor != "" {
 		startLSN, err = pglogrepl.ParseLSN(startCursor)
@@ -44,16 +46,32 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 			return nil, fmt.Errorf("error parsing start cursor: %w", err)
 		}
 	} else {
-		// If no start cursor is specified, initialize to the current WAL flush position
-		// obtained via the `IDENTIFY_SYSTEM` command.
+		// If no start cursor is specified, we are free to begin replication from the latest tail-end of the WAL.
+
+		// We begin by dropping and recreating the slot. This avoids situations where the
+		// 'restart_lsn' is significantly behind the point we actually want to start from,
+		// and also has the happy side-effect of making it so that merely hitting the
+		// "Backfill Everything" button in the UI is all that a user has to do to recover
+		// after replication slot invalidation.
+		//
+		// This is always safe to do, because if our start cursor is reset then we don't
+		// care about any prior state in the replication slot, and if we're able to drop
+		// it then we also have the necessary permissions to recreate it. Any errors here
+		// aren't fatal, just to be on the safe side.
+		if err := recreateReplicationSlot(ctx, db.conn, slot); err != nil {
+			logrus.WithField("err", err).Debug("error recreating replication slot")
+		}
+
+		// Obtain the current WAL flush location via an IDENTIFY_SYSTEM command.
+		// Note: We use IDENTIFY_SYSTEM here for legacy reasons, it might be cleaner
+		// to get this information from the newly-recreated slot's confirmed_flush_lsn
+		// now that we do it that way.
 		var sysident, err = pglogrepl.IdentifySystem(ctx, conn)
 		if err != nil {
 			return nil, fmt.Errorf("unable to read WAL flush LSN from database: %w", err)
 		}
 		startLSN = sysident.XLogPos
 	}
-
-	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
 	// Check that the slot's `confirmed_flush_lsn` is less than or equal to our resume cursor value.
 	// This is necessary because Postgres deliberately allows clients to specify an older start LSN,
