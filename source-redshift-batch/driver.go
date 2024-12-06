@@ -32,6 +32,12 @@ const (
 	documentsPerCheckpoint = 1000
 )
 
+var featureFlagDefaults = map[string]bool{
+	// When set, discovered collection schemas will request that schema inference be
+	// used _in addition to_ the full column/types discovery we already do.
+	"use_schema_inference": false,
+}
+
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
 // by a config schema, connect function, and value translation logic.
 type BatchSQLDriver struct {
@@ -86,7 +92,7 @@ type documentMetadata struct {
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
 }
 
-func generateCollectionSchema(keyColumns []string, columnTypes map[string]columnType) (json.RawMessage, error) {
+func generateCollectionSchema(keyColumns []string, columnTypes map[string]columnType, useSchemaInference bool) (json.RawMessage, error) {
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
 		ExpandedStruct: true,
@@ -104,13 +110,17 @@ func generateCollectionSchema(keyColumns []string, columnTypes map[string]column
 		properties[colName] = colType.JSONSchema()
 	}
 
+	var extras = map[string]any{
+		"properties": properties,
+	}
+	if useSchemaInference {
+		extras["x-infer-schema"] = true
+	}
 	var schema = &jsonschema.Schema{
 		Type:                 "object",
 		Required:             required,
 		AdditionalProperties: nil,
-		Extras: map[string]interface{}{
-			"properties": properties,
-		},
+		Extras:               extras,
 	}
 
 	// Marshal schema to JSON
@@ -149,6 +159,9 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	cfg.SetDefaults()
+
+	var featureFlags = boilerplate.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	log.WithField("flags", featureFlags).Info("parsed feature flags")
 
 	var db, err = drv.Connect(ctx, &cfg)
 	if err != nil {
@@ -245,7 +258,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			columnTypes[column.Name] = column.DataType
 		}
 
-		generatedSchema, err := generateCollectionSchema(keyColumns, columnTypes)
+		generatedSchema, err := generateCollectionSchema(keyColumns, columnTypes, featureFlags["use_schema_inference"])
 		if err != nil {
 			log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
 			continue
@@ -604,6 +617,9 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 	cfg.SetDefaults()
 
+	var featureFlags = boilerplate.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	log.WithField("flags", featureFlags).Info("parsed feature flags")
+
 	var db, err = drv.Connect(stream.Context(), &cfg)
 	if err != nil {
 		return err
@@ -646,6 +662,7 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		Bindings:       bindings,
 		Output:         stream,
 		TranslateValue: drv.TranslateValue,
+		featureFlags:   featureFlags,
 	}
 	return capture.Run(stream.Context())
 }
@@ -681,6 +698,7 @@ type capture struct {
 	Bindings       []bindingInfo
 	Output         *boilerplate.PullOutput
 	TranslateValue func(val any, databaseTypeName string) (any, error)
+	featureFlags   map[string]bool
 }
 
 type bindingInfo struct {
