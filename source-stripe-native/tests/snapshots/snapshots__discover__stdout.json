@@ -2,7 +2,8 @@
   {
     "recommendedName": "Accounts",
     "resourceConfig": {
-      "name": "Accounts"
+      "name": "Accounts",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -72,7 +73,8 @@
   {
     "recommendedName": "Persons",
     "resourceConfig": {
-      "name": "Persons"
+      "name": "Persons",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -139,7 +141,8 @@
   {
     "recommendedName": "ExternalAccountCards",
     "resourceConfig": {
-      "name": "ExternalAccountCards"
+      "name": "ExternalAccountCards",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -206,7 +209,8 @@
   {
     "recommendedName": "ExternalBankAccount",
     "resourceConfig": {
-      "name": "ExternalBankAccount"
+      "name": "ExternalBankAccount",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -273,7 +277,8 @@
   {
     "recommendedName": "ApplicationFees",
     "resourceConfig": {
-      "name": "ApplicationFees"
+      "name": "ApplicationFees",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -344,7 +349,8 @@
   {
     "recommendedName": "ApplicationFeesRefunds",
     "resourceConfig": {
-      "name": "ApplicationFeesRefunds"
+      "name": "ApplicationFeesRefunds",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -411,7 +417,8 @@
   {
     "recommendedName": "Customers",
     "resourceConfig": {
-      "name": "Customers"
+      "name": "Customers",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -482,7 +489,8 @@
   {
     "recommendedName": "BankAccounts",
     "resourceConfig": {
-      "name": "BankAccounts"
+      "name": "BankAccounts",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -549,7 +557,8 @@
   {
     "recommendedName": "Cards",
     "resourceConfig": {
-      "name": "Cards"
+      "name": "Cards",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -616,7 +625,8 @@
   {
     "recommendedName": "CustomerBalanceTransaction",
     "resourceConfig": {
-      "name": "CustomerBalanceTransaction"
+      "name": "CustomerBalanceTransaction",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -683,7 +693,8 @@
   {
     "recommendedName": "PaymentMethods",
     "resourceConfig": {
-      "name": "PaymentMethods"
+      "name": "PaymentMethods",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -750,7 +761,8 @@
   {
     "recommendedName": "Charges",
     "resourceConfig": {
-      "name": "Charges"
+      "name": "Charges",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -821,7 +833,8 @@
   {
     "recommendedName": "CheckoutSessions",
     "resourceConfig": {
-      "name": "CheckoutSessions"
+      "name": "CheckoutSessions",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -892,7 +905,8 @@
   {
     "recommendedName": "CheckoutSessionsLine",
     "resourceConfig": {
-      "name": "CheckoutSessionsLine"
+      "name": "CheckoutSessionsLine",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -959,7 +973,8 @@
   {
     "recommendedName": "Coupons",
     "resourceConfig": {
-      "name": "Coupons"
+      "name": "Coupons",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1030,7 +1045,8 @@
   {
     "recommendedName": "CreditNotes",
     "resourceConfig": {
-      "name": "CreditNotes"
+      "name": "CreditNotes",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1101,7 +1117,8 @@
   {
     "recommendedName": "CreditNotesLines",
     "resourceConfig": {
-      "name": "CreditNotesLines"
+      "name": "CreditNotesLines",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1168,7 +1185,8 @@
   {
     "recommendedName": "Disputes",
     "resourceConfig": {
-      "name": "Disputes"
+      "name": "Disputes",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1239,7 +1257,8 @@
   {
     "recommendedName": "EarlyFraudWarning",
     "resourceConfig": {
-      "name": "EarlyFraudWarning"
+      "name": "EarlyFraudWarning",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1310,7 +1329,8 @@
   {
     "recommendedName": "InvoiceItems",
     "resourceConfig": {
-      "name": "InvoiceItems"
+      "name": "InvoiceItems",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1381,7 +1401,8 @@
   {
     "recommendedName": "Invoices",
     "resourceConfig": {
-      "name": "Invoices"
+      "name": "Invoices",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1452,7 +1473,8 @@
   {
     "recommendedName": "InvoiceLineItems",
     "resourceConfig": {
-      "name": "InvoiceLineItems"
+      "name": "InvoiceLineItems",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1519,7 +1541,8 @@
   {
     "recommendedName": "PaymentIntents",
     "resourceConfig": {
-      "name": "PaymentIntents"
+      "name": "PaymentIntents",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1590,7 +1613,8 @@
   {
     "recommendedName": "Payouts",
     "resourceConfig": {
-      "name": "Payouts"
+      "name": "Payouts",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1661,7 +1685,8 @@
   {
     "recommendedName": "Plans",
     "resourceConfig": {
-      "name": "Plans"
+      "name": "Plans",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1732,7 +1757,8 @@
   {
     "recommendedName": "Products",
     "resourceConfig": {
-      "name": "Products"
+      "name": "Products",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1803,7 +1829,8 @@
   {
     "recommendedName": "PromotionCode",
     "resourceConfig": {
-      "name": "PromotionCode"
+      "name": "PromotionCode",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1874,7 +1901,8 @@
   {
     "recommendedName": "Refunds",
     "resourceConfig": {
-      "name": "Refunds"
+      "name": "Refunds",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1945,7 +1973,8 @@
   {
     "recommendedName": "Reviews",
     "resourceConfig": {
-      "name": "Reviews"
+      "name": "Reviews",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2016,7 +2045,8 @@
   {
     "recommendedName": "SetupIntents",
     "resourceConfig": {
-      "name": "SetupIntents"
+      "name": "SetupIntents",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2087,7 +2117,8 @@
   {
     "recommendedName": "SetupAttempts",
     "resourceConfig": {
-      "name": "SetupAttempts"
+      "name": "SetupAttempts",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2154,7 +2185,8 @@
   {
     "recommendedName": "Subscriptions",
     "resourceConfig": {
-      "name": "Subscriptions"
+      "name": "Subscriptions",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2225,7 +2257,8 @@
   {
     "recommendedName": "SubscriptionSchedule",
     "resourceConfig": {
-      "name": "SubscriptionSchedule"
+      "name": "SubscriptionSchedule",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2296,7 +2329,8 @@
   {
     "recommendedName": "SubscriptionItems",
     "resourceConfig": {
-      "name": "SubscriptionItems"
+      "name": "SubscriptionItems",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2402,7 +2436,8 @@
   {
     "recommendedName": "UsageRecords",
     "resourceConfig": {
-      "name": "UsageRecords"
+      "name": "UsageRecords",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2474,7 +2509,8 @@
   {
     "recommendedName": "TopUps",
     "resourceConfig": {
-      "name": "TopUps"
+      "name": "TopUps",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2545,7 +2581,8 @@
   {
     "recommendedName": "Transfers",
     "resourceConfig": {
-      "name": "Transfers"
+      "name": "Transfers",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2616,7 +2653,8 @@
   {
     "recommendedName": "TransferReversals",
     "resourceConfig": {
-      "name": "TransferReversals"
+      "name": "TransferReversals",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2683,7 +2721,8 @@
   {
     "recommendedName": "Files",
     "resourceConfig": {
-      "name": "Files"
+      "name": "Files",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2755,7 +2794,8 @@
   {
     "recommendedName": "FilesLink",
     "resourceConfig": {
-      "name": "FilesLink"
+      "name": "FilesLink",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -2827,7 +2867,8 @@
   {
     "recommendedName": "BalanceTransactions",
     "resourceConfig": {
-      "name": "BalanceTransactions"
+      "name": "BalanceTransactions",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {

@@ -72,7 +72,7 @@
       "title": "ResourceConfig",
       "type": "object"
     },
-    "documentationUrl": "https://docs.estuary.dev",
+    "documentationUrl": "https://go.estuary.dev/source-stripe-native",
     "resourcePathPointers": [
       "/name"
     ]
