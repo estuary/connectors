@@ -50,25 +50,25 @@ async def all_resources(
     if config.api_catalog == "Brand":
         # We pass along the credentials.username value since its required by every endpoint
         all_streams = (
-            action_object(Campaigns, Actions, http, config.stop_date, config.credentials.username),
-            action_object(Campaigns, ActionInquiries, http, config.stop_date, config.credentials.username),
-            base_object(Invoices, http, config.stop_date, config.credentials.username),
-            base_object(Jobs, http, config.stop_date, config.credentials.username),
-            base_object(PromoCodes, http, config.stop_date, config.credentials.username),
-            base_object(Deals, http, config.stop_date, config.credentials.username),
-            base_object(ExceptionLists, http, config.stop_date, config.credentials.username),
-            base_object(UniqueUrls, http, config.stop_date, config.credentials.username),
-            base_object(TrackingValueRequests, http, config.stop_date, config.credentials.username),
-            snapshot_object(Campaigns, http, config.stop_date, config.credentials.username),
-            snapshot_object(Ads, http, config.stop_date, config.credentials.username),
-            snapshot_object(Catalogs, http, config.stop_date, config.credentials.username),
-            snapshot_object(Reports, http, config.stop_date, config.credentials.username),
-            snapshot_object(PhoneNumbers, http, config.stop_date, config.credentials.username),
-            child_object(Campaigns, Contracts, http, config.stop_date, config.credentials.username),
-            child_object(Campaigns, Tasks, http, config.stop_date, config.credentials.username),
-            child_object(Campaigns, Notes, http, config.stop_date, config.credentials.username),
-            child_object(Campaigns, BlockRedirectRules, http, config.stop_date, config.credentials.username),
-            media_groups_object(Campaigns, MediaPartnerGroups, http, config.stop_date, config.credentials.username),
+            action_object(Campaigns, Actions, http, config.start_date, config.credentials.username),
+            action_object(Campaigns, ActionInquiries, http, config.start_date, config.credentials.username),
+            base_object(Invoices, http, config.start_date, config.credentials.username),
+            base_object(Jobs, http, config.start_date, config.credentials.username),
+            base_object(PromoCodes, http, config.start_date, config.credentials.username),
+            base_object(Deals, http, config.start_date, config.credentials.username),
+            base_object(ExceptionLists, http, config.start_date, config.credentials.username),
+            base_object(UniqueUrls, http, config.start_date, config.credentials.username),
+            base_object(TrackingValueRequests, http, config.start_date, config.credentials.username),
+            snapshot_object(Campaigns, http, config.start_date, config.credentials.username),
+            snapshot_object(Ads, http, config.start_date, config.credentials.username),
+            snapshot_object(Catalogs, http, config.start_date, config.credentials.username),
+            snapshot_object(Reports, http, config.start_date, config.credentials.username),
+            snapshot_object(PhoneNumbers, http, config.start_date, config.credentials.username),
+            child_object(Campaigns, Contracts, http, config.start_date, config.credentials.username),
+            child_object(Campaigns, Tasks, http, config.start_date, config.credentials.username),
+            child_object(Campaigns, Notes, http, config.start_date, config.credentials.username),
+            child_object(Campaigns, BlockRedirectRules, http, config.start_date, config.credentials.username),
+            media_groups_object(Campaigns, MediaPartnerGroups, http, config.start_date, config.credentials.username),
 
         )
 
@@ -114,7 +114,7 @@ def base_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -154,7 +154,7 @@ def action_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -187,7 +187,7 @@ def snapshot_object(
         model=cls,
         open=open,
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -225,7 +225,7 @@ def child_object(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -259,6 +259,6 @@ def media_groups_object(
         model=cls,
         open=open,
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )

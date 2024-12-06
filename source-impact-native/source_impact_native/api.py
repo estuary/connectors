@@ -58,7 +58,7 @@ async def fetch_incremental(
 
 async def fetch_backfill(
     cls,
-    stop_date,
+    config_start_date: datetime,
     account_sid,
     http: HTTPSession,
     log: Logger,
@@ -80,16 +80,16 @@ async def fetch_backfill(
     else:
         url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
         if _cls.START_DATE:
-            parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, stop_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
+            parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, config_start_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
 
     result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
     for results in result[f"{_cls.NAME}"]:
-        if _s_to_dt(results[f"{_cls.REP_KEY}"]) == stop_date:
+        if _s_to_dt(results[f"{_cls.REP_KEY}"]) == config_start_date:
             doc = _cls.model_validate_json(json.dumps(results))
             yield doc
             return
-        elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < stop_date:
+        elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < config_start_date:
             return
         elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < cutoff:
             doc = _cls.model_validate_json(json.dumps(results))
@@ -156,7 +156,7 @@ async def fetch_incremental_actions(
 async def fetch_backfill_actions(
     cls_parent,
     cls,
-    stop_date,
+    config_start_date: datetime,
     account_sid,
     http: HTTPSession,
     log: Logger,
@@ -176,8 +176,8 @@ async def fetch_backfill_actions(
     parameters = {}
 
 
-    if cutoff - timedelta(days=1095) <= stop_date <= cutoff:
-        start_date = stop_date
+    if cutoff - timedelta(days=1095) <= config_start_date <= cutoff:
+        start_date = config_start_date
         end_date = cutoff
     else:
         start_date = cutoff - timedelta(days=1095)
@@ -202,8 +202,8 @@ async def fetch_backfill_actions(
         for start, end in dates:
             iterating = True
 
-            parameters["LockingDateStart"] = _cursor_dt(cls.NAME, start)
-            parameters["LockingDateEnd"] = _cursor_dt(cls.NAME, end)
+            parameters["ActionDateStart"] = _cursor_dt(cls.NAME, start)
+            parameters["ActionDateEnd"] = _cursor_dt(cls.NAME, end)
 
 
             while iterating:
@@ -211,12 +211,12 @@ async def fetch_backfill_actions(
                 result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
                 for results in result[f"{_cls.NAME}"]:
-                    if _s_to_dt(results[f"CreationDate"]) == stop_date:
+                    if _s_to_dt(results[f"CreationDate"]) == config_start_date:
                         doc = _cls.model_validate_json(json.dumps(results))
                         yield doc
                         iterating = False
                         break
-                    elif _s_to_dt(results[f"CreationDate"]) < stop_date:
+                    elif _s_to_dt(results[f"CreationDate"]) < config_start_date:
                         break
                     elif _s_to_dt(results[f"CreationDate"]) < cutoff:
                         doc = _cls.model_validate_json(json.dumps(results))
@@ -316,7 +316,7 @@ async def fetch_incremental_child(
 async def fetch_backfill_child(
     cls_parent,
     cls,
-    stop_date,
+    config_start_date: datetime,
     account_sid,
     http: HTTPSession,
     log: Logger,
@@ -349,17 +349,17 @@ async def fetch_backfill_child(
             url = f"{API}/{API_CATALOG}/{account_sid}/Programs/{campaign}/{cls.NAME}"
         headers = {'Accept': 'application/json'}
         # if _cls.START_DATE:
-        #     parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, stop_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
+        #     parameters = {f"{_cls.START_DATE}": _cursor_dt(cls.NAME, config_start_date), f"{_cls.END_DATE}": _cursor_dt(cls.NAME, cutoff)}
 
         while iterating:
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
             for results in result[f"{_cls.NAME}"]:
-                if _s_to_dt(results[f"{_cls.REP_KEY}"]) == stop_date:
+                if _s_to_dt(results[f"{_cls.REP_KEY}"]) == config_start_date:
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
 
-                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < stop_date:
+                elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < config_start_date:
                     iterating = False
                     break
                 elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < cutoff:
