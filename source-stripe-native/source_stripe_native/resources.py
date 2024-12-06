@@ -145,7 +145,7 @@ def base_object(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -184,7 +184,7 @@ def child_object(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
-        initial_config=ResourceConfig(name=child_cls.NAME),
+        initial_config=ResourceConfig(name=child_cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -224,7 +224,7 @@ def split_child_object(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
-        initial_config=ResourceConfig(name=child_cls.NAME),
+        initial_config=ResourceConfig(name=child_cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -263,7 +263,7 @@ def usage_records(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
-        initial_config=ResourceConfig(name=child_cls.NAME),
+        initial_config=ResourceConfig(name=child_cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
 
@@ -303,6 +303,6 @@ def no_events_object(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
         ),
-        initial_config=ResourceConfig(name=cls.NAME),
+        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
