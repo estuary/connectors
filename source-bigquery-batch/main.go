@@ -24,7 +24,6 @@ type Config struct {
 	Dataset         string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset to discover tables within." jsonschema_extras:"order=2"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-	// TODO(wgd): Add network tunnel support
 }
 
 type advancedConfig struct {
