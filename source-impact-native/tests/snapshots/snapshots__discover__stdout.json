@@ -2,7 +2,8 @@
   {
     "recommendedName": "Actions",
     "resourceConfig": {
-      "name": "Actions"
+      "name": "Actions",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -63,7 +64,8 @@
   {
     "recommendedName": "ActionInquiries",
     "resourceConfig": {
-      "name": "ActionInquiries"
+      "name": "ActionInquiries",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -124,7 +126,8 @@
   {
     "recommendedName": "Invoices",
     "resourceConfig": {
-      "name": "Invoices"
+      "name": "Invoices",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -185,7 +188,8 @@
   {
     "recommendedName": "Jobs",
     "resourceConfig": {
-      "name": "Jobs"
+      "name": "Jobs",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -246,7 +250,8 @@
   {
     "recommendedName": "PromoCodes",
     "resourceConfig": {
-      "name": "PromoCodes"
+      "name": "PromoCodes",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -307,7 +312,8 @@
   {
     "recommendedName": "Deals",
     "resourceConfig": {
-      "name": "Deals"
+      "name": "Deals",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -368,7 +374,8 @@
   {
     "recommendedName": "ExceptionLists",
     "resourceConfig": {
-      "name": "ExceptionLists"
+      "name": "ExceptionLists",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -429,7 +436,8 @@
   {
     "recommendedName": "UniqueUrls",
     "resourceConfig": {
-      "name": "UniqueUrls"
+      "name": "UniqueUrls",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -490,7 +498,8 @@
   {
     "recommendedName": "TrackingValueRequests",
     "resourceConfig": {
-      "name": "TrackingValueRequests"
+      "name": "TrackingValueRequests",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -551,7 +560,8 @@
   {
     "recommendedName": "Campaigns",
     "resourceConfig": {
-      "name": "Campaigns"
+      "name": "Campaigns",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -605,7 +615,8 @@
   {
     "recommendedName": "Ads",
     "resourceConfig": {
-      "name": "Ads"
+      "name": "Ads",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -659,7 +670,8 @@
   {
     "recommendedName": "Catalogs",
     "resourceConfig": {
-      "name": "Catalogs"
+      "name": "Catalogs",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -713,7 +725,8 @@
   {
     "recommendedName": "Reports",
     "resourceConfig": {
-      "name": "Reports"
+      "name": "Reports",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -767,7 +780,8 @@
   {
     "recommendedName": "PhoneNumbers",
     "resourceConfig": {
-      "name": "PhoneNumbers"
+      "name": "PhoneNumbers",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -821,7 +835,8 @@
   {
     "recommendedName": "Contracts",
     "resourceConfig": {
-      "name": "Contracts"
+      "name": "Contracts",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -882,7 +897,8 @@
   {
     "recommendedName": "Tasks",
     "resourceConfig": {
-      "name": "Tasks"
+      "name": "Tasks",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -943,7 +959,8 @@
   {
     "recommendedName": "Notes",
     "resourceConfig": {
-      "name": "Notes"
+      "name": "Notes",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1004,7 +1021,8 @@
   {
     "recommendedName": "BlockRedirectRules",
     "resourceConfig": {
-      "name": "BlockRedirectRules"
+      "name": "BlockRedirectRules",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1065,7 +1083,8 @@
   {
     "recommendedName": "MediaPartnerGroups",
     "resourceConfig": {
-      "name": "MediaPartnerGroups"
+      "name": "MediaPartnerGroups",
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
