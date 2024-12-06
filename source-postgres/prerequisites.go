@@ -142,14 +142,10 @@ func (db *postgresDatabase) prerequisiteReplicationSlot(ctx context.Context) err
 		)
 	}
 
-	// Slot does not exist in any database. Try to create it.
-	logEntry.Info("attempting to create replication slot")
-	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
-		return fmt.Errorf("replication slot %q doesn't exist and couldn't be created", slotName)
-	}
-
-	logEntry.Info("created replication slot")
-	return nil
+	// Slot does not exist in any database. Try to create it (note that it will probably be
+	// dropped and recreated before replication actually begins, but creating it here is the
+	// most reliable way to verify that we can do that).
+	return createReplicationSlot(ctx, db.conn, slotName)
 }
 
 func (db *postgresDatabase) prerequisitePublication(ctx context.Context) error {

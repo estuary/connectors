@@ -8,6 +8,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5"
+	"github.com/sirupsen/logrus"
 )
 
 type replicationSlotInfo struct {
@@ -58,4 +59,27 @@ func listPublishedTables(ctx context.Context, conn *pgx.Conn, publicationName st
 		publicationStatus[sqlcapture.JoinStreamID(schema, table)] = true
 	}
 	return publicationStatus, nil
+}
+
+// createReplicationSlot attempts to create a new logical replication slot with the specified name.
+func createReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string) error {
+	var logEntry = logrus.WithField("slot", slotName)
+	logEntry.Info("attempting to create replication slot")
+	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
+		return fmt.Errorf("replication slot %q couldn't be created", slotName)
+	}
+	logEntry.Info("created replication slot")
+	return nil
+}
+
+// recreateReplicationSlot attempts to drop and then recreate a replication slot with the specified name.
+func recreateReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string) error {
+	var logEntry = logrus.WithField("slot", slotName)
+	logEntry.Info("attempting to drop replication slot")
+	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_drop_replication_slot('%s');`, slotName)); err != nil {
+		// Not a fatal error because we don't want a failure to drop a nonexistent slot
+		// to prevent the subsequent attempt to create it.
+		logEntry.WithField("err", err).Debug("failed to drop replication slot")
+	}
+	return createReplicationSlot(ctx, conn, slotName)
 }
