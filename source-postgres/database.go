@@ -16,7 +16,7 @@ type replicationSlotInfo struct {
 	Plugin            string
 	SlotType          string
 	Active            bool
-	RestartLSN        pglogrepl.LSN
+	RestartLSN        *pglogrepl.LSN
 	ConfirmedFlushLSN pglogrepl.LSN
 	WALStatus         string
 }
