@@ -1,4 +1,4 @@
-package network_tunnel
+package networkTunnel
 
 import (
 	"bytes"
