@@ -5,5 +5,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_basic_datatypes_13111208":{"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_basic_datatypes_13111208":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>"}}}
 
