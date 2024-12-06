@@ -396,29 +396,47 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 							eventTxID = rs.gtidString
 						}
 						if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
-							// Emit a synthetic delete event of the old row-state
+							// When the row key is changed by an update, translate it into a synthetic pair: a delete
+							// event of the old row-state, plus an insert event of the new row-state.
 							events = append(events, &sqlcapture.ChangeEvent{
 								Operation: sqlcapture.DeleteOp,
 								RowKey:    rowKeyBefore,
 								Before:    before,
 								Source: &mysqlSourceInfo{
 									SourceCommon: sourceCommon,
-									EventCursor:  fmt.Sprintf("%s:%d:%d-D", cursor.Name, binlogEstimatedOffset, rowIdx/2),
+									// Since updates consist of paired row-states (before, then after) which we iterate
+									// over two-at-a-time, it is consistent to have the row-index portion of the event
+									// cursor be the before-state index for this deletion and the after-state index for
+									// the insert.
+									EventCursor: fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx-1),
+									TxID:        eventTxID,
+								},
+							}, &sqlcapture.ChangeEvent{
+								Operation: sqlcapture.InsertOp,
+								RowKey:    rowKeyAfter,
+								After:     after,
+								Source: &mysqlSourceInfo{
+									SourceCommon: sourceCommon,
+									EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
 									TxID:         eventTxID,
 								},
 							})
+						} else {
+							events = append(events, &sqlcapture.ChangeEvent{
+								Operation: sqlcapture.UpdateOp,
+								RowKey:    rowKeyAfter,
+								Before:    before,
+								After:     after,
+								Source: &mysqlSourceInfo{
+									SourceCommon: sourceCommon,
+									// For updates the row-index part of the event cursor has to increment by two here
+									// so that there's room for synthetic delete/insert pairs. Since this value really
+									// just needs to be unique and properly ordered this is fine.
+									EventCursor: fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
+									TxID:        eventTxID,
+								},
+							})
 						}
-						events = append(events, &sqlcapture.ChangeEvent{
-							Operation: sqlcapture.UpdateOp,
-							RowKey:    rowKeyAfter,
-							Before:    before,
-							After:     after,
-							Source: &mysqlSourceInfo{
-								SourceCommon: sourceCommon,
-								EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx/2),
-								TxID:         eventTxID,
-							},
-						})
 						for _, event := range events {
 							if err := rs.emitEvent(ctx, event); err != nil {
 								return err
