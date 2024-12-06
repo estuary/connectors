@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -24,7 +25,8 @@ type Config struct {
 	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Database string         `json:"database" jsonschema:"default=dev,description=Logical database name to capture from." jsonschema_extras:"order=3"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-	// TODO(wgd): Add network tunnel support
+
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
@@ -70,6 +72,9 @@ func (c *Config) SetDefaults() {
 // ToURI converts the Config to a DSN string.
 func (c *Config) ToURI() string {
 	var address = c.Address
+	if c.NetworkTunnel.InUse() {
+		address = "localhost:5432"
+	}
 	var uri = url.URL{
 		Scheme: "postgres",
 		Host:   address,
@@ -94,6 +99,13 @@ func connectRedshift(ctx context.Context, cfg *Config) (*sql.DB, error) {
 		"user":     cfg.User,
 		"database": cfg.Database,
 	}).Info("connecting to database")
+
+	// If a network tunnel is configured, then try to start it before establishing connections.
+	if cfg.NetworkTunnel.InUse() {
+		if _, err := cfg.NetworkTunnel.Start(ctx, cfg.Address, "5432"); err != nil {
+			return nil, err
+		}
+	}
 
 	var db, err = sql.Open("pgx", cfg.ToURI())
 	if err != nil {
