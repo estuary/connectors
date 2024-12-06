@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -23,7 +24,8 @@ type Config struct {
 	User     string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
 	Password string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
-	// TODO(wgd): Add network tunnel support
+
+	NetworkTunnel *networkTunnel.TunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
 type advancedConfig struct {
@@ -79,6 +81,15 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		"user":    cfg.User,
 	}).Info("connecting to database")
 
+	// If a network tunnel is configured, then try to start it before establishing connections.
+	var address = cfg.Address
+	if cfg.NetworkTunnel.InUse() {
+		if _, err := cfg.NetworkTunnel.Start(ctx, cfg.Address, "3306"); err != nil {
+			return nil, err
+		}
+		address = "localhost:3306"
+	}
+
 	var conn *client.Conn
 
 	const mysqlErrorCodeSecureTransportRequired = 3159 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
@@ -94,12 +105,12 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	// * Otherwise we report both errors because it's better to be clear what failed and how.
 	// * Except if the non-TLS connection specifically failed because TLS is required then
 	//   we don't need to mention that and just return the with-TLS error.
-	if connWithTLS, errWithTLS := client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName, withTLS); errWithTLS == nil {
+	if connWithTLS, errWithTLS := client.Connect(address, cfg.User, cfg.Password, cfg.Advanced.DBName, withTLS); errWithTLS == nil {
 		log.WithField("addr", cfg.Address).Info("connected with TLS")
 		conn = connWithTLS
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return nil, cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(cfg.Address, cfg.User, cfg.Password, cfg.Advanced.DBName); errWithoutTLS == nil {
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, cfg.User, cfg.Password, cfg.Advanced.DBName); errWithoutTLS == nil {
 		log.WithField("addr", cfg.Address).Info("connected without TLS")
 		conn = connWithoutTLS
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
