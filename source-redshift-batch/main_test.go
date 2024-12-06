@@ -328,3 +328,21 @@ func snapshotBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) {
 	}
 	cupaloy.SnapshotT(t, summary.String())
 }
+
+func TestFeatureFlagUseSchemaInference(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "77244729"
+	var tableName = fmt.Sprintf("test.feature_flag_use_schema_inference_%s", uniqueID)
+
+	// Includes some extra junk to make sure the parsing helper logic is doing its job as intended
+	cs.EndpointSpec.(*Config).Advanced.FeatureFlags = "this_flag_does_not_exist,use_schema_inference,,,,no_this_flag_also_does_not_exist"
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data TEXT)", tableName))
+
+	// Discover the table and verify discovery snapshot
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
+}
