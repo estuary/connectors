@@ -71,9 +71,6 @@ fn constraint_for_projection(
     res: &Resource,
     last_spec: Option<&MaterializationSpec>,
 ) -> Constraint {
-    // TODO(whb): Handle top-level synthetic projections, like
-    // flow_published_at.
-
     let mut constraint = if p.is_primary_key {
         Constraint {
             r#type: constraint::Type::LocationRecommended.into(),
@@ -84,7 +81,7 @@ fn constraint_for_projection(
             r#type: constraint::Type::FieldOptional.into(),
             reason: "The root document may be materialized".to_string(),
         }
-    } else if !p.ptr.strip_prefix("/").unwrap().contains("/") {
+    } else if p.field == "flow_published_at" || !p.ptr.strip_prefix("/").unwrap().contains("/") {
         Constraint {
             r#type: constraint::Type::LocationRecommended.into(),
             reason: "Top-level locations should usually be materialized".to_string(),
