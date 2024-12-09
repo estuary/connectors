@@ -49,7 +49,8 @@ class SourceGoogleAds(AbstractSource):
             config.pop("end_date")
         for query in config.get("custom_queries", []):
             try:
-                query["query"] = GAQL.parse(query["query"])
+                if type(query["query"]) == str:
+                    query["query"] = GAQL.parse(query["query"])
             except ValueError:
                 message = f"The custom GAQL query {query['table_name']} failed. Validate your GAQL query with the Google Ads query validator. https://developers.google.com/google-ads/api/fields/v17/query_validator"
                 raise AirbyteTracedException(message=message, failure_type=FailureType.config_error)
