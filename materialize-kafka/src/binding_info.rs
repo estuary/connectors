@@ -253,7 +253,7 @@ fn field_to_shape(
         );
     }
     // This must be a synthetic projection like flow_published_at,
-    // flow-document, etc. General cases of those are handled below, by
+    // flow_document, etc. General cases of those are handled below, by
     // conjuring up an appropriate shape for single scalar type. More complex
     // types for synthetic projections aren't handled right now and hopefully
     // never will need to be.
