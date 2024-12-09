@@ -8,7 +8,6 @@ connector
 /source-s3/source-s3
 */target
 **/.DS_Store
-target
 
 
 # top-level directory where we put flow binaries downloaded from the latest flow release

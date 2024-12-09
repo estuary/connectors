@@ -1,0 +1,128 @@
+[
+  "applied.actionDescription",
+  "create topic simple\ncreate topic flow_checkpoints_v1"
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {
+    "updated": {}
+  }
+]
+{
+  "broker": 1,
+  "key": "{\"id\":1}",
+  "offset": 0,
+  "partition": 0,
+  "payload": "{\"canary\":\"amputation's\",\"id\":1}",
+  "topic": "simple",
+  "ts": 1733774520841,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":3}",
+  "offset": 1,
+  "partition": 0,
+  "payload": "{\"canary\":\"splatters\",\"id\":3}",
+  "topic": "simple",
+  "ts": 1733774521699,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":9}",
+  "offset": 3,
+  "partition": 0,
+  "payload": "{\"canary\":\"devilish\",\"id\":9}",
+  "topic": "simple",
+  "ts": 1733774522708,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":2}",
+  "offset": 0,
+  "partition": 1,
+  "payload": "{\"canary\":\"armament's\",\"id\":2}",
+  "topic": "simple",
+  "ts": 1733774521689,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":6}",
+  "offset": 1,
+  "partition": 1,
+  "payload": "{\"canary\":\"grosbeak's\",\"id\":6}",
+  "topic": "simple",
+  "ts": 1733774521724,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":7}",
+  "offset": 3,
+  "partition": 1,
+  "payload": "{\"canary\":\"pieced\",\"id\":7}",
+  "topic": "simple",
+  "ts": 1733774522674,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":4}",
+  "offset": 0,
+  "partition": 2,
+  "payload": "{\"canary\":\"strengthen\",\"id\":4}",
+  "topic": "simple",
+  "ts": 1733774521706,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":5}",
+  "offset": 1,
+  "partition": 2,
+  "payload": "{\"canary\":\"Kringle's\",\"id\":5}",
+  "topic": "simple",
+  "ts": 1733774521716,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":8}",
+  "offset": 3,
+  "partition": 2,
+  "payload": "{\"canary\":\"roaches\",\"id\":8}",
+  "topic": "simple",
+  "ts": 1733774522699,
+  "tstype": "create"
+}
+{
+  "broker": 1,
+  "key": "{\"id\":10}",
+  "offset": 4,
+  "partition": 2,
+  "payload": "{\"canary\":\"glucose's\",\"id\":10}",
+  "topic": "simple",
+  "ts": 1733774522716,
+  "tstype": "create"
+}
+[
+  "applied.actionDescription",
+  ""
+]
+[
+  "connectorState",
+  {
+    "updated": {}
+  }
+]
