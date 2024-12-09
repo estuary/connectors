@@ -1,33 +1,11 @@
 {
   "properties": {
-    "itblInternal": {
-      "type": ["null", "object"],
-      "properties": {
-        "documentCreatedAt": {
-          "type": ["null", "string"],
-          "format": "date-time"
-        },
-        "documentUpdatedAt": {
-          "type": ["null", "string"],
-          "format": "date-time"
-        }
-      }
-    },
-    "_type": {
-      "type": ["null", "string"]
-    },
     "createdAt": {
       "type": "string",
       "format": "date-time"
     },
     "email": {
       "type": "string"
-    },
-    "userId": {
-      "type": ["null", "string"]
-    },
-    "data": {
-      "type": ["null", "object"]
     }
   },
   "type": "object"
