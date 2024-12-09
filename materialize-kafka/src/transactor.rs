@@ -49,13 +49,23 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
     // invocations immediately following a shard split.
     tracing::info!(txn_id, "started recovering checkpoint");
     producer.init_transactions(None)?;
-    output.send(Response {
-        opened: Some(Opened {
-            runtime_checkpoint: recover_checkpoint(&config, &spec.name, &range)?,
-        }),
-        ..Default::default()
-    })?;
-    tracing::info!("finished recovering checkpoint");
+    if let Some(runtime_checkpoint) = recover_checkpoint(&config, &spec.name, &range)? {
+        tracing::info!("finished recovering checkpoint");
+        output.send(Response {
+            opened: Some(Opened {
+                runtime_checkpoint: Some(runtime_checkpoint),
+            }),
+            ..Default::default()
+        })?;
+    } else {
+        tracing::info!("no checkpoint to recover");
+        output.send(Response {
+            opened: Some(Opened {
+                runtime_checkpoint: None,
+            }),
+            ..Default::default()
+        })?;
+    }
 
     let bindings = get_binding_info(
         &spec.bindings,
@@ -334,11 +344,13 @@ fn recover_checkpoint(
         range: *range,
     };
     let mut out = None;
+    let mut count = 0;
 
     consumer.assign(&assignment)?;
     for msg in consumer.iter() {
         match msg {
             Ok(msg) => {
+                count += 1;
                 let read_key: CheckpointKey = serde_json::from_slice(
                     msg.key().expect("checkpoints topic key is always present"),
                 )?;
@@ -374,6 +386,10 @@ fn recover_checkpoint(
         if partition_high_watermarks.is_empty() {
             break;
         }
+    }
+
+    if count > 0 {
+        tracing::info!(count, "read persisted checkpoint messages");
     }
 
     Ok(out)

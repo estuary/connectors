@@ -11,4 +11,3 @@
       ["test/collection", { "id": 6, "slash/key": "six", "canary": "grosbeak's", "slash/root": false, "value": {"slash/nested": 6.0, "nested": "f"}}]
     ]
   ]
-  
