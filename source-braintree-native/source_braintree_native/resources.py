@@ -96,13 +96,13 @@ def full_refresh_resources(
                 gateway_property,
                 gateway_response_field,
             ),
-            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"), id=None)
+            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
     return [
         common.Resource(
             name=name,
-            key=["/id"],
+            key=["/_meta/row_id"],
             model=FullRefreshResource,
             open=functools.partial(open, _create_gateway(config), gateway_property, gateway_response_field),
             initial_state=ResourceState(),
