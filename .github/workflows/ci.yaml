@@ -104,6 +104,7 @@ jobs:
           - materialize-gcs-parquet
           - materialize-google-pubsub
           - materialize-google-sheets
+          - materialize-kafka
           - materialize-mongodb
           - materialize-motherduck
           - materialize-mysql
@@ -173,6 +174,7 @@ jobs:
           contains(fromJson('[
             "materialize-dynamodb",
             "materialize-elasticsearch",
+            "materialize-kafka",
             "source-dynamodb",
             "source-kafka",
             "source-kinesis",
@@ -270,6 +272,7 @@ jobs:
               "materialize-postgres",
               "materialize-mysql",
               "materialize-sqlserver",
+              "materialize-kafka",
               "materialize-mongodb",
               "materialize-motherduck",
               "materialize-snowflake",
