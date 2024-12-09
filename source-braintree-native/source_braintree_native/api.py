@@ -95,7 +95,7 @@ async def fetch_transactions(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=window_size)
+    window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.transaction.search(
@@ -129,7 +129,7 @@ async def fetch_customers(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=window_size)
+    window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.customer.search(
@@ -163,7 +163,7 @@ async def fetch_credit_card_verifications(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=window_size)
+    window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.verification.search(
@@ -197,7 +197,7 @@ async def fetch_subscriptions(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(days=window_size)
+    window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.subscription.search(
@@ -234,7 +234,7 @@ async def fetch_disputes(
     # The start date must be shifted back 1 day since we have to query Braintree using the received_date field,
     # which is less granular than the created_at cursor field (date vs. datetime).
     start = log_cursor - timedelta(days=1)
-    window_end = log_cursor + timedelta(days=window_size)
+    window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
     collection = braintree_gateway.dispute.search(
