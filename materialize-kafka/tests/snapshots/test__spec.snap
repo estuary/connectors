@@ -1,0 +1,192 @@
+---
+source: tests/test.rs
+expression: "serde_json::to_string_pretty(&got).unwrap()"
+---
+{
+  "configSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "bootstrap_servers": {
+        "description": "The initial servers in the Kafka cluster to initially connect to, separated by commas. The Kafka client will be informed of the rest of the cluster nodes by connecting to one of these nodes.",
+        "order": 0,
+        "title": "Bootstrap Servers",
+        "type": "string"
+      },
+      "credentials": {
+        "description": "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "auth_type": {
+                "const": "user_password",
+                "default": "user_password",
+                "order": 0,
+                "type": "string"
+              },
+              "mechanism": {
+                "default": "PLAIN",
+                "description": "The SASL Mechanism describes how to exchange and authenticate clients/servers.",
+                "enum": [
+                  "PLAIN",
+                  "SCRAM-SHA-256",
+                  "SCRAM-SHA-512"
+                ],
+                "order": 1,
+                "title": "SASL Mechanism",
+                "type": "string"
+              },
+              "password": {
+                "order": 3,
+                "secret": true,
+                "title": "Password",
+                "type": "string"
+              },
+              "username": {
+                "order": 2,
+                "secret": true,
+                "title": "Username",
+                "type": "string"
+              }
+            },
+            "required": [
+              "auth_type",
+              "mechanism",
+              "password",
+              "username"
+            ],
+            "title": "SASL (User & Password)"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "const": "AWS",
+                "default": "AWS",
+                "order": 0,
+                "type": "string"
+              },
+              "aws_access_key_id": {
+                "order": 1,
+                "title": "AWS Access Key ID",
+                "type": "string"
+              },
+              "aws_secret_access_key": {
+                "order": 2,
+                "secret": true,
+                "title": "AWS Secret Access Key",
+                "type": "string"
+              },
+              "region": {
+                "order": 3,
+                "title": "AWS Region",
+                "type": "string"
+              }
+            },
+            "required": [
+              "auth_type",
+              "aws_access_key_id",
+              "aws_secret_access_key",
+              "region"
+            ],
+            "title": "AWS MSK IAM"
+          }
+        ],
+        "order": 1,
+        "title": "Credentials",
+        "type": "object"
+      },
+      "message_format": {
+        "description": "Format for materialized messages. Avro format requires a schema registry configuration. Messages in JSON format do not use a schema registry.",
+        "enum": [
+          "Avro",
+          "JSON"
+        ],
+        "order": 3,
+        "title": "Message Format",
+        "type": "string"
+      },
+      "schema_registry": {
+        "description": "Connection details for interacting with a schema registry. This is necessary for materializing messages with Avro encoding.",
+        "order": 4,
+        "properties": {
+          "endpoint": {
+            "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
+            "order": 0,
+            "title": "Schema Registry Endpoint",
+            "type": "string"
+          },
+          "password": {
+            "description": "Schema registry password to use for authentication. If you are using Confluent Cloud, this will be the 'Secret' from your schema registry API key.",
+            "order": 2,
+            "secret": true,
+            "title": "Schema Registry Password",
+            "type": "string"
+          },
+          "username": {
+            "description": "Schema registry username to use for authentication. If you are using Confluent Cloud, this will be the 'Key' from your schema registry API key.",
+            "order": 1,
+            "title": "Schema Registry Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "endpoint",
+          "password",
+          "username"
+        ],
+        "title": "Schema Registry",
+        "type": "object"
+      },
+      "tls": {
+        "default": "system_certificates",
+        "description": "Controls how should TLS certificates be found or used.",
+        "enum": [
+          "system_certificates"
+        ],
+        "order": 2,
+        "title": "TLS Settings",
+        "type": "string"
+      },
+      "topic_partitions": {
+        "default": 6,
+        "description": "The number of partitions to create new topics with.",
+        "order": 5,
+        "title": "Topic Partitions",
+        "type": "integer"
+      },
+      "topic_replication_factor": {
+        "default": 3,
+        "description": "The replication factor to create new topics with.",
+        "order": 6,
+        "title": "Topic Replication Factor",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "bootstrap_servers",
+      "credentials"
+    ],
+    "title": "Kafka Materialization Configuration",
+    "type": "object"
+  },
+  "documentationUrl": "https://go.estuary.dev/materialize-kafka",
+  "protocol": 3032023,
+  "resourceConfigSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "properties": {
+      "topic": {
+        "description": "Name of the Kafka topic to materialize to.",
+        "title": "Topic",
+        "type": "string",
+        "x-collection-name": true
+      }
+    },
+    "required": [
+      "topic"
+    ],
+    "title": "Kafka Resource Configuration",
+    "type": "object"
+  }
+}

@@ -1,0 +1,82 @@
+materializations:
+  acmeCo/materialize-kafka/avro:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        protobuf: true
+        config:
+          bootstrap_servers: "localhost:9092"
+          topic_partitions: 3
+          topic_replication_factor: 1
+          message_format: Avro
+          schema_registry:
+            schema_registry_type: confluent_schema_registry
+            endpoint: http://localhost:8081
+            username: user
+            password: password
+    bindings:
+      - resource:
+          topic: test_topic_avro
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+            value/slash~1nested: {}
+
+  acmeCo/materialize-kafka/json:
+    endpoint:
+      local:
+        command:
+          - cargo
+          - run
+        protobuf: true
+        config:
+          bootstrap_servers: "localhost:9092"
+          topic_partitions: 3
+          topic_replication_factor: 1
+          message_format: JSON
+    bindings:
+      - resource:
+          topic: test_topic_json_1
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+            value/slash~1nested: {}
+      - resource:
+          topic: test_topic_json_2
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+            value/slash~1nested: {}
+      - resource:
+          topic: test_topic_json_3
+        source: test/collection
+        fields:
+          recommended: true
+          include:
+            flow_document: {}
+            value/slash~1nested: {}
+
+collections:
+  test/collection:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        slash/key: { type: string }
+        canary: { type: string }
+        slash/root: { type: boolean }
+        value:
+          type: object
+          properties:
+            slash/nested: { type: number }
+            nested: { type: string }
+      required: [id, canary]
+    key: [/id, /slash~1key, /value/nested]
