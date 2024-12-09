@@ -32,8 +32,13 @@ aws-sdk-iam = "1.48.0"
 aws-sigv4 = { version = "1.2.4", features = ["sign-http", "http0-compat"] }
 base64 = "0.22"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
-apache-avro = { version = "0.16.0" }
+apache-avro = { version = "0.17" }
 bytes = "1.8"
 reqwest = { version = "0.12", features = ["json"] }
 futures = "0.3"
 prost = "0.13"
+
+[dev-dependencies]
+insta = { version = "1", features = ["json", "serde"] }
+schema_registry_converter = { version = "4.2.0", features = ["avro", "json"] }
+source-kafka = { path = "../source-kafka" }

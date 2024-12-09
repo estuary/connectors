@@ -1,0 +1,14 @@
+[
+    [],
+    [
+      ["test/collection", { "id": 1, "slash/key": "one", "canary": "amputation's", "slash/root": true, "value": {"slash/nested": 1.0, "nested": "a"}}],
+      ["test/collection", { "id": 2, "slash/key": "two", "canary": "armament's", "slash/root": false, "value": {"slash/nested": 2.0, "nested": "b"}}],
+      ["test/collection", { "id": 3, "slash/key": "three", "canary": "splatters", "slash/root": true, "value": {"slash/nested": 3.0, "nested": "c"}}]
+    ],
+    [
+      ["test/collection", { "id": 4, "slash/key": "four", "canary": "strengthen", "slash/root": false, "value": {"slash/nested": 4.0, "nested": "d"}}],
+      ["test/collection", { "id": 5, "slash/key": "five", "canary": "Kringle's", "slash/root": true, "value": {"slash/nested": 5.0, "nested": "e"}}],
+      ["test/collection", { "id": 6, "slash/key": "six", "canary": "grosbeak's", "slash/root": false, "value": {"slash/nested": 6.0, "nested": "f"}}]
+    ]
+  ]
+  
