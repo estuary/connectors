@@ -1708,11 +1708,12 @@ name = "materialize-kafka"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "apache-avro 0.16.0",
+ "apache-avro 0.17.0",
  "avro",
  "aws-sdk-iam",
  "aws-sigv4",
  "base64 0.22.1",
+ "bigdecimal 0.4.6",
  "bytes",
  "doc",
  "futures",
@@ -1727,6 +1728,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "time",
  "tokio",
  "tracing",
  "tracing-subscriber",
