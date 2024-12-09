@@ -40,28 +40,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Id"
         }
       },
-      "required": [
-        "id"
-      ],
       "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
@@ -105,28 +91,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Id"
         }
       },
-      "required": [
-        "id"
-      ],
       "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
@@ -170,28 +142,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Id"
         }
       },
-      "required": [
-        "id"
-      ],
       "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {
@@ -235,28 +193,14 @@
             "row_id": -1
           },
           "description": "Document metadata"
-        },
-        "id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "title": "Id"
         }
       },
-      "required": [
-        "id"
-      ],
       "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {

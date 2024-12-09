@@ -70,7 +70,7 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 
 class FullRefreshResource(BaseDocument, extra="allow"):
-    id: str | None
+    pass
 
 
 class IncrementalResource(BaseDocument, extra="allow"):
