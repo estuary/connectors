@@ -12,8 +12,8 @@
               "type": "boolean"
             },
             "window_size": {
-              "default": 15,
-              "description": "Window size in days for incremental streams. This should be left as the default value unless connector errors indicate a smaller window size is required.",
+              "default": 24,
+              "description": "Window size in hours for incremental streams. This should be left as the default value unless connector errors indicate a smaller window size is required.",
               "exclusiveMinimum": 0,
               "title": "Window Size",
               "type": "integer"

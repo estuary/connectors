@@ -53,9 +53,9 @@ class EndpointConfig(BaseModel):
             default=False,
         )
         window_size: Annotated[int, Field(
-            description="Window size in days for incremental streams. This should be left as the default value unless connector errors indicate a smaller window size is required.",
+            description="Window size in hours for incremental streams. This should be left as the default value unless connector errors indicate a smaller window size is required.",
             title="Window Size",
-            default=15,
+            default=24,
             gt=0,
         )]
 
