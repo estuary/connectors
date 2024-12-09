@@ -29,6 +29,11 @@ def test_capture(request, snapshot):
         elif typ == "acmeCo/property_history":
             rec["timestamp"] = "redacted"
             rec["value"] = "redacted"
+        elif typ == "acmeCo/companies":
+            rec["properties"]["hs_time_in_lead"] = "redacted"
+        elif typ == "acmeCo/tickets":
+            rec["properties"]["hs_time_in_1"] = "redacted"
+        
 
     assert snapshot("capture.stdout.json") == lines
 

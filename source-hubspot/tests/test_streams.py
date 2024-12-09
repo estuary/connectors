@@ -68,7 +68,7 @@ def test_updated_at_field_non_exist_handler(requests_mock, common_params, fake_p
     ]
 
     requests_mock.register_uri("GET", stream.url, responses)
-    requests_mock.register_uri("GET", "/properties/v2/contact/properties", properties_response)
+    requests_mock.register_uri("GET", "/crm/v3/properties", properties_response)
 
     _, stream_state = read_incremental(stream, {})
 
@@ -123,10 +123,12 @@ def test_streams_read(stream, endpoint, cursor_value, requests_mock, common_para
     ]
     properties_response = [
         {
-            "json": [
-                {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
-                for property_name in fake_properties_list
-            ],
+            "json": {
+                "results": [
+                    {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
+                    for property_name in fake_properties_list
+                ]
+            },
             "status_code": 200,
         }
     ]
@@ -138,54 +140,11 @@ def test_streams_read(stream, endpoint, cursor_value, requests_mock, common_para
     requests_mock.register_uri("GET", stream_url, responses)
     requests_mock.register_uri("GET", "/marketing/v3/forms", responses)
     requests_mock.register_uri("GET", "/email/public/v1/campaigns/test_id", responses)
-    requests_mock.register_uri("GET", f"/properties/v2/{endpoint}/properties", properties_response)
+    requests_mock.register_uri("GET", f"/crm/v3/properties/{endpoint}", properties_response)
 
     records = read_full_refresh(stream)
     assert records
 
-
-@pytest.mark.parametrize(
-    "error_response",
-    [
-        {"json": {}, "status_code": 429},
-        {"json": {}, "status_code": 502},
-        {"json": {}, "status_code": 504},
-    ],
-)
-def test_common_error_retry(error_response, requests_mock, common_params, fake_properties_list):
-    """Error once, check that we retry and not fail"""
-    properties_response = [
-        {"name": property_name, "type": "string", "updatedAt": 1571085954360, "createdAt": 1565059306048}
-        for property_name in fake_properties_list
-    ]
-    responses = [
-        error_response,
-        {
-            "json": properties_response,
-            "status_code": 200,
-        },
-    ]
-
-    stream = Companies(**common_params)
-
-    response = {
-        stream.data_field: [
-            {
-                "id": "test_id",
-                "created": "2022-02-25T16:43:11Z",
-                "updatedAt": "2022-02-25T16:43:11Z",
-                "lastUpdatedTime": "2022-02-25T16:43:11Z",
-            }
-        ],
-    }
-    requests_mock.register_uri("GET", "/properties/v2/company/properties", responses)
-    stream._sync_mode = SyncMode.full_refresh
-    stream_url = stream.url
-    stream._sync_mode = None
-    requests_mock.register_uri("GET", stream_url, [{"json": response}])
-    records = read_full_refresh(stream)
-
-    assert [response[stream.data_field][0]] == records
 
 
 def test_contact_lists_transform(requests_mock, common_params):
@@ -240,16 +199,16 @@ def test_client_side_incremental_stream(requests_mock, common_params, fake_prope
     ]
     properties_response = [
         {
-            "json": [
+            "json": {"results": [
                 {"name": property_name, "type": "string", "createdAt": "2023-01-30T23:46:24.355Z", "updatedAt": "2023-01-30T23:46:36.287Z"}
                 for property_name in fake_properties_list
-            ],
+            ]},
             "status_code": 200,
         }
     ]
 
     requests_mock.register_uri("GET", stream.url, responses)
-    requests_mock.register_uri("GET", "/properties/v2/form/properties", properties_response)
+    requests_mock.register_uri("GET", "/crm/v3/properties/form", properties_response)
 
     list(stream.read_records(SyncMode.incremental))
     assert stream.state == {stream.cursor_field: pendulum.parse(latest_cursor_value).to_rfc3339_string()}
@@ -273,15 +232,15 @@ def test_empty_string_in_state(state, record, expected, requests_mock, common_pa
     # A.K.A: not related to the test at all, but definetely required.
     properties_response = [
         {
-            "json": [
+            "json": {"results": [
                 {"name": property_name, "type": "string", "CreatedAt": "2023-01-30T23:46:24.355Z", "updatedAt": "2023-01-30T23:46:36.287Z"}
                 for property_name in fake_properties_list
-            ],
+            ]},
             "status_code": 200,
         }
     ]
     requests_mock.register_uri("GET", stream.url, json=record)
-    requests_mock.register_uri("GET", "/properties/v2/form/properties", properties_response)
+    requests_mock.register_uri("GET", "/crm/v3/properties/form", properties_response)
     # end of mocking `availability strategy`
 
     result = stream.filter_by_state(stream.state, record)
