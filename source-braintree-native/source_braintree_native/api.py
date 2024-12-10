@@ -31,9 +31,11 @@ CONVENIENCE_OBJECTS = [
 
 
 def _search_limit_error_message(count: int, name: str) -> str:
-    msg = f"{count} {name} returned in a single search which is "
-    f"greater than or equal to Braintree's documented maximum for a single {name} search. "
-    "Reduce the window size and backfill this stream."
+    msg = (
+        f"{count} {name} returned in a single search which is "
+        f"greater than or equal to Braintree's documented maximum for a single {name} search. "
+        "Reduce the window size and backfill this stream."
+    )
 
     return msg
 
@@ -73,7 +75,7 @@ def _braintree_object_to_dict(braintree_object):
         data.pop('_setattrs', None)
         return data
 
-
+# TODO(bair): Refactor snapshot_ and fetch_ functions to make asynchronous API requests instead of synchronous requests.
 async def snapshot_resources(
         braintree_gateway: BraintreeGateway,
         gateway_property: str,
