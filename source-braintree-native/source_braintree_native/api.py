@@ -123,10 +123,12 @@ async def fetch_transactions(
     if count >= TRANSACTION_SEARCH_LIMIT:
         raise RuntimeError(_search_limit_error_message(count, "transactions"))
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    # If we saw a more recent record, yield its timestamp.
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    # Otherwise if we did not see any records, use the previous window's end as the next window's start.
+    elif most_recent_created_at == log_cursor:
+        yield end
 
 
 async def fetch_customers(
@@ -159,10 +161,12 @@ async def fetch_customers(
     if count >= SEARCH_LIMIT:
         raise RuntimeError(_search_limit_error_message(count, "customers"))
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    # If we saw a more recent record, yield its timestamp.
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    # Otherwise if we did not see any records, use the previous window's end as the next window's start.
+    elif most_recent_created_at == log_cursor:
+        yield end
 
 
 async def fetch_credit_card_verifications(
@@ -195,10 +199,12 @@ async def fetch_credit_card_verifications(
     if count >= SEARCH_LIMIT:
         raise RuntimeError(_search_limit_error_message(count, "credit card verifications"))
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    # If we saw a more recent record, yield its timestamp.
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    # Otherwise if we did not see any records, use the previous window's end as the next window's start.
+    elif most_recent_created_at == log_cursor:
+        yield end
 
 
 async def fetch_subscriptions(
@@ -231,10 +237,12 @@ async def fetch_subscriptions(
     if count >= SEARCH_LIMIT:
         raise RuntimeError(_search_limit_error_message(count, "subscriptions"))
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    # If we saw a more recent record, yield its timestamp.
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    # Otherwise if we did not see any records, use the previous window's end as the next window's start.
+    elif most_recent_created_at == log_cursor:
+        yield end
 
 
 async def fetch_disputes(
@@ -270,7 +278,9 @@ async def fetch_disputes(
     if count >= SEARCH_LIMIT:
         raise RuntimeError(_search_limit_error_message(count, "disputes"))
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    # If we saw a more recent record, yield its timestamp.
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    # Otherwise if we did not see any records, use the previous window's end as the next window's start.
+    elif most_recent_created_at == log_cursor:
+        yield end
