@@ -1,3 +1,5 @@
+import asyncio
+
 from braintree import (
     BraintreeGateway,
     AddOnGateway,
@@ -31,9 +33,11 @@ CONVENIENCE_OBJECTS = [
 
 
 def _search_limit_error_message(count: int, name: str) -> str:
-    msg = f"{count} {name} returned in a single search which is "
-    f"greater than or equal to Braintree's documented maximum for a single {name} search. "
-    "Reduce the window size and backfill this stream."
+    msg = (
+        f"{count} {name} returned in a single search which is "
+        f"greater than or equal to Braintree's documented maximum for a single {name} search. "
+        "Reduce the window size and backfill this stream."
+    )
 
     return msg
 
@@ -73,13 +77,15 @@ def _braintree_object_to_dict(braintree_object):
         data.pop('_setattrs', None)
         return data
 
-
+# TODO(bair): Refactor snapshot_ and fetch_ functions to make asynchronous API requests instead of synchronous requests.
 async def snapshot_resources(
         braintree_gateway: BraintreeGateway,
         gateway_property: str,
         gateway_response_field: str | None,
         log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
+    # Yield to the event loop to prevent starvation.
+    await asyncio.sleep(0)
     resources = getattr(braintree_gateway, gateway_property).all()
 
     iterator = getattr(resources, gateway_response_field) if gateway_response_field else resources
@@ -93,6 +99,8 @@ async def fetch_transactions(
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    # Yield to the event loop to prevent starvation.
+    await asyncio.sleep(0)
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     window_end = log_cursor + timedelta(hours=window_size)
@@ -127,6 +135,8 @@ async def fetch_customers(
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    # Yield to the event loop to prevent starvation.
+    await asyncio.sleep(0)
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     window_end = log_cursor + timedelta(hours=window_size)
@@ -161,6 +171,8 @@ async def fetch_credit_card_verifications(
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    # Yield to the event loop to prevent starvation.
+    await asyncio.sleep(0)
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     window_end = log_cursor + timedelta(hours=window_size)
@@ -195,6 +207,8 @@ async def fetch_subscriptions(
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    # Yield to the event loop to prevent starvation.
+    await asyncio.sleep(0)
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     window_end = log_cursor + timedelta(hours=window_size)
@@ -229,6 +243,8 @@ async def fetch_disputes(
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    # Yield to the event loop to prevent starvation.
+    await asyncio.sleep(0)
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     # The start date must be shifted back 1 day since we have to query Braintree using the received_date field,
