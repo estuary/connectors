@@ -2,7 +2,6 @@ use anyhow::Result;
 use apply::do_apply;
 use bytes::BytesMut;
 use configuration::{schema_for, EndpointConfig, Resource};
-use core::str;
 use prost::Message;
 use proto_flow::materialize::{
     response::{Applied, Spec, Validated},
@@ -20,7 +19,6 @@ pub mod transactor;
 pub mod validate;
 
 const KAFKA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
-const FLOW_CHECKPOINTS_TOPIC: &str = "flow_checkpoints_v1";
 
 pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
     let request = match input.read()? {

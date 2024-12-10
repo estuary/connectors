@@ -1,32 +1,23 @@
 use anyhow::{Context, Result};
 use avro::{encode, encode_key};
 use bytes::Bytes;
-use proto_flow::{
-    flow::RangeSpec,
-    materialize::{
-        request::{Open, StartCommit, Store},
-        response::{Acknowledged, Flushed, Opened, StartedCommit},
-        Response,
-    },
-    RuntimeCheckpoint,
+use proto_flow::materialize::{
+    request::{Open, Store},
+    response::{Acknowledged, Flushed, Opened, StartedCommit},
+    Response,
 };
 use rdkafka::{
-    consumer::Consumer,
     error::KafkaError,
-    producer::{FutureRecord, Producer},
+    producer::{BaseRecord, Producer},
+    types::RDKafkaErrorCode,
     util::Timeout,
-    Message, Offset, TopicPartitionList,
 };
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use tokio::task::JoinHandle;
 use tuple::Element;
-use xxhash_rust::xxh3::xxh3_64;
 
 use crate::{
     binding_info::{get_binding_info, BindingInfo},
     configuration::{EndpointConfig, MessageFormat},
-    Input, Output, FLOW_CHECKPOINTS_TOPIC, KAFKA_TIMEOUT,
+    Input, Output,
 };
 
 pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) -> Result<()> {
@@ -35,37 +26,14 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
         .expect("must have a materialization spec");
 
     let config: EndpointConfig = serde_json::from_str(&spec.config_json)?;
-    let range = open.range.expect("range must be set");
+    let producer = config.to_producer()?;
 
-    let txn_id = txn_id_for_mat_and_range(&spec.name, range);
-    let producer = config.to_producer(&txn_id)?;
-
-    // Fence off any other active producers for this materialization and key
-    // range. This is not completely bulletproof for a materialization that
-    // recently had it shard(s) split, since a prior invocation of a larger
-    // shard range may update the checkpoint for that range concurrently with
-    // the smaller split range coming online. This has the potential to result
-    // in duplicate messages, but only in the initial transactions of connector
-    // invocations immediately following a shard split.
-    tracing::info!(txn_id, "started recovering checkpoint");
-    producer.init_transactions(None)?;
-    if let Some(runtime_checkpoint) = recover_checkpoint(&config, &spec.name, &range)? {
-        tracing::info!("finished recovering checkpoint");
-        output.send(Response {
-            opened: Some(Opened {
-                runtime_checkpoint: Some(runtime_checkpoint),
-            }),
-            ..Default::default()
-        })?;
-    } else {
-        tracing::info!("no checkpoint to recover");
-        output.send(Response {
-            opened: Some(Opened {
-                runtime_checkpoint: None,
-            }),
-            ..Default::default()
-        })?;
-    }
+    output.send(Response {
+        opened: Some(Opened {
+            runtime_checkpoint: None,
+        }),
+        ..Default::default()
+    })?;
 
     let bindings = get_binding_info(
         &spec.bindings,
@@ -76,8 +44,6 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
 
     let mut key_buf = Vec::new();
     let mut payload_buf = Vec::new();
-    let mut in_txn = false;
-    let mut commit_op: Option<JoinHandle<Result<(i32, i64)>>> = None;
 
     loop {
         let request = match input.read()? {
@@ -92,66 +58,43 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
             })?;
             tracing::debug!("wrote Flushed");
         } else if let Some(store) = request.store {
-            if !in_txn {
-                producer.begin_transaction()?;
-                in_txn = true;
+            let mut msg = msg_for_store(
+                &config.message_format,
+                &mut key_buf,
+                &mut payload_buf,
+                store,
+                &bindings,
+            )?;
+
+            loop {
+                match producer.send(msg) {
+                    Ok(_) => {
+                        break;
+                    }
+                    Err((err, original_message)) => match err {
+                        KafkaError::MessageProduction(RDKafkaErrorCode::QueueFull) => {
+                            tracing::debug!("polling producer since queue is full");
+                            producer.poll(Timeout::Never);
+                            msg = original_message;
+                        }
+                        _ => {
+                            anyhow::bail!(
+                                "failed to send store message to topic {}: {}",
+                                original_message.topic,
+                                err
+                            )
+                        }
+                    },
+                }
             }
-            producer
-                .send(
-                    msg_for_store(
-                        &config.message_format,
-                        &mut key_buf,
-                        &mut payload_buf,
-                        store,
-                        &bindings,
-                    )?,
-                    Timeout::Never,
-                )
-                .await
-                .map_err(|(err, msg)| {
-                    anyhow::anyhow!("sending store message to topic {}: {}", msg.topic(), err)
-                })?;
-        } else if let Some(StartCommit { runtime_checkpoint }) = request.start_commit {
-            if !in_txn {
-                // In case there were no store requests for this txn.
-                producer.begin_transaction()?;
-            }
-
-            let (partition, offset) = producer
-                .send(
-                    msg_for_checkpoint(
-                        &mut key_buf,
-                        &mut payload_buf,
-                        runtime_checkpoint.expect("StartCommit must have a runtime checkpoint"),
-                        &spec.name,
-                        &range,
-                    )?,
-                    Timeout::Never,
-                )
-                .await
-                .map_err(|(err, _)| anyhow::anyhow!("sending checkpoint message: {}", err))?;
-
-            let commit_producer = producer.clone();
-            assert!(commit_op
-                .replace(tokio::spawn(async move {
-                    commit_producer.commit_transaction(Timeout::Never)?;
-                    Ok((partition, offset))
-                }))
-                .is_none());
-
+        } else if request.start_commit.is_some() {
+            producer.flush(Timeout::Never)?;
             output.send(Response {
                 started_commit: Some(StartedCommit { state: None }),
                 ..Default::default()
             })?;
             tracing::debug!("wrote StartedCommit");
         } else if request.acknowledge.is_some() {
-            if let Some(commit_op) = commit_op.take() {
-                // commit_op will be None for a recovery commit.
-                let (partition, offset) = commit_op.await??;
-                tracing::debug!(partition, offset, "committed transaction");
-            }
-            in_txn = false;
-
             output.send(Response {
                 acknowledged: Some(Acknowledged { state: None }),
                 ..Default::default()
@@ -170,7 +113,7 @@ fn msg_for_store<'a>(
     payload_buf: &'a mut Vec<u8>,
     store: Store,
     bindings: &'a [BindingInfo],
-) -> Result<FutureRecord<'a, Vec<u8>, Vec<u8>>> {
+) -> Result<BaseRecord<'a, Vec<u8>, Vec<u8>>> {
     let Store {
         binding,
         key_packed,
@@ -211,7 +154,7 @@ fn msg_for_store<'a>(
                 .collect::<serde_json::Value>();
 
             serde_json::to_writer(&mut *key_buf, &key_doc)?;
-            let mut rec = FutureRecord::to(&b.topic).key(key_buf);
+            let mut rec = BaseRecord::to(&b.topic).key(key_buf);
 
             if !delete {
                 serde_json::to_writer(&mut *payload_buf, &doc)?;
@@ -236,7 +179,7 @@ fn msg_for_store<'a>(
             key_buf.push(0);
             key_buf.extend(schema.key_schema_id.to_be_bytes());
             encode_key(key_buf, &schema.key_schema, &doc, &b.key_ptr).context("encoding key")?;
-            let mut rec = FutureRecord::to(&b.topic).key(key_buf);
+            let mut rec = BaseRecord::to(&b.topic).key(key_buf);
 
             if !delete {
                 payload_buf.push(0);
@@ -265,188 +208,4 @@ fn convert_tuple(packed: &Bytes) -> Vec<serde_json::Value> {
             _ => panic!("received unexpected tuple element {:?}", element),
         })
         .collect()
-}
-
-#[derive(Serialize, Deserialize)]
-struct CheckpointKey {
-    materialization: String,
-    range: RangeSpec,
-}
-
-impl CheckpointKey {
-    fn overlaps(&self, other: &CheckpointKey) -> bool {
-        self.materialization == other.materialization
-            && self.range.key_end >= other.range.key_begin
-            && self.range.key_begin <= other.range.key_end
-    }
-}
-
-fn msg_for_checkpoint<'a>(
-    key_buf: &'a mut Vec<u8>,
-    payload_buf: &'a mut Vec<u8>,
-    checkpoint: RuntimeCheckpoint,
-    materialization_name: &str,
-    range: &RangeSpec,
-) -> Result<FutureRecord<'a, Vec<u8>, Vec<u8>>> {
-    serde_json::to_writer(
-        &mut *key_buf,
-        &CheckpointKey {
-            materialization: materialization_name.to_string(),
-            range: *range,
-        },
-    )?;
-
-    serde_json::to_writer(&mut *payload_buf, &checkpoint)?;
-
-    Ok(FutureRecord::to(FLOW_CHECKPOINTS_TOPIC)
-        .key(key_buf)
-        .payload(payload_buf))
-}
-
-fn recover_checkpoint(
-    config: &EndpointConfig,
-    materialization_name: &str,
-    range: &RangeSpec,
-) -> Result<Option<RuntimeCheckpoint>> {
-    let consumer = config.to_consumer()?;
-    let mut assignment = TopicPartitionList::new();
-    let topic_metadata = consumer.fetch_metadata(Some(FLOW_CHECKPOINTS_TOPIC), KAFKA_TIMEOUT)?;
-
-    // We must read up until the latest offsets for all partitions of the
-    // checkpoint topic to get the latest checkpoint. Any prior producer must
-    // have been fenced off to prevent additional relevant offsets from being
-    // committed after these are retrieved.
-    let mut partition_high_watermarks: HashMap<i32, i64> = HashMap::new();
-    assert!(topic_metadata.topics().len() == 1); // sanity check
-    assert!(topic_metadata.topics()[0].partitions().len() != 0);
-    for partition in topic_metadata.topics()[0].partitions() {
-        let (low, high) =
-            consumer.fetch_watermarks(FLOW_CHECKPOINTS_TOPIC, partition.id(), KAFKA_TIMEOUT)?;
-
-        if high > low {
-            assignment.add_partition_offset(
-                FLOW_CHECKPOINTS_TOPIC,
-                partition.id(),
-                Offset::Offset(low),
-            )?;
-
-            partition_high_watermarks.insert(partition.id(), high);
-        }
-    }
-
-    if assignment.count() == 0 {
-        // No checkpoints have ever been written to the topic.
-        return Ok(None);
-    }
-
-    let this_key = CheckpointKey {
-        materialization: materialization_name.to_string(),
-        range: *range,
-    };
-    let mut out = None;
-    let mut count = 0;
-
-    consumer.assign(&assignment)?;
-    for msg in consumer.iter() {
-        match msg {
-            Ok(msg) => {
-                count += 1;
-                let read_key: CheckpointKey = serde_json::from_slice(
-                    msg.key().expect("checkpoints topic key is always present"),
-                )?;
-
-                if this_key.overlaps(&read_key) {
-                    out = Some(serde_json::from_slice(
-                        msg.payload()
-                            .expect("checkpoints topic payload is always present"),
-                    )?);
-                }
-
-                let partition = msg.partition();
-                if msg.offset() >= *partition_high_watermarks.get(&partition).unwrap() {
-                    // For this to happen additional checkpoint messages must
-                    // have been written to the partition since the high
-                    // watermark was fetched, maybe by some other
-                    // materialization. The high watermark is the offset that
-                    // the next message will be written as, rather than the
-                    // offset of the "latest" message.
-                    partition_high_watermarks.remove(&partition);
-                }
-            }
-            Err(e) => match e {
-                KafkaError::PartitionEOF(partition) => {
-                    // Read to the end of the topic without reaching the high
-                    // watermark.
-                    partition_high_watermarks.remove(&partition);
-                }
-                _ => return Err(e.into()),
-            },
-        }
-
-        if partition_high_watermarks.is_empty() {
-            break;
-        }
-    }
-
-    if count > 0 {
-        tracing::info!(count, "read persisted checkpoint messages");
-    }
-
-    Ok(out)
-}
-
-fn txn_id_for_mat_and_range(materialization_name: &str, range: RangeSpec) -> String {
-    let sanitized = materialization_name.replace(|c: char| !c.is_alphanumeric(), "_");
-    let trimmed = if sanitized.len() > 32 {
-        &sanitized[0..32]
-    } else {
-        &sanitized
-    };
-    let hashed = xxh3_64(materialization_name.as_bytes());
-
-    // A cleaned up version of the materialization name is used for help with
-    // human-readability for debugging, with a hash stuck on the end to prevent
-    // inadvertent collisions. Also note that only the key_begin is used for
-    // fencing, since there is no way to fence off "overlapping" ranges.
-    format!("{}_{:08x}_{:016x}", trimmed, range.key_begin, hashed)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_overlaps() {
-        let tests = [
-            ("foo/bar", 1, 5, "foo/bar", 3, 7, true),
-            ("foo/bar", 1, 5, "foo/bar", 1, 5, true),
-            ("foo/bar", 7, 10, "foo/bar", 1, 5, false),
-            ("foo/bar", 1, 5, "foo/bar", 5, 10, true),
-            ("foo/bar", 5, 10, "foo/bar", 1, 5, true),
-            ("foo/bar", 1, 5, "foo/bar", 6, 10, false),
-            ("foo/bar", 1, 5, "foo/baz", 3, 7, false),
-        ];
-
-        for test in tests {
-            assert_eq!(
-                CheckpointKey {
-                    materialization: test.0.to_string(),
-                    range: RangeSpec {
-                        key_begin: test.1,
-                        key_end: test.2,
-                        ..Default::default()
-                    }
-                }
-                .overlaps(&CheckpointKey {
-                    materialization: test.3.to_string(),
-                    range: RangeSpec {
-                        key_begin: test.4,
-                        key_end: test.5,
-                        ..Default::default()
-                    }
-                }),
-                test.6
-            );
-        }
-    }
 }
