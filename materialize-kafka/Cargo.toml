@@ -40,6 +40,5 @@ prost = "0.13"
 
 [dev-dependencies]
 insta = { version = "1", features = ["json", "serde"] }
-schema_registry_converter = { version = "4.2.0", features = ["avro", "json"] }
 time = "0.3"
 bigdecimal = "0.4"

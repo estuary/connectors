@@ -6,7 +6,7 @@ use proto_flow::{
         response::validated::{constraint, Binding, Constraint},
     },
 };
-use rdkafka::consumer::Consumer;
+use rdkafka::producer::Producer;
 
 use crate::{
     configuration::{EndpointConfig, Resource, SchemaRegistryConfig},
@@ -16,10 +16,10 @@ use crate::{
 pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
     let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
     config.validate()?;
-    let consumer = config.to_consumer()?;
+    let producer = config.to_producer()?;
 
     // Kafka connectivity check.
-    consumer
+    producer.client()
         .fetch_metadata(None, KAFKA_TIMEOUT)
         .context("Could not connect to bootstrap server with the provided configuration. This may be due to an incorrect configuration for authentication or bootstrap servers. Double check your configuration and try again.")?;
 

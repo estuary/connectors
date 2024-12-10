@@ -1,10 +1,10 @@
 use anyhow::Result;
-use rdkafka::admin::AdminClient;
-use rdkafka::client::{ClientContext, OAuthToken};
-use rdkafka::consumer::{BaseConsumer, ConsumerContext};
-use rdkafka::error::KafkaError;
-use rdkafka::producer::FutureProducer;
-use rdkafka::ClientConfig;
+use rdkafka::{
+    admin::AdminClient,
+    client::{ClientContext, OAuthToken},
+    producer::{ProducerContext, ThreadedProducer},
+    ClientConfig, Message,
+};
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
 
@@ -273,7 +273,7 @@ impl ClientContext for FlowClientContext {
                 Ok(OAuthToken {
                     // This is just a descriptive name of the principal which is
                     // accessing the resource, not a specific constant
-                    principal_name: "flow-kafka-capture".to_string(),
+                    principal_name: "flow-kafka-materialize".to_string(),
                     token,
                     lifetime_ms,
                 })
@@ -281,16 +281,25 @@ impl ClientContext for FlowClientContext {
             _ => Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into()),
         }
     }
-
-    fn error(&self, error: KafkaError, reason: &str) {
-        // The default `error` implementation logs errors at the `error` log
-        // level, including the expected PartitionEOF errors when reading a
-        // partition to the end.
-        tracing::debug!(%error, reason, "librdkafka error");
-    }
 }
 
-impl ConsumerContext for FlowClientContext {}
+impl ProducerContext for FlowClientContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(
+        &self,
+        delivery_result: &rdkafka::message::DeliveryResult<'_>,
+        _: Self::DeliveryOpaque,
+    ) {
+        if let Err((err, msg)) = delivery_result {
+            tracing::warn!(
+                "failed to deliver message for topic {}: {}",
+                msg.topic(),
+                err.to_string()
+            );
+        }
+    }
+}
 
 impl EndpointConfig {
     pub fn validate(&self) -> Result<()> {
@@ -301,33 +310,10 @@ impl EndpointConfig {
         Ok(())
     }
 
-    pub fn to_producer(&self, transactional_id: &str) -> Result<FutureProducer<FlowClientContext>> {
+    pub fn to_producer(&self) -> Result<ThreadedProducer<FlowClientContext>> {
         let (mut config, ctx) = self.common_config()?;
-        config.set("transactional.id", transactional_id);
         config.set("compression.type", "lz4");
         Ok(config.create_with_context(ctx)?)
-    }
-
-    pub fn to_consumer(&self) -> Result<BaseConsumer<FlowClientContext>> {
-        let (mut config, ctx) = self.common_config()?;
-
-        config.set("enable.auto.commit", "false");
-        // librdkafka will throw an error if this is left blank.
-        config.set("group.id", "materialize-kafka");
-        // This consumer is only used for restoring state from checkpoints
-        // topic, and we want to know when we have reached the end of the topic.
-        config.set("enable.partition.eof", "true");
-
-        let consumer: BaseConsumer<FlowClientContext> = config.create_with_context(ctx)?;
-
-        if let Some(Credentials::AWS { .. }) = &self.credentials {
-            // In order to generate an initial OAuth Bearer token to be used by
-            // the consumer we need to call poll once.
-            // See https://docs.confluent.io/platform/current/clients/librdkafka/html/classRdKafka_1_1OAuthBearerTokenRefreshCb.html
-            let _ = consumer.poll(Some(std::time::Duration::ZERO));
-        }
-
-        Ok(consumer)
     }
 
     pub fn to_admin(&self) -> Result<AdminClient<FlowClientContext>> {
