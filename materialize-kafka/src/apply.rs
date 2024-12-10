@@ -6,7 +6,7 @@ use rdkafka::admin::{AdminOptions, NewTopic, TopicReplication};
 
 use crate::{
     configuration::{EndpointConfig, Resource},
-    FLOW_CHECKPOINTS_TOPIC, KAFKA_TIMEOUT,
+    KAFKA_TIMEOUT,
 };
 
 pub async fn do_apply(req: Apply) -> Result<String> {
@@ -36,7 +36,7 @@ pub async fn do_apply(req: Apply) -> Result<String> {
         })
         .collect::<Result<Vec<String>>>()?;
 
-    let mut topics_to_create = configured_topics
+    let topics_to_create = configured_topics
         .iter()
         .filter_map(|topic| {
             if existing_topics.contains(topic) {
@@ -50,15 +50,6 @@ pub async fn do_apply(req: Apply) -> Result<String> {
             }
         })
         .collect::<Vec<NewTopic>>();
-
-    if !existing_topics.contains(FLOW_CHECKPOINTS_TOPIC) {
-        topics_to_create.push(NewTopic {
-            name: FLOW_CHECKPOINTS_TOPIC,
-            num_partitions: config.topic_partitions,
-            replication: TopicReplication::Fixed(config.topic_replication_factor),
-            config: vec![("cleanup.policy", "compact")],
-        });
-    }
 
     if topics_to_create.is_empty() {
         return Ok("".to_string());
