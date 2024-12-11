@@ -27,9 +27,6 @@ rdkafka = { version = "0.36", features = [
 ] }
 serde = { version = "1.0", features = ["derive"] }
 schemars = "0.8"
-http = "0.2" # 0.2x version is needed for MSK token signing via aws-sigv4
-aws-sdk-iam = "1.48.0"
-aws-sigv4 = { version = "1.2.4", features = ["sign-http", "http0-compat"] }
 base64 = "0.22"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 apache-avro = { version = "0.17" }
