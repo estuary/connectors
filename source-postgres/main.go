@@ -105,6 +105,7 @@ type advancedConfig struct {
 	DiscoverSchemas       []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	DiscoverOnlyPublished bool     `json:"discover_only_published,omitempty" jsonschema:"title=Discover Only Published Tables,description=When set the capture will only discover tables which have already been added to the publication. This can be useful if you intend to manage which tables are captured by adding or removing them from the publication."`
 	MinimumBackfillXID    string   `json:"min_backfill_xid,omitempty" jsonschema:"title=Minimum Backfill XID,description=Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases." jsonschema_extras:"pattern=^[0-9]+$"`
+	ReadOnlyCapture       bool     `json:"read_only_capture,omitempty" jsonschema:"title=Read-Only Capture,description=When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."`
 }
 
 // Validate checks that the configuration possesses all required properties.

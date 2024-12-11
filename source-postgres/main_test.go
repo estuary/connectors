@@ -19,13 +19,17 @@ import (
 )
 
 var (
-	dbAddress = flag.String("db_address", "localhost:5432", "The database server address to use for tests")
-	dbName    = flag.String("db_name", "postgres", "Use the named database for tests")
+	dbName = flag.String("db_name", "postgres", "Use the named database for tests")
 
-	dbControlUser = flag.String("db_control_user", "postgres", "The user for test setup/control operations")
-	dbControlPass = flag.String("db_control_pass", "postgres", "The password the the test setup/control user")
-	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
-	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+	dbControlAddress = flag.String("db_control_address", "localhost:5432", "The database server address to use for test setup/control operations")
+	dbControlUser    = flag.String("db_control_user", "postgres", "The user for test setup/control operations")
+	dbControlPass    = flag.String("db_control_pass", "postgres", "The password the the test setup/control user")
+
+	dbCaptureAddress = flag.String("db_capture_address", "localhost:5432", "The database server address to use for test captures")
+	dbCaptureUser    = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
+	dbCapturePass    = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+
+	readOnlyCapture = flag.Bool("read_only_capture", false, "When true, run test captures in read-only mode")
 )
 
 const testSchemaName = "test"
@@ -55,10 +59,10 @@ func postgresTestBackend(t testing.TB) *testBackend {
 
 	// Open control connection
 	var ctx = context.Background()
-	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, *dbControlUser, *dbControlPass, *dbAddress, *dbName)
+	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, *dbControlUser, *dbControlPass, *dbControlAddress, *dbName)
 	log.WithFields(log.Fields{
 		"user": *dbControlUser,
-		"addr": *dbAddress,
+		"addr": *dbControlAddress,
 	}).Info("opening control connection")
 	var pool, err = pgxpool.New(ctx, controlURI)
 	require.NoError(t, err)
@@ -66,12 +70,15 @@ func postgresTestBackend(t testing.TB) *testBackend {
 
 	// Construct the capture config
 	var captureConfig = Config{
-		Address:  *dbAddress,
+		Address:  *dbCaptureAddress,
 		User:     *dbCaptureUser,
 		Password: *dbCapturePass,
 		Database: *dbName,
 	}
 	captureConfig.Advanced.BackfillChunkSize = 16
+	if *readOnlyCapture {
+		captureConfig.Advanced.ReadOnlyCapture = true
+	}
 	if err := captureConfig.Validate(); err != nil {
 		t.Fatalf("error validating capture config: %v", err)
 	}
