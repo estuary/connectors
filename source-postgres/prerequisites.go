@@ -21,14 +21,22 @@ func (db *postgresDatabase) SetupPrerequisites(ctx context.Context) []error {
 		return errs
 	}
 
-	for _, prereq := range []func(ctx context.Context) error{
+	var checks = []func(ctx context.Context) error{
 		db.prerequisiteLogicalReplication,
 		db.prerequisiteReplicationUser,
 		db.prerequisiteReplicationSlot,
 		db.prerequisitePublication,
-		db.prerequisiteWatermarksTable,
-		db.prerequisiteWatermarksInPublication,
-	} {
+	}
+
+	if !db.config.Advanced.ReadOnlyCapture {
+		// We only care about the watermarks table when not in read-only mode
+		checks = append(checks,
+			db.prerequisiteWatermarksTable,
+			db.prerequisiteWatermarksInPublication,
+		)
+	}
+
+	for _, prereq := range checks {
 		if err := prereq(ctx); err != nil {
 			errs = append(errs, err)
 		}

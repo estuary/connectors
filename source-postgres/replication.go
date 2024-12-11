@@ -311,21 +311,12 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 
 	// After establishing a target fence position, issue a watermark write. This ensures
 	// that there will always be a change event whose commit LSN is greater than the target,
-	// which avoids certain classes of failure which could otherwise occur when capturing
-	// from an idle database on a server hosting other active databases.
-	//
-	// TODO(wgd):
-	//
-	// However, this won't work against a read replica, so we need to rethink this and/or
-	// keep it around but make it possible to disable in that context.
-	//
-	// It might also be useful to use some other "traffic generation" mechanism that doesn't
-	// require a table to exist for us to use. I think at least one other CDC solution for
-	// Postgres does that, though I don't recall which or what it does exactly. However that
-	// won't play nicely with the current transaction-commit driven logic here, unless we also
-	// add some equivalent of the "Implicit FlushEvent Conversion" that MySQL CDC does.
-	if err := s.db.WriteWatermark(ctx, uuid.New().String()); err != nil {
-		return err
+	// which avoids certain classes of failure which can otherwise occur when capturing
+	// from an idle database.
+	if !s.db.config.Advanced.ReadOnlyCapture {
+		if err := s.db.WriteWatermark(ctx, uuid.New().String()); err != nil {
+			return err
+		}
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -340,6 +331,9 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-fenceWatchdog.C:
+			if s.db.config.Advanced.ReadOnlyCapture {
+				return fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
+			}
 			return fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
 		case event, ok := <-s.events:
 			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
