@@ -14,7 +14,6 @@ use validate::do_validate;
 pub mod apply;
 pub mod binding_info;
 pub mod configuration;
-pub mod msk_oauthbearer;
 pub mod transactor;
 pub mod validate;
 

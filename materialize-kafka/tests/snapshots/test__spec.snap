@@ -46,7 +46,6 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
               },
               "username": {
                 "order": 2,
-                "secret": true,
                 "title": "Username",
                 "type": "string"
               }
@@ -58,39 +57,6 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
               "username"
             ],
             "title": "SASL (User & Password)"
-          },
-          {
-            "properties": {
-              "auth_type": {
-                "const": "AWS",
-                "default": "AWS",
-                "order": 0,
-                "type": "string"
-              },
-              "aws_access_key_id": {
-                "order": 1,
-                "title": "AWS Access Key ID",
-                "type": "string"
-              },
-              "aws_secret_access_key": {
-                "order": 2,
-                "secret": true,
-                "title": "AWS Secret Access Key",
-                "type": "string"
-              },
-              "region": {
-                "order": 3,
-                "title": "AWS Region",
-                "type": "string"
-              }
-            },
-            "required": [
-              "auth_type",
-              "aws_access_key_id",
-              "aws_secret_access_key",
-              "region"
-            ],
-            "title": "AWS MSK IAM"
           }
         ],
         "order": 1,

@@ -1,9 +1,9 @@
 use anyhow::Result;
 use rdkafka::{
     admin::AdminClient,
-    client::{ClientContext, OAuthToken},
-    producer::{ProducerContext, ThreadedProducer},
-    ClientConfig, Message,
+    client::DefaultClientContext,
+    producer::{DefaultProducerContext, ThreadedProducer},
+    ClientConfig,
 };
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -27,12 +27,6 @@ pub enum Credentials {
         mechanism: SaslMechanism,
         username: String,
         password: String,
-    },
-    #[serde(rename = "AWS")]
-    AWS {
-        aws_access_key_id: String,
-        aws_secret_access_key: String,
-        region: String,
     },
 }
 
@@ -125,7 +119,6 @@ impl JsonSchema for EndpointConfig {
                             },
                             "username": {
                                 "order": 2,
-                                "secret": true,
                                 "title": "Username",
                                 "type": "string"
                             },
@@ -141,38 +134,6 @@ impl JsonSchema for EndpointConfig {
                             "mechanism",
                             "password",
                             "username"
-                        ]
-                    }, {
-                        "title": "AWS MSK IAM",
-                        "properties": {
-                            "auth_type": {
-                                "type": "string",
-                                "default": "AWS",
-                                "const": "AWS",
-                                "order": 0
-                            },
-                            "aws_access_key_id": {
-                                "title": "AWS Access Key ID",
-                                "type": "string",
-                                "order": 1
-                            },
-                            "aws_secret_access_key": {
-                                "order": 2,
-                                "secret": true,
-                                "title": "AWS Secret Access Key",
-                                "type": "string"
-                            },
-                            "region": {
-                                "order": 3,
-                                "title": "AWS Region",
-                                "type": "string"
-                            }
-                        },
-                        "required": [
-                            "auth_type",
-                            "aws_access_key_id",
-                            "aws_secret_access_key",
-                            "region"
                         ]
                     }]
                 },
@@ -248,59 +209,6 @@ impl JsonSchema for EndpointConfig {
     }
 }
 
-pub struct FlowClientContext {
-    auth: Option<Credentials>,
-}
-
-impl ClientContext for FlowClientContext {
-    const ENABLE_REFRESH_OAUTH_TOKEN: bool = true;
-
-    fn generate_oauth_token(
-        &self,
-        _oauthbearer_config: Option<&str>,
-    ) -> Result<OAuthToken, Box<dyn std::error::Error>> {
-        match &self.auth {
-            Some(Credentials::AWS {
-                aws_access_key_id,
-                aws_secret_access_key,
-                region,
-            }) => {
-                let (token, lifetime_ms) = crate::msk_oauthbearer::token(
-                    region,
-                    aws_access_key_id,
-                    aws_secret_access_key,
-                )?;
-                Ok(OAuthToken {
-                    // This is just a descriptive name of the principal which is
-                    // accessing the resource, not a specific constant
-                    principal_name: "flow-kafka-materialize".to_string(),
-                    token,
-                    lifetime_ms,
-                })
-            }
-            _ => Err(anyhow::anyhow!("generate_oauth_token called without AWS credentials").into()),
-        }
-    }
-}
-
-impl ProducerContext for FlowClientContext {
-    type DeliveryOpaque = ();
-
-    fn delivery(
-        &self,
-        delivery_result: &rdkafka::message::DeliveryResult<'_>,
-        _: Self::DeliveryOpaque,
-    ) {
-        if let Err((err, msg)) = delivery_result {
-            tracing::warn!(
-                "failed to deliver message for topic {}: {}",
-                msg.topic(),
-                err.to_string()
-            );
-        }
-    }
-}
-
 impl EndpointConfig {
     pub fn validate(&self) -> Result<()> {
         if matches!(self.message_format, MessageFormat::Avro) && self.schema_registry.is_none() {
@@ -310,20 +218,18 @@ impl EndpointConfig {
         Ok(())
     }
 
-    pub fn to_producer(&self) -> Result<ThreadedProducer<FlowClientContext>> {
-        let (mut config, ctx) = self.common_config()?;
+    pub fn to_producer(&self) -> Result<ThreadedProducer<DefaultProducerContext>> {
+        let mut config = self.common_config()?;
         config.set("compression.type", "lz4");
-        Ok(config.create_with_context(ctx)?)
+        Ok(config.create()?)
     }
 
-    pub fn to_admin(&self) -> Result<AdminClient<FlowClientContext>> {
-        // TODO(whb): Will this generate an OAuth token without calling `poll`?
-        // May not work with MSK etc.
-        let (config, ctx) = self.common_config()?;
-        Ok(config.create_with_context(ctx)?)
+    pub fn to_admin(&self) -> Result<AdminClient<DefaultClientContext>> {
+        let config = self.common_config()?;
+        Ok(config.create()?)
     }
 
-    fn common_config(&self) -> Result<(ClientConfig, FlowClientContext)> {
+    fn common_config(&self) -> Result<ClientConfig> {
         let mut config = ClientConfig::new();
 
         config.set("bootstrap.servers", self.bootstrap_servers.clone());
@@ -339,20 +245,10 @@ impl EndpointConfig {
                 config.set("sasl.username", username);
                 config.set("sasl.password", password);
             }
-            Some(Credentials::AWS { .. }) => {
-                if self.security_protocol() != "SASL_SSL" {
-                    anyhow::bail!("must use tls=system_certificates for AWS")
-                }
-                config.set("sasl.mechanism", "OAUTHBEARER");
-            }
             None => (),
         }
 
-        let ctx = FlowClientContext {
-            auth: self.credentials.clone(),
-        };
-
-        Ok((config, ctx))
+        Ok(config)
     }
 
     fn security_protocol(&self) -> &'static str {
