@@ -87,6 +87,19 @@ func TestSlotLSNAdvances(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
+	if *dbCaptureAddress != *dbControlAddress {
+		// If the database used for test control operations is not the same database
+		// we're capturing from (that is, we're testing some sort of replicated setup)
+		// then issuing a query against pg_replication_slots using the test control
+		// connection won't tell us whether the replica slot is advancing, so this
+		// test will fail even if it's working correctly.
+		//
+		// In theory the test could be rewritten to establish a temporary control
+		// connection to the capture database and check there, but it's not worth
+		// the effort in general since we know this logic works in non-replicated
+		// setups and I've verified it manually in the standby replica scenario.
+		t.Skip("skipping test in replicated test scenario")
+	}
 
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	var uniqueID = "99718274"
