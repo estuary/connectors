@@ -1,6 +1,6 @@
 use crate::configuration::{MessageFormat, SchemaRegistryConfig};
 use anyhow::Result;
-use doc::{shape::ObjProperty, Pointer, Shape};
+use doc::{ptr::Token, shape::ObjProperty, Pointer, Shape};
 use futures::stream::{self, StreamExt};
 use json::schema::{
     self,
@@ -221,7 +221,15 @@ fn binding_info(binding: &Binding) -> Result<ComputedBinding> {
     let key_ptr = field_selection
         .keys
         .iter()
-        .map(|k| Pointer::from_str(k))
+        .map(|k| {
+            // The selected key fields are treated as unescaped strings. For
+            // example, a key field like `some/nested~1key` is taken directly as
+            // a property named "some/nested~1key" with that pointer rather than
+            // unescaping the ~1 into a nested pointer of ("some", "nested/key").
+            let mut ptr = Pointer::empty();
+            ptr.push(Token::from_str(k));
+            ptr
+        })
         .collect::<Vec<Pointer>>();
 
     let (key_schema, schema) = avro::shape_to_avro(shape, &key_ptr);
