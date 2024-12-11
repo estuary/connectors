@@ -124,18 +124,15 @@ async def fetch_transactions(
         TransactionSearch.created_at.between(log_cursor, end),
     )
 
-    count = 0
+    if collection.maximum_size >= TRANSACTION_SEARCH_LIMIT:
+        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "transactions"))
 
     async for object in _async_iterator_wrapper(collection):
-        count += 1
         doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
-
-    if count >= TRANSACTION_SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(count, "transactions"))
 
     if end == window_end:
         yield window_end
@@ -159,18 +156,15 @@ async def fetch_customers(
         CustomerSearch.created_at.between(log_cursor, end),
     )
 
-    count = 0
+    if collection.maximum_size >= SEARCH_LIMIT:
+        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "customers"))
 
     async for object in _async_iterator_wrapper(collection):
-        count += 1
         doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
-
-    if count >= SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(count, "customers"))
 
     if end == window_end:
         yield window_end
@@ -194,24 +188,20 @@ async def fetch_credit_card_verifications(
         CreditCardVerificationSearch.created_at.between(log_cursor, end),
     )
 
-    count = 0
+    if collection.maximum_size >= SEARCH_LIMIT:
+        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "credit card verifications"))
 
     async for object in _async_iterator_wrapper(collection):
-        count += 1
         doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
 
-    if count >= SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(count, "credit card verifications"))
-
     if end == window_end:
         yield window_end
     elif most_recent_created_at > log_cursor:
         yield most_recent_created_at
-
 
 async def fetch_subscriptions(
         braintree_gateway: BraintreeGateway,
@@ -229,18 +219,15 @@ async def fetch_subscriptions(
         SubscriptionSearch.created_at.between(log_cursor, end),
     )
 
-    count = 0
+    if collection.maximum_size >= SEARCH_LIMIT:
+        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "subscriptions"))
 
     async for object in _async_iterator_wrapper(collection):
-        count += 1
         doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
 
         if doc.created_at > log_cursor:
             yield doc
             most_recent_created_at = doc.created_at
-
-    if count >= SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(count, "subscriptions"))
 
     if end == window_end:
         yield window_end
