@@ -19,7 +19,7 @@ expression: schema
     },
     "paths": {
       "title": "URL paths",
-      "description": "List of URL paths to accept requests at.\n\nDiscovery will return a separate collection for each given path. Paths must be provided without any percent encoding, and should not include any query parameters or fragment.",
+      "description": "List of URL paths to accept requests at.\n\nDiscovery will return a separate collection for each given path. Paths must be provided without any percent encoding, and should not include any query parameters or fragment.\n\nPaths can include path parameters, following the syntax of OpenAPI path templating. For example, `/vendors/{vendorId}/products/{productId}`, which would accept a request to `/vendors/abc/products/123`. This would result in captured data with `\"_meta\": { \"pathParams\": { \"vendorId\": \"abc\", \"productId\": \"123\"}, ...}`",
       "default": [
         "/webhook-data"
       ],
