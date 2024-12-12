@@ -465,8 +465,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			}
 			queries = []string{item.Query}
 		}
+		d.be.StartedResourceCommit(path)
 		for _, query := range queries {
-			d.be.StartedResourceCommit(path)
 			if _, err := db.ExecContext(ctx, query); err != nil {
 				// When doing a recovery apply, it may be the case that some tables & files have already been deleted after being applied
 				// it is okay to skip them in this case
@@ -477,8 +477,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				}
 				return nil, fmt.Errorf("query %q failed: %w", query, err)
 			}
-			d.be.FinishedResourceCommit(path)
 		}
+		d.be.FinishedResourceCommit(path)
 
 		// Cleanup files.
 		d.deleteFiles(ctx, item.ToDelete)
