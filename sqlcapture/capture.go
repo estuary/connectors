@@ -299,6 +299,26 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 		}
 	}
 
+	// This is part of a migration dated 2024-12-12 and can be removed within a few days. The
+	// only purpose here is to make sure that preexisting only-changes bindings have an
+	// initialized StateKey value, the same as activatePendingStreams has been modified to
+	// produce going forward.
+	for _, binding := range c.Bindings {
+		if state, ok := c.State.Streams[binding.StateKey]; ok && binding.Resource.Mode == BackfillModeOnlyChanges && state.Mode == TableStateActive && state.KeyColumns == nil {
+			if !slices.Equal(binding.CollectionKey, c.Database.FallbackCollectionKey()) {
+				for _, ptr := range binding.CollectionKey {
+					state.KeyColumns = append(state.KeyColumns, collectionKeyToPrimaryKey(ptr))
+				}
+			}
+			if len(binding.Resource.PrimaryKey) > 0 {
+				logrus.WithFields(logrus.Fields{"stateKey": binding.StateKey, "key": binding.Resource.PrimaryKey}).Debug("key overriden by resource config")
+				state.KeyColumns = binding.Resource.PrimaryKey
+			}
+			logrus.WithField("stateKey", binding.StateKey).WithField("key", state.KeyColumns).Info("initialized missing KeyColumns state for only-changes binding")
+			state.dirty = true
+		}
+	}
+
 	// If all bindings are new (or there are no bindings), reset the replication cursor. This is
 	// safe because logically if no streams are currently active then we can't miss any events of
 	// interest when the replication stream jumps ahead, and doing this allows the user an easy
