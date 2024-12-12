@@ -64,7 +64,7 @@ dependencies = [
 [[package]]
 name = "allocator"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 dependencies = [
  "jemalloc-ctl",
  "jemallocator",
@@ -482,7 +482,7 @@ dependencies = [
 [[package]]
 name = "doc"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 dependencies = [
  "base64 0.13.1",
  "bigdecimal",
@@ -1097,7 +1097,7 @@ dependencies = [
 [[package]]
 name = "json"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 dependencies = [
  "addr",
  "bigdecimal",
@@ -1243,7 +1243,7 @@ dependencies = [
 [[package]]
 name = "models"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 dependencies = [
  "caseless",
  "humantime-serde",
@@ -1614,12 +1614,12 @@ dependencies = [
 [[package]]
 name = "proto-build"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 
 [[package]]
 name = "proto-flow"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 dependencies = [
  "bytes",
  "pbjson",
@@ -1638,7 +1638,7 @@ dependencies = [
 [[package]]
 name = "proto-gazette"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 dependencies = [
  "bytes",
  "pbjson",
@@ -2661,7 +2661,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 [[package]]
 name = "tuple"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#af95f7b986e6abb37328161ed91ee8202a2fa841"
+source = "git+https://github.com/estuary/flow#eb0047a15c45ca170c0aa947ee52bc2ef21f6e8d"
 dependencies = [
  "memchr",
  "serde_json",
