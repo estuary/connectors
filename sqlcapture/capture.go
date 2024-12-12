@@ -355,6 +355,22 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			continue
 		}
 
+		// Translate the collection key pointers back into a list of column names which form the key.
+		//
+		// NOTE(2024-12-12): This can also be overridden by explicitly specifying a key in the resource
+		// config, but that ability isn't surfaced to users and is such an old backwards-compatibility
+		// feature that there may not actually be anyone using it. We should consider deprecation.
+		state.KeyColumns = nil
+		if !slices.Equal(binding.CollectionKey, c.Database.FallbackCollectionKey()) {
+			for _, ptr := range binding.CollectionKey {
+				state.KeyColumns = append(state.KeyColumns, collectionKeyToPrimaryKey(ptr))
+			}
+		}
+		if len(binding.Resource.PrimaryKey) > 0 {
+			logrus.WithFields(logrus.Fields{"stream": streamID, "key": binding.Resource.PrimaryKey}).Debug("key overriden by resource config")
+			state.KeyColumns = binding.Resource.PrimaryKey
+		}
+
 		// Select the appropriate state transition depending on the backfill mode in the resource config.
 		logrus.WithFields(logrus.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
 		switch binding.Resource.Mode {
@@ -375,6 +391,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		case BackfillModeWithoutKey:
 			logrus.WithField("stream", streamID).Info("user selected keyless backfill mode")
 			state.Mode = TableStateKeylessBackfill
+			state.KeyColumns = nil
 		case BackfillModeOnlyChanges:
 			logrus.WithField("stream", streamID).Info("user selected only changes, skipping backfill")
 			state.Mode = TableStateActive
@@ -382,25 +399,16 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
 		}
 
-		// When initializing a binding with the precise or unfiltered backfill modes, we'll need a primary key.
+		// Log an informational notice if the key we'll be using for a backfill differs from
+		// the discovered primary key of a table.
 		if state.Mode == TableStatePreciseBackfill || state.Mode == TableStateUnfilteredBackfill {
-			if len(binding.Resource.PrimaryKey) > 0 {
-				logrus.WithFields(logrus.Fields{"stream": streamID, "key": binding.Resource.PrimaryKey}).Debug("backfill key overriden by resource config")
-				state.KeyColumns = binding.Resource.PrimaryKey
-			} else {
-				logrus.WithFields(logrus.Fields{"stream": streamID, "key": binding.CollectionKey}).Debug("using collection primary key as backfill key")
-				state.KeyColumns = nil
-				for _, ptr := range binding.CollectionKey {
-					state.KeyColumns = append(state.KeyColumns, collectionKeyToPrimaryKey(ptr))
-				}
-			}
-
+			logrus.WithFields(logrus.Fields{"stream": streamID, "key": state.KeyColumns}).Debug("using backfill key")
 			if !slices.Equal(state.KeyColumns, discoveryInfo.PrimaryKey) {
 				logrus.WithFields(logrus.Fields{
 					"stream":      streamID,
 					"backfillKey": state.KeyColumns,
 					"databaseKey": discoveryInfo.PrimaryKey,
-				}).Warn("backfill key differs from database table primary key")
+				}).Info("backfill key differs from database table primary key")
 			}
 		}
 
