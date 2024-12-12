@@ -288,6 +288,8 @@ async def fetch_changes(
                     if "ORA-30052" in str(e) and is_rds:
                         log.info("Automatically triggering a backfill due to ORA-30052 (low retention period of redo logs has caused a gap in data)")
                         yield Triggers.BACKFILL
+                    else:
+                        raise
 
                 cols = [col[0] for col in c.description]
                 c.rowfactory = functools.partial(changes_rowfactory, table.table_name, cols)
