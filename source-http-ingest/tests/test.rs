@@ -31,7 +31,12 @@ async fn test_discover() {
 
     let discover_req = serde_json::json!({
         "discover": {
-            "config": {}
+            "config": {
+                "paths": [
+                    "/webhook-data",
+                    "/path/a/{paramA}/b/{paramB}"
+                ]
+            }
         }
     });
     write_capture_request(&discover_req, &mut stdin)
@@ -109,7 +114,7 @@ async fn run_http_request_processing(
     ));
     let handle_b = tokio::task::spawn(write_docs(
         128,
-        "http://localhost:27172/another.json".to_string(),
+        "http://localhost:27172/another/123/b/456".to_string(),
         client_b,
         headers_b,
     ));
@@ -307,10 +312,10 @@ fn open_json() -> serde_json::Value {
                             "projections": []
                         },
                         "resourceConfig": {
-                            "path": "another.json",
+                            "path": "/another/{paramA}/b/{paramB}",
                             "idFromHeader": "X-Webhook-Id"
                         },
-                        "resourcePath": ["/another.json"]
+                        "resourcePath": ["/another/{paramA}/b/{paramB}"]
                     }
                 ]
             }

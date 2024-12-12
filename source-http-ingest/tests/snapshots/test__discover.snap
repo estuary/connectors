@@ -18,9 +18,19 @@ expression: result
                   "description": "HTTP headers that were sent with the request will get added here. Headers that are known to be sensitive or not useful will not be included",
                   "type": "object"
                 },
+                "pathParams": {
+                  "description": "Parameters extracted from the path of the request, if configured",
+                  "properties": {},
+                  "required": [],
+                  "type": "object"
+                },
                 "receivedAt": {
                   "description": "Timestamp of when the request was received by the connector",
                   "format": "date-time",
+                  "type": "string"
+                },
+                "reqPath": {
+                  "description": "The configured path at which the request was received. Will include parameter placeholders if the path has them",
                   "type": "string"
                 },
                 "webhookId": {
@@ -47,8 +57,77 @@ expression: result
         "recommendedName": "webhook-data",
         "resourceConfig": {
           "idFromHeader": null,
-          "path": null,
-          "stream": null
+          "path": "/webhook-data",
+          "stream": "/webhook-data"
+        }
+      },
+      {
+        "documentSchema": {
+          "properties": {
+            "_meta": {
+              "description": "These fields are automatically added by the connector, and do not need to be specified in the request body",
+              "properties": {
+                "headers": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "HTTP headers that were sent with the request will get added here. Headers that are known to be sensitive or not useful will not be included",
+                  "type": "object"
+                },
+                "pathParams": {
+                  "description": "Parameters extracted from the path of the request, if configured",
+                  "properties": {
+                    "paramA": {
+                      "description": "The value of the path parameter",
+                      "type": "string"
+                    },
+                    "paramB": {
+                      "description": "The value of the path parameter",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "paramA",
+                    "paramB"
+                  ],
+                  "type": "object"
+                },
+                "receivedAt": {
+                  "description": "Timestamp of when the request was received by the connector",
+                  "format": "date-time",
+                  "type": "string"
+                },
+                "reqPath": {
+                  "description": "The configured path at which the request was received. Will include parameter placeholders if the path has them",
+                  "type": "string"
+                },
+                "webhookId": {
+                  "description": "The id of the webhook request, which is automatically added by the connector",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "webhookId",
+                "receivedAt",
+                "pathParams"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "_meta"
+          ],
+          "type": "object",
+          "x-infer-schema": true
+        },
+        "key": [
+          "/_meta/webhookId"
+        ],
+        "recommendedName": "path/a/{paramA}/b/{paramB}",
+        "resourceConfig": {
+          "idFromHeader": null,
+          "path": "/path/a/{paramA}/b/{paramB}",
+          "stream": "/path/a/{paramA}/b/{paramB}"
         }
       }
     ]
