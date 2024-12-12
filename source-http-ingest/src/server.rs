@@ -54,8 +54,6 @@ pub async fn run_server(
     let cors_allow_origin = parse_cors_allowed_origins(&endpoint_config.allowed_cors_origins)
         .expect("allowedCorsOrigins must be valid");
 
-    let handler = Handler::try_new(stdin, stdout, endpoint_config, bindings)?;
-
     let mut router = Router::new()
         .merge(SwaggerUi::new("/swagger-ui").url("/api-doc/openapi.json", openapi_spec))
         // The root path redirects to the swagger ui, so that a user who clicks a link to just
@@ -63,10 +61,21 @@ pub async fn run_server(
         .route(
             "/",
             routing::get(|| async { axum::response::Redirect::permanent("/swagger-ui/") }),
-        )
-        // There's just one route that handles all bindings. The path will be provided as an argument.
-        .route("/*path", routing::post(handle_webhook).put(handle_webhook))
-        // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
+        );
+
+    for binding in bindings.iter() {
+        // The paths in the endpoint and resource config may include parameters, which
+        // are specified using the openapi path syntax (e.g. `/a/{aId}`). We translate
+        // these into axum's path syntax (e.g. `/a/:aId`) so that we can use axum to
+        // extract the path parameters for us.
+        let openapi_path = binding.url_path();
+        let axum_path = openapi_to_axum_path(&openapi_path);
+        tracing::info!(path = %openapi_path, %axum_path, "configuring handler for route");
+        router = router.route(&axum_path, routing::post(handle_webhook));
+    }
+
+    // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
+    router = router
         .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
         // Handle decompression of request bodies. The order of these is important!
         // This layer applies to all routes defined _before_ it, so the max body size is
@@ -104,6 +113,7 @@ pub async fn run_server(
         router = router.layer(cors);
     }
 
+    let handler = Handler::try_new(stdin, stdout, endpoint_config, bindings)?;
     let router = router.with_state(Arc::new(handler));
 
     let address = std::net::SocketAddr::from((std::net::Ipv4Addr::UNSPECIFIED, listen_on_port()));
@@ -120,12 +130,20 @@ pub async fn run_server(
 async fn handle_webhook(
     State(handler): State<Arc<Handler>>,
     request_headers: axum::http::header::HeaderMap,
-    Path(path): Path<String>,
+    // This is the configured path from axum, which will be used lookup the handler.
+    matched_path: axum::extract::MatchedPath,
+    path_params: Option<Path<serde_json::Map<String, Value>>>,
     Query(query_params): Query<serde_json::Map<String, serde_json::Value>>,
     body: Bytes,
 ) -> (StatusCode, Json<Value>) {
     match handler
-        .handle_webhook(path, request_headers, query_params, body)
+        .handle_webhook(
+            matched_path.as_str(),
+            path_params.map(|p| p.0).unwrap_or_default(),
+            request_headers,
+            query_params,
+            body,
+        )
         .await
     {
         Ok(resp) => resp,
@@ -144,6 +162,9 @@ struct CollectionHandler {
     schema_index: json::schema::index::Index<'static, doc::Annotation>,
     binding_index: u32,
     id_header: Option<String>,
+    /// The path from the resource configuration for this binding, which will be
+    /// added into each captured document.
+    configured_path: String,
 }
 
 fn required_string_header<'a>(
@@ -175,12 +196,14 @@ mod pointers {
     }
 }
 
-mod properties {
+pub mod properties {
     pub const META: &str = "_meta";
     pub const ID: &str = "webhookId";
     pub const TS: &str = "receivedAt";
     pub const QUERY: &str = "query";
     pub const HEADERS: &str = "headers";
+    pub const REQ_PATH: &str = "reqPath";
+    pub const PATH_PARAMS: &str = "pathParams";
 }
 
 impl CollectionHandler {
@@ -188,6 +211,8 @@ impl CollectionHandler {
         &self,
         mut object: JsonObj,
         id: String,
+        req_path: String,
+        path_params: serde_json::Map<String, Value>,
         headers: serde_json::Map<String, Value>,
         query_params: serde_json::Map<String, Value>,
         ts: String,
@@ -203,6 +228,13 @@ impl CollectionHandler {
         meta.insert(properties::ID.to_string(), Value::String(id));
         meta.insert(properties::TS.to_string(), Value::String(ts));
         meta.insert(properties::HEADERS.to_string(), Value::Object(headers));
+        meta.insert(properties::REQ_PATH.to_string(), Value::String(req_path));
+        if !path_params.is_empty() {
+            meta.insert(
+                properties::PATH_PARAMS.to_string(),
+                Value::Object(path_params),
+            );
+        }
 
         // It seems like most people probably won't use query parameters at all, so only include
         // them if non-empty. That way, users who don't use them won't have columns added for them
@@ -224,6 +256,7 @@ impl CollectionHandler {
     fn prepare_documents(
         &self,
         body: JsonBody,
+        path_params: serde_json::Map<String, serde_json::Value>,
         request_headers: axum::http::header::HeaderMap,
         query_params: serde_json::Map<String, serde_json::Value>,
     ) -> anyhow::Result<Vec<(u32, String)>> {
@@ -257,7 +290,15 @@ impl CollectionHandler {
         match body {
             JsonBody::Object(obj) => {
                 let id = header_id.unwrap_or_else(new_uuid);
-                let prepped = self.prepare_doc(obj, id, header_json, query_params, ts)?;
+                let prepped = self.prepare_doc(
+                    obj,
+                    id,
+                    self.configured_path.clone(),
+                    path_params,
+                    header_json,
+                    query_params,
+                    ts,
+                )?;
                 Ok(vec![prepped])
             }
             JsonBody::Array(arr) => {
@@ -272,6 +313,8 @@ impl CollectionHandler {
                     prepped.push(self.prepare_doc(
                         inner,
                         id,
+                        self.configured_path.clone(),
+                        path_params.clone(),
                         header_json.clone(),
                         query_params.clone(),
                         ts.clone(),
@@ -303,18 +346,9 @@ impl Handler {
 
         for (i, binding) in bindings.into_iter().enumerate() {
             let binding_index = i as u32;
-            let url_path = binding.url_path();
+            let configured_path = binding.url_path();
 
-            tracing::info!(%url_path, collection = %binding.collection.name, "binding http url path to collection");
-
-            // In documentation and configuration, we always represent the path with the leading /.
-            // But the axum `Path` extractor always strips out the leading /, so we strip it here
-            // to make matching easier.
-            let path = if let Some(without_slash) = url_path.strip_prefix('/') {
-                without_slash.to_owned()
-            } else {
-                url_path
-            };
+            tracing::info!(%configured_path, collection = %binding.collection.name, "binding http url path to collection");
 
             let schema_value = serde_json::from_str::<Value>(&binding.collection.write_schema_json)
                 .context("parsing write_schema_json")?;
@@ -338,13 +372,15 @@ impl Handler {
                 .context("adding schema to index")?;
             let index = index_builder.into_index();
 
+            let axum_path = openapi_to_axum_path(&configured_path);
             collections_by_path.insert(
-                path,
+                axum_path,
                 CollectionHandler {
                     schema_url,
                     schema_index: index,
                     binding_index,
                     id_header: binding.resource_config.id_from_header,
+                    configured_path,
                 },
             );
         }
@@ -368,7 +404,8 @@ impl Handler {
 
     async fn handle_webhook(
         &self,
-        collection_path: String,
+        matched_path: &str,
+        path_params: serde_json::Map<String, Value>,
         request_headers: axum::http::header::HeaderMap,
         query_params: serde_json::Map<String, serde_json::Value>,
         body: Bytes,
@@ -380,15 +417,11 @@ impl Handler {
                     return Ok(err_response(
                         StatusCode::FORBIDDEN,
                         anyhow::anyhow!("invalid authorization token"),
-                        &collection_path,
+                        matched_path,
                     ));
                 }
                 Err(err) => {
-                    return Ok(err_response(
-                        StatusCode::UNAUTHORIZED,
-                        err,
-                        &collection_path,
-                    ));
+                    return Ok(err_response(StatusCode::UNAUTHORIZED, err, matched_path));
                 }
             }
         }
@@ -408,11 +441,11 @@ impl Handler {
                 // This is just so we can get an idea of whether the data came
                 // across in some other format.
                 let body_prefix = String::from_utf8_lossy(&body[..(body.len().min(256))]);
-                tracing::warn!(%collection_path, ?content_type, ?content_encoding, %body_prefix, error = ?err, "failed parsing request body as json");
+                tracing::warn!(%matched_path, ?content_type, ?content_encoding, %body_prefix, error = ?err, "failed parsing request body as json");
                 return Ok(err_response(
                     StatusCode::BAD_REQUEST,
                     anyhow::anyhow!("invalid json: {err}"),
-                    &collection_path,
+                    &matched_path,
                 ));
             }
         };
@@ -420,8 +453,10 @@ impl Handler {
         let start = std::time::Instant::now();
         let mut handlers_guard = self.handlers_by_path.lock().await;
 
-        let Some(collection) = handlers_guard.get_mut(collection_path.as_str()) else {
-            tracing::info!(uri_path = %collection_path, "unknown uri path");
+        // Lookup the handler by the configured path, which may be different
+        // from the actual request path if it contains path parameters.
+        let Some(collection) = handlers_guard.get_mut(matched_path) else {
+            tracing::info!(uri_path = %matched_path, "unknown uri path");
             return Ok((
                 StatusCode::NOT_FOUND,
                 Json(serde_json::json!({"error": "not found"})),
@@ -429,11 +464,11 @@ impl Handler {
         };
 
         tracing::debug!(elapsed_ms = %start.elapsed().as_millis(), "acquired lock on handler");
-        let enhanced_docs = match collection.prepare_documents(json, request_headers, query_params)
-        {
-            Ok(docs) => docs,
-            Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err, &collection_path)),
-        };
+        let enhanced_docs =
+            match collection.prepare_documents(json, path_params, request_headers, query_params) {
+                Ok(docs) => docs,
+                Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err, &matched_path)),
+            };
 
         // It's important that we validate all the documents before publishing
         // any of them. We don't have the ability to "roll back" a partial
@@ -457,7 +492,7 @@ impl Handler {
 
             if validator.invalid() {
                 let basic_output = json::validator::build_basic_output(validator.outcomes());
-                tracing::info!(%basic_output, uri_path = %collection_path, "request document failed validation");
+                tracing::info!(%basic_output, uri_path = %matched_path, "request document failed validation");
                 return Ok((
                     StatusCode::BAD_REQUEST,
                     Json(
@@ -480,6 +515,58 @@ impl Handler {
 }
 
 const JSON_CONTENT_TYPE: &str = "application/json";
+
+fn openapi_path_param(path_component: &str) -> Result<&str, &str> {
+    if path_component.starts_with('{') && path_component.ends_with('}') && path_component.len() > 2
+    {
+        Ok(&path_component[1..path_component.len() - 1])
+    } else {
+        Err(path_component)
+    }
+}
+
+// Converts the openapi path syntax to the axum path syntax. This only affects
+// paths that contain path parameters, since openapi uses curly braces for those,
+// while axum uses a leading colon. Paths that don't include parameters will be
+// returned
+fn openapi_to_axum_path(path: &str) -> String {
+    transform_path_params(path, |param| format!(":{}", param))
+}
+
+/// Transforms openapi path parameters using the given `transform`, which will be
+/// passed each parameter name.
+pub fn transform_path_params<F>(path: &str, transform: F) -> String
+where
+    F: Fn(&str) -> String,
+{
+    use itertools::Itertools;
+
+    let trailing_slash = if path.ends_with('/') && path.len() > 1 {
+        "/"
+    } else {
+        ""
+    };
+    let rel_path = path
+        .trim_start_matches('/')
+        .trim_end_matches('/')
+        .split('/')
+        .map(|part| match openapi_path_param(part) {
+            Ok(param_name) => transform(param_name),
+            Err(constant) => constant.to_owned(),
+        })
+        .format("/");
+    format!("/{rel_path}{trailing_slash}")
+}
+
+/// Returns a list of path parameters in the given path specification. Path
+/// parameters are specified in the OpenAPI path format, e.g.
+/// `/vendors/{vendorId}/products/{productId}`, which would result in
+/// `["vendorId", "productId"]`.
+pub fn openapi_path_parameters(endpoint_config_path: &str) -> impl Iterator<Item = &str> {
+    endpoint_config_path
+        .split('/')
+        .filter_map(|component| openapi_path_param(component).ok())
+}
 
 pub fn openapi_spec<'a>(
     endpoint_config: &EndpointConfig,
@@ -590,6 +677,17 @@ pub fn openapi_spec<'a>(
                     ))
                     .example(Some(serde_json::json!("abcd1234"))),
             )
+        }
+
+        for path_param in openapi_path_parameters(&url_path) {
+            op_builder = op_builder.parameter(
+                openapi::path::ParameterBuilder::new()
+                    .name(path_param.to_owned())
+                    .parameter_in(openapi::path::ParameterIn::Path)
+                    .required(openapi::Required::True)
+                    .description(Some("a url path parameter"))
+                    .example(Some(serde_json::json!("abcd1234"))),
+            );
         }
         let operation = op_builder.build();
         let path_item = openapi::path::PathItemBuilder::new()
@@ -711,6 +809,43 @@ mod test {
             openapi_spec(&endpoint_config, &[binding0, binding1]).expect("failed to generate spec");
         let json = spec.to_pretty_json().expect("failed to serialize json");
         insta::assert_snapshot!(json);
+    }
+
+    #[test]
+    fn test_path_params() {
+        for (path, expected) in &[
+            (
+                "/vendors/{vendorId}/products/{productId}",
+                vec!["vendorId", "productId"],
+            ),
+            ("/vendors/{vendorId}/products", vec!["vendorId"]),
+            ("/vendors/{vendorId}", vec!["vendorId"]),
+            ("/vendors", vec![]),
+            ("/", vec![]),
+        ] {
+            let actual: Vec<_> = super::openapi_path_parameters(path).collect();
+            assert_eq!(actual, *expected);
+        }
+    }
+
+    #[test]
+    fn test_path_to_axum() {
+        for (openapi_path, expected) in &[
+            (
+                "/vendors/{vendorId}/products/{productId}",
+                "/vendors/:vendorId/products/:productId",
+            ),
+            (
+                "/vendors/{vendorId}/products/",
+                "/vendors/:vendorId/products/",
+            ),
+            ("/vendors/{vendorId}", "/vendors/:vendorId"),
+            ("/vendors", "/vendors"),
+            ("/", "/"),
+        ] {
+            let actual = super::openapi_to_axum_path(openapi_path);
+            assert_eq!(actual, *expected);
+        }
     }
 }
 
