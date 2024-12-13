@@ -1,0 +1,398 @@
+[
+  [
+    "acmeCo/admins",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "away_mode_enabled": false,
+      "away_mode_reassign": false,
+      "email": "alexb@estuary.dev",
+      "has_inbox_seat": true,
+      "id": "7939621",
+      "name": "Alex Bair",
+      "team_ids": [
+        7949170
+      ],
+      "team_priority_level": {
+        "primary_team_ids": [
+          7949170
+        ]
+      },
+      "type": "admin"
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "10313875",
+      "name": "Feature Request",
+      "type": "tag"
+    }
+  ],
+  [
+    "acmeCo/teams",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "admin_ids": [
+        7939621
+      ],
+      "id": "7949170",
+      "name": "Test Team Inbox",
+      "type": "team"
+    }
+  ],
+  [
+    "acmeCo/company_attributes",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "api_writable": true,
+      "archived": false,
+      "custom": false,
+      "data_type": "string",
+      "description": "The name of a company",
+      "full_name": "name",
+      "label": "Company name",
+      "messenger_writable": true,
+      "model": "company",
+      "name": "name",
+      "type": "data_attribute",
+      "ui_writable": true
+    }
+  ],
+  [
+    "acmeCo/contact_attributes",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "api_writable": true,
+      "archived": false,
+      "custom": false,
+      "data_type": "string",
+      "description": "A person's role in their company, such as the name of their department",
+      "full_name": "role",
+      "label": "Contact role",
+      "messenger_writable": true,
+      "model": "contact",
+      "name": "role",
+      "type": "data_attribute",
+      "ui_writable": false
+    }
+  ],
+  [
+    "acmeCo/contacts",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "android_app_name": null,
+      "android_app_version": null,
+      "android_device": null,
+      "android_last_seen_at": null,
+      "android_os_version": null,
+      "android_sdk_version": null,
+      "avatar": null,
+      "browser": null,
+      "browser_language": null,
+      "browser_version": null,
+      "companies": {
+        "data": [
+          {
+            "id": "67570a878b6e26fe4ce6a895",
+            "type": "company",
+            "url": "/companies/67570a878b6e26fe4ce6a895"
+          }
+        ],
+        "has_more": false,
+        "total_count": 1,
+        "type": "list",
+        "url": "/contacts/67570a878b6e26fe4ce6a894/companies"
+      },
+      "created_at": 1733757575,
+      "custom_attributes": {},
+      "email": "example.user@projectmap.com",
+      "external_id": "1cfe8e49-d7c1-426a-a7b7-6a424e7f8148",
+      "has_hard_bounced": false,
+      "id": "67570a878b6e26fe4ce6a894",
+      "ios_app_name": null,
+      "ios_app_version": null,
+      "ios_device": null,
+      "ios_last_seen_at": null,
+      "ios_os_version": null,
+      "ios_sdk_version": null,
+      "language_override": null,
+      "last_contacted_at": 1734097732,
+      "last_email_clicked_at": null,
+      "last_email_opened_at": null,
+      "last_replied_at": null,
+      "last_seen_at": 1733757575,
+      "location": {
+        "city": "Dublin",
+        "continent_code": "EU",
+        "country": "Ireland",
+        "country_code": "IRL",
+        "region": "Leinster",
+        "type": "location"
+      },
+      "marked_email_as_spam": false,
+      "name": "Example User",
+      "notes": {
+        "data": [],
+        "has_more": false,
+        "total_count": 0,
+        "type": "list",
+        "url": "/contacts/67570a878b6e26fe4ce6a894/notes"
+      },
+      "opted_in_subscription_types": {
+        "data": [],
+        "has_more": false,
+        "total_count": 0,
+        "type": "list",
+        "url": "/contacts/67570a878b6e26fe4ce6a894/subscriptions"
+      },
+      "opted_out_subscription_types": {
+        "data": [],
+        "has_more": false,
+        "total_count": 0,
+        "type": "list",
+        "url": "/contacts/67570a878b6e26fe4ce6a894/subscriptions"
+      },
+      "os": null,
+      "owner_id": null,
+      "phone": null,
+      "referrer": null,
+      "role": "user",
+      "signed_up_at": 1733757575,
+      "sms_consent": false,
+      "social_profiles": {
+        "data": [],
+        "type": "list"
+      },
+      "tags": {
+        "data": [],
+        "has_more": false,
+        "total_count": 0,
+        "type": "list",
+        "url": "/contacts/67570a878b6e26fe4ce6a894/tags"
+      },
+      "type": "contact",
+      "unsubscribed_from_emails": false,
+      "unsubscribed_from_sms": false,
+      "updated_at": 1734097734,
+      "utm_campaign": null,
+      "utm_content": null,
+      "utm_medium": null,
+      "utm_source": null,
+      "utm_term": null,
+      "workspace_id": "s3r1c48t"
+    }
+  ],
+  [
+    "acmeCo/conversations",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "admin_assignee_id": null,
+      "ai_agent": null,
+      "ai_agent_participated": false,
+      "contacts": {
+        "contacts": [
+          {
+            "external_id": "1cfe8e49-d7c1-426a-a7b7-6a424e7f8148",
+            "id": "67570a878b6e26fe4ce6a894",
+            "type": "contact"
+          }
+        ],
+        "type": "contact.list"
+      },
+      "conversation_rating": null,
+      "created_at": 1733757575,
+      "custom_attributes": {
+        "Copilot used": false
+      },
+      "first_contact_reply": null,
+      "id": "1",
+      "linked_objects": {
+        "data": [],
+        "has_more": false,
+        "total_count": 0,
+        "type": "list"
+      },
+      "open": true,
+      "priority": "not_priority",
+      "read": false,
+      "sla_applied": null,
+      "snoozed_until": null,
+      "source": {
+        "attachments": [],
+        "author": {
+          "email": "operator+s3r1c48t@intercom.io",
+          "id": "7939622",
+          "name": "Fin",
+          "type": "admin"
+        },
+        "body": "",
+        "delivered_as": "admin_initiated",
+        "id": "1",
+        "redacted": false,
+        "subject": "",
+        "type": null,
+        "url": null
+      },
+      "state": "open",
+      "statistics": {
+        "count_assignments": 0,
+        "count_conversation_parts": 7,
+        "count_reopens": 0,
+        "first_admin_reply_at": null,
+        "first_assignment_at": null,
+        "first_close_at": null,
+        "first_contact_reply_at": null,
+        "last_admin_reply_at": null,
+        "last_assignment_admin_reply_at": null,
+        "last_assignment_at": null,
+        "last_close_at": null,
+        "last_closed_by_id": null,
+        "last_contact_reply_at": null,
+        "median_time_to_reply": null,
+        "time_to_admin_reply": null,
+        "time_to_assignment": null,
+        "time_to_first_close": null,
+        "time_to_last_close": null,
+        "type": "conversation_statistics"
+      },
+      "tags": {
+        "tags": [],
+        "type": "tag.list"
+      },
+      "team_assignee_id": null,
+      "teammates": {
+        "admins": [
+          {
+            "id": "7939621",
+            "type": "admin"
+          }
+        ],
+        "type": "admin.list"
+      },
+      "ticket": null,
+      "title": "Title",
+      "topics": {
+        "topics": [],
+        "total_count": 0,
+        "type": "topic.list"
+      },
+      "type": "conversation",
+      "updated_at": 1734097743,
+      "waiting_since": null
+    }
+  ],
+  [
+    "acmeCo/conversation_parts",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assigned_to": null,
+      "attachments": [],
+      "author": {
+        "email": "alexb@estuary.dev",
+        "id": "7939621",
+        "name": "Alex Bair",
+        "type": "admin"
+      },
+      "body": "<p class=\"no-margin\">Hello</p>",
+      "conversation_id": "1",
+      "created_at": 1734097565,
+      "external_id": null,
+      "id": "1",
+      "notified_at": 1734097565,
+      "part_type": "comment",
+      "redacted": false,
+      "type": "conversation_part",
+      "updated_at": 1734097565
+    }
+  ],
+  [
+    "acmeCo/segments",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "count": 0,
+      "created_at": 1733757603,
+      "id": "67570aa28d7950b29e95d0d7",
+      "name": "New",
+      "person_type": "user",
+      "type": "segment",
+      "updated_at": 1733757603
+    }
+  ],
+  [
+    "acmeCo/companies",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "app_id": "s3r1c48t",
+      "company_id": "4662804711282882593",
+      "created_at": 1733757575,
+      "custom_attributes": {},
+      "id": "67570a878b6e26fe4ce6a895",
+      "monthly_spend": 0,
+      "name": "ProjectMap",
+      "plan": {},
+      "segments": {
+        "segments": [],
+        "type": "segment.list"
+      },
+      "session_count": 0,
+      "tags": {
+        "tags": [
+          {
+            "id": "10313875",
+            "name": "Feature Request",
+            "type": "tag"
+          }
+        ],
+        "type": "tag.list"
+      },
+      "type": "company",
+      "updated_at": 1733759659,
+      "user_count": 1
+    }
+  ],
+  [
+    "acmeCo/company_segments",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": 1734098338,
+      "id": "675c3da2329616b591d02949",
+      "name": "Name is Estuary",
+      "person_type": "user",
+      "type": "segment",
+      "updated_at": 1734098339
+    }
+  ]
+]
