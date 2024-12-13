@@ -15,6 +15,7 @@ from .flow import (
     BaseOAuth2Credentials,
     ClientCredentialsOAuth2Credentials,
     ClientCredentialsOAuth2Spec,
+    LongLivedClientCredentialsOAuth2Credentials,
     OAuth2Spec,
 )
 
@@ -128,13 +129,13 @@ class TokenSource:
         scope: str = ""
 
     oauth_spec: OAuth2Spec | ClientCredentialsOAuth2Spec | None
-    credentials: BaseOAuth2Credentials | ClientCredentialsOAuth2Credentials | AccessToken | BasicAuth
+    credentials: BaseOAuth2Credentials | ClientCredentialsOAuth2Credentials | LongLivedClientCredentialsOAuth2Credentials | AccessToken | BasicAuth
     authorization_header: str = DEFAULT_AUTHORIZATION_HEADER
     _access_token: AccessTokenResponse | None = None
     _fetched_at: int = 0
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
-        if isinstance(self.credentials, AccessToken):
+        if isinstance(self.credentials, AccessToken) or isinstance(self.credentials, LongLivedClientCredentialsOAuth2Credentials):
             return ("Bearer", self.credentials.access_token)
         elif isinstance(self.credentials, BasicAuth):
             return (
