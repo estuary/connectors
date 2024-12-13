@@ -16,11 +16,12 @@ from braintree.search import Search
 from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator
-from estuary_cdk.capture.common import LogCursor
+from estuary_cdk.capture.common import LogCursor, PageCursor
 
 from .models import (
     FullRefreshResource,
     IncrementalResource,
+    Transaction,
 )
 
 
@@ -44,6 +45,16 @@ TRANSACTION_SEARCH_FIELDS = [
 CONVENIENCE_OBJECTS = [
     'gateway'
 ]
+
+DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
+
+def _dt_to_str(dt: datetime) -> str:
+    return dt.strftime(DATETIME_STRING_FORMAT)
+
+
+def _str_to_dt(string: str) -> datetime:
+    return datetime.fromisoformat(string)
 
 
 def _search_limit_error_message(count: int, name: str) -> str:
@@ -215,6 +226,40 @@ async def fetch_transactions(
             queue.task_done()
 
     yield end
+
+
+async def backfill_transactions(
+        braintree_gateway: BraintreeGateway,
+        window_size: int,
+        log: Logger,
+        page: PageCursor | None,
+        cutoff: LogCursor,
+) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
+    assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    start = _str_to_dt(page)
+    end = min(start + timedelta(hours=window_size), cutoff)
+
+    if start >= cutoff:
+        return
+
+    collection: ResourceCollection = await asyncio.to_thread(
+        braintree_gateway.transaction.search,
+        TransactionSearch.created_at.between(start, end),
+    )
+
+    if collection.maximum_size >= TRANSACTION_SEARCH_LIMIT:
+        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "transactions"))
+
+    async for object in _async_iterator_wrapper(collection):
+        doc = Transaction.model_validate(_braintree_object_to_dict(object))
+
+        # Yield the document if it has been updated before the cutoff (i.e. the incremental task won't capture it).
+        if doc.updated_at < cutoff:
+            yield doc
+
+    yield _dt_to_str(end)
 
 
 async def fetch_customers(
