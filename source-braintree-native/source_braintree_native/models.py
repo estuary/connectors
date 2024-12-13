@@ -78,6 +78,10 @@ class IncrementalResource(BaseDocument, extra="allow"):
     created_at: AwareDatetime
 
 
+class Transaction(IncrementalResource):
+    updated_at: AwareDatetime
+
+
 IncrementalResourceFetchChangesFn = Callable[
     [BraintreeGateway, int, Logger, LogCursor],
     AsyncGenerator[IncrementalResource | LogCursor, None],
