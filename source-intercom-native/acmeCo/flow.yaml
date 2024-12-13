@@ -1,0 +1,46 @@
+---
+collections:
+  acmeCo/admins:
+    schema: admins.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/companies:
+    schema: companies.schema.yaml
+    key:
+      - /id
+  acmeCo/company_attributes:
+    schema: company_attributes.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/company_segments:
+    schema: company_segments.schema.yaml
+    key:
+      - /id
+  acmeCo/contact_attributes:
+    schema: contact_attributes.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/contacts:
+    schema: contacts.schema.yaml
+    key:
+      - /id
+  acmeCo/conversation_parts:
+    schema: conversation_parts.schema.yaml
+    key:
+      - /id
+  acmeCo/conversations:
+    schema: conversations.schema.yaml
+    key:
+      - /id
+  acmeCo/segments:
+    schema: segments.schema.yaml
+    key:
+      - /id
+  acmeCo/tags:
+    schema: tags.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/teams:
+    schema: teams.schema.yaml
+    key:
+      - /_meta/row_id
