@@ -158,7 +158,7 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 	if err != nil {
 		t.Fatalf("unable to begin transaction: %v", err)
 	}
-	log.WithFields(log.Fields{"table": table, "count": len(rows), "first": rows[0]}).Debug("inserting data")
+	log.WithFields(log.Fields{"table": table, "count": len(rows)}).Debug("inserting data")
 	var query = fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
 	for _, row := range rows {
 		log.WithFields(log.Fields{"table": table, "row": row}).Trace("inserting row")
