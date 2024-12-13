@@ -12,6 +12,7 @@ from braintree import (
     )
 from braintree.attribute_getter import AttributeGetter
 from braintree.paginated_collection import PaginatedCollection
+from braintree.search import Search
 from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator
@@ -27,6 +28,18 @@ from .models import (
 # the connector could have missed data and we'll need to use smaller date windows.
 SEARCH_LIMIT = 10_000
 TRANSACTION_SEARCH_LIMIT = 50_000
+
+TRANSACTION_SEARCH_FIELDS = [
+    'authorization_expired_at',
+    'authorized_at',
+    'created_at',
+    'failed_at',
+    'gateway_rejected_at',
+    'processor_declined_at',
+    'settled_at',
+    'submitted_for_settlement_at',
+    'voided_at',
+]
 
 CONVENIENCE_OBJECTS = [
     'gateway'
@@ -108,6 +121,66 @@ async def snapshot_resources(
         yield FullRefreshResource.model_validate(_braintree_object_to_dict(object))
 
 
+async def _fetch_transaction_ids_for_single_field(
+    field: str,
+    braintree_gateway: BraintreeGateway,
+    start: datetime,
+    end: datetime,
+    log: Logger,
+) -> list[str]:
+
+    search_criteria: Search.RangeNodeBuilder = getattr(TransactionSearch, field)
+
+    collection: ResourceCollection = await asyncio.to_thread(
+        braintree_gateway.transaction.search,
+        search_criteria.between(start, end),
+    )
+
+    if collection.maximum_size >= TRANSACTION_SEARCH_LIMIT:
+        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "transactions"))
+
+    return collection.ids
+
+
+async def _fetch_unique_updated_transaction_ids(
+    braintree_gateway: BraintreeGateway,
+    start: datetime,
+    end: datetime,
+    log: Logger,
+) -> list[str]:
+    async with asyncio.TaskGroup() as tg:
+        tasks = [tg.create_task(_fetch_transaction_ids_for_single_field(
+            field,
+            braintree_gateway,
+            start,
+            end,
+            log
+        )) for field in TRANSACTION_SEARCH_FIELDS]
+
+    id_set: set[str] = set()
+    for task in tasks:
+        for id in task.result():
+            id_set.add(id)
+
+    return list(id_set)
+
+
+async def _fetch_transaction_batch(
+        braintree_gateway: BraintreeGateway,
+        ids: list[str],
+        queue: asyncio.Queue,
+        log: Logger,
+):
+    collection: ResourceCollection = await asyncio.to_thread(
+        braintree_gateway.transaction.search,
+        TransactionSearch.ids.in_list(ids),
+    )
+
+    async for object in _async_iterator_wrapper(collection):
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
+        await queue.put(doc)
+
+
 async def fetch_transactions(
         braintree_gateway: BraintreeGateway,
         window_size: int,
@@ -115,29 +188,33 @@ async def fetch_transactions(
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
-    most_recent_created_at = log_cursor
     window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
-    collection: ResourceCollection = await asyncio.to_thread(
-        braintree_gateway.transaction.search,
-        TransactionSearch.created_at.between(log_cursor, end),
+    ids = await _fetch_unique_updated_transaction_ids(
+        braintree_gateway,
+        log_cursor,
+        end,
+        log,
     )
 
-    if collection.maximum_size >= TRANSACTION_SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "transactions"))
+    queue = asyncio.Queue(maxsize=10)
 
-    async for object in _async_iterator_wrapper(collection):
-        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
+    async with asyncio.TaskGroup() as tg:
+        for index in range(0, len(ids), TRANSACTION_SEARCH_LIMIT):
+            tg.create_task(_fetch_transaction_batch(
+                braintree_gateway,
+                ids[index:index+TRANSACTION_SEARCH_LIMIT],
+                queue,
+                log,
+            ))
 
-        if doc.created_at > log_cursor:
+        for _ in range(len(ids)):
+            doc: IncrementalResource = await queue.get()
             yield doc
-            most_recent_created_at = doc.created_at
+            queue.task_done()
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
-        yield most_recent_created_at
+    yield end
 
 
 async def fetch_customers(
