@@ -289,6 +289,7 @@ async def fetch_changes(
                         log.info("Automatically triggering a backfill due to ORA-30052 (low retention period of redo logs has caused a gap in data)")
                         yield Triggers.BACKFILL
                     else:
+                        log.warning("query failed", query)
                         raise
 
                 cols = [col[0] for col in c.description]
