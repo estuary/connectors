@@ -31,6 +31,7 @@ on:
       - "source-front/**"
       - "source-genesys/**"
       - "source-braintree-native/**"
+      - "source-intercom-native/**"
 
   pull_request:
     branches: [main]
@@ -64,6 +65,7 @@ on:
       - "source-front/**"
       - "source-genesys/**"
       - "source-braintree-native/**"
+      - "source-intercom-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -180,6 +182,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-braintree-native
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-intercom-native
             type: capture
             version: v1
             usage_rate: "1.0"
