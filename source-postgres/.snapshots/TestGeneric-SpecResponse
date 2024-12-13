@@ -93,6 +93,11 @@
             "title": "Minimum Backfill XID",
             "description": "Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases.",
             "pattern": "^[0-9]+$"
+          },
+          "read_only_capture": {
+            "type": "boolean",
+            "title": "Read-Only Capture",
+            "description": "When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."
           }
         },
         "additionalProperties": false,
