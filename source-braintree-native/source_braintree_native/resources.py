@@ -1,7 +1,7 @@
 import braintree
 from braintree import BraintreeGateway
 from braintree.exceptions.authentication_error import AuthenticationError
-from datetime import timedelta
+from datetime import datetime, timedelta, UTC
 import functools
 from logging import Logger
 
@@ -20,8 +20,10 @@ from .models import (
 )
 
 from .api import (
+    _dt_to_str,
     snapshot_resources,
     fetch_transactions,
+    backfill_transactions,
     fetch_credit_card_verifications,
     fetch_customers,
     fetch_disputes,
@@ -43,7 +45,6 @@ INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn]] = [
     ("customers", fetch_customers),
     ("disputes", fetch_disputes),
     ("subscriptions", fetch_subscriptions),
-    ("transactions", fetch_transactions),
 ]
 
 
@@ -159,10 +160,59 @@ def incremental_resources(
     ]
 
 
+def transactions(
+        log: Logger, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+            gateway: BraintreeGateway,
+            window_size: int,
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_transactions,
+                gateway,
+                window_size,
+            ),
+            fetch_page=functools.partial(
+                backfill_transactions,
+                gateway,
+                window_size,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
+
+    return common.Resource(
+        name='transactions',
+        key=["/id"],
+        model=IncrementalResource,
+        open=functools.partial(open, _create_gateway(config), config.advanced.window_size),
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=_dt_to_str(config.start_date), cutoff=cutoff)
+        ),
+        initial_config=ResourceConfig(
+            name='transactions', interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     return [
         *full_refresh_resources(log, config),
         *incremental_resources(log, config),
+        transactions(log, config),
     ]
