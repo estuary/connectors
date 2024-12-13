@@ -1,0 +1,57 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-intercom-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_intercom_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: admins
+          interval: PT5M
+        target: acmeCo/admins
+      - resource:
+          name: tags
+          interval: PT5M
+        target: acmeCo/tags
+      - resource:
+          name: teams
+          interval: PT5M
+        target: acmeCo/teams
+      - resource:
+          name: company_attributes
+          interval: PT5M
+        target: acmeCo/company_attributes
+      - resource:
+          name: contact_attributes
+          interval: PT5M
+        target: acmeCo/contact_attributes
+      - resource:
+          name: contacts
+          interval: PT5M
+        target: acmeCo/contacts
+      - resource:
+          name: conversations
+          interval: PT5M
+        target: acmeCo/conversations
+      - resource:
+          name: conversation_parts
+          interval: PT5M
+        target: acmeCo/conversation_parts
+      - resource:
+          name: segments
+          interval: PT5M
+        target: acmeCo/segments
+      - resource:
+          name: companies
+          interval: PT5M
+        target: acmeCo/companies
+      - resource:
+          name: company_segments
+          interval: PT5M
+        target: acmeCo/company_segments
