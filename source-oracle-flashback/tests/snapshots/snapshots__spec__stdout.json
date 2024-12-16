@@ -238,6 +238,7 @@
     },
     "documentationUrl": "https://go.estuary.dev/source-oracle-flashback",
     "resourcePathPointers": [
+      "/schema",
       "/name"
     ]
   }
