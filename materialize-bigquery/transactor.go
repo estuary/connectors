@@ -86,7 +86,7 @@ func newTransactor(
 			fieldSchemas[f.Name] = f
 		}
 
-		if err = t.addBinding(binding, fieldSchemas); err != nil {
+		if err = t.addBinding(binding, fieldSchemas, &ep.Dialect); err != nil {
 			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -103,7 +103,7 @@ func newTransactor(
 	return t, opts, nil
 }
 
-func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema) error {
+func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema, dialect *sql.Dialect) error {
 	loadSchema, err := schemaForCols(target.KeyPtrs(), fieldSchemas)
 	if err != nil {
 		return err
@@ -115,9 +115,10 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 	}
 
 	b := &binding{
-		target:    target,
-		loadFile:  newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, loadSchema),
-		storeFile: newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, storeSchema),
+		target:      target,
+		loadFile:    newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, loadSchema),
+		storeFile:   newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, storeSchema),
+		mergeBounds: sql.NewMergeBoundsBuilder(target, dialect.Literal),
 	}
 
 	for _, m := range []struct {
@@ -127,7 +128,6 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		{&b.tempTableName, tplTempTableName},
 		{&b.loadQuerySQL, tplLoadQuery},
 		{&b.storeInsertSQL, tplStoreInsert},
-		{&b.storeUpdateSQL, tplStoreUpdate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -297,6 +297,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		} else if err = b.storeFile.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
+		b.mergeBounds.NextStore(it.Key)
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
@@ -358,7 +359,13 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 		if !b.mustMerge {
 			subqueries = append(subqueries, b.storeInsertSQL)
 		} else {
-			subqueries = append(subqueries, b.storeUpdateSQL)
+			if bounds, err := b.mergeBounds.Build(); err != nil {
+				return fmt.Errorf("building merge bounds: %w", err)
+			} else if mergeQuery, err := renderMergeQueryTemplate(b.target, bounds); err != nil {
+				return fmt.Errorf("rendering merge query template: %w", err)
+			} else {
+				subqueries = append(subqueries, mergeQuery)
+			}
 		}
 
 		// Reset for the next round.
