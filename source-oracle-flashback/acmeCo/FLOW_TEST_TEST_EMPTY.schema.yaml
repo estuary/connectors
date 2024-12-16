@@ -11,9 +11,7 @@ $defs:
         title: Op
         type: string
       source:
-        anyOf:
-          - $ref: "#/$defs/Source"
-          - type: "null"
+        $ref: "#/$defs/Source"
     required:
       - op
       - source
@@ -46,9 +44,6 @@ properties:
   _meta:
     allOf:
       - $ref: "#/$defs/Meta"
-    default:
-      op: u
-      source: ~
     description: Document metadata
   ID:
     anyOf:
@@ -57,5 +52,7 @@ properties:
     default: ~
     format: number
     title: Id
+required:
+  - _meta
 title: TEST_EMPTY
 type: object
