@@ -103,6 +103,47 @@ def _braintree_object_to_dict(braintree_object):
         return data
 
 
+async def _determine_window_end(
+        search_method,
+        search_range_node_builder: Search.RangeNodeBuilder,
+        start: datetime,
+        initial_end: datetime,
+        search_limit: int,
+        log: Logger,
+) -> tuple[datetime, ResourceCollection]:
+    end = initial_end
+
+    while True:
+        collection: ResourceCollection = await asyncio.to_thread(
+            search_method,
+            search_range_node_builder.between(start, end),
+        )
+
+        if collection.maximum_size < search_limit:
+            break
+
+        window_size = (end - start) / 2
+
+        # Braintree's datetimes have a resolution of seconds, so we remove microseconds from the window size.
+        window_size = window_size - timedelta(microseconds=window_size.microseconds)
+
+        log.debug(f"Number of results exceeds search limit. Reducing window size.", {
+            "start": start,
+            "end": end,
+            "reduced end": start + window_size,
+            "search limit": search_limit,
+        })
+
+        # It's unlikely a user will have enough data in Braintree that the connector will reduce the window size below 1 second,
+        # but if it does happen the connector should raise an error since that stream will be stuck.
+        if window_size < timedelta(seconds=1):
+            raise RuntimeError("Window size is smaller than Braintree's datetime resolution of 1 second. Contact Estuary support for help addressing this error.")
+
+        end = start + window_size
+
+    return (end, collection)
+
+
 # Braintree's SDK makes synchronous API requests, which prevents multiple streams from
 # sending concurrent API requests. asyncio.to_thread is used as a wrapper to run these
 # synchronous API calls in a separate thread and avoid blocking the main thread's event loop.
@@ -181,8 +222,14 @@ async def fetch_transactions(
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
-    window_end = log_cursor + timedelta(hours=window_size)
-    end = min(window_end, datetime.now(tz=UTC))
+    end, _ = await _determine_window_end(
+        search_method=braintree_gateway.transaction.search,
+        search_range_node_builder=TransactionSearch.created_at,
+        start=log_cursor,
+        initial_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC)),
+        search_limit=TRANSACTION_SEARCH_LIMIT,
+        log=log
+    )
 
     ids = await _fetch_unique_updated_transaction_ids(
         braintree_gateway,
@@ -216,18 +263,18 @@ async def backfill_transactions(
     assert isinstance(cutoff, datetime)
 
     start = _str_to_dt(page)
-    end = min(start + timedelta(hours=window_size), cutoff)
 
     if start >= cutoff:
         return
 
-    collection: ResourceCollection = await asyncio.to_thread(
-        braintree_gateway.transaction.search,
-        TransactionSearch.created_at.between(start, end),
+    end, collection = await _determine_window_end(
+        search_method=braintree_gateway.transaction.search,
+        search_range_node_builder=TransactionSearch.created_at,
+        start=start,
+        initial_end=min(start + timedelta(hours=window_size), cutoff),
+        search_limit=TRANSACTION_SEARCH_LIMIT,
+        log=log
     )
-
-    if collection.maximum_size >= TRANSACTION_SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "transactions"))
 
     async for object in _async_iterator_wrapper(collection):
         doc = Transaction.model_validate(_braintree_object_to_dict(object))
@@ -247,16 +294,14 @@ async def fetch_customers(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(hours=window_size)
-    end = min(window_end, datetime.now(tz=UTC))
-
-    collection: ResourceCollection = await asyncio.to_thread(
-        braintree_gateway.customer.search,
-        CustomerSearch.created_at.between(log_cursor, end),
+    end, collection = await _determine_window_end(
+        search_method=braintree_gateway.customer.search,
+        search_range_node_builder=CustomerSearch.created_at,
+        start=log_cursor,
+        initial_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC)),
+        search_limit=SEARCH_LIMIT,
+        log=log
     )
-
-    if collection.maximum_size >= SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "customers"))
 
     async for object in _async_iterator_wrapper(collection):
         doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
@@ -265,10 +310,10 @@ async def fetch_customers(
             yield doc
             most_recent_created_at = doc.created_at
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    else:
+        yield end
 
 
 async def fetch_credit_card_verifications(
@@ -279,16 +324,14 @@ async def fetch_credit_card_verifications(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(hours=window_size)
-    end = min(window_end, datetime.now(tz=UTC))
-
-    collection: ResourceCollection = await asyncio.to_thread(
-        braintree_gateway.verification.search,
-        CreditCardVerificationSearch.created_at.between(log_cursor, end),
+    end, collection = await _determine_window_end(
+        search_method=braintree_gateway.verification.search,
+        search_range_node_builder=CreditCardVerificationSearch.created_at,
+        start=log_cursor,
+        initial_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC)),
+        search_limit=SEARCH_LIMIT,
+        log=log
     )
-
-    if collection.maximum_size >= SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "credit card verifications"))
 
     async for object in _async_iterator_wrapper(collection):
         doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
@@ -297,10 +340,11 @@ async def fetch_credit_card_verifications(
             yield doc
             most_recent_created_at = doc.created_at
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    else:
+        yield end
+
 
 async def fetch_subscriptions(
         braintree_gateway: BraintreeGateway,
@@ -310,16 +354,14 @@ async def fetch_subscriptions(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(hours=window_size)
-    end = min(window_end, datetime.now(tz=UTC))
-
-    collection: ResourceCollection = await asyncio.to_thread(
-        braintree_gateway.subscription.search,
-        SubscriptionSearch.created_at.between(log_cursor, end),
+    end, collection = await _determine_window_end(
+        search_method=braintree_gateway.subscription.search,
+        search_range_node_builder=SubscriptionSearch.created_at,
+        start=log_cursor,
+        initial_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC)),
+        search_limit=SEARCH_LIMIT,
+        log=log
     )
-
-    if collection.maximum_size >= SEARCH_LIMIT:
-        raise RuntimeError(_search_limit_error_message(collection.maximum_size, "subscriptions"))
 
     async for object in _async_iterator_wrapper(collection):
         doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
@@ -328,10 +370,10 @@ async def fetch_subscriptions(
             yield doc
             most_recent_created_at = doc.created_at
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    else:
+        yield end
 
 
 async def fetch_disputes(
