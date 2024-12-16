@@ -102,7 +102,7 @@ var databricksDialect = func() sql.Dialect {
 				return sql.JoinTransform(".", sql.PassThroughTransform(notQuoted, quoteTf))(path...)
 			}
 		}),
-		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "\\'")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "\\'")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
