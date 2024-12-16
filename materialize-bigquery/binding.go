@@ -12,13 +12,13 @@ type binding struct {
 	target         sql.Table
 	loadQuerySQL   string
 	storeInsertSQL string
-	storeUpdateSQL string
 
 	loadFile      *stagedFile
 	storeFile     *stagedFile
 	tempTableName string
 	hasData       bool
 	mustMerge     bool
+	mergeBounds   *sql.MergeBoundsBuilder
 }
 
 // bindingDocument is used by the load operation to fetch binding flow_document values

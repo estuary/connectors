@@ -228,9 +228,10 @@ SELECT {{ range $ind, $col := $.Columns }}
 {{ define "storeUpdate" -}}
 MERGE INTO {{ $.Identifier }} AS l
 USING {{ template "tempTableName" . }} AS r
-ON {{ range $ind, $key := $.Keys }}
-{{- if $ind }} AND {{end -}}
-	l.{{$key.Identifier}} = r.c{{$ind}}
+ON {{ range $ind, $bound := $.Bounds }}
+	{{ if $ind -}} AND {{end -}}
+	l.{{$bound.Identifier}} = r.c{{$ind}}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
 {{- if $.Document }}
 WHEN MATCHED AND r.c{{ Add (len $.Columns) -1 }}='"delete"' THEN
@@ -338,3 +339,20 @@ UPDATE {{ Identifier $.TablePath }}
 	tplStoreInsert       = tplAll.Lookup("storeInsert")
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
 )
+
+type mergeQueryInput struct {
+	sql.Table
+	Bounds []sql.MergeBound
+}
+
+func renderMergeQueryTemplate(table sql.Table, bounds []sql.MergeBound) (string, error) {
+	var w strings.Builder
+	if err := tplStoreUpdate.Execute(&w, &mergeQueryInput{
+		Table:  table,
+		Bounds: bounds,
+	}); err != nil {
+		return "", err
+	}
+
+	return w.String(), nil
+}
