@@ -121,7 +121,7 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 				isSimpleIdentifier,
 				sql.QuoteTransform(`"`, `""`),
 			))),
-		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(_ int) string {
 			return "?"
 		}),
