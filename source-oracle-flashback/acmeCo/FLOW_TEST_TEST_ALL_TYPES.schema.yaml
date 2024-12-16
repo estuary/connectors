@@ -11,9 +11,7 @@ $defs:
         title: Op
         type: string
       source:
-        anyOf:
-          - $ref: "#/$defs/Source"
-          - type: "null"
+        $ref: "#/$defs/Source"
     required:
       - op
       - source
@@ -46,9 +44,6 @@ properties:
   _meta:
     allOf:
       - $ref: "#/$defs/Meta"
-    default:
-      op: u
-      source: ~
     description: Document metadata
   ID:
     description: Primary Key
@@ -75,6 +70,19 @@ properties:
     default: ~
     format: number
     title: Float 126
+  FLOAT_16:
+    anyOf:
+      - type: number
+      - type: "null"
+    default: ~
+    title: Float 16
+  FLOAT_63:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    format: number
+    title: Float 63
   INTEG:
     anyOf:
       - type: string
@@ -199,6 +207,7 @@ properties:
     default: ~
     title: Vchar2
 required:
+  - _meta
   - ID
 title: TEST_ALL_TYPES
 type: object

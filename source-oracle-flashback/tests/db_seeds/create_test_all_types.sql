@@ -11,6 +11,8 @@ CREATE TABLE flow_test.test_all_types(
   integ INTEGER,
 	double_precision DOUBLE PRECISION,
 	float_126 FLOAT(126),
+	float_63 FLOAT(63),
+	float_16 FLOAT(16),
 	real_num REAL,
 	datetime DATE,
 	ts TIMESTAMP,

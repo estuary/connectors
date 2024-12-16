@@ -119,6 +119,31 @@
           "format": "number",
           "title": "Float 126"
         },
+        "FLOAT_16": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Float 16"
+        },
+        "FLOAT_63": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "format": "number",
+          "title": "Float 63"
+        },
         "INTEG": {
           "anyOf": [
             {
