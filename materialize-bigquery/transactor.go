@@ -276,6 +276,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var b = t.bindings[it.Binding]
 
+		if it.Exists {
+			b.mustMerge = true
+		}
+
 		var flowDocument = it.RawJSON
 		if t.cfg.HardDelete && it.Delete {
 			if it.Exists {
@@ -351,7 +355,7 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 
 		edcTableDefs[b.tempTableName] = b.storeFile.edc()
 
-		if b.target.DeltaUpdates {
+		if !b.mustMerge {
 			subqueries = append(subqueries, b.storeInsertSQL)
 		} else {
 			subqueries = append(subqueries, b.storeUpdateSQL)
@@ -359,6 +363,7 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 
 		// Reset for the next round.
 		b.hasData = false
+		b.mustMerge = false
 	}
 
 	// Complete the transaction and return the appropriate error.
