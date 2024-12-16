@@ -555,9 +555,15 @@ async def fetch_search_objects(
 
         for r in result.results:
             this_mod_time = r.properties.hs_lastmodifieddate
+
+            if until and this_mod_time > until:
+                log.info(
+                    "ignoring search result with record modification time that is later than maximum search window",
+                    {id: r.id, "this_mod_time": this_mod_time, "until": until},
+                )
+                continue
+
             if this_mod_time < max_updated:
-                # This should never happen since results are requested in
-                # ASCENDING order by the last modified time.
                 raise Exception(f"last modified date {this_mod_time} is before {max_updated} for {r.id}")
             
             max_updated = this_mod_time
