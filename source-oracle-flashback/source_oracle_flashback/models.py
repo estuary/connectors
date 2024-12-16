@@ -116,6 +116,8 @@ class EndpointConfig(BaseModel):
 
 
 class ResourceConfig(GenericResourceConfig):
+    PATH_POINTERS: ClassVar[list[str]] = ["/schema", "/name"]
+
     schema_name: str = Field(
         alias='schema',
         default=False,
