@@ -18,6 +18,7 @@ type binding struct {
 	storeFile     *stagedFile
 	tempTableName string
 	hasData       bool
+	mustMerge     bool
 }
 
 // bindingDocument is used by the load operation to fetch binding flow_document values
