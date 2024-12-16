@@ -34,10 +34,44 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	)
 
+	{
+		tpl := templates.mergeInto
+		tbl := tables[0]
+		require.False(t, tbl.DeltaUpdates)
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		bounds := []sql.MergeBound{
+			{
+				Identifier:   tbl.Keys[0].Identifier,
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
+			},
+			{
+				Identifier: tbl.Keys[1].Identifier,
+				// No bounds - as would be the case for a boolean key, which
+				// would be a very weird key, but technically allowed.
+			},
+			{
+				Identifier:   tbl.Keys[2].Identifier,
+				LiteralLower: testDialect.Literal("aGVsbG8K"),
+				LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo="),
+			},
+		}
+
+		tf := mergeQueryInput{
+			Table:  tbl,
+			File:   "test-file",
+			Bounds: bounds,
+		}
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &tf))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
 	for _, tpl := range []*template.Template{
 		templates.loadQuery,
 		templates.copyInto,
-		templates.mergeInto,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
