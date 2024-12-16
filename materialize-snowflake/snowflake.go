@@ -293,10 +293,11 @@ type binding struct {
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		stage     *stagedFile
-		mergeInto string
-		copyInto  string
-		mustMerge bool
+		stage       *stagedFile
+		mergeInto   string
+		copyInto    string
+		mustMerge   bool
+		mergeBounds *sql.MergeBoundsBuilder
 	}
 }
 
@@ -306,11 +307,12 @@ func (d *transactor) addBinding(target sql.Table) error {
 
 	b.load.stage = newStagedFile(os.TempDir())
 	b.store.stage = newStagedFile(os.TempDir())
+	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target, d.ep.Dialect.Literal)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
 		var pipeName string
 		var err error
-		if pipeName, err = RenderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.pipeName); err != nil {
+		if pipeName, err = renderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.pipeName); err != nil {
 			return fmt.Errorf("pipeName template: %w", err)
 		} else {
 			pipeName = strings.ToUpper(strings.Trim(pipeName, "`"))
@@ -349,7 +351,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
-		} else if subqueries[i], err = RenderTableAndFileTemplate(b.target, dir, d.templates.loadQuery); err != nil {
+		} else if subqueries[i], err = renderTableAndFileTemplate(b.target, dir, d.templates.loadQuery); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			filesToCleanup = append(filesToCleanup, dir)
@@ -465,6 +467,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		} else if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
+		b.store.mergeBounds.NextStore(it.Key)
 	}
 
 	// Upload the staged files and build a list of merge and copy into queries that need to be run
@@ -485,7 +488,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			if mergeIntoQuery, err := RenderTableAndFileTemplate(b.target, dir, d.templates.mergeInto); err != nil {
+			if bounds, err := b.store.mergeBounds.Build(); err != nil {
+				return nil, fmt.Errorf("building merge bounds: %w", err)
+			} else if mergeIntoQuery, err := renderMergeQueryTemplate(d.templates.mergeInto, b.target, dir, bounds); err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			} else {
 				d.cp[b.target.StateKey] = &checkpointItem{
@@ -511,7 +516,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// it means if the spec has been updated, we will end up creating a new pipe
 			if !exists {
 				log.WithField("name", b.pipeName).Info("store: creating pipe")
-				if createPipe, err := RenderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.createPipe); err != nil {
+				if createPipe, err := renderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.createPipe); err != nil {
 					return nil, fmt.Errorf("createPipe template: %w", err)
 				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
 					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)
@@ -539,7 +544,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 
 		} else {
-			if copyIntoQuery, err := RenderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
+			if copyIntoQuery, err := renderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
 				return nil, fmt.Errorf("copyInto template: %w", err)
 			} else {
 				d.cp[b.target.StateKey] = &checkpointItem{
@@ -586,7 +591,7 @@ type copyHistoryRow struct {
 }
 
 func (d *transactor) copyHistory(ctx context.Context, tableName string, fileNames []string) ([]copyHistoryRow, error) {
-	query, err := RenderCopyHistoryTemplate(tableName, fileNames, d.templates.copyHistory)
+	query, err := renderCopyHistoryTemplate(tableName, fileNames, d.templates.copyHistory)
 	if err != nil {
 		return nil, fmt.Errorf("snowpipe: rendering copy history: %w", err)
 	}

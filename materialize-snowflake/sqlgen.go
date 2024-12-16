@@ -280,9 +280,10 @@ USING (
 	{{- end }}
 	FROM {{ $.File }}
 ) AS r
-ON {{ range $ind, $key := $.Table.Keys }}
-	{{- if $ind }} AND {{ end -}}
-	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+ON {{ range $ind, $bound := $.Bounds }}
+	{{ if $ind -}} AND {{ end -}}
+	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{- if $.Table.Document }}
 WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='delete' THEN
@@ -347,7 +348,7 @@ type tableShardVersion struct {
 	Version       string
 }
 
-func RenderTableShardVersionTemplate(table sql.Table, shardKeyBegin uint32, version string, tpl *template.Template) (string, error) {
+func renderTableShardVersionTemplate(table sql.Table, shardKeyBegin uint32, version string, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	var keyBegin = fmt.Sprintf("%08x", shardKeyBegin)
 	if err := tpl.Execute(&w, &tableShardVersion{Table: table, ShardKeyBegin: keyBegin, Version: version}); err != nil {
@@ -368,7 +369,7 @@ type tableAndFile struct {
 	File  string
 }
 
-func RenderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {
+func renderTableAndFileTemplate(table sql.Table, file string, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &tableAndFile{Table: table, File: file}); err != nil {
 		return "", err
@@ -387,7 +388,7 @@ type copyHistory struct {
 	Files     []string
 }
 
-func RenderCopyHistoryTemplate(tableName string, files []string, tpl *template.Template) (string, error) {
+func renderCopyHistoryTemplate(tableName string, files []string, tpl *template.Template) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &copyHistory{TableName: tableName, Files: files}); err != nil {
 		return "", err
@@ -399,4 +400,23 @@ func RenderCopyHistoryTemplate(tableName string, files []string, tpl *template.T
 		"files":     files,
 	}).Debug("rendered template")
 	return s, nil
+}
+
+type mergeQueryInput struct {
+	Table  sql.Table
+	File   string
+	Bounds []sql.MergeBound
+}
+
+func renderMergeQueryTemplate(tpl *template.Template, table sql.Table, file string, bounds []sql.MergeBound) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &mergeQueryInput{
+		Table:  table,
+		File:   file,
+		Bounds: bounds,
+	}); err != nil {
+		return "", err
+	}
+
+	return w.String(), nil
 }
