@@ -559,7 +559,7 @@ async def fetch_search_objects(
             if until and this_mod_time > until:
                 log.info(
                     "ignoring search result with record modification time that is later than maximum search window",
-                    {id: r.id, "this_mod_time": this_mod_time, "until": until},
+                    {"id": r.id, "this_mod_time": this_mod_time, "until": until},
                 )
                 continue
 
