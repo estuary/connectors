@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-google-analytics-data-api:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_google_analytics_data_api
+        config: config.yaml
+    bindings: []
