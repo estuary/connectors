@@ -194,6 +194,18 @@
           "format": "number",
           "title": "Num"
         },
+        "NUM104": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Num104"
+        },
         "NUM15": {
           "anyOf": [
             {
