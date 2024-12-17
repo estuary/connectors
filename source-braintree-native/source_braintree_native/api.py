@@ -384,15 +384,15 @@ async def fetch_disputes(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    # The start date must be shifted back 1 day since we have to query Braintree using the received_date field,
-    # which is less granular than the created_at cursor field (date vs. datetime).
-    start = log_cursor - timedelta(days=1)
     window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
+    # Braintree does not let us search disputes based on the created_at field. I assume received_at is an adequate proxy
+    # for created_at, although received_at is less granular than created_at (date vs. datetime). We'll always receive
+    # results we've already seen in this search, but we filter those out client-side.
     search_result = await asyncio.to_thread(
         braintree_gateway.dispute.search,
-        DisputeSearch.received_date.between(start, end),
+        DisputeSearch.received_date.between(log_cursor, end),
     )
 
     count = 0
@@ -403,12 +403,14 @@ async def fetch_disputes(
 
         if doc.created_at > log_cursor:
             yield doc
-            most_recent_created_at = doc.created_at
+
+            if doc.created_at > most_recent_created_at:
+                most_recent_created_at = doc.created_at
 
     if count >= SEARCH_LIMIT:
         raise RuntimeError(_search_limit_error_message(count, "disputes"))
 
-    if end == window_end:
-        yield window_end
-    elif most_recent_created_at > log_cursor:
+    if most_recent_created_at > log_cursor:
         yield most_recent_created_at
+    else:
+        yield end
