@@ -495,6 +495,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					Version:   d.version,
 				}
 			}
+			// Reset for next round.
+			b.store.mustMerge = false
 		} else if b.pipeName != "" {
 			var pipeNameParts = strings.Split(b.pipeName, ".")
 			var pipeNameLastPart = pipeNameParts[len(pipeNameParts)-1]
