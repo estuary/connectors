@@ -291,7 +291,7 @@ def build_table(
         field_type: type[int | str | datetime | float | Decimal]
         field_schema_extra: dict | None = None
 
-        if col.data_type == col.Type.NUMBER and col.data_scale == 0 :
+        if col.data_type == col.Type.NUMBER and col.data_scale == 0:
             # data_precision: 0 defaults to precision 38
             if col.data_precision > 18 or col.data_precision == 0:
                 field_type = Decimal

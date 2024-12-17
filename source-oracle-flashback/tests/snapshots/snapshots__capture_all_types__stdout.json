@@ -12,6 +12,7 @@
       "INTERVAL_DAY": "+01 02:03:04.567000",
       "INTERVAL_YEAR": "+1234-05",
       "NUM": "123456789.123456789",
+      "NUM104": 123456.3456,
       "NUM15": 123456789123456,
       "NUM19": "1234567891234567891",
       "NVCHAR2": "nvarchar2 value with unicode characters \u2764\ufe0f \ud83d\udd25\ufe0f",
