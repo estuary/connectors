@@ -92,6 +92,25 @@ ALTER TABLE "a-schema".key_value ALTER COLUMN
 	second_required_column DROP NOT NULL;
 --- End alter table drop not nulls ---
 
+--- Begin "a-schema".key_value mergeInto ---
+MERGE INTO "a-schema".key_value AS l
+USING (
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
+	FROM test-file
+) AS r
+ON 
+	l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
+WHEN MATCHED AND r.flow_document='delete' THEN
+	DELETE
+WHEN MATCHED THEN
+	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
+WHEN NOT MATCHED and r.flow_document!='delete' THEN
+	INSERT (key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger39Chars, r.stringInteger66Chars, r.stringNumber, r.flow_document);
+--- End "a-schema".key_value mergeInto ---
+
 --- Begin "a-schema".key_value loadQuery ---
 SELECT 0, "a-schema".key_value.flow_document
 	FROM "a-schema".key_value
@@ -110,22 +129,6 @@ COPY INTO "a-schema".key_value (
 	FROM test-file
 );
 --- End "a-schema".key_value copyInto ---
-
---- Begin "a-schema".key_value mergeInto ---
-MERGE INTO "a-schema".key_value AS l
-USING (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
-	FROM test-file
-) AS r
-ON l.key1 = r.key1 AND l.key2 = r.key2 AND l."key!binary" = r."key!binary"
-WHEN MATCHED AND r.flow_document='delete' THEN
-	DELETE
-WHEN MATCHED THEN
-	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
-WHEN NOT MATCHED and r.flow_document!='delete' THEN
-	INSERT (key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
-	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger39Chars, r.stringInteger66Chars, r.stringNumber, r.flow_document);
---- End "a-schema".key_value mergeInto ---
 
 --- Begin "a-schema".delta_updates copyInto ---
 COPY INTO "a-schema".delta_updates (

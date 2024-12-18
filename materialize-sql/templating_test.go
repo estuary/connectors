@@ -44,7 +44,7 @@ func newTestDialect() Dialect {
 				},
 				QuoteTransform("\"", "\\\""),
 			))),
-		Literaler: LiteralFn(QuoteTransform("'", "''")),
+		Literaler: ToLiteralFn(QuoteTransform("'", "''")),
 		Placeholderer: PlaceholderFn(func(index int) string {
 			return fmt.Sprintf("$%d", index+1)
 		}),

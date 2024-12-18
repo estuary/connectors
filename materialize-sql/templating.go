@@ -2,9 +2,11 @@ package sql
 
 import (
 	"encoding/base64"
+	"fmt"
 	"strings"
 	"text/template"
 
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -39,4 +41,94 @@ func RenderTableTemplate(table Table, tpl *template.Template) (string, error) {
 	var s = w.String()
 	log.WithField("rendered", s).WithField("table", table).Debug("rendered template")
 	return s, nil
+}
+
+// MergeBound represents an identifier for which a merge query should use an
+// equality comparison for, as well as an optional lower and upper bound for the
+// range of values the merge should apply to in the target table. These value
+// ranges are known for each transaction from the range of observed keys to
+// store, and providing the range hints in the merge query directly may allow
+// for warehouses to do additional optimizations when executing the merge.
+type MergeBound struct {
+	// Identifier is the identifier for the key column this bound applies to,
+	// with the dialect's quoting applied.
+	Identifier string
+	// LiteralLower will be an empty string if no condition should be used,
+	// which is the case for boolean keys.
+	LiteralLower string
+	// LiteralUpper will also be an empty string if no condition should be
+	// used.
+	LiteralUpper string
+}
+
+// MergeBoundsBuilder tracks and generates a MergeBound for each of a binding's
+// key fields.
+type MergeBoundsBuilder struct {
+	table     Table
+	literaler func(any) string
+
+	lower tuple.Tuple
+	upper tuple.Tuple
+}
+
+func NewMergeBoundsBuilder(table Table, literaler func(any) string) *MergeBoundsBuilder {
+	return &MergeBoundsBuilder{
+		table:     table,
+		literaler: literaler,
+	}
+}
+
+// NextStore updates the observed minimum and maximum key for a transaction. It
+// relies on the fact that Stores are sent to materializations in ascending key
+// order, so the first observed Store will have the minimum key and the final
+// observed store will have the maximum key.
+func (b *MergeBoundsBuilder) NextStore(key tuple.Tuple) {
+	if len(key) != len(b.table.Keys) {
+		panic(fmt.Sprintf("application error: %d key fields vs. %d key columns for merge query bounds", len(key), len(b.table.Keys)))
+	}
+
+	if b.lower == nil {
+		b.lower = key
+	}
+	b.upper = key
+}
+
+// Build outputs the computed merge conditions for this transaction and resets
+// the tracked values in preparation for the next transaction.
+func (b *MergeBoundsBuilder) Build() ([]MergeBound, error) {
+	conditions := make([]MergeBound, len(b.lower))
+
+	convertedLower, err := b.table.ConvertKey(b.lower)
+	if err != nil {
+		return nil, fmt.Errorf("converting lower bound: %w", err)
+	}
+	convertedUpper, err := b.table.ConvertKey(b.upper)
+	if err != nil {
+		return nil, fmt.Errorf("converting upper bound: %w", err)
+	}
+
+	for idx, key := range b.table.Keys {
+		conditions[idx] = MergeBound{
+			Identifier: key.Identifier,
+		}
+
+		lower := convertedLower[idx]
+		upper := convertedUpper[idx]
+
+		if _, ok := lower.(bool); ok {
+			// Boolean keys cannot reasonably support bounds for merge queries.
+			// It is assumed that if the lower value is a boolean type then the
+			// upper value must be as well since we do not allow keys with
+			// multiple types in SQL materializations.
+			continue
+		}
+
+		conditions[idx].LiteralLower = b.literaler(lower)
+		conditions[idx].LiteralUpper = b.literaler(upper)
+	}
+
+	b.lower = nil
+	b.upper = nil
+
+	return conditions, nil
 }
