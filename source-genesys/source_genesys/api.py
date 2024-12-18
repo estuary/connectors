@@ -87,13 +87,17 @@ async def _perform_conversation_job(
         domain: str,
         log: Logger,
         start_date: datetime,
-        end_date: datetime = datetime.now(tz=UTC),
+        end_date: datetime | None = None,
 ) -> AsyncGenerator[Conversation, None]:
     """
     Requests the Genesys API to perform an async job & paginates through the results.
 
     API docs - https://developer.genesys.cloud/routing/conversations/conversations-apis#post-api-v2-analytics-conversations-details-jobs
     """
+
+    if end_date is None:
+        end_date = datetime.now(tz=UTC)
+
     # Submit job.
     url = f"{COMMON_API}.{domain}/api/v2/analytics/conversations/details/jobs"
     body = {
