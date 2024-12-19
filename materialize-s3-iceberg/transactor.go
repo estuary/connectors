@@ -247,6 +247,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	var appends []tableAppend
+
 	for _, b := range t.bindings {
 		bindingState := t.state.BindingStates[b.stateKey]
 
@@ -254,21 +256,22 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue // no data for this binding
 		}
 
-		ll := log.WithFields(log.Fields{
-			"table":             pathToFQN(b.path),
-			"previousCheckoint": bindingState.PreviousCheckpoint,
-			"currentCheckpoint": bindingState.CurrentCheckpoint,
+		appends = append(appends, tableAppend{
+			Table:              pathToFQN(b.path),
+			PreviousCheckpoint: bindingState.PreviousCheckpoint,
+			NextCheckpoint:     bindingState.CurrentCheckpoint,
+			FilePaths:          bindingState.FileKeys,
 		})
 
-		ll.Info("starting appendFiles for table")
+		bindingState.FileKeys = nil // reset for next txn
+	}
+
+	if len(appends) > 0 {
 		appendCtx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 		defer cancel()
-		if err := t.catalog.appendFiles(appendCtx, t.materialization, b.path, bindingState.FileKeys, bindingState.PreviousCheckpoint, bindingState.CurrentCheckpoint); err != nil {
-			return nil, fmt.Errorf("appendFiles for %s: %w", b.path, err)
+		if err := t.catalog.appendFiles(appendCtx, t.materialization, appends); err != nil {
+			return nil, fmt.Errorf("appendFiles: %w", err)
 		}
-		ll.Info("finished appendFiles for table")
-
-		bindingState.FileKeys = nil // reset for next txn
 	}
 
 	checkpointJSON, err := json.Marshal(t.state)
