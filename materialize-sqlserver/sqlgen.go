@@ -112,7 +112,7 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 				},
 				sql.QuoteTransform(`"`, `""`),
 			))),
-		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			// parameterIndex starts at 0, but sqlserver parameters start at @p1
 			return fmt.Sprintf("@p%d", index+1)

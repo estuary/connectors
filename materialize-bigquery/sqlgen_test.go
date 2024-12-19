@@ -6,10 +6,11 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSQLGeneration(t *testing.T) {
-	snap, _ := sql.RunSqlGenTests(
+	snap, tables := sql.RunSqlGenTests(
 		t,
 		bqDialect,
 		func(table string, delta bool) sql.Resource {
@@ -25,7 +26,6 @@ func TestSQLGeneration(t *testing.T) {
 				tplCreateTargetTable,
 				tplLoadQuery,
 				tplStoreInsert,
-				tplStoreUpdate,
 			},
 			TplAddColumns:    tplAlterTableColumns,
 			TplDropNotNulls:  tplAlterTableColumns,
@@ -34,6 +34,40 @@ func TestSQLGeneration(t *testing.T) {
 			TplUpdateFence:   tplUpdateFence,
 		},
 	)
+
+	{
+		tpl := tplStoreUpdate
+		tbl := tables[0]
+		require.False(t, tbl.DeltaUpdates)
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		bounds := []sql.MergeBound{
+			{
+				Identifier:   tbl.Keys[0].Identifier,
+				LiteralLower: bqDialect.Literal(int64(10)),
+				LiteralUpper: bqDialect.Literal(int64(100)),
+			},
+			{
+				Identifier: tbl.Keys[1].Identifier,
+				// No bounds - as would be the case for a boolean key, which
+				// would be a very weird key, but technically allowed.
+			},
+			{
+				Identifier:   tbl.Keys[2].Identifier,
+				LiteralLower: bqDialect.Literal("aGVsbG8K"),
+				LiteralUpper: bqDialect.Literal("Z29vZGJ5ZQo="),
+			},
+		}
+
+		tf := mergeQueryInput{
+			Table:  tbl,
+			Bounds: bounds,
+		}
+
+		snap.WriteString("--- Begin " + testcase + " ---\n")
+		require.NoError(t, tpl.Execute(snap, &tf))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
 
 	cupaloy.SnapshotT(t, snap.String())
 }

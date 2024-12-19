@@ -132,7 +132,7 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 				},
 				sql.QuoteTransform(`"`, `""`),
 			))),
-		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			// parameterIndex starts at 0, but postgres (and redshift, which is based on postgres)
 			// parameters start at $1
