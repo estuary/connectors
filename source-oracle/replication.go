@@ -214,7 +214,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 
 	s.redoSequence = redoSequence
 
-	return err
+	return nil
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int64) error {
