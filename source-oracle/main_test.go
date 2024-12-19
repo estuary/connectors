@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -36,7 +37,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func oracleTestBackend(t testing.TB) *testBackend {
+func oracleTestBackend(t testing.TB, configFile string) *testBackend {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
@@ -44,11 +45,15 @@ func oracleTestBackend(t testing.TB) *testBackend {
 	}
 
 	var ctx = context.Background()
-	var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", "config.yaml")
+	var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", configFile)
 	var configRaw, err = sops.Output()
 	require.NoError(t, err)
+	var jq = exec.CommandContext(ctx, "jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+	jq.Stdin = bytes.NewReader(configRaw)
+	cleanedConfig, err := jq.Output()
+	require.NoError(t, err)
 	var config Config
-	err = json.Unmarshal(configRaw, &config)
+	err = json.Unmarshal(cleanedConfig, &config)
 	require.NoError(t, err)
 
 	config.Advanced.BackfillChunkSize = 16
@@ -58,7 +63,7 @@ func oracleTestBackend(t testing.TB) *testBackend {
 	config.SetDefaults("test")
 
 	// Open control connection
-	db, err := connectOracle(ctx, "test", configRaw)
+	db, err := connectOracle(ctx, "test", cleanedConfig)
 	log.WithFields(log.Fields{
 		"user": config.User,
 		"addr": config.Address,
@@ -218,12 +223,17 @@ func argsTuple(row []any) string {
 
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
-	var tb = oracleTestBackend(t)
+	var tb = oracleTestBackend(t, "config.rds.yaml")
 	tests.Run(context.Background(), t, tb)
 }
 
-func TestCapitalizedTables(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t), context.Background()
+func TestGenericPDB(t *testing.T) {
+	var tb = oracleTestBackend(t, "config.pdb.yaml")
+	tests.Run(context.Background(), t, tb)
+}
+
+func testCapitalizedTables(t *testing.T, configFile string) {
+	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
 	tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."USERS"`, tb.config.User))
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."USERS" (id INTEGER PRIMARY KEY, data VARCHAR(2000) NOT NULL)`, tb.config.User))
 	var cs = tb.CaptureSpec(ctx, t)
@@ -245,6 +255,14 @@ func TestCapitalizedTables(t *testing.T) {
 			tests.VerifiedCapture(ctx, t, cs)
 		})
 	})
+}
+
+func TestCapitalizedTables(t *testing.T) {
+	testCapitalizedTables(t, "config.rds.yaml")
+}
+
+func TestCapitalizedTablesPDB(t *testing.T) {
+	testCapitalizedTables(t, "config.pdb.yaml")
 }
 
 func TestConfigURI(t *testing.T) {
