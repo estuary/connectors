@@ -2,12 +2,13 @@ import functools
 import itertools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+import re
 from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import LogCursor, PageCursor, Resource, open_binding
 from estuary_cdk.flow import CaptureBinding
-from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
+from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
 from .api import (
     FetchDelayedFn,
@@ -60,6 +61,9 @@ from .models import (
 )
 
 
+MISSING_SCOPE_REGEX = r"This app hasn't been granted all required scopes to make this call."
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
@@ -92,7 +96,7 @@ async def all_resources(
         for index, n in enumerate(custom_object_names)
     ]
 
-    return [
+    resources =  [
         crm_object_with_associations(Company, Names.companies, Names.companies, http, fetch_recent_companies, fetch_delayed_companies),
         crm_object_with_associations(Contact, Names.contacts, Names.contacts, http, fetch_recent_contacts, fetch_delayed_contacts),
         crm_object_with_associations(Deal, Names.deals, Names.deals, http, fetch_recent_deals, fetch_delayed_deals),
@@ -101,11 +105,24 @@ async def all_resources(
         crm_object_with_associations(Product, Names.products, Names.products, http, fetch_recent_products, fetch_delayed_products),
         crm_object_with_associations(LineItem, Names.line_items, Names.line_items, http, fetch_recent_line_items, fetch_delayed_line_items),
         properties(http, itertools.chain(standard_object_names, custom_object_path_components)),
-        email_events(http),
         deal_pipelines(http),
         owners(http),
         *custom_object_resources,
     ]
+
+    try:
+        async for _ in fetch_recent_email_events(log, http, datetime.now(tz=UTC), None):
+            break
+
+        resources.append(email_events(http))
+    except HTTPError as err:
+        is_missing_scope = err.code == 403 and bool(re.search(MISSING_SCOPE_REGEX, err.message))
+
+        if not is_missing_scope:
+            raise
+
+    return resources
+
 
 def crm_object_with_associations(
     cls: type[CRMObject],
