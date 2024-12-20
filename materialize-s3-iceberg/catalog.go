@@ -211,42 +211,34 @@ func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec
 	}, nil
 }
 
-type tableAppend struct {
-	Table              string   `json:"table"`
-	PreviousCheckpoint string   `json:"prev_checkpoint"`
-	NextCheckpoint     string   `json:"next_checkpoint"`
-	FilePaths          []string `json:"file_paths"`
-}
-
 func (c *catalog) appendFiles(
 	ctx context.Context,
 	materialization string,
-	tableAppends []tableAppend,
+	tablePath []string,
+	filePaths []string,
+	prevCheckpoint string,
+	nextCheckpoint string,
 ) error {
-	input, err := json.Marshal(tableAppends)
-	if err != nil {
-		return nil
-	}
+	fqn := pathToFQN(tablePath)
 
 	b, err := runIcebergctl(
 		ctx,
 		c.cfg,
 		"append-files",
 		materialization,
-		string(input),
+		fqn,
+		prevCheckpoint,
+		nextCheckpoint,
+		strings.Join(filePaths, ","),
 	)
 	if err != nil {
 		return err
 	}
 
 	if len(b) > 0 {
-		output := make(map[string]string)
-		if err := json.Unmarshal(b, &output); err != nil {
-			return err
-		}
-
 		log.WithFields(log.Fields{
-			"output": output,
+			"table":  fqn,
+			"output": string(b),
 		}).Info("append files")
 	}
 
