@@ -167,12 +167,6 @@ class IncrementalTwilioStream(TwilioStream, IncrementalMixin):
 
     @state.setter
     def state(self, value: MutableMapping[str, Any]):
-        if self._lookback_window and value.get(self.cursor_field):
-            new_start_date = (
-                pendulum.parse(value[self.cursor_field]) - pendulum.duration(minutes=self._lookback_window)
-            ).to_iso8601_string()
-            if new_start_date > self._start_date:
-                value[self.cursor_field] = new_start_date
         self._cursor_value = value.get(self.cursor_field)
 
     def generate_date_ranges(self) -> Iterable[Optional[MutableMapping[str, Any]]]:
