@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -198,7 +199,7 @@ type replicationStream struct {
 	cancel   context.CancelFunc            // Cancel function for the replication goroutine's context
 	errCh    chan error                    // Error channel for the final exit status of the replication goroutine
 	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
-	eventBuf sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
+	eventBuf []sqlcapture.DatabaseEvent    // A buffer used in between 'receiveMessage' and the output channel
 
 	previousFenceLSN pglogrepl.LSN // // The most recently reached fence LSN, updated at the end of each StreamToFence cycle.
 
@@ -426,16 +427,16 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 	for {
 		// If there's already a change event which needs to be sent to the consumer,
 		// try to do so until/unless the context expires first.
-		if s.eventBuf != nil {
+		for len(s.eventBuf) > 0 {
 			select {
 			case <-ctx.Done():
 				return nil
-			case s.events <- s.eventBuf:
-				s.eventBuf = nil
+			case s.events <- s.eventBuf[0]:
+				s.eventBuf = s.eventBuf[1:]
 			}
 		}
 
-		// In tbe absence of a buffered message, go try to receive another from
+		// In tbe absence of any buffered events, go try to receive another from
 		// the database.
 		var lsn, msg, err = s.receiveMessage(ctx)
 		if pgconn.Timeout(err) {
@@ -447,15 +448,15 @@ func (s *replicationStream) relayMessages(ctx context.Context) error {
 
 		// Once a message arrives, decode it and buffer the result until the next
 		// time this function is invoked.
-		event, err := s.decodeMessage(lsn, msg)
+		events, err := s.decodeMessage(lsn, msg)
 		if err != nil {
 			return fmt.Errorf("error decoding message: %w", err)
 		}
-		s.eventBuf = event
+		s.eventBuf = events
 	}
 }
 
-func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Message) (sqlcapture.DatabaseEvent, error) {
+func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Message) ([]sqlcapture.DatabaseEvent, error) {
 	// Some notes on the Logical Replication / pgoutput message stream, since
 	// as far as I can tell this isn't documented anywhere but comments in the
 	// relevant PostgreSQL sources.
@@ -566,7 +567,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 			Cursor: s.lastTxnEndLSN.String(),
 		}
 		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
-		return event, nil
+		return []sqlcapture.DatabaseEvent{event}, nil
 	case *pglogrepl.TruncateMessage:
 		for _, relID := range msg.RelationIDs {
 			var relation = s.relations[relID]
@@ -613,7 +614,7 @@ func (s *replicationStream) decodeChangeEvent(
 	beforeType uint8, // Postgres TupleType (0, 'K' for key, 'O' for old full tuple, 'N' for new).
 	before, after *pglogrepl.TupleData, // Before and after tuple data. Either may be nil.
 	relID uint32, // Relation ID to which tuple data pertains.
-) (sqlcapture.DatabaseEvent, error) {
+) ([]sqlcapture.DatabaseEvent, error) {
 	if s.nextTxnFinalLSN == 0 {
 		return nil, fmt.Errorf("got %q message without a transaction in progress", op)
 	}
@@ -631,7 +632,7 @@ func (s *replicationStream) decodeChangeEvent(
 		// change data. This avoids situations where a sufficiently large transaction full
 		// of changes on a not-currently-active table causes the fenced streaming watchdog
 		// to trigger.
-		return &sqlcapture.KeepaliveEvent{}, nil
+		return []sqlcapture.DatabaseEvent{&sqlcapture.KeepaliveEvent{}}, nil
 	}
 
 	bf, err := s.decodeTuple(before, beforeType, rel, nil)
@@ -646,15 +647,6 @@ func (s *replicationStream) decodeChangeEvent(
 	keyColumns, ok := s.keyColumns(streamID)
 	if !ok {
 		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
-	}
-	var rowKey []byte
-	if op == sqlcapture.InsertOp || op == sqlcapture.UpdateOp {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, af, nil, encodeKeyFDB)
-	} else {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, bf, nil, encodeKeyFDB)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 	}
 
 	discovery, ok := s.tables.discovery[streamID]
@@ -684,14 +676,66 @@ func (s *replicationStream) decodeChangeEvent(
 	if s.db.includeTxIDs[streamID] {
 		sourceInfo.TxID = s.nextTxnXID
 	}
-	var event = &sqlcapture.ChangeEvent{
-		Operation: op,
-		RowKey:    rowKey,
-		Source:    sourceInfo,
-		Before:    bf,
-		After:     af,
+	var events []sqlcapture.DatabaseEvent
+
+	// Encode the preimage/postimage row keys as appropriate for this update type
+	var rowKeyBefore, rowKeyAfter []byte
+	if op == sqlcapture.InsertOp || op == sqlcapture.UpdateOp {
+		rowKeyAfter, err = sqlcapture.EncodeRowKey(keyColumns, af, nil, encodeKeyFDB)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding 'after' row key for %q: %w", streamID, err)
+		}
 	}
-	return event, nil
+	if op == sqlcapture.DeleteOp || op == sqlcapture.UpdateOp {
+		rowKeyBefore, err = sqlcapture.EncodeRowKey(keyColumns, bf, nil, encodeKeyFDB)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding 'before' row key for %q: %w", streamID, err)
+		}
+	}
+	switch op {
+	case sqlcapture.InsertOp:
+		events = append(events, &sqlcapture.ChangeEvent{
+			Operation: op,
+			Source:    sourceInfo,
+			RowKey:    rowKeyAfter,
+			After:     af,
+		})
+	case sqlcapture.UpdateOp:
+		// Most of the time the preimage/postimage row keys are identical and we emit an update event.
+		// But if the row keys differ then we treat updates as a paired deletion of the old row key
+		// followed by an insert of the new one.
+		if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
+			events = append(events, &sqlcapture.ChangeEvent{
+				Operation: sqlcapture.DeleteOp,
+				Source:    sourceInfo,
+				RowKey:    rowKeyBefore,
+				Before:    bf,
+			}, &sqlcapture.ChangeEvent{
+				Operation: sqlcapture.InsertOp,
+				Source:    sourceInfo,
+				RowKey:    rowKeyAfter,
+				After:     af,
+			})
+		} else {
+			events = append(events, &sqlcapture.ChangeEvent{
+				Operation: op,
+				Source:    sourceInfo,
+				RowKey:    rowKeyAfter,
+				Before:    bf,
+				After:     af,
+			})
+		}
+	case sqlcapture.DeleteOp:
+		events = append(events, &sqlcapture.ChangeEvent{
+			Operation: op,
+			Source:    sourceInfo,
+			RowKey:    rowKeyBefore,
+			Before:    bf,
+		})
+	default:
+		return nil, fmt.Errorf("unhandled change operation %q", op)
+	}
+	return events, nil
 }
 
 func (s *replicationStream) decodeTuple(
