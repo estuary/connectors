@@ -650,6 +650,7 @@ func TestPrimaryKeyUpdate(t *testing.T) {
 	// Primary key updates
 	tb.Update(ctx, t, tableName, "id", 1, "id", 6)
 	tb.Update(ctx, t, tableName, "id", 4, "id", 7)
+	tb.Update(ctx, t, tableName, "id", 2, "data", "MODIFIED") // And one update to not-the-PK
 	cs.Capture(ctx, t, nil)
 
 	cupaloy.SnapshotT(t, cs.Summary())
