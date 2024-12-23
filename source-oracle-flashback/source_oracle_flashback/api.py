@@ -212,12 +212,15 @@ async def fetch_page(
 
                         i += 1
                         if i % CHECKPOINT_EVERY == 0:
+                            log.debug("emitting checkpoint at CHECKPOINT_EVERY", i, "last_rowid", last_rowid)
                             yield last_rowid
 
                     if c.rowcount < backfill_chunk_size:
+                        log.debug("had less than backfill_chunk_size documents", c.rowcount, "last_rowid", last_rowid)
                         break
 
         if last_rowid is not None and (i % CHECKPOINT_EVERY) != 0:
+            log.debug("emitting final checkpoint of backfill", last_rowid, "total documents", i)
             yield last_rowid
 
 op_mapping = {
