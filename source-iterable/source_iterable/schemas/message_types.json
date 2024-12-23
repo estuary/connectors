@@ -2,12 +2,6 @@
   "properties": {
     "id": {
       "type": "integer"
-    },
-    "name": {
-      "type": ["null", "string"]
-    },
-    "channelId": {
-      "type": ["null", "number"]
     }
   },
   "type": "object"
