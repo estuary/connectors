@@ -221,13 +221,10 @@ func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *s
 
 	var mapping = make(map[string]tableObject, len(tables))
 	var tablesCondition = ""
-	for i, table := range tables {
-		if i > 0 {
-			tablesCondition += " OR "
-		}
-		tablesCondition += fmt.Sprintf("(OWNER = '%s' AND OBJECT_NAME = '%s')", table.Schema, table.Name)
+	for _, table := range tables {
+		tablesCondition += fmt.Sprintf("(OWNER = '%s' AND OBJECT_NAME = '%s') OR ", table.Schema, table.Name)
 	}
-	tablesCondition += fmt.Sprintf(" OR (OWNER = '%s' AND OBJECT_NAME = '%s')", watermarkSchema, watermarkTableName)
+	tablesCondition += fmt.Sprintf("(OWNER = '%s' AND OBJECT_NAME = '%s')", watermarkSchema, watermarkTableName)
 
 	var fullQuery = fmt.Sprintf("%s AND (%s)", queryTableObjectIdentifiers, tablesCondition)
 	logrus.WithField("query", fullQuery).Debug("fetching object identifiers for tables")

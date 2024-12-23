@@ -53,6 +53,13 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		return nil, fmt.Errorf("set NLS_TIMESTAMP_TZ_FORMAT: %w", err)
 	}
 
+	// Logminer cannot run on PDB instances, so we switch to the CDB
+	if db.pdbName != "" {
+		if _, err := conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
+			return nil, fmt.Errorf("switching to CDB: %w", err)
+		}
+	}
+
 	var startSCN int64
 	if startCursor != "" {
 		startSCN, err = strconv.ParseInt(startCursor, 10, 64)
@@ -204,9 +211,10 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 			return fmt.Errorf("adding logfile %q (%s, %d, %s, %s) to logminer: %w", f.Name, f.Status, f.FirstChange, f.DictStart, f.DictEnd, err)
 		}
 	}
+
 	s.redoSequence = redoSequence
 
-	return nil
+	return err
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int64) error {
