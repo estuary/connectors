@@ -154,7 +154,7 @@ async def tables_to_resources(
                     break
 
     for (i, t) in enumerate(tables):
-        # if max_rowid is None, that maens there are no rows in the table, so we
+        # if max_rowid is None, that means there are no rows in the table, so we
         # skip backfill
 
         backfill = ResourceState.Backfill(cutoff=(max_rowids[i],)) if max_rowids[i] is not None else None
