@@ -64,7 +64,7 @@ var duckDialect = func() sql.Dialect {
 				},
 				sql.QuoteTransform(`"`, `""`),
 			))),
-		Literaler: sql.LiteralFn(sql.QuoteTransform("'", "''")),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			return "?"
 		}),

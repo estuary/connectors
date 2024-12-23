@@ -1,7 +1,9 @@
 package sql
 
 import (
+	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -59,10 +61,10 @@ type Identifierer interface {
 	Identifier(path ...string) string
 }
 
-// Literaler takes a string and returns a raw SQL literal for the Endpoint
-// with required quoting and escaping already applied.
+// Literaler takes a string or integer and returns a raw SQL literal for the
+// Endpoint with required quoting and escaping already applied.
 type Literaler interface {
-	Literal(str string) string
+	Literal(in any) string
 }
 
 // Placeholderer returns the appropriate Endpoint placeholder representation
@@ -93,9 +95,28 @@ type IdentifierFn func(path ...string) string
 func (f IdentifierFn) Identifier(path ...string) string { return f(path...) }
 
 // LiteralFn is a function that implements Literaler.
-type LiteralFn func(s string) string
+type LiteralFn func(in any) string
 
-func (f LiteralFn) Literal(str string) string { return f(str) }
+func (f LiteralFn) Literal(in any) string { return f(in) }
+
+// ToLiteralFn builds a LiteralFn from a string handler to apply quoting and
+// escaping to strings. Integer literals are rendered without any quoting.
+func ToLiteralFn(fn func(s string) string) LiteralFn {
+	return func(in any) string {
+		switch v := in.(type) {
+		case string:
+			return fn(v)
+		case int64:
+			return strconv.Itoa(int(v))
+		case uint64:
+			return strconv.FormatUint(v, 10)
+		case float64: // numbers with a 0 decimal part like "1.0", which are considered integers
+			return strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			panic(fmt.Sprintf("unhandled literal type %T (value: %v)", in, in))
+		}
+	}
+}
 
 // PlaceholderFn is a function that implements Placeholderer.
 type PlaceholderFn func(index int) string
@@ -113,7 +134,7 @@ var _ = Dialect{
 	TableLocatorer:  TableLocatorFn(func(path []string) InfoTableLocation { return InfoTableLocation{} }),
 	ColumnLocatorer: ColumnLocatorFn(func(field string) string { return field }),
 	Placeholderer:   PlaceholderFn(func(index int) string { return "" }),
-	Literaler:       LiteralFn(func(s string) string { return "" }),
+	Literaler:       ToLiteralFn(func(s string) string { return "" }),
 	Identifierer:    IdentifierFn(func(path ...string) string { return "" }),
 	TypeMapper:      DDLMapper{},
 }
