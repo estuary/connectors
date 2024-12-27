@@ -76,24 +76,24 @@ async def validate_flashback(
                     raise Exception(msg)
 
             if undo_retention_seconds < one_week_seconds:
-                msg = f"We require a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {undo_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
+                msg = f"We recommend a minimum of 7 days UNDO_RETENTION to ensure consistency of this task. The current UNDO_RETENTION is {undo_retention_seconds} seconds. See go.estuary.dev/source-oracle-flashback for more information on how to configure the UNDO_RETENTION."  # nopep8
                 if skip_retention_checks:
                     log.warn(msg)
                 else:
                     raise Exception(msg)
 
             if avg_retention_seconds < one_week_seconds:
-                msg = f"We require a minimum of 7 days undo retention to ensure consistency of this task. The current average auto-tuned retention of the database for the past four days is {avg_retention_seconds} seconds. See go.estuary.dev/source-oracle for more information on how to configure the UNDO_RETENTION."  # nopep8
+                msg = f"We require a minimum of 7 days undo retention to ensure consistency of this task. The current average auto-tuned retention of the database for the past four days is {avg_retention_seconds} seconds. See go.estuary.dev/source-oracle-flashback for more information on how to configure the UNDO_RETENTION."  # nopep8
                 if skip_retention_checks:
                     log.warn(msg)
                 else:
                     raise Exception(msg)
 
             if not autoextensible:
-                log.warn("We recommend making your undo tablespace auto-extensible. See go.estuary.dev/source-oracle for more information.")
+                log.warn("We recommend making your undo tablespace auto-extensible. See go.estuary.dev/source-oracle-flashback for more information.")
 
             if retention_mode != 'GUARANTEE':
-                log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle for more information.")
+                log.warn("We recommend guaranteeing retention of the undo tablespace. See go.estuary.dev/source-oracle-flashback for more information.")
 
 
 async def tables_to_resources(
