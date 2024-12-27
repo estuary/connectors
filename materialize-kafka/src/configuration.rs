@@ -34,7 +34,9 @@ pub enum Credentials {
 #[serde(rename_all = "SCREAMING-KEBAB-CASE")]
 pub enum SaslMechanism {
     Plain,
+    #[serde(rename = "SCRAM-SHA-256")]
     ScramSha256,
+    #[serde(rename = "SCRAM-SHA-512")]
     ScramSha512,
 }
 
