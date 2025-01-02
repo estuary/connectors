@@ -377,6 +377,11 @@ SELECT ROWID, {% for c in table.columns -%}
     ORDER BY ROWID ASC
     FETCH FIRST {{ chunk_size }} ROWS ONLY
 """,
+    # VERSIONS BETWEEN SCN results in any valid rows for the specified SCN range, and rows
+    # which have "VERSIONS_STARTSCN < rangeBegin && VERSIONS_ENDSCN >= rangeBegin" are also considered
+    # in our logic however we only consider VERSIONS_STARTSCN as the transaction identifying checkpoint
+    # that's why we need the extra "VERSIONS_STARTSCN >= {{cursor}}" to avoid results where VERSIONS_STARTSCN
+    # is smaller than the latest checkpoint we have emitted
     'inc': """
 SELECT /*+parallel */ VERSIONS_STARTSCN, VERSIONS_OPERATION, ROWID, {% for c in table.columns -%}
 {%- if not loop.first %}, {% endif -%}
@@ -384,6 +389,7 @@ SELECT /*+parallel */ VERSIONS_STARTSCN, VERSIONS_OPERATION, ROWID, {% for c in 
 {%- endfor %} FROM {{ table.quoted_owner }}.{{ table.quoted_table_name }}
     VERSIONS BETWEEN SCN {{ cursor }} AND MAXVALUE
     WHERE VERSIONS_STARTSCN IS NOT NULL
+    AND VERSIONS_STARTSCN >= {{ cursor }}
     ORDER BY VERSIONS_STARTSCN ASC
 """
 }))
