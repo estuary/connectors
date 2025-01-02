@@ -308,7 +308,9 @@ async def fetch_customers(
 
         if doc.created_at > log_cursor:
             yield doc
-            most_recent_created_at = doc.created_at
+
+            if doc.created_at > most_recent_created_at:
+                most_recent_created_at = doc.created_at
 
     if most_recent_created_at > log_cursor:
         yield most_recent_created_at
@@ -338,7 +340,9 @@ async def fetch_credit_card_verifications(
 
         if doc.created_at > log_cursor:
             yield doc
-            most_recent_created_at = doc.created_at
+
+            if doc.created_at > most_recent_created_at:
+                most_recent_created_at = doc.created_at
 
     if most_recent_created_at > log_cursor:
         yield most_recent_created_at
@@ -368,7 +372,9 @@ async def fetch_subscriptions(
 
         if doc.created_at > log_cursor:
             yield doc
-            most_recent_created_at = doc.created_at
+
+            if doc.created_at > most_recent_created_at:
+                most_recent_created_at = doc.created_at
 
     if most_recent_created_at > log_cursor:
         yield most_recent_created_at
