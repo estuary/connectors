@@ -1,5 +1,5 @@
 Big Schema Initial Constraints:
-{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
 {"Field":"arrayField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
@@ -188,7 +188,7 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Field":"stringUuidField","Type":"text"}
 
 Big Schema Changed Types With Table Replacement Constraints:
-{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field is able to be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document is required for a standard updates materialization"}
@@ -331,7 +331,6 @@ Challenging Field Names Materialized Columns:
 {"Field":"123startsWithDigits","Type":"text"}
 {"Field":"VALUEWITHDIFFERENTCAPS","Type":"text"}
 {"Field":"_id_flow","Type":"keyword"}
-{"Field":"_meta/flow_truncated","Type":"boolean"}
 {"Field":"a\"string`with`quote'characters","Type":"text"}
 {"Field":"flow_document","Type":"flattened"}
 {"Field":"flow_published_at","Type":"date"}

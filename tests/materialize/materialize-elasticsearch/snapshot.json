@@ -20,7 +20,6 @@
   "index": "index-simple",
   "rows": [
     {
-      "_meta/flow_truncated": false,
       "canary": "amputation's",
       "flow_document": {
         "_meta": {
@@ -33,7 +32,6 @@
       "id": 1
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "armament's",
       "flow_document": {
         "_meta": {
@@ -46,7 +44,6 @@
       "id": 2
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "splatters",
       "flow_document": {
         "_meta": {
@@ -59,7 +56,6 @@
       "id": 3
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "strengthen",
       "flow_document": {
         "_meta": {
@@ -72,7 +68,6 @@
       "id": 4
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "Kringle's",
       "flow_document": {
         "_meta": {
@@ -85,7 +80,6 @@
       "id": 5
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "grosbeak's",
       "flow_document": {
         "_meta": {
@@ -98,7 +92,6 @@
       "id": 6
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "pieced",
       "flow_document": {
         "_meta": {
@@ -111,7 +104,6 @@
       "id": 7
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "roaches",
       "flow_document": {
         "_meta": {
@@ -124,7 +116,6 @@
       "id": 8
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "devilish",
       "flow_document": {
         "_meta": {
@@ -137,7 +128,6 @@
       "id": 9
     },
     {
-      "_meta/flow_truncated": false,
       "canary": "glucose's",
       "flow_document": {
         "_meta": {
@@ -155,7 +145,6 @@
   "index": "index-duplicated-keys-standard",
   "rows": [
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "77a80200-1dda-11b2-8000-071353030311"
@@ -170,7 +159,6 @@
       "str": "str 6"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "78409880-1dda-11b2-8000-071353030311"
@@ -185,7 +173,6 @@
       "str": "str 7"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "78d92f00-1dda-11b2-8000-071353030311"
@@ -200,7 +187,6 @@
       "str": "str 8"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "7971c580-1dda-11b2-8000-071353030311"
@@ -215,7 +201,6 @@
       "str": "str 9"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "7a0a5c00-1dda-11b2-8000-071353030311"
@@ -235,7 +220,6 @@
   "index": "index-duplicated-keys-delta",
   "rows": [
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "1714c700-1dd2-11b2-8000-071353030311"
@@ -250,7 +234,6 @@
       "str": "str 1"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "77a80200-1dda-11b2-8000-071353030311"
@@ -265,7 +248,6 @@
       "str": "str 6"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "17ad5d80-1dd2-11b2-8000-071353030311"
@@ -280,7 +262,6 @@
       "str": "str 2"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "78409880-1dda-11b2-8000-071353030311"
@@ -295,7 +276,6 @@
       "str": "str 7"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "1845f400-1dd2-11b2-8000-071353030311"
@@ -310,7 +290,6 @@
       "str": "str 3"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "78d92f00-1dda-11b2-8000-071353030311"
@@ -325,7 +304,6 @@
       "str": "str 8"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "18de8a80-1dd2-11b2-8000-071353030311"
@@ -340,7 +318,6 @@
       "str": "str 4"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "7971c580-1dda-11b2-8000-071353030311"
@@ -355,7 +332,6 @@
       "str": "str 9"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "19772100-1dd2-11b2-8000-071353030311"
@@ -370,7 +346,6 @@
       "str": "str 5"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_document": {
         "_meta": {
           "uuid": "7a0a5c00-1dda-11b2-8000-071353030311"
@@ -390,70 +365,60 @@
   "index": "index-duplicated-keys-delta-exclude-flow-doc",
   "rows": [
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T00:00:06.000000000Z",
       "id": 1,
       "int": 1,
       "str": "str 1"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T01:00:04.000000000Z",
       "id": 1,
       "int": 6,
       "str": "str 6"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T00:00:07.000000000Z",
       "id": 2,
       "int": 2,
       "str": "str 2"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T01:00:05.000000000Z",
       "id": 2,
       "int": 7,
       "str": "str 7"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T00:00:08.000000000Z",
       "id": 3,
       "int": 3,
       "str": "str 3"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T01:00:06.000000000Z",
       "id": 3,
       "int": 8,
       "str": "str 8"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T00:00:09.000000000Z",
       "id": 4,
       "int": 4,
       "str": "str 4"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T01:00:07.000000000Z",
       "id": 4,
       "int": 9,
       "str": "str 9"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T00:00:10.000000000Z",
       "id": 5,
       "int": 5,
       "str": "str 5"
     },
     {
-      "_meta/flow_truncated": false,
       "flow_published_at": "1970-01-01T01:00:08.000000000Z",
       "id": 5,
       "int": 10,
@@ -465,7 +430,6 @@
   "index": "index-multiple-data-types",
   "rows": [
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": false,
       "float_field": 1.1,
@@ -496,7 +460,6 @@
       "str_field": "str1"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": true,
       "float_field": 2.2,
@@ -527,7 +490,6 @@
       "str_field": "str2"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": false,
       "float_field": 3.3,
@@ -558,7 +520,6 @@
       "str_field": "str3"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": true,
       "float_field": 4.4,
@@ -589,7 +550,6 @@
       "str_field": "str4"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": false,
       "float_field": 5.5,
@@ -620,7 +580,6 @@
       "str_field": "str5"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": true,
       "float_field": 66.66,
@@ -655,7 +614,6 @@
       "str_field": "str6 v2"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": false,
       "float_field": 77.77,
@@ -688,7 +646,6 @@
       "str_field": "str7 v2"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": null,
       "bool_field": true,
       "float_field": 88.88,
@@ -719,7 +676,6 @@
       "str_field": "str8 v2"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": "YWxvaGEK",
       "bool_field": false,
       "float_field": 99.99,
@@ -750,7 +706,6 @@
       "str_field": "str9 v2"
     },
     {
-      "_meta/flow_truncated": false,
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
       "float_field": 1010.101,
@@ -786,7 +741,6 @@
   "index": "index-formatted-strings",
   "rows": [
     {
-      "_meta/flow_truncated": false,
       "date": "0000-01-01",
       "datetime": "0000-01-01T00:00:00Z",
       "flow_document": {
@@ -811,7 +765,6 @@
       "time": "00:00:00Z"
     },
     {
-      "_meta/flow_truncated": false,
       "date": "1999-02-02",
       "datetime": "1999-02-02T14:20:12.33Z",
       "flow_document": {
@@ -836,7 +789,6 @@
       "time": "14:20:12.33Z"
     },
     {
-      "_meta/flow_truncated": false,
       "date": "1000-03-03",
       "datetime": "1000-03-03T23:59:38.10Z",
       "flow_document": {
@@ -861,7 +813,6 @@
       "time": "23:59:38.10Z"
     },
     {
-      "_meta/flow_truncated": false,
       "date": "2023-08-29",
       "datetime": "2023-08-29T23:59:38Z",
       "flow_document": {
@@ -886,7 +837,6 @@
       "time": "23:59:38Z"
     },
     {
-      "_meta/flow_truncated": false,
       "date": "9999-12-31",
       "datetime": "9999-12-31T23:59:59Z",
       "flow_document": {
@@ -911,7 +861,6 @@
       "time": "23:59:59Z"
     },
     {
-      "_meta/flow_truncated": false,
       "date": null,
       "datetime": null,
       "flow_document": {
@@ -930,7 +879,6 @@
       "time": null
     },
     {
-      "_meta/flow_truncated": false,
       "date": null,
       "datetime": null,
       "flow_document": {
@@ -949,7 +897,6 @@
       "time": null
     },
     {
-      "_meta/flow_truncated": false,
       "date": null,
       "datetime": null,
       "flow_document": {
@@ -973,7 +920,6 @@
   "index": "index-deletions",
   "rows": [
     {
-      "_meta/flow_truncated": false,
       "_meta/op": "u",
       "flow_document": {
         "_meta": {
@@ -986,7 +932,6 @@
       "id": 2
     },
     {
-      "_meta/flow_truncated": false,
       "_meta/op": "c",
       "flow_document": {
         "_meta": {
