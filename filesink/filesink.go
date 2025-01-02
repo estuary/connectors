@@ -356,7 +356,7 @@ func StdConstraints(p *pf.Projection) *pm.Response_Validated_Constraint {
 		constraint.Reason = "The operation type should usually be materialized"
 	case strings.HasPrefix(p.Field, "_meta/"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "Metadata fields fields are able to be materialized"
+		constraint.Reason = "Metadata fields are able to be materialized"
 	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "array") ||
 		isNumeric ||
 		p.Inference.IsSingleScalarType():

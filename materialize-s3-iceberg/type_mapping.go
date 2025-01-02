@@ -124,7 +124,7 @@ func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *
 		constraint.Reason = "The operation type should usually be materialized"
 	case strings.HasPrefix(p.Field, "_meta/"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "Metadata fields fields are able to be materialized"
+		constraint.Reason = "Metadata fields are able to be materialized"
 	case p.Inference.IsSingleScalarType() || isNumeric:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
