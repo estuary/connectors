@@ -340,7 +340,19 @@ async def _capture_substreams(
 
     # Fetch child records
     while True:
-        if cls_child.NAME == "Persons" and parent_data.controller["requirement_collection"] == "stripe" :
+        # Per the Stripe docs, Persons can't be accessed for accounts where `account.controller.requirement_collection` is "stripe". It also
+        # appears that when `account.controller.type` is "account", then Persons can't be accessed. This handling may need refined further
+        # if we encounter further access issues and our understanding of the Stripe API deepens.
+        # Docs reference: https://docs.stripe.com/api/persons
+        if (
+                cls_child.NAME == "Persons" and
+                parent_data.controller["type"] == "account"
+            ) or (
+                cls_child.NAME == "Persons" and 
+                "requirement_collection" in parent_data.controller and
+                parent_data.controller["requirement_collection"] is not None and 
+                parent_data.controller["requirement_collection"] == "stripe"
+            ):
             break
 
         try:
