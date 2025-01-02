@@ -564,10 +564,10 @@
       "add_ons": [],
       "balance": "0.00",
       "billing_day_of_month": 26,
-      "billing_period_end_date": "2024-12-25",
-      "billing_period_start_date": "2024-11-26",
+      "billing_period_end_date": "redacted",
+      "billing_period_start_date": "redacted",
       "created_at": "2024-11-26T16:29:00Z",
-      "current_billing_cycle": 1,
+      "current_billing_cycle": 0,
       "days_past_due": null,
       "description": null,
       "descriptor": {
@@ -582,10 +582,10 @@
       "merchant_account_id": "estuary",
       "never_expires": true,
       "next_bill_amount": "11.00",
-      "next_billing_date": "2024-12-26",
+      "next_billing_date": "redacted",
       "next_billing_period_amount": "11.00",
       "number_of_billing_cycles": null,
-      "paid_through_date": "2024-12-25",
+      "paid_through_date": "redacted",
       "payment_method_token": "haq682e0",
       "plan_id": "38py",
       "price": "11.00",
@@ -941,7 +941,7 @@
       "trial_duration": null,
       "trial_duration_unit": null,
       "trial_period": false,
-      "updated_at": "2024-11-26T16:29:00Z"
+      "updated_at": "redacted"
     }
   ],
   [
