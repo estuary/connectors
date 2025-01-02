@@ -142,14 +142,18 @@ async def fetch_backfill(
     )
 
     for doc in result.data:
-        doc_ts = _s_to_dt(doc.created)
+        # Sometimes API results don't have a created field. These may have been added by some legacy Stripe system
+        # that didn't add the created field. Since we can't determine when these results were created, treat them
+        # like other results within the backfill window and yield them.
+        doc_ts = _s_to_dt(doc.created) if doc.created is not None else None
+
         if doc_ts == start_date:
             # Yield final document for reference
             yield doc
             return
-        elif doc_ts < start_date:
+        elif doc_ts is not None and doc_ts < start_date:
             return
-        elif doc_ts < cutoff:
+        elif doc_ts is None or doc_ts < cutoff:
             yield doc
 
     if result.has_more:
@@ -255,7 +259,11 @@ async def fetch_backfill_substreams(
     )
 
     for doc in result.data:
-        doc_ts = _s_to_dt(doc.created)
+        # Sometimes API results don't have a created field. These may have been added by some legacy Stripe system
+        # that didn't add the created field. Since we can't determine when these results were created, treat them
+        # like other results within the backfill window and yield them.
+        doc_ts = _s_to_dt(doc.created) if doc.created is not None else None
+
         if doc_ts == start_date:
             parent_data = doc
             id = parent_data.id
@@ -276,10 +284,10 @@ async def fetch_backfill_substreams(
                 yield doc 
             return
 
-        elif doc_ts < start_date:
+        elif doc_ts is not None and doc_ts < start_date:
             return
 
-        elif doc_ts < cutoff:
+        elif doc_ts is None or doc_ts < cutoff:
             parent_data = doc
             id = parent_data.id
             child_data = _capture_substreams(
