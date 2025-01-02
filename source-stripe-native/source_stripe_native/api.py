@@ -31,6 +31,7 @@ MAX_PAGE_LIMIT = 100
 
 MISSING_RESOURCE_REGEX = r"resource_missing.+No such.+"
 NOT_ON_LEGACY_BILLING_REGEX = r"Cannot list usage record summaries for.+because it is not on the legacy metered billing system"
+DO_NOT_HAVE_PLATFORM_CONTROLS_REGEX = r"You cannot perform this request as you do not have Platform Controls for the Stripe Dashboard on the account"
 
 def add_event_types(params: dict[str, str | int], event_types: dict[str, Literal["c", "u", "d"]]):
     """
@@ -381,6 +382,17 @@ async def _capture_substreams(
                         "code": err.code,
                         "message": err.message
                     },
+                )
+                break
+            # Stripe has a "Stripe Connect" feature that lets external accounts be connected to a Stripe account, but
+            # the Stripe account may not have appropriate permissions to read data for connected external accounts.
+            elif err.code == 403 and bool(re.search(DO_NOT_HAVE_PLATFORM_CONTROLS_REGEX, err.message, re.DOTALL)):
+                log.warning(
+                    f"Cannot retrieve {cls_child.NAME} for account {id}. Skipping to the next resource.",
+                    {
+                        "code": err.code,
+                        "message": err.message,
+                    }
                 )
                 break
             # Propagate all other errors.
