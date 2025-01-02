@@ -1,6 +1,14 @@
 import json
 import subprocess
 
+SUBSCRIPTION_FIELDS_TO_REDACT = [
+    'billing_period_end_date',
+    'billing_period_start_date',
+    'next_billing_date',
+    'paid_through_date',
+    'updated_at',
+]
+
 def test_capture(request, snapshot):
     result = subprocess.run(
         [
@@ -36,6 +44,13 @@ def test_capture(request, snapshot):
             for e in evidence:
                 if 'url' in e:
                     e['url'] = 'redacted'
+        if stream == 'acmeCo/subscriptions':
+            for field in SUBSCRIPTION_FIELDS_TO_REDACT:
+                rec[field] = 'redacted'
+            rec['current_billing_cycle'] = 0
+
+            rec['status_history'] = [rec['status_history'][-1]]
+            rec['transactions'] = [rec['transactions'][-1]]
 
     assert snapshot("capture.stdout.json") == unique_stream_lines
 
