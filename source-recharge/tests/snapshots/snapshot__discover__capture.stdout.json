@@ -1,0 +1,2837 @@
+[
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "address1": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "address2": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cart_note": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "city": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "company": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "country": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "customer_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "discount_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "first_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "last_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "note_attributes": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "phone": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "province": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shipping_lines_override": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "zip": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "addresses",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
+      ],
+      "stream": "addresses",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "address_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "analytics_data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "billing_address": {
+          "properties": {
+            "address1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "address2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "cart_note": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "city": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "company": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "country": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "customer_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "discount_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "note_attributes": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "phone": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "province": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "shipping_lines_override": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "zip": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "client_details": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "customer_hash": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "customer_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "discount_codes": {
+          "items": {
+            "type": [
+              "null",
+              "object"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "email": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "error": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "error_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "first_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "has_uncommited_changes": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "last_charge_attempt_date": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "last_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "line_items": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "note": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "note_attributes": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "number_times_tried": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "processed_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "processor_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "retry_date": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "scheduled_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shipments_count": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "shipping_address": {
+          "properties": {
+            "address1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "address2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "cart_note": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "city": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "company": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "country": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "customer_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "discount_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "note_attributes": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "phone": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "province": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "shipping_lines_override": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "zip": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "shipping_lines": {
+          "items": {
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "shopify_order_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_variant_id_not_found": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "subtotal_price": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "tags": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "tax_lines": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_discounts": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_line_items_price": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_price": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_refunds": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_tax": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_weight": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "transaction_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "charges",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
+      ],
+      "stream": "charges",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "created_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "collections",
+    "resourceConfig": {
+      "stream": "collections",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "accepts_marketing": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "analytics_data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "apply_credit_to_next_recurring_charge": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "billing_address1": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_address2": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_city": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_company": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_country": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_first_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_last_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_phone": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_province": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "billing_zip": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "email": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "first_charge_processed_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "first_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "has_card_error_in_dunning": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "has_valid_payment_method": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "hash": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "last_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "number_active_subscriptions": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "number_subscriptions": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "processor_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "reason_payment_method_not_valid": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_customer_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "stripe_customer_token": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "customers",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
+      ],
+      "stream": "customers",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "applies_to": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "applies_to_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "applies_to_product_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "applies_to_resource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "channel_settings": {
+          "properties": {
+            "api": {
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "checkout_page": {
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "customer_portal": {
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            },
+            "merchant_portal": {
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "code": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "discount_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "duration": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "duration_usage_limit": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "ends_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "external_discount_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "external_discount_source": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "first_time_customer_restriction": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "once_per_customer": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "prerequisite_subtotal_min": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "starts_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "times_used": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "usage_limit": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "value": {
+          "type": [
+            "null",
+            "number"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "discounts",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
+      ],
+      "stream": "discounts",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "description": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "key": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "owner_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "owner_resource": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "value": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "value_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "metafields",
+    "resourceConfig": {
+      "stream": "metafields",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "address_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "customer_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "next_charge_scheduled_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "price": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "product_title": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "properties": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "quantity": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "recharge_product_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "shopify_product_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "shopify_variant_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "sku": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "variant_title": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "onetimes",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
+      ],
+      "stream": "onetimes",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "address_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "address_is_active": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "billing_address": {
+          "properties": {
+            "address1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "address2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "cart_note": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "city": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "company": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "country": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "customer_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "discount_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "note_attributes": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "phone": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "province": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "shipping_lines_override": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "zip": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "browser_ip": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "charge": {
+          "additionalProperties": true,
+          "properties": {
+            "external_transaction_id": {
+              "additionalProperties": true,
+              "properties": {
+                "payment_processor": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                }
+              },
+              "type": [
+                "null",
+                "object"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "payment_processor_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "status": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "charge_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "charge_status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "client_details": {
+          "additionalProperties": true,
+          "properties": {
+            "browser_ip": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "user_agent": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "currency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "customer": {
+          "properties": {
+            "billing_address1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_address2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_city": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_company": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_country": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_phone": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_province": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "billing_zip": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "email": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "first_charge_processed_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "has_card_error_in_dunning": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "has_valid_payment_method": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hash": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "number_active_subscriptions": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "number_subscriptions": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "processor_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "reason_payment_method_not_valid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "shopify_customer_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "status": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "customer_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "discount_codes": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "discounts": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "email": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "error": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "external_cart_token": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "external_order_id": {
+          "additionalProperties": true,
+          "properties": {
+            "ecommerce": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "external_order_name": {
+          "additionalProperties": true,
+          "properties": {
+            "ecommerce": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "external_order_number": {
+          "additionalProperties": true,
+          "properties": {
+            "ecommerce": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "first_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "hash": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "is_prepaid": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "last_name": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "line_items": {
+          "items": {
+            "properties": {
+              "external_inventory_policy": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "grams": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "images": {
+                "type": [
+                  "null",
+                  "object"
+                ]
+              },
+              "price": {
+                "type": [
+                  "null",
+                  "number"
+                ]
+              },
+              "properties": {
+                "type": [
+                  "null",
+                  "array"
+                ]
+              },
+              "quantity": {
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "shopify_product_id": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "shopify_variant_id": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "sku": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "subscription_id": {
+                "type": [
+                  "null",
+                  "integer"
+                ]
+              },
+              "title": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              },
+              "variant_title": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "note": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "note_attributes": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "order_attributes": {
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "payment_processor": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "processed_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "redacted": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "scheduled_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shipped_date": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shipping_address": {
+          "properties": {
+            "address1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "address2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "cart_note": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "city": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "company": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "country": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "created_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "customer_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "discount_id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "first_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
+            "last_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "note_attributes": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "phone": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "province": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "shipping_lines_override": {
+              "type": [
+                "null",
+                "array"
+              ]
+            },
+            "updated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "zip": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "shipping_lines": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "shopify_cart_token": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_customer_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_order_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_order_number": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "subtotal_price": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "tags": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "tax_lines": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "taxable": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "total_discounts": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "total_duties": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_line_items_price": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "total_price": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "total_refunds": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_tax": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_weight": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "total_weight_grams": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "transaction_id": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "orders",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
+      ],
+      "stream": "orders",
+      "syncMode": "incremental"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "charge_interval_frequency": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "collection_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cutoff_day_of_month": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "cutoff_day_of_week": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "discount_amount": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "discount_type": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "expire_after_specific_number_of_charges": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "handle": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "images": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "modifiable_properties": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "order_day_of_month": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "order_day_of_week": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "order_interval_frequency_options": {
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "order_interval_unit": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "shopify_product_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "storefront_purchase_options": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "subscription_defaults": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "title": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "products",
+    "resourceConfig": {
+      "stream": "products",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "shop": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "store": {
+          "properties": {
+            "checkout_platform": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "created_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "currency": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "disabled_currencies_historical": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "domain": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "email": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "enabled_presentment_currencies": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "enabled_presentment_currencies_symbols": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
+            "iana_timezone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "id": {
+              "type": "integer"
+            },
+            "my_shopify_domain": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "name": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shop_email": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "shop_phone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "timezone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "updated_at": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "type": [
+            "object"
+          ]
+        },
+        "store_id": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "store_id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/store_id"
+    ],
+    "recommendedName": "shop",
+    "resourceConfig": {
+      "stream": "shop",
+      "syncMode": "full_refresh"
+    }
+  },
+  {
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "properties": {
+        "_meta": {
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ],
+          "type": "object"
+        },
+        "address_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "analytics_data": {
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "cancellation_reason": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cancellation_reason_comments": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "cancelled_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "charge_interval_frequency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "commit_update": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "created_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "customer_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "email": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "expire_after_specific_number_of_charges": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "has_queued_charges": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "id": {
+          "type": [
+            "integer"
+          ]
+        },
+        "is_prepaid": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_skippable": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "is_swappable": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "max_retries_reached": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "next_charge_scheduled_at": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "order_day_of_month": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "order_day_of_week": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "order_interval_frequency": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "order_interval_unit": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "price": {
+          "type": [
+            "null",
+            "number"
+          ]
+        },
+        "product_title": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "properties": {
+          "items": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": [
+                  "null",
+                  "string"
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "type": [
+            "null",
+            "array"
+          ]
+        },
+        "quantity": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "recharge_product_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "shopify_product_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "shopify_variant_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "sku": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "sku_override": {
+          "type": [
+            "null",
+            "boolean"
+          ]
+        },
+        "status": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "updated_at": {
+          "format": "date-time",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "variant_title": {
+          "type": [
+            "null",
+            "string"
+          ]
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
+    "key": [
+      "/id"
+    ],
+    "recommendedName": "subscriptions",
+    "resourceConfig": {
+      "cursorField": [
+        "updated_at"
+      ],
+      "stream": "subscriptions",
+      "syncMode": "incremental"
+    }
+  }
+]
