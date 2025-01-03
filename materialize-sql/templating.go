@@ -6,7 +6,6 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -64,56 +63,91 @@ type MergeBound struct {
 // MergeBoundsBuilder tracks and generates a MergeBound for each of a binding's
 // key fields.
 type MergeBoundsBuilder struct {
-	table     Table
-	literaler func(any) string
+	keyColumns []Column
+	literaler  func(any) string
 
-	lower tuple.Tuple
-	upper tuple.Tuple
+	lower []any
+	upper []any
 }
 
-func NewMergeBoundsBuilder(table Table, literaler func(any) string) *MergeBoundsBuilder {
+func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string) *MergeBoundsBuilder {
 	return &MergeBoundsBuilder{
-		table:     table,
-		literaler: literaler,
+		keyColumns: keyColumns,
+		literaler:  literaler,
 	}
 }
 
-// NextStore updates the observed minimum and maximum key for a transaction. It
-// relies on the fact that Stores are sent to materializations in ascending key
-// order, so the first observed Store will have the minimum key and the final
-// observed store will have the maximum key.
-func (b *MergeBoundsBuilder) NextStore(key tuple.Tuple) {
-	if len(key) != len(b.table.Keys) {
-		panic(fmt.Sprintf("application error: %d key fields vs. %d key columns for merge query bounds", len(key), len(b.table.Keys)))
+// NextKey updates the observed minimum and maximum key for a transaction.
+func (b *MergeBoundsBuilder) NextKey(key []any) {
+	if len(key) != len(b.keyColumns) {
+		panic(fmt.Sprintf("application error: %d key fields vs. %d key columns for merge query bounds", len(key), len(b.keyColumns)))
 	}
 
 	if b.lower == nil {
-		b.lower = key
+		// Initialize the tracked values if this is the first key observed for
+		// the transaction. A new array is allocated for both the tracked upper
+		// and lower values so that they can be updated separately based on the
+		// observed minimum and maximum keys for subsequent Stores. Note that
+		// b.lower and b.upper are set to `nil` on initialization of a
+		// MergeBoundsBuilder, and also after calls to `Build`.
+		b.lower = append([]any(nil), key...)
+		b.upper = append([]any(nil), key...)
 	}
-	b.upper = key
+
+	for idx, k := range key {
+		b.lower[idx] = minKey(b.lower[idx], k)
+		b.upper[idx] = maxKey(b.upper[idx], k)
+	}
+}
+
+func minKey(k1 any, k2 any) any {
+	switch k1 := k1.(type) {
+	case bool:
+		// Booleans are not comparable.
+		return false
+	case string:
+		return min(k1, k2.(string))
+	case int64:
+		return min(k1, k2.(int64))
+	case uint64:
+		return min(k1, k2.(uint64))
+	case float64:
+		return min(k1, k2.(float64))
+	default:
+		panic(fmt.Sprintf("minKey unhandled key type %T (value: %v)", k1, k1))
+	}
+}
+
+func maxKey(k1 any, k2 any) any {
+	switch k1 := k1.(type) {
+	case bool:
+		// Booleans are not comparable.
+		return false
+	case string:
+		return max(k1, k2.(string))
+	case int64:
+		return max(k1, k2.(int64))
+	case uint64:
+		return max(k1, k2.(uint64))
+	case float64:
+		return max(k1, k2.(float64))
+	default:
+		panic(fmt.Sprintf("maxKey unhandled key type %T (value: %v)", k1, k1))
+	}
 }
 
 // Build outputs the computed merge conditions for this transaction and resets
 // the tracked values in preparation for the next transaction.
-func (b *MergeBoundsBuilder) Build() ([]MergeBound, error) {
+func (b *MergeBoundsBuilder) Build() []MergeBound {
 	conditions := make([]MergeBound, len(b.lower))
 
-	convertedLower, err := b.table.ConvertKey(b.lower)
-	if err != nil {
-		return nil, fmt.Errorf("converting lower bound: %w", err)
-	}
-	convertedUpper, err := b.table.ConvertKey(b.upper)
-	if err != nil {
-		return nil, fmt.Errorf("converting upper bound: %w", err)
-	}
-
-	for idx, key := range b.table.Keys {
+	for idx, col := range b.keyColumns {
 		conditions[idx] = MergeBound{
-			Identifier: key.Identifier,
+			Identifier: col.Identifier,
 		}
 
-		lower := convertedLower[idx]
-		upper := convertedUpper[idx]
+		lower := b.lower[idx]
+		upper := b.upper[idx]
 
 		if _, ok := lower.(bool); ok {
 			// Boolean keys cannot reasonably support bounds for merge queries.
@@ -127,8 +161,9 @@ func (b *MergeBoundsBuilder) Build() ([]MergeBound, error) {
 		conditions[idx].LiteralUpper = b.literaler(upper)
 	}
 
+	// Reset for tracking the next transaction.
 	b.lower = nil
 	b.upper = nil
 
-	return conditions, nil
+	return conditions
 }
