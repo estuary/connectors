@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test_vectordatatypes_56892992": 2 Documents
+# ================================
+{"A":"[1.100000,2.200000,3.000000,4.400000,5.500000]","B":null,"ID":1,"_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_VectorDatatypes_56892992","seq":0,"off":0}}}
+{"A":null,"B":"[1,2,3]","ID":2,"_meta":{"op":"c","source":{"schema":"PUBLIC","snapshot":true,"table":"test_VectorDatatypes_56892992","seq":0,"off":1}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"streams":{"PUBLIC%2Ftest_VectorDatatypes_56892992":{"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_VECTORDATATYPES_56892992"}}}
+
