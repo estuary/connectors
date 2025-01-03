@@ -1,5 +1,6 @@
 import asyncio
 import json
+import time
 from typing import Any, Literal
 
 import click
@@ -371,15 +372,23 @@ def append_files(
     # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
     # at a lower level than PyIceberg currently makes available.
     checkpoints[materialization] = next_checkpoint
-    txn = tbl.transaction()
-    txn.add_files(file_paths.split(","))
-    txn.set_properties({"flow_checkpoints_v1": json.dumps(checkpoints)})
-    txn.commit_transaction()
+    
+    attempt = 1
+    while True:
+        try:
+            txn = tbl.transaction()
+            txn.add_files(file_paths.split(","))
+            txn.set_properties({"flow_checkpoints_v1": json.dumps(checkpoints)})
+            txn.commit_transaction()
+            break
+        except Exception as e:
+            if attempt == 3:
+                raise
+            time.sleep(attempt * 2)
+            attempt += 1
 
-    # TODO(whb): This additional logging should not really be necessary, but is
-    # included for now to assist in troubleshooting potential errors.
     tbl = catalog.load_table(table)
-    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get("flow_checkpoints_v1")}") 
+    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get("flow_checkpoints_v1")} after {attempt} attempts") 
 
 if __name__ == "__main__":
     run(auto_envvar_prefix="ICEBERG")
