@@ -118,7 +118,7 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		target:      target,
 		loadFile:    newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, loadSchema),
 		storeFile:   newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, storeSchema),
-		mergeBounds: sql.NewMergeBoundsBuilder(target, dialect.Literal),
+		mergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
 	}
 
 	for _, m := range []struct {
@@ -292,12 +292,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		b.storeFile.start()
 		b.hasData = true
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
+		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err = b.storeFile.encodeRow(ctx, converted); err != nil {
+		}
+		if err = b.storeFile.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
-		b.mergeBounds.NextStore(it.Key)
+		b.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
@@ -359,13 +361,11 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 		if !b.mustMerge {
 			subqueries = append(subqueries, b.storeInsertSQL)
 		} else {
-			if bounds, err := b.mergeBounds.Build(); err != nil {
-				return fmt.Errorf("building merge bounds: %w", err)
-			} else if mergeQuery, err := renderMergeQueryTemplate(b.target, bounds); err != nil {
+			mergeQuery, err := renderMergeQueryTemplate(b.target, b.mergeBounds.Build())
+			if err != nil {
 				return fmt.Errorf("rendering merge query template: %w", err)
-			} else {
-				subqueries = append(subqueries, mergeQuery)
 			}
+			subqueries = append(subqueries, mergeQuery)
 		}
 
 		// Reset for the next round.

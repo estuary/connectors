@@ -86,3 +86,69 @@ func TestTableTemplate(t *testing.T) {
 	require.NoError(t, err)
 	cupaloy.SnapshotT(t, out)
 }
+
+func TestMergeBoundsBuilder(t *testing.T) {
+	literaler := ToLiteralFn(QuoteTransform("'", "''"))
+
+	for _, tt := range []struct {
+		name       string
+		keyColumns []Column
+		keys       [][]any
+		want       []MergeBound
+	}{
+		{
+			name: "single key",
+			keyColumns: []Column{
+				{Identifier: "colA"},
+			},
+			keys: [][]any{
+				{"a"},
+				{"b"},
+				{"c"},
+			},
+			want: []MergeBound{
+				{"colA", literaler("a"), literaler("c")},
+			},
+		},
+		{
+			name: "multiple keys ordered",
+			keyColumns: []Column{
+				{Identifier: "colA"}, {Identifier: "colB"}, {Identifier: "colC"},
+			},
+			keys: [][]any{
+				{"a", true, int64(1)},
+				{"b", false, int64(2)},
+				{"c", true, int64(3)},
+			},
+			want: []MergeBound{
+				{"colA", literaler("a"), literaler("c")},
+				{"colB", "", ""},
+				{"colC", literaler(int64(1)), literaler(int64(3))},
+			},
+		},
+		{
+			name: "multiple keys unordered",
+			keyColumns: []Column{
+				{Identifier: "colA"}, {Identifier: "colB"}, {Identifier: "colC"},
+			},
+			keys: [][]any{
+				{"a", true, int64(3)},
+				{"b", false, int64(1)},
+				{"c", true, int64(2)},
+			},
+			want: []MergeBound{
+				{"colA", literaler("a"), literaler("c")},
+				{"colB", "", ""},
+				{"colC", literaler(int64(1)), literaler(int64(3))},
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			b := NewMergeBoundsBuilder(tt.keyColumns, literaler)
+			for _, store := range tt.keys {
+				b.NextKey(store)
+			}
+			require.Equal(t, tt.want, b.Build())
+		})
+	}
+}
