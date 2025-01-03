@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-command -v flowctl-go >/dev/null 2>&1 || { echo >&2 "flowctl-go must be available via PATH, aborting."; exit 1; }
+command -v flowctl >/dev/null 2>&1 || { echo >&2 "flowctl must be available via PATH, aborting."; exit 1; }
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
