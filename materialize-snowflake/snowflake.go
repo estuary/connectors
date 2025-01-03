@@ -307,7 +307,7 @@ func (d *transactor) addBinding(target sql.Table) error {
 
 	b.load.stage = newStagedFile(os.TempDir())
 	b.store.stage = newStagedFile(os.TempDir())
-	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target, d.ep.Dialect.Literal)
+	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
 		var pipeName string
@@ -462,12 +462,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if err := b.store.stage.start(ctx, d.db); err != nil {
 			return nil, err
-		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		}
+		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
+		if err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
-		} else if err = b.store.stage.encodeRow(converted); err != nil {
+		}
+		if err = b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		}
-		b.store.mergeBounds.NextStore(it.Key)
+		b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 	}
 
 	// Upload the staged files and build a list of merge and copy into queries that need to be run
@@ -488,17 +491,15 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			if bounds, err := b.store.mergeBounds.Build(); err != nil {
-				return nil, fmt.Errorf("building merge bounds: %w", err)
-			} else if mergeIntoQuery, err := renderMergeQueryTemplate(d.templates.mergeInto, b.target, dir, bounds); err != nil {
+			mergeIntoQuery, err := renderMergeQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
+			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
-			} else {
-				d.cp[b.target.StateKey] = &checkpointItem{
-					Table:     b.target.Identifier,
-					Query:     mergeIntoQuery,
-					StagedDir: dir,
-					Version:   d.version,
-				}
+			}
+			d.cp[b.target.StateKey] = &checkpointItem{
+				Table:     b.target.Identifier,
+				Query:     mergeIntoQuery,
+				StagedDir: dir,
+				Version:   d.version,
 			}
 			// Reset for next round.
 			b.store.mustMerge = false
