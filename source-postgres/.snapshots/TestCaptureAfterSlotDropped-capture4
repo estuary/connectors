@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_captureafterslotdropped_46115540": 8 Documents
+# Collection "acmeCo/test/test/captureafterslotdropped_46115540": 8 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"captureafterslotdropped_46115540","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"captureafterslotdropped_46115540","loc":[11111111,11111111,11111111]}},"data":"four","id":4}

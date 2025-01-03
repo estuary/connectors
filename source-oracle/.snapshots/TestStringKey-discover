@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer_t18110541",
+    "recommended_name": "flow_test_logminer/t18110541",
     "resource_config_json": {
       "mode": "Without Primary Key",
       "namespace": "FLOW_TEST_LOGMINER",

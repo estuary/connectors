@@ -1,6 +1,6 @@
 user: FLOW_TEST_LOGMINER
 password: flow_test123
-address: database-1.chqpmndqvzby.us-east-2.rds.amazonaws.com:1521
+address: database-2.chqpmndqvzby.us-east-2.rds.amazonaws.com:1521
 database: ORCL
 advanced:
     discover_schemas:
@@ -45,8 +45,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-07-08T15:32:33Z"
-    mac: ENC[AES256_GCM,data:0N2iwi8xQGNQLRcMeJ3ousRqWXVyC+u5twFmZDMz12oBk4LVI+mw23UdG4iPu0igbN+sdbxEiTJzv/ROsxJzqR9hdpds4qcsiUabytVl6cZMm282YCdTvZj5a4fqMTHHsJ5zPwkyW2KAKa2CqPaAtJlBmqbzQUsuOdFdgggCyOg=,iv:aT+M91TXQjGn/MEs9r/M+MgzUWGX+F1Bwl1F8pyI9Js=,tag:it1hCM2PQ3T1A5kwVhdUgw==,type:str]
+    lastmodified: "2024-09-11T08:47:03Z"
+    mac: ENC[AES256_GCM,data:3+ZWQkm3QUxJe+aVzOQo7Ct44qEqFXxbLAgD8s42sRyX/hd13kOpAwe31mcCyPnHkCHyHm1sHFTeV5LFNNi5HDKKy+myZKAEjTxwdVvPdS2FuuTLl9BU0xfJvttbn+BZqDgmLysRJR8NWSjP5Lkk1/5oT+ZnzSeBOh+44XphPhE=,iv:AYEX9Y0y0qvW1T3thkSNkM3EnvT+PZPLaNzg3rEm4KA=,tag:UOAxqm7hAu/uIgySgh5QuQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1
