@@ -556,6 +556,21 @@ async def fetch_search_objects(
         for r in result.results:
             this_mod_time = r.properties.hs_lastmodifieddate
 
+            if this_mod_time < since:
+                # The search API will return records with a modification time
+                # before the requested "since" (the start of the window) if
+                # their updatedAt timestamp is within the same millisecond,
+                # effectively ignoring the microseconds part of the range
+                # criteria. These spurious results can be safely ignored in the
+                # rare case that there is a record with a modification time
+                # within the same millisecond as requested at the start of the
+                # time window, but some smaller fraction of a second earlier.
+                log.info(
+                    "ignoring search result with record modification time that is earlier than minimum search window",
+                    {"id": r.id, "this_mod_time": this_mod_time, "since": since},
+                )
+                continue
+
             if until and this_mod_time > until:
                 log.info(
                     "ignoring search result with record modification time that is later than maximum search window",
