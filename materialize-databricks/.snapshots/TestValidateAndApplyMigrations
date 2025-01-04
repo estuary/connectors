@@ -1,5 +1,6 @@
 Base Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
@@ -20,6 +21,7 @@ Base Initial Constraints:
 
 Migratable Changes Before Apply Schema:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"boolWidenedToJson","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"dateValue","Nullable":"YES","Type":"DATE"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"TIMESTAMP"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
@@ -38,12 +40,13 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-key (STRING), _meta/flow_truncated (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMP), flow_published_at (TIMESTAMP), int64 (BIGINT), intWidenedToJson (BIGINT), multiple (STRING), nonScalarValue (STRING), numericString (DECIMAL), optional (STRING), requiredNumeric (DECIMAL), scalarValue (STRING), stringWidenedToJson (STRING), timeValue (STRING), flow_document (STRING)
+key (STRING), _meta/flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMP), flow_published_at (TIMESTAMP), int64 (BIGINT), intWidenedToJson (BIGINT), multiple (STRING), nonScalarValue (STRING), numericString (DECIMAL), optional (STRING), requiredNumeric (DECIMAL), scalarValue (STRING), stringWidenedToJson (STRING), timeValue (STRING), flow_document (STRING)
 
-1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 01:01:01, {}
+1, false, true, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111 +0000 UTC, 2024-09-13 01:01:01 +0000 UTC, 1, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 01:01:01, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"boolWidenedToJson","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolWidenedToJson' is already being materialized as endpoint type 'BOOLEAN' but endpoint type 'STRING' is required by its schema '{ type: [boolean, string] }'"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
@@ -64,6 +67,7 @@ Migratable Changes Constraints:
 
 Migratable Changes Applied Schema:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"boolWidenedToJson","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"dateValue","Nullable":"YES","Type":"STRING"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"STRING"}
 {"Name":"flow_document","Nullable":"NO","Type":"STRING"}
@@ -82,7 +86,7 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (STRING), _meta/flow_truncated (BOOLEAN), flow_published_at (TIMESTAMP), int64 (BIGINT), multiple (STRING), nonScalarValue (STRING), optional (STRING), scalarValue (STRING), stringWidenedToJson (STRING), timeValue (STRING), flow_document (STRING), dateValue (STRING), datetimeValue (STRING), intWidenedToJson (STRING), numericString (STRING), requiredNumeric (STRING)
+key (STRING), _meta/flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), flow_published_at (TIMESTAMP), int64 (BIGINT), multiple (STRING), nonScalarValue (STRING), optional (STRING), scalarValue (STRING), stringWidenedToJson (STRING), timeValue (STRING), flow_document (STRING), dateValue (STRING), datetimeValue (STRING), intWidenedToJson (STRING), numericString (STRING), requiredNumeric (STRING)
 
-1, false, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, hello, 01:01:01, {}, 2024-01-01, 2024-01-01T01:01:01.111111000Z, 999, 123, 456
+1, false, true, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, hello, 01:01:01, {}, 2024-01-01, 2024-01-01T01:01:01.111111000Z, 999, 123, 456
 
