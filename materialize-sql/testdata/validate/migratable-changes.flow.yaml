@@ -17,6 +17,7 @@ collections:
         requiredNumeric: { type: string }
         stringWidenedToJson: { type: [string, integer, boolean] }
         intWidenedToJson: { type: [string, integer, boolean] }
+        boolWidenedToJson: { type: [boolean, string] }
       required: [key, scalarValue, requiredNumeric]
     key: [/key]
     projections:

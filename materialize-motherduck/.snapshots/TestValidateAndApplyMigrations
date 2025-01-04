@@ -1,5 +1,6 @@
 Base Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
@@ -20,6 +21,7 @@ Base Initial Constraints:
 
 Migratable Changes Before Apply Schema:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"boolWidenedToJson","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"dateValue","Nullable":"YES","Type":"DATE"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"flow_document","Nullable":"NO","Type":"JSON"}
@@ -39,12 +41,13 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), intWidenedToJson (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), numericString (HUGEINT), optional (VARCHAR), requiredNumeric (HUGEINT), scalarValue (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (TIME), second_root (VARCHAR)
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), intWidenedToJson (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), numericString (HUGEINT), optional (VARCHAR), requiredNumeric (HUGEINT), scalarValue (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (TIME), second_root (VARCHAR)
 
-1, false, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111 +0000 UTC, {}, 2024-09-13 01:01:01 +0000 UTC, 1, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 1970-01-01 01:01:01 +0000 UTC, {}
+1, false, true, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111 +0000 UTC, {}, 2024-09-13 01:01:01 +0000 UTC, 1, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 1970-01-01 01:01:01 +0000 UTC, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"datetimeValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'datetimeValue' is already being materialized as endpoint type 'TIMESTAMP WITH TIME ZONE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -65,6 +68,7 @@ Migratable Changes Constraints:
 
 Migratable Changes Applied Schema:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"boolWidenedToJson","Nullable":"YES","Type":"JSON"}
 {"Name":"dateValue","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"flow_document","Nullable":"NO","Type":"JSON"}
@@ -84,7 +88,7 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), datetimeValue (TIMESTAMPTZ), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), dateValue (VARCHAR), intWidenedToJson (VARCHAR), numericString (VARCHAR), requiredNumeric (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (VARCHAR)
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), datetimeValue (TIMESTAMPTZ), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), boolWidenedToJson (VARCHAR), dateValue (VARCHAR), intWidenedToJson (VARCHAR), numericString (VARCHAR), requiredNumeric (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (VARCHAR)
 
-1, false, 2024-01-01 01:01:01.111111 +0000 UTC, {}, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, {}, 2024-01-01, 999, 123, 456, "hello", 01:01:01
+1, false, 2024-01-01 01:01:01.111111 +0000 UTC, {}, 2024-09-13 01:01:01 +0000 UTC, 1, <nil>, <nil>, <nil>, test, {}, true, 2024-01-01, 999, 123, 456, "hello", 01:01:01
 
