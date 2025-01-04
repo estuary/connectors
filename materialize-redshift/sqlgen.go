@@ -153,7 +153,7 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
-	return fmt.Sprintf(`json_parse(%s)`, migration.Identifier)
+	return fmt.Sprintf(`CAST(%s as SUPER)`, migration.Identifier)
 }
 
 func jsonQuoteCast(migration sql.ColumnTypeMigration) string {

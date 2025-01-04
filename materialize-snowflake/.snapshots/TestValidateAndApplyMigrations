@@ -1,5 +1,6 @@
 Base Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
@@ -19,6 +20,7 @@ Base Initial Constraints:
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
 Migratable Changes Before Apply Schema:
+{"Name":"BOOLWIDENEDTOJSON","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"DATETIMEVALUE","Nullable":"YES","Type":"TIMESTAMP_LTZ"}
 {"Name":"DATEVALUE","Nullable":"YES","Type":"DATE"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
@@ -38,12 +40,13 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-KEY (TEXT), _meta/flow_truncated (BOOLEAN), DATEVALUE (DATE), DATETIMEVALUE (TIMESTAMP_LTZ), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), INT64 (FIXED), INTWIDENEDTOJSON (FIXED), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), NUMERICSTRING (FIXED), OPTIONAL (VARIANT), REQUIREDNUMERIC (FIXED), SCALARVALUE (TEXT), STRINGWIDENEDTOJSON (TEXT), TIMEVALUE (TEXT), FLOW_DOCUMENT (VARIANT)
+KEY (TEXT), _meta/flow_truncated (BOOLEAN), BOOLWIDENEDTOJSON (BOOLEAN), DATEVALUE (DATE), DATETIMEVALUE (TIMESTAMP_LTZ), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), INT64 (FIXED), INTWIDENEDTOJSON (FIXED), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), NUMERICSTRING (FIXED), OPTIONAL (VARIANT), REQUIREDNUMERIC (FIXED), SCALARVALUE (TEXT), STRINGWIDENEDTOJSON (TEXT), TIMEVALUE (TEXT), FLOW_DOCUMENT (VARIANT)
 
-1, 0, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111111 -0800 PST, 2024-09-13 01:01:01 -0700 PDT, 1, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 01:01:01, {}
+1, 0, 1, 2024-01-01 00:00:00 +0000 UTC, 2024-01-01 01:01:01.111111111 -0800 PST, 2024-09-13 01:01:01 -0700 PDT, 1, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 01:01:01, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
@@ -63,6 +66,7 @@ Migratable Changes Constraints:
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Migratable Changes Applied Schema:
+{"Name":"BOOLWIDENEDTOJSON","Nullable":"YES","Type":"VARIANT"}
 {"Name":"DATETIMEVALUE","Nullable":"YES","Type":"TEXT"}
 {"Name":"DATEVALUE","Nullable":"YES","Type":"TEXT"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
@@ -82,7 +86,7 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-KEY (TEXT), _meta/flow_truncated (BOOLEAN), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), INT64 (FIXED), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), OPTIONAL (VARIANT), SCALARVALUE (TEXT), TIMEVALUE (TEXT), FLOW_DOCUMENT (VARIANT), DATEVALUE (TEXT), DATETIMEVALUE (TEXT), INTWIDENEDTOJSON (VARIANT), NUMERICSTRING (TEXT), REQUIREDNUMERIC (TEXT), STRINGWIDENEDTOJSON (VARIANT)
+KEY (TEXT), _meta/flow_truncated (BOOLEAN), FLOW_PUBLISHED_AT (TIMESTAMP_LTZ), INT64 (FIXED), MULTIPLE (VARIANT), NONSCALARVALUE (VARIANT), OPTIONAL (VARIANT), SCALARVALUE (TEXT), TIMEVALUE (TEXT), FLOW_DOCUMENT (VARIANT), BOOLWIDENEDTOJSON (VARIANT), DATEVALUE (TEXT), DATETIMEVALUE (TEXT), INTWIDENEDTOJSON (VARIANT), NUMERICSTRING (TEXT), REQUIREDNUMERIC (TEXT), STRINGWIDENEDTOJSON (VARIANT)
 
-1, 0, 2024-09-13 01:01:01 -0700 PDT, 1, <nil>, <nil>, <nil>, test, 01:01:01, {}, 2024-01-01, 2024-01-01T09:01:01.111111111Z, 999, 123, 456, "hello"
+1, 0, 2024-09-13 01:01:01 -0700 PDT, 1, <nil>, <nil>, <nil>, test, 01:01:01, {}, true, 2024-01-01, 2024-01-01T09:01:01.111111111Z, 999, 123, 456, "hello"
 
