@@ -139,6 +139,17 @@
         }
       },
       "key": ["/id"]
+    },
+    "tests/binary-key": {
+       "schema": {
+       "properties": {
+           "id": {"type": "string", "contentEncoding": "base64"},
+           "counter": { "type": "integer" }
+          },
+          "required": ["id"],
+          "type": "object"
+       },
+       "key": ["/id"]
     }
   },
 

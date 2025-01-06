@@ -157,7 +157,7 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 			SELECT
 			{{ range $ind, $key := $.Table.Keys }}
 			{{- if $ind }}, {{ end -}}
-			{{ $key.Identifier }}
+			{{ template "cast" $key -}}
 			{{- end }}
 			FROM json.`+"`{{ $file }}`"+`
 		)
@@ -165,11 +165,7 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 	) AS r
 	ON {{ range $ind, $key := $.Table.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	{{ $.Table.Identifier }}.{{ $key.Identifier }} = {{ if eq (First (Split $key.DDL " ")) "BINARY" -}}
-		unbase64(r.{{ $key.Identifier }})
-	{{- else -}}
-		r.{{ $key.Identifier }}
-	{{- end -}}
+	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else -}}
 SELECT -1, ""
