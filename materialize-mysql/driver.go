@@ -801,8 +801,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	// Drain the final binding.
-	if err := drainBinding(d.bindings[lastBinding]); err != nil {
-		return nil, err
+	if lastBinding != -1 {
+		if err := drainBinding(d.bindings[lastBinding]); err != nil {
+			return nil, err
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
