@@ -100,7 +100,6 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
         end_date: Date = None,
         date_window_size: int = 30,  # in days
         attribution_window: int = 0,  # in days
-        select_properties_by_default: bool = True,
         project_id: int = None,
         reqs_per_hour_limit: int = MixpanelStream.DEFAULT_REQS_PER_HOUR_LIMIT,
         **kwargs,
@@ -118,7 +117,6 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
             end_date=end_date,
             date_window_size=smaller_date_window,
             attribution_window=attribution_window,
-            select_properties_by_default=select_properties_by_default,
             project_id=project_id,
             reqs_per_hour_limit=reqs_per_hour_limit,
             **kwargs,

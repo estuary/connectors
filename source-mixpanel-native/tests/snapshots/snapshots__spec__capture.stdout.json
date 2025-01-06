@@ -1,185 +1,200 @@
 [
   {
+    "protocol": 3032023,
     "configSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Source Mixpanel Spec",
+      "required": [
+        "credentials"
+      ],
+      "type": "object",
       "properties": {
-        "attribution_window": {
-          "default": 5,
-          "description": "A period of time for attributing results to ads and the lookback period after those actions occur during which ad results are counted. Default attribution window is 5 days. (This value should be non-negative integer)",
-          "order": 2,
-          "title": "Attribution Window",
-          "type": "integer"
-        },
         "credentials": {
+          "title": "Authentication *",
           "description": "Choose how to authenticate to Mixpanel",
+          "type": "object",
+          "order": 0,
           "oneOf": [
             {
-              "properties": {
-                "option_title": {
-                  "const": "Service Account",
-                  "order": 0,
-                  "type": "string"
-                },
-                "project_id": {
-                  "description": "Your project ID number. See the <a href=\"https://help.mixpanel.com/hc/en-us/articles/115004490503-Project-Settings#project-id\">docs</a> for more information on how to obtain this.",
-                  "order": 3,
-                  "title": "Project ID",
-                  "type": "integer"
-                },
-                "secret": {
-                  "airbyte_secret": true,
-                  "description": "Mixpanel Service Account Secret. See the <a href=\"https://developer.mixpanel.com/reference/service-accounts\">docs</a> for more information on how to obtain this.",
-                  "order": 2,
-                  "title": "Secret",
-                  "type": "string"
-                },
-                "username": {
-                  "description": "Mixpanel Service Account Username. See the <a href=\"https://developer.mixpanel.com/reference/service-accounts\">docs</a> for more information on how to obtain this.",
-                  "order": 1,
-                  "title": "Username",
-                  "type": "string"
-                }
-              },
+              "type": "object",
+              "title": "Service Account",
               "required": [
                 "username",
                 "secret",
                 "project_id"
               ],
-              "title": "Service Account",
-              "type": "object"
+              "properties": {
+                "option_title": {
+                  "type": "string",
+                  "const": "Service Account",
+                  "order": 0
+                },
+                "username": {
+                  "order": 1,
+                  "title": "Username",
+                  "type": "string",
+                  "description": "Mixpanel Service Account Username. See the <a href=\"https://developer.mixpanel.com/reference/service-accounts\">docs</a> for more information on how to obtain this."
+                },
+                "secret": {
+                  "order": 2,
+                  "title": "Secret",
+                  "type": "string",
+                  "description": "Mixpanel Service Account Secret. See the <a href=\"https://developer.mixpanel.com/reference/service-accounts\">docs</a> for more information on how to obtain this.",
+                  "airbyte_secret": true
+                },
+                "project_id": {
+                  "order": 3,
+                  "title": "Project ID",
+                  "description": "Your project ID number. See the <a href=\"https://help.mixpanel.com/hc/en-us/articles/115004490503-Project-Settings#project-id\">docs</a> for more information on how to obtain this.",
+                  "type": "integer"
+                }
+              }
             },
             {
-              "properties": {
-                "api_secret": {
-                  "airbyte_secret": true,
-                  "description": "Mixpanel project secret. See the <a href=\"https://developer.mixpanel.com/reference/project-secret#managing-a-projects-secret\">docs</a> for more information on how to obtain this.",
-                  "order": 1,
-                  "title": "Project Secret",
-                  "type": "string"
-                },
-                "option_title": {
-                  "const": "Project Secret",
-                  "order": 0,
-                  "type": "string"
-                }
-              },
+              "type": "object",
+              "title": "Project Secret",
               "required": [
                 "api_secret"
               ],
-              "title": "Project Secret",
-              "type": "object"
+              "properties": {
+                "option_title": {
+                  "type": "string",
+                  "const": "Project Secret",
+                  "order": 0
+                },
+                "api_secret": {
+                  "order": 1,
+                  "title": "Project Secret",
+                  "type": "string",
+                  "description": "Mixpanel project secret. See the <a href=\"https://developer.mixpanel.com/reference/project-secret#managing-a-projects-secret\">docs</a> for more information on how to obtain this.",
+                  "airbyte_secret": true
+                }
+              }
             }
-          ],
-          "order": 0,
-          "title": "Authentication *",
-          "type": "object"
+          ]
         },
-        "date_window_size": {
-          "default": 30,
-          "description": "Defines window size in days, that used to slice through data. You can reduce it, if amount of data in each window is too big for your environment. (This value should be positive integer)",
-          "minimum": 1,
-          "order": 8,
-          "title": "Date slicing window",
-          "type": "integer"
-        },
-        "end_date": {
-          "description": "The date in the format YYYY-MM-DD. Any data after this date will not be replicated. Left empty to always sync to most recent date",
-          "examples": [
-            "2021-11-16"
-          ],
-          "format": "date",
-          "order": 6,
-          "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?$",
-          "title": "End Date",
-          "type": "string"
+        "attribution_window": {
+          "order": 2,
+          "title": "Attribution Window",
+          "type": "integer",
+          "description": "A period of time for attributing results to ads and the lookback period after those actions occur during which ad results are counted. Default attribution window is 5 days. (This value should be non-negative integer)",
+          "default": 5
         },
         "project_timezone": {
-          "default": "US/Pacific",
+          "order": 3,
+          "title": "Project Timezone",
+          "type": "string",
           "description": "Time zone in which integer date times are stored. The project timezone may be found in the project settings in the <a href=\"https://help.mixpanel.com/hc/en-us/articles/115004547203-Manage-Timezones-for-Projects-in-Mixpanel\">Mixpanel console</a>.",
+          "default": "US/Pacific",
           "examples": [
             "US/Pacific",
             "UTC"
-          ],
-          "order": 3,
-          "title": "Project Timezone",
-          "type": "string"
-        },
-        "region": {
-          "default": "US",
-          "description": "The region of mixpanel domain instance either US or EU.",
-          "enum": [
-            "US",
-            "EU"
-          ],
-          "order": 7,
-          "title": "Region",
-          "type": "string"
-        },
-        "select_properties_by_default": {
-          "default": true,
-          "description": "Setting this config parameter to TRUE ensures that new properties on events and engage records are captured. Otherwise new properties will be ignored.",
-          "order": 4,
-          "title": "Select Properties By Default",
-          "type": "boolean"
+          ]
         },
         "start_date": {
+          "order": 4,
+          "title": "Start Date",
+          "type": "string",
           "description": "The date in the format YYYY-MM-DD. Any data before this date will not be replicated. If this option is not set, the connector will replicate data from up to one year ago by default.",
           "examples": [
             "2021-11-16"
           ],
-          "format": "date",
-          "order": 5,
           "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?$",
-          "title": "Start Date",
-          "type": "string"
+          "format": "date"
+        },
+        "end_date": {
+          "order": 5,
+          "title": "End Date",
+          "type": "string",
+          "description": "The date in the format YYYY-MM-DD. Any data after this date will not be replicated. Left empty to always sync to most recent date",
+          "examples": [
+            "2021-11-16"
+          ],
+          "pattern": "^$|^[0-9]{4}-[0-9]{2}-[0-9]{2}(T[0-9]{2}:[0-9]{2}:[0-9]{2}Z)?$",
+          "format": "date"
+        },
+        "region": {
+          "order": 6,
+          "title": "Region",
+          "description": "The region of mixpanel domain instance either US or EU.",
+          "type": "string",
+          "enum": [
+            "US",
+            "EU"
+          ],
+          "default": "US"
+        },
+        "date_window_size": {
+          "order": 7,
+          "title": "Date slicing window",
+          "description": "Defines window size in days, that used to slice through data. You can reduce it, if amount of data in each window is too big for your environment. (This value should be positive integer)",
+          "type": "integer",
+          "minimum": 1,
+          "default": 30
+        },
+        "advanced": {
+          "title": "Advanced",
+          "description": "Advanced configuration options",
+          "type": "object",
+          "order": 8,
+          "properties": {
+            "page_size": {
+              "order": 0,
+              "title": "Page size",
+              "type": "integer",
+              "minimum": 100,
+              "default": 50000
+            },
+            "minimal_cohort_members_properties": {
+              "order": 1,
+              "title": "Minimal Cohort Members properties",
+              "type": "boolean",
+              "description": "Set to TRUE to capture only the minimal properties for the cohort members binding. Typically left as the default.",
+              "default": true
+            }
+          }
         }
-      },
-      "required": [
-        "credentials"
-      ],
-      "title": "Source Mixpanel Spec",
-      "type": "object"
+      }
     },
-    "documentationUrl": "https://go.estuary.dev/kC5MzU",
-    "protocol": 3032023,
     "resourceConfigSchema": {
-      "additionalProperties": false,
+      "title": "ResourceConfig",
       "description": "ResourceConfig encodes a configured resource stream",
+      "type": "object",
       "properties": {
-        "cursorField": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Cursor Field",
-          "type": "array"
-        },
-        "namespace": {
-          "description": "Enclosing schema namespace of this resource",
-          "title": "Namespace",
-          "type": "string"
-        },
         "stream": {
-          "description": "Name of this stream",
           "title": "Stream",
+          "description": "Name of this stream",
           "type": "string"
         },
         "syncMode": {
+          "title": "Sync Mode",
           "description": "Sync this resource incrementally, or fully refresh it every run",
           "enum": [
             "full_refresh",
             "incremental"
           ],
-          "title": "Sync Mode",
           "type": "string"
+        },
+        "namespace": {
+          "title": "Namespace",
+          "description": "Enclosing schema namespace of this resource",
+          "type": "string"
+        },
+        "cursorField": {
+          "title": "Cursor Field",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "required": [
         "stream",
         "syncMode"
       ],
-      "title": "ResourceConfig",
-      "type": "object"
+      "additionalProperties": false
     },
+    "documentationUrl": "https://go.estuary.dev/kC5MzU",
     "resourcePathPointers": [
       "/namespace",
       "/stream"
