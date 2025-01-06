@@ -62,21 +62,23 @@ class SourceMixpanel(AbstractSource):
 
     @adapt_validate_if_testing
     def _validate_and_transform(self, config: MutableMapping[str, Any]):
-        project_timezone, start_date, end_date, attribution_window, select_properties_by_default, region, date_window_size, project_id = (
+        project_timezone, start_date, end_date, attribution_window, region, date_window_size, project_id, page_size, minimal_cohort_members_properties = (
             config.get("project_timezone", "US/Pacific"),
             config.get("start_date"),
             config.get("end_date"),
             config.get("attribution_window", 5),
-            config.get("select_properties_by_default", True),
             config.get("region", "US"),
             config.get("date_window_size", 30),
             config.get("credentials", dict()).get("project_id"),
+            config.get('advanced', {}).get('page_size', 50000),
+            config.get('advanced', {}).get("minimal_cohort_members_properties", True),
         )
+
         if region not in ("US", "EU"):
             raise_config_error("Region must be either EU or US.")
 
-        if select_properties_by_default not in (True, False, "", None):
-            raise_config_error("Please provide a valid True/False value for the `Select properties by default` parameter.")
+        if minimal_cohort_members_properties not in (True, False, "", None):
+            raise_config_error("Please provide a valid True/False value for the `Minimal Cohort Members properties` parameter.")
 
         if not isinstance(attribution_window, int) or attribution_window < 0:
             raise_config_error("Please provide a valid integer for the `Attribution window` parameter.")
@@ -94,10 +96,11 @@ class SourceMixpanel(AbstractSource):
         config["start_date"] = self.validate_date("start date", start_date, today.subtract(days=365))
         config["end_date"] = self.validate_date("end date", end_date, today)
         config["attribution_window"] = attribution_window
-        config["select_properties_by_default"] = select_properties_by_default
         config["region"] = region
         config["date_window_size"] = date_window_size
         config["project_id"] = project_id
+        config["minimal_cohort_members_properties"] = minimal_cohort_members_properties
+        config['page_size'] = page_size
 
         return config
 

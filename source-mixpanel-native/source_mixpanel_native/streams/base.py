@@ -49,7 +49,8 @@ class MixpanelStream(HttpStream, ABC):
         end_date: Date = None,
         date_window_size: int = 30,  # in days
         attribution_window: int = 0,  # in days
-        select_properties_by_default: bool = True,
+        minimal_cohort_members_properties: bool = True,
+        page_size: int = 50000,
         project_id: int = None,
         reqs_per_hour_limit: int = DEFAULT_REQS_PER_HOUR_LIMIT,
         **kwargs,
@@ -58,7 +59,8 @@ class MixpanelStream(HttpStream, ABC):
         self.end_date = end_date
         self.date_window_size = date_window_size
         self.attribution_window = attribution_window
-        self.additional_properties = select_properties_by_default
+        self.minimal_cohort_members_properties = minimal_cohort_members_properties
+        self.page_size = page_size
         self.region = region
         self.project_timezone = project_timezone
         self.project_id = project_id

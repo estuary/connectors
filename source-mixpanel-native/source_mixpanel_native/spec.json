@@ -79,15 +79,8 @@
         "default": "US/Pacific",
         "examples": ["US/Pacific", "UTC"]
       },
-      "select_properties_by_default": {
-        "order": 4,
-        "title": "Select Properties By Default",
-        "type": "boolean",
-        "description": "Setting this config parameter to TRUE ensures that new properties on events and engage records are captured. Otherwise new properties will be ignored.",
-        "default": true
-      },
       "start_date": {
-        "order": 5,
+        "order": 4,
         "title": "Start Date",
         "type": "string",
         "description": "The date in the format YYYY-MM-DD. Any data before this date will not be replicated. If this option is not set, the connector will replicate data from up to one year ago by default.",
@@ -96,7 +89,7 @@
         "format": "date"
       },
       "end_date": {
-        "order": 6,
+        "order": 5,
         "title": "End Date",
         "type": "string",
         "description": "The date in the format YYYY-MM-DD. Any data after this date will not be replicated. Left empty to always sync to most recent date",
@@ -105,7 +98,7 @@
         "format": "date"
       },
       "region": {
-        "order": 7,
+        "order": 6,
         "title": "Region",
         "description": "The region of mixpanel domain instance either US or EU.",
         "type": "string",
@@ -113,12 +106,34 @@
         "default": "US"
       },
       "date_window_size": {
-        "order": 8,
+        "order": 7,
         "title": "Date slicing window",
         "description": "Defines window size in days, that used to slice through data. You can reduce it, if amount of data in each window is too big for your environment. (This value should be positive integer)",
         "type": "integer",
         "minimum": 1,
         "default": 30
+      },
+      "advanced": {
+        "title": "Advanced",
+        "description": "Advanced configuration options",
+        "type": "object",
+        "order": 8,
+        "properties": {
+            "page_size": {
+                "order": 0,
+                "title": "Page size",
+                "type": "integer",
+                "minimum": 100,
+                "default": 50000
+            },
+            "minimal_cohort_members_properties": {
+                "order": 1,
+                "title": "Minimal Cohort Members properties",
+                "type": "boolean",
+                "description": "Set to TRUE to capture only the minimal properties for the cohort members binding. Typically left as the default.",
+                "default": true
+              }
+        }
       }
     }
   }
