@@ -31,8 +31,8 @@ class CohortMembers(MixpanelStream):
 
         # Since we know that each result received from the Mixpanel API will be a consistent, pretty small size when the
         # minimal_cohort_members_properties flag is set, we can use a very large page size to page through results faster.
-        # if minimal_cohort_members_properties:
-        #     page_size = 1_000_000
+        if minimal_cohort_members_properties:
+            page_size = 1_000_000
 
         super().__init__(
             page_size=page_size,
@@ -58,8 +58,8 @@ class CohortMembers(MixpanelStream):
         params = super().request_params(stream_state, stream_slice, next_page_token)
         params = {**params, "page_size": self.page_size}
 
-        # if self.minimal_cohort_members_properties:
-        #     params['output_properties'] = '"$last_seen"'
+        if self.minimal_cohort_members_properties:
+            params['output_properties'] = '"$last_seen"'
 
         if next_page_token:
             params.update(next_page_token)
