@@ -1,18 +1,28 @@
 #
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
-
-from functools import cache
+from datetime import datetime, timedelta
 from typing import Any, Iterable, List, Mapping, MutableMapping, Optional
 
+import pendulum
 import requests
 from airbyte_cdk.models import SyncMode
+from airbyte_cdk.sources.streams.core import IncrementalMixin, StreamData
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 
-from .base import IncrementalMixpanelStream, MixpanelStream
+from .base import MixpanelStream
+
+DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%S"
 
 
-class Engage(IncrementalMixpanelStream):
+def _dt_to_str(dt: datetime) -> str:
+    return dt.strftime(DATETIME_STRING_FORMAT)
+
+def _str_to_dt(string: str) -> datetime:
+    return datetime.fromisoformat(string)
+
+
+class Engage(MixpanelStream, IncrementalMixin):
     """Return list of all users
     API Docs: https://developer.mixpanel.com/reference/engage
     Endpoint: https://mixpanel.com/api/2.0/engage
@@ -21,16 +31,21 @@ class Engage(IncrementalMixpanelStream):
     http_method: str = "POST"
     data_field: str = "results"
     primary_key: str = "distinct_id"
-    page_size: int = 50000  # min 100
     _total: Any = None
-    cursor_field = "last_seen"
+    _cursor_value = ''
 
     @property
-    def state_checkpoint_interval(self) -> int:
-        # to meet the requirement of emitting state at least once per 15 minutes,
-        # we assume there's at least 1 record per request returned. Given that each request is followed by a 60 seconds sleep
-        # we'll have to emit state every 15 records
-        return 10000
+    def cursor_field(self) -> str:
+        """Name of the field associated with the state"""
+        return "last_seen"
+
+    @property
+    def state(self) -> Mapping[str, Any]:
+        return {self.cursor_field: self._cursor_value}
+
+    @state.setter
+    def state(self, value: Mapping[str, Any]):
+        self._cursor_value = value[self.cursor_field]
 
     @property
     def source_defined_cursor(self) -> bool:
@@ -42,6 +57,27 @@ class Engage(IncrementalMixpanelStream):
 
     # enable automatic object mutation to align with desired schema before outputting to the destination
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
+
+    def stream_slices(
+        self, sync_mode: SyncMode, cursor_field: List[str] = None, stream_state: Mapping[str, Any] = None
+    ) -> Iterable[Optional[Mapping[str, Any]]]:
+        config_start_date = datetime.combine(self.start_date, datetime.min.time())
+        cursor: str | None = self.state.get(self.cursor_field, None)
+
+        start_date = _str_to_dt(cursor) if cursor else config_start_date
+        end_date = _str_to_dt(pendulum.now(tz=self.project_timezone).to_datetime_string())
+        window_size = min(30, self.date_window_size)
+
+        while start_date < end_date:
+            slice_end = min(start_date + timedelta(days=window_size), end_date)
+            stream_slice = {
+                "start": start_date,
+                "end": slice_end,
+            }
+
+            yield stream_slice
+
+            start_date = slice_end
 
     def path(self, **kwargs) -> str:
         return "engage"
@@ -58,9 +94,15 @@ class Engage(IncrementalMixpanelStream):
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state, stream_slice, next_page_token)
-        params = {**params, "page_size": self.page_size}
+        params = {
+            **params,
+            "page_size": self.page_size,
+            "where": f'properties["$last_seen"]>"{_dt_to_str(stream_slice['start'])}" and properties["$last_seen"]<="{_dt_to_str(stream_slice['end'])}"'
+        }
+
         if next_page_token:
             params.update(next_page_token)
+
         return params
 
     def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
@@ -131,16 +173,16 @@ class Engage(IncrementalMixpanelStream):
             if not item_cursor or not state_cursor or item_cursor >= state_cursor:
                 yield item
 
-    def set_cursor(self, cursor_field: List[str]):
-        if not cursor_field:
-            raise Exception("cursor_field is not defined")
-        if len(cursor_field) > 1:
-            raise Exception("multidimensional cursor_field is not supported")
-        self.cursor_field = cursor_field[0]
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: Optional[List[str]] = None,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Optional[Mapping[str, Any]] = None,
+    ) -> Iterable[StreamData]:
+        yield from self._read_pages(
+            lambda req, res, state, _slice: self.parse_response(res, stream_slice=_slice, stream_state=state), stream_slice, stream_state
+        )
 
-    def stream_slices(
-        self, sync_mode: SyncMode, cursor_field: List[str] = None, stream_state: Mapping[str, Any] = None
-    ) -> Iterable[Optional[Mapping[str, Any]]]:
-        if sync_mode == SyncMode.incremental:
-            self.set_cursor(cursor_field)
-        return super().stream_slices(sync_mode=sync_mode, cursor_field=cursor_field, stream_state=stream_state)
+        # Update state after finishing reading a stream slice.
+        self.state = {self.cursor_field: _dt_to_str(stream_slice['end'])}
