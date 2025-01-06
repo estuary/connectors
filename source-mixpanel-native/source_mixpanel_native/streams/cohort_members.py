@@ -5,7 +5,6 @@
 from typing import Any, Iterable, List, Mapping, Optional, MutableMapping
 
 import requests
-from airbyte_cdk.sources.streams.core import IncrementalMixin
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 
@@ -13,37 +12,33 @@ from .base import MixpanelStream
 from .cohorts import Cohorts
 
 
-# CohortMembers is currently a full refresh stream that uses checkpoints to flush records out of the Airbyte connector.
-# This is necessary because some cohorts have enough members that the connector OOMs before it finishes reading that
-# cohort's members. In the future, we could make this stream incremental by having cursor values for each cohort within
-# the state and performing client-side filtering.
-class CohortMembers(MixpanelStream, IncrementalMixin):
+class CohortMembers(MixpanelStream):
     """Return list of users grouped by cohort"""
     http_method: str = "POST"
     data_field: str = "results"
     primary_key: str = "distinct_id"
-    page_size: int = 50000
     _total: Any = None
-    _cursor_value: str = ''
-
-    @property
-    def cursor_field(self) -> str:
-        return "last_seen"
-
-    @property
-    def state(self) -> Mapping[str, Any]:
-        return {self.cursor_field: self._cursor_value}
-
-    @state.setter
-    def state(self, value: Mapping[str, Any]):
-        self._cursor_value = value[self.cursor_field]
-
-    @property
-    def state_checkpoint_interval(self) -> int:
-        return 100
 
     # enable automatic object mutation to align with desired schema before outputting to the destination
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
+
+    def __init__(
+        self,
+        minimal_cohort_members_properties: bool = True,
+        page_size: int = 50000,
+        **kwargs,
+    ):
+
+        # Since we know that each result received from the Mixpanel API will be a consistent, pretty small size when the
+        # minimal_cohort_members_properties flag is set, we can use a very large page size to page through results faster.
+        # if minimal_cohort_members_properties:
+        #     page_size = 1_000_000
+
+        super().__init__(
+            page_size=page_size,
+            minimal_cohort_members_properties=minimal_cohort_members_properties,
+            **kwargs,
+        )
 
     def path(self, **kwargs) -> str:
         return "engage"
@@ -62,6 +57,10 @@ class CohortMembers(MixpanelStream, IncrementalMixin):
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state, stream_slice, next_page_token)
         params = {**params, "page_size": self.page_size}
+
+        # if self.minimal_cohort_members_properties:
+        #     params['output_properties'] = '"$last_seen"'
+
         if next_page_token:
             params.update(next_page_token)
 
@@ -87,7 +86,7 @@ class CohortMembers(MixpanelStream, IncrementalMixin):
         self, sync_mode, cursor_field: List[str] = None, stream_state: Mapping[str, Any] = None
     ) -> Iterable[Optional[Mapping[str, Any]]]:
         # full refresh is needed for Cohorts because even though some cohorts might already have been read
-        # they can still have new members added.
+        # they can still have members added or removed.
         cohorts = Cohorts(**self.get_stream_params()).read_records(SyncMode.full_refresh)
         # A single cohort could be empty (i.e. no members), so we only check for members in non-empty cohorts. 
         filtered_cohorts = [cohort for cohort in cohorts if cohort["count"] > 0]
@@ -107,13 +106,11 @@ class CohortMembers(MixpanelStream, IncrementalMixin):
                     this_property_name = this_property_name[1:]
                 item[this_property_name] = properties[property_name]
 
-            item_cursor: str = item.get(self.cursor_field)
+            item_cursor: str | None = item.get('last_seen', None)
             if item_cursor:
                 item_cursor += "+00:00"
-                item[self.cursor_field] = item_cursor
+                item['last_seen'] = item_cursor
 
             item["cohort_id"] = stream_slice["id"]
 
-            # Always yield every record. If/when this stream is actually made incremental,
-            # we will need to filter which records are yielded based
             yield item
