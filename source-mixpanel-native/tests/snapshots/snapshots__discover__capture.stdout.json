@@ -1,13 +1,27 @@
 [
   {
+    "recommendedName": "cohorts",
+    "resourceConfig": {
+      "stream": "cohorts",
+      "syncMode": "incremental",
+      "cursorField": [
+        "created"
+      ]
+    },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
       "additionalProperties": true,
       "required": [
         "id"
       ],
       "properties": {
+        "id": {
+          "description": "The unique identifier of the cohort data.",
+          "type": "integer"
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -15,47 +29,28 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
-        },
-        "id": {
-          "description": "The unique identifier of the cohort data.",
-          "type": "integer"
+          ]
         }
       },
-      "type": "object",
       "x-infer-schema": true
     },
     "key": [
       "/id"
-    ],
-    "recommendedName": "cohorts",
-    "resourceConfig": {
-      "cursorField": [
-        "created"
-      ],
-      "stream": "cohorts",
-      "syncMode": "incremental"
-    }
+    ]
   },
   {
+    "recommendedName": "cohort_members",
+    "resourceConfig": {
+      "stream": "cohort_members",
+      "syncMode": "full_refresh"
+    },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
       "required": [
         "distinct_id"
       ],
       "properties": {
-        "_meta": {
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ],
-          "type": "object"
-        },
         "cohort_id": {
           "description": "The unique identifier of the cohort to which the member belongs",
           "type": [
@@ -70,75 +65,52 @@
         "id": {
           "description": "The unique identifier of the cohort member",
           "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
-      "type": "object",
       "x-infer-schema": true
     },
     "key": [
       "/distinct_id"
-    ],
-    "recommendedName": "cohort_members",
-    "resourceConfig": {
-      "cursorField": [
-        "last_seen"
-      ],
-      "stream": "cohort_members",
-      "syncMode": "incremental"
-    }
+    ]
   },
   {
+    "recommendedName": "funnels",
+    "resourceConfig": {
+      "stream": "funnels",
+      "syncMode": "incremental",
+      "cursorField": [
+        "date"
+      ]
+    },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
       "required": [
         "date",
         "funnel_id"
       ],
       "properties": {
-        "_meta": {
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ],
-          "type": "object"
+        "funnel_id": {
+          "description": "Unique identifier for the funnel.",
+          "type": "integer"
         },
         "date": {
           "description": "Date field for the funnel data.",
           "type": "string"
         },
-        "funnel_id": {
-          "description": "Unique identifier for the funnel.",
-          "type": "integer"
-        }
-      },
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/funnel_id",
-      "/date"
-    ],
-    "recommendedName": "funnels",
-    "resourceConfig": {
-      "cursorField": [
-        "date"
-      ],
-      "stream": "funnels",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "required": [
-        "date"
-      ],
-      "properties": {
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -146,15 +118,35 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
-        },
-        "amount": {
-          "description": "Total revenue amount for the specified date",
-          "type": [
-            "null",
-            "number"
           ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/funnel_id",
+      "/date"
+    ]
+  },
+  {
+    "recommendedName": "revenue",
+    "resourceConfig": {
+      "stream": "revenue",
+      "syncMode": "incremental",
+      "cursorField": [
+        "date"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "date"
+      ],
+      "properties": {
+        "date": {
+          "description": "Date for which the revenue data is recorded",
+          "type": "string"
         },
         "count": {
           "description": "Number of revenue transactions for the specified date",
@@ -163,41 +155,22 @@
             "integer"
           ]
         },
-        "date": {
-          "description": "Date for which the revenue data is recorded",
-          "type": "string"
-        },
         "paid_count": {
           "description": "Number of successful paid transactions for the specified date",
           "type": [
             "null",
             "integer"
           ]
-        }
-      },
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/date"
-    ],
-    "recommendedName": "revenue",
-    "resourceConfig": {
-      "cursorField": [
-        "date"
-      ],
-      "stream": "revenue",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "required": [
-        "insert_id"
-      ],
-      "properties": {
+        },
+        "amount": {
+          "description": "Total revenue amount for the specified date",
+          "type": [
+            "null",
+            "number"
+          ]
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -205,46 +178,46 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
-        },
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/date"
+    ]
+  },
+  {
+    "recommendedName": "export",
+    "resourceConfig": {
+      "stream": "export",
+      "syncMode": "incremental",
+      "cursorField": [
+        "time"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "insert_id"
+      ],
+      "properties": {
         "distinct_id": {
           "description": "Unique identifier for the event",
           "type": "string"
         },
         "time": {
           "description": "Timestamp of the event",
-          "format": "date-time",
-          "type": "string"
+          "type": "string",
+          "format": "date-time"
         },
         "insert_id": {
-            "description": "Unique insertion identifier",
-            "type": "string"
-        }
-      },
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/insert_id"
-    ],
-    "recommendedName": "export",
-    "resourceConfig": {
-      "cursorField": [
-        "time"
-      ],
-      "stream": "export",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "required": [
-        "id"
-      ],
-      "properties": {
+          "description": "Unique insertion identifier",
+          "type": "string"
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -252,18 +225,30 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
-        },
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/insert_id"
+    ]
+  },
+  {
+    "recommendedName": "annotations",
+    "resourceConfig": {
+      "stream": "annotations",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
         "date": {
           "description": "The date of the annotation in ISO 8601 date-time format.",
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "description": {
-          "description": "The description or notes associated with the annotation.",
           "type": [
             "null",
             "string"
@@ -272,28 +257,16 @@
         "id": {
           "description": "The unique identifier of the annotation.",
           "type": "integer"
-        }
-      },
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "annotations",
-    "resourceConfig": {
-      "stream": "annotations",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "required": [
-        "distinct_id"
-      ],
-      "properties": {
+        },
+        "description": {
+          "description": "The description or notes associated with the annotation.",
+          "type": [
+            "null",
+            "string"
+          ]
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -301,9 +274,31 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
-        },
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "engage",
+    "resourceConfig": {
+      "stream": "engage",
+      "syncMode": "incremental",
+      "cursorField": [
+        "last_seen"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "distinct_id"
+      ],
+      "properties": {
         "distinct_id": {
           "description": "The unique identifier for the user.",
           "type": "string"
@@ -311,21 +306,23 @@
         "id": {
           "description": "The unique ID associated with the user.",
           "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
-      "type": "object",
       "x-infer-schema": true
     },
     "key": [
       "/distinct_id"
-    ],
-    "recommendedName": "engage",
-    "resourceConfig": {
-      "cursorField": [
-        "last_seen"
-      ],
-      "stream": "engage",
-      "syncMode": "incremental"
-    }
+    ]
   }
 ]
