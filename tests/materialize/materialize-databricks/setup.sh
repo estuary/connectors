@@ -72,6 +72,12 @@ resources_json_template='[
       "table": "deletions"
     },
     "source": "${TEST_COLLECTION_DELETIONS}"
+  },
+  {
+    "resource": {
+      "table": "binary_key"
+    },
+    "source": "${TEST_COLLECTION_BINARY_KEY}"
   }
 ]'
 
