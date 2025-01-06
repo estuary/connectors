@@ -51,16 +51,16 @@ SELECT 0, `a-schema`.key_value.flow_document
 	JOIN (
 		(
 			SELECT
-			key1, key2, `key!binary`
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1, key2, `key!binary`
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
 			FROM json.`file2`
 		)
 	) AS r
-	ON `a-schema`.key_value.key1 = r.key1 AND `a-schema`.key_value.key2 = r.key2 AND `a-schema`.key_value.`key!binary` = unbase64(r.`key!binary`)
+	ON `a-schema`.key_value.key1 = r.key1 AND `a-schema`.key_value.key2 = r.key2 AND `a-schema`.key_value.`key!binary` = r.`key!binary`
 --- End `a-schema`.key_value loadQuery ---
 
 --- Begin `a-schema`.key_value mergeInto ---

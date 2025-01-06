@@ -37,7 +37,9 @@
     ["tests/unsigned-bigint", { "id": 1, "unsigned_bigint": 18446744073709551615}],
 
     ["tests/deletions", { "id": 1, "_meta": {"op": "c"} }],
-    ["tests/deletions", { "id": 2, "_meta": {"op": "c"} }]
+    ["tests/deletions", { "id": 2, "_meta": {"op": "c"} }],
+
+    ["tests/binary-key", { "id": "c2F5xY1uYXJhCg==", "counter": 0 }]
   ],
   [
     ["tests/simple", { "id": 7, "canary": "pieced"}],
@@ -76,6 +78,8 @@
     ["tests/deletions", { "id": 3, "_meta": {"op": "c"} }],
 
     ["tests/deletions", { "id": 4, "_meta": {"op": "c"} }],
-    ["tests/deletions", { "id": 4, "_meta": {"op": "d"} }]
+    ["tests/deletions", { "id": 4, "_meta": {"op": "d"} }],
+
+    ["tests/binary-key", { "id": "c2F5xY1uYXJhCg==", "counter": 1 }]
   ]
 ]

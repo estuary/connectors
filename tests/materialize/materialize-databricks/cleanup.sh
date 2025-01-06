@@ -18,5 +18,6 @@ dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.multiple_types"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.formatted_strings"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.unsigned_bigint"
 dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.deletions"
+dropTable "\`$DATABRICKS_CATALOG\`.\`some-schema\`.binary_key"
 
 go run ${TEST_DIR}/materialize-databricks/fetch-data.go --run-query "delete from \`$DATABRICKS_CATALOG\`.\`some-schema\`.flow_materializations_v2 where MATERIALIZATION='tests/materialize-databricks/materialize';"

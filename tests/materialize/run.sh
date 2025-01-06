@@ -48,6 +48,7 @@ export TEST_COLLECTION_COMPOUND_KEY="tests/compound-key"
 export TEST_COLLECTION_SYMBOLS="tests/symbols"
 export TEST_COLLECTION_UNSIGNED_BIGINT="tests/unsigned-bigint"
 export TEST_COLLECTION_DELETIONS="tests/deletions"
+export TEST_COLLECTION_BINARY_KEY="tests/binary-key"
 
 
 function decrypt_config {
