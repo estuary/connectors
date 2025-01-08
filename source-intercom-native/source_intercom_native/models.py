@@ -67,6 +67,11 @@ class EndpointConfig(BaseModel):
             default=5,
             gt=0,
         )]
+        use_companies_list_endpoint: bool = Field(
+            description="If selected, the /companies/list endpoint is used instead of the /companies/scroll endpoint. Typically, leave as the default unless the connector's logs indicate otherwise.",
+            title="Use /companies/list endpoint",
+            default=False,
+        )
 
     advanced: Advanced = Field(
         default_factory=Advanced, #type: ignore
@@ -156,8 +161,18 @@ class CompanyListResponse(BaseModel, extra="allow"):
     pages: Pagination
 
 
+class CompanyScrollResponse(BaseModel, extra="allow"):
+    data: list[TimestampedResource]
+    scroll_param: str
+
+
 ClientSideFilteringResourceFetchChangesFn = Callable[
     [HTTPSession, Logger, LogCursor],
+    AsyncGenerator[TimestampedResource | LogCursor, None],
+]
+
+CompanyResourceFetchChangesFn = Callable[
+    [HTTPSession, bool, Logger, LogCursor],
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]
 

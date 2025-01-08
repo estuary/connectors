@@ -13,6 +13,7 @@ from .models import (
     IntercomResource,
     TimestampedResource,
     ClientSideFilteringResourceFetchChangesFn,
+    CompanyResourceFetchChangesFn,
     IncrementalDateWindowResourceFetchChangesFn,
     OAUTH2_SPEC,
 )
@@ -51,8 +52,13 @@ INCREMENTAL_DATE_WINDOW_RESOURCES: list[tuple[str, IncrementalDateWindowResource
 # Each tuple contains the resource's name and its fetch function.
 CLIENT_SIDE_FILTERED_RESOURCES: list[tuple[str, ClientSideFilteringResourceFetchChangesFn]] = [
     ("segments", fetch_segments),
+]
+
+# Company-related resources. These are also filtered on the client side, but require
+# an additional config setting to determine which endpoint to use.
+COMPANY_RESOURCES: list[tuple[str, CompanyResourceFetchChangesFn]] = [
     ("companies", fetch_companies),
-    ("company_segments", fetch_company_segments)
+    ("company_segments", fetch_company_segments),
 ]
 
 
@@ -249,6 +255,51 @@ def client_side_filtered_resources(
     return resources
 
 
+def company_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        fetch_fn: CompanyResourceFetchChangesFn,
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_fn,
+                http,
+                config.advanced.use_companies_list_endpoint,
+            )
+        )
+
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, fetch_fn),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=config.start_date),
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, fetch_fn) in COMPANY_RESOURCES
+    ]
+
+    return resources
+
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -259,4 +310,5 @@ async def all_resources(
         *incremental_date_window_resources(log, http, config),
         conversations(log, http, config),
         *client_side_filtered_resources(log, http, config),
+        *company_resources(log, http, config),
     ]

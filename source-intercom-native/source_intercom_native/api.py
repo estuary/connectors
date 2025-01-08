@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, UTC, timedelta
 import json
 from logging import Logger
@@ -16,6 +17,7 @@ from .models import (
     ConversationResponse,
     SegmentsResponse,
     CompanyListResponse,
+    CompanyScrollResponse,
     CompanySegmentsResponse,
 )
 
@@ -25,6 +27,9 @@ SEARCH_PAGE_SIZE = 150
 COMPANIES_LIST_LIMIT = 10_000
 
 COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API"
+COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX = r"scroll already exists for this workspace"
+
+companies_scroll_lock = asyncio.Lock()
 
 def _dt_to_s(dt: datetime) -> int:
     return int(dt.timestamp())
@@ -379,18 +384,11 @@ async def fetch_segments(
         yield _s_to_dt(last_seen_ts)
 
 
-async def fetch_companies(
+async def _list_companies(
         http: HTTPSession,
         log: Logger,
-        log_cursor: LogCursor,
-) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
-
-    log_cursor_ts = _dt_to_s(log_cursor)
-    last_seen_ts = log_cursor_ts
-
+) -> AsyncGenerator[TimestampedResource, None]:
     url = f"{API}/companies/list"
-
     current_page = 1
     params = {
         "per_page": 60,
@@ -406,8 +404,6 @@ async def fetch_companies(
             )
         except HTTPError as err:
             # End pagination and checkpoint any documents if we hit the limit for the /companies/list endpoint.
-            # If support for the /companies/scroll endpoint is added, we can re-evaluate whether to break or
-            # fail here & tell users to use the /companies/scroll endpoint option.
             if err.code == 400 and bool(re.search(COMPANIES_LIST_LIMIT_REACHED_REGEX, err.message, re.DOTALL)):
                 break
             else:
@@ -416,20 +412,70 @@ async def fetch_companies(
         if not exceeds_list_limit and response.total_count > COMPANIES_LIST_LIMIT:
             log.warning(f"{response.total_count} companies found."
                         " This is greater than the maximum number of companies returned by the /companies/list endpoint, and the connector could be missing data."
-                        f" Contact Estuary support to request this stream use the /companies/scroll endpoint to retrieve more than {COMPANIES_LIST_LIMIT} companies.")
+                        f" Consider configuring the connector to use the /companies/scroll endpoint to retrieve more than {COMPANIES_LIST_LIMIT} companies.")
             exceeds_list_limit = True
 
         for company in response.data:
-            if company.updated_at > last_seen_ts:
-                last_seen_ts = company.updated_at
-            if company.updated_at > log_cursor_ts:
-                yield company
+            yield company
 
         if current_page >= response.pages.total_pages:
             break
 
         current_page += 1
         params['page'] = current_page
+
+
+async def _scroll_companies(
+        http: HTTPSession,
+        log: Logger,
+) -> AsyncGenerator[TimestampedResource, None]:
+    url = f"{API}/companies/scroll"
+    params = {}
+
+    # The Intercom API only lets a single "scroll" through /companies/scroll happen at a time,
+    # and the companies_scroll_lock prevents the connector from attempting multiple concurrent "scrolls".
+    async with companies_scroll_lock:
+        while True:
+            try:
+                response = CompanyScrollResponse.model_validate_json(
+                    await http.request(log, url, method="GET", params=params)
+                )
+            except HTTPError as err:
+                if err.code == 400 and bool(re.search(COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX, err.message, re.DOTALL)):
+                    log.fatal(
+                        "Unable to access the /companies/scroll endpoint because it's in use by a different application."
+                        " Please ensure no other application is using the /companies/scroll endpoint or "
+                        " configure the connector to use the alternative /companies/list endpoint."
+                        )
+                raise
+
+            if len(response.data) == 0:
+                break
+
+            for company in response.data:
+                yield company
+
+            params['scroll_param'] = response.scroll_param
+
+
+async def fetch_companies(
+        http: HTTPSession,
+        use_list_endpoint: bool,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    log_cursor_ts = _dt_to_s(log_cursor)
+    last_seen_ts = log_cursor_ts
+
+    companies_func = _list_companies if use_list_endpoint else _scroll_companies
+
+    async for company in companies_func(http, log):
+        if company.updated_at > last_seen_ts:
+            last_seen_ts = company.updated_at
+        if company.updated_at > log_cursor_ts:
+            yield company
 
     # Results are not returned sorted by a timestamp field,
     # so we can't yield a cursor until pagination is complete.
@@ -439,6 +485,7 @@ async def fetch_companies(
 
 async def fetch_company_segments(
         http: HTTPSession,
+        use_list_endpoint: bool,
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -447,54 +494,27 @@ async def fetch_company_segments(
     log_cursor_ts = _dt_to_s(log_cursor)
     last_seen_ts = log_cursor_ts
 
-    url = f"{API}/companies/list"
+    company_ids: list[str] = []
 
-    current_page = 1
-    params = {
-        "per_page": 60,
-        "page": current_page
-    }
+    companies_func = _list_companies if use_list_endpoint else _scroll_companies
 
-    exceeds_list_limit = False
+    # Fetch & buffer company ids to avoid using the /companies/scroll endpoint for longer than necessary and
+    # avoid exceeding the one minute timeout for a single "scroll" if we were to fetch segments while scrolling.
+    async for company in companies_func(http, log):
+        company_ids.append(company.id)
 
-    while True:
-        try:
-            response = CompanyListResponse.model_validate_json(
-                await http.request(log, url, method="POST", params=params)
-            )
-        except HTTPError as err:
-            # End pagination and checkpoint any documents if we hit the limit for the /companies/list endpoint.
-            # If support for the /companies/scroll endpoint is added, we can re-evaluate whether to break or
-            # fail here & tell users to use the /companies/scroll endpoint option.
-            if err.code == 400 and bool(re.search(COMPANIES_LIST_LIMIT_REACHED_REGEX, err.message, re.DOTALL)):
-                break
-            else:
-                raise
+    for id in company_ids:
+        segments_url = f"{API}/companies/{id}/segments"
 
-        if not exceeds_list_limit and response.total_count > COMPANIES_LIST_LIMIT:
-            log.warning(f"{response.total_count} companies found."
-                        " This is greater than the maximum number of companies returned by the /companies/list endpoint, and the connector could be missing data."
-                        f" Contact Estuary support to request this stream use the /companies/scroll endpoint to retrieve more than {COMPANIES_LIST_LIMIT} companies.")
-            exceeds_list_limit = True
+        company_segments = CompanySegmentsResponse.model_validate_json(
+            await http.request(log, segments_url)
+        )
 
-        for company in response.data:
-            segments_url = f"{API}/companies/{company.id}/segments"
-
-            company_segments = CompanySegmentsResponse.model_validate_json(
-                await http.request(log, segments_url)
-            )
-
-            for segment in company_segments.data:
-                if segment.updated_at > last_seen_ts:
-                    last_seen_ts = segment.updated_at
-                if segment.updated_at > log_cursor_ts:
-                    yield segment
-
-        if current_page >= response.pages.total_pages:
-            break
-
-        current_page += 1
-        params['page'] = current_page
+        for segment in company_segments.data:
+            if segment.updated_at > last_seen_ts:
+                last_seen_ts = segment.updated_at
+            if segment.updated_at > log_cursor_ts:
+                yield segment
 
     # Results are not returned sorted by a timestamp field,
     # so we can't yield a cursor until pagination is complete.
