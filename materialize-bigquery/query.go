@@ -39,7 +39,7 @@ func (c client) newQuery(queryString string, parameters ...interface{}) *bigquer
 }
 
 const (
-	maxAttempts            = 10
+	maxAttempts            = 30
 	initialBackoff float64 = 200 // Milliseconds
 	maxBackoff             = time.Duration(60 * time.Second)
 )
@@ -99,12 +99,18 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 						delay = maxBackoff
 					}
 
-					log.WithFields(log.Fields{
+					ll := log.WithFields(log.Fields{
 						"attempt":   attempt,
 						"jobStatus": status,
 						"error":     err,
 						"delay":     delay.String(),
-					}).Warn("job failed (will retry)")
+					})
+
+					if attempt > 10 {
+						ll.Info("job failed (will retry)")
+					} else {
+						ll.Debug("job failed (will retry)")
+					}
 
 					select {
 					case <-ctx.Done():
