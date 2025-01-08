@@ -31,6 +31,12 @@
               "exclusiveMinimum": 0,
               "title": "Window Size",
               "type": "integer"
+            },
+            "use_companies_list_endpoint": {
+              "default": false,
+              "description": "If selected, the /companies/list endpoint is used instead of the /companies/scroll endpoint. Typically, leave as the default unless the connector's logs indicate otherwise.",
+              "title": "Use /companies/list endpoint",
+              "type": "boolean"
             }
           },
           "title": "Advanced",
