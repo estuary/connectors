@@ -84,12 +84,18 @@ async def all_resources(
     # Docs reference: https://developers.hubspot.com/docs/api/crm/crm-custom-objects#retrieve-existing-custom-objects
     custom_object_path_components = [f"p_{n}" for n in custom_object_names]
 
+    # TODO(whb): Set this value from the endpoint configuration after all
+    # pre-existing tasks have had the option set to True.
+    # with_history = config.capturePropertyHistory
+    with_history = True
+
     custom_object_resources = [
         crm_object_with_associations(
             CustomObject,
             n,
             custom_object_path_components[index],
             http,
+            with_history,
             functools.partial(fetch_recent_custom_objects, custom_object_path_components[index]),
             functools.partial(fetch_delayed_custom_objects, custom_object_path_components[index]),
         )
@@ -97,13 +103,13 @@ async def all_resources(
     ]
 
     resources =  [
-        crm_object_with_associations(Company, Names.companies, Names.companies, http, fetch_recent_companies, fetch_delayed_companies),
-        crm_object_with_associations(Contact, Names.contacts, Names.contacts, http, fetch_recent_contacts, fetch_delayed_contacts),
-        crm_object_with_associations(Deal, Names.deals, Names.deals, http, fetch_recent_deals, fetch_delayed_deals),
-        crm_object_with_associations(Engagement, Names.engagements, Names.engagements, http, fetch_recent_engagements, fetch_delayed_engagements),
-        crm_object_with_associations(Ticket, Names.tickets, Names.tickets, http, fetch_recent_tickets, fetch_delayed_tickets),
-        crm_object_with_associations(Product, Names.products, Names.products, http, fetch_recent_products, fetch_delayed_products),
-        crm_object_with_associations(LineItem, Names.line_items, Names.line_items, http, fetch_recent_line_items, fetch_delayed_line_items),
+        crm_object_with_associations(Company, Names.companies, Names.companies, http, with_history, fetch_recent_companies, fetch_delayed_companies),
+        crm_object_with_associations(Contact, Names.contacts, Names.contacts, http, with_history, fetch_recent_contacts, fetch_delayed_contacts),
+        crm_object_with_associations(Deal, Names.deals, Names.deals, http, with_history, fetch_recent_deals, fetch_delayed_deals),
+        crm_object_with_associations(Engagement, Names.engagements, Names.engagements, http, with_history, fetch_recent_engagements, fetch_delayed_engagements),
+        crm_object_with_associations(Ticket, Names.tickets, Names.tickets, http, with_history, fetch_recent_tickets, fetch_delayed_tickets),
+        crm_object_with_associations(Product, Names.products, Names.products, http, with_history, fetch_recent_products, fetch_delayed_products),
+        crm_object_with_associations(LineItem, Names.line_items, Names.line_items, http, with_history, fetch_recent_line_items, fetch_delayed_line_items),
         properties(http, itertools.chain(standard_object_names, custom_object_path_components)),
         deal_pipelines(http),
         owners(http),
@@ -111,7 +117,7 @@ async def all_resources(
     ]
 
     try:
-        async for _ in fetch_recent_email_events(log, http, datetime.now(tz=UTC), None):
+        async for _ in fetch_recent_email_events(log, http, with_history, datetime.now(tz=UTC), None):
             break
 
         resources.append(email_events(http))
@@ -129,6 +135,7 @@ def crm_object_with_associations(
     object_name: str,
     path_component: str,
     http: HTTPSession,
+    with_history: bool,
     fetch_recent: FetchRecentFn,
     fetch_delayed: FetchDelayedFn,
 ) -> Resource:
@@ -151,8 +158,9 @@ def crm_object_with_associations(
                 fetch_recent,
                 fetch_delayed,
                 http,
+                with_history,
             ),
-            fetch_page=functools.partial(fetch_page_with_associations, cls, http, path_component),
+            fetch_page=functools.partial(fetch_page_with_associations, cls, http, with_history, path_component),
         )
 
     started_at = datetime.now(tz=UTC)
@@ -296,6 +304,7 @@ def email_events(http: HTTPSession) -> Resource:
                 fetch_recent_email_events,
                 fetch_delayed_email_events,
                 http,
+                True, # email events do not include property history
             ),
             fetch_page=functools.partial(fetch_email_events_page, http),
         )
