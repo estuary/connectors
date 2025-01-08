@@ -12,7 +12,8 @@ python = "^3.12"
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
 mypy = "^1.8.0"
-pytest = "^7.4.3"
+pytest = "^8.3.4"
+pytest-asyncio = "^0.25.1"
 pytest-insta = "^0.3.0"
 
 [build-system]

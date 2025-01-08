@@ -2,7 +2,6 @@ import asyncio
 import functools
 import itertools
 from datetime import UTC, datetime, timedelta
-import json
 from logging import Logger
 from typing import (
     Any,
@@ -51,6 +50,7 @@ from .models import (
 )
 
 import source_hubspot_native.emitted_changes_cache as cache
+from source_hubspot_native.buffer_ordered import buffer_ordered
 
 HUB = "https://api.hubapi.com"
 
@@ -474,18 +474,24 @@ async def fetch_changes_with_associations(
 
     recent.sort()  # Oldest updates first.
 
-    for batch_it in itertools.batched(recent, 50):
-        batch = list(batch_it)
-
+    async def _do_batch_fetch(batch: list[tuple[datetime, str]]) -> Iterable[tuple[datetime, str, CRMObject]]:
         # Enable lookup of datetimes for IDs from the result batch.
         dts = {id: dt for dt, id in batch}
 
         documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
             log, cls, http, object_name, [id for _, id in batch]
         )
-        for doc in documents.results:
-            id = str(doc.id)
-            yield dts[id], id, doc
+
+        return ((dts[str(doc.id)], str(doc.id), doc) for doc in documents.results)
+
+
+    async def _batches_gen() -> AsyncGenerator[Awaitable[Iterable[tuple[datetime, str, CRMObject]]], None]:
+        for batch_it in itertools.batched(recent, 50):
+            yield _do_batch_fetch(list(batch_it))
+
+    async for res in buffer_ordered(_batches_gen(), 3):
+        for ts, id, doc in res:
+            yield ts, id, doc
 
 
 async def fetch_search_objects(
