@@ -1,10 +1,11 @@
 from datetime import datetime, UTC, timedelta
 import json
 from logging import Logger
+import re
 from typing import AsyncGenerator
 
 from estuary_cdk.capture.common import LogCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPSession, HTTPError
 from pydantic import TypeAdapter
 
 from .models import (
@@ -23,6 +24,7 @@ API = "https://api.intercom.io"
 SEARCH_PAGE_SIZE = 150
 COMPANIES_LIST_LIMIT = 10_000
 
+COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API"
 
 def _dt_to_s(dt: datetime) -> int:
     return int(dt.timestamp())
@@ -395,24 +397,33 @@ async def fetch_companies(
         "page": current_page
     }
 
-    count = 0
+    exceeds_list_limit = False
 
     while True:
-        response = CompanyListResponse.model_validate_json(
-            await http.request(log, url, method="POST", params=params)
-        )
+        try:
+            response = CompanyListResponse.model_validate_json(
+                await http.request(log, url, method="POST", params=params)
+            )
+        except HTTPError as err:
+            # End pagination and checkpoint any documents if we hit the limit for the /companies/list endpoint.
+            # If support for the /companies/scroll endpoint is added, we can re-evaluate whether to break or
+            # fail here & tell users to use the /companies/scroll endpoint option.
+            if err.code == 400 and bool(re.search(COMPANIES_LIST_LIMIT_REACHED_REGEX, err.message, re.DOTALL)):
+                break
+            else:
+                raise
+
+        if not exceeds_list_limit and response.total_count > COMPANIES_LIST_LIMIT:
+            log.warning(f"{response.total_count} companies found."
+                        " This is greater than the maximum number of companies returned by the /companies/list endpoint, and the connector could be missing data."
+                        f" Contact Estuary support to request this stream use the /companies/scroll endpoint to retrieve more than {COMPANIES_LIST_LIMIT} companies.")
+            exceeds_list_limit = True
 
         for company in response.data:
-            count += 1
             if company.updated_at > last_seen_ts:
                 last_seen_ts = company.updated_at
             if company.updated_at > log_cursor_ts:
                 yield company
-
-        if count >= COMPANIES_LIST_LIMIT:
-            log.warning(f"{count} companies retreived from the /companies/list endpoint."
-                        "This is greater than or equal to the maximum number of companies returned by this endpoint, and the connector could be missing data."
-                        f"Contact Estuary support to request this stream use the /companies/scroll endpoint to retrieve more than {COMPANIES_LIST_LIMIT} companies.")
 
         if current_page >= response.pages.total_pages:
             break
@@ -444,15 +455,29 @@ async def fetch_company_segments(
         "page": current_page
     }
 
-    count = 0
+    exceeds_list_limit = False
 
     while True:
-        response = CompanyListResponse.model_validate_json(
-            await http.request(log, url, method="POST", params=params)
-        )
+        try:
+            response = CompanyListResponse.model_validate_json(
+                await http.request(log, url, method="POST", params=params)
+            )
+        except HTTPError as err:
+            # End pagination and checkpoint any documents if we hit the limit for the /companies/list endpoint.
+            # If support for the /companies/scroll endpoint is added, we can re-evaluate whether to break or
+            # fail here & tell users to use the /companies/scroll endpoint option.
+            if err.code == 400 and bool(re.search(COMPANIES_LIST_LIMIT_REACHED_REGEX, err.message, re.DOTALL)):
+                break
+            else:
+                raise
+
+        if not exceeds_list_limit and response.total_count > COMPANIES_LIST_LIMIT:
+            log.warning(f"{response.total_count} companies found."
+                        " This is greater than the maximum number of companies returned by the /companies/list endpoint, and the connector could be missing data."
+                        f" Contact Estuary support to request this stream use the /companies/scroll endpoint to retrieve more than {COMPANIES_LIST_LIMIT} companies.")
+            exceeds_list_limit = True
 
         for company in response.data:
-            count += 1
             segments_url = f"{API}/companies/{company.id}/segments"
 
             company_segments = CompanySegmentsResponse.model_validate_json(
@@ -464,11 +489,6 @@ async def fetch_company_segments(
                     last_seen_ts = segment.updated_at
                 if segment.updated_at > log_cursor_ts:
                     yield segment
-
-        if count >= COMPANIES_LIST_LIMIT:
-            log.warning(f"{count} companies retreived from the /companies/list endpoint."
-                        "This is greater than or equal to the maximum number of companies returned by this endpoint, and the connector could be missing data."
-                        f"Contact Estuary support to request this stream use the /companies/scroll endpoint to retrieve more than {COMPANIES_LIST_LIMIT} companies.")
 
         if current_page >= response.pages.total_pages:
             break
