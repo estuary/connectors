@@ -2,6 +2,7 @@ import urllib.parse
 from datetime import datetime
 from enum import StrEnum, auto
 from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, Self, TypeVar
+from pydantic.json_schema import SkipJsonSchema
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -81,6 +82,11 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
+    capturePropertyHistory: bool = Field(
+        title="Capture Property History",
+        description="Include historical data for changes to properties of HubSpot objects in captured documents.",
+        default=False,
+    )
 
 
 # We use ResourceState directly, without extending it.
@@ -139,7 +145,7 @@ class Owner(BaseDocument, extra="allow"):
 class BaseCRMObject(BaseDocument, extra="forbid"):
     ASSOCIATED_ENTITIES: ClassVar[list[str]]
 
-    class History(BaseDocument, extra="forbid"):
+    class History(BaseModel, extra="forbid"):
         timestamp: datetime
         value: str
         sourceType: str
@@ -153,7 +159,7 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
     archived: bool
 
     properties: dict[str, str | None]
-    propertiesWithHistory: dict[str, list[History]] = {}
+    propertiesWithHistory: SkipJsonSchema[dict[str, list[History]]] = {}
 
     class InlineAssociations(BaseModel):
         class Entry(BaseModel):
