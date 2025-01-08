@@ -75,6 +75,12 @@
             }
           ],
           "title": "Authentication"
+        },
+        "capturePropertyHistory": {
+          "default": false,
+          "description": "Include historical data for changes to properties of HubSpot objects in captured documents.",
+          "title": "Capture Property History",
+          "type": "boolean"
         }
       },
       "required": [
