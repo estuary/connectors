@@ -404,7 +404,6 @@ func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string) (stri
 		b.WriteString(col)
 		b.WriteString(" (" + colTypes[i].DatabaseTypeName() + ")")
 	}
-	b.WriteString("\n")
 
 	for rows.Next() {
 		var data = make([]anyColumn, len(cols))

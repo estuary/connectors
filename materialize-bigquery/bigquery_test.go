@@ -129,7 +129,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			// bigquery does not support more than 6 fractional second precision, and will fail if we try
 			// to insert a value with 9
-			for i, _ := range values {
+			for i := range values {
 				if keys[i] == "datetimeValue" {
 					values[i] = "'2024-01-01 01:01:01.111111'"
 				}
@@ -287,10 +287,6 @@ func TestFencingCases(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	// These tests assume that the configuration obtained from environment variables forms a valid
-	// config that could be used to materialize into Bigquery. Various parameters of the
-	// configuration are then manipulated to test assertions for incorrect configs.
-
 	// Due to the nature of configuring the connector with a JSON service account key and the
 	// difficulties in discriminating between error responses from BigQuery there's only a handful
 	// of cases that can be explicitly tested.

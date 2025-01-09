@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -255,6 +256,10 @@ func (col *anyColumn) Scan(i interface{}) error {
 	switch ii := i.(type) {
 	case []byte:
 		sval = string(ii)
+	case time.Time:
+		// Consistent formatting of datetimes, which may otherwise use the
+		// database or local timezone.
+		sval = ii.UTC().Format(time.RFC3339Nano)
 	case string:
 		if _, err := strconv.Atoi(ii); err == nil {
 			// Snowflake integer value columns scan into an interface{} with a concrete type of
