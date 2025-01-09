@@ -16,7 +16,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
@@ -71,7 +70,7 @@ func TestValidateAndApply(t *testing.T) {
 
 			return out.String()
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
 
 			for _, table := range []string{resourceConfig.Table} {

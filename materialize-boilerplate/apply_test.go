@@ -52,62 +52,37 @@ func TestApply(t *testing.T) {
 			name:         "new materialization",
 			originalSpec: nil,
 			newSpec:      loadApplySpec(t, "base.flow.proto"),
-			want: testResults{
-				createdMetaTables: true,
-				putSpec:           true,
-				createdResources:  1,
-			},
+			want:         testResults{createdResources: 1},
 		},
 		{
 			name:         "remove required field",
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "remove-required.flow.proto"),
-			want: testResults{
-				createdMetaTables:    true,
-				putSpec:              true,
-				nullabledProjections: 1,
-			},
+			want:         testResults{nullabledProjections: 1},
 		},
 		{
 			name:         "add required field",
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "add-new-required.flow.proto"),
-			want: testResults{
-				createdMetaTables: true,
-				putSpec:           true,
-				addedProjections:  1,
-			},
+			want:         testResults{addedProjections: 1},
 		},
 		{
 			name:         "add binding",
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "add-new-binding.flow.proto"),
-			want: testResults{
-				createdMetaTables: true,
-				putSpec:           true,
-				createdResources:  1,
-			},
+			want:         testResults{createdResources: 1},
 		},
 		{
 			name:         "replace binding",
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "replace-original-binding.flow.proto"),
-			want: testResults{
-				createdMetaTables: true,
-				putSpec:           true,
-				deletedResources:  1,
-				createdResources:  1,
-			},
+			want:         testResults{deletedResources: 1, createdResources: 1},
 		},
 		{
 			name:         "field is newly nullable",
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "make-nullable.flow.proto"),
-			want: testResults{
-				createdMetaTables:    true,
-				putSpec:              true,
-				nullabledProjections: 1,
-			},
+			want:         testResults{nullabledProjections: 1},
 		},
 	}
 
@@ -120,7 +95,7 @@ func TestApply(t *testing.T) {
 			}
 			is := testInfoSchemaFromSpec(t, tt.originalSpec, simpleTestTransform)
 
-			req := &pm.Request_Apply{Materialization: tt.newSpec, Version: "aVersion"}
+			req := &pm.Request_Apply{Materialization: tt.newSpec, Version: "aVersion", LastMaterialization: tt.originalSpec}
 
 			// Not concurrent.
 			got, err := ApplyChanges(ctx, req, app, is, false)
@@ -147,8 +122,6 @@ func TestApply(t *testing.T) {
 }
 
 type testResults struct {
-	createdMetaTables     bool
-	putSpec               bool
 	createdResources      int
 	deletedResources      int
 	addedProjections      int
@@ -164,32 +137,14 @@ type testApplier struct {
 	results    testResults
 }
 
-func (a *testApplier) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, ActionApplyFn, error) {
-	return "create meta tables", func(ctx context.Context) error {
-		a.results.createdMetaTables = true
-		return nil
-	}, nil
-}
-
 func (a *testApplier) CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, ActionApplyFn, error) {
 	binding := spec.Bindings[bindingIndex]
 
-	return fmt.Sprintf("create resource for collection %q", binding.Collection.Name.String()), func(ctx context.Context) error {
+	return fmt.Sprintf("create resource for %q", binding.ResourcePath), func(ctx context.Context) error {
 		a.mu.Lock()
 		defer a.mu.Unlock()
 
 		a.results.createdResources += 1
-		return nil
-	}, nil
-}
-
-func (a *testApplier) LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
-	return a.storedSpec, nil
-}
-
-func (a *testApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, exists bool) (string, ActionApplyFn, error) {
-	return fmt.Sprintf("put spec with version %q", version), func(ctx context.Context) error {
-		a.results.putSpec = true
 		return nil
 	}, nil
 }
@@ -214,8 +169,8 @@ func (a *testApplier) UpdateResource(ctx context.Context, spec *pf.Materializati
 	}
 
 	action := fmt.Sprintf(
-		"update resource for collection %q [new projections: %d, newly nullable fields: %d, newly delta updates: %t]",
-		binding.Collection.Name.String(),
+		"update resource for %q [new projections: %d, newly nullable fields: %d, newly delta updates: %t]",
+		binding.ResourcePath,
 		len(bindingUpdate.NewProjections),
 		len(bindingUpdate.NewlyNullableFields),
 		bindingUpdate.NewlyDeltaUpdates,

@@ -72,12 +72,11 @@ func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_S
 
 func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var (
-		err        error
-		endpoint   *Endpoint
-		client     Client
-		loadedSpec *pf.MaterializationSpec
-		resp       = new(pm.Response_Validated)
-		conf       = d.EndpointSpecType
+		err      error
+		endpoint *Endpoint
+		client   Client
+		resp     = new(pm.Response_Validated)
+		conf     = d.EndpointSpecType
 	)
 
 	if err = req.Validate(); err != nil {
@@ -95,10 +94,6 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 	}
 	defer client.Close()
 
-	if loadedSpec, _, err = loadSpec(ctx, client, endpoint, req.Name); err != nil {
-		return nil, fmt.Errorf("loading current applied materialization spec: %w", err)
-	}
-
 	resources := make([]Resource, 0, len(req.Bindings))
 	resourcePaths := make([][]string, 0, len(req.Bindings))
 	for _, b := range req.Bindings {
@@ -108,9 +103,6 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		}
 		resources = append(resources, res)
 		resourcePaths = append(resourcePaths, res.Path())
-	}
-	if endpoint.MetaSpecs != nil {
-		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
 	}
 	if endpoint.MetaCheckpoints != nil {
 		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
@@ -146,7 +138,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 			bindingSpec.Backfill,
 			bindingSpec.Collection,
 			bindingSpec.FieldConfigJsonMap,
-			loadedSpec,
+			req.LastMaterialization,
 		)
 		if err != nil {
 			return nil, err
@@ -188,9 +180,6 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	for _, b := range req.Materialization.Bindings {
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 	}
-	if endpoint.MetaSpecs != nil {
-		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
-	}
 	if endpoint.MetaCheckpoints != nil {
 		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
 	}
@@ -198,6 +187,22 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 	is, err := client.InfoSchema(ctx, resourcePaths)
 	if err != nil {
 		return nil, err
+	}
+
+	if endpoint.MetaCheckpoints != nil && !is.HasResource(endpoint.MetaCheckpoints.Path) {
+		if resolved, err := ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect); err != nil {
+			return nil, err
+		} else if createStatement, err := RenderTableTemplate(resolved, endpoint.CreateTableTemplate); err != nil {
+			return nil, err
+		} else if err := client.CreateTable(ctx, TableCreate{
+			Table:              resolved,
+			TableCreateSql:     createStatement,
+			ResourceConfigJson: nil, // not applicable for meta tables
+		}); err != nil {
+			return nil, fmt.Errorf("creating checkpoints table: %w", err)
+		} else {
+			log.WithField("table", resolved.Identifier).Info("created checkpoints table")
+		}
 	}
 
 	if sm, ok := client.(SchemaManager); ok {
@@ -226,7 +231,6 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 }
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
-	var loadedVersion string
 	var conf = d.EndpointSpecType
 
 	if err := json.Unmarshal(open.Materialization.ConfigJson, conf); err != nil {
@@ -247,20 +251,6 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *bo
 	defer client.Close()
 
 	var resourcePaths [][]string
-	if endpoint.MetaSpecs != nil {
-		resourcePaths = append(resourcePaths, endpoint.MetaSpecs.Path)
-
-		if _, loadedVersion, err = loadSpec(ctx, client, endpoint, open.Materialization.Name); err != nil {
-			return nil, nil, nil, fmt.Errorf("loading prior applied materialization spec: %w", err)
-		} else if loadedVersion == "" {
-			return nil, nil, nil, fmt.Errorf("materialization has not been applied")
-		} else if loadedVersion != open.Version {
-			return nil, nil, nil, fmt.Errorf(
-				"applied and current materializations are different versions (applied: %s vs current: %s)",
-				loadedVersion, open.Version)
-		}
-	}
-
 	var tables []Table
 	for index, spec := range open.Materialization.Bindings {
 		resourcePaths = append(resourcePaths, spec.ResourcePath)

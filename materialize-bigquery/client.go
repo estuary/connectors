@@ -113,11 +113,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	return is, nil
 }
 
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.query(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
-	return err
-}
-
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	_, err := c.query(ctx, tc.TableCreateSql)
 	return err

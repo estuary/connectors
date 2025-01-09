@@ -19,7 +19,7 @@
       "schema": {
         "type": "string",
         "title": "Schema",
-        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables.",
+        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration).",
         "order": 4
       },
       "warehouse": {

@@ -20,7 +20,6 @@ import (
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -61,35 +60,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	}
 
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	// Compress the spec bytes to store, since we are using a VARBYTE column with a limit of 1MB.
-	// TODO(whb): This will go away when we start passing in the last validated spec to Validate
-	// calls and stop needing to persist a spec at all.
-	// updateSpec.Parameters
-	specB64 := updateSpec.Parameters[1] // The second parameter is the spec
-	specBytes, err := base64.StdEncoding.DecodeString(specB64.(string))
-	if err != nil {
-		return fmt.Errorf("decoding base64 spec prior to compressing: %w", err)
-	}
-
-	// Sanity check that this is indeed a spec. By all rights this is totally unnecessary but it
-	// makes me feel a little better about indexing updateSpec.Parameters up above.
-	var spec pf.MaterializationSpec
-	if err := spec.Unmarshal(specBytes); err != nil {
-		return fmt.Errorf("application logic error - specBytes was not a spec: %w", err)
-	}
-
-	compressed, err := compressBytes(specBytes)
-	if err != nil {
-		return fmt.Errorf("compressing spec bytes: %w", err)
-	}
-
-	updateSpec.Parameters[1] = base64.StdEncoding.EncodeToString(compressed)
-
-	_, err = c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
-	return err
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -255,32 +225,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
-	var version, spec string
-
-	if err := c.db.QueryRowContext(
-		ctx,
-		fmt.Sprintf(
-			"SELECT version, spec FROM %s WHERE materialization = %s;",
-			specs.Identifier,
-			specs.Keys[0].Placeholder,
-		),
-		materialization.String(),
-	).Scan(&version, &spec); err != nil {
-		return "", "", err
-	}
-
-	if hexBytes, err := hex.DecodeString(spec); err != nil {
-		return "", "", fmt.Errorf("hex.DecodeString: %w", err)
-	} else if specBytes, err := base64.StdEncoding.DecodeString(string(hexBytes)); err != nil {
-		return "", "", fmt.Errorf("base64.DecodeString: %w", err)
-	} else if specBytes, err = maybeDecompressBytes(specBytes); err != nil {
-		return "", "", fmt.Errorf("decompressing spec: %w", err)
-	} else {
-		return base64.StdEncoding.EncodeToString(specBytes), version, nil
-	}
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

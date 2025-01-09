@@ -225,13 +225,11 @@ func newPostgresDriver() *sql.Driver {
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
 
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             pgDialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
+				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,

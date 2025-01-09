@@ -9,7 +9,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -111,13 +110,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	return is, nil
 }
 
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	// Normalize query by removing trailing ';' as Trino does not accept it.
-	updateSpec.QueryString = strings.TrimRight(updateSpec.QueryString, ";")
-	_, err := c.db.ExecContext(ctx, updateSpec.QueryString)
-	return err
-}
-
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
 	return err
@@ -184,34 +176,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (spec, version string, err error) {
-
-	fetchVersionAndSpecQuery, err := sql.RenderTableTemplate(specs, c.templates.fetchVersionAndSpec)
-	if err != nil {
-		return "", "", err
-	}
-
-	// QueryRowContext cannot be used until Trino driver issue is fixed https://github.com/trinodb/trino-go-client/issues/102
-	rows, err := c.db.QueryContext(ctx,
-		fetchVersionAndSpecQuery,
-		materialization.String())
-	if err != nil {
-		return "", "", fmt.Errorf("quering spec and version faield: %w", err)
-	}
-	var numberOfResults int
-	for rows.Next() {
-		numberOfResults++
-		if err := rows.Scan(&version, &spec); err != nil {
-			return "", "", fmt.Errorf("quering spec and version faield: %w", err)
-		}
-	}
-	if numberOfResults != 1 {
-		return "", "", fmt.Errorf("quering spec and version should return exactly one result number of results: %d", numberOfResults)
-	}
-
-	return
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
