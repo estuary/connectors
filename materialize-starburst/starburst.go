@@ -117,14 +117,11 @@ func newStarburstDriver() *sql.Driver {
 				"schema":  cfg.Schema,
 			}).Info("opening Starburst")
 
-			var metaBase sql.TablePath
-			var metaSpecs, _ = sql.MetaTables(metaBase)
 			var templates = renderTemplates(starburstTrinoDialect)
 
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             starburstTrinoDialect,
-				MetaSpecs:           &metaSpecs,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,

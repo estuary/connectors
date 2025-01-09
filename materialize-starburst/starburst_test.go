@@ -7,15 +7,14 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
-	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	"os"
 	"slices"
 	"strings"
 	"testing"
+
+	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 
 	"github.com/stretchr/testify/require"
 )
@@ -80,16 +79,9 @@ func TestValidateAndApply(t *testing.T) {
 
 			return sch
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s", targetTableDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				targetTableDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				targetTableDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }

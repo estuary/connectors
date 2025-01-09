@@ -15,7 +15,6 @@ import (
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 
 	_ "github.com/marcboeker/go-duckdb"
@@ -46,11 +45,6 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.QueryString)
-	return err
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -200,10 +194,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
-	return sql.StdFetchSpecAndVersion(ctx, c.db, specs, materialization)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

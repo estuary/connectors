@@ -13,9 +13,6 @@ import (
 )
 
 type Client interface {
-	// FetchSpecAndVersion retrieves the materialization from Table `specs`,
-	// or returns sql.ErrNoRows if no such spec exists.
-	FetchSpecAndVersion(ctx context.Context, specs Table, materialization pf.Materialization) (specB64, version string, _ error)
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
 
@@ -24,9 +21,6 @@ type Client interface {
 	// need to include all tables in the entire destination system, but must include all tables in
 	// the relevant schemas.
 	InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error)
-
-	// PutSpec executes the MetaSpecsUpdate to upsert the spec into the metadata table.
-	PutSpec(ctx context.Context, spec MetaSpecsUpdate) error
 
 	// CreateTable creates a table in the destination system.
 	CreateTable(ctx context.Context, tc TableCreate) error
@@ -97,8 +91,6 @@ type Endpoint struct {
 	Config interface{}
 	// Dialect of the Endpoint.
 	Dialect
-	// MetaSpecs is the specification meta-table of the Endpoint.
-	MetaSpecs *TableShape
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
 	// It's optional, and won't be created or used if it's nil.
 	MetaCheckpoints *TableShape

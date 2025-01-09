@@ -88,11 +88,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	return sql.StdFetchInfoSchema(ctx, c.db, pgDialect, catalog, resourcePaths)
 }
 
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
-	return err
-}
-
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	var res tableConfig
 	if tc.ResourceConfigJson != nil {
@@ -177,10 +172,6 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return sql.StdCreateSchema(ctx, c.db, pgDialect, schemaName)
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
-	return sql.StdFetchSpecAndVersion(ctx, c.db, specs, materialization)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

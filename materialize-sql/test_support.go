@@ -42,8 +42,9 @@ func RunFenceTestCases(
 	var runTest = func(t *testing.T, ranges ...uint32) {
 		var ctx = context.Background()
 
-		var metaShape = FlowCheckpointsTable(checkpointsPath...)
-		var metaTable, err = ResolveTable(metaShape, dialect)
+		var metaShape = FlowCheckpointsTable(checkpointsPath)
+		metaShape.Path = checkpointsPath
+		var metaTable, err = ResolveTable(*metaShape, dialect)
 		require.NoError(t, err)
 
 		createSQL, err := RenderTableTemplate(metaTable, createTableTpl)
@@ -319,7 +320,7 @@ func RunValidateAndApplyMigrationsTests(
 	dumpSchema func(t *testing.T) string,
 	insertData func(t *testing.T, cols []string, values []string),
 	dumpData func(t *testing.T) string,
-	cleanup func(t *testing.T, materialization pf.Materialization),
+	cleanup func(t *testing.T),
 ) {
 	ctx := context.Background()
 	var snap strings.Builder
@@ -331,7 +332,7 @@ func RunValidateAndApplyMigrationsTests(
 	require.NoError(t, err)
 
 	t.Run("validate and apply migratable type changes", func(t *testing.T) {
-		defer cleanup(t, pf.Materialization("test/sqlite"))
+		defer cleanup(t)
 
 		fixture := loadValidateSpec(t, "base.flow.proto")
 

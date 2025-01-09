@@ -392,11 +392,6 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, cerrors.NewUserError(nil, fmt.Sprintf("could not connect to endpoint: received status code %d", p.StatusCode))
 	}
 
-	storedSpec, err := client.getSpec(ctx, req.Name)
-	if err != nil {
-		return nil, fmt.Errorf("getting spec: %w", err)
-	}
-
 	is, err := client.infoSchema(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting infoSchema for validate: %w", err)
@@ -422,7 +417,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 			binding.Backfill,
 			binding.Collection,
 			binding.FieldConfigJsonMap,
-			storedSpec,
+			req.LastMaterialization,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("validating binding: %w", err)

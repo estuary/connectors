@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	dbSql "database/sql"
 	"encoding/base64"
 	"errors"
 	"fmt"
@@ -16,7 +15,6 @@ import (
 	storage "cloud.google.com/go/storage"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -111,11 +109,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	}
 
 	return is, nil
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.query(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
-	return err
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -314,36 +307,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
-	job, err := c.query(ctx, fmt.Sprintf(
-		"SELECT version, spec FROM %s WHERE materialization=%s;",
-		specs.Identifier,
-		specs.Keys[0].Placeholder,
-	), materialization.String())
-	if err != nil {
-		return "", "", err
-	}
-
-	var data struct {
-		Version string `bigquery:"version"`
-		SpecB64 string `bigquery:"spec"`
-	}
-
-	if err := c.fetchOne(ctx, job, &data); err == errNotFound {
-		return "", "", dbSql.ErrNoRows
-	} else if err != nil {
-		return "", "", err
-	}
-
-	log.WithFields(log.Fields{
-		"table":           specs.Identifier,
-		"materialization": materialization.String(),
-		"version":         data.Version,
-	}).Info("existing materialization spec loaded")
-
-	return data.SpecB64, data.Version, nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

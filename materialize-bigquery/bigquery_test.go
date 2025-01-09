@@ -14,7 +14,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -73,17 +72,11 @@ func TestValidateAndApply(t *testing.T) {
 			t.Helper()
 			return dumpSchema(t, ctx, client, cfg, resourceConfig)
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = client.query(ctx, fmt.Sprintf(
 				"drop table %s;",
 				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
-			))
-
-			_, _ = client.query(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, sql.DefaultFlowMaterializations),
 			))
 		},
 	)
@@ -186,17 +179,11 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			return b.String()
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = client.query(ctx, fmt.Sprintf(
 				"drop table %s;",
 				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
-			))
-
-			_, _ = client.query(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, sql.DefaultFlowMaterializations),
 			))
 		},
 	)

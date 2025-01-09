@@ -18,7 +18,6 @@ import (
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/databricks/databricks-sql-go"
@@ -121,11 +120,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	}
 
 	return is, nil
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.QueryString)
-	return err
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -301,23 +295,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
-	var version, spec string
-
-	if err := c.db.QueryRowContext(
-		ctx,
-		fmt.Sprintf(
-			"SELECT version, spec FROM %s WHERE materialization = %s;",
-			specs.Identifier,
-			databricksDialect.Literal(materialization.String()),
-		),
-	).Scan(&version, &spec); err != nil {
-		return "", "", err
-	}
-
-	return spec, version, nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
