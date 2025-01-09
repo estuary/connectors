@@ -183,6 +183,8 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
         self.propertiesWithHistory = {
             k: v for k, v in self.propertiesWithHistory.items() if len(v)
         }
+        if len(self.propertiesWithHistory) == 0:
+            delattr(self, "propertiesWithHistory")
 
         # If the model has attached inline associations,
         # hoist them to corresponding arrays. Then clear associations.
