@@ -497,8 +497,16 @@ async def fetch_changes_with_associations(
         for batch_it in itertools.batched(recent, 50 if with_history else 100):
             yield _do_batch_fetch(list(batch_it))
 
+    total = len(recent)
+    if total >= 10_000:
+        log.info("will process large batch of changes with associations", {"total": total})
+
+    count = 0
     async for res in buffer_ordered(_batches_gen(), 3):
         for ts, id, doc in res:
+            count += 1
+            if count > 0 and count % 10_000 == 0:
+                log.info("fetching changes with associations", {"count": count, "total": total})
             yield ts, id, doc
 
 
