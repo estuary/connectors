@@ -40,8 +40,8 @@ func (c client) newQuery(queryString string, parameters ...interface{}) *bigquer
 
 const (
 	maxAttempts            = 30
-	initialBackoff float64 = 200 // Milliseconds
-	maxBackoff             = time.Duration(60 * time.Second)
+	initialBackoff float64 = 200       // Milliseconds
+	maxBackoff             = 60 * 1000 // Milliseconds
 )
 
 // runQuery will run a query and return the completed job.
@@ -94,10 +94,10 @@ func (c client) runQuery(ctx context.Context, query *bigquery.Query) (*bigquery.
 					strings.Contains(err.Error(), "The job encountered an error during execution. Retrying the job may solve the problem.") ||
 					(len(e.Errors) == 1 && e.Errors[0].Reason == "jobRateLimitExceeded") {
 					backoff *= math.Pow(2, 1+rand.Float64())
-					delay := time.Duration(backoff * float64(time.Millisecond))
-					if delay > maxBackoff {
-						delay = maxBackoff
+					if backoff > maxBackoff {
+						backoff = maxBackoff
 					}
+					delay := time.Duration(backoff * float64(time.Millisecond))
 
 					ll := log.WithFields(log.Fields{
 						"attempt":   attempt,
