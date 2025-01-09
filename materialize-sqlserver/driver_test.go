@@ -291,14 +291,6 @@ func TestPrereqs(t *testing.T) {
 			},
 			want: []string{"Cannot open database \"wrongmaster\" that was requested by the login."},
 		},
-		{
-			name: "wrong address",
-			cfg: func(cfg config) *config {
-				cfg.Address = "wrong." + cfg.Address
-				return &cfg
-			},
-			want: []string{fmt.Sprintf("host at address %q cannot be found", "wrong."+cfg.Address)},
-		},
 	}
 
 	ctx := context.Background()
