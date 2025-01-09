@@ -232,9 +232,15 @@ func (t *transactor) addBinding(target sql.Table) error {
 	return nil
 }
 
+type minMax struct {
+	Min any
+	Max any
+}
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
+	var bindingMinMaxKeys = make(map[string]minMax)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
@@ -246,6 +252,31 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err := b.loadFile.encodeRow(converted); err != nil {
 			return fmt.Errorf("encoding row for load: %w", err)
+		} else {
+			bindingName := b.target.Identifier
+			if bmx, ok := bindingMinMaxKeys[bindingName]; !ok {
+				bindingMinMaxKeys[bindingName] = minMax{
+					Min: converted[0],
+					Max: converted[0],
+				}
+			} else {
+				switch v := converted[0].(type) {
+				case int:
+					if v < bmx.Min.(int) {
+						bmx.Min = v
+					}
+					if v > bmx.Max.(int) {
+						bmx.Max = v
+					}
+				case string:
+					if v < bmx.Min.(string) {
+						bmx.Min = v
+					}
+					if v > bmx.Max.(string) {
+						bmx.Max = v
+					}
+				}
+			}
 		}
 	}
 
@@ -270,7 +301,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			toDelete = append(toDelete, fullPaths...)
 		}
 	}
-	defer d.deleteFiles(ctx, toDelete)
+	//defer d.deleteFiles(ctx, toDelete)
 
 	if it.Err() != nil {
 		return it.Err()
@@ -293,7 +324,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		defer rows.Close()
 		d.be.FinishedEvaluatingLoads()
+		log.WithField("loadQuery", unionQuery)
 
+		var loadedCounts = make(map[string]int)
 		for rows.Next() {
 			var binding int
 			var document string
@@ -305,7 +338,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 					return err
 				}
 			}
+
+			bindingName := d.bindings[binding].target.Identifier
+			loadedCounts[bindingName] = loadedCounts[bindingName] + 1
 		}
+		log.WithFields(log.Fields{"loadQuery": unionQuery, "loaded": loadedCounts, "minMaxKeys": bindingMinMaxKeys, "fullPaths": toDelete}).Info("load")
 
 		if err = rows.Err(); err != nil {
 			return fmt.Errorf("querying Loads: %w", err)
@@ -477,11 +514,43 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				}
 				return nil, fmt.Errorf("query %q failed: %w", query, err)
 			}
+
+		}
+
+		var binding = d.bindingForStateKey(stateKey)
+		var keyStrings []string
+		for _, k := range binding.target.Keys {
+			keyStrings = append(keyStrings, k.Identifier)
+		}
+		var duplicatesQuery = fmt.Sprintf(`select %s from %s group by %s having count(*) > 1`, strings.Join(keyStrings, ","), binding.target.Identifier, strings.Join(keyStrings, ","))
+		rows, err := db.QueryContext(ctx, duplicatesQuery)
+		if err != nil {
+			return nil, fmt.Errorf("finding %q duplicates: %w", duplicatesQuery, err)
+		}
+		defer rows.Close()
+		var duplicates [][]any
+		for rows.Next() {
+			var row = make([]any, len(binding.target.Keys))
+
+			var rowReferences = make([]any, len(row))
+			for i := 0; i < len(row); i++ {
+				rowReferences[i] = &row[i]
+			}
+
+			if err := rows.Scan(rowReferences...); err != nil {
+				return nil, fmt.Errorf("scanning duplicates: %w", err)
+			}
+
+			duplicates = append(duplicates, row)
+		}
+
+		if len(duplicates) > 0 {
+			log.WithFields(log.Fields{"query": item.Queries, "fullPaths": item.ToDelete, "duplicates": duplicates}).Info("acknowledge")
 		}
 		d.be.FinishedResourceCommit(path)
 
 		// Cleanup files.
-		d.deleteFiles(ctx, item.ToDelete)
+		//d.deleteFiles(ctx, item.ToDelete)
 	}
 
 	d.cpRecovery = false
@@ -505,6 +574,15 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+}
+
+func (d *transactor) bindingForStateKey(stateKey string) *binding {
+	for _, b := range d.bindings {
+		if b.target.StateKey == stateKey {
+			return b
+		}
+	}
+	return nil
 }
 
 func (d *transactor) pathForStateKey(stateKey string) []string {
