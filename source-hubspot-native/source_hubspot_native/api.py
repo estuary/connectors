@@ -487,9 +487,19 @@ async def fetch_changes_with_associations(
         # Enable lookup of datetimes for IDs from the result batch.
         dts = {id: dt for dt, id in batch}
 
-        documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
-            log, cls, http, with_history, object_name, [id for _, id in batch]
-        )
+        attempt = 1
+        while True:
+            try:
+                documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
+                    log, cls, http, with_history, object_name, [id for _, id in batch]
+                )
+                break
+            except Exception as e:
+                if attempt == 5:
+                    raise
+                log.warning("failed to fetch batch with associations (will retry)", {"error": str(e), "attempt": attempt})
+                await asyncio.sleep(attempt * 2)
+                attempt += 1
 
         return ((dts[str(doc.id)], str(doc.id), doc) for doc in documents.results)
 
