@@ -242,10 +242,6 @@ func TestFencingCases(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	// These tests assume that the configuration obtained from environment variables forms a valid
-	// config that could be used to materialize into Redshift. Various parameters of the
-	// configuration are then manipulated to test assertions for incorrect configs.
-
 	cfg := mustGetCfg(t)
 
 	nonExistentBucket := uuid.NewString()
@@ -283,14 +279,6 @@ func TestPrereqs(t *testing.T) {
 				return &cfg
 			},
 			want: []error{fmt.Errorf("database %q does not exist", "wrong"+cfg.Database)},
-		},
-		{
-			name: "wrong address",
-			cfg: func(cfg config) *config {
-				cfg.Address = "wrong." + cfg.Address
-				return &cfg
-			},
-			want: []error{fmt.Errorf("host at address %q cannot be found", "wrong."+cfg.Address)},
 		},
 		{
 			name: "bucket doesn't exist",

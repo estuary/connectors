@@ -179,10 +179,6 @@ func TestSpecification(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	// These tests assume that the configuration obtained from environment variables forms a valid
-	// config that could be used to materialize into Snowflake. Various parameters of the
-	// configuration are then manipulated to test assertions for incorrect configs.
-
 	cfg := mustGetCfg(t)
 
 	tests := []struct {
@@ -194,14 +190,6 @@ func TestPrereqs(t *testing.T) {
 			name: "valid",
 			cfg:  func(cfg config) *config { return &cfg },
 			want: nil,
-		},
-		{
-			name: "wrong account identifier in host",
-			cfg: func(cfg config) *config {
-				cfg.Host = "wrong.snowflakecomputing.com"
-				return &cfg
-			},
-			want: []error{fmt.Errorf("incorrect account identifier %q in host URL", "wrong")},
 		},
 		{
 			name: "wrong username",

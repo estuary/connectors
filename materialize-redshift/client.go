@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"path"
 	"strings"
@@ -23,8 +22,8 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
-	"github.com/jackc/pgconn"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -189,28 +188,20 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 
 	if err := db.PingContext(pingCtx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
-		var pgErr *pgconn.PgError
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
+		var pgErr *pgconn.ConnectError
 
 		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case "28000":
+			err = pgErr.Unwrap()
+			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
 				err = fmt.Errorf("incorrect username or password")
-			case "3D000":
+			} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
 				err = fmt.Errorf("database %q does not exist", cfg.Database)
-			}
-		} else if errors.As(err, &netConnErr) {
-			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
-			}
-		} else if errors.As(err, &netOpErr) {
-			if netOpErr.Timeout() {
+			} else if strings.Contains(errStr, "context deadline exceeded") {
 				errStr := `connection to host at address %q timed out, possible causes:
-	* Redshift endpoint is not set to be publicly accessible
-	* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
-	* the configured address is incorrect, possibly with an incorrect host or port
-	* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
+					* Redshift endpoint is not set to be publicly accessible
+					* there is no inbound rule allowing Estuary's IP address to connect through the Redshift VPC security group
+					* the configured address is incorrect, possibly with an incorrect host or port
+					* if connecting through an SSH tunnel, the SSH bastion server may not be operational, or the connection details are incorrect`
 				err = fmt.Errorf(errStr, cfg.Address)
 			}
 		}

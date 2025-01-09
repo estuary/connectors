@@ -150,13 +150,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 		var sfError *sf.SnowflakeError
 		if errors.As(err, &sfError) {
 			switch sfError.Number {
-			case 260008:
-				// This is the error if the host URL has an incorrect account identifier. The error
-				// message from the Snowflake driver will accurately report that the account name is
-				// incorrect, but would be confusing for a user because we have a separate "Account"
-				// input field. We want to be specific here and report that it is the account
-				// identifier in the host URL.
-				err = fmt.Errorf("incorrect account identifier %q in host URL", strings.TrimSuffix(cfg.Host, ".snowflakecomputing.com"))
 			case 390100:
 				err = fmt.Errorf("incorrect username or password")
 			case 390201:

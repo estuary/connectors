@@ -364,10 +364,10 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong address",
 			cfg: func(cfg config) *config {
-				cfg.Address = "wrong." + cfg.Address
+				cfg.Address = cfg.Address + ".wrong"
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("host at address %q cannot be found", "wrong."+cfg.Address)},
+			want: []string{fmt.Sprintf("host at address %q cannot be found", cfg.Address+".wrong")},
 		},
 	}
 
