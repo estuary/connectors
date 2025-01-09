@@ -105,6 +105,14 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			for i, col := range cols {
 				keys[i] = testDialect.Identifier(col)
 			}
+			for i := range values {
+				if values[i] == "true" {
+					values[i] = "1"
+				} else if values[i] == "false" {
+					values[i] = "0"
+				}
+			}
+
 			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
 			values = append(values, "0")
 			keys = append(keys, testDialect.Identifier("flow_published_at"))

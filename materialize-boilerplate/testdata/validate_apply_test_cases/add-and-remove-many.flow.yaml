@@ -14,7 +14,7 @@ collections:
         optionalObject: { type: object }
         addedOptionalString: { type: string }
         addedRequiredString: { type: string }
-      required: [key, requiredString, requiredInteger, requiredBoolean, requiredObject, addedRequiredString]
+      required: [key, requiredInteger, requiredBoolean, addedRequiredString]
     key: [/key]
     projections:
       flow_document: ""
