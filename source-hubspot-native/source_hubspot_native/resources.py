@@ -84,10 +84,7 @@ async def all_resources(
     # Docs reference: https://developers.hubspot.com/docs/api/crm/crm-custom-objects#retrieve-existing-custom-objects
     custom_object_path_components = [f"p_{n}" for n in custom_object_names]
 
-    # TODO(whb): Set this value from the endpoint configuration after all
-    # pre-existing tasks have had the option set to True.
-    # with_history = config.capturePropertyHistory
-    with_history = True
+    with_history = config.capturePropertyHistory
 
     custom_object_resources = [
         crm_object_with_associations(
