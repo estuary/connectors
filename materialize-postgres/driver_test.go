@@ -198,14 +198,6 @@ func TestPrereqs(t *testing.T) {
 			},
 			want: []error{fmt.Errorf("database %q does not exist", "wrong"+cfg.Database)},
 		},
-		{
-			name: "wrong address",
-			cfg: func(cfg config) *config {
-				cfg.Address = "wrong." + cfg.Address
-				return &cfg
-			},
-			want: []error{fmt.Errorf("host at address %q cannot be found", "wrong."+cfg.Address)},
-		},
 	}
 
 	for _, tt := range tests {

@@ -5,14 +5,13 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
-	"net"
 	"strings"
 	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/jackc/pgconn"
+	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -58,23 +57,14 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 
 	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
-		var pgErr *pgconn.PgError
-		var netConnErr *net.DNSError
-		var netOpErr *net.OpError
-
+		var pgErr *pgconn.ConnectError
 		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case "28P01":
+			err = pgErr.Unwrap()
+			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28P01)") {
 				err = fmt.Errorf("incorrect username or password")
-			case "3D000":
+			} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
 				err = fmt.Errorf("database %q does not exist", cfg.Database)
-			}
-		} else if errors.As(err, &netConnErr) {
-			if netConnErr.IsNotFound {
-				err = fmt.Errorf("host at address %q cannot be found", cfg.Address)
-			}
-		} else if errors.As(err, &netOpErr) {
-			if netOpErr.Timeout() {
+			} else if strings.Contains(errStr, "context deadline exceeded") {
 				err = fmt.Errorf("connection to host at address %q timed out (incorrect host or port?)", cfg.Address)
 			}
 		}
