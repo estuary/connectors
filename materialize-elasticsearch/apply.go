@@ -14,12 +14,6 @@ type elasticApplier struct {
 	cfg    config
 }
 
-func (e *elasticApplier) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, boilerplate.ActionApplyFn, error) {
-	return fmt.Sprintf("create index %q", defaultFlowMaterializations), func(ctx context.Context) error {
-		return e.client.createMetaIndex(ctx, e.cfg.Advanced.Replicas)
-	}, nil
-}
-
 func (e *elasticApplier) CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
 	binding := spec.Bindings[bindingIndex]
 
@@ -35,16 +29,6 @@ func (e *elasticApplier) CreateResource(ctx context.Context, spec *pf.Materializ
 
 	return fmt.Sprintf("create index %q", binding.ResourcePath[0]), func(ctx context.Context) error {
 		return e.client.createIndex(ctx, binding.ResourcePath[0], res.Shards, e.cfg.Advanced.Replicas, props)
-	}, nil
-}
-
-func (e *elasticApplier) LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
-	return e.client.getSpec(ctx, materialization)
-}
-
-func (e *elasticApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, _ bool) (string, boilerplate.ActionApplyFn, error) {
-	return fmt.Sprintf("update stored materialization spec and set version = %s", version), func(ctx context.Context) error {
-		return e.client.putSpec(ctx, spec, version)
 	}, nil
 }
 

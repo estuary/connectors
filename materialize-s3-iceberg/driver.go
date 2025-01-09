@@ -256,7 +256,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		resourcePaths = append(resourcePaths, res.path())
 	}
 
-	catalog := newCatalog(cfg, resourcePaths, req.LastMaterialization)
+	catalog := newCatalog(cfg, resourcePaths)
 
 	is, err := catalog.infoSchema(ctx)
 	if err != nil {
@@ -304,7 +304,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 	}
 
-	catalog := newCatalog(cfg, resourcePaths, req.LastMaterialization)
+	catalog := newCatalog(cfg, resourcePaths)
 
 	existingNamespaces, err := catalog.listNamespaces(ctx)
 	if err != nil {
@@ -361,7 +361,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 		})
 	}
 
-	catalog := newCatalog(cfg, resourcePaths, open.Materialization)
+	catalog := newCatalog(cfg, resourcePaths)
 	tablePaths, err := catalog.tablePaths(ctx, resourcePaths)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("looking up table paths: %w", err)

@@ -79,7 +79,6 @@ func NewSQLiteDriver() *sql.Driver {
 			return &sql.Endpoint{
 				Config:              config{path: path},
 				Dialect:             sqliteDialect,
-				MetaSpecs:           nil,
 				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
@@ -123,16 +122,6 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
 	return "", nil, nil
-}
-
-// We don't use specs table for sqlite since it is ephemeral and won't be
-// persisted between ApplyUpsert and Transactions calls
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (specB64, version string, err error) {
-	return "", "", stdsql.ErrNoRows
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	return nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
