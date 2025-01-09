@@ -11,7 +11,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	"github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-sql-driver/mysql"
 )
 
@@ -238,21 +237,12 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
-	return err
-}
-
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization flow.Materialization) (string, string, error) {
-	return sql.StdFetchSpecAndVersion(ctx, c.db, specs, materialization)
 }
 
 func (c *client) Close() {

@@ -162,14 +162,10 @@ func newBigQueryDriver() *sql.Driver {
 				"bucket_path": cfg.BucketPath,
 			}).Info("creating bigquery endpoint")
 
-			var metaBase sql.TablePath = []string{cfg.ProjectID, cfg.Dataset}
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
-
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             bqDialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
+				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.ProjectID, cfg.Dataset}),
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
 				NewResource:         newTableConfig,

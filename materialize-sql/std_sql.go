@@ -13,30 +13,8 @@ import (
 	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
-
-// StdFetchSpecAndVersion is a convenience for Client implementations which
-// use Go's standard `sql.DB` type under the hood.
-func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materialization pf.Materialization) (spec, version string, err error) {
-	// Fail-fast: surface a connection issue.
-	if err = db.PingContext(ctx); err != nil {
-		err = fmt.Errorf("connecting to DB: %w", err)
-		return
-	}
-	err = db.QueryRowContext(
-		ctx,
-		fmt.Sprintf(
-			"SELECT version, spec FROM %s WHERE materialization = %s;",
-			specs.Identifier,
-			specs.Keys[0].Placeholder,
-		),
-		materialization.String(),
-	).Scan(&version, &spec)
-
-	return
-}
 
 // StdSQLExecStatements is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.

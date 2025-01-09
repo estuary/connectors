@@ -11,7 +11,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -54,16 +53,9 @@ func TestValidateAndApply(t *testing.T) {
 
 			return sch
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				pgDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				pgDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -122,16 +114,9 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			return rows
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				pgDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				pgDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }

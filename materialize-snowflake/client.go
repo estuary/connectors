@@ -10,7 +10,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	sf "github.com/snowflakedb/gosnowflake"
 )
 
@@ -56,11 +55,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	}
 
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
-	return err
 }
 
 // The error message returned from Snowflake for the multi-statement table
@@ -177,10 +171,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
-	return sql.StdFetchSpecAndVersion(ctx, c.db, specs, materialization)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

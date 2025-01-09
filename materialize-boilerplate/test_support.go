@@ -45,7 +45,7 @@ func RunValidateAndApplyTestCases(
 	config any,
 	resourceConfig any,
 	dumpSchema func(t *testing.T) string,
-	cleanup func(t *testing.T, materialization pf.Materialization),
+	cleanup func(t *testing.T),
 ) {
 	ctx := context.Background()
 	var snap strings.Builder
@@ -57,7 +57,7 @@ func RunValidateAndApplyTestCases(
 	require.NoError(t, err)
 
 	t.Run("validate and apply many different types of fields", func(t *testing.T) {
-		defer cleanup(t, pf.Materialization("test/sqlite"))
+		defer cleanup(t)
 
 		fixture := loadSpec(t, "big-schema.flow.proto")
 
@@ -155,7 +155,7 @@ func RunValidateAndApplyTestCases(
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				defer cleanup(t, pf.Materialization("test/sqlite"))
+				defer cleanup(t)
 
 				initial := loadSpec(t, "base.flow.proto")
 
@@ -178,7 +178,7 @@ func RunValidateAndApplyTestCases(
 	})
 
 	t.Run("validate and apply fields with challenging names", func(t *testing.T) {
-		defer cleanup(t, pf.Materialization("test/sqlite"))
+		defer cleanup(t)
 
 		fixture := loadSpec(t, "challenging-fields.flow.proto")
 

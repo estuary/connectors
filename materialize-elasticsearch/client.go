@@ -2,100 +2,18 @@ package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"strings"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/tidwall/gjson"
-)
-
-const (
-	defaultFlowMaterializations = "flow_materializations_v2"
 )
 
 type client struct {
 	es *elasticsearch.Client
-}
-
-func (c *client) createMetaIndex(ctx context.Context, replicas *int) error {
-	props := map[string]property{
-		"version": {Type: elasticTypeKeyword, Index: boolPtr(false)},
-		// Binary mappings are never indexed, and to specify index: false on such a mapping results
-		// in an error.
-		"specBytes": {Type: elasticTypeBinary},
-	}
-
-	// The meta index will always be created with the default number of shards.
-	// Long term we plan to not require a meta index at all.
-	return c.createIndex(ctx, defaultFlowMaterializations, nil, replicas, props)
-}
-
-func (c *client) putSpec(ctx context.Context, spec *pf.MaterializationSpec, version string) error {
-	specBytes, err := spec.Marshal()
-	if err != nil {
-		return fmt.Errorf("marshalling spec: %w", err)
-	}
-
-	res, err := c.es.Index(
-		defaultFlowMaterializations,
-		esutil.NewJSONReader(map[string]string{
-			"specBytes": base64.StdEncoding.EncodeToString(specBytes),
-			"version":   version,
-		}),
-		c.es.Index.WithContext(ctx),
-		c.es.Index.WithDocumentID(url.PathEscape(spec.Name.String())),
-	)
-	if err != nil {
-		return fmt.Errorf("putSpec: %w", err)
-	}
-	defer res.Body.Close()
-	if res.IsError() {
-		return fmt.Errorf("putSpec error response [%s] %s", res.Status(), res.String())
-	}
-
-	return nil
-}
-
-func (c *client) getSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
-	res, err := c.es.Get(
-		defaultFlowMaterializations,
-		url.PathEscape(string(materialization)),
-		c.es.Get.WithContext(ctx),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("getSpec spec: %w", err)
-	}
-	defer res.Body.Close()
-
-	if res.StatusCode == http.StatusNotFound {
-		return nil, nil
-	} else if res.IsError() {
-		return nil, fmt.Errorf("getSpec error response [%s] %s", res.Status(), res.String())
-	}
-
-	var spec pf.MaterializationSpec
-
-	if jsonBytes, err := io.ReadAll(res.Body); err != nil {
-		return nil, fmt.Errorf("reading response body: %w", err)
-	} else if loc := gjson.GetBytes(jsonBytes, "_source.specBytes"); !loc.Exists() {
-		return nil, fmt.Errorf("malformed response: '_source.specBytes' does not exist")
-	} else if specBytes, err := base64.StdEncoding.DecodeString(loc.String()); err != nil {
-		return nil, fmt.Errorf("base64.Decode: %w", err)
-	} else if err := spec.Unmarshal(specBytes); err != nil {
-		return nil, fmt.Errorf("spec.Unmarshal: %w", err)
-	} else if err := spec.Validate(); err != nil {
-		return nil, fmt.Errorf("validating spec: %w", err)
-	}
-
-	return &spec, nil
 }
 
 type createIndexParams struct {
