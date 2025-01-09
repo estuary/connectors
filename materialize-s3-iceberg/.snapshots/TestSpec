@@ -6,9 +6,6 @@
           "catalog_type": {
             "const": "AWS Glue",
             "default": "AWS Glue",
-            "enum": [
-              "AWS Glue"
-            ],
             "title": "Catalog Type",
             "type": "string"
           }
@@ -21,9 +18,6 @@
           "catalog_type": {
             "const": "Iceberg REST Server",
             "default": "Iceberg REST Server",
-            "enum": [
-              "Iceberg REST Server"
-            ],
             "order": 0,
             "title": "Catalog Type",
             "type": "string"
@@ -120,7 +114,7 @@
         "type": "string"
       },
       "upload_interval": {
-        "default": "PT5M",
+        "default": "PT300S",
         "description": "Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
         "format": "duration",
         "order": 6,
