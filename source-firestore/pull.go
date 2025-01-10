@@ -48,7 +48,7 @@ const progressLogInterval = 10000
 //
 // TODO(wgd): Consider making this user-configurable?
 const (
-	backfillRestartDelayNoRestartCursor   = 6 * time.Hour
+	backfillRestartDelayNoRestartCursor   = 24 * time.Hour
 	backfillRestartDelayWithRestartCursor = 5 * time.Minute
 )
 
