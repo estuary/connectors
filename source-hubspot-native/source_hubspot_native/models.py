@@ -159,7 +159,7 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
     archived: bool
 
     properties: dict[str, str | None]
-    propertiesWithHistory: SkipJsonSchema[dict[str, list[History]]] = {}
+    propertiesWithHistory: dict[str, list[History]] | None = None
 
     class InlineAssociations(BaseModel):
         class Entry(BaseModel):
@@ -180,11 +180,11 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
     def _post_init(self) -> Self:
         # Clear properties and history which don't have current values.
         self.properties = {k: v for k, v in self.properties.items() if v}
-        self.propertiesWithHistory = {
-            k: v for k, v in self.propertiesWithHistory.items() if len(v)
-        }
-        if len(self.propertiesWithHistory) == 0:
-            delattr(self, "propertiesWithHistory")
+        if self.propertiesWithHistory:
+            self.propertiesWithHistory = {
+                k: v for k, v in self.propertiesWithHistory.items() if len(v)
+            }
+
 
         # If the model has attached inline associations,
         # hoist them to corresponding arrays. Then clear associations.
