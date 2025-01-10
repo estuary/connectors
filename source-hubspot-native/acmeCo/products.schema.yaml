@@ -3,13 +3,6 @@ $defs:
   History:
     additionalProperties: false
     properties:
-      _meta:
-        allOf:
-          - $ref: "#/$defs/Meta"
-        default:
-          op: u
-          row_id: -1
-        description: Document metadata
       timestamp:
         format: date-time
         title: Timestamp
@@ -93,13 +86,15 @@ properties:
         - type: "null"
     title: Properties
   propertiesWithHistory:
-    additionalProperties:
-      items:
-        $ref: "#/$defs/History"
-      type: array
-    default: {}
+    anyOf:
+      - additionalProperties:
+          items:
+            $ref: "#/$defs/History"
+          type: array
+        type: object
+      - type: "null"
+    default: ~
     title: Propertieswithhistory
-    type: object
   associations:
     additionalProperties: false
     default: {}
