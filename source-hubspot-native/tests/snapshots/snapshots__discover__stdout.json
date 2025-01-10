@@ -6,6 +6,67 @@
     },
     "documentSchema": {
       "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
         "Meta": {
           "properties": {
             "op": {
@@ -75,6 +136,24 @@
             ]
           },
           "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/History"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Propertieswithhistory"
         },
         "associations": {
           "additionalProperties": false,
@@ -121,6 +200,67 @@
     },
     "documentSchema": {
       "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
         "Meta": {
           "properties": {
             "op": {
@@ -190,6 +330,24 @@
             ]
           },
           "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/History"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Propertieswithhistory"
         },
         "associations": {
           "additionalProperties": false,
@@ -228,6 +386,67 @@
     },
     "documentSchema": {
       "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
         "Meta": {
           "properties": {
             "op": {
@@ -297,6 +516,24 @@
             ]
           },
           "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/History"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Propertieswithhistory"
         },
         "associations": {
           "additionalProperties": false,
@@ -351,6 +588,67 @@
     },
     "documentSchema": {
       "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
         "Meta": {
           "properties": {
             "op": {
@@ -420,6 +718,24 @@
             ]
           },
           "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/History"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Propertieswithhistory"
         },
         "associations": {
           "additionalProperties": false,
@@ -458,6 +774,67 @@
     },
     "documentSchema": {
       "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
         "Meta": {
           "properties": {
             "op": {
@@ -527,6 +904,24 @@
             ]
           },
           "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/History"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Propertieswithhistory"
         },
         "associations": {
           "additionalProperties": false,
@@ -581,6 +976,67 @@
     },
     "documentSchema": {
       "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
         "Meta": {
           "properties": {
             "op": {
@@ -650,6 +1106,24 @@
             ]
           },
           "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/History"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Propertieswithhistory"
         },
         "associations": {
           "additionalProperties": false,
@@ -680,6 +1154,67 @@
     },
     "documentSchema": {
       "$defs": {
+        "History": {
+          "additionalProperties": false,
+          "properties": {
+            "timestamp": {
+              "format": "date-time",
+              "title": "Timestamp",
+              "type": "string"
+            },
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "sourceType": {
+              "title": "Sourcetype",
+              "type": "string"
+            },
+            "sourceId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourceid"
+            },
+            "sourceLabel": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Sourcelabel"
+            },
+            "updatedByUserId": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Updatedbyuserid"
+            }
+          },
+          "required": [
+            "timestamp",
+            "value",
+            "sourceType"
+          ],
+          "title": "History",
+          "type": "object"
+        },
         "Meta": {
           "properties": {
             "op": {
@@ -749,6 +1284,24 @@
             ]
           },
           "title": "Properties"
+        },
+        "propertiesWithHistory": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "items": {
+                  "$ref": "#/$defs/History"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Propertieswithhistory"
         },
         "associations": {
           "additionalProperties": false,
