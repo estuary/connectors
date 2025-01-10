@@ -189,22 +189,6 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		return nil, err
 	}
 
-	if endpoint.MetaCheckpoints != nil && !is.HasResource(endpoint.MetaCheckpoints.Path) {
-		if resolved, err := ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect); err != nil {
-			return nil, err
-		} else if createStatement, err := RenderTableTemplate(resolved, endpoint.CreateTableTemplate); err != nil {
-			return nil, err
-		} else if err := client.CreateTable(ctx, TableCreate{
-			Table:              resolved,
-			TableCreateSql:     createStatement,
-			ResourceConfigJson: nil, // not applicable for meta tables
-		}); err != nil {
-			return nil, fmt.Errorf("creating checkpoints table: %w", err)
-		} else {
-			log.WithField("table", resolved.Identifier).Info("created checkpoints table")
-		}
-	}
-
 	if sm, ok := client.(SchemaManager); ok {
 		// Create any schemas that don't already exist, if the endpoint supports schemas.
 		existingSchemas, err := sm.ListSchemas(ctx)
@@ -224,6 +208,23 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 				}
 				log.WithField("schema", r).Info("created schema")
 			}
+		}
+	}
+
+	if endpoint.MetaCheckpoints != nil && !is.HasResource(endpoint.MetaCheckpoints.Path) {
+		// Create the checkpoints table if it doesn't already exist.
+		if resolved, err := ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect); err != nil {
+			return nil, err
+		} else if createStatement, err := RenderTableTemplate(resolved, endpoint.CreateTableTemplate); err != nil {
+			return nil, err
+		} else if err := client.CreateTable(ctx, TableCreate{
+			Table:              resolved,
+			TableCreateSql:     createStatement,
+			ResourceConfigJson: nil, // not applicable for meta tables
+		}); err != nil {
+			return nil, fmt.Errorf("creating checkpoints table: %w", err)
+		} else {
+			log.WithField("table", resolved.Identifier).Info("created checkpoints table")
 		}
 	}
 
