@@ -150,6 +150,7 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 	var stopLoadLogger func(func())
 	var stopStoreLogger func(func())
 	var stopWaitingForDocsLogger func(func())
+	var waitingForDocsMu sync.Mutex
 	var loadPhaseStarted bool
 	var ackDelayActive bool
 	var recovery = true
@@ -164,15 +165,19 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 			round++
 			l.be.round++
 		case sentAcknowledged:
+			waitingForDocsMu.Lock()
 			if !loadPhaseStarted {
 				stopWaitingForDocsLogger = l.logAsync(l.waitingForDocsLogFn(round))
 			}
+			waitingForDocsMu.Unlock()
 		case readLoad, readFlush:
+			waitingForDocsMu.Lock()
 			if !l.waitingForDocsStart.IsZero() {
 				stopWaitingForDocsLogger(l.finishedWaitingForDocsLogFn(round))
 			}
 			l.waitingForDocsStart = time.Time{}
 			loadPhaseStarted = true
+			waitingForDocsMu.Unlock()
 		}
 
 		// Start and stop other loggers, resetting counters as needed.
