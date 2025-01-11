@@ -898,12 +898,19 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 				return err
 			}
 		}
+		if count%100000 == 1 {
+			log.WithFields(log.Fields{
+				"name":  res.Name,
+				"count": count,
+			}).Info("processing query results")
+		}
 	}
 
 	log.WithFields(log.Fields{
+		"name":  res.Name,
 		"query": query,
 		"count": count,
-	}).Info("query complete")
+	}).Info("polling complete")
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("error processing results iterator: %w", err)
 	}
