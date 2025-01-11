@@ -741,12 +741,17 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 			cursorValues[i] = rowValues[j]
 		}
 		state.CursorValues = cursorValues
-
 		count++
 		if count%documentsPerCheckpoint == 0 {
 			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 				return err
 			}
+		}
+		if count%100000 == 1 {
+			log.WithFields(log.Fields{
+				"name":  res.Name,
+				"count": count,
+			}).Info("processing query results")
 		}
 		return nil
 	}, nil, args...); err != nil {
@@ -754,9 +759,10 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	}
 
 	log.WithFields(log.Fields{
+		"name":  res.Name,
 		"query": query,
 		"count": count,
-	}).Info("query complete")
+	}).Info("polling complete")
 	state.LastPolled = pollTime
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
