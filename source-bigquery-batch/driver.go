@@ -32,6 +32,21 @@ const (
 	// on overall throughput, and isn't really needed anyway. So instead we emit one for
 	// every N rows, plus one when the query results are fully processed.
 	documentsPerCheckpoint = 1000
+
+	// We have a watchdog timeout which fires if we're sitting there waiting for query
+	// results but haven't received anything for a while. This constant specifies the
+	// duration of that timeout while waiting for for the first result row.
+	//
+	// It is useful to have two different timeouts for the first result row versus any
+	// subsequent rows, because sometimes when using a cursor the queries can have some
+	// nontrivial startup cost and we don't want to make things any more failure-prone
+	// than we have to.
+	pollingWatchdogFirstRowTimeout = 30 * time.Minute
+
+	// The duration of the no-data watchdog for subsequent rows after the first one.
+	// This timeout can be less generous, because after the first row is received we
+	// ought to be getting a consistent stream of results until the query completes.
+	pollingWatchdogTimeout = 5 * time.Minute
 )
 
 var (
@@ -615,6 +630,14 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	}).Info("executing query")
 	var pollTime = time.Now().UTC()
 
+	// Set up a watchdog timeout which will terminate the capture task if no data is
+	// received after a long period of time. The deferred stop ensures that the timeout
+	// will always be cancelled for good when the polling operation finishes.
+	var watchdog = time.AfterFunc(pollingWatchdogFirstRowTimeout, func() {
+		log.WithField("name", res.Name).Fatal("polling timed out")
+	})
+	defer watchdog.Stop()
+
 	var q = c.DB.Query(query)
 	var params []bigquery.QueryParameter
 	for idx, val := range cursorValues {
@@ -643,6 +666,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		} else if err != nil {
 			return fmt.Errorf("error reading result row: %w", err)
 		}
+		watchdog.Reset(pollingWatchdogTimeout) // Reset the no-data watchdog timeout after each row received
 
 		if shape == nil {
 			// Construct a Shape corresponding to the columns of these result rows

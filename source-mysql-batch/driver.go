@@ -33,6 +33,21 @@ const (
 	// on overall throughput, and isn't really needed anyway. So instead we emit one for
 	// every N rows, plus one when the query results are fully processed.
 	documentsPerCheckpoint = 1000
+
+	// We have a watchdog timeout which fires if we're sitting there waiting for query
+	// results but haven't received anything for a while. This constant specifies the
+	// duration of that timeout while waiting for for the first result row.
+	//
+	// It is useful to have two different timeouts for the first result row versus any
+	// subsequent rows, because sometimes when using a cursor the queries can have some
+	// nontrivial startup cost and we don't want to make things any more failure-prone
+	// than we have to.
+	pollingWatchdogFirstRowTimeout = 30 * time.Minute
+
+	// The duration of the no-data watchdog for subsequent rows after the first one.
+	// This timeout can be less generous, because after the first row is received we
+	// ought to be getting a consistent stream of results until the query completes.
+	pollingWatchdogTimeout = 5 * time.Minute
 )
 
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
@@ -672,6 +687,14 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	}).Info("executing query")
 	var pollTime = time.Now().UTC()
 
+	// Set up a watchdog timeout which will terminate the capture task if no data is
+	// received after a long period of time. The deferred stop ensures that the timeout
+	// will always be cancelled for good when the polling operation finishes.
+	var watchdog = time.AfterFunc(pollingWatchdogFirstRowTimeout, func() {
+		log.WithField("name", res.Name).Fatal("polling timed out")
+	})
+	defer watchdog.Stop()
+
 	// There is no helper function for a streaming select query _with arguments_,
 	// so we have to drop down a level and prepare the statement ourselves here.
 	stmt, err := c.DB.Prepare(query)
@@ -690,6 +713,8 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	var serializedDocument []byte
 
 	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
+		watchdog.Reset(pollingWatchdogTimeout) // Reset the no-data watchdog timeout after each row received
+
 		if shape == nil {
 			// Construct a Shape corresponding to the columns of these result rows
 			var fieldNames = []string{"_meta"}
