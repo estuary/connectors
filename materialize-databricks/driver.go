@@ -494,6 +494,7 @@ func (d *transactor) checkForDuplicates(ctx context.Context, db *stdsql.DB, stat
 		keyStrings = append(keyStrings, k.Identifier)
 	}
 	var duplicatesQuery = fmt.Sprintf(`select %s from %s group by %s having count(*) > 1`, strings.Join(keyStrings, ","), binding.target.Identifier, strings.Join(keyStrings, ","))
+	log.WithFields(log.Fields{"query": duplicatesQuery}).Info("duplicates query")
 	rows, err := db.QueryContext(ctx, duplicatesQuery)
 	if err != nil {
 		return fmt.Errorf("finding %q duplicates: %w", duplicatesQuery, err)
