@@ -43,6 +43,10 @@ var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticProperty
 }
 
 func propForProjection(p *pf.Projection, types []string, fc json.RawMessage) (property, error) {
+	if mustWrapAndFlatten(p) {
+		return objProp(), nil
+	}
+
 	type fieldConfig struct {
 		Keyword bool `json:"keyword"`
 	}
@@ -58,17 +62,12 @@ func propForProjection(p *pf.Projection, types []string, fc json.RawMessage) (pr
 		return property{Type: numericStringTypes[numericString], Coerce: true}, nil
 	}
 
-	nonNullTypes := typesWithoutNull(types)
-	if len(nonNullTypes) == 0 {
-		panic("internal application error: expected a single non-null type")
-	}
-
-	switch t := nonNullTypes[0]; t {
+	switch t := typesWithoutNull(types)[0]; t {
 	case pf.JsonTypeArray:
-		// You can add an array of the same item to any field in Elasticsearch,
-		// and we only allow schematized arrays having a single type to be
-		// materialized.
-		return propForProjection(p, p.Inference.Array.ItemTypes, nil)
+		// Arrays of the same item type can be added to a field  that has that
+		// type, so the created mapping will be for that singly-typed array
+		// item.
+		return propForProjection(p, p.Inference.Array.ItemTypes, fc)
 	case pf.JsonTypeBoolean:
 		return property{Type: elasticTypeBoolean}, nil
 	case pf.JsonTypeInteger:
@@ -103,15 +102,7 @@ func propForProjection(p *pf.Projection, types []string, fc json.RawMessage) (pr
 			}
 		}
 	case pf.JsonTypeObject:
-		return property{
-			Type: elasticTypeFlattened,
-			// See https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html
-			// This setting is to avoid extremely long strings causing errors due to Elastic's
-			// requirement that strings do not have a byte length longer than 32766. Long strings
-			// will not be indexed or stored in the Lucene index, but will still be present in the
-			// _source field.
-			IgnoreAbove: 32766 / 4,
-		}, nil
+		return objProp(), nil
 	case pf.JsonTypeNumber:
 		return property{Type: elasticTypeDouble}, nil
 	default:
@@ -156,29 +147,16 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	switch {
 	case p.IsPrimaryKey:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "Primary key locations are required"
-	case p.IsRootDocumentProjection() && !deltaUpdates:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "The root document is required for a standard updates materialization"
-	case p.IsRootDocumentProjection():
+		constraint.Reason = "All Locations that are part of the collections key are required"
+	case p.IsRootDocumentProjection() && deltaUpdates:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
-	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "array"):
-		var itemTypes []string
-		if p.Inference.Array != nil {
-			itemTypes = typesWithoutNull(p.Inference.Array.ItemTypes)
-		}
-
-		if len(itemTypes) == 1 && itemTypes[0] == "array" {
-			constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-			constraint.Reason = "Nested arrays cannot be materialized"
-		} else if len(itemTypes) == 1 {
-			constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-			constraint.Reason = "Arrays with a single item type can be materialized"
-		} else {
-			constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-			constraint.Reason = "Arrays with multiple or unknown item types cannot be materialized"
-		}
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case len(p.Inference.Types) == 0:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field with no types"
 	case p.Field == "_meta/op":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The operation type should usually be materialized"
@@ -188,15 +166,16 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	case p.Inference.IsSingleScalarType() || isNumeric:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
-	case p.Inference.IsSingleType():
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "This field is able to be materialized"
-
-	default:
-		// Anything else is either multiple different types or a single 'null'
-		// type.
+	case slices.Equal(p.Inference.Types, []string{"null"}):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = "Cannot materialize this field"
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Object fields may be materialized"
+	default:
+		// Any other case is one where the field is an array or has multiple types.
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "This field is able to be materialized"
 	}
 
 	return &constraint
@@ -229,4 +208,39 @@ func typesWithoutNull(ts []string) []string {
 	}
 
 	return out
+}
+
+func mustWrapAndFlatten(p *pf.Projection) bool {
+	nonNullTypes := typesWithoutNull(p.Inference.Types)
+
+	if len(nonNullTypes) != 1 {
+		return true
+	}
+
+	if nonNullTypes[0] == "array" {
+		if p.Inference.Array == nil {
+			return true
+		}
+
+		items := typesWithoutNull(p.Inference.Array.ItemTypes)
+		if len(items) != 1 || items[0] == "array" {
+			// Nested arrays don't work because we need some non-array type
+			// somewhere in order to actually create the mapping.
+			return true
+		}
+	}
+
+	return false
+}
+
+func objProp() property {
+	return property{
+		Type: elasticTypeFlattened,
+		// See https://www.elastic.co/guide/en/elasticsearch/reference/current/ignore-above.html
+		// This setting is to avoid extremely long strings causing errors due to Elastic's
+		// requirement that strings do not have a byte length longer than 32766. Long strings
+		// will not be indexed or stored in the Lucene index, but will still be present in the
+		// _source field.
+		IgnoreAbove: 32766 / 4,
+	}
 }
