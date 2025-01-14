@@ -47,7 +47,49 @@ func TestPropForProjection(t *testing.T) {
 					},
 				},
 			},
-			want: property{Type: elasticTypeFlattened, IgnoreAbove: 32766 / 4},
+			want: objProp(),
+		},
+		{
+			name: "array with array items",
+			in: &pf.Projection{
+				Inference: pf.Inference{
+					Types: []string{"array"},
+					Array: &pf.Inference_Array{
+						ItemTypes: []string{"array"},
+					},
+				},
+			},
+			want: objProp(),
+		},
+		{
+			name: "array with multiple item types",
+			in: &pf.Projection{
+				Inference: pf.Inference{
+					Types: []string{"array"},
+					Array: &pf.Inference_Array{
+						ItemTypes: []string{"object", "string"},
+					},
+				},
+			},
+			want: objProp(),
+		},
+		{
+			name: "array with unknown item types",
+			in: &pf.Projection{
+				Inference: pf.Inference{
+					Types: []string{"array"},
+				},
+			},
+			want: objProp(),
+		},
+		{
+			name: "multiple types",
+			in: &pf.Projection{
+				Inference: pf.Inference{
+					Types: []string{"array", "string", "object"},
+				},
+			},
+			want: objProp(),
 		},
 	}
 
