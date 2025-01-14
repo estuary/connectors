@@ -490,6 +490,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 		allFields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
 		fields := make([]string, 0, len(allFields))
 		floatFields := make([]bool, len(allFields))
+		wrapFields := make([]bool, len(allFields))
 
 		for idx, field := range allFields {
 			fields = append(fields, translateField(field))
@@ -497,6 +498,8 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 				return nil, nil, nil, err
 			} else if prop.Type == elasticTypeDouble {
 				floatFields[idx] = true
+			} else if mustWrapAndFlatten(b.Collection.GetProjection(field)) {
+				wrapFields[idx] = true
 			}
 		}
 
@@ -506,6 +509,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 			deltaUpdates: res.DeltaUpdates,
 			fields:       fields,
 			floatFields:  floatFields,
+			wrapFields:   wrapFields,
 			docField:     b.FieldSelection.Document,
 		})
 	}

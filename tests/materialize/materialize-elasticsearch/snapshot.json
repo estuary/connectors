@@ -457,6 +457,9 @@
       },
       "flow_published_at": "1970-01-01T00:00:13.000000000Z",
       "id": 1,
+      "multiple": {
+        "json": 1
+      },
       "nested": {
         "id": "i1"
       },
@@ -491,6 +494,9 @@
       },
       "flow_published_at": "1970-01-01T00:00:14.000000000Z",
       "id": 2,
+      "multiple": {
+        "json": 2.2
+      },
       "nested": {
         "id": "i2"
       },
@@ -525,6 +531,9 @@
       },
       "flow_published_at": "1970-01-01T00:00:15.000000000Z",
       "id": 3,
+      "multiple": {
+        "json": true
+      },
       "nested": {
         "id": "i3"
       },
@@ -559,6 +568,9 @@
       },
       "flow_published_at": "1970-01-01T00:00:16.000000000Z",
       "id": 4,
+      "multiple": {
+        "json": false
+      },
       "nested": {
         "id": "i4"
       },
@@ -593,6 +605,9 @@
       },
       "flow_published_at": "1970-01-01T00:00:17.000000000Z",
       "id": 5,
+      "multiple": {
+        "json": "string five"
+      },
       "nested": {
         "id": "i5"
       },
@@ -631,6 +646,13 @@
       },
       "flow_published_at": "1970-01-01T01:00:19.000000000Z",
       "id": 6,
+      "multiple": {
+        "json": [
+          "one",
+          2,
+          true
+        ]
+      },
       "nested": {
         "id": "i6"
       },
@@ -667,6 +689,11 @@
       },
       "flow_published_at": "1970-01-01T01:00:20.000000000Z",
       "id": 7,
+      "multiple": {
+        "json": {
+          "object": "seven"
+        }
+      },
       "nested": {
         "id": "i7"
       },
@@ -701,6 +728,9 @@
       },
       "flow_published_at": "1970-01-01T01:00:21.000000000Z",
       "id": 8,
+      "multiple": {
+        "json": null
+      },
       "nested": {
         "id": "i8"
       },
@@ -735,6 +765,9 @@
       },
       "flow_published_at": "1970-01-01T01:00:22.000000000Z",
       "id": 9,
+      "multiple": {
+        "json": null
+      },
       "nested": {
         "id": "i9"
       },
@@ -769,6 +802,9 @@
       },
       "flow_published_at": "1970-01-01T01:00:23.000000000Z",
       "id": 10,
+      "multiple": {
+        "json": null
+      },
       "nested": {
         "id": "i10"
       },
@@ -798,9 +834,13 @@
       },
       "flow_published_at": "1970-01-01T01:00:13.000000000Z",
       "id": 1,
-      "int_and_str": 1,
+      "int_and_str": {
+        "json": 1
+      },
       "int_str": "10",
-      "num_and_str": 1.1,
+      "num_and_str": {
+        "json": 1.1
+      },
       "num_str": "10.1",
       "time": "00:00:00Z"
     },
@@ -822,9 +862,13 @@
       },
       "flow_published_at": "1970-01-01T01:00:14.000000000Z",
       "id": 2,
-      "int_and_str": 2,
+      "int_and_str": {
+        "json": 2
+      },
       "int_str": "20",
-      "num_and_str": 2.1,
+      "num_and_str": {
+        "json": 2.1
+      },
       "num_str": "20.1",
       "time": "14:20:12.33Z"
     },
@@ -846,9 +890,13 @@
       },
       "flow_published_at": "1970-01-01T00:00:11.000000000Z",
       "id": 3,
-      "int_and_str": 3,
+      "int_and_str": {
+        "json": 3
+      },
       "int_str": "30",
-      "num_and_str": 3.1,
+      "num_and_str": {
+        "json": 3.1
+      },
       "num_str": "30.1",
       "time": "23:59:38.10Z"
     },
@@ -870,9 +918,13 @@
       },
       "flow_published_at": "1970-01-01T00:00:12.000000000Z",
       "id": 4,
-      "int_and_str": "4",
+      "int_and_str": {
+        "json": "4"
+      },
       "int_str": "40",
-      "num_and_str": "4.1",
+      "num_and_str": {
+        "json": "4.1"
+      },
       "num_str": "40.1",
       "time": "23:59:38Z"
     },
@@ -894,9 +946,13 @@
       },
       "flow_published_at": "1970-01-01T01:00:15.000000000Z",
       "id": 5,
-      "int_and_str": "5",
+      "int_and_str": {
+        "json": "5"
+      },
       "int_str": "50",
-      "num_and_str": "5.1",
+      "num_and_str": {
+        "json": "5.1"
+      },
       "num_str": "50.1",
       "time": "23:59:59Z"
     },
@@ -912,9 +968,13 @@
       },
       "flow_published_at": "1970-01-01T01:00:16.000000000Z",
       "id": 8,
-      "int_and_str": null,
+      "int_and_str": {
+        "json": null
+      },
       "int_str": null,
-      "num_and_str": null,
+      "num_and_str": {
+        "json": null
+      },
       "num_str": null,
       "time": null
     },
@@ -930,9 +990,13 @@
       },
       "flow_published_at": "1970-01-01T01:00:17.000000000Z",
       "id": 9,
-      "int_and_str": null,
+      "int_and_str": {
+        "json": null
+      },
       "int_str": null,
-      "num_and_str": null,
+      "num_and_str": {
+        "json": null
+      },
       "num_str": null,
       "time": null
     },
@@ -948,9 +1012,13 @@
       },
       "flow_published_at": "1970-01-01T01:00:18.000000000Z",
       "id": 10,
-      "int_and_str": null,
+      "int_and_str": {
+        "json": null
+      },
       "int_str": null,
-      "num_and_str": null,
+      "num_and_str": {
+        "json": null
+      },
       "num_str": null,
       "time": null
     }
