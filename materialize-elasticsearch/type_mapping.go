@@ -33,7 +33,8 @@ type property struct {
 }
 
 func propForField(field string, binding *pf.MaterializationSpec_Binding) (property, error) {
-	return propForProjection(binding.Collection.GetProjection(field), binding.FieldSelection.FieldConfigJsonMap[field])
+	p := binding.Collection.GetProjection(field)
+	return propForProjection(p, p.Inference.Types, binding.FieldSelection.FieldConfigJsonMap[field])
 }
 
 var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticPropertyType{
@@ -41,7 +42,7 @@ var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticProperty
 	boilerplate.StringFormatNumber:  elasticTypeDouble,
 }
 
-func propForProjection(p *pf.Projection, fc json.RawMessage) (property, error) {
+func propForProjection(p *pf.Projection, types []string, fc json.RawMessage) (property, error) {
 	type fieldConfig struct {
 		Keyword bool `json:"keyword"`
 	}
@@ -57,27 +58,34 @@ func propForProjection(p *pf.Projection, fc json.RawMessage) (property, error) {
 		return property{Type: numericStringTypes[numericString], Coerce: true}, nil
 	}
 
-	typesWithoutNull := func(ts []string) []string {
-		out := []string{}
-		for _, t := range ts {
-			if t != "null" {
-				out = append(out, t)
-			}
-		}
-		return out
+	nonNullTypes := typesWithoutNull(types)
+	if len(nonNullTypes) == 0 {
+		panic("internal application error: expected a single non-null type")
 	}
 
-	switch t := typesWithoutNull(p.Inference.Types)[0]; t {
+	switch t := nonNullTypes[0]; t {
+	case pf.JsonTypeArray:
+		// You can add an array of the same item to any field in Elasticsearch,
+		// and we only allow schematized arrays having a single type to be
+		// materialized.
+		return propForProjection(p, p.Inference.Array.ItemTypes, nil)
 	case pf.JsonTypeBoolean:
 		return property{Type: elasticTypeBoolean}, nil
 	case pf.JsonTypeInteger:
 		return property{Type: elasticTypeLong}, nil
 	case pf.JsonTypeString:
-		if p.Inference.String_.ContentEncoding == "base64" {
+		inf := p.Inference.String_
+		if inf == nil {
+			// This simplifies handling for arrays with string item types, since
+			// these will not have a string inference set.
+			inf = &pf.Inference_String{}
+		}
+
+		if inf.ContentEncoding == "base64" {
 			return property{Type: elasticTypeBinary}, nil
 		}
 
-		switch f := p.Inference.String_.Format; f {
+		switch f := inf.Format; f {
 		// Formats for "integer" and "number" are handled above.
 		case "date":
 			return property{Type: elasticTypeDate}, nil
@@ -155,6 +163,22 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	case p.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
+	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "array"):
+		var itemTypes []string
+		if p.Inference.Array != nil {
+			itemTypes = typesWithoutNull(p.Inference.Array.ItemTypes)
+		}
+
+		if len(itemTypes) == 1 && itemTypes[0] == "array" {
+			constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+			constraint.Reason = "Nested arrays cannot be materialized"
+		} else if len(itemTypes) == 1 {
+			constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+			constraint.Reason = "Arrays with a single item type can be materialized"
+		} else {
+			constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+			constraint.Reason = "Arrays with multiple or unknown item types cannot be materialized"
+		}
 	case p.Field == "_meta/op":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The operation type should usually be materialized"
@@ -164,14 +188,13 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	case p.Inference.IsSingleScalarType() || isNumeric:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
-	case p.Inference.IsSingleType() && !slices.Contains(p.Inference.Types, "array"):
+	case p.Inference.IsSingleType():
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "This field is able to be materialized"
 
 	default:
-		// Anything else is either multiple different types, a single 'null' type, or an array type
-		// which we currently don't support. We could potentially support array types if they made
-		// the "elements" configuration available and that was a single type.
+		// Anything else is either multiple different types or a single 'null'
+		// type.
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize this field"
 	}
@@ -180,7 +203,7 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 }
 
 func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
-	prop, err := propForProjection(proposed, fc)
+	prop, err := propForProjection(proposed, proposed.Inference.Types, fc)
 	if err != nil {
 		return false, err
 	}
@@ -189,10 +212,21 @@ func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection, fc json.RawMessage) (string, error) {
-	prop, err := propForProjection(p, fc)
+	prop, err := propForProjection(p, p.Inference.Types, fc)
 	if err != nil {
 		return "", err
 	}
 
 	return string(prop.Type), nil
+}
+
+func typesWithoutNull(ts []string) []string {
+	out := []string{}
+	for _, t := range ts {
+		if t != "null" {
+			out = append(out, t)
+		}
+	}
+
+	return out
 }
