@@ -430,6 +430,10 @@
   "index": "index-multiple-data-types",
   "rows": [
     {
+      "array_int": [
+        11,
+        12
+      ],
       "binary_field": null,
       "bool_field": false,
       "float_field": 1.1,
@@ -460,6 +464,10 @@
       "str_field": "str1"
     },
     {
+      "array_int": [
+        21,
+        22
+      ],
       "binary_field": null,
       "bool_field": true,
       "float_field": 2.2,
@@ -490,6 +498,10 @@
       "str_field": "str2"
     },
     {
+      "array_int": [
+        31,
+        32
+      ],
       "binary_field": null,
       "bool_field": false,
       "float_field": 3.3,
@@ -520,6 +532,10 @@
       "str_field": "str3"
     },
     {
+      "array_int": [
+        41,
+        42
+      ],
       "binary_field": null,
       "bool_field": true,
       "float_field": 4.4,
@@ -550,6 +566,10 @@
       "str_field": "str4"
     },
     {
+      "array_int": [
+        51,
+        52
+      ],
       "binary_field": null,
       "bool_field": false,
       "float_field": 5.5,
@@ -580,6 +600,10 @@
       "str_field": "str5"
     },
     {
+      "array_int": [
+        61,
+        62
+      ],
       "binary_field": null,
       "bool_field": true,
       "float_field": 66.66,
@@ -614,6 +638,10 @@
       "str_field": "str6 v2"
     },
     {
+      "array_int": [
+        71,
+        72
+      ],
       "binary_field": null,
       "bool_field": false,
       "float_field": 77.77,
@@ -646,6 +674,10 @@
       "str_field": "str7 v2"
     },
     {
+      "array_int": [
+        81,
+        82
+      ],
       "binary_field": null,
       "bool_field": true,
       "float_field": 88.88,
@@ -676,6 +708,10 @@
       "str_field": "str8 v2"
     },
     {
+      "array_int": [
+        91,
+        92
+      ],
       "binary_field": "YWxvaGEK",
       "bool_field": false,
       "float_field": 99.99,
@@ -706,6 +742,10 @@
       "str_field": "str9 v2"
     },
     {
+      "array_int": [
+        1,
+        2
+      ],
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
       "float_field": 1010.101,

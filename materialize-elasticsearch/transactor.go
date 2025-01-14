@@ -216,8 +216,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		} else {
 			for idx, v := range append(it.Key, it.Values...) {
 				if b, ok := v.([]byte); ok {
-					// An object or array field is received as raw JSON bytes. We currently only support
-					// objects.
 					v = json.RawMessage(b)
 				}
 				if s, ok := v.(string); b.floatFields[idx] && ok {
