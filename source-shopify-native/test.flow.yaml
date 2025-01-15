@@ -1,0 +1,17 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-shopify-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_shopify_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: products
+          interval: PT5M
+        target: acmeCo/products
