@@ -32,6 +32,7 @@ on:
       - "source-genesys/**"
       - "source-braintree-native/**"
       - "source-intercom-native/**"
+      - "source-shopify-native/**"
 
   pull_request:
     branches: [main]
@@ -66,6 +67,7 @@ on:
       - "source-genesys/**"
       - "source-braintree-native/**"
       - "source-intercom-native/**"
+      - "source-shopify-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -186,6 +188,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-intercom-native
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-shopify-native
             type: capture
             version: v1
             usage_rate: "1.0"
