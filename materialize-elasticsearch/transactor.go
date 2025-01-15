@@ -40,6 +40,10 @@ type binding struct {
 	// these and we'll replace them with NULL.
 	floatFields []bool
 
+	// Index of fields that are some type that cannot be materialized natively, and must be wrapped
+	// in a synthetic object and materialized into a flattened mapping.
+	wrapFields []bool
+
 	// Present if the binding includes the root document, empty if not. This is usually the default
 	// "flow_document" but may have an alternate user-defined projection name.
 	docField string
@@ -216,8 +220,6 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		} else {
 			for idx, v := range append(it.Key, it.Values...) {
 				if b, ok := v.([]byte); ok {
-					// An object or array field is received as raw JSON bytes. We currently only support
-					// objects.
 					v = json.RawMessage(b)
 				}
 				if s, ok := v.(string); b.floatFields[idx] && ok {
@@ -225,6 +227,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					if s == "Infinity" || s == "-Infinity" || s == "NaN" {
 						v = nil
 					}
+				} else if b.wrapFields[idx] {
+					v = map[string]any{"json": v}
 				}
 
 				doc[b.fields[idx]] = v
