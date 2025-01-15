@@ -105,6 +105,23 @@ func TestVariantDatatypes(t *testing.T) {
 	t.Run("capture", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
 }
 
+func TestVectorDatatypes(t *testing.T) {
+	var ctx, tb = context.Background(), snowflakeTestBackend(t)
+	var uniqueID = "56892992"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY NOT NULL, a VECTOR(FLOAT, 5), b VECTOR(INT, 3))")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	t.Run("discover", func(t *testing.T) { cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT 1, [1.1,2.2,3,4.4,5.5]::VECTOR(FLOAT,5), NULL;`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT 2, NULL, [1,2,3]::VECTOR(INT,3);`, tableName))
+	t.Run("init", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT 3, [1.1,2.2,3,4.4,5.5]::VECTOR(FLOAT,5), NULL;`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT 4, NULL, [1,2,3]::VECTOR(INT,3);`, tableName))
+	t.Run("main", func(t *testing.T) { verifiedCapture(ctx, t, cs) })
+}
+
 func TestLargeCapture(t *testing.T) {
 	var ctx, tb = context.Background(), snowflakeTestBackend(t)
 	var uniqueID = "63855638"
