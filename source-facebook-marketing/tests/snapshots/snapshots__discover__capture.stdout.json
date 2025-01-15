@@ -15852,12 +15852,6 @@
             }
           }
         },
-        "wish_bid": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "_meta": {
           "type": "object",
           "properties": {
@@ -19538,12 +19532,6 @@
               }
             }
           }
-        },
-        "wish_bid": {
-          "type": [
-            "null",
-            "number"
-          ]
         },
         "age": {
           "type": [
@@ -23242,12 +23230,6 @@
             }
           }
         },
-        "wish_bid": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "country": {
           "type": [
             "null",
@@ -26936,12 +26918,6 @@
               }
             }
           }
-        },
-        "wish_bid": {
-          "type": [
-            "null",
-            "number"
-          ]
         },
         "region": {
           "type": [
@@ -30632,12 +30608,6 @@
             }
           }
         },
-        "wish_bid": {
-          "type": [
-            "null",
-            "number"
-          ]
-        },
         "dma": {
           "type": [
             "null",
@@ -34326,12 +34296,6 @@
               }
             }
           }
-        },
-        "wish_bid": {
-          "type": [
-            "null",
-            "number"
-          ]
         },
         "publisher_platform": {
           "type": [
@@ -38037,12 +38001,6 @@
               }
             }
           }
-        },
-        "wish_bid": {
-          "type": [
-            "null",
-            "number"
-          ]
         },
         "_meta": {
           "type": "object",
