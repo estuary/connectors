@@ -28,6 +28,8 @@ type transactor struct {
 
 	bindings []*binding
 	be       *boilerplate.BindingEvents
+
+	loggedStorageApiMessage bool
 }
 
 func newTransactor(
@@ -228,6 +230,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return fmt.Errorf("load job read: %w", err)
 	}
 	t.be.FinishedEvaluatingLoads()
+
+	if !bqit.IsAccelerated() && !t.loggedStorageApiMessage {
+		log.Warn("not using the storage read API for load queries, performance may not be optimal. see https://go.estuary.dev/materialize-bigquery for more information")
+		t.loggedStorageApiMessage = true
+	}
 
 	for {
 		var bd bindingDocument
