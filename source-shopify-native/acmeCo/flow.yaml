@@ -1,0 +1,6 @@
+---
+collections:
+  acmeCo/products:
+    schema: products.schema.yaml
+    key:
+      - /id
