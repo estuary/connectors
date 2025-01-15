@@ -222,12 +222,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return fmt.Errorf("load query: %w", err)
 	}
 
-	conf, err := job.Config()
+	bqit, err := job.Read(ctx)
 	if err != nil {
-		log.Fatal(fmt.Errorf("bigquery job config: %w", err))
+		ll.WithError(err).Error("job read failed")
+		return fmt.Errorf("load job read: %w", err)
 	}
-	queryConfig := conf.(*bigquery.QueryConfig)
-	bqit := t.client.bigqueryClient.DatasetInProject(queryConfig.Dst.ProjectID, queryConfig.Dst.DatasetID).Table(queryConfig.Dst.TableID).Read(ctx)
 	t.be.FinishedEvaluatingLoads()
 
 	for {
