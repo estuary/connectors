@@ -97,9 +97,6 @@ func newSnowflakeDriver() *sql.Driver {
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			var metaBase sql.TablePath = []string{parsed.Schema}
-			var metaSpecs, _ = sql.MetaTables(metaBase)
-
 			dsn, err := parsed.toURI(tenant)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
@@ -120,9 +117,8 @@ func newSnowflakeDriver() *sql.Driver {
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint{
-				Config:    parsed,
-				Dialect:   dialect,
-				MetaSpecs: &metaSpecs,
+				Config:  parsed,
+				Dialect: dialect,
 				// Snowflake does not use the checkpoint table, instead we use the recovery log
 				// as the authoritative checkpoint and idempotent apply pattern
 				MetaCheckpoints:     nil,

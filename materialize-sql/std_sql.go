@@ -10,32 +10,11 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"time"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
-
-// StdFetchSpecAndVersion is a convenience for Client implementations which
-// use Go's standard `sql.DB` type under the hood.
-func StdFetchSpecAndVersion(ctx context.Context, db *sql.DB, specs Table, materialization pf.Materialization) (spec, version string, err error) {
-	// Fail-fast: surface a connection issue.
-	if err = db.PingContext(ctx); err != nil {
-		err = fmt.Errorf("connecting to DB: %w", err)
-		return
-	}
-	err = db.QueryRowContext(
-		ctx,
-		fmt.Sprintf(
-			"SELECT version, spec FROM %s WHERE materialization = %s;",
-			specs.Identifier,
-			specs.Keys[0].Placeholder,
-		),
-		materialization.String(),
-	).Scan(&version, &spec)
-
-	return
-}
 
 // StdSQLExecStatements is a convenience for Client implementations which
 // use Go's standard `sql.DB` type under the hood.
@@ -255,6 +234,10 @@ func (col *anyColumn) Scan(i interface{}) error {
 	switch ii := i.(type) {
 	case []byte:
 		sval = string(ii)
+	case time.Time:
+		// Consistent formatting of datetimes, which may otherwise use the
+		// database or local timezone.
+		sval = ii.UTC().Format(time.RFC3339Nano)
 	case string:
 		if _, err := strconv.Atoi(ii); err == nil {
 			// Snowflake integer value columns scan into an interface{} with a concrete type of

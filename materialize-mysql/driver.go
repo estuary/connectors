@@ -263,9 +263,6 @@ func newMysqlDriver() *sql.Driver {
 				"user":     cfg.User,
 			}).Info("opening database")
 
-			var metaBase sql.TablePath
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
-
 			if cfg.Advanced.SSLMode == "verify_ca" || cfg.Advanced.SSLMode == "verify_identity" {
 				if err := registerCustomSSL(cfg); err != nil {
 					return nil, fmt.Errorf("error registering custom ssl: %w", err)
@@ -325,8 +322,7 @@ func newMysqlDriver() *sql.Driver {
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             dialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
+				MetaCheckpoints:     sql.FlowCheckpointsTable(nil),
 				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,

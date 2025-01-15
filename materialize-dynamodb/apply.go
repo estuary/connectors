@@ -17,14 +17,6 @@ import (
 type ddbApplier struct {
 	client *client
 	cfg    config
-	// TODO(whb): Including the lastSpec from the validate or apply request is a
-	// temporary hack until we get around to removing the "load/persist a spec
-	// in the destination" concept more thoroughly.
-	lastSpec *pf.MaterializationSpec
-}
-
-func (e *ddbApplier) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, boilerplate.ActionApplyFn, error) {
-	return "", nil, nil
 }
 
 func (e *ddbApplier) CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
@@ -36,14 +28,6 @@ func (e *ddbApplier) CreateResource(ctx context.Context, spec *pf.Materializatio
 	return fmt.Sprintf("create table %q", tableName), func(ctx context.Context) error {
 		return createTable(ctx, e.client, tableName, attrs, schema)
 	}, nil
-}
-
-func (e *ddbApplier) LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
-	return e.lastSpec, nil
-}
-
-func (e *ddbApplier) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, _ bool) (string, boilerplate.ActionApplyFn, error) {
-	return "", nil, nil
 }
 
 func (e *ddbApplier) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {

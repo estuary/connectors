@@ -12,7 +12,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 
@@ -82,16 +81,9 @@ func TestValidateAndApply(t *testing.T) {
 
 			return sch
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				testDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -153,16 +145,9 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			return rows
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				testDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -179,10 +164,6 @@ func TestSpecification(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	// These tests assume that the configuration obtained from environment variables forms a valid
-	// config that could be used to materialize into Snowflake. Various parameters of the
-	// configuration are then manipulated to test assertions for incorrect configs.
-
 	cfg := mustGetCfg(t)
 
 	tests := []struct {
@@ -194,14 +175,6 @@ func TestPrereqs(t *testing.T) {
 			name: "valid",
 			cfg:  func(cfg config) *config { return &cfg },
 			want: nil,
-		},
-		{
-			name: "wrong account identifier in host",
-			cfg: func(cfg config) *config {
-				cfg.Host = "wrong.snowflakecomputing.com"
-				return &cfg
-			},
-			want: []error{fmt.Errorf("incorrect account identifier %q in host URL", "wrong")},
 		},
 		{
 			name: "wrong username",

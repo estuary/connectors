@@ -181,8 +181,6 @@ func newSqlServerDriver() *sql.Driver {
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
-			var metaSpecs, metaCheckpoints = sql.MetaTables(metaBase)
-
 			db, err := stdsql.Open("sqlserver", cfg.ToURI())
 			if err != nil {
 				return nil, fmt.Errorf("opening db: %w", err)
@@ -209,8 +207,7 @@ func newSqlServerDriver() *sql.Driver {
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             dialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
+				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,

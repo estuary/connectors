@@ -54,9 +54,9 @@ func newTestDialect() Dialect {
 
 func TestTableTemplate(t *testing.T) {
 	var (
-		shape      = FlowCheckpointsTable("one", "reserved", "checkpoints")
+		shape      = FlowCheckpointsTable([]string{"one", "reserved"})
 		dialect    = newTestDialect()
-		table, err = ResolveTable(shape, dialect)
+		table, err = ResolveTable(*shape, dialect)
 	)
 	assert.NoError(t, err)
 

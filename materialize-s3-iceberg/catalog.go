@@ -12,20 +12,14 @@ import (
 )
 
 type catalog struct {
-	cfg *config
-	// TODO(whb): Including the lastSpec from the validate or apply request is a temporary hack
-	// until we get around to removing the "load/persist a spec in the destination" concept more
-	// thoroughly. As of this writing, the iceberg materialization is the first one to actually use
-	// the lastSpec from the validate or apply request.
-	lastSpec      *pf.MaterializationSpec
+	cfg           *config
 	resourcePaths [][]string
 }
 
-func newCatalog(cfg config, resourcePaths [][]string, lastSpec *pf.MaterializationSpec) *catalog {
+func newCatalog(cfg config, resourcePaths [][]string) *catalog {
 	return &catalog{
 		cfg:           &cfg,
 		resourcePaths: resourcePaths,
-		lastSpec:      lastSpec,
 	}
 }
 
@@ -243,18 +237,4 @@ func (c *catalog) appendFiles(
 	}
 
 	return nil
-}
-
-// These functions are vestigial from the age of persisting specs in the destination.
-
-func (c *catalog) CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, boilerplate.ActionApplyFn, error) {
-	return "", nil, nil
-}
-
-func (c *catalog) LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error) {
-	return c.lastSpec, nil
-}
-
-func (c *catalog) PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, exists bool) (string, boilerplate.ActionApplyFn, error) {
-	return "", nil, nil
 }

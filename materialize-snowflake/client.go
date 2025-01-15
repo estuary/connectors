@@ -10,7 +10,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	sf "github.com/snowflakedb/gosnowflake"
 )
 
@@ -56,11 +55,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 	}
 
 	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
-}
-
-func (c *client) PutSpec(ctx context.Context, updateSpec sql.MetaSpecsUpdate) error {
-	_, err := c.db.ExecContext(ctx, updateSpec.ParameterizedQuery, updateSpec.Parameters...)
-	return err
 }
 
 // The error message returned from Snowflake for the multi-statement table
@@ -150,13 +144,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 		var sfError *sf.SnowflakeError
 		if errors.As(err, &sfError) {
 			switch sfError.Number {
-			case 260008:
-				// This is the error if the host URL has an incorrect account identifier. The error
-				// message from the Snowflake driver will accurately report that the account name is
-				// incorrect, but would be confusing for a user because we have a separate "Account"
-				// input field. We want to be specific here and report that it is the account
-				// identifier in the host URL.
-				err = fmt.Errorf("incorrect account identifier %q in host URL", strings.TrimSuffix(cfg.Host, ".snowflakecomputing.com"))
 			case 390100:
 				err = fmt.Errorf("incorrect username or password")
 			case 390201:
@@ -184,10 +171,6 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	}
 
 	return errs
-}
-
-func (c *client) FetchSpecAndVersion(ctx context.Context, specs sql.Table, materialization pf.Materialization) (string, string, error) {
-	return sql.StdFetchSpecAndVersion(ctx, c.db, specs, materialization)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

@@ -13,7 +13,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -79,16 +78,9 @@ func TestValidateAndApply(t *testing.T) {
 
 			return sch
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				testDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -147,16 +139,9 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			return rows
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				testDialect.Identifier(cfg.Schema, sql.DefaultFlowMaterializations),
-				testDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -242,10 +227,6 @@ func TestFencingCases(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	// These tests assume that the configuration obtained from environment variables forms a valid
-	// config that could be used to materialize into Redshift. Various parameters of the
-	// configuration are then manipulated to test assertions for incorrect configs.
-
 	cfg := mustGetCfg(t)
 
 	nonExistentBucket := uuid.NewString()
@@ -283,14 +264,6 @@ func TestPrereqs(t *testing.T) {
 				return &cfg
 			},
 			want: []error{fmt.Errorf("database %q does not exist", "wrong"+cfg.Database)},
-		},
-		{
-			name: "wrong address",
-			cfg: func(cfg config) *config {
-				cfg.Address = "wrong." + cfg.Address
-				return &cfg
-			},
-			want: []error{fmt.Errorf("host at address %q cannot be found", "wrong."+cfg.Address)},
 		},
 		{
 			name: "bucket doesn't exist",

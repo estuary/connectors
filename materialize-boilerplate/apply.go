@@ -43,16 +43,6 @@ type BindingUpdate struct {
 // resources based on binding changes. Many of these functions should return an ActionApplyFn, which
 // may be executed concurrently.
 type Applier interface {
-	// CreateMetaTables is called to create the tables (or the equivalent endpoint concept) that
-	// store a persisted spec and any other metadata the materialization needs to persist.
-	CreateMetaTables(ctx context.Context, spec *pf.MaterializationSpec) (string, ActionApplyFn, error)
-
-	// LoadSpec loads the persisted spec from the metadata table.
-	LoadSpec(ctx context.Context, materialization pf.Materialization) (*pf.MaterializationSpec, error)
-
-	// PutSpec upserts a spec into the metadata table.
-	PutSpec(ctx context.Context, spec *pf.MaterializationSpec, version string, exists bool) (string, ActionApplyFn, error)
-
 	// CreateResource creates a new resource in the endpoint. It is called only if the resource does
 	// not already exist, either because it is brand new or because it was previously deleted as
 	// part of a resource replacement.
@@ -82,11 +72,6 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
 
-	storedSpec, err := applier.LoadSpec(ctx, req.Materialization.Name)
-	if err != nil {
-		return nil, fmt.Errorf("getting stored spec: %w", err)
-	}
-
 	actionDescriptions := []string{}
 	actions := []ActionApplyFn{}
 
@@ -97,22 +82,11 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 	}
 
-	// TODO(whb): We will eventually stop persisting specs for materializations, and instead include
-	// the previous spec as part of the protocol. When that happens this can go away. Then, if
-	// individual materializations still need individual metadata tables (ex: SQL materializations),
-	// they should create them as needed separately from the Applier. For now, we always call
-	// CreateMetaTables, and materializations are free to either create them or not.
-	desc, action, err := applier.CreateMetaTables(ctx, req.Materialization)
-	if err != nil {
-		return nil, fmt.Errorf("getting CreateMetaTables action: %w", err)
-	}
-	addAction(desc, action)
-
 	for bindingIdx, binding := range req.Materialization.Bindings {
 		// The existing binding spec is used to extract various properties that can't be learned
 		// from introspecting the destination system, such as the backfill counter and if the
 		// materialization was previously delta updates.
-		existingBinding, err := findExistingBinding(binding.ResourcePath, storedSpec)
+		existingBinding, err := findExistingBinding(binding.ResourcePath, req.LastMaterialization)
 		if err != nil {
 			return nil, fmt.Errorf("finding existing binding: %w", err)
 		}
@@ -147,7 +121,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 				desc = append(desc, createDesc)
 			}
 
-			action = func(ctx context.Context) error {
+			action := func(ctx context.Context) error {
 				if err := deleteAction(ctx); err != nil {
 					return err
 				}
@@ -238,20 +212,6 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 			if err := a(ctx); err != nil {
 				return nil, fmt.Errorf("executing apply actions: %w", err)
 			}
-		}
-	}
-
-	// Only update the spec after all other actions have completed successfully.
-	desc, action, err = applier.PutSpec(ctx, req.Materialization, req.Version, storedSpec != nil)
-	if err != nil {
-		return nil, fmt.Errorf("getting PutSpec action: %w", err)
-	}
-	// Although all current materializations always do persist a spec, its possible that some may
-	// not in the future as we transition to runtime provided specs for apply.
-	if action != nil {
-		actionDescriptions = append(actionDescriptions, desc)
-		if err := action(ctx); err != nil {
-			return nil, fmt.Errorf("updating persisted specification: %w", err)
 		}
 	}
 

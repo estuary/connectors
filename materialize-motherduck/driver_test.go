@@ -11,7 +11,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -76,7 +75,7 @@ func TestValidateAndApply(t *testing.T) {
 
 			return sch
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
 
 			db, err := cfg.db(ctx)
@@ -84,12 +83,6 @@ func TestValidateAndApply(t *testing.T) {
 			defer db.Close()
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				duckDialect.Identifier(cfg.Database, cfg.Schema, sql.DefaultFlowMaterializations),
-				duckDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -157,7 +150,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			return rows
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
 
 			db, err := cfg.db(ctx)
@@ -165,12 +158,6 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			defer db.Close()
 
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				duckDialect.Identifier(cfg.Database, cfg.Schema, sql.DefaultFlowMaterializations),
-				duckDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }

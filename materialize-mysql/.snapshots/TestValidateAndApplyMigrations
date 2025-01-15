@@ -41,7 +41,6 @@ Migratable Changes Before Apply Schema:
 
 Migratable Changes Before Apply Data:
 key (VARCHAR), _meta/flow_truncated (TINYINT), boolWidenedToJson (TINYINT), dateValue (DATE), datetimeValue (DATETIME), flow_published_at (DATETIME), int64 (BIGINT), intWidenedToJson (BIGINT), multiple (JSON), nonScalarValue (JSON), numericString (DECIMAL), optional (JSON), requiredNumeric (DECIMAL), scalarValue (TEXT), stringWidenedToJson (TEXT), timeValue (TIME), flow_document (JSON)
-
 1, 0, 1, 2024-01-01, 2024-01-01 01:01:01.111111, 2024-09-13 01:01:01.000000, 1, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 01:01:01.000000, {}
 
 Migratable Changes Constraints:
@@ -87,6 +86,5 @@ Migratable Changes Applied Schema:
 
 Migratable Changes Applied Data:
 key (VARCHAR), _meta/flow_truncated (TINYINT), flow_published_at (DATETIME), int64 (BIGINT), multiple (JSON), nonScalarValue (JSON), optional (JSON), scalarValue (TEXT), flow_document (JSON), boolWidenedToJson (JSON), dateValue (TEXT), datetimeValue (TEXT), intWidenedToJson (JSON), numericString (TEXT), requiredNumeric (TEXT), stringWidenedToJson (JSON), timeValue (TEXT)
-
 1, 0, 2024-09-13 01:01:01.000000, 1, <nil>, <nil>, <nil>, test, {}, 1, 2024-01-01, 2024-01-01T01:01:01.111111Z, 999, 123, 456, "hello", 01:01:01.000000
 

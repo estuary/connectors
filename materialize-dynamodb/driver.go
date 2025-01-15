@@ -262,9 +262,8 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	}
 
 	return boilerplate.ApplyChanges(ctx, req, &ddbApplier{
-		client:   client,
-		cfg:      cfg,
-		lastSpec: req.LastMaterialization,
+		client: client,
+		cfg:    cfg,
 	}, is, true)
 }
 

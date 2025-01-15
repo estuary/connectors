@@ -14,7 +14,6 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -73,17 +72,11 @@ func TestValidateAndApply(t *testing.T) {
 			t.Helper()
 			return dumpSchema(t, ctx, client, cfg, resourceConfig)
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = client.query(ctx, fmt.Sprintf(
 				"drop table %s;",
 				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
-			))
-
-			_, _ = client.query(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, sql.DefaultFlowMaterializations),
 			))
 		},
 	)
@@ -129,7 +122,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			// bigquery does not support more than 6 fractional second precision, and will fail if we try
 			// to insert a value with 9
-			for i, _ := range values {
+			for i := range values {
 				if keys[i] == "datetimeValue" {
 					values[i] = "'2024-01-01 01:01:01.111111'"
 				}
@@ -186,17 +179,11 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			return b.String()
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = client.query(ctx, fmt.Sprintf(
 				"drop table %s;",
 				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
-			))
-
-			_, _ = client.query(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, sql.DefaultFlowMaterializations),
 			))
 		},
 	)
@@ -287,10 +274,6 @@ func TestFencingCases(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
-	// These tests assume that the configuration obtained from environment variables forms a valid
-	// config that could be used to materialize into Bigquery. Various parameters of the
-	// configuration are then manipulated to test assertions for incorrect configs.
-
 	// Due to the nature of configuring the connector with a JSON service account key and the
 	// difficulties in discriminating between error responses from BigQuery there's only a handful
 	// of cases that can be explicitly tested.

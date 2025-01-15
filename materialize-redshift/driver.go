@@ -232,7 +232,6 @@ func newRedshiftDriver() *sql.Driver {
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
-			metaSpecs, metaCheckpoints := sql.MetaTables(metaBase)
 
 			db, err := stdsql.Open("pgx", cfg.toURI())
 			if err != nil {
@@ -256,8 +255,7 @@ func newRedshiftDriver() *sql.Driver {
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             dialect,
-				MetaSpecs:           &metaSpecs,
-				MetaCheckpoints:     &metaCheckpoints,
+				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,

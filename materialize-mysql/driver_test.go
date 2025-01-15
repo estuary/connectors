@@ -71,15 +71,9 @@ func TestValidateAndApply(t *testing.T) {
 
 			return sch
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = 'test/sqlite'",
-				testDialect.Identifier(sql.DefaultFlowMaterializations),
-			))
 		},
 	)
 }
@@ -137,16 +131,9 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			return rows
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				testDialect.Identifier(sql.DefaultFlowMaterializations),
-				testDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -204,16 +191,9 @@ func TestValidateAndApplyMigrationsMariaDB(t *testing.T) {
 
 			return rows
 		},
-		func(t *testing.T, materialization pf.Materialization) {
+		func(t *testing.T) {
 			t.Helper()
-
 			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf(
-				"delete from %s where materialization = %s",
-				testDialect.Identifier(sql.DefaultFlowMaterializations),
-				testDialect.Literal(materialization.String()),
-			))
 		},
 	)
 }
@@ -364,10 +344,10 @@ func TestPrereqs(t *testing.T) {
 		{
 			name: "wrong address",
 			cfg: func(cfg config) *config {
-				cfg.Address = "wrong." + cfg.Address
+				cfg.Address = cfg.Address + ".wrong"
 				return &cfg
 			},
-			want: []string{fmt.Sprintf("host at address %q cannot be found", "wrong."+cfg.Address)},
+			want: []string{fmt.Sprintf("host at address %q cannot be found", cfg.Address+".wrong")},
 		},
 	}
 
