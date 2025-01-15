@@ -1,0 +1,21 @@
+credentials:
+    credentials_title: Private App Credentials
+    access_token_sops: ENC[AES256_GCM,data:Mcq58scGHGj8jW7Lsv9gI7GQ+kbnnGe40nwOY+60W173vqNklHo=,iv:9XLi7MOmucqmyesaSxEhj4GQKd74JbyR1w20TdG7YcM=,tag:U2M6LgJeHn3Xj4ysnQYLag==,type:str]
+store: estuary-alex-testing
+start_date: "2025-01-10T00:00:00Z"
+advanced:
+    window_size: 50000
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2023-12-19T13:25:05Z"
+          enc: CiQAdmEdwmjDSn1NNdMUXMUGzrNlxb+PmRnwO3SlDl7ECE2TEj8SSQCVvC1zgeSluXBB2sK8SHPxU5VLUcCcAoMUAYjww/YYhqowBhINH4xi+cC9zJaOZxU8Oq/jrGCzO0o1Kxr1HMKv4C3tyc6/4ck=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-01-15T20:49:00Z"
+    mac: ENC[AES256_GCM,data:IcKCvsGVyeQnIAREIC/6nd47ozM6g+iGZAsfwvrllPTkkhjFKpFQF77c0OYKHU1rOFC7DXWFWtsMD/yKgeUMgclm2Vw7EBe6MLwtcWbagiZ7WsVIpzOXb6rbhRImcu8dFkaWgVS742llsOfCA/RZquTJ4OlOsWpGTdxZDhoIEaA=,iv:YEslMowXvReoZbgPMRqjwjanRQIBKUuY8UCLpmbc9Zk=,tag:2WAsc4HHDBX488FcSADg1g==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3

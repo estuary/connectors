@@ -1,0 +1,310 @@
+[
+  [
+    "acmeCo/products",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "bodyHtml": "This is a gift card for the store",
+      "createdAt": "2025-01-14T15:10:14Z",
+      "description": "This is a gift card for the store",
+      "descriptionHtml": "This is a gift card for the store",
+      "featuredMedia": {
+        "alt": "Gift card that shows text: Generated data gift card",
+        "id": "gid://shopify/MediaImage/26890923409453",
+        "mediaContentType": "IMAGE",
+        "mediaErrors": [],
+        "mediaWarnings": [],
+        "preview": {
+          "image": {
+            "altText": "Gift card that shows text: Generated data gift card",
+            "height": 2881,
+            "id": "gid://shopify/ImageSource/26929507041325",
+            "url": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/gift_card.png?v=1736867416",
+            "width": 2881
+          },
+          "status": "READY"
+        },
+        "status": "READY"
+      },
+      "feedback": null,
+      "giftCardTemplateSuffix": "",
+      "handle": "gift-card",
+      "hasOnlyDefaultVariant": false,
+      "hasOutOfStockVariants": false,
+      "hasVariantsThatRequiresComponents": false,
+      "id": "gid://shopify/Product/8086707830829",
+      "isGiftCard": true,
+      "legacyResourceId": "8086707830829",
+      "media": [
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "alt": "Gift card that shows text: Generated data gift card",
+          "id": "gid://shopify/MediaImage/26890923409453",
+          "image": {
+            "height": 2881,
+            "url": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/gift_card.png?v=1736867416",
+            "width": 2881
+          }
+        }
+      ],
+      "mediaCount": {
+        "count": 1,
+        "precision": "EXACT"
+      },
+      "onlineStorePreviewUrl": "https://estuary-alex-testing.myshopify.com/products/gift-card",
+      "onlineStoreUrl": null,
+      "options": [
+        {
+          "id": "gid://shopify/ProductOption/10153289351213",
+          "name": "Denominations",
+          "position": 1,
+          "values": [
+            "$10",
+            "$25",
+            "$50",
+            "$100"
+          ]
+        }
+      ],
+      "priceRangeV2": {
+        "maxVariantPrice": {
+          "amount": "100.0",
+          "currencyCode": "USD"
+        },
+        "minVariantPrice": {
+          "amount": "10.0",
+          "currencyCode": "USD"
+        }
+      },
+      "productType": "giftcard",
+      "publishedAt": "2025-01-14T15:10:15Z",
+      "requiresSellingPlan": false,
+      "resourcePublications": [
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "isPublished": true,
+          "publication": {
+            "catalog": {
+              "id": "gid://shopify/AppCatalog/63489409069",
+              "status": "ACTIVE",
+              "title": "Channel Catalog 148054310957 for Online Store"
+            },
+            "id": "gid://shopify/Publication/148054310957",
+            "name": "Online Store"
+          }
+        }
+      ],
+      "seo": {
+        "description": null,
+        "title": null
+      },
+      "status": "ACTIVE",
+      "tags": [],
+      "templateSuffix": null,
+      "title": "Gift Card",
+      "totalInventory": 0,
+      "tracksInventory": false,
+      "updatedAt": "2025-01-15T03:10:30Z",
+      "variants": [
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "barcode": null,
+          "compareAtPrice": null,
+          "createdAt": "2025-01-14T15:10:14Z",
+          "id": "gid://shopify/ProductVariant/43217823334445",
+          "image": null,
+          "inventoryItem": {
+            "id": "gid://shopify/InventoryItem/45258934976557",
+            "measurement": {
+              "weight": {
+                "unit": "POUNDS",
+                "value": 0.0
+              }
+            },
+            "requiresShipping": false,
+            "tracked": false
+          },
+          "inventoryLevels": [
+            {
+              "__parentId": "gid://shopify/ProductVariant/43217823334445",
+              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258934976557",
+              "location": {
+                "fulfillmentService": null,
+                "id": "gid://shopify/Location/73871392813"
+              }
+            }
+          ],
+          "inventoryPolicy": "DENY",
+          "inventoryQuantity": 0,
+          "legacyResourceId": "43217823334445",
+          "position": 1,
+          "price": "10.00",
+          "selectedOptions": [
+            {
+              "name": "Denominations",
+              "optionValue": {
+                "id": "gid://shopify/ProductOptionValue/4829205987373",
+                "name": "$10"
+              },
+              "value": "$10"
+            }
+          ],
+          "sku": null,
+          "taxable": false,
+          "title": "$10",
+          "updatedAt": "2025-01-14T15:10:14Z"
+        },
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "barcode": null,
+          "compareAtPrice": null,
+          "createdAt": "2025-01-14T15:10:14Z",
+          "id": "gid://shopify/ProductVariant/43217823367213",
+          "image": null,
+          "inventoryItem": {
+            "id": "gid://shopify/InventoryItem/45258935009325",
+            "measurement": {
+              "weight": {
+                "unit": "POUNDS",
+                "value": 0.0
+              }
+            },
+            "requiresShipping": false,
+            "tracked": false
+          },
+          "inventoryLevels": [
+            {
+              "__parentId": "gid://shopify/ProductVariant/43217823367213",
+              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935009325",
+              "location": {
+                "fulfillmentService": null,
+                "id": "gid://shopify/Location/73871392813"
+              }
+            }
+          ],
+          "inventoryPolicy": "DENY",
+          "inventoryQuantity": 0,
+          "legacyResourceId": "43217823367213",
+          "position": 2,
+          "price": "25.00",
+          "selectedOptions": [
+            {
+              "name": "Denominations",
+              "optionValue": {
+                "id": "gid://shopify/ProductOptionValue/4829206020141",
+                "name": "$25"
+              },
+              "value": "$25"
+            }
+          ],
+          "sku": null,
+          "taxable": false,
+          "title": "$25",
+          "updatedAt": "2025-01-14T15:10:14Z"
+        },
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "barcode": null,
+          "compareAtPrice": null,
+          "createdAt": "2025-01-14T15:10:14Z",
+          "id": "gid://shopify/ProductVariant/43217823399981",
+          "image": null,
+          "inventoryItem": {
+            "id": "gid://shopify/InventoryItem/45258935042093",
+            "measurement": {
+              "weight": {
+                "unit": "POUNDS",
+                "value": 0.0
+              }
+            },
+            "requiresShipping": false,
+            "tracked": false
+          },
+          "inventoryLevels": [
+            {
+              "__parentId": "gid://shopify/ProductVariant/43217823399981",
+              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935042093",
+              "location": {
+                "fulfillmentService": null,
+                "id": "gid://shopify/Location/73871392813"
+              }
+            }
+          ],
+          "inventoryPolicy": "DENY",
+          "inventoryQuantity": 0,
+          "legacyResourceId": "43217823399981",
+          "position": 3,
+          "price": "50.00",
+          "selectedOptions": [
+            {
+              "name": "Denominations",
+              "optionValue": {
+                "id": "gid://shopify/ProductOptionValue/4829206052909",
+                "name": "$50"
+              },
+              "value": "$50"
+            }
+          ],
+          "sku": null,
+          "taxable": false,
+          "title": "$50",
+          "updatedAt": "2025-01-14T15:10:14Z"
+        },
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "barcode": null,
+          "compareAtPrice": null,
+          "createdAt": "2025-01-14T15:10:14Z",
+          "id": "gid://shopify/ProductVariant/43217823432749",
+          "image": null,
+          "inventoryItem": {
+            "id": "gid://shopify/InventoryItem/45258935074861",
+            "measurement": {
+              "weight": {
+                "unit": "POUNDS",
+                "value": 0.0
+              }
+            },
+            "requiresShipping": false,
+            "tracked": false
+          },
+          "inventoryLevels": [
+            {
+              "__parentId": "gid://shopify/ProductVariant/43217823432749",
+              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935074861",
+              "location": {
+                "fulfillmentService": null,
+                "id": "gid://shopify/Location/73871392813"
+              }
+            }
+          ],
+          "inventoryPolicy": "DENY",
+          "inventoryQuantity": 0,
+          "legacyResourceId": "43217823432749",
+          "position": 4,
+          "price": "100.00",
+          "selectedOptions": [
+            {
+              "name": "Denominations",
+              "optionValue": {
+                "id": "gid://shopify/ProductOptionValue/4829206085677",
+                "name": "$100"
+              },
+              "value": "$100"
+            }
+          ],
+          "sku": null,
+          "taxable": false,
+          "title": "$100",
+          "updatedAt": "2025-01-14T15:10:14Z"
+        }
+      ],
+      "variantsCount": {
+        "count": 4,
+        "precision": "EXACT"
+      },
+      "vendor": "Snowboard Vendor"
+    }
+  ]
+]
