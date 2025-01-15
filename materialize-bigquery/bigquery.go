@@ -84,6 +84,14 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
+	// Use the much faster storage read API for reading query results if the
+	// authorization provides sufficient access, typically via the "BigQuery
+	// Read Session User" role. Result iterators will automatically fall back to
+	// the standard but much slower job/table read API if the storage API can't
+	// be accessed.
+	if err := bigqueryClient.EnableStorageReadClient(ctx, clientOpts...); err != nil {
+		return nil, fmt.Errorf("enabling storage read client: %w", err)
+	}
 
 	cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
 	if err != nil {
