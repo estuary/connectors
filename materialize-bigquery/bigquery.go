@@ -84,6 +84,9 @@ func (c *config) client(ctx context.Context) (*client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("creating bigquery client: %w", err)
 	}
+	if err := bigqueryClient.EnableStorageReadClient(ctx); err != nil {
+		panic(err)
+	}
 
 	cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
 	if err != nil {
