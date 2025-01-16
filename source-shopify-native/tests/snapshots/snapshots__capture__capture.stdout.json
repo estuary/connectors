@@ -116,13 +116,16 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258934976557",
+            "legacyResourceId": "45258934976557",
             "measurement": {
+              "id": "gid://shopify/InventoryItemMeasurement/44217186123821",
               "weight": {
                 "unit": "POUNDS",
                 "value": 0.0
               }
             },
             "requiresShipping": false,
+            "sku": null,
             "tracked": false
           },
           "inventoryLevels": [
@@ -131,7 +134,8 @@
               "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258934976557",
               "location": {
                 "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813"
+                "id": "gid://shopify/Location/73871392813",
+                "name": "Shop location"
               }
             }
           ],
@@ -164,13 +168,16 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258935009325",
+            "legacyResourceId": "45258935009325",
             "measurement": {
+              "id": "gid://shopify/InventoryItemMeasurement/44217186156589",
               "weight": {
                 "unit": "POUNDS",
                 "value": 0.0
               }
             },
             "requiresShipping": false,
+            "sku": null,
             "tracked": false
           },
           "inventoryLevels": [
@@ -179,7 +186,8 @@
               "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935009325",
               "location": {
                 "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813"
+                "id": "gid://shopify/Location/73871392813",
+                "name": "Shop location"
               }
             }
           ],
@@ -212,13 +220,16 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258935042093",
+            "legacyResourceId": "45258935042093",
             "measurement": {
+              "id": "gid://shopify/InventoryItemMeasurement/44217186189357",
               "weight": {
                 "unit": "POUNDS",
                 "value": 0.0
               }
             },
             "requiresShipping": false,
+            "sku": null,
             "tracked": false
           },
           "inventoryLevels": [
@@ -227,7 +238,8 @@
               "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935042093",
               "location": {
                 "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813"
+                "id": "gid://shopify/Location/73871392813",
+                "name": "Shop location"
               }
             }
           ],
@@ -260,13 +272,16 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258935074861",
+            "legacyResourceId": "45258935074861",
             "measurement": {
+              "id": "gid://shopify/InventoryItemMeasurement/44217186222125",
               "weight": {
                 "unit": "POUNDS",
                 "value": 0.0
               }
             },
             "requiresShipping": false,
+            "sku": null,
             "tracked": false
           },
           "inventoryLevels": [
@@ -275,7 +290,8 @@
               "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935074861",
               "location": {
                 "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813"
+                "id": "gid://shopify/Location/73871392813",
+                "name": "Shop location"
               }
             }
           ],
