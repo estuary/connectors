@@ -264,6 +264,17 @@ files = [
 ]
 
 [[package]]
+name = "capi-param-builder"
+version = "5.1.0"
+description = "Sua descrição aqui"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "capi_param_builder-5.1.0-py3-none-any.whl", hash = "sha256:b4fc2a48d79a5d193c4716083706471213d1255b2778c2fa6251e4a4e9ed12c9"},
+    {file = "capi_param_builder-5.1.0.tar.gz", hash = "sha256:de801092ce24ee4f160095bb60e6c9eb10ae033d43e3791b45b1899f614fe44e"},
+]
+
+[[package]]
 name = "cattrs"
 version = "24.1.2"
 description = "Composable complex class support for attrs and dataclasses."
@@ -579,18 +590,6 @@ files = [
 ]
 
 [[package]]
-name = "enum34"
-version = "1.1.10"
-description = "Python 3.4 Enum backported to 3.3, 3.2, 3.1, 2.7, 2.6, 2.5, and 2.4"
-optional = false
-python-versions = "*"
-files = [
-    {file = "enum34-1.1.10-py2-none-any.whl", hash = "sha256:a98a201d6de3f2ab3db284e70a33b0f896fbf35f8086594e8c9e74b909058d53"},
-    {file = "enum34-1.1.10-py3-none-any.whl", hash = "sha256:c3858660960c984d6ab0ebad691265180da2b43f07e061c0f8dca9ef3cffd328"},
-    {file = "enum34-1.1.10.tar.gz", hash = "sha256:cce6a7477ed816bd2542d03d53db9f0db935dd013b70f336a95c73979289f248"},
-]
-
-[[package]]
 name = "estuary-cdk"
 version = "0.2.0"
 description = "Estuary Connector Development Kit"
@@ -612,19 +611,19 @@ url = "../estuary-cdk"
 
 [[package]]
 name = "facebook-business"
-version = "19.0.0"
+version = "21.0.0"
 description = "Facebook Business SDK"
 optional = false
 python-versions = "*"
 files = [
-    {file = "facebook_business-19.0.0-py3-none-any.whl", hash = "sha256:591deedc010cefeb49151bbfadf72659cf262056072b437ca3dbf0ba37b3fa43"},
-    {file = "facebook_business-19.0.0.tar.gz", hash = "sha256:e12ea2a13d1703922d1b5d3921bc67bd10176596770ce154f287019738775800"},
+    {file = "facebook_business-21.0.0-py3-none-any.whl", hash = "sha256:07ae97e60016df16371be19e58aa68835e186682c951bc0f6843f3219c358fe1"},
+    {file = "facebook_business-21.0.0.tar.gz", hash = "sha256:15e050e596c364ac3491a40a371d0e00188a74cef43e95edf718671fa79cd9fa"},
 ]
 
 [package.dependencies]
 aiohttp = {version = "*", markers = "python_version >= \"3.5.3\""}
+capi-param-builder = ">=0.1.0-dev0"
 curlify = ">=2.1.0"
-enum34 = {version = "*", markers = "python_version >= \"3\""}
 pycountry = ">=19.8.18"
 requests = ">=2.3.0"
 six = ">=1.7.3"
@@ -2190,4 +2189,4 @@ propcache = ">=0.2.0"
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "946d5140824f65748ca3686ff70a0b0f8eeae35b97078204c6256b6d597a8836"
+content-hash = "14ef917b697c6d88335f8a691e0863376f55875ffeacd6606a04d4dceebb2082"
