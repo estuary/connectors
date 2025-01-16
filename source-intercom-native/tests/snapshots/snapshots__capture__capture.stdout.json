@@ -206,6 +206,272 @@
     }
   ],
   [
+    "acmeCo/conversation_parts",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assigned_to": null,
+      "attachments": [],
+      "author": {
+        "email": "alexb@estuary.dev",
+        "id": "7939621",
+        "name": "Alex Bair",
+        "type": "admin"
+      },
+      "body": "<p class=\"no-margin\">Hello</p>",
+      "conversation_id": "1",
+      "created_at": 1734097565,
+      "external_id": null,
+      "id": "1",
+      "notified_at": 1734097565,
+      "part_type": "comment",
+      "redacted": false,
+      "type": "conversation_part",
+      "updated_at": 1734097565
+    }
+  ],
+  [
+    "acmeCo/tickets",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "admin_assignee_id": "7939621",
+      "category": "Tracker",
+      "contacts": {
+        "contacts": [],
+        "type": "contact.list"
+      },
+      "created_at": 1737064622,
+      "id": "2",
+      "is_shared": false,
+      "linked_objects": {
+        "data": [],
+        "has_more": false,
+        "total_count": 0,
+        "type": "list"
+      },
+      "open": true,
+      "team_assignee_id": "0",
+      "ticket_attributes": {
+        "Amount": "43",
+        "Order number": "123456",
+        "Reason": "testing",
+        "Supporting evidence": [],
+        "_default_description_": "bug ticket",
+        "_default_title_": "test ticket"
+      },
+      "ticket_id": "1",
+      "ticket_parts": {
+        "ticket_parts": [
+          {
+            "attachments": [],
+            "author": {
+              "email": "alexb@estuary.dev",
+              "id": "7939621",
+              "name": "Alex Bair",
+              "type": "admin"
+            },
+            "created_at": 1737064623,
+            "id": "7",
+            "part_type": "ticket_state_updated_by_admin",
+            "previous_ticket_state": "submitted",
+            "redacted": false,
+            "ticket_state": "submitted",
+            "type": "ticket_part",
+            "updated_at": 1737064623
+          },
+          {
+            "assigned_to": {
+              "id": "7939621",
+              "type": "admin"
+            },
+            "attachments": [],
+            "author": {
+              "email": "alexb@estuary.dev",
+              "id": "7939621",
+              "name": "Alex Bair",
+              "type": "admin"
+            },
+            "created_at": 1737064624,
+            "id": "8",
+            "part_type": "assignment",
+            "redacted": false,
+            "type": "ticket_part",
+            "updated_at": 1737064624
+          },
+          {
+            "attachments": [],
+            "author": {
+              "email": "alexb@estuary.dev",
+              "id": "7939621",
+              "name": "Alex Bair",
+              "type": "admin"
+            },
+            "created_at": 1737064781,
+            "id": "13",
+            "part_type": "ticket_state_updated_by_admin",
+            "previous_ticket_state": "submitted",
+            "redacted": false,
+            "ticket_state": "in_progress",
+            "type": "ticket_part",
+            "updated_at": 1737064781
+          }
+        ],
+        "total_count": 3,
+        "type": "ticket_part.list"
+      },
+      "ticket_state": "in_progress",
+      "ticket_state_external_label": "In progress",
+      "ticket_state_internal_label": "In progress",
+      "ticket_type": {
+        "archived": false,
+        "category": "Tracker",
+        "created_at": 1733757567,
+        "description": "Capture bug reports that impacts multiple customers. All relevant customer conversations will be linked to a Tracker ticket to act as the single source of truth.",
+        "icon": "\u26a0\ufe0f",
+        "id": "2",
+        "is_internal": true,
+        "name": "Bug report",
+        "ticket_type_attributes": {
+          "data": [
+            {
+              "archived": false,
+              "created_at": 1733757568,
+              "data_type": "string",
+              "default": true,
+              "description": "",
+              "id": "6304497",
+              "input_options": {
+                "multiline": false
+              },
+              "name": "_default_title_",
+              "order": 0,
+              "required_to_create": false,
+              "required_to_create_for_contacts": false,
+              "ticket_type_id": 2,
+              "type": "ticket_type_attribute",
+              "updated_at": 1733757568,
+              "visible_on_create": true,
+              "visible_to_contacts": false,
+              "workspace_id": "s3r1c48t"
+            },
+            {
+              "archived": false,
+              "created_at": 1733757568,
+              "data_type": "string",
+              "default": true,
+              "description": "",
+              "id": "6304498",
+              "input_options": {
+                "multiline": true
+              },
+              "name": "_default_description_",
+              "order": 1,
+              "required_to_create": false,
+              "required_to_create_for_contacts": false,
+              "ticket_type_id": 2,
+              "type": "ticket_type_attribute",
+              "updated_at": 1733757568,
+              "visible_on_create": true,
+              "visible_to_contacts": false,
+              "workspace_id": "s3r1c48t"
+            },
+            {
+              "archived": false,
+              "created_at": 1733757568,
+              "data_type": "string",
+              "default": false,
+              "description": "",
+              "id": "6304499",
+              "input_options": {
+                "multiline": false
+              },
+              "name": "Order number",
+              "order": 2,
+              "required_to_create": false,
+              "required_to_create_for_contacts": false,
+              "ticket_type_id": 2,
+              "type": "ticket_type_attribute",
+              "updated_at": 1733757568,
+              "visible_on_create": true,
+              "visible_to_contacts": false,
+              "workspace_id": "s3r1c48t"
+            },
+            {
+              "archived": false,
+              "created_at": 1733757569,
+              "data_type": "string",
+              "default": false,
+              "description": "",
+              "id": "6304500",
+              "input_options": {
+                "multiline": false
+              },
+              "name": "Amount",
+              "order": 3,
+              "required_to_create": false,
+              "required_to_create_for_contacts": false,
+              "ticket_type_id": 2,
+              "type": "ticket_type_attribute",
+              "updated_at": 1733757569,
+              "visible_on_create": true,
+              "visible_to_contacts": false,
+              "workspace_id": "s3r1c48t"
+            },
+            {
+              "archived": false,
+              "created_at": 1733757569,
+              "data_type": "string",
+              "default": false,
+              "description": "",
+              "id": "6304501",
+              "input_options": {
+                "multiline": true
+              },
+              "name": "Reason",
+              "order": 4,
+              "required_to_create": false,
+              "required_to_create_for_contacts": false,
+              "ticket_type_id": 2,
+              "type": "ticket_type_attribute",
+              "updated_at": 1733757569,
+              "visible_on_create": true,
+              "visible_to_contacts": false,
+              "workspace_id": "s3r1c48t"
+            },
+            {
+              "archived": false,
+              "created_at": 1733757569,
+              "data_type": "files",
+              "default": false,
+              "description": "",
+              "id": "6304502",
+              "input_options": null,
+              "name": "Supporting evidence",
+              "order": 5,
+              "required_to_create": false,
+              "required_to_create_for_contacts": false,
+              "ticket_type_id": 2,
+              "type": "ticket_type_attribute",
+              "updated_at": 1733757569,
+              "visible_on_create": true,
+              "visible_to_contacts": false,
+              "workspace_id": "s3r1c48t"
+            }
+          ],
+          "type": "list"
+        },
+        "type": "ticket_type",
+        "updated_at": 1733757567,
+        "workspace_id": "s3r1c48t"
+      },
+      "type": "ticket",
+      "updated_at": 1737064623
+    }
+  ],
+  [
     "acmeCo/conversations",
     {
       "_meta": {
@@ -304,32 +570,6 @@
       "type": "conversation",
       "updated_at": 1734097743,
       "waiting_since": null
-    }
-  ],
-  [
-    "acmeCo/conversation_parts",
-    {
-      "_meta": {
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "assigned_to": null,
-      "attachments": [],
-      "author": {
-        "email": "alexb@estuary.dev",
-        "id": "7939621",
-        "name": "Alex Bair",
-        "type": "admin"
-      },
-      "body": "<p class=\"no-margin\">Hello</p>",
-      "conversation_id": "1",
-      "created_at": 1734097565,
-      "external_id": null,
-      "id": "1",
-      "notified_at": 1734097565,
-      "part_type": "comment",
-      "redacted": false,
-      "type": "conversation_part",
-      "updated_at": 1734097565
     }
   ],
   [

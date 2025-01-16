@@ -36,13 +36,17 @@ captures:
           interval: PT5M
         target: acmeCo/contacts
       - resource:
-          name: conversations
-          interval: PT5M
-        target: acmeCo/conversations
-      - resource:
           name: conversation_parts
           interval: PT5M
         target: acmeCo/conversation_parts
+      - resource:
+          name: tickets
+          interval: PT5M
+        target: acmeCo/tickets
+      - resource:
+          name: conversations
+          interval: PT5M
+        target: acmeCo/conversations
       - resource:
           name: segments
           interval: PT5M

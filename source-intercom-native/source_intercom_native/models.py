@@ -116,6 +116,10 @@ class ContactsSearchResponse(SearchResponse):
     data: list[TimestampedResource]
 
 
+class TicketsSearchResponse(SearchResponse):
+    tickets: list[TimestampedResource]
+
+
 class ConversationsSearchResponse(SearchResponse):
     conversations: list[TimestampedResource]
 
@@ -170,6 +174,8 @@ ClientSideFilteringResourceFetchChangesFn = Callable[
     [HTTPSession, Logger, LogCursor],
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]
+
+IncrementalResourceFetchChangesFn = ClientSideFilteringResourceFetchChangesFn
 
 CompanyResourceFetchChangesFn = Callable[
     [HTTPSession, bool, Logger, LogCursor],
