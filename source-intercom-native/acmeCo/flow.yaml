@@ -44,3 +44,7 @@ collections:
     schema: teams.schema.yaml
     key:
       - /_meta/row_id
+  acmeCo/tickets:
+    schema: tickets.schema.yaml
+    key:
+      - /id

@@ -13,6 +13,7 @@ from .models import (
     IntercomResource,
     TimestampedResource,
     ClientSideFilteringResourceFetchChangesFn,
+    IncrementalResourceFetchChangesFn,
     CompanyResourceFetchChangesFn,
     IncrementalDateWindowResourceFetchChangesFn,
     OAUTH2_SPEC,
@@ -20,6 +21,7 @@ from .models import (
 from .api import (
     snapshot_resources,
     fetch_contacts,
+    fetch_tickets,
     fetch_conversations,
     fetch_conversations_parts,
     fetch_segments,
@@ -47,6 +49,12 @@ INCREMENTAL_DATE_WINDOW_RESOURCES: list[tuple[str, IncrementalDateWindowResource
     ('conversation_parts', fetch_conversations_parts),
 ]
 
+# Incremental resources that don't use date windows.
+# Each tuple contains the resource's name and it's fetch function.
+INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn]] = [
+    ('tickets', fetch_tickets),
+    ('conversations', fetch_conversations),
+]
 
 # Resources that have a timestamp field we can use to perform client side filtering.
 # Each tuple contains the resource's name and its fetch function.
@@ -65,9 +73,6 @@ COMPANY_RESOURCES: list[tuple[str, CompanyResourceFetchChangesFn]] = [
 async def validate_credentials(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ):
-    """
-    Validates that the provided access token is a valid Front access token.
-    """
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     url = f"{API}/data_attributes"
     params = {"model": "contact"}
@@ -131,11 +136,12 @@ def full_refresh_resources(
     return resources
 
 
-def conversations(
+def incremental_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> common.Resource:
+) -> list[common.Resource]:
 
     def open(
+        fetch_fn: IncrementalResourceFetchChangesFn,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -148,24 +154,29 @@ def conversations(
             state,
             task,
             fetch_changes=functools.partial(
-                fetch_conversations,
+                fetch_fn,
                 http,
             )
         )
 
-    return common.Resource(
-        name='conversations',
-        key=["/id"],
-        model=TimestampedResource,
-        open=open,
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=config.start_date),
-        ),
-        initial_config=ResourceConfig(
-            name='conversations', interval=timedelta(minutes=5)
-        ),
-        schema_inference=True,
-    )
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, fetch_fn),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=config.start_date),
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, fetch_fn) in INCREMENTAL_RESOURCES
+    ]
+
+    return resources
 
 
 def incremental_date_window_resources(
@@ -308,7 +319,7 @@ async def all_resources(
     return [
         *full_refresh_resources(log, http, config),
         *incremental_date_window_resources(log, http, config),
-        conversations(log, http, config),
+        *incremental_resources(log, http, config),
         *client_side_filtered_resources(log, http, config),
         *company_resources(log, http, config),
     ]

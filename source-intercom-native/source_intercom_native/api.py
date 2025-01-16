@@ -13,6 +13,7 @@ from .models import (
     IntercomResource,
     TimestampedResource,
     ContactsSearchResponse,
+    TicketsSearchResponse,
     ConversationsSearchResponse,
     ConversationResponse,
     SegmentsResponse,
@@ -127,7 +128,7 @@ def _generate_contacts_search_request_body(
     }
 
 
-def _generate_conversations_search_request_body(
+def _generate_conversations_or_tickets_search_request_body(
         lower_bound: int,
         upper_bound: int,
         next_page_cursor: str | None = None
@@ -135,7 +136,7 @@ def _generate_conversations_search_request_body(
     # Intercom's search endpoints support complex queries within the request body. We filter and sort results
     # on the updated_at field, requesting all results with an updated at on or between the lower & upper bounds.
     #
-    # Unlike the contacts search endpoint, the conversations search endpoint *does* filter based on exact Unix timestamps.
+    # Unlike the contacts search endpoint, the conversations and tickets search endpoints *do* filter based on exact Unix timestamps.
     query = {
             "operator": "AND",
             "value": [
@@ -232,6 +233,56 @@ async def fetch_contacts(
         yield _s_to_dt(last_seen_ts)
 
 
+async def fetch_tickets(
+    http: HTTPSession,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    start = _dt_to_s(log_cursor)
+    end = int(datetime.now(tz=UTC).timestamp())
+
+    last_seen_ts = start
+
+    url = f"{API}/tickets/search"
+    body = _generate_conversations_or_tickets_search_request_body(start, end)
+
+    while True:
+        response = TicketsSearchResponse.model_validate_json(
+                await http.request(log, url, "POST", json=body)
+        )
+
+        page_num = response.pages.page
+        total_pages = response.pages.total_pages
+
+        if total_pages == 0:
+            break
+
+        if page_num == 1 or page_num % 25 == 0 or page_num == total_pages:
+            log.info(f"Processing page {page_num} of {total_pages}.", {
+                'start': _s_to_dt(start),
+            })
+
+        for ticket in response.tickets:
+            if ticket.updated_at > last_seen_ts:
+                # Checkpoint any yielded documents if the next result was updated later than
+                # the prior results and it's not the first result we've seen.
+                if last_seen_ts != start:
+                    yield _s_to_dt(last_seen_ts)
+
+                last_seen_ts = ticket.updated_at
+
+            if ticket.updated_at > start:
+                    yield ticket
+
+        if response.pages.next is None:
+            yield _s_to_dt(last_seen_ts)
+            break
+
+        body = _generate_conversations_or_tickets_search_request_body(start, end, response.pages.next.starting_after)
+
+
 async def fetch_conversations(
     http: HTTPSession,
     log: Logger,
@@ -245,7 +296,7 @@ async def fetch_conversations(
     last_seen_ts = start
 
     url = f"{API}/conversations/search"
-    body = _generate_conversations_search_request_body(start, end)
+    body = _generate_conversations_or_tickets_search_request_body(start, end)
 
     while True:
         response = ConversationsSearchResponse.model_validate_json(
@@ -279,7 +330,7 @@ async def fetch_conversations(
             yield _s_to_dt(last_seen_ts)
             break
 
-        body = _generate_conversations_search_request_body(start, end, response.pages.next.starting_after)
+        body = _generate_conversations_or_tickets_search_request_body(start, end, response.pages.next.starting_after)
 
 
 async def fetch_conversations_parts(
@@ -297,7 +348,7 @@ async def fetch_conversations_parts(
     last_seen_ts = start
 
     url = f"{API}/conversations/search"
-    body = _generate_conversations_search_request_body(start, end)
+    body = _generate_conversations_or_tickets_search_request_body(start, end)
 
     while True:
         response = ConversationsSearchResponse.model_validate_json(
@@ -328,7 +379,7 @@ async def fetch_conversations_parts(
         if response.pages.next is None:
             break
 
-        body = _generate_conversations_search_request_body(start, end, response.pages.next.starting_after)
+        body = _generate_conversations_or_tickets_search_request_body(start, end, response.pages.next.starting_after)
 
     # Since a conversation part's updated_at could be after the window_start but before the parent
     # conversation's updated_at, we can't yield a new cursor until after checking the entire date window.
