@@ -105,6 +105,7 @@
                     "auction_bid",
                     "auction_competitiveness",
                     "auction_max_competitor_bid",
+                    "average_purchases_conversion_value",
                     "buying_type",
                     "campaign_id",
                     "campaign_name",
@@ -116,7 +117,6 @@
                     "catalog_segment_value_omni_purchase_roas",
                     "catalog_segment_value_website_purchase_roas",
                     "clicks",
-                    "conversion_lead_rate",
                     "conversion_rate_ranking",
                     "conversion_values",
                     "conversions",
@@ -127,7 +127,6 @@
                     "cost_per_action_type",
                     "cost_per_ad_click",
                     "cost_per_conversion",
-                    "cost_per_conversion_lead",
                     "cost_per_dda_countby_convs",
                     "cost_per_estimated_ad_recallers",
                     "cost_per_inline_link_click",
@@ -175,8 +174,10 @@
                     "marketing_messages_cost_per_delivered",
                     "marketing_messages_cost_per_link_btn_click",
                     "marketing_messages_spend",
+                    "marketing_messages_website_purchase_values",
                     "mobile_app_purchase_roas",
                     "objective",
+                    "onsite_conversion_messaging_detected_purchase_deduped",
                     "optimization_goal",
                     "outbound_clicks",
                     "outbound_clicks_ctr",
@@ -185,6 +186,7 @@
                     "qualifying_question_qualify_answer_rate",
                     "quality_ranking",
                     "reach",
+                    "shops_assisted_purchases",
                     "social_spend",
                     "spend",
                     "total_postbacks",
@@ -237,8 +239,10 @@
                     "age",
                     "app_id",
                     "body_asset",
+                    "breakdown_reporting_ad_id",
                     "call_to_action_asset",
                     "coarse_conversion_value",
+                    "conversion_destination",
                     "country",
                     "description_asset",
                     "device_platform",
@@ -252,6 +256,7 @@
                     "image_asset",
                     "impression_device",
                     "is_conversion_id_modeled",
+                    "is_rendered_as_delayed_skip_ad",
                     "landing_destination",
                     "link_url_asset",
                     "marketing_messages_btn_name",
@@ -262,6 +267,7 @@
                     "media_format",
                     "media_origin_url",
                     "media_text_content",
+                    "media_type",
                     "mmm",
                     "place_page_id",
                     "platform_position",
@@ -270,11 +276,14 @@
                     "publisher_platform",
                     "redownload",
                     "region",
+                    "signal_source_bucket",
                     "skan_campaign_id",
                     "skan_conversion_id",
                     "skan_version",
                     "standard_event_content_type",
                     "title_asset",
+                    "user_persona_id",
+                    "user_persona_name",
                     "video_asset"
                   ]
                 }
@@ -298,6 +307,10 @@
                     "action_type",
                     "action_video_sound",
                     "action_video_type",
+                    "conversion_destination",
+                    "matched_persona_id",
+                    "matched_persona_name",
+                    "signal_source_bucket",
                     "standard_event_content_type"
                   ]
                 }
@@ -454,8 +467,8 @@
     "documentationUrl": "https://go.estuary.dev/facebook-marketing",
     "oauth2": {
       "provider": "facebook",
-      "authUrlTemplate": "https://www.facebook.com/v19.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{#urlencode}}{{{  state }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management",
-      "accessTokenUrlTemplate": "https://graph.facebook.com/v19.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
+      "authUrlTemplate": "https://www.facebook.com/v21.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{#urlencode}}{{{  state }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management",
+      "accessTokenUrlTemplate": "https://graph.facebook.com/v21.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
       "accessTokenResponseMap": {
         "access_token": "/access_token"
       }
