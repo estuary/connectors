@@ -175,9 +175,12 @@ def build_query(start: datetime, end: datetime) -> str:
                                 }}
                                 inventoryItem {{
                                     id
+                                    legacyResourceId
+                                    sku
                                     requiresShipping
                                     tracked
                                     measurement {{
+                                        id
                                         weight {{
                                             value
                                             unit
@@ -189,8 +192,10 @@ def build_query(start: datetime, end: datetime) -> str:
                                                 id
                                                 location {{
                                                     id
+                                                    name
                                                     fulfillmentService {{
                                                         id
+                                                        handle
                                                         serviceName
                                                         type
                                                     }}
