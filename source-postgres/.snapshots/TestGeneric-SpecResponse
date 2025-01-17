@@ -94,6 +94,12 @@
             "description": "Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases.",
             "pattern": "^[0-9]+$"
           },
+          "max_backfill_xid": {
+            "type": "string",
+            "title": "Maximum Backfill XID",
+            "description": "Only backfill rows with XMIN values smaller (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases.",
+            "pattern": "^[0-9]+$"
+          },
           "read_only_capture": {
             "type": "boolean",
             "title": "Read-Only Capture",
