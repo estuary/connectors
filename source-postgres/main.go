@@ -268,19 +268,6 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 	if err := registerDatatypeTweaks(ctx, conn, conn.TypeMap()); err != nil {
 		return err
 	}
-
-	// Attempt (non-fatal) to set the statement_timeout parameter to zero, then
-	// independently of that log a warning if it's nonzero.
-	if _, err := conn.Exec(ctx, "SET statement_timeout = 0;"); err != nil {
-		logrus.WithField("err", err).Debug("failed to set statement_timeout = 0")
-	}
-	var statementTimeout string
-	if err := conn.QueryRow(ctx, "SHOW statement_timeout").Scan(&statementTimeout); err != nil {
-		logrus.WithField("err", err).Warn("failed to query statement_timeout")
-	} else if statementTimeout != "0" {
-		logrus.WithField("timeout", statementTimeout).Warn("nonzero statement_timeout")
-	}
-
 	db.conn = conn
 	return nil
 }
