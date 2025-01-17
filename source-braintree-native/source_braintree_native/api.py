@@ -382,6 +382,10 @@ async def fetch_subscriptions(
         yield end
 
 
+def _are_same_day(start: datetime, end: datetime) -> bool:
+    return start.date() == end.date()
+
+
 async def fetch_disputes(
         braintree_gateway: BraintreeGateway,
         window_size: int,
@@ -393,12 +397,16 @@ async def fetch_disputes(
     window_end = log_cursor + timedelta(hours=window_size)
     end = min(window_end, datetime.now(tz=UTC))
 
-    # Braintree does not let us search disputes based on the created_at field. I assume received_at is an adequate proxy
-    # for created_at, although received_at is less granular than created_at (date vs. datetime). We'll always receive
-    # results we've already seen in this search, but we filter those out client-side.
+    # Braintree does not let us search disputes based on the created_at field, and the received_date field is
+    # the best alternative that Braintree exposes for searching. Since received_date can be earlier than
+    # created_at, it's possible to miss records with a small enough window size when the stream is caught up to the present.
+    # Ex: {'id': 'dispute_1', 'received_date': '2025-01-10', 'created_at': '2025-01-11T00:50:00Z'} could be missed with
+    # a window size of 1 hour. To avoid missing these type of results, we move the start of the received_date search back one day.
+    start = log_cursor - timedelta(days=1) if _are_same_day(log_cursor, end) else log_cursor
+
     search_result = await asyncio.to_thread(
         braintree_gateway.dispute.search,
-        DisputeSearch.received_date.between(log_cursor, end),
+        DisputeSearch.received_date.between(start, end),
     )
 
     count = 0
