@@ -60,7 +60,7 @@ async def snapshot_resources(
         yield resource
 
 
-def _generate_contacts_search_request_body(
+def _generate_contacts_search_body(
         lower_bound: int,
         upper_bound: int,
         next_page_cursor: str | None = None
@@ -128,7 +128,7 @@ def _generate_contacts_search_request_body(
     }
 
 
-def _generate_conversations_or_tickets_search_request_body(
+def _generate_conversations_or_tickets_search_body(
         lower_bound: int,
         upper_bound: int,
         next_page_cursor: str | None = None
@@ -185,7 +185,7 @@ async def fetch_contacts(
     last_seen_ts = start
 
     url = f"{API}/contacts/search"
-    body = _generate_contacts_search_request_body(start, end)
+    body = _generate_contacts_search_body(start, end)
 
     pagination_ended_early = False
     while True:
@@ -224,7 +224,7 @@ async def fetch_contacts(
         if pagination_ended_early or response.pages.next is None:
             break
 
-        body = _generate_contacts_search_request_body(start, end, response.pages.next.starting_after)
+        body = _generate_contacts_search_body(start, end, response.pages.next.starting_after)
 
     # Results are returned in descending order, so we can't yield a cursor until pagination is complete.
     if end == max_end:
@@ -246,7 +246,7 @@ async def fetch_tickets(
     last_seen_ts = start
 
     url = f"{API}/tickets/search"
-    body = _generate_conversations_or_tickets_search_request_body(start, end)
+    body = _generate_conversations_or_tickets_search_body(start, end)
 
     while True:
         response = TicketsSearchResponse.model_validate_json(
@@ -280,7 +280,7 @@ async def fetch_tickets(
             yield _s_to_dt(last_seen_ts)
             break
 
-        body = _generate_conversations_or_tickets_search_request_body(start, end, response.pages.next.starting_after)
+        body = _generate_conversations_or_tickets_search_body(start, end, response.pages.next.starting_after)
 
 
 async def fetch_conversations(
@@ -296,7 +296,7 @@ async def fetch_conversations(
     last_seen_ts = start
 
     url = f"{API}/conversations/search"
-    body = _generate_conversations_or_tickets_search_request_body(start, end)
+    body = _generate_conversations_or_tickets_search_body(start, end)
 
     while True:
         response = ConversationsSearchResponse.model_validate_json(
@@ -330,7 +330,7 @@ async def fetch_conversations(
             yield _s_to_dt(last_seen_ts)
             break
 
-        body = _generate_conversations_or_tickets_search_request_body(start, end, response.pages.next.starting_after)
+        body = _generate_conversations_or_tickets_search_body(start, end, response.pages.next.starting_after)
 
 
 async def fetch_conversations_parts(
@@ -348,7 +348,7 @@ async def fetch_conversations_parts(
     last_seen_ts = start
 
     url = f"{API}/conversations/search"
-    body = _generate_conversations_or_tickets_search_request_body(start, end)
+    body = _generate_conversations_or_tickets_search_body(start, end)
 
     while True:
         response = ConversationsSearchResponse.model_validate_json(
@@ -379,7 +379,7 @@ async def fetch_conversations_parts(
         if response.pages.next is None:
             break
 
-        body = _generate_conversations_or_tickets_search_request_body(start, end, response.pages.next.starting_after)
+        body = _generate_conversations_or_tickets_search_body(start, end, response.pages.next.starting_after)
 
     # Since a conversation part's updated_at could be after the window_start but before the parent
     # conversation's updated_at, we can't yield a new cursor until after checking the entire date window.
