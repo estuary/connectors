@@ -26,6 +26,7 @@ from .models import (
 API = "https://api.intercom.io"
 SEARCH_PAGE_SIZE = 150
 COMPANIES_LIST_LIMIT = 10_000
+MIN_CHECKPOINT_INTERVAL = SEARCH_PAGE_SIZE * 50
 
 COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API"
 COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX = r"scroll already exists for this workspace"
@@ -263,6 +264,8 @@ async def fetch_tickets(
     url = f"{API}/tickets/search"
     body = _generate_conversations_or_tickets_search_body(start, end)
 
+    count = 0
+
     while True:
         response = TicketsSearchResponse.model_validate_json(
                 await http.request(log, url, "POST", json=body)
@@ -281,15 +284,15 @@ async def fetch_tickets(
 
         for ticket in response.tickets:
             if ticket.updated_at > last_seen_ts:
-                # Checkpoint any yielded documents if the next result was updated later than
-                # the prior results and it's not the first result we've seen.
-                if last_seen_ts != start:
+                if count >= MIN_CHECKPOINT_INTERVAL:
                     yield _s_to_dt(last_seen_ts)
+                    count = 0
 
                 last_seen_ts = ticket.updated_at
 
             if ticket.updated_at > start:
                     yield ticket
+                    count += 1
 
         if response.pages.next is None:
             yield _s_to_dt(last_seen_ts)
@@ -313,6 +316,8 @@ async def fetch_conversations(
     url = f"{API}/conversations/search"
     body = _generate_conversations_or_tickets_search_body(start, end)
 
+    count = 0
+
     while True:
         response = ConversationsSearchResponse.model_validate_json(
                 await http.request(log, url, "POST", json=body)
@@ -331,15 +336,15 @@ async def fetch_conversations(
 
         for conversation in response.conversations:
             if conversation.updated_at > last_seen_ts:
-                # Checkpoint any yielded documents if the next result was updated later than
-                # the prior results and it's not the first result we've seen.
-                if last_seen_ts != start:
+                if count >= MIN_CHECKPOINT_INTERVAL:
                     yield _s_to_dt(last_seen_ts)
+                    count = 0
 
                 last_seen_ts = conversation.updated_at
 
             if conversation.updated_at > start:
                     yield conversation
+                    count += 1
 
         if response.pages.next is None:
             yield _s_to_dt(last_seen_ts)
