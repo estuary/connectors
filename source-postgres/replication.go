@@ -249,7 +249,7 @@ var (
 	// operation will error out if no further events are received when there ought to be
 	// some. This should never be hit in normal operation, and exists only so that certain
 	// rare failure modes produce an error rather than blocking forever.
-	streamToFenceWatchdogTimeout = 5 * time.Minute
+	streamToFenceWatchdogTimeout = 12 * 60 * time.Minute
 )
 
 func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
