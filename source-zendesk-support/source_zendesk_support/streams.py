@@ -601,6 +601,10 @@ class SourceZendeskSupportIncrementalCursorExportStream(SourceZendeskIncremental
     state_checkpoint_interval = 1000
     _cursor_value = ""
 
+    def __init__(self, is_parent = False, **kwargs):
+        super().__init__(**kwargs)
+        self._is_parent = is_parent
+
     @property
     def cursor_field(self) -> str:
         """Name of the field associated with the state"""
@@ -655,11 +659,27 @@ class SourceZendeskSupportIncrementalCursorExportStream(SourceZendeskIncremental
         response_json = response.json()
 
         records = response_json.get(self.response_list_name, [])
-        for record in records:
-            yield record
-
         cursor = response_json.get("after_cursor", None)
-        if cursor and len(records) != 0:
+
+        total = len(records)
+        count = 0
+
+        for record in records:
+            # If this stream is acting as a parent stream, yield the cursor before yielding the final "slice" of this response.
+            # This is necessary due to Airbyte's state checkpointing semantics; state is checkpointed immediately after finishing processing a slice.
+            if (
+                self._is_parent and
+                cursor and
+                total != 0 and
+                count == total - 1
+                ):
+                yield {'cursor': cursor}
+
+            yield record
+            count += 1
+
+
+        if cursor and total != 0:
             self.state = {self.cursor_field: cursor}
 
 
@@ -960,73 +980,64 @@ class Macros(SourceZendeskSupportStream):
     """Macros stream: https://developer.zendesk.com/api-reference/ticketing/business-rules/macros/"""
 
 
-class TicketAudits(SourceZendeskSupportCursorPaginationStream):
-    """TicketAudits stream: https://developer.zendesk.com/api-reference/ticketing/tickets/ticket_audits/
-    
-    This endpoint doesn't let us filter the returned documents by start date. It returns documents in descending order
-    of when they were created, starting at the present. So we stop paginating once we receive a request that has a 
-    document created before the start date OR before our last parsed document was created.
-    """
-
-    # limit of 200 to avoid Zendesk server 504 errors.
-    # See https://support.zendesk.com/hc/en-us/community/posts/5555348549402-Cursor-Based-Incremental-API-504-Issue
-    page_size = 200
-    # ticket audits doesn't have the 'updated_by' field
-    cursor_field = "created_at"
-
+class TicketAudits(SourceZendeskSupportFullRefreshStream, IncrementalMixin):
     response_list_name = "audits"
 
-    transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
+    _cursor_value = ""
 
-    # Due to how this endpoint behaves, its methods are different from most other streams'.
-    def request_params(self, next_page_token: Mapping[str, Any] = None, **kwargs) -> MutableMapping[str, Any]:
-        params = {"limit": self.page_size}
+    @property
+    def cursor_field(self) -> str:
+        """Name of the field associated with the state"""
+        return "after_cursor"
 
-        if next_page_token:
-            params.update(next_page_token)
-        return params
+    @property
+    def state(self) -> Mapping[str, Any]:
+        return {self.cursor_field: self._cursor_value}
 
-    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
-        if self._ignore_pagination:
-            return None
+    @state.setter
+    def state(self, value: Mapping[str, Any]):
+        self._cursor_value = value[self.cursor_field]
 
-        before_cursor = response.json().get("before_cursor", None)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
-        return {"cursor": before_cursor} if before_cursor else None
+        self.parent = Tickets(
+            is_parent= True,
+            **kwargs
+        )
 
-    def _is_before_last_cursor_date(self, response: requests.Response, stream_state: Mapping[str, Any]) -> bool:
-        """
-        This method checks whether a response contains documents before the last cursor date (if it exists) or the start date.
-        This allows us to determine when to stop paginating backwards.
-        """
-        document = response.json().get(self.response_list_name, [{}])[0]
-        document_created_at = document.get(self.cursor_field, "")
-        cursor_date = (stream_state or {}).get(self.cursor_field) or self._start_date
-        return document_created_at < cursor_date
+    def stream_slices(
+        self, sync_mode: SyncMode, cursor_field: Optional[List[str]] = None, stream_state: Optional[Mapping[str, Any]] = None
+    ) -> Iterable[Optional[Mapping[str, Any]]]:
+        latest_cursor = self.state.get(self.cursor_field, None)
 
-    # Same as airbyte_cdk's HttpStream._read_pages method, but adds a condition to stop paginating 
-    # if the response contains documents created before our last cursor date / start date.
-    def _read_pages(
+        self.parent.state = {self.cursor_field: latest_cursor}
+
+        parent_records = self.parent.read_records(
+            sync_mode=SyncMode.incremental, cursor_field=cursor_field
+        )
+
+        for record in parent_records:
+            next_cursor = record.get('cursor', None)
+            if next_cursor:
+                # Update state if we receive a cursor
+                self.state = {self.cursor_field: next_cursor}
+            else:
+                yield {"parent": record}
+
+    def path(
         self,
-        records_generator_fn: Callable[
-            [requests.PreparedRequest, requests.Response, Mapping[str, Any], Optional[Mapping[str, Any]]], Iterable[StreamData]
-        ],
-        stream_slice: Optional[Mapping[str, Any]] = None,
-        stream_state: Optional[Mapping[str, Any]] = None,
-    ) -> Iterable[StreamData]:
-        stream_state = stream_state or {}
-        pagination_complete = False
-        next_page_token = None
-        while not pagination_complete:
-            request, response = self._fetch_next_page(stream_slice, stream_state, next_page_token)
-            yield from records_generator_fn(request, response, stream_state, stream_slice)
+        *,
+        stream_state: Mapping[str, Any] = None,
+        stream_slice: Mapping[str, Any] = None,
+        next_page_token: Mapping[str, Any] = None,
+    ) -> str:
+        ticket_id = stream_slice.get("parent").get("id")
+        return f"tickets/{ticket_id}/audits"
 
-            next_page_token = self.next_page_token(response)
-            if not next_page_token or self._is_before_last_cursor_date(response, stream_state):
-                pagination_complete = True
-
-        # Return an empty generator in case no records are yielded
-        yield from []
+    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+        for record in response.json().get(self.response_list_name, []):
+            yield record
 
 
 class Tags(SourceZendeskSupportFullRefreshStream):
