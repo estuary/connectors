@@ -84,7 +84,7 @@ captures:
           stream: ticket_audits
           syncMode: incremental
           cursorField:
-            - created_at
+            - after_cursor
         target: acmeCo/ticket_audits
       - resource:
           stream: ticket_comments
