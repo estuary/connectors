@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"sync"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -25,6 +26,8 @@ const (
 	// MongoDB docs recommend limiting this to "10's" of values, see
 	// https://www.mongodb.com/docs/manual/reference/operator/query/in/#-in
 	loadBatchSize = 100
+
+	concurrentLoadWorkers = 5
 
 	// The default batchWriteLimit is 100,000 documents. Practically speaking we will be limited to
 	// less than that to keep connector memory usage reasonable.
@@ -49,12 +52,22 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	ctx := it.Context()
 	it.WaitForAcknowledged()
 
+	var mu sync.Mutex
+	lockedAndLoaded := func(binding int, doc json.RawMessage) error {
+		// Prevent concurrent load workers from interleaving |loaded| responses.
+		mu.Lock()
+		defer mu.Unlock()
+		return loaded(binding, doc)
+	}
+
 	sendBatches := make(chan loadBatch)
 
 	group, groupCtx := errgroup.WithContext(ctx)
-	group.Go(func() error {
-		return t.loadWorker(groupCtx, loaded, sendBatches)
-	})
+	for idx := 0; idx < concurrentLoadWorkers; idx++ {
+		group.Go(func() error {
+			return t.loadWorker(groupCtx, lockedAndLoaded, sendBatches)
+		})
+	}
 
 	sendBatch := func(binding int, batch []string) error {
 		select {
