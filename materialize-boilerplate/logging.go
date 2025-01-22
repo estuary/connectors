@@ -147,7 +147,8 @@ func (l *extendedLogger) logAsync(asyncLog func()) (stopLogger func(doneLog func
 }
 
 func (l *extendedLogger) handler() func(transactionsEvent) {
-	var stopLoadLogger func(func())
+	var stopReadingLoadsLogger func(func())
+	var stopProcessingLoadsLogger func(func())
 	var stopStoreLogger func(func())
 	var stopWaitingForDocsLogger func(func())
 	var waitingForDocsMu sync.Mutex
@@ -184,19 +185,19 @@ func (l *extendedLogger) handler() func(transactionsEvent) {
 		switch event {
 		case readLoad:
 			if n := l.readLoads.Add(1); n == 1 {
-				stopLoadLogger = l.logAsync(l.readingLoadsLogFn(round))
+				stopReadingLoadsLogger = l.logAsync(l.readingLoadsLogFn(round))
 			}
 		case readFlush:
 			if total := l.readLoads.Swap(0); total != 0 {
-				stopLoadLogger(l.finishedReadingLoadsLogFn(round, total))
+				stopReadingLoadsLogger(l.finishedReadingLoadsLogFn(round, total))
 			}
 		case sentLoaded:
 			if n := l.sentLoaded.Add(1); n == 1 {
-				stopLoadLogger = l.logAsync(l.processingLoadedsLogFn(round))
+				stopProcessingLoadsLogger = l.logAsync(l.processingLoadedsLogFn(round))
 			}
 		case sentFlushed:
 			if total := l.sentLoaded.Swap(0); total != 0 {
-				stopLoadLogger(l.finishedProcessingLoadedsLogFn(round, total))
+				stopProcessingLoadsLogger(l.finishedProcessingLoadedsLogFn(round, total))
 			}
 		case readStore:
 			if n := l.readStores.Add(1); n == 1 {
