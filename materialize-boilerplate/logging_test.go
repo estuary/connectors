@@ -36,3 +36,52 @@ func TestExtendedLoggerWaitingForDocsRace(t *testing.T) {
 		wg.Wait()
 	}
 }
+
+func TestLoads(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		do   func(func(transactionsEvent))
+	}{
+		{
+			"no load requests",
+			func(handler func(transactionsEvent)) {
+				handler(readFlush)
+				handler(sentFlushed)
+			},
+		},
+		{
+			"no load results",
+			func(handler func(transactionsEvent)) {
+				handler(readLoad)
+				handler(readFlush)
+				handler(sentFlushed)
+			},
+		},
+		{
+			"staged with results",
+			func(handler func(transactionsEvent)) {
+				handler(readLoad)
+				handler(readFlush)
+				handler(sentLoaded)
+				handler(sentFlushed)
+			},
+		},
+		{
+			"not staged with results",
+			func(handler func(transactionsEvent)) {
+				handler(readLoad)
+				handler(sentLoaded)
+				handler(readFlush)
+				handler(sentFlushed)
+			},
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			be := newBindingEvents()
+			logger := newExtendedLogger(loggerAtLevel{lvl: log.InfoLevel}, be)
+			handler := logger.handler()
+			tt.do(handler)
+		})
+
+	}
+}
