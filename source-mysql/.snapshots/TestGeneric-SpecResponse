@@ -66,6 +66,14 @@
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
             "default": 50000
           },
+          "discover_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Discovery Schema Selection",
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
+          },
           "watermarks_table": {
             "type": "string",
             "title": "Watermarks Table Name",

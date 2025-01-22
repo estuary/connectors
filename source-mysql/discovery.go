@@ -27,7 +27,7 @@ const (
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
-	var tables, err = getTables(ctx, db.conn)
+	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering tables: %w", err)
 	}
@@ -439,7 +439,7 @@ const queryDiscoverTables = `
   FROM information_schema.tables
   WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys');`
 
-func getTables(_ context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(_ context.Context, conn *client.Conn, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
 	var results, err = conn.Execute(queryDiscoverTables)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
@@ -448,11 +448,22 @@ func getTables(_ context.Context, conn *client.Conn) ([]*sqlcapture.DiscoveryInf
 
 	var tables []*sqlcapture.DiscoveryInfo
 	for _, row := range results.Values {
+		var tableSchema = string(row[0].AsString())
+		var tableName = string(row[1].AsString())
 		var collation = string(row[4].AsString())
+		var omitBinding = false
+		if len(selectedSchemas) > 0 && !slices.Contains(selectedSchemas, tableSchema) {
+			logrus.WithFields(logrus.Fields{
+				"schema": tableSchema,
+				"table":  tableName,
+			}).Debug("table in filtered schema")
+			omitBinding = true
+		}
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
-			Schema:    string(row[0].AsString()),
-			Name:      string(row[1].AsString()),
-			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
+			Schema:      tableSchema,
+			Name:        tableName,
+			BaseTable:   strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
+			OmitBinding: omitBinding,
 			ExtraDetails: &mysqlTableDiscoveryDetails{
 				StorageEngine:  string(row[3].AsString()),
 				DefaultCharset: charsetFromCollation(collation),
