@@ -296,7 +296,6 @@ class TestAllStreams:
             (SatisfactionRatings, "satisfaction_ratings"),
             (SlaPolicies, "slas/policies.json"),
             (Tags, "tags"),
-            (TicketAudits, "ticket_audits"),
             (TicketComments, "incremental/ticket_events.json"),
             (TicketFields, "ticket_fields"),
             (TicketForms, "ticket_forms"),
@@ -317,7 +316,6 @@ class TestAllStreams:
             "SatisfactionRatings",
             "SlaPolicies",
             "Tags",
-            "TicketAudits",
             "TicketComments",
             "TicketFields",
             "TicketForms",
@@ -518,7 +516,6 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (GroupMemberships, {}, {"updated_at": "2022-03-17T16:03:07Z"}, {"updated_at": "2022-03-17T16:03:07Z"}),
             (TicketForms, {}, {"updated_at": "2023-03-17T16:03:07Z"}, {"updated_at": "2023-03-17T16:03:07Z"}),
             (TicketMetricEvents, {}, {"time": "2024-03-17T16:03:07Z"}, {"time": "2024-03-17T16:03:07Z"}),
-            (TicketAudits, {}, {"created_at": "2025-03-17T16:03:07Z"}, {"created_at": "2025-03-17T16:03:07Z"}),
             (OrganizationMemberships, {}, {"updated_at": "2025-03-17T16:03:07Z"}, {"updated_at": "2025-03-17T16:03:07Z"}),
         ],
         ids=[
@@ -526,7 +523,6 @@ class TestSourceZendeskSupportCursorPaginationStream:
             "GroupMemberships",
             "TicketForms",
             "TicketMetricEvents",
-            "TicketAudits",
             "OrganizationMemberships",
         ],
     )
@@ -581,7 +577,6 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (GroupMemberships, 1622505600),
             (TicketForms, 1622505600),
             (TicketMetricEvents, 1622505600),
-            (TicketAudits, 1622505600),
             (OrganizationMemberships, 1622505600),
         ],
         ids=[
@@ -589,7 +584,6 @@ class TestSourceZendeskSupportCursorPaginationStream:
             "GroupMemberships",
             "TicketForms",
             "TicketMetricEvents",
-            "TicketAudits",
             "OrganizationMemberships",
         ],
     )
@@ -605,7 +599,7 @@ class TestSourceZendeskSupportCursorPaginationStream:
             (GroupMemberships, {"page[size]": 100, "start_time": 1622505600, "sort_by": "asc"}),
             (TicketForms, {}),
             (TicketMetricEvents, {"page[size]": 1000, "start_time": 1622505600}),
-            (TicketAudits, {"limit": 200}),
+            (TicketAudits, {"page[size]": 100}),
             (SatisfactionRatings, {"page[size]": 100, "start_time": 1622505600}),
             (OrganizationMemberships, {"page[size]": 100, "start_time": 1622505600})
         ],
@@ -881,7 +875,7 @@ def test_read_tickets_stream(requests_mock):
                 {"id": 360023382300, "value": None},
                 {"id": 360004841380, "value": "customer_tickets"},
                 {"id": 360022469240, "value": "5"},
-                {"id": 360023712840, "value": "False"},
+                {"id": 360023712840, "value": "false"},
             ]
         },
     ]
