@@ -306,6 +306,7 @@ properties:
               type:
                 - "null"
                 - integer
+                - string
             locale:
               type:
                 - "null"
@@ -416,6 +417,7 @@ properties:
             - string
             - array
             - object
+            - integer
           items:
             type:
               - "null"
@@ -445,6 +447,7 @@ properties:
           type:
             - "null"
             - string
+            - integer
   author_id:
     type:
       - "null"
