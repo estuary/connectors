@@ -1308,7 +1308,7 @@
       "stream": "ticket_audits",
       "syncMode": "incremental",
       "cursorField": [
-        "created_at"
+        "after_cursor"
       ]
     },
     "documentSchema": {
@@ -1760,8 +1760,152 @@
               "body": {
                 "type": [
                   "null",
-                  "string"
-                ]
+                  "string",
+                  "object",
+                  "array"
+                ],
+                "properties": {
+                  "html_url": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "id": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "locale": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "title": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  },
+                  "url": {
+                    "type": [
+                      "null",
+                      "string"
+                    ]
+                  }
+                },
+                "items": {
+                  "type": [
+                    "null",
+                    "object"
+                  ],
+                  "properties": {
+                    "article": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "article_id": {
+                          "type": [
+                            "null",
+                            "integer"
+                          ]
+                        },
+                        "brand_id": {
+                          "type": [
+                            "null",
+                            "integer"
+                          ]
+                        },
+                        "html_url": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "id": {
+                          "type": [
+                            "null",
+                            "integer"
+                          ]
+                        },
+                        "locale": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "score": {
+                          "type": [
+                            "null",
+                            "number"
+                          ]
+                        },
+                        "title": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        },
+                        "url": {
+                          "type": [
+                            "null",
+                            "string"
+                          ]
+                        }
+                      }
+                    },
+                    "reviews": {
+                      "type": [
+                        "null",
+                        "object"
+                      ],
+                      "properties": {
+                        "agent": {
+                          "type": [
+                            "null",
+                            "array"
+                          ],
+                          "items": {
+                            "type": [
+                              "null",
+                              "string"
+                            ]
+                          }
+                        },
+                        "enduser": {
+                          "type": [
+                            "null",
+                            "object"
+                          ],
+                          "properties": {
+                            "reason": {
+                              "type": [
+                                "null",
+                                "string"
+                              ]
+                            },
+                            "user_id": {
+                              "type": [
+                                "null",
+                                "integer"
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "viewed": {
+                      "type": [
+                        "null",
+                        "boolean"
+                      ]
+                    }
+                  }
+                }
               },
               "recipients": {
                 "type": [
@@ -1796,8 +1940,36 @@
               "previous_value": {
                 "type": [
                   "null",
-                  "string"
-                ]
+                  "string",
+                  "array",
+                  "object"
+                ],
+                "items": {
+                  "type": [
+                    "null",
+                    "string"
+                  ]
+                },
+                "properties": {
+                  "in_business_hours": {
+                    "type": [
+                      "null",
+                      "boolean"
+                    ]
+                  },
+                  "minute": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  },
+                  "seconds": {
+                    "type": [
+                      "null",
+                      "integer"
+                    ]
+                  }
+                }
               },
               "macro_title": {
                 "type": [
