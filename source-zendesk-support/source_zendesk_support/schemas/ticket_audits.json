@@ -171,7 +171,7 @@
                     "type": ["null", "string"]
                 },
                 "id": {
-                    "type": ["null", "integer"]
+                    "type": ["null", "integer", "string"]
                 },
                 "locale": {
                     "type": ["null", "string"]
@@ -259,7 +259,7 @@
             "type": ["null", "integer"]
           },
           "previous_value": {
-            "type": ["null", "string", "array", "object"],
+            "type": ["null", "string", "array", "object", "integer"],
             "items": {
                 "type": ["null", "string"]
             },
@@ -282,7 +282,7 @@
             "type": ["null", "boolean"]
           },
           "resource": {
-            "type": ["null", "string"]
+            "type": ["null", "string", "integer"]
           }
         }
       }

@@ -1774,7 +1774,8 @@
                   "id": {
                     "type": [
                       "null",
-                      "integer"
+                      "integer",
+                      "string"
                     ]
                   },
                   "locale": {
@@ -1942,7 +1943,8 @@
                   "null",
                   "string",
                   "array",
-                  "object"
+                  "object",
+                  "integer"
                 ],
                 "items": {
                   "type": [
@@ -1986,7 +1988,8 @@
               "resource": {
                 "type": [
                   "null",
-                  "string"
+                  "string",
+                  "integer"
                 ]
               }
             }
