@@ -159,25 +159,86 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		return "", nil, fmt.Errorf("cannot drop nullability constraints but got %d DropNotNulls for table %s", len(ta.DropNotNulls), ta.Identifier)
 	}
 
-	var stmts []string
+	var addColumnsQuery []string
 	if len(ta.AddColumns) > 0 {
 		var addColumnsStmt strings.Builder
 		if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		stmts = append(stmts, addColumnsStmt.String())
+
+		addColumnsQuery = append(addColumnsQuery, addColumnsStmt.String())
 	}
 
+	var migrateQueries []string
 	if len(ta.ColumnTypeChanges) > 0 {
-		// TODO: Support column migrations
+		sourceTable := ta.Table.Identifier
+		tmpTable := dialect.Identifier(ta.InfoLocation.TableSchema, uuid.NewString())
+
+		params := migrateParams{
+			SourceTable: sourceTable,
+			TmpName:     tmpTable,
+		}
+
+		for _, col := range ta.Columns() {
+			mCol := migrateColumn{Identifier: col.Identifier}
+
+			if n := slices.IndexFunc(ta.ColumnTypeChanges, func(m sql.ColumnTypeMigration) bool {
+				return m.Identifier == col.Identifier
+			}); n != -1 {
+				m := ta.ColumnTypeChanges[n]
+				mCol.CastSQL = m.CastSQL(m)
+			}
+
+			params.Columns = append(params.Columns, mCol)
+		}
+
+		var migrateTableQuery strings.Builder
+		if err := tplCreateMigrationTable.Execute(&migrateTableQuery, params); err != nil {
+			return "", nil, fmt.Errorf("rendering create migration table statement: %w", err)
+		}
+
+		migrateQueries = []string{
+			migrateTableQuery.String(),
+			fmt.Sprintf("DROP TABLE %s;", sourceTable),
+			fmt.Sprintf(
+				"EXEC sp_rename %s, %s;",
+				dialect.Literal(tmpTable),
+				dialect.Literal(dialect.Identifier(ta.InfoLocation.TableName))),
+		}
 	}
 
-	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
-		for _, stmt := range stmts {
-			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+	allQueries := append(addColumnsQuery, migrateQueries...)
+
+	return strings.Join(allQueries, "\n"), func(ctx context.Context) error {
+		if len(addColumnsQuery) == 1 { // slice is either empty or has a single query
+			if _, err := c.db.ExecContext(ctx, addColumnsQuery[0]); err != nil {
+				log.WithField("query", addColumnsQuery[0]).Error("alter table query failed")
 				return err
 			}
 		}
+
+		// The queries for a table migration are run in a transaction since this
+		// involves copying the existing table into a "temporary" table with a
+		// different name, dropping the original table, and renaming the
+		// temporary table to replace the original table. This will all be done
+		// as an atomic action via the transaction.
+		txn, err := c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("db.BeginTx: %w", err)
+		}
+		defer txn.Rollback()
+
+		for _, query := range migrateQueries {
+			if _, err := txn.ExecContext(ctx, query); err != nil {
+				log.WithField("query", query).Error("migrate table query failed")
+				return err
+			}
+		}
+
+		if err := txn.Commit(); err != nil {
+			return fmt.Errorf("txn.Commit: %w", err)
+		}
+
 		return nil
 	}, nil
 }

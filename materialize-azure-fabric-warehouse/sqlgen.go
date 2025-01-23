@@ -47,7 +47,15 @@ var dialect = func() sql.Dialect {
 	)
 
 	return sql.Dialect{
-		MigratableTypes: sql.MigrationSpecs{}, // TODO: Support column migrations.
+		MigratableTypes: sql.MigrationSpecs{
+			"bigint":    {sql.NewMigrationSpec([]string{"DECIMAL(38,0)", "VARCHAR(MAX)"})},
+			"decimal":   {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
+			"float":     {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
+			"bit":       {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"}, sql.WithCastSQL(bitToStringCast))},
+			"date":      {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
+			"datetime2": {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
+			"time":      {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
+		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
 		}),
@@ -70,10 +78,28 @@ var dialect = func() sql.Dialect {
 	}
 }()
 
+func bitToStringCast(m sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(
+		`CAST(CASE WHEN %s = 1 THEN 'true' WHEN %s = 0 THEN 'false' ELSE NULL END AS %s)`,
+		m.Identifier, m.Identifier, m.NullableDDL,
+	)
+}
+
 type queryParams struct {
 	sql.Table
 	URIs              []string
 	StorageAccountKey string
+}
+
+type migrateParams struct {
+	SourceTable string
+	TmpName     string
+	Columns     []migrateColumn
+}
+
+type migrateColumn struct {
+	Identifier string
+	CastSQL    string
 }
 
 var (
@@ -101,6 +127,15 @@ ALTER TABLE {{$.Identifier}} ADD
 	{{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }};
+{{ end }}
+
+{{ define "createMigrationTable" }}
+CREATE TABLE {{$.TmpName}} AS SELECT
+{{- range $ind, $col := $.Columns }}
+	{{- if $ind }},{{ end }}
+	{{ if $col.CastSQL -}} {{ $col.CastSQL }} AS {{$col.Identifier}} {{- else -}} {{$col.Identifier}} {{- end }}
+{{- end }}
+	FROM {{$.SourceTable}};
 {{ end }}
 
 {{ define "createLoadTable" }}
@@ -193,12 +228,13 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplCreateTargetTable  = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns  = tplAll.Lookup("alterTableColumns")
-	tplCreateLoadTable    = tplAll.Lookup("createLoadTable")
-	tplLoadQuery          = tplAll.Lookup("loadQuery")
-	tplDropLoadTable      = tplAll.Lookup("dropLoadTable")
-	tplStoreMergeQuery    = tplAll.Lookup("storeMergeQuery")
-	tplStoreCopyIntoQuery = tplAll.Lookup("storeCopyIntoQuery")
-	tplUpdateFence        = tplAll.Lookup("updateFence")
+	tplCreateTargetTable    = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns    = tplAll.Lookup("alterTableColumns")
+	tplCreateMigrationTable = tplAll.Lookup("createMigrationTable")
+	tplCreateLoadTable      = tplAll.Lookup("createLoadTable")
+	tplLoadQuery            = tplAll.Lookup("loadQuery")
+	tplDropLoadTable        = tplAll.Lookup("dropLoadTable")
+	tplStoreMergeQuery      = tplAll.Lookup("storeMergeQuery")
+	tplStoreCopyIntoQuery   = tplAll.Lookup("storeCopyIntoQuery")
+	tplUpdateFence          = tplAll.Lookup("updateFence")
 )
