@@ -250,10 +250,6 @@ def deal_pipelines(http: HTTPSession) -> Resource:
 
 def owners(http: HTTPSession) -> Resource:
 
-    async def snapshot(log: Logger) -> AsyncGenerator[Owner, None]:
-        for item in await fetch_owners(log, http):
-            yield item
-
     def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -266,7 +262,7 @@ def owners(http: HTTPSession) -> Resource:
             binding_index,
             state,
             task,
-            fetch_snapshot=snapshot,
+            fetch_snapshot=functools.partial(fetch_owners, http),
             tombstone=Owner(_meta=Owner.Meta(op="d"), createdAt=None, updatedAt=None),
         )
 
