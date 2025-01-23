@@ -79,11 +79,30 @@ async def fetch_deal_pipelines(
 
 
 async def fetch_owners(
-    log: Logger, http: HTTPSession
-) -> list[Owner]:
-    url = f"{HUB}/owners/v2/owners/"
+   http: HTTPSession, log: Logger, 
+) -> AsyncGenerator[Owner, None]:
+    url = f"{HUB}/crm/v3/owners"
+    after: str | None = None
 
-    return TypeAdapter(list[Owner]).validate_json(await http.request(log, url))
+    input: dict[str, Any] = {
+        "limit": 500,
+    }
+
+    while True:
+        if after:
+            input["after"] = after
+
+        result = PageResult[Owner].model_validate_json(
+            await http.request(log, url, method="GET", params=input)
+        )
+
+        for owner in result.results:
+            yield owner
+
+        if not result.paging:
+            break
+
+        after = result.paging.next.after
 
 
 async def fetch_page_with_associations(
