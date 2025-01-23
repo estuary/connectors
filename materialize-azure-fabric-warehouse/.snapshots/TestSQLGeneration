@@ -148,4 +148,14 @@ WHERE flow_document <> '"delete"';
 DROP TABLE flow_temp_table_store_0;
 --- End "a-warehouse"."a-schema".key_value storeMergeQuery ---
 
+--- Begin createMigrationTable
+CREATE TABLE some_table_tmp AS SELECT
+	not_migrated_column,
+	CAST(is_migrated_column AS VARCHAR(MAX)) AS is_migrated_column,
+	another_not_migrated_column,
+	CAST(CASE WHEN migrated_boolean_column = 1 THEN 'true' WHEN migrated_boolean_column = 0 THEN 'false' ELSE NULL END AS VARCHAR(MAX)) AS migrated_boolean_column,
+	yet_another_not_migrated_column
+	FROM some_table;
+--- End createMigrationTable ---
+
 

@@ -64,5 +64,28 @@ func TestSQLGeneration(t *testing.T) {
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
+	{
+		params := migrateParams{
+			SourceTable: "some_table",
+			TmpName:     "some_table_tmp",
+			Columns: []migrateColumn{
+				{Identifier: "not_migrated_column"},
+				{Identifier: "is_migrated_column", CastSQL: "CAST(is_migrated_column AS VARCHAR(MAX))"},
+				{Identifier: "another_not_migrated_column"},
+				{Identifier: "migrated_boolean_column", CastSQL: bitToStringCast(sql.ColumnTypeMigration{
+					Column: sql.Column{
+						Identifier: "migrated_boolean_column",
+						MappedType: sql.MappedType{NullableDDL: "VARCHAR(MAX)"},
+					},
+				})},
+				{Identifier: "yet_another_not_migrated_column"},
+			},
+		}
+
+		snap.WriteString("--- Begin createMigrationTable")
+		require.NoError(t, tplCreateMigrationTable.Execute(snap, params))
+		snap.WriteString("--- End createMigrationTable ---\n\n")
+	}
+
 	cupaloy.SnapshotT(t, snap.String())
 }
