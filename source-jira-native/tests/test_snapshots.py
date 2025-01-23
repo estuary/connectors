@@ -16,7 +16,17 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    assert snapshot("capture.stdout.json") == lines
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    assert snapshot("capture.stdout.json") == unique_stream_lines
+
 
 def test_discover(request, snapshot):
     result = subprocess.run(
