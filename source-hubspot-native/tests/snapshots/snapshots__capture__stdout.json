@@ -5736,28 +5736,15 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "activeSalesforceId": null,
-      "activeUserId": 63843671,
+      "archived": false,
       "createdAt": "2024-02-08T02:34:06.654000Z",
       "email": "johnny@estuary.dev",
       "firstName": "Johnny",
-      "hasContactsAccess": false,
-      "isActive": true,
+      "id": "722900407",
       "lastName": "Graettinger",
-      "ownerId": 722900407,
-      "portalId": 45192106,
-      "remoteList": [
-        {
-          "active": true,
-          "id": 579527292,
-          "ownerId": 722900407,
-          "portalId": 45192106,
-          "remoteId": "63843671",
-          "remoteType": "HUBSPOT"
-        }
-      ],
       "type": "PERSON",
       "updatedAt": "2024-02-08T04:35:51.909000Z",
+      "userId": 63843671,
       "userIdIncludingInactive": 63843671
     }
   ]
