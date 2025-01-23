@@ -51,7 +51,7 @@ require (
 	github.com/klauspost/compress v1.17.9
 	github.com/marcboeker/go-duckdb v1.8.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
-	github.com/microsoft/go-mssqldb v0.21.0
+	github.com/microsoft/go-mssqldb v1.8.0
 	github.com/minio/highwayhash v1.0.2
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pinecone-io/go-pinecone v1.1.1
@@ -104,7 +104,7 @@ require (
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.8.0 // indirect
-	github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 // indirect
+	github.com/AzureAD/microsoft-authentication-library-for-go v1.3.2 // indirect
 	github.com/DataDog/appsec-internal-go v1.6.0 // indirect
 	github.com/DataDog/datadog-agent/pkg/obfuscate v0.54.0 // indirect
 	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.54.0 // indirect

@@ -1,0 +1,151 @@
+--- Begin "a-warehouse"."a-schema".key_value createTargetTable ---
+
+CREATE TABLE "a-warehouse"."a-schema".key_value (
+	key1 BIGINT,
+	key2 BIT,
+	"key!binary" VARCHAR(MAX),
+	"array" VARCHAR(MAX),
+	"binary" VARCHAR(MAX),
+	"boolean" BIT,
+	flow_published_at DATETIME2(6),
+	"integer" BIGINT,
+	"integerGt64Bit" DECIMAL(38,0),
+	"integerWithUserDDL" DECIMAL(20),
+	multiple VARCHAR(MAX),
+	number FLOAT,
+	"numberCastToString" VARCHAR(MAX),
+	"object" VARCHAR(MAX),
+	string VARCHAR(MAX),
+	"stringInteger" DECIMAL(38,0),
+	"stringInteger39Chars" VARCHAR(MAX),
+	"stringInteger66Chars" VARCHAR(MAX),
+	"stringNumber" FLOAT,
+	flow_document VARCHAR(MAX)
+);
+--- End "a-warehouse"."a-schema".key_value createTargetTable ---
+
+--- Begin "a-warehouse"."a-schema".delta_updates createTargetTable ---
+
+CREATE TABLE "a-warehouse"."a-schema".delta_updates (
+	"theKey" VARCHAR(MAX),
+	"aValue" BIGINT,
+	flow_published_at DATETIME2(6)
+);
+--- End "a-warehouse"."a-schema".delta_updates createTargetTable ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE "a-warehouse"."a-schema".key_value ADD
+	first_new_column STRING,
+	second_new_column BOOL;
+--- End alter table add columns ---
+
+--- Begin Fence Update ---
+UPDATE "path"."to".checkpoints
+	SET   "checkpoint" = 'AAECAwQFBgcICQ=='
+	WHERE materialization = 'some/Materialization'
+	AND   key_begin = 1122867
+	AND   key_end   = 4293844428
+	AND   fence     = 123;
+--- End Fence Update ---
+
+--- Begin "a-warehouse"."a-schema".key_value storeCopyIntoQuery ---
+COPY INTO "a-warehouse"."a-schema".key_value
+(key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+FROM 'https://some/file1, https://some/file2'
+WITH (
+	FILE_TYPE = 'CSV',
+	COMPRESSION = 'Gzip',
+	CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='some-storage-account-key')
+);
+--- End "a-warehouse"."a-schema".key_value storeCopyIntoQuery ---
+
+--- Begin "a-warehouse"."a-schema".delta_updates storeCopyIntoQuery ---
+COPY INTO "a-warehouse"."a-schema".delta_updates
+("theKey", "aValue", flow_published_at)
+FROM 'https://some/file1, https://some/file2'
+WITH (
+	FILE_TYPE = 'CSV',
+	COMPRESSION = 'Gzip',
+	CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='some-storage-account-key')
+);
+--- End "a-warehouse"."a-schema".delta_updates storeCopyIntoQuery ---
+
+--- Begin "a-warehouse"."a-schema".key_value createLoadTable ---
+CREATE TABLE flow_temp_table_load_0 (
+	key1 BIGINT,
+	key2 BIT,
+	"key!binary" VARCHAR(MAX)
+);
+
+COPY INTO flow_temp_table_load_0
+(key1, key2, "key!binary")
+FROM 'https://some/file1,https://some/file2'
+WITH (
+    FILE_TYPE = 'CSV',
+    COMPRESSION = 'Gzip',
+    CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='some-storage-account-key')
+);
+--- End "a-warehouse"."a-schema".key_value createLoadTable ---
+
+--- Begin "a-warehouse"."a-schema".key_value loadQuery ---
+SELECT 0, r.flow_document
+FROM flow_temp_table_load_0 AS l
+JOIN "a-warehouse"."a-schema".key_value AS r
+	 ON  l.key1 = r.key1
+	 AND l.key2 = r.key2
+	 AND l."key!binary" = r."key!binary"
+--- End "a-warehouse"."a-schema".key_value loadQuery ---
+
+--- Begin "a-warehouse"."a-schema".key_value dropLoadTable ---
+DROP TABLE flow_temp_table_load_0;--- End "a-warehouse"."a-schema".key_value dropLoadTable ---
+
+--- Begin "a-warehouse"."a-schema".key_value storeMergeQuery ---
+CREATE TABLE flow_temp_table_store_0 (
+	key1 BIGINT,
+	key2 BIT,
+	"key!binary" VARCHAR(MAX),
+	"array" VARCHAR(MAX),
+	"binary" VARCHAR(MAX),
+	"boolean" BIT,
+	flow_published_at DATETIME2(6),
+	"integer" BIGINT,
+	"integerGt64Bit" DECIMAL(38,0),
+	"integerWithUserDDL" DECIMAL(20),
+	multiple VARCHAR(MAX),
+	number FLOAT,
+	"numberCastToString" VARCHAR(MAX),
+	"object" VARCHAR(MAX),
+	string VARCHAR(MAX),
+	"stringInteger" DECIMAL(38,0),
+	"stringInteger39Chars" VARCHAR(MAX),
+	"stringInteger66Chars" VARCHAR(MAX),
+	"stringNumber" FLOAT,
+	flow_document VARCHAR(MAX)
+);
+
+COPY INTO flow_temp_table_store_0
+(key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+FROM 'https://some/file1, https://some/file2'
+WITH (
+    FILE_TYPE = 'CSV',
+    COMPRESSION = 'Gzip',
+    CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='some-storage-account-key')
+);
+
+DELETE l
+FROM "a-warehouse"."a-schema".key_value AS l
+INNER JOIN flow_temp_table_store_0 AS r
+	 ON  l.key1 = r.key1
+	 AND l.key2 = r.key2
+	 AND l."key!binary" = r."key!binary";
+
+INSERT INTO "a-warehouse"."a-schema".key_value (key1,key2,"key!binary","array","binary","boolean",flow_published_at,"integer","integerGt64Bit","integerWithUserDDL",multiple,number,"numberCastToString","object",string,"stringInteger","stringInteger39Chars","stringInteger66Chars","stringNumber",flow_document)
+SELECT key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
+FROM flow_temp_table_store_0
+WHERE flow_document <> '"delete"';
+
+DROP TABLE flow_temp_table_store_0;
+--- End "a-warehouse"."a-schema".key_value storeMergeQuery ---
+
+

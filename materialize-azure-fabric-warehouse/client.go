@@ -1,0 +1,386 @@
+package main
+
+import (
+	"context"
+	stdsql "database/sql"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"net"
+	"path"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/google/uuid"
+	"github.com/segmentio/encoding/json"
+	log "github.com/sirupsen/logrus"
+)
+
+var _ sql.SchemaManager = (*client)(nil)
+
+type client struct {
+	db  *stdsql.DB
+	cfg *config
+	ep  *sql.Endpoint
+}
+
+func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
+	cfg := ep.Config.(*config)
+
+	db, err := cfg.db()
+	if err != nil {
+		return nil, err
+	}
+
+	return &client{
+		db:  db,
+		cfg: cfg,
+		ep:  ep,
+	}, nil
+}
+
+func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+	// The body of this function is a copy of sql.StdFetchInfoSchema, except the
+	// identifiers for the information schema views need to be in capital
+	// letters for Fabric Warehouse. I'd hope to replace this at some point with
+	// REST API calls if the necessary REST endpoints added to Fabric Warehouse,
+	// since right now there's only endpoints to list warehouses and they don't
+	// even work with service principal authentication.
+	is := boilerplate.NewInfoSchema(
+		sql.ToLocatePathFn(dialect.TableLocator),
+		dialect.ColumnLocator,
+	)
+
+	if len(resourcePaths) == 0 {
+		return is, nil
+	}
+
+	schemas := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		loc := dialect.TableLocator(p)
+		schemas = append(schemas, dialect.Literal(loc.TableSchema))
+	}
+
+	slices.Sort(schemas)
+	schemas = slices.Compact(schemas)
+
+	tables, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+		select table_schema, table_name
+		from INFORMATION_SCHEMA.TABLES
+		where table_catalog = %s
+		and table_schema in (%s);
+		`,
+		dialect.Literal(c.cfg.Warehouse),
+		strings.Join(schemas, ","),
+	))
+	if err != nil {
+		return nil, err
+	}
+	defer tables.Close()
+
+	type tableRow struct {
+		TableSchema string
+		TableName   string
+	}
+
+	for tables.Next() {
+		var t tableRow
+		if err := tables.Scan(&t.TableSchema, &t.TableName); err != nil {
+			return nil, err
+		}
+
+		is.PushResource(t.TableSchema, t.TableName)
+	}
+
+	columns, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+		select table_schema, table_name, column_name, is_nullable, data_type, character_maximum_length, column_default
+		from INFORMATION_SCHEMA.COLUMNS
+		where table_catalog = %s
+		and table_schema in (%s);
+		`,
+		dialect.Literal(c.cfg.Warehouse),
+		strings.Join(schemas, ","),
+	))
+	if err != nil {
+		return nil, err
+	}
+	defer columns.Close()
+
+	type columnRow struct {
+		tableRow
+		ColumnName             string
+		IsNullable             string
+		DataType               string
+		CharacterMaximumLength stdsql.NullInt64
+		ColumnDefault          stdsql.NullString
+	}
+
+	for columns.Next() {
+		var c columnRow
+		if err := columns.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
+			return nil, err
+		}
+
+		is.PushField(boilerplate.EndpointField{
+			Name:               c.ColumnName,
+			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
+			Type:               c.DataType,
+			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
+			HasDefault:         c.ColumnDefault.Valid,
+		}, c.TableSchema, c.TableName)
+	}
+	if err := columns.Err(); err != nil {
+		return nil, err
+	}
+
+	return is, nil
+}
+
+func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
+	return err
+}
+
+func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	stmt := fmt.Sprintf("DROP TABLE %s;", dialect.Identifier(path...))
+
+	return stmt, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, stmt)
+		return err
+	}, nil
+}
+
+func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	if len(ta.DropNotNulls) != 0 {
+		return "", nil, fmt.Errorf("cannot drop nullability constraints but got %d DropNotNulls for table %s", len(ta.DropNotNulls), ta.Identifier)
+	}
+
+	var stmts []string
+	if len(ta.AddColumns) > 0 {
+		var addColumnsStmt strings.Builder
+		if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
+			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
+		}
+		stmts = append(stmts, addColumnsStmt.String())
+	}
+
+	if len(ta.ColumnTypeChanges) > 0 {
+		// TODO: Support column migrations
+	}
+
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		for _, stmt := range stmts {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, nil
+}
+
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	rows, err := c.db.QueryContext(ctx, "select schema_name from INFORMATION_SCHEMA.SCHEMATA")
+	if err != nil {
+		return nil, fmt.Errorf("querying schemata: %w", err)
+	}
+	defer rows.Close()
+
+	out := []string{}
+
+	for rows.Next() {
+		var schema string
+		if err := rows.Scan(&schema); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		out = append(out, schema)
+	}
+
+	return out, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+	return sql.StdCreateSchema(ctx, c.db, dialect, schemaName)
+}
+
+type badRequestResponseBody struct {
+	Error            string `json:"error"`
+	ErrorDescription string `json:"error_description"`
+	ErrorCodes       []int  `json:"error_codes"`
+}
+
+func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
+	errs := &sql.PrereqErr{}
+
+	cfg := conf.(*config)
+
+	db, err := cfg.db()
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
+
+	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	var wh int
+	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {
+		var authErr *azidentity.AuthenticationFailedError
+		var netOpErr *net.OpError
+
+		if errors.As(err, &netOpErr) {
+			err = fmt.Errorf("could not connect to endpoint: ensure the connection string '%s' is correct", cfg.ConnectionString)
+		} else if errors.Is(err, stdsql.ErrNoRows) {
+			err = fmt.Errorf("warehouse '%s' does not exist", cfg.Warehouse)
+		} else if errors.As(err, &authErr) {
+			var res badRequestResponseBody
+			if err := json.NewDecoder(authErr.RawResponse.Body).Decode(&res); err != nil {
+				panic(err)
+			}
+
+			if slices.Contains(res.ErrorCodes, 700016) {
+				err = fmt.Errorf("invalid client ID '%s': ensure that the client ID for the correct application is configured", cfg.ClientID)
+			} else if slices.Contains(res.ErrorCodes, 7000215) {
+				err = fmt.Errorf("invalid client secret provided: ensure the secret being sent in the request is the client secret value, not the client secret ID, for a secret added to app '%s'", cfg.ClientID)
+			}
+
+			log.WithField("response", res).Error("connection error")
+		}
+
+		errs.Err(err)
+	}
+
+	// Create, read, and delete an object per the configuration. Storage account
+	// keys don't have fine-grained permissions so if _anything_ works,
+	// everything should work.
+	testKey := path.Join(cfg.Directory, uuid.NewString())
+	data := []byte("testing")
+	if storage, err := cfg.storageClient(); err != nil {
+		errs.Err(err)
+	} else if _, err := storage.UploadBuffer(ctx, cfg.ContainerName, testKey, data, nil); err != nil {
+		var netOpErr *net.OpError
+
+		if errors.As(err, &netOpErr) {
+			err = fmt.Errorf(
+				"could not connect to blob storage endpoint '%s': ensure the storage account name '%s', storage account key, and container name '%s' are correct",
+				storage.URL(), cfg.StorageAccountName, cfg.ContainerName,
+			)
+		} else {
+			err = fmt.Errorf("uploading test blob: %w", err)
+		}
+
+		errs.Err(err)
+	} else if _, err := storage.DownloadBuffer(ctx, cfg.ContainerName, testKey, data, nil); err != nil {
+		errs.Err(fmt.Errorf("downloading test blob: %w", err))
+	} else if _, err := storage.DeleteBlob(ctx, cfg.ContainerName, testKey, nil); err != nil {
+		errs.Err(fmt.Errorf("deleting test blob: %w", err))
+	}
+
+	return errs
+}
+
+func (c *client) ExecStatements(ctx context.Context, statements []string) error {
+	return sql.StdSQLExecStatements(ctx, c.db, statements)
+}
+
+func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
+	var txn, err = c.db.BeginTx(ctx, nil)
+	if err != nil {
+		return sql.Fence{}, fmt.Errorf("db.BeginTx: %w", err)
+	}
+	defer func() {
+		if txn != nil {
+			_ = txn.Rollback()
+		}
+	}()
+
+	// Increment the fence value of _any_ checkpoint which overlaps our key range.
+	if _, err = txn.Exec(
+		fmt.Sprintf(`
+			UPDATE %s
+				SET fence=fence+1
+				WHERE materialization=%s
+				AND key_end>=%s
+				AND key_begin<=%s
+			;
+			`,
+			checkpoints.Identifier,
+			checkpoints.Keys[0].Placeholder,
+			checkpoints.Keys[1].Placeholder,
+			checkpoints.Keys[2].Placeholder,
+		),
+		fence.Materialization,
+		fence.KeyBegin,
+		fence.KeyEnd,
+	); err != nil {
+		return sql.Fence{}, fmt.Errorf("incrementing fence: %w", err)
+	}
+
+	// Read the checkpoint with the narrowest [key_begin, key_end] which fully overlaps our range.
+	var readBegin, readEnd uint32
+	var checkpoint string
+
+	if err = txn.QueryRow(
+		fmt.Sprintf(`
+			SELECT TOP 1 fence, key_begin, key_end, "checkpoint"
+				FROM %s
+				WHERE materialization=%s
+				AND key_begin<=%s
+				AND key_end>=%s
+				ORDER BY key_end - key_begin ASC
+			;
+			`,
+			checkpoints.Identifier,
+			checkpoints.Keys[0].Placeholder,
+			checkpoints.Keys[1].Placeholder,
+			checkpoints.Keys[2].Placeholder,
+		),
+		fence.Materialization,
+		fence.KeyBegin,
+		fence.KeyEnd,
+	).Scan(&fence.Fence, &readBegin, &readEnd, &checkpoint); err == stdsql.ErrNoRows {
+		// Set an invalid range, which compares as unequal to trigger an insertion below.
+		readBegin, readEnd = 1, 0
+	} else if err != nil {
+		return sql.Fence{}, fmt.Errorf("scanning fence and checkpoint: %w", err)
+	} else if fence.Checkpoint, err = base64.StdEncoding.DecodeString(checkpoint); err != nil {
+		return sql.Fence{}, fmt.Errorf("base64.Decode(checkpoint): %w", err)
+	}
+
+	// If a checkpoint for this exact range doesn't exist then insert it now.
+	if readBegin == fence.KeyBegin && readEnd == fence.KeyEnd {
+		// Exists; no-op.
+	} else if _, err = txn.Exec(
+		fmt.Sprintf(
+			`INSERT INTO %s (materialization, key_begin, key_end, fence, "checkpoint") VALUES (%s, %s, %s, %s, %s);`,
+			checkpoints.Identifier,
+			checkpoints.Keys[0].Placeholder,
+			checkpoints.Keys[1].Placeholder,
+			checkpoints.Keys[2].Placeholder,
+			checkpoints.Values[0].Placeholder,
+			checkpoints.Values[1].Placeholder,
+		),
+		fence.Materialization,
+		fence.KeyBegin,
+		fence.KeyEnd,
+		fence.Fence,
+		base64.StdEncoding.EncodeToString(fence.Checkpoint),
+	); err != nil {
+		return sql.Fence{}, fmt.Errorf("inserting fence: %w", err)
+	}
+
+	err = txn.Commit()
+	txn = nil // Disable deferred rollback.
+
+	if err != nil {
+		return sql.Fence{}, fmt.Errorf("txn.Commit: %w", err)
+	}
+	return fence, nil
+}
+
+func (c *client) Close() {
+	c.db.Close()
+}
