@@ -87,6 +87,76 @@ func TestValidateAndApply(t *testing.T) {
 	)
 }
 
+func TestValidateAndApplyMigrations(t *testing.T) {
+	ctx := context.Background()
+
+	cfg := mustGetCfg(t)
+
+	resourceConfig := tableConfig{
+		Table:     "target",
+		Schema:    cfg.Schema,
+		warehouse: cfg.Warehouse,
+	}
+
+	db, err := cfg.db()
+	require.NoError(t, err)
+	defer db.Close()
+
+	sql.RunValidateAndApplyMigrationsTests(
+		t,
+		newDriver(),
+		cfg,
+		resourceConfig,
+		func(t *testing.T) string {
+			t.Helper()
+
+			sch, err := getSchema(ctx, db, cfg.Warehouse, resourceConfig.Schema, resourceConfig.Table)
+			require.NoError(t, err)
+
+			return sch
+		},
+		func(t *testing.T, cols []string, values []string) {
+			t.Helper()
+
+			var keys = make([]string, len(cols))
+			for i, col := range cols {
+				keys[i] = dialect.Identifier(col)
+			}
+			for i := range values {
+				if values[i] == "true" {
+					values[i] = "1"
+				} else if values[i] == "false" {
+					values[i] = "0"
+				}
+			}
+
+			keys = append(keys, dialect.Identifier("_meta/flow_truncated"))
+			values = append(values, "0")
+			keys = append(keys, dialect.Identifier("flow_published_at"))
+			values = append(values, "'2024-09-13 01:01:01'")
+			keys = append(keys, dialect.Identifier("flow_document"))
+			values = append(values, "'{}'")
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", dialect.Identifier(resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			_, err = db.ExecContext(ctx, q)
+
+			require.NoError(t, err)
+		},
+		func(t *testing.T) string {
+			t.Helper()
+
+			rows, err := sql.DumpTestTable(t, db, dialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
+
+			require.NoError(t, err)
+
+			return rows
+		},
+		func(t *testing.T) {
+			t.Helper()
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", dialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+		},
+	)
+}
+
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 
