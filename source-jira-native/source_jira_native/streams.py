@@ -229,7 +229,6 @@ class Boards(JiraStream):
     """
 
     extract_field = "values"
-    use_cache = True
     api_v1 = True
 
     def path(self, **kwargs) -> str:
@@ -361,7 +360,6 @@ class Filters(JiraStream):
     """
 
     extract_field = "values"
-    use_cache = True
 
     def path(self, **kwargs) -> str:
         return "filter/search"
@@ -410,10 +408,10 @@ class Issues(IncrementalJiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-search/#api-rest-api-3-search-get
     """
 
+    page_size = 100
     state_checkpoint_interval = 10000
     cursor_field = "updated"
     extract_field = "issues"
-    use_cache = True
     _expand_fields_list = ["renderedFields", "transitions", "changelog"]
 
     # Issue: https://github.com/airbytehq/airbyte/issues/26712
@@ -518,8 +516,6 @@ class IssueFields(JiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-fields/#api-rest-api-3-field-get
     """
 
-    use_cache = True
-
     def path(self, **kwargs) -> str:
         return "field"
 
@@ -546,7 +542,6 @@ class IssueCustomFieldContexts(JiraStream):
     https://developer.atlassian.com/cloud/jira/platform/rest/v3/api-group-issue-custom-field-contexts/#api-rest-api-3-field-fieldid-context-get
     """
 
-    use_cache = True
     extract_field = "values"
     skip_http_status_codes = [
         # https://community.developer.atlassian.com/t/get-custom-field-contexts-not-found-returned/48408/2
@@ -661,7 +656,6 @@ class IssuePropertyKeys(JiraStream):
     """
 
     extract_field = "keys"
-    use_cache = True
     skip_http_status_codes = [
         # Issue does not exist or you do not have permission to see it.
         requests.codes.NOT_FOUND,
@@ -977,7 +971,6 @@ class Projects(JiraStream):
     """
 
     extract_field = "values"
-    use_cache = True
 
     def path(self, **kwargs) -> str:
         return "project/search"
@@ -1230,7 +1223,6 @@ class Screens(JiraStream):
     """
 
     extract_field = "values"
-    use_cache = True
 
     def path(self, **kwargs) -> str:
         return "screens"
@@ -1242,7 +1234,6 @@ class ScreenTabs(JiraStream):
     """
 
     raise_on_http_errors = False
-    use_cache = True
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -1315,7 +1306,6 @@ class Sprints(JiraStream):
     """
 
     extract_field = "values"
-    use_cache = True
     api_v1 = True
 
     def __init__(self, **kwargs):
@@ -1420,7 +1410,6 @@ class Users(JiraStream):
     """
 
     primary_key = "accountId"
-    use_cache = True
 
     def path(self, **kwargs) -> str:
         return "users/search"
