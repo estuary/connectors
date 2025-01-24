@@ -16,8 +16,9 @@ import (
 )
 
 type binding struct {
-	target    sql.Table
-	mustMerge bool
+	target           sql.Table
+	mustMerge        bool
+	hasBinaryColumns bool
 }
 
 type transactor struct {
@@ -60,7 +61,18 @@ func newTransactor(
 	for idx, b := range bindings {
 		t.loadFiles.AddBinding(idx, b.KeyNames())
 		t.storeFiles.AddBinding(idx, b.ColumnNames())
-		t.bindings = append(t.bindings, &binding{target: b})
+
+		hasBinaryColumns := false
+		for _, col := range b.Columns() {
+			if col.DDL == "VARBINARY(MAX)" {
+				hasBinaryColumns = true
+			}
+		}
+
+		t.bindings = append(t.bindings, &binding{
+			target:           b,
+			hasBinaryColumns: hasBinaryColumns,
+		})
 	}
 
 	opts := &boilerplate.MaterializeOptions{
@@ -279,7 +291,12 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					}
 				} else {
 					var copyIntoQuery strings.Builder
-					if err := tplStoreCopyIntoQuery.Execute(&copyIntoQuery, params); err != nil {
+					tpl := tplStoreCopyIntoDirectQuery
+					if b.hasBinaryColumns {
+						tpl = tplStoreCopyIntoFromStagedQuery
+					}
+
+					if err := tpl.Execute(&copyIntoQuery, params); err != nil {
 						return err
 					} else if _, err := txn.ExecContext(ctx, copyIntoQuery.String()); err != nil {
 						log.WithField(
