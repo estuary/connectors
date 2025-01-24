@@ -43,17 +43,17 @@ func TestSQLGeneration(t *testing.T) {
 
 		bounds := []sql.MergeBound{
 			{
-				Identifier:   tbl.Keys[0].Identifier,
+				Column:       tbl.Keys[0],
 				LiteralLower: bqDialect.Literal(int64(10)),
 				LiteralUpper: bqDialect.Literal(int64(100)),
 			},
 			{
-				Identifier: tbl.Keys[1].Identifier,
+				Column: tbl.Keys[1],
 				// No bounds - as would be the case for a boolean key, which
 				// would be a very weird key, but technically allowed.
 			},
 			{
-				Identifier:   tbl.Keys[2].Identifier,
+				Column:       tbl.Keys[2],
 				LiteralLower: bqDialect.Literal("aGVsbG8K"),
 				LiteralUpper: bqDialect.Literal("Z29vZGJ5ZQo="),
 			},

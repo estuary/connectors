@@ -155,9 +155,9 @@ WITH (
 SELECT 0, r.flow_document
 FROM flow_temp_table_load_0 AS l
 JOIN "a-warehouse"."a-schema".key_value AS r
-	 ON  l.key1= r.key1
-	 AND l.key2= r.key2
-	 AND BASE64_DECODE(l."key!binary")= r."key!binary"
+	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
+	 AND l.key2 = r.key2
+	 AND BASE64_DECODE(l."key!binary") = r."key!binary"
 --- End "a-warehouse"."a-schema".key_value loadQuery ---
 
 --- Begin "a-warehouse"."a-schema".key_value dropLoadTable ---
@@ -199,7 +199,7 @@ WITH (
 DELETE r
 FROM "a-warehouse"."a-schema".key_value AS r
 INNER JOIN flow_temp_table_store_0 AS l
-	 ON  l.key1 = r.key1
+	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
 	 AND l.key2 = r.key2
 	 AND BASE64_DECODE(l."key!binary") = r."key!binary";
 

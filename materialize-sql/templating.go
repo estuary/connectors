@@ -49,9 +49,7 @@ func RenderTableTemplate(table Table, tpl *template.Template) (string, error) {
 // store, and providing the range hints in the merge query directly may allow
 // for warehouses to do additional optimizations when executing the merge.
 type MergeBound struct {
-	// Identifier is the identifier for the key column this bound applies to,
-	// with the dialect's quoting applied.
-	Identifier string
+	Column
 	// LiteralLower will be an empty string if no condition should be used,
 	// which is the case for boolean keys.
 	LiteralLower string
@@ -142,23 +140,21 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 	conditions := make([]MergeBound, len(b.lower))
 
 	for idx, col := range b.keyColumns {
-		conditions[idx] = MergeBound{
-			Identifier: col.Identifier,
-		}
+		conditions[idx] = MergeBound{Column: col}
 
-		lower := b.lower[idx]
-		upper := b.upper[idx]
-
-		if _, ok := lower.(bool); ok {
+		ft, _ := col.AsFlatType()
+		if ft == BOOLEAN {
 			// Boolean keys cannot reasonably support bounds for merge queries.
-			// It is assumed that if the lower value is a boolean type then the
-			// upper value must be as well since we do not allow keys with
-			// multiple types in SQL materializations.
+			continue
+		} else if ft == BINARY {
+			// Binary keys could in principal be used as merge query bounds, but
+			// the complexity and overhead of comparing their binary values is
+			// probably not worth it.
 			continue
 		}
 
-		conditions[idx].LiteralLower = b.literaler(lower)
-		conditions[idx].LiteralUpper = b.literaler(upper)
+		conditions[idx].LiteralLower = b.literaler(b.lower[idx])
+		conditions[idx].LiteralUpper = b.literaler(b.upper[idx])
 	}
 
 	// Reset for tracking the next transaction.
