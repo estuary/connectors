@@ -71,7 +71,7 @@ Migratable Changes Applied Schema:
 {"Name":"datetimeValue","Nullable":"YES","Type":"text"}
 {"Name":"flow_document","Nullable":"NO","Type":"json"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"int64","Nullable":"YES","Type":"bigint"}
+{"Name":"int64","Nullable":"YES","Type":"numeric"}
 {"Name":"intWidenedToJson","Nullable":"YES","Type":"json"}
 {"Name":"key","Nullable":"NO","Type":"text"}
 {"Name":"multiple","Nullable":"YES","Type":"json"}
@@ -85,6 +85,6 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (TEXT), _meta/flow_truncated (BOOL), flow_published_at (TIMESTAMPTZ), int64 (INT8), multiple (JSON), nonScalarValue (JSON), optional (JSON), scalarValue (TEXT), flow_document (JSON), boolWidenedToJson (JSON), dateValue (TEXT), datetimeValue (TEXT), intWidenedToJson (JSON), numericString (TEXT), requiredNumeric (TEXT), stringWidenedToJson (JSON), timeValue (TEXT)
-1, false, 2024-09-13T01:01:01Z, 1, <nil>, <nil>, <nil>, test, {}, true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 999, 123, 456, "hello", 01:01:01
+key (TEXT), _meta/flow_truncated (BOOL), flow_published_at (TIMESTAMPTZ), multiple (JSON), nonScalarValue (JSON), optional (JSON), scalarValue (TEXT), flow_document (JSON), boolWidenedToJson (JSON), dateValue (TEXT), datetimeValue (TEXT), int64 (NUMERIC), intWidenedToJson (JSON), numericString (TEXT), requiredNumeric (TEXT), stringWidenedToJson (JSON), timeValue (TEXT)
+1, false, 2024-09-13T01:01:01Z, <nil>, <nil>, <nil>, test, {}, true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 1, 999, 123, 456, "hello", 01:01:01
 

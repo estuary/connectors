@@ -47,7 +47,7 @@ var duckDialect = func() sql.Dialect {
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
 			"double":  {sql.NewMigrationSpec([]string{"varchar"})},
-			"bigint":  {sql.NewMigrationSpec([]string{"varchar"})},
+			"bigint":  {sql.NewMigrationSpec([]string{"hugeint", "varchar"})},
 			"hugeint": {sql.NewMigrationSpec([]string{"varchar"})},
 			"date":    {sql.NewMigrationSpec([]string{"varchar"})},
 			"time":    {sql.NewMigrationSpec([]string{"varchar"})},
