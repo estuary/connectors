@@ -19,7 +19,7 @@ var dialect = func() sql.Dialect {
 			sql.BOOLEAN:  sql.MapStatic("BIT"),
 			sql.OBJECT:   sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(sql.ToJsonString)),
 			sql.ARRAY:    sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(sql.ToJsonString)),
-			sql.BINARY:   sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR")), // TODO(whb): Binary support?
+			sql.BINARY:   sql.MapStatic("VARBINARY(MAX)", sql.AlsoCompatibleWith("VARBINARY")),
 			sql.MULTIPLE: sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(sql.ToJsonString)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("DECIMAL(38,0)", sql.AlsoCompatibleWith("DECIMAL"), sql.UsingConverter(sql.StrToInt)),
@@ -112,6 +112,14 @@ flow_temp_table_load_{{ $.Binding }}
 flow_temp_table_store_{{ $.Binding }}
 {{- end }}
 
+{{ define "maybe_unbase64" -}}
+{{- if eq $.DDL "VARBINARY(MAX)" -}}BASE64_DECODE({{$.Identifier}}){{ else }}{{$.Identifier}}{{ end }}
+{{- end }}
+
+{{ define "maybe_unbase64_lhs" -}}
+{{- if eq $.DDL "VARBINARY(MAX)" -}}BASE64_DECODE(l.{{$.Identifier}}){{ else }}l.{{$.Identifier}}{{ end }}
+{{- end }}
+
 {{ define "createTargetTable" }}
 CREATE TABLE {{$.Identifier}} (
 {{- range $ind, $col := $.Columns }}
@@ -142,7 +150,7 @@ CREATE TABLE {{$.TmpName}} AS SELECT
 CREATE TABLE {{ template "temp_name_load" $ }} (
 {{- range $ind, $key := $.Keys }}
 	{{- if $ind }},{{ end }}
-	{{$key.Identifier}} {{$key.DDL}}
+	{{$key.Identifier}} {{- if eq $key.DDL "VARBINARY(MAX)" }} VARCHAR(MAX) {{- else }} {{$key.DDL}} {{- end }}
 {{- end }}
 );
 
@@ -162,7 +170,7 @@ FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $key := $.Keys }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{ template "maybe_unbase64_lhs" $key }}= r.{{ $key.Identifier }}
 {{- end }}
 {{ end }}
 
@@ -170,16 +178,11 @@ JOIN {{ $.Identifier}} AS r
 DROP TABLE {{ template "temp_name_load" $ }};
 {{- end }}
 
--- Azure Fabric Warehouse doesn't yet support an actual "merge" query,
--- so the best we can do is a delete followed by an insert. A true
--- merge query may eventually be supported and we should switch to using
--- that when it is.
-
-{{ define "storeMergeQuery" }}
+{{ define "create_store_staging_table" -}}
 CREATE TABLE {{ template "temp_name_store" $ }} (
 {{- range $ind, $col := $.Columns }}
 	{{- if $ind }},{{ end }}
-	{{$col.Identifier}} {{$col.DDL}}
+	{{$col.Identifier}} {{- if eq $col.DDL "VARBINARY(MAX)" }} VARCHAR(MAX) {{- else }} {{$col.DDL}} {{- end }}
 {{- end }}
 );
 
@@ -191,24 +194,51 @@ WITH (
     COMPRESSION = 'Gzip',
     CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='{{ $.StorageAccountKey }}')
 );
+{{- end }}
 
-DELETE l
-FROM {{$.Identifier}} AS l
-INNER JOIN {{ template "temp_name_store" $ }} AS r
+-- Azure Fabric Warehouse doesn't yet support an actual "merge" query,
+-- so the best we can do is a delete followed by an insert. A true
+-- merge query may eventually be supported and we should switch to using
+-- that when it is.
+
+{{ define "storeMergeQuery" }}
+{{ template "create_store_staging_table" $ }}
+
+DELETE r
+FROM {{$.Identifier}} AS r
+INNER JOIN {{ template "temp_name_store" $ }} AS l
 {{- range $ind, $key := $.Keys }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{ template "maybe_unbase64_lhs" $key }} = r.{{ $key.Identifier }}
 {{- end }};
 
-INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }},{{ end }}{{$col.Identifier}}{{- end }})
-SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }}
+INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
+SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
 FROM {{ template "temp_name_store" $ }}
 WHERE {{$.Document.Identifier}} <> '"delete"';
 
 DROP TABLE {{ template "temp_name_store" $ }};
 {{ end }}
 
-{{ define "storeCopyIntoQuery" }}
+-- storeCopyIntoFromStagedQuery is used when there is no data to
+-- merge, but there are binary columns that must be converted from
+-- the staged CSV data, which is base64 encoded.
+
+{{ define "storeCopyIntoFromStagedQuery" }}
+{{ template "create_store_staging_table" $ }}
+
+INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{ end }})
+SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
+FROM {{ template "temp_name_store" $ }};
+
+DROP TABLE {{ template "temp_name_store" $ }};
+{{ end }}
+
+-- storeCopyIntoDirectQuery is used when there is no data to
+-- merge and none of the columns are binary. In this case the
+-- data can be loaded directly into the target table.
+
+{{ define "storeCopyIntoDirectQuery" }}
 COPY INTO {{$.Identifier}}
 ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
 FROM '{{- range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}{{$uri}}{{- end }}'
@@ -228,13 +258,14 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplCreateTargetTable    = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns    = tplAll.Lookup("alterTableColumns")
-	tplCreateMigrationTable = tplAll.Lookup("createMigrationTable")
-	tplCreateLoadTable      = tplAll.Lookup("createLoadTable")
-	tplLoadQuery            = tplAll.Lookup("loadQuery")
-	tplDropLoadTable        = tplAll.Lookup("dropLoadTable")
-	tplStoreMergeQuery      = tplAll.Lookup("storeMergeQuery")
-	tplStoreCopyIntoQuery   = tplAll.Lookup("storeCopyIntoQuery")
-	tplUpdateFence          = tplAll.Lookup("updateFence")
+	tplCreateTargetTable            = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns            = tplAll.Lookup("alterTableColumns")
+	tplCreateMigrationTable         = tplAll.Lookup("createMigrationTable")
+	tplCreateLoadTable              = tplAll.Lookup("createLoadTable")
+	tplLoadQuery                    = tplAll.Lookup("loadQuery")
+	tplDropLoadTable                = tplAll.Lookup("dropLoadTable")
+	tplStoreMergeQuery              = tplAll.Lookup("storeMergeQuery")
+	tplStoreCopyIntoFromStagedQuery = tplAll.Lookup("storeCopyIntoFromStagedQuery")
+	tplStoreCopyIntoDirectQuery     = tplAll.Lookup("storeCopyIntoDirectQuery")
+	tplUpdateFence                  = tplAll.Lookup("updateFence")
 )

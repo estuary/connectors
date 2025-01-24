@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE whb_warehouse.estuary_test_schema.simple (\n\tid BIGINT,\n\tcanary VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_standard (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.multiple_types (\n\tid BIGINT,\n\tarray_int VARCHAR(MAX),\n\tbinary_field VARCHAR(MAX),\n\tbool_field BIT,\n\tfloat_field FLOAT,\n\tflow_published_at DATETIME2(6),\n\tmultiple VARCHAR(MAX),\n\tnested VARCHAR(MAX),\n\tnullable_int BIGINT,\n\tstr_field VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.formatted_strings (\n\tid BIGINT,\n\t\"date\" DATE,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tint_and_str DECIMAL(38,0),\n\tint_str DECIMAL(38,0),\n\tnum_and_str FLOAT,\n\tnum_str FLOAT,\n\t\"time\" TIME(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.deletions (\n\tid BIGINT,\n\t\"_meta/op\" VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n"
+  "\nCREATE TABLE whb_warehouse.estuary_test_schema.simple (\n\tid BIGINT,\n\tcanary VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_standard (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.multiple_types (\n\tid BIGINT,\n\tarray_int VARCHAR(MAX),\n\tbinary_field VARBINARY(MAX),\n\tbool_field BIT,\n\tfloat_field FLOAT,\n\tflow_published_at DATETIME2(6),\n\tmultiple VARCHAR(MAX),\n\tnested VARCHAR(MAX),\n\tnullable_int BIGINT,\n\tstr_field VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.formatted_strings (\n\tid BIGINT,\n\t\"date\" DATE,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tint_and_str DECIMAL(38,0),\n\tint_str DECIMAL(38,0),\n\tnum_and_str FLOAT,\n\tnum_str FLOAT,\n\t\"time\" TIME(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.deletions (\n\tid BIGINT,\n\t\"_meta/op\" VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.binary_key (\n\tid VARBINARY(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n"
 ]
 [
   "connectorState",
@@ -446,6 +446,17 @@
       "flow_document": "{\"_meta\":{\"op\":\"c\",\"uuid\":\"855d8780-1dda-11b2-8000-071353030311\"},\"id\":3}",
       "flow_published_at": "1970-01-01 01:00:27 +0000 UTC",
       "id": 3
+    }
+  ]
+}
+{
+  "_table": "binary_key",
+  "rows": [
+    {
+      "counter": 1,
+      "flow_document": "{\"_meta\":{\"uuid\":\"87274b00-1dda-11b2-8000-071353030311\"},\"counter\":1,\"id\":\"c2F5xY1uYXJhCg==\"}",
+      "flow_published_at": "1970-01-01 01:00:30 +0000 UTC",
+      "id": "c2F5xY1uYXJhCg=="
     }
   ]
 }
