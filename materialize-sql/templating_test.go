@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,6 +91,14 @@ func TestTableTemplate(t *testing.T) {
 func TestMergeBoundsBuilder(t *testing.T) {
 	literaler := ToLiteralFn(QuoteTransform("'", "''"))
 
+	colA := Column{Identifier: "colA"}
+	colB := Column{Identifier: "colB", Projection: Projection{Projection: pf.Projection{
+		Inference: pf.Inference{
+			Types: []string{"boolean"},
+		},
+	}}}
+	colC := Column{Identifier: "colC"}
+
 	for _, tt := range []struct {
 		name       string
 		keyColumns []Column
@@ -97,49 +106,43 @@ func TestMergeBoundsBuilder(t *testing.T) {
 		want       []MergeBound
 	}{
 		{
-			name: "single key",
-			keyColumns: []Column{
-				{Identifier: "colA"},
-			},
+			name:       "single key",
+			keyColumns: []Column{colA},
 			keys: [][]any{
 				{"a"},
 				{"b"},
 				{"c"},
 			},
 			want: []MergeBound{
-				{"colA", literaler("a"), literaler("c")},
+				{colA, literaler("a"), literaler("c")},
 			},
 		},
 		{
-			name: "multiple keys ordered",
-			keyColumns: []Column{
-				{Identifier: "colA"}, {Identifier: "colB"}, {Identifier: "colC"},
-			},
+			name:       "multiple keys ordered",
+			keyColumns: []Column{colA, colB, colC},
 			keys: [][]any{
 				{"a", true, int64(1)},
 				{"b", false, int64(2)},
 				{"c", true, int64(3)},
 			},
 			want: []MergeBound{
-				{"colA", literaler("a"), literaler("c")},
-				{"colB", "", ""},
-				{"colC", literaler(int64(1)), literaler(int64(3))},
+				{colA, literaler("a"), literaler("c")},
+				{colB, "", ""},
+				{colC, literaler(int64(1)), literaler(int64(3))},
 			},
 		},
 		{
-			name: "multiple keys unordered",
-			keyColumns: []Column{
-				{Identifier: "colA"}, {Identifier: "colB"}, {Identifier: "colC"},
-			},
+			name:       "multiple keys unordered",
+			keyColumns: []Column{colA, colB, colC},
 			keys: [][]any{
 				{"a", true, int64(3)},
 				{"b", false, int64(1)},
 				{"c", true, int64(2)},
 			},
 			want: []MergeBound{
-				{"colA", literaler("a"), literaler("c")},
-				{"colB", "", ""},
-				{"colC", literaler(int64(1)), literaler(int64(3))},
+				{colA, literaler("a"), literaler("c")},
+				{colB, "", ""},
+				{colC, literaler(int64(1)), literaler(int64(3))},
 			},
 		},
 	} {

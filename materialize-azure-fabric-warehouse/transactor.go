@@ -17,8 +17,16 @@ import (
 
 type binding struct {
 	target           sql.Table
-	mustMerge        bool
 	hasBinaryColumns bool
+
+	load struct {
+		mergeBounds *sql.MergeBoundsBuilder
+	}
+
+	store struct {
+		mustMerge   bool
+		mergeBounds *sql.MergeBoundsBuilder
+	}
 }
 
 type transactor struct {
@@ -58,21 +66,24 @@ func newTransactor(
 		storeFiles: boilerplate.NewStagedFiles(storageClient, fileSizeLimit, true),
 	}
 
-	for idx, b := range bindings {
-		t.loadFiles.AddBinding(idx, b.KeyNames())
-		t.storeFiles.AddBinding(idx, b.ColumnNames())
+	for idx, target := range bindings {
+		t.loadFiles.AddBinding(idx, target.KeyNames())
+		t.storeFiles.AddBinding(idx, target.ColumnNames())
 
 		hasBinaryColumns := false
-		for _, col := range b.Columns() {
+		for _, col := range target.Columns() {
 			if col.DDL == "VARBINARY(MAX)" {
 				hasBinaryColumns = true
 			}
 		}
 
-		t.bindings = append(t.bindings, &binding{
-			target:           b,
+		b := &binding{
+			target:           target,
 			hasBinaryColumns: hasBinaryColumns,
-		})
+		}
+		b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
+		b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
+		t.bindings = append(t.bindings, b)
 	}
 
 	opts := &boilerplate.MaterializeOptions{
@@ -102,6 +113,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err = t.loadFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("encoding Load key: %w", err)
+		} else {
+			b.load.mergeBounds.NextKey(converted)
 		}
 	}
 	if it.Err() != nil {
@@ -139,12 +152,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("flushing store file: %w", err)
 		}
 
-		var createQuery strings.Builder
-		if err := tplCreateLoadTable.Execute(&createQuery, queryParams{
+		params := &queryParams{
 			Table:             b.target,
 			URIs:              uris,
 			StorageAccountKey: t.cfg.StorageAccountKey,
-		}); err != nil {
+			Bounds:            b.load.mergeBounds.Build(),
+		}
+
+		var createQuery strings.Builder
+		if err := tplCreateLoadTable.Execute(&createQuery, params); err != nil {
 			return fmt.Errorf("rendering create load table: %w", err)
 		} else if _, err := txn.ExecContext(ctx, createQuery.String()); err != nil {
 			log.WithField(
@@ -153,12 +169,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table: %w", err)
 		}
 
-		loadQuery, err := sql.RenderTableTemplate(b.target, tplLoadQuery)
-		if err != nil {
+		var loadQuery strings.Builder
+		if err := tplLoadQuery.Execute(&loadQuery, params); err != nil {
 			return fmt.Errorf("rendering load query: %w", err)
 		}
-
-		unionQueries = append(unionQueries, loadQuery)
+		unionQueries = append(unionQueries, loadQuery.String())
 
 		dropQuery, err := sql.RenderTableTemplate(b.target, tplDropLoadTable)
 		if err != nil {
@@ -218,7 +233,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		b := t.bindings[it.Binding]
 		if it.Exists {
-			b.mustMerge = true
+			b.store.mustMerge = true
 		}
 
 		flowDocument := it.RawJSON
@@ -230,6 +245,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := t.storeFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
+		} else {
+			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
 	}
 	if it.Err() != nil {
@@ -276,10 +293,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					Table:             b.target,
 					URIs:              uris,
 					StorageAccountKey: t.cfg.StorageAccountKey,
+					Bounds:            b.store.mergeBounds.Build(),
 				}
 
 				t.be.StartedResourceCommit(b.target.Path)
-				if b.mustMerge {
+				if b.store.mustMerge {
 					var mergeQuery strings.Builder
 					if err := tplStoreMergeQuery.Execute(&mergeQuery, params); err != nil {
 						return err
@@ -306,7 +324,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					}
 				}
 				t.be.FinishedResourceCommit(b.target.Path)
-				b.mustMerge = false
+				b.store.mustMerge = false
 			}
 
 			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {

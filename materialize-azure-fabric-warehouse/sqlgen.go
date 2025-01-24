@@ -89,6 +89,7 @@ type queryParams struct {
 	sql.Table
 	URIs              []string
 	StorageAccountKey string
+	Bounds            []sql.MergeBound
 }
 
 type migrateParams struct {
@@ -168,9 +169,10 @@ WITH (
 SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
-{{- range $ind, $key := $.Keys }}
+{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	{{ template "maybe_unbase64_lhs" $key }}= r.{{ $key.Identifier }}
+	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{ end }}
 
@@ -207,9 +209,10 @@ WITH (
 DELETE r
 FROM {{$.Identifier}} AS r
 INNER JOIN {{ template "temp_name_store" $ }} AS l
-{{- range $ind, $key := $.Keys }}
+{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	{{ template "maybe_unbase64_lhs" $key }} = r.{{ $key.Identifier }}
+	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }};
 
 INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
