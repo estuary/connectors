@@ -318,6 +318,39 @@ async def fetch_customers(
         yield end
 
 
+async def backfill_customers(
+        braintree_gateway: BraintreeGateway,
+        window_size: int,
+        log: Logger,
+        page: PageCursor | None,
+        cutoff: LogCursor,
+) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
+    assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    start = _str_to_dt(page)
+
+    if start >= cutoff:
+        return
+
+    end, collection = await _determine_window_end(
+        search_method=braintree_gateway.customer.search,
+        search_range_node_builder=CustomerSearch.created_at,
+        start=start,
+        initial_end=min(start + timedelta(hours=window_size), cutoff),
+        search_limit=SEARCH_LIMIT,
+        log=log
+    )
+
+    async for object in _async_iterator_wrapper(collection):
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at < cutoff:
+            yield doc
+
+    yield _dt_to_str(end)
+
+
 async def fetch_credit_card_verifications(
         braintree_gateway: BraintreeGateway,
         window_size: int,
@@ -350,6 +383,39 @@ async def fetch_credit_card_verifications(
         yield end
 
 
+async def backfill_credit_card_verifications(
+        braintree_gateway: BraintreeGateway,
+        window_size: int,
+        log: Logger,
+        page: PageCursor | None,
+        cutoff: LogCursor,
+) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
+    assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    start = _str_to_dt(page)
+
+    if start >= cutoff:
+        return
+
+    end, collection = await _determine_window_end(
+        search_method=braintree_gateway.verification.search,
+        search_range_node_builder=CreditCardVerificationSearch.created_at,
+        start=start,
+        initial_end=min(start + timedelta(hours=window_size), cutoff),
+        search_limit=SEARCH_LIMIT,
+        log=log
+    )
+
+    async for object in _async_iterator_wrapper(collection):
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at < cutoff:
+            yield doc
+
+    yield _dt_to_str(end)
+
+
 async def fetch_subscriptions(
         braintree_gateway: BraintreeGateway,
         window_size: int,
@@ -380,6 +446,39 @@ async def fetch_subscriptions(
         yield most_recent_created_at
     else:
         yield end
+
+
+async def backfill_subscriptions(
+        braintree_gateway: BraintreeGateway,
+        window_size: int,
+        log: Logger,
+        page: PageCursor | None,
+        cutoff: LogCursor,
+) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
+    assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    start = _str_to_dt(page)
+
+    if start >= cutoff:
+        return
+
+    end, collection = await _determine_window_end(
+        search_method=braintree_gateway.subscription.search,
+        search_range_node_builder=SubscriptionSearch.created_at,
+        start=start,
+        initial_end=min(start + timedelta(hours=window_size), cutoff),
+        search_limit=SEARCH_LIMIT,
+        log=log
+    )
+
+    async for object in _async_iterator_wrapper(collection):
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
+
+        if doc.created_at < cutoff:
+            yield doc
+
+    yield _dt_to_str(end)
 
 
 def _are_same_day(start: datetime, end: datetime) -> bool:
@@ -428,3 +527,45 @@ async def fetch_disputes(
         yield most_recent_created_at
     else:
         yield end
+
+
+async def backfill_disputes(
+        braintree_gateway: BraintreeGateway,
+        window_size: int,
+        log: Logger,
+        page: PageCursor | None,
+        cutoff: LogCursor,
+) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
+    assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    start = _str_to_dt(page)
+
+    if start >= cutoff:
+        return
+
+    window_end = start + timedelta(hours=window_size)
+    end = min(window_end, cutoff)
+
+    # Due to the potential day difference between received_date and created_at,
+    # always search the previous day for results created in this date window as well.
+    search_start = start - timedelta(days=1)
+
+    search_result = await asyncio.to_thread(
+        braintree_gateway.dispute.search,
+        DisputeSearch.received_date.between(search_start, end),
+    )
+
+    count = 0
+
+    async for object in _async_iterator_wrapper(search_result.disputes):
+        count += 1
+        doc = IncrementalResource.model_validate(_braintree_object_to_dict(object))
+
+        if start < doc.created_at <= end:
+            yield doc
+
+    if count >= SEARCH_LIMIT:
+        raise RuntimeError(_search_limit_error_message(count, "disputes"))
+
+    yield _dt_to_str(end)
