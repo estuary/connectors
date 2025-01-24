@@ -16,23 +16,23 @@ import (
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	// Get lists of all tables, columns and primary keys in the database
-	var tables, err = getTables(ctx, db.conn)
+	var tables, err = getTables(ctx, db.conn, db.featureFlags["uppercase_discovery_queries"])
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database tables: %w", err)
 	}
-	columns, err := getColumns(ctx, db.conn)
+	columns, err := getColumns(ctx, db.conn, db.featureFlags["uppercase_discovery_queries"])
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database columns: %w", err)
 	}
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn)
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn, db.featureFlags["uppercase_discovery_queries"])
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
-	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, db.featureFlags["uppercase_discovery_queries"])
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
-	computedColumns, err := getComputedColumns(ctx, db.conn)
+	computedColumns, err := getComputedColumns(ctx, db.conn, db.featureFlags["uppercase_discovery_queries"])
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database computed columns: %w", err)
 	}
@@ -184,14 +184,25 @@ type sqlserverTableDiscoveryDetails struct {
 	ComputedColumns []string // List of the names of computed columns in this table, in no particular order.
 }
 
-const queryDiscoverTables = `
+const queryDiscoverTablesLowercase = `
   SELECT table_schema, table_name, table_type
   FROM information_schema.tables
   WHERE table_schema != 'information_schema' AND table_schema != 'performance_schema'
     AND table_schema != 'sys' AND table_schema != 'cdc'
 	AND table_name != 'systranschemas';`
 
-func getTables(ctx context.Context, conn *sql.DB) ([]*sqlcapture.DiscoveryInfo, error) {
+const queryDiscoverTablesUppercase = `
+  SELECT TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE
+  FROM INFORMATION_SCHEMA.TABLES
+  WHERE TABLE_SCHEMA != 'INFORMATION_SCHEMA' AND TABLE_SCHEMA != 'PERFORMANCE_SCHEMA'
+    AND TABLE_SCHEMA != 'SYS' AND TABLE_SCHEMA != 'CDC'
+	AND TABLE_NAME != 'SYSTRANSCHEMAS';`
+
+func getTables(ctx context.Context, conn *sql.DB, uppercaseQuery bool) ([]*sqlcapture.DiscoveryInfo, error) {
+	var queryDiscoverTables = queryDiscoverTablesLowercase
+	if uppercaseQuery {
+		queryDiscoverTables = queryDiscoverTablesUppercase
+	}
 	rows, err := conn.QueryContext(ctx, queryDiscoverTables)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
@@ -214,12 +225,21 @@ func getTables(ctx context.Context, conn *sql.DB) ([]*sqlcapture.DiscoveryInfo, 
 	return tables, nil
 }
 
-const queryDiscoverColumns = `
+const queryDiscoverColumnsLowercase = `
   SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, collation_name, character_maximum_length
   FROM information_schema.columns
   ORDER BY table_schema, table_name, ordinal_position;`
 
-func getColumns(ctx context.Context, conn *sql.DB) ([]sqlcapture.ColumnInfo, error) {
+const queryDiscoverColumnsUppercase = `
+  SELECT TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION, COLUMN_NAME, IS_NULLABLE, DATA_TYPE, COLLATION_NAME, CHARACTER_MAXIMUM_LENGTH
+  FROM INFORMATION_SCHEMA.COLUMNS
+  ORDER BY TABLE_SCHEMA, TABLE_NAME, ORDINAL_POSITION;`
+
+func getColumns(ctx context.Context, conn *sql.DB, uppercaseQuery bool) ([]sqlcapture.ColumnInfo, error) {
+	var queryDiscoverColumns = queryDiscoverColumnsLowercase
+	if uppercaseQuery {
+		queryDiscoverColumns = queryDiscoverColumnsUppercase
+	}
 	var rows, err = conn.QueryContext(ctx, queryDiscoverColumns)
 	if err != nil {
 		return nil, fmt.Errorf("error querying columns: %w", err)
@@ -281,7 +301,7 @@ func (t sqlserverTextColumnType) String() string {
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
 // overkill but shouldn't hurt, and helps to make absolutely sure that we're
 // matching up the constraint type with the column names/positions correctly.
-const queryDiscoverPrimaryKeys = `
+const queryDiscoverPrimaryKeysLowercase = `
 SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
   FROM information_schema.key_column_usage kcu
   JOIN information_schema.table_constraints tcs
@@ -292,10 +312,26 @@ SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
     AND tcs.table_schema = kcu.table_schema
     AND tcs.table_name = kcu.table_name
   WHERE tcs.constraint_type = 'PRIMARY KEY'
-  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;
-`
+  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;`
 
-func getPrimaryKeys(ctx context.Context, conn *sql.DB) (map[string][]string, error) {
+const queryDiscoverPrimaryKeysUppercase = `
+SELECT KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.COLUMN_NAME, KCU.ORDINAL_POSITION
+  FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE KCU
+  JOIN INFORMATION_SCHEMA.TABLE_CONSTRAINTS TCS
+    ON  TCS.CONSTRAINT_CATALOG = KCU.CONSTRAINT_CATALOG
+    AND TCS.CONSTRAINT_SCHEMA = KCU.CONSTRAINT_SCHEMA
+    AND TCS.CONSTRAINT_NAME = KCU.CONSTRAINT_NAME
+    AND TCS.TABLE_CATALOG = KCU.TABLE_CATALOG
+    AND TCS.TABLE_SCHEMA = KCU.TABLE_SCHEMA
+    AND TCS.TABLE_NAME = KCU.TABLE_NAME
+  WHERE TCS.CONSTRAINT_TYPE = 'PRIMARY KEY'
+  ORDER BY KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.ORDINAL_POSITION;`
+
+func getPrimaryKeys(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map[string][]string, error) {
+	var queryDiscoverPrimaryKeys = queryDiscoverPrimaryKeysLowercase
+	if uppercaseQuery {
+		queryDiscoverPrimaryKeys = queryDiscoverPrimaryKeysUppercase
+	}
 	var rows, err = conn.QueryContext(ctx, queryDiscoverPrimaryKeys)
 	if err != nil {
 		return nil, fmt.Errorf("error querying primary keys: %w", err)
@@ -318,17 +354,29 @@ func getPrimaryKeys(ctx context.Context, conn *sql.DB) (map[string][]string, err
 	return keys, nil
 }
 
-const queryDiscoverSecondaryIndices = `
+const queryDiscoverSecondaryIndicesLowercase = `
 SELECT sch.name, tbl.name, COALESCE(idx.name, 'null'), COL_NAME(ic.object_id,ic.column_id), ic.key_ordinal
 FROM sys.indexes idx
      JOIN sys.tables tbl ON tbl.object_id = idx.object_id
 	 JOIN sys.schemas sch ON sch.schema_id = tbl.schema_id
 	 JOIN sys.index_columns ic ON ic.index_id = idx.index_id AND ic.object_id = tbl.object_id
 WHERE ic.key_ordinal != 0 AND idx.is_unique = 1 AND sch.name NOT IN ('cdc')
-ORDER BY sch.name, tbl.name, idx.name, ic.key_ordinal
-`
+ORDER BY sch.name, tbl.name, idx.name, ic.key_ordinal;`
 
-func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[string][]string, error) {
+const queryDiscoverSecondaryIndicesUppercase = `
+SELECT SCH.NAME, TBL.NAME, COALESCE(IDX.NAME, 'NULL'), COL_NAME(IC.OBJECT_ID,IC.COLUMN_ID), IC.KEY_ORDINAL
+FROM SYS.INDEXES IDX
+     JOIN SYS.TABLES TBL ON TBL.OBJECT_ID = IDX.OBJECT_ID
+	 JOIN SYS.SCHEMAS SCH ON SCH.SCHEMA_ID = TBL.SCHEMA_ID
+	 JOIN SYS.INDEX_COLUMNS IC ON IC.INDEX_ID = IDX.INDEX_ID AND IC.OBJECT_ID = TBL.OBJECT_ID
+WHERE IC.KEY_ORDINAL != 0 AND IDX.IS_UNIQUE = 1 AND SCH.NAME NOT IN ('CDC')
+ORDER BY SCH.NAME, TBL.NAME, IDX.NAME, IC.KEY_ORDINAL;`
+
+func getSecondaryIndexes(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map[string]map[string][]string, error) {
+	var queryDiscoverSecondaryIndices = queryDiscoverSecondaryIndicesLowercase
+	if uppercaseQuery {
+		queryDiscoverSecondaryIndices = queryDiscoverSecondaryIndicesUppercase
+	}
 	var rows, err = conn.QueryContext(ctx, queryDiscoverSecondaryIndices)
 	if err != nil {
 		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
@@ -358,15 +406,25 @@ func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[stri
 	return streamIndexColumns, err
 }
 
-const queryListComputedColumns = `
+const queryListComputedColumnsLowercase = `
 SELECT sch.name, tbl.name, col.name
   FROM sys.columns col
     JOIN sys.tables tbl ON tbl.object_id = col.object_id
 	JOIN sys.schemas sch ON sch.schema_id = tbl.schema_id
-  WHERE col.is_computed = 1;
-`
+  WHERE col.is_computed = 1;`
 
-func getComputedColumns(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID][]string, error) {
+const queryListComputedColumnsUppercase = `
+SELECT SCH.NAME, TBL.NAME, COL.NAME
+  FROM SYS.COLUMNS COL
+    JOIN SYS.TABLES TBL ON TBL.OBJECT_ID = COL.OBJECT_ID
+	JOIN SYS.SCHEMAS SCH ON SCH.SCHEMA_ID = TBL.SCHEMA_ID
+  WHERE COL.IS_COMPUTED = 1;`
+
+func getComputedColumns(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map[sqlcapture.StreamID][]string, error) {
+	var queryListComputedColumns = queryListComputedColumnsLowercase
+	if uppercaseQuery {
+		queryListComputedColumns = queryListComputedColumnsUppercase
+	}
 	var rows, err = conn.QueryContext(ctx, queryListComputedColumns)
 	if err != nil {
 		return nil, fmt.Errorf("error querying computed columns: %w", err)
