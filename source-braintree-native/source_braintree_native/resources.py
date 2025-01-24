@@ -17,6 +17,7 @@ from .models import (
     FullRefreshResource,
     IncrementalResource,
     IncrementalResourceFetchChangesFn,
+    IncrementalResourceFetchPageFn,
 )
 
 from .api import (
@@ -25,9 +26,13 @@ from .api import (
     fetch_transactions,
     backfill_transactions,
     fetch_credit_card_verifications,
+    backfill_credit_card_verifications,
     fetch_customers,
+    backfill_customers,
     fetch_disputes,
+    backfill_disputes,
     fetch_subscriptions,
+    backfill_subscriptions,
 )
 
 
@@ -39,12 +44,12 @@ FULL_REFRESH_RESOURCES: list[tuple[str, str, str | None]] = [
     ("plans", "plan", None),
 ]
 
-# Supported incremental resources and their corresponding name and fetch_changes function.
-INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn]] = [
-    ("credit_card_verifications", fetch_credit_card_verifications),
-    ("customers", fetch_customers),
-    ("disputes", fetch_disputes),
-    ("subscriptions", fetch_subscriptions),
+# Supported incremental resources and their corresponding name, fetch_changes function, and fetch_page function.
+INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn, IncrementalResourceFetchPageFn]] = [
+    ("credit_card_verifications", fetch_credit_card_verifications, backfill_credit_card_verifications),
+    ("customers", fetch_customers, backfill_customers),
+    ("disputes", fetch_disputes, backfill_disputes),
+    ("subscriptions", fetch_subscriptions, backfill_subscriptions),
 ]
 
 
@@ -122,6 +127,7 @@ def incremental_resources(
 
     def open(
             fetch_changes_fn: IncrementalResourceFetchChangesFn,
+            fetch_page_fn: IncrementalResourceFetchPageFn,
             gateway: BraintreeGateway,
             window_size: int,
             binding: CaptureBinding[ResourceConfig],
@@ -140,23 +146,31 @@ def incremental_resources(
                 gateway,
                 window_size,
             ),
+            fetch_page=functools.partial(
+                fetch_page_fn,
+                gateway,
+                window_size,
+            )
         )
+
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
 
     return [
         common.Resource(
             name=name,
             key=["/id"],
             model=IncrementalResource,
-            open=functools.partial(open, fetch_changes_fn, _create_gateway(config), config.advanced.window_size),
+            open=functools.partial(open, fetch_changes_fn, fetch_page_fn, _create_gateway(config), config.advanced.window_size),
             initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=config.start_date),
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(next_page=_dt_to_str(config.start_date), cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
         )
-        for (name, fetch_changes_fn) in INCREMENTAL_RESOURCES
+        for (name, fetch_changes_fn, fetch_page_fn) in INCREMENTAL_RESOURCES
     ]
 
 
