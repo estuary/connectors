@@ -30,6 +30,11 @@ from .models import (
 SEARCH_LIMIT = 10_000
 TRANSACTION_SEARCH_LIMIT = 50_000
 
+# Disputes are searched using the received_date field, which is a date not a datetime. Using a window size
+# smaller than 24 hours (1 day) would make the stream slower than necessary & fetch duplicate results from
+# Braintree, so we enforce that dispute date windows must be at least 24 hours wide.
+MIN_DISPUTES_WINDOW_SIZE = 24
+
 TRANSACTION_SEARCH_FIELDS = [
     'authorization_expired_at',
     'authorized_at',
@@ -493,7 +498,7 @@ async def fetch_disputes(
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
-    window_end = log_cursor + timedelta(hours=window_size)
+    window_end = log_cursor + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
     end = min(window_end, datetime.now(tz=UTC))
 
     # Braintree does not let us search disputes based on the created_at field, and the received_date field is
@@ -544,7 +549,7 @@ async def backfill_disputes(
     if start >= cutoff:
         return
 
-    window_end = start + timedelta(hours=window_size)
+    window_end = start + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
     end = min(window_end, cutoff)
 
     # Due to the potential day difference between received_date and created_at,
