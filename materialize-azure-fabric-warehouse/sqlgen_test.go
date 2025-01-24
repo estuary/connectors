@@ -32,7 +32,8 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tbl := range tables {
 		for _, tpl := range []*template.Template{
-			tplStoreCopyIntoQuery,
+			tplStoreCopyIntoFromStagedQuery,
+			tplStoreCopyIntoDirectQuery,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
