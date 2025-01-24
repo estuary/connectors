@@ -35,6 +35,14 @@ var sqlserverDriver = &sqlcapture.Driver{
 
 const defaultPort = "1433"
 
+var featureFlagDefaults = map[string]bool{
+	// When set, discovery queries will use a variant with all identifiers capitalized.
+	// We believe this should probably be a safe change (and it's required for discovery
+	// to work in the Turkish_CI_AS locale), but didn't want to release it unconditionally
+	// on a Friday without much testing so it's gated behind a flag for now.
+	"uppercase_discovery_queries": false,
+}
+
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
 	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
@@ -57,6 +65,7 @@ type advancedConfig struct {
 	AutomaticCaptureInstances   bool   `json:"capture_instance_management,omitempty" jsonschema:"title=Automatic Capture Instance Management,default=false,description=When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use."`
 	Filegroup                   string `json:"filegroup,omitempty" jsonschema:"title=CDC Instance Filegroup,description=When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."`
 	RoleName                    string `json:"role_name,omitempty" jsonschema:"title=CDC Instance Access Role,description=When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."`
+	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 type tunnelConfig struct {
@@ -162,6 +171,11 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 	}
 	config.SetDefaults()
 
+	var featureFlags = boilerplate.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	if config.Advanced.FeatureFlags != "" {
+		log.WithField("flags", featureFlags).Info("parsed feature flags")
+	}
+
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		host, port, err := net.SplitHostPort(config.Address)
@@ -185,7 +199,10 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 		}
 	}
 
-	var db = &sqlserverDatabase{config: &config}
+	var db = &sqlserverDatabase{
+		config:       &config,
+		featureFlags: featureFlags,
+	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -196,7 +213,8 @@ type sqlserverDatabase struct {
 	config *Config
 	conn   *sql.DB
 
-	datetimeLocation *time.Location // The location in which to interpret DATETIME column values as timestamps.
+	featureFlags     map[string]bool // Parsed feature flag settings with defaults applied
+	datetimeLocation *time.Location  // The location in which to interpret DATETIME column values as timestamps.
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {

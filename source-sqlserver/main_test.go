@@ -31,6 +31,7 @@ var (
 
 	enableCDCWhenCreatingTables = flag.Bool("enable_cdc_when_creating_tables", true, "Set to true if CDC should be enabled before the test capture runs")
 	testSchemaName              = flag.String("test_schema_name", "dbo", "The schema in which to create test tables.")
+	testFeatureFlags            = flag.String("feature_flags", "", "Feature flags to apply to all test captures.")
 )
 
 func TestMain(m *testing.M) {
@@ -76,6 +77,7 @@ func sqlserverTestBackend(t *testing.T) *testBackend {
 		Password: *dbCapturePass,
 		Database: *dbName,
 	}
+	captureConfig.Advanced.FeatureFlags = *testFeatureFlags
 	// Other connectors use 16 in tests, but going below 128 here
 	// appears to change database backfill row ordering in the
 	// 'DuplicatedScanKey' test.
