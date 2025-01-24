@@ -99,7 +99,7 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
 			"numeric":                  {sql.NewMigrationSpec([]string{"text"})},
-			"bigint":                   {sql.NewMigrationSpec([]string{"text"})},
+			"bigint":                   {sql.NewMigrationSpec([]string{"numeric(38,0)", "text"})},
 			"double precision":         {sql.NewMigrationSpec([]string{"text"})},
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
