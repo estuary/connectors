@@ -99,7 +99,10 @@ var bqDialect = func() sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"integer":    {sql.NewMigrationSpec([]string{"string"})},
+			"integer": {
+				sql.NewMigrationSpec([]string{"bignumeric(38,0)"}, sql.WithCastSQL(toBigNumericCast)),
+				sql.NewMigrationSpec([]string{"string"}),
+			},
 			"bignumeric": {sql.NewMigrationSpec([]string{"string"})},
 			"float":      {sql.NewMigrationSpec([]string{"string"})},
 			"date":       {sql.NewMigrationSpec([]string{"string"})},
@@ -138,6 +141,10 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+}
+
+func toBigNumericCast(m sql.ColumnTypeMigration) string {
+	return fmt.Sprintf("CAST(%s AS BIGNUMERIC)", m.Identifier)
 }
 
 var (

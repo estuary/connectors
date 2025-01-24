@@ -71,7 +71,7 @@ Migratable Changes Applied Schema:
 {"Name":"datevalue","Nullable":"YES","Type":"character varying"}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"int64","Nullable":"YES","Type":"bigint"}
+{"Name":"int64","Nullable":"YES","Type":"numeric"}
 {"Name":"intwidenedtojson","Nullable":"YES","Type":"super"}
 {"Name":"key","Nullable":"YES","Type":"character varying"}
 {"Name":"multiple","Nullable":"YES","Type":"super"}
@@ -85,6 +85,6 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (VARCHAR), _meta/flow_truncated (BOOL), boolwidenedtojson (TIMESTAMPTZ), datevalue (INT8), datetimevalue (4000), flow_published_at (4000), int64 (4000), intwidenedtojson (VARCHAR), multiple (VARCHAR), nonscalarvalue (4000), numericstring (4000), optional (VARCHAR), requirednumeric (VARCHAR), scalarvalue (4000), stringwidenedtojson (VARCHAR), timevalue (VARCHAR), flow_document (4000)
-1, false, 2024-09-13T01:01:01Z, 1, <nil>, <nil>, <nil>, test, 01:01:01, "{}", true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 999, 123, 456, "hello"
+key (VARCHAR), _meta/flow_truncated (BOOL), boolwidenedtojson (TIMESTAMPTZ), datevalue (4000), datetimevalue (4000), flow_published_at (4000), int64 (VARCHAR), intwidenedtojson (VARCHAR), multiple (4000), nonscalarvalue (4000), numericstring (VARCHAR), optional (VARCHAR), requirednumeric (NUMERIC), scalarvalue (4000), stringwidenedtojson (VARCHAR), timevalue (VARCHAR), flow_document (4000)
+1, false, 2024-09-13T01:01:01Z, <nil>, <nil>, <nil>, test, 01:01:01, "{}", true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 1, 999, 123, 456, "hello"
 

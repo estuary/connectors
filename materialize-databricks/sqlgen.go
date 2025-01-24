@@ -62,7 +62,7 @@ var databricksDialect = func() sql.Dialect {
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
 			"decimal":   {sql.NewMigrationSpec([]string{"string"})},
-			"long":      {sql.NewMigrationSpec([]string{"string"})},
+			"long":      {sql.NewMigrationSpec([]string{"numeric(38,0)", "string"})},
 			"double":    {sql.NewMigrationSpec([]string{"string"})},
 			"timestamp": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"date":      {sql.NewMigrationSpec([]string{"string"})},

@@ -13,7 +13,7 @@ collections:
         dateValue: { type: string }
         datetimeValue: { type: string }
         timeValue: { type: string }
-        int64: { type: integer, maximum: 9223372036854775808}
+        int64: { type: integer, maximum: 10000000000000000000}
         requiredNumeric: { type: string }
         stringWidenedToJson: { type: [string, integer, boolean] }
         intWidenedToJson: { type: [string, integer, boolean] }
