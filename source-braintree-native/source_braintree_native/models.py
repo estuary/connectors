@@ -8,6 +8,7 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     ConnectorState as GenericConnectorState,
     LogCursor,
+    PageCursor,
     ResourceConfig,
     ResourceState,
 )
@@ -85,4 +86,9 @@ class Transaction(IncrementalResource):
 IncrementalResourceFetchChangesFn = Callable[
     [BraintreeGateway, int, Logger, LogCursor],
     AsyncGenerator[IncrementalResource | LogCursor, None],
+]
+
+IncrementalResourceFetchPageFn = Callable[
+    [BraintreeGateway, int, Logger, PageCursor, LogCursor],
+    AsyncGenerator[IncrementalResource | PageCursor, None],
 ]
