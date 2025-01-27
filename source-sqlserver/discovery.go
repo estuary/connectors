@@ -28,11 +28,11 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
-	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, db.featureFlags["uppercase_discovery_queries"])
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
-	computedColumns, err := getComputedColumns(ctx, db.conn, db.featureFlags["uppercase_discovery_queries"])
+	computedColumns, err := getComputedColumns(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database computed columns: %w", err)
 	}
@@ -354,7 +354,7 @@ func getPrimaryKeys(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map
 	return keys, nil
 }
 
-const queryDiscoverSecondaryIndicesLowercase = `
+const queryDiscoverSecondaryIndices = `
 SELECT sch.name, tbl.name, COALESCE(idx.name, 'null'), COL_NAME(ic.object_id,ic.column_id), ic.key_ordinal
 FROM sys.indexes idx
      JOIN sys.tables tbl ON tbl.object_id = idx.object_id
@@ -363,20 +363,7 @@ FROM sys.indexes idx
 WHERE ic.key_ordinal != 0 AND idx.is_unique = 1 AND sch.name NOT IN ('cdc')
 ORDER BY sch.name, tbl.name, idx.name, ic.key_ordinal;`
 
-const queryDiscoverSecondaryIndicesUppercase = `
-SELECT SCH.NAME, TBL.NAME, COALESCE(IDX.NAME, 'NULL'), COL_NAME(IC.OBJECT_ID,IC.COLUMN_ID), IC.KEY_ORDINAL
-FROM SYS.INDEXES IDX
-     JOIN SYS.TABLES TBL ON TBL.OBJECT_ID = IDX.OBJECT_ID
-	 JOIN SYS.SCHEMAS SCH ON SCH.SCHEMA_ID = TBL.SCHEMA_ID
-	 JOIN SYS.INDEX_COLUMNS IC ON IC.INDEX_ID = IDX.INDEX_ID AND IC.OBJECT_ID = TBL.OBJECT_ID
-WHERE IC.KEY_ORDINAL != 0 AND IDX.IS_UNIQUE = 1 AND SCH.NAME NOT IN ('CDC')
-ORDER BY SCH.NAME, TBL.NAME, IDX.NAME, IC.KEY_ORDINAL;`
-
-func getSecondaryIndexes(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map[string]map[string][]string, error) {
-	var queryDiscoverSecondaryIndices = queryDiscoverSecondaryIndicesLowercase
-	if uppercaseQuery {
-		queryDiscoverSecondaryIndices = queryDiscoverSecondaryIndicesUppercase
-	}
+func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[string][]string, error) {
 	var rows, err = conn.QueryContext(ctx, queryDiscoverSecondaryIndices)
 	if err != nil {
 		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
@@ -406,25 +393,14 @@ func getSecondaryIndexes(ctx context.Context, conn *sql.DB, uppercaseQuery bool)
 	return streamIndexColumns, err
 }
 
-const queryListComputedColumnsLowercase = `
+const queryListComputedColumns = `
 SELECT sch.name, tbl.name, col.name
   FROM sys.columns col
     JOIN sys.tables tbl ON tbl.object_id = col.object_id
 	JOIN sys.schemas sch ON sch.schema_id = tbl.schema_id
   WHERE col.is_computed = 1;`
 
-const queryListComputedColumnsUppercase = `
-SELECT SCH.NAME, TBL.NAME, COL.NAME
-  FROM SYS.COLUMNS COL
-    JOIN SYS.TABLES TBL ON TBL.OBJECT_ID = COL.OBJECT_ID
-	JOIN SYS.SCHEMAS SCH ON SCH.SCHEMA_ID = TBL.SCHEMA_ID
-  WHERE COL.IS_COMPUTED = 1;`
-
-func getComputedColumns(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map[sqlcapture.StreamID][]string, error) {
-	var queryListComputedColumns = queryListComputedColumnsLowercase
-	if uppercaseQuery {
-		queryListComputedColumns = queryListComputedColumnsUppercase
-	}
+func getComputedColumns(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID][]string, error) {
 	var rows, err = conn.QueryContext(ctx, queryListComputedColumns)
 	if err != nil {
 		return nil, fmt.Errorf("error querying computed columns: %w", err)
