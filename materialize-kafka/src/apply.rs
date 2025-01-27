@@ -2,7 +2,10 @@ use std::collections::HashSet;
 
 use anyhow::{Context, Result};
 use proto_flow::materialize::request::Apply;
-use rdkafka::admin::{AdminOptions, NewTopic, TopicReplication};
+use rdkafka::{
+    admin::{AdminOptions, NewTopic, TopicReplication},
+    types::RDKafkaErrorCode,
+};
 
 use crate::{
     configuration::{EndpointConfig, Resource},
@@ -60,8 +63,14 @@ pub async fn do_apply(req: Apply) -> Result<String> {
         .await
         .context("creating topics")?
         .into_iter()
-        .map(|res| {
-            res.map_err(|err| anyhow::anyhow!("failed to create topic: {} (code {})", err.0, err.1))
+        .filter_map(|res| match res {
+            Ok(t) => Some(Ok(t)),
+            Err((_, err_code)) if err_code == RDKafkaErrorCode::TopicAlreadyExists => None,
+            Err((err_msg, err_code)) => Some(Err(anyhow::anyhow!(
+                "failed to create topic: {} (code {})",
+                err_msg,
+                err_code
+            ))),
         })
         .collect::<Result<Vec<_>, _>>()?
         .iter()
