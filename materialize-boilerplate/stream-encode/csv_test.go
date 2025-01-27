@@ -1,6 +1,7 @@
 package stream_encode
 
 import (
+	"bytes"
 	"os"
 	"testing"
 
@@ -24,21 +25,6 @@ func TestCsvEncoder(t *testing.T) {
 			nulls: false,
 			opts:  []CsvOption{WithCsvSkipHeaders()},
 		},
-		{
-			name:  "with default null",
-			nulls: true,
-			opts:  nil,
-		},
-		{
-			name:  "with custom null",
-			nulls: true,
-			opts:  []CsvOption{WithCsvNullString("MyNullString")},
-		},
-		{
-			name:  "with custom delimiter",
-			nulls: true,
-			opts:  []CsvOption{WithCsvDelimiter([]rune("|")[0])},
-		},
 	}
 
 	for _, tt := range tests {
@@ -58,6 +44,42 @@ func TestCsvEncoder(t *testing.T) {
 			require.NoError(t, enc.Close())
 
 			cupaloy.SnapshotT(t, duckdbReadFile(t, sink.Name(), "CSV"))
+		})
+	}
+}
+
+func TestCsvWriter(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		row  []any
+		want string
+	}{
+		{
+			name: "empty",
+			row:  nil,
+			want: "\n",
+		},
+		{
+			name: "basic",
+			row:  []any{"first", "second", "third"},
+			want: "first,second,third\n",
+		},
+		{
+			name: "empty string and null",
+			row:  []any{"first", "", nil},
+			want: "first,\"\",\n",
+		},
+		{
+			name: "special characters",
+			row:  []any{"has\nnewline", " startsWithSpace", "\tstartsWithTab", "has\"quote", "has,comma", "has\rreturn"},
+			want: "\"has\nnewline\",\" startsWithSpace\",\"\tstartsWithTab\",\"has\"\"quote\",\"has,comma\",\"has\rreturn\"\n",
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			csvw := newCsvWriter(&buf)
+			require.NoError(t, csvw.writeRow(tt.row))
+			require.Equal(t, tt.want, buf.String())
 		})
 	}
 }
