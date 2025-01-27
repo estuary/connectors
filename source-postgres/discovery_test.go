@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
 func TestDiscoveryComplex(t *testing.T) {
@@ -125,4 +127,15 @@ func TestDiscoveryWithoutPermissions(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s %s;`, tableName, tableDef))
 
 	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+}
+
+func TestFloatKeyDiscovery(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "46399195"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id DOUBLE PRECISION PRIMARY KEY, val DOUBLE PRECISION)")
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	tb.Insert(ctx, t, tableName, [][]any{{3.14, 3.14}, {123.456, 123.456}, {-12.3456789, -12.3456789}, {9999999999.99, 9999999999.99}})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("capture", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }

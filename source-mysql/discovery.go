@@ -187,7 +187,7 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 	return true
 }
 
-func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
+func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
 	var schema columnSchema
 	if typeName, ok := column.DataType.(string); ok {
 		schema, ok = mysqlTypeToJSON[typeName]

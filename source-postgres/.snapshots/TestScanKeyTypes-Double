@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":-1.1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"-1.1"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -17,7 +17,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":-1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"-1"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -30,7 +30,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":-0.9}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"-0.9"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -43,7 +43,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":"0"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -56,7 +56,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":0.9}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":"0.9"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -69,7 +69,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":"1"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -82,7 +82,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":1.111}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":"1.111"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -95,7 +95,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":1.222}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":"1.222"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -108,7 +108,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":1.333}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":"1.333"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -121,7 +121,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":1.444}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":"1.444"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -134,7 +134,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 10","key":1.555}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 10","key":"1.555"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -147,7 +147,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 11","key":1.666}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 11","key":"1.666"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -160,7 +160,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 12","key":1.777}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 12","key":"1.777"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -173,7 +173,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 13","key":1.888}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 13","key":"1.888"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -186,7 +186,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 14","key":1.999}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 14","key":"1.999"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -199,7 +199,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytypes_double_28040008": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 15","key":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_double_28040008","loc":[11111111,11111111,11111111]}},"data":"Data 15","key":"2"}
 # ================================
 # Final State Checkpoint
 # ================================

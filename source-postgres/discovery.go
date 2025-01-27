@@ -202,7 +202,7 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 }
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
-func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
+func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
 	var arrayColumn = false
 	var colSchema columnSchema
 
@@ -217,6 +217,13 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) 
 		colSchema, ok = postgresTypeToJSON[columnType]
 		if !ok {
 			return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
+		}
+
+		// If the column is a primary key and there's a special-case for this type as a primary
+		// key (as in the case of floatN columns which always get stringified when used as keys),
+		// then we use that instead of the normal-value type mapping above.
+		if s, ok := postgresPrimaryKeyTypes[columnType]; isPrimaryKey && ok {
+			colSchema = s
 		}
 	} else if dataType, ok := column.DataType.(postgresComplexType); ok {
 		var schema, err = dataType.toColumnSchema(column)
@@ -298,6 +305,11 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		}
 	}
 	return out
+}
+
+var postgresPrimaryKeyTypes = map[string]columnSchema{
+	"float4": {jsonTypes: []string{"string"}, format: "number"},
+	"float8": {jsonTypes: []string{"string"}, format: "number"},
 }
 
 var postgresTypeToJSON = map[string]columnSchema{

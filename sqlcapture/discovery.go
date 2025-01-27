@@ -86,7 +86,8 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 				continue // Skip adding properties corresponding to omitted columns
 			}
 
-			var jsonType, err = db.TranslateDBToJSONType(column)
+			var isPrimaryKey = slices.Contains(table.PrimaryKey, column.Name)
+			var jsonType, err = db.TranslateDBToJSONType(column, isPrimaryKey)
 			if err != nil {
 				// Unhandled types are translated to the catch-all schema {} but with
 				// a description clarifying that we don't have a better translation.

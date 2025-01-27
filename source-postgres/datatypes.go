@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -205,13 +207,15 @@ func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interfa
 	}
 	for id, val := range f {
 		var columnInfo *sqlcapture.ColumnInfo
+		var isPrimaryKey bool
 		if table != nil {
 			if info, ok := table.Columns[id]; ok {
 				columnInfo = &info
 			}
+			isPrimaryKey = slices.Contains(table.PrimaryKey, id)
 		}
 
-		var translated, err = translateRecordField(columnInfo, val)
+		var translated, err = translateRecordField(columnInfo, isPrimaryKey, val)
 		if err != nil {
 			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
 		}
@@ -229,7 +233,7 @@ func oversizePlaceholderJSON(orig []byte) json.RawMessage {
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
-func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
+func translateRecordField(column *sqlcapture.ColumnInfo, isPrimaryKey bool, val any) (any, error) {
 	var dataType any
 	if column != nil {
 		dataType = column.DataType
@@ -277,9 +281,15 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		if str, ok := stringifySpecialFloats(float64(x)); ok {
 			return str, nil
 		}
+		if isPrimaryKey {
+			return strconv.FormatFloat(float64(x), 'f', -1, 32), nil
+		}
 	case float64:
 		if str, ok := stringifySpecialFloats(x); ok {
 			return str, nil
+		}
+		if isPrimaryKey {
+			return strconv.FormatFloat(x, 'f', -1, 64), nil
 		}
 	case json.RawMessage:
 		if len(x) > truncateColumnThreshold {
@@ -287,9 +297,9 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 		}
 		return x, nil
 	case pgtype.Array[any]:
-		return translateArray(column, x)
+		return translateArray(column, isPrimaryKey, x)
 	case pgtype.Range[any]:
-		return stringifyRange(x)
+		return stringifyRange(x, isPrimaryKey)
 	case pgtype.Text:
 		if len(x.String) > truncateColumnThreshold {
 			return x.String[:truncateColumnThreshold], nil
@@ -347,7 +357,7 @@ func stringifySpecialFloats(x float64) (string, bool) {
 	return "", false
 }
 
-func stringifyRange(r pgtype.Range[any]) (string, error) {
+func stringifyRange(r pgtype.Range[any], isPrimaryKey bool) (string, error) {
 	if r.LowerType == pgtype.Empty || r.UpperType == pgtype.Empty {
 		return "empty", nil
 	}
@@ -360,7 +370,7 @@ func stringifyRange(r pgtype.Range[any]) (string, error) {
 		buf.WriteString("(")
 	}
 	if r.LowerType == pgtype.Inclusive || r.LowerType == pgtype.Exclusive {
-		if translated, err := translateRecordField(nil, r.Lower); err != nil {
+		if translated, err := translateRecordField(nil, isPrimaryKey, r.Lower); err != nil {
 			fmt.Fprintf(buf, "%v", r.Lower)
 		} else {
 			fmt.Fprintf(buf, "%v", translated)
@@ -368,7 +378,7 @@ func stringifyRange(r pgtype.Range[any]) (string, error) {
 	}
 	buf.WriteString(",")
 	if r.UpperType == pgtype.Inclusive || r.UpperType == pgtype.Exclusive {
-		if translated, err := translateRecordField(nil, r.Upper); err != nil {
+		if translated, err := translateRecordField(nil, isPrimaryKey, r.Upper); err != nil {
 			fmt.Fprintf(buf, "%v", r.Upper)
 		} else {
 			fmt.Fprintf(buf, "%v", translated)
@@ -393,13 +403,13 @@ func formatRFC3339(t time.Time) (any, error) {
 	return t.Format(time.RFC3339Nano), nil
 }
 
-func translateArray(_ *sqlcapture.ColumnInfo, x pgtype.Array[any]) (any, error) {
+func translateArray(_ *sqlcapture.ColumnInfo, isPrimaryKey bool, x pgtype.Array[any]) (any, error) {
 	var dims = make([]int, 0)
 	for _, dim := range x.Dims {
 		dims = append(dims, int(dim.Length))
 	}
 	for idx := range x.Elements {
-		var translated, err = translateRecordField(nil, x.Elements[idx])
+		var translated, err = translateRecordField(nil, isPrimaryKey, x.Elements[idx])
 		if err != nil {
 			return nil, err
 		}

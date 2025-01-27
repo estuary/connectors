@@ -144,7 +144,7 @@ type Database interface {
 	// DiscoverTables queries the database for the latest information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
-	TranslateDBToJSONType(column ColumnInfo) (*jsonschema.Schema, error)
+	TranslateDBToJSONType(column ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error)
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 	EmptySourceMetadata() SourceMetadata
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
