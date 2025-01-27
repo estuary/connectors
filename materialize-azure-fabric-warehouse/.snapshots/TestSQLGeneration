@@ -75,7 +75,7 @@ CREATE TABLE flow_temp_table_store_0 (
 
 COPY INTO flow_temp_table_store_0
 (key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
-FROM 'https://some/file1, https://some/file2'
+FROM 'https://some/file1', 'https://some/file2'
 WITH (
     FILE_TYPE = 'CSV',
     COMPRESSION = 'Gzip',
@@ -92,7 +92,7 @@ DROP TABLE flow_temp_table_store_0;
 --- Begin "a-warehouse"."a-schema".key_value storeCopyIntoDirectQuery ---
 COPY INTO "a-warehouse"."a-schema".key_value
 (key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
-FROM 'https://some/file1, https://some/file2'
+FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
 	COMPRESSION = 'Gzip',
@@ -109,7 +109,7 @@ CREATE TABLE flow_temp_table_store_1 (
 
 COPY INTO flow_temp_table_store_1
 ("theKey", "aValue", flow_published_at)
-FROM 'https://some/file1, https://some/file2'
+FROM 'https://some/file1', 'https://some/file2'
 WITH (
     FILE_TYPE = 'CSV',
     COMPRESSION = 'Gzip',
@@ -126,7 +126,7 @@ DROP TABLE flow_temp_table_store_1;
 --- Begin "a-warehouse"."a-schema".delta_updates storeCopyIntoDirectQuery ---
 COPY INTO "a-warehouse"."a-schema".delta_updates
 ("theKey", "aValue", flow_published_at)
-FROM 'https://some/file1, https://some/file2'
+FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
 	COMPRESSION = 'Gzip',
@@ -143,7 +143,7 @@ CREATE TABLE flow_temp_table_load_0 (
 
 COPY INTO flow_temp_table_load_0
 (key1, key2, "key!binary")
-FROM 'https://some/file1,https://some/file2'
+FROM 'https://some/file1', 'https://some/file2'
 WITH (
     FILE_TYPE = 'CSV',
     COMPRESSION = 'Gzip',
@@ -189,7 +189,7 @@ CREATE TABLE flow_temp_table_store_0 (
 
 COPY INTO flow_temp_table_store_0
 (key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
-FROM 'https://some/file1, https://some/file2'
+FROM 'https://some/file1', 'https://some/file2'
 WITH (
     FILE_TYPE = 'CSV',
     COMPRESSION = 'Gzip',

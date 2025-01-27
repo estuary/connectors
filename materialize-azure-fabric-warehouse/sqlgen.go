@@ -157,7 +157,7 @@ CREATE TABLE {{ template "temp_name_load" $ }} (
 
 COPY INTO {{ template "temp_name_load" $ }}
 ({{- range $ind, $key := $.Keys }}{{- if $ind }}, {{ end }}{{$key.Identifier}}{{- end }})
-FROM '{{- range $ind, $uri := $.URIs }}{{- if $ind }},{{ end }}{{$uri}}{{- end }}'
+FROM {{ range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}'{{$uri}}'{{- end }}
 WITH (
     FILE_TYPE = 'CSV',
     COMPRESSION = 'Gzip',
@@ -190,7 +190,7 @@ CREATE TABLE {{ template "temp_name_store" $ }} (
 
 COPY INTO {{ template "temp_name_store" $ }}
 ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
-FROM '{{- range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}{{$uri}}{{- end }}'
+FROM {{ range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}'{{$uri}}'{{- end }}
 WITH (
     FILE_TYPE = 'CSV',
     COMPRESSION = 'Gzip',
@@ -244,7 +244,7 @@ DROP TABLE {{ template "temp_name_store" $ }};
 {{ define "storeCopyIntoDirectQuery" }}
 COPY INTO {{$.Identifier}}
 ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
-FROM '{{- range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}{{$uri}}{{- end }}'
+FROM {{ range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}'{{$uri}}'{{- end }}
 WITH (
 	FILE_TYPE = 'CSV',
 	COMPRESSION = 'Gzip',
