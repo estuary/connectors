@@ -44,18 +44,6 @@
       },
       "csvConfig": {
         "properties": {
-          "delimiter": {
-            "type": "string",
-            "title": "Delimiter",
-            "description": "Character to separate columns within a row. Defaults to a comma if blank. Must be a single character with a byte length of 1.",
-            "order": 0
-          },
-          "nullString": {
-            "type": "string",
-            "title": "Null String",
-            "description": "String to use to represent NULL values. Defaults to an empty string if blank.",
-            "order": 1
-          },
           "skipHeaders": {
             "type": "boolean",
             "title": "Skip Headers",
