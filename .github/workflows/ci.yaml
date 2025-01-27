@@ -95,6 +95,7 @@ jobs:
           - source-sqlserver
           - source-test
           - source-azure-blob-storage
+          - materialize-azure-fabric-warehouse
           - materialize-bigquery
           - materialize-databricks
           - materialize-dynamodb
@@ -277,6 +278,7 @@ jobs:
               "materialize-motherduck",
               "materialize-snowflake",
               "materialize-databricks",
+              "materialize-azure-fabric-warehouse",
               "materialize-bigquery",
               "materialize-redshift",
               "materialize-s3-iceberg"
