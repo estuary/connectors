@@ -211,6 +211,10 @@ func typesWithoutNull(ts []string) []string {
 }
 
 func mustWrapAndFlatten(p *pf.Projection) bool {
+	if _, isNumeric := boilerplate.AsFormattedNumeric(p); isNumeric {
+		return false
+	}
+
 	nonNullTypes := typesWithoutNull(p.Inference.Types)
 
 	if len(nonNullTypes) != 1 {
