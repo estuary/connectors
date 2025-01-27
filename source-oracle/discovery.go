@@ -85,7 +85,7 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.St
 }
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
-func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
+func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
 	var col = column.DataType.(oracleColumnType)
 
 	var jsonType = col.toJSONSchemaType()
