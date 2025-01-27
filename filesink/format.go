@@ -45,28 +45,16 @@ func NewParquetStreamEncoder(cfg ParquetConfig, b *pf.MaterializationSpec_Bindin
 }
 
 type CsvConfig struct {
-	Delimiter   string `json:"delimiter,omitempty" jsonschema:"title=Delimiter,description=Character to separate columns within a row. Defaults to a comma if blank. Must be a single character with a byte length of 1." jsonschema_extras:"order=0"`
-	NullString  string `json:"nullString,omitempty" jsonschema:"title=Null String,description=String to use to represent NULL values. Defaults to an empty string if blank." jsonschema_extras:"order=1"`
-	SkipHeaders bool   `json:"skipHeaders,omitempty" jsonschema:"title=Skip Headers,description=Do not write headers to files." jsonschema_extras:"order=2"`
+	SkipHeaders bool `json:"skipHeaders,omitempty" jsonschema:"title=Skip Headers,description=Do not write headers to files." jsonschema_extras:"order=2"`
 }
 
 func (c CsvConfig) Validate() error {
-	if r := []rune(c.Delimiter); len(r) > 1 {
-		return fmt.Errorf("delimiter %q must be a single rune (byte length of 1): got byte length of %d", c.Delimiter, len(r))
-	}
-
 	return nil
 }
 
 func NewCsvStreamEncoder(cfg CsvConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) StreamEncoder {
 	var opts []enc.CsvOption
 
-	if cfg.Delimiter != "" {
-		opts = append(opts, enc.WithCsvDelimiter([]rune(cfg.Delimiter)[0])) // already validated to be 1 byte in length
-	}
-	if cfg.NullString != "" {
-		opts = append(opts, enc.WithCsvNullString(cfg.NullString))
-	}
 	if cfg.SkipHeaders {
 		opts = append(opts, enc.WithCsvSkipHeaders())
 	}
