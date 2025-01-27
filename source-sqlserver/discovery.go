@@ -420,7 +420,7 @@ func getComputedColumns(ctx context.Context, conn *sql.DB) (map[sqlcapture.Strea
 }
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
-func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo) (*jsonschema.Schema, error) {
+func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
 	var schema columnSchema
 	if typeInfo, ok := column.DataType.(*sqlserverTextColumnType); ok {
 		if schema, ok = sqlserverTypeToJSON[typeInfo.Type]; !ok {
