@@ -515,7 +515,7 @@ func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, m
 		"originalColumnExists": migration.OriginalColumnExists,
 		"progressColumnExists": migration.ProgressColumnExists,
 		"step":                 step,
-	}).Info("migrating columns using column renaming")
+	}).Info("rendered queries for column migration using renaming")
 
 	if len(steps) == 0 {
 		steps = StdMigrationSteps
