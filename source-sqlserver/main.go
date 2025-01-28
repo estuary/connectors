@@ -41,6 +41,12 @@ var featureFlagDefaults = map[string]bool{
 	// to work in the Turkish_CI_AS locale), but didn't want to release it unconditionally
 	// on a Friday without much testing so it's gated behind a flag for now.
 	"uppercase_discovery_queries": false,
+
+	// When true, the capture will use a fence mechanism based on observing CDC worker runs
+	// and LSN positions rather than watermark writes. This mechanism may require additional
+	// permissions, so the plan is to flip this to default-true for new users first and then
+	// see if we can migrate existing captures to read-only operation.
+	"read_only": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
