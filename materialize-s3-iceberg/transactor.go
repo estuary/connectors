@@ -229,7 +229,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(err)
 		}
 
-		for _, bindingState := range t.state.BindingStates {
+		for _, b := range t.bindings {
+			bindingState := t.state.BindingStates[b.stateKey]
+
 			if len(bindingState.FileKeys) == 0 {
 				continue // no data for this binding
 			}
