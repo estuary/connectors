@@ -688,6 +688,8 @@ async def _binding_incremental_task(
                     is_larger = item > state.cursor
                 elif isinstance(item, datetime) and isinstance(state.cursor, datetime):
                     is_larger = item > state.cursor
+                elif isinstance(item, tuple) and isinstance(state.cursor, tuple) and isinstance(item[0], str) and isinstance(state.cursor[0], str):
+                    is_larger = item[0] > state.cursor[0]
                 else:
                     raise RuntimeError(
                         f"Implementation error: FetchChangesFn yielded LogCursor {item} of a different type than the last LogCursor {state.cursor}",
