@@ -1,0 +1,20 @@
+credentials:
+    credentials_title: Email & API Token
+    username: alexb@estuary.dev
+    password_sops: ENC[AES256_GCM,data:D+KkD6IXwM8FlO3b8ATMbYn02ygOlgRKhIJQ++7zVoRsdLBr9CjkYA==,iv:9d0RUyUcGDOlAoB70U+lW7uSC1KKQBl+WhlTulxhlYw=,tag:qqi29EA5wssWQX+HPxbZ4w==,type:str]
+start_date: "2024-07-26T00:00:00Z"
+subdomain: d3v-estuary
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-07-26T15:53:37Z"
+          enc: CiQAdmEdwpmP0/Kcv6L1SnM3nPbsYLywIaUeOL1mz7cZjFUwWt0SSQD5lVw43Of1YI96anxUVo7d7ALi0DYnCNvxTHCgHX5ZeDBPlfXwLNpmYb6y3hJSsHG7NupwDQT/qIpUvlqQnq5IVkgJEFHPU1s=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-01-27T22:39:17Z"
+    mac: ENC[AES256_GCM,data:tQ8p9LaHt5MpdwwTiJYn3kxn/CBB/Udyt6Sq3eBnJ+Ya0lntgJGlJY/P0fQfPr/6drvc/AwNI2la7wWUQj2xgs2r3Jbl9m4bJQ32MWyL62Cgg7S1HkzvHFSNlYwznMcGJI+qyAeL/vy+mTdxMKjEFZjf0zniWyroa07JNDL5Euk=,iv:jLlhfUt2jBzyYlrJTgj7nt3WoZmNR7t0SM6PKC2/4u4=,tag:I6XcGgeO2xpl6Pg8Iai/zg==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3
