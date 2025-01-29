@@ -1,0 +1,66 @@
+---
+collections:
+  acmeCo/audit_logs:
+    schema: audit_logs.schema.yaml
+    key:
+      - /id
+  acmeCo/brands:
+    schema: brands.schema.yaml
+    key:
+      - /id
+  acmeCo/groups:
+    schema: groups.schema.yaml
+    key:
+      - /id
+  acmeCo/macros:
+    schema: macros.schema.yaml
+    key:
+      - /id
+  acmeCo/organization_memberships:
+    schema: organization_memberships.schema.yaml
+    key:
+      - /id
+  acmeCo/satisfaction_ratings:
+    schema: satisfaction_ratings.schema.yaml
+    key:
+      - /id
+  acmeCo/tags:
+    schema: tags.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/ticket_audits:
+    schema: ticket_audits.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_comments:
+    schema: ticket_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_fields:
+    schema: ticket_fields.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_metric_events:
+    schema: ticket_metric_events.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_metrics:
+    schema: ticket_metrics.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_metrics_events:
+    schema: ticket_metrics_events.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_skips:
+    schema: ticket_skips.schema.yaml
+    key:
+      - /id
+  acmeCo/tickets:
+    schema: tickets.schema.yaml
+    key:
+      - /id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /id
