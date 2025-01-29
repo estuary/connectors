@@ -1,0 +1,568 @@
+[
+  [
+    "acmeCo/brands",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "active": true,
+      "brand_url": "https://d3v-estuary.zendesk.com",
+      "created_at": "2024-07-26T15:40:59Z",
+      "default": true,
+      "has_help_center": true,
+      "help_center_state": "enabled",
+      "host_mapping": null,
+      "id": 28835714705684,
+      "is_deleted": false,
+      "logo": null,
+      "name": "Estuary",
+      "signature_template": "{{agent.signature}}",
+      "subdomain": "d3v-estuary",
+      "ticket_form_ids": [
+        28835740693908
+      ],
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/brands/28835714705684.json"
+    }
+  ],
+  [
+    "acmeCo/groups",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-07-26T15:41:00Z",
+      "default": true,
+      "deleted": false,
+      "description": "",
+      "id": 28835740822676,
+      "is_public": true,
+      "name": "Support",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/groups/28835740822676.json"
+    }
+  ],
+  [
+    "acmeCo/macros",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "actions": [
+        {
+          "field": "group_id",
+          "value": "current_groups"
+        },
+        {
+          "field": "assignee_id",
+          "value": "current_user"
+        }
+      ],
+      "active": true,
+      "created_at": "2024-07-26T15:41:01Z",
+      "default": false,
+      "description": null,
+      "id": 28835714801684,
+      "position": 9999,
+      "raw_title": "Take it!",
+      "restriction": null,
+      "title": "Take it!",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/macros/28835714801684.json"
+    }
+  ],
+  [
+    "acmeCo/organization_memberships",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-07-26T15:41:00Z",
+      "default": true,
+      "id": 28835714744724,
+      "organization_id": 28835714737428,
+      "organization_name": "Estuary",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/organization_memberships/28835714744724.json",
+      "user_id": 28835702984212,
+      "view_tickets": true
+    }
+  ],
+  [
+    "acmeCo/satisfaction_ratings",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "assignee_id": 28835702984212,
+      "comment": null,
+      "created_at": "2024-08-01T17:02:45Z",
+      "group_id": 28835740822676,
+      "id": 29013431981588,
+      "reason": "No reason provided",
+      "reason_id": 29007440423316,
+      "requester_id": 28835702984212,
+      "score": "offered",
+      "ticket_id": 29,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/satisfaction_ratings/29013431981588.json"
+    }
+  ],
+  [
+    "acmeCo/ticket_audits",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "author_id": 28835702984212,
+      "created_at": "2024-07-26T15:42:05Z",
+      "events": [
+        {
+          "attachments": [],
+          "audit_id": 28835719459732,
+          "author_id": 28835719437332,
+          "body": "Can I still cancel my order?",
+          "html_body": "<div class=\"zd-comment\" dir=\"auto\">Can I still cancel my order?</div>",
+          "id": 28835719459860,
+          "plain_body": "Can I still cancel my order?",
+          "public": true,
+          "type": "Comment"
+        },
+        {
+          "field_name": "priority",
+          "id": 28835719459988,
+          "type": "Create",
+          "value": "urgent"
+        },
+        {
+          "field_name": "subject",
+          "id": 28835719460116,
+          "type": "Create",
+          "value": "SAMPLE TICKET: Cancel order"
+        },
+        {
+          "field_name": "tags",
+          "id": 28835719460244,
+          "type": "Create",
+          "value": [
+            "order",
+            "sample_ticket"
+          ]
+        },
+        {
+          "field_name": "28835767646868",
+          "id": 28835719460372,
+          "type": "Create",
+          "value": "order"
+        },
+        {
+          "field_name": "type",
+          "id": 28835719460500,
+          "type": "Create",
+          "value": null
+        },
+        {
+          "field_name": "status",
+          "id": 28835719460628,
+          "type": "Create",
+          "value": "open"
+        },
+        {
+          "field_name": "assignee_id",
+          "id": 28835719460756,
+          "type": "Create",
+          "value": "28835702984212"
+        },
+        {
+          "field_name": "group_id",
+          "id": 28835719460884,
+          "type": "Create",
+          "value": "28835740822676"
+        },
+        {
+          "field_name": "brand_id",
+          "id": 28835719461012,
+          "type": "Create",
+          "value": "28835714705684"
+        },
+        {
+          "field_name": "ticket_form_id",
+          "id": 28835719461140,
+          "type": "Create",
+          "value": "28835740693908"
+        },
+        {
+          "field_name": "custom_status_id",
+          "id": 28835719461268,
+          "type": "Create",
+          "value": "28835714727188"
+        },
+        {
+          "field_name": "requester_id",
+          "id": 28835719461396,
+          "type": "Create",
+          "value": "28835719437332"
+        }
+      ],
+      "id": 28835719459732,
+      "metadata": {
+        "custom": {},
+        "system": {
+          "client": "Kragle 3.2.0",
+          "ip_address": "54.190.230.46",
+          "latitude": 45.8234,
+          "location": "Boardman, OR, United States",
+          "longitude": -119.7257
+        }
+      },
+      "ticket_id": 12,
+      "via": {
+        "channel": "sample_ticket",
+        "source": {
+          "from": {},
+          "rel": null,
+          "to": {}
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/ticket_comments",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "attachments": [],
+      "audit_id": 28835719459732,
+      "author_id": 28835719437332,
+      "body": "Can I still cancel my order?",
+      "created_at": "2024-07-26T15:42:05Z",
+      "html_body": "<div class=\"zd-comment\" dir=\"auto\">Can I still cancel my order?</div>",
+      "id": 28835719459860,
+      "metadata": {
+        "custom": {},
+        "system": {
+          "client": "Kragle 3.2.0",
+          "ip_address": "54.190.230.46",
+          "latitude": 45.8234,
+          "location": "Boardman, OR, United States",
+          "longitude": -119.7257
+        }
+      },
+      "plain_body": "Can I still cancel my order?",
+      "public": true,
+      "type": "Comment",
+      "via": {
+        "channel": "sample_ticket",
+        "source": {
+          "from": {},
+          "rel": null,
+          "to": {}
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/ticket_fields",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "active": true,
+      "agent_description": null,
+      "collapsed_for_agents": false,
+      "created_at": "2024-07-26T15:40:58Z",
+      "description": "",
+      "editable_in_portal": true,
+      "id": 28835714573076,
+      "key": null,
+      "position": 1,
+      "raw_description": "",
+      "raw_title": "Subject",
+      "raw_title_in_portal": "Subject",
+      "regexp_for_validation": null,
+      "removable": false,
+      "required": false,
+      "required_in_portal": true,
+      "tag": null,
+      "title": "Subject",
+      "title_in_portal": "Subject",
+      "type": "subject",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_fields/28835714573076.json",
+      "visible_in_portal": true
+    }
+  ],
+  [
+    "acmeCo/ticket_metric_events",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "id": 28835704018964,
+      "instance_id": 1,
+      "metric": "agent_work_time",
+      "ticket_id": 1,
+      "time": "2024-07-26T15:41:04Z",
+      "type": "activate"
+    }
+  ],
+  [
+    "acmeCo/ticket_metrics",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "agent_wait_time_in_minutes": {
+        "business": null,
+        "calendar": null
+      },
+      "assigned_at": "2024-07-26T15:41:04Z",
+      "assignee_stations": 1,
+      "assignee_updated_at": "2024-08-01T14:45:47Z",
+      "created_at": "2024-07-26T15:41:04Z",
+      "custom_status_updated_at": "2024-07-26T15:41:04Z",
+      "first_resolution_time_in_minutes": {
+        "business": null,
+        "calendar": null
+      },
+      "full_resolution_time_in_minutes": {
+        "business": null,
+        "calendar": null
+      },
+      "group_stations": 1,
+      "id": 28835715028244,
+      "initially_assigned_at": "2024-07-26T15:41:04Z",
+      "latest_comment_added_at": "2024-08-01T14:45:47Z",
+      "on_hold_time_in_minutes": {
+        "business": 0,
+        "calendar": 0
+      },
+      "reopens": 0,
+      "replies": 1,
+      "reply_time_in_minutes": {
+        "business": 1865,
+        "calendar": 8585
+      },
+      "requester_updated_at": "2024-07-26T15:41:04Z",
+      "requester_wait_time_in_minutes": {
+        "business": null,
+        "calendar": null
+      },
+      "solved_at": null,
+      "status_updated_at": "2024-07-26T15:41:04Z",
+      "ticket_id": 1,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_metrics/28835715028244.json"
+    }
+  ],
+  [
+    "acmeCo/ticket_skips",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-08-01T12:45:36Z",
+      "id": 29004918979220,
+      "reason": "Testing ticket skip API",
+      "ticket": {
+        "allow_attachments": true,
+        "allow_channelback": false,
+        "assignee_id": 28835702984212,
+        "brand_id": 28835714705684,
+        "collaborator_ids": [],
+        "created_at": "2024-07-26T15:41:04Z",
+        "custom_fields": [
+          {
+            "id": 28835767646868,
+            "value": null
+          }
+        ],
+        "custom_status_id": 28835714727188,
+        "deleted_ticket_form_id": null,
+        "description": "Hi there,\n\nI\u2019m sending an email because I\u2019m having a problem setting up your new product. Can you help me troubleshoot?\n\nThanks,\n The Customer\n\n",
+        "due_at": null,
+        "email_cc_ids": [],
+        "encoded_id": "Y4NVZV-M3XM2",
+        "external_id": null,
+        "fields": [
+          {
+            "id": 28835767646868,
+            "value": null
+          }
+        ],
+        "follower_ids": [],
+        "followup_ids": [],
+        "forum_topic_id": null,
+        "from_messaging_channel": false,
+        "generated_timestamp": 1722523548,
+        "group_id": 28835740822676,
+        "has_incidents": false,
+        "id": 1,
+        "is_public": true,
+        "organization_id": null,
+        "priority": "normal",
+        "problem_id": null,
+        "raw_subject": "SAMPLE TICKET: Meet the ticket",
+        "recipient": null,
+        "requester_id": 28835741127700,
+        "satisfaction_rating": {
+          "score": "unoffered"
+        },
+        "sharing_agreement_ids": [],
+        "status": "open",
+        "subject": "SAMPLE TICKET: Meet the ticket",
+        "submitter_id": 28835702984212,
+        "tags": [
+          "sample",
+          "support",
+          "zendesk"
+        ],
+        "ticket_form_id": 28835740693908,
+        "type": "incident",
+        "updated_at": "2024-08-01T14:45:47Z",
+        "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1.json",
+        "via": {
+          "channel": "sample_ticket",
+          "source": {
+            "from": {},
+            "rel": null,
+            "to": {}
+          }
+        }
+      },
+      "ticket_id": 1,
+      "updated_at": "redacted",
+      "user_id": 28835702984212
+    }
+  ],
+  [
+    "acmeCo/tickets",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "allow_attachments": true,
+      "allow_channelback": false,
+      "assignee_id": 28835702984212,
+      "brand_id": 28835714705684,
+      "collaborator_ids": [],
+      "created_at": "2024-07-26T15:41:04Z",
+      "custom_fields": [
+        {
+          "id": 28835767646868,
+          "value": null
+        }
+      ],
+      "custom_status_id": 28835714727188,
+      "description": "Hi there,\n\nI\u2019m sending an email because I\u2019m having a problem setting up your new product. Can you help me troubleshoot?\n\nThanks,\n The Customer\n\n",
+      "due_at": null,
+      "email_cc_ids": [],
+      "encoded_id": "Y4NVZV-M3XM2",
+      "external_id": null,
+      "fields": [
+        {
+          "id": 28835767646868,
+          "value": null
+        }
+      ],
+      "follower_ids": [],
+      "followup_ids": [],
+      "forum_topic_id": null,
+      "from_messaging_channel": false,
+      "generated_timestamp": 1722523548,
+      "group_id": 28835740822676,
+      "has_incidents": false,
+      "id": 1,
+      "is_public": true,
+      "organization_id": null,
+      "priority": "normal",
+      "problem_id": null,
+      "raw_subject": "SAMPLE TICKET: Meet the ticket",
+      "recipient": null,
+      "requester_id": 28835741127700,
+      "satisfaction_rating": {
+        "score": "unoffered"
+      },
+      "sharing_agreement_ids": [],
+      "status": "open",
+      "subject": "SAMPLE TICKET: Meet the ticket",
+      "submitter_id": 28835702984212,
+      "tags": [
+        "sample",
+        "support",
+        "zendesk"
+      ],
+      "ticket_form_id": 28835740693908,
+      "type": "incident",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1.json",
+      "via": {
+        "channel": "sample_ticket",
+        "source": {
+          "from": {},
+          "rel": null,
+          "to": {}
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "active": true,
+      "alias": null,
+      "created_at": "2024-07-26T15:40:53Z",
+      "custom_role_id": 28835714445588,
+      "default_group_id": 28835740822676,
+      "details": null,
+      "email": "alexb@estuary.dev",
+      "external_id": null,
+      "iana_time_zone": "America/New_York",
+      "id": 28835702984212,
+      "last_login_at": "redacted",
+      "locale": "en-US",
+      "locale_id": 1,
+      "moderator": true,
+      "name": "Alex Bair",
+      "notes": "Another ticket to test the satisfaction rating.",
+      "only_private_comments": false,
+      "organization_id": 28835714737428,
+      "phone": null,
+      "photo": null,
+      "report_csv": true,
+      "restricted_agent": false,
+      "role": "admin",
+      "role_type": 4,
+      "shared": false,
+      "shared_agent": false,
+      "shared_phone_number": null,
+      "signature": null,
+      "suspended": false,
+      "tags": [],
+      "ticket_restriction": null,
+      "time_zone": "America/New_York",
+      "two_factor_auth_enabled": null,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/users/28835702984212.json",
+      "user_fields": {},
+      "verified": true
+    }
+  ]
+]

@@ -1,0 +1,73 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-zendesk-support-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_zendesk_support_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: audit_logs
+          interval: PT5M
+        target: acmeCo/audit_logs
+      - resource:
+          name: ticket_metrics
+          interval: PT5M
+        target: acmeCo/ticket_metrics
+      - resource:
+          name: tags
+          interval: PT5M
+        target: acmeCo/tags
+      - resource:
+          name: brands
+          interval: PT5M
+        target: acmeCo/brands
+      - resource:
+          name: groups
+          interval: PT5M
+        target: acmeCo/groups
+      - resource:
+          name: macros
+          interval: PT5M
+        target: acmeCo/macros
+      - resource:
+          name: organization_memberships
+          interval: PT5M
+        target: acmeCo/organization_memberships
+      - resource:
+          name: ticket_fields
+          interval: PT5M
+        target: acmeCo/ticket_fields
+      - resource:
+          name: satisfaction_ratings
+          interval: PT5M
+        target: acmeCo/satisfaction_ratings
+      - resource:
+          name: ticket_skips
+          interval: PT5M
+        target: acmeCo/ticket_skips
+      - resource:
+          name: ticket_metric_events
+          interval: PT5M
+        target: acmeCo/ticket_metric_events
+      - resource:
+          name: tickets
+          interval: PT5M
+        target: acmeCo/tickets
+      - resource:
+          name: users
+          interval: PT5M
+        target: acmeCo/users
+      - resource:
+          name: ticket_audits
+          interval: PT5M
+        target: acmeCo/ticket_audits
+      - resource:
+          name: ticket_comments
+          interval: PT5M
+        target: acmeCo/ticket_comments
