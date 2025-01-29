@@ -1,0 +1,143 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ApiToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Email & API Token",
+              "default": "Email & API Token",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "title": "Email",
+              "type": "string"
+            },
+            "password": {
+              "secret": true,
+              "title": "API Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "ApiToken",
+          "type": "object"
+        },
+        "_OAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "access_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "zendesk"
+        }
+      },
+      "properties": {
+        "subdomain": {
+          "description": "This is your Zendesk subdomain that can be found in your account URL. For example, in https://{MY_SUBDOMAIN}.zendesk.com/, where MY_SUBDOMAIN is the value of your subdomain.",
+          "title": "Subdomain",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Email & API Token": "#/$defs/ApiToken",
+              "OAuth Credentials": "#/$defs/_OAuth2Credentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/_OAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/ApiToken"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "subdomain",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-zendesk-support-native",
+    "oauth2": {
+      "provider": "zendesk",
+      "authUrlTemplate": "https://{{{ config.subdomain }}}.zendesk.com/oauth/authorizations/new?response_type=code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=read&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://{{{ config.subdomain }}}.zendesk.com/oauth/tokens",
+      "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"code\": \"{{{ code }}}\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"scope\": \"read\"}",
+      "accessTokenHeaders": {
+        "Content-Type": "application/json"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
