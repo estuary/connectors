@@ -2,12 +2,13 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from estuary_cdk.http import HTTPSession
 from logging import Logger
-from typing import Iterable, Any
+from typing import AsyncGenerator, Any
 from zoneinfo import ZoneInfo
 
 from .models import (
     NumberType,
     Row,
+    RowData,
     Sheet,
     Spreadsheet,
 )
@@ -26,16 +27,16 @@ async def fetch_spreadsheet(
 
 
 async def fetch_rows(
-    log: Logger,
     http: HTTPSession,
     spreadsheet_id: str,
     sheet: Sheet,
-) -> Iterable[Row]:
+    log: Logger,
+) -> AsyncGenerator[Row, None]:
 
     url = f"{API}/v4/spreadsheets/{spreadsheet_id}"
     params = {
         "ranges": [sheet.properties.title],
-        "fields": "properties,sheets.properties,sheets.data(rowData.values(effectiveFormat(numberFormat(type)),effectiveValue))",
+        "fields": "properties,sheets.properties",
     }
 
     spreadsheet = Spreadsheet.model_validate_json(
@@ -46,40 +47,36 @@ async def fetch_rows(
         raise RuntimeError(f"Spreadsheet sheet '{sheet}' was not found")
 
     sheet = spreadsheet.sheets[0]
-
-    if sheet.data is None:
-        return ([])
-
-    rows = sheet.data[0].rowData
-
-    if rows is None:
-        return ([])
-
     headers = default_column_headers(sheet.properties.gridProperties.columnCount)
-
-    # Augment with headers from a frozen row, if there is one.
-    if sheet.properties.gridProperties.frozenRowCount == 1:
-        for ind, column in enumerate(rows[0].values):
-            if (ev := column.effectiveValue) and ev.stringValue:
-                headers[ind] = ev.stringValue
-        rows.pop(0)
+    headers_from_frozen = sheet.properties.gridProperties.frozenRowCount == 1
 
     # https://developers.google.com/sheets/api/reference/rest/v4/DateTimeRenderOption
     user_tz = ZoneInfo(spreadsheet.properties.timeZone)
     lotus_epoch = datetime(1899, 12, 30, tzinfo=user_tz)
 
-    return (
-        convert_row(id, headers, row.values, lotus_epoch) for id, row in enumerate(rows) if row.values is not None 
-    )
+    params["fields"] = "sheets.data(rowData.values(effectiveFormat(numberFormat(type)),effectiveValue))"
+    async for row in http.request_object_stream(log, RowData, "sheets.item.data.item.rowData.item", url, params=params):
+        if headers_from_frozen:
+            assert row.values is not None
+            for ind, column in enumerate(row.values):
+                if (ev := column.effectiveValue) and ev.stringValue:
+                    headers[ind] = ev.stringValue
+            headers_from_frozen = False
+            continue
+
+        if (not row.values) or all(not v.effectiveValue for v in row.values):
+            continue
+
+        yield convert_row(headers, row.values, lotus_epoch)
 
 
 def convert_row(
-    id: int, headers: list[str], columns: list[Sheet.Value], epoch: datetime
+    headers: list[str], columns: list[RowData.Value], epoch: datetime
 ) -> Row:
     d: dict[str, Any] = {}
 
     for ind, column in enumerate(columns):
-        if not isinstance((ev := column.effectiveValue), Sheet.EffectiveValue):
+        if not isinstance((ev := column.effectiveValue), RowData.EffectiveValue):
             continue
 
         if isinstance((sv := ev.stringValue), str):
@@ -90,7 +87,7 @@ def convert_row(
 
         if isinstance((nv := ev.numberValue), Decimal):
             nt = (
-                isinstance((ef := column.effectiveFormat), Sheet.EffectiveFormat)
+                isinstance((ef := column.effectiveFormat), RowData.EffectiveFormat)
                 and ef.numberFormat.type
             )
 
@@ -105,7 +102,7 @@ def convert_row(
             else:
                 d[headers[ind]] = nv
 
-    return Row(_meta=Row.Meta(op="u", row_id=id), **d)
+    return Row(**d)
 
 
 def default_column_headers(n: int) -> list[str]:
