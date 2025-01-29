@@ -59,9 +59,33 @@ class NumberType(StrEnum):
     SCIENTIFIC = "SCIENTIFIC"
 
 
+class RowData(BaseModel, extra="forbid"):
+    """
+    Models the data of a Google Spreadsheet Row.
+    """
+
+    class EffectiveValue(BaseModel, extra="forbid"):
+        stringValue: str | None = None
+        numberValue: Decimal | None = None
+        boolValue: bool | None = None
+        errorValue: dict | None = None
+
+    class EffectiveFormat(BaseModel, extra="forbid"):
+        numberFormat: "RowData.NumberFormat"
+
+    class NumberFormat(BaseModel, extra="forbid"):
+        type: NumberType
+
+    class Value(BaseModel, extra="forbid"):
+        effectiveFormat: "RowData.EffectiveFormat | None" = None
+        effectiveValue: "RowData.EffectiveValue | None" = None
+
+    values: list[Value] | None = None
+
+
 class Sheet(BaseModel, extra="allow"):
     """
-    Models a Google Spreadsheet Sheet.
+    Models the metadata of a Google Spreadsheet Sheet.
     See: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/sheets
     """
 
@@ -82,43 +106,6 @@ class Sheet(BaseModel, extra="allow"):
         gridProperties: Grid
 
     properties: Properties
-
-    class EffectiveValue(BaseModel, extra="forbid"):
-        stringValue: str | None = None
-        numberValue: Decimal | None = None
-        boolValue: bool | None = None
-        errorValue: dict | None = None
-
-    class EffectiveFormat(BaseModel, extra="forbid"):
-        numberFormat: "Sheet.NumberFormat"
-
-    class NumberFormat(BaseModel, extra="forbid"):
-        type: NumberType
-
-    class Value(BaseModel, extra="forbid"):
-        effectiveFormat: "Sheet.EffectiveFormat | None" = None
-        effectiveValue: "Sheet.EffectiveValue | None" = None
-
-    class RowData(BaseModel, extra="forbid"):
-        values: list["Sheet.Value"] | None = None
-
-    class Data(BaseModel, extra="forbid"):
-        rowData: list["Sheet.RowData"] | None = None
-
-        @model_validator(mode="after")
-        def _post_init(self) -> "Sheet.Data":
-            # Remove all trailing rows which have no set cells.
-            # Note that this can be represented as either no values, or a list of values where the
-            # effectiveValue of each cell is empty.
-            while self.rowData:
-                if (not self.rowData[-1].values) or all(not v.effectiveValue for v in self.rowData[-1].values):
-                    self.rowData.pop()
-                else:
-                    break
-
-            return self
-
-    data: tuple[Data] | None = None  # When present, it's always a single element.
 
 
 class Spreadsheet(BaseModel):

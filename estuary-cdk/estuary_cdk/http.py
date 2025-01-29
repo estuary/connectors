@@ -1,7 +1,8 @@
 from dataclasses import dataclass
 from logging import Logger
+import ijson
 from pydantic import BaseModel
-from typing import AsyncGenerator, Any
+from typing import AsyncGenerator, Any, AsyncIterator, TypeVar
 import abc
 import aiohttp
 import asyncio
@@ -20,6 +21,30 @@ from .flow import (
 )
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
+
+StreamedObject = TypeVar("StreamedObject", bound=BaseModel)
+
+class _AsyncStreamWrapper:
+    """
+    Used to adapt an AsyncGenerator of bytes into a file-like object that can be
+    incrementally read by ijson.
+    """
+    def __init__(self, gen: AsyncGenerator[bytes, None]):
+        self.gen: AsyncIterator[bytes] = gen
+        self.buf = b""
+
+    async def read(self, size: int = -1) -> bytes:
+        if size == -1:
+            return self.buf + b"".join([chunk async for chunk in self.gen])
+
+        while len(self.buf) < size:
+            try:
+                self.buf += await anext(self.gen)
+            except StopAsyncIteration:
+                break 
+
+        data, self.buf = self.buf[:size], self.buf[size:]
+        return data
 
 class HTTPError(RuntimeError):
     """
@@ -99,6 +124,32 @@ class HTTPSession(abc.ABC):
             yield buffer
 
         return
+    
+    async def request_object_stream(
+        self,
+        log: Logger,
+        cls: type[StreamedObject],
+        prefix: str,
+        url: str,
+        method: str = "GET",
+        params: dict[str, Any] | None = None,
+        json: dict[str, Any] | None = None,
+        form: dict[str, Any] | None = None,
+    ) -> AsyncGenerator[StreamedObject, None]:
+        """
+        Request a url and incrementally decode a stream of JSON objects as
+        instances of `cls`.
+
+        Prefix is a path within the JSON document where objects to parse reside.
+        Usually it will end with the ".item" suffix, which allows iteration
+        through objects in an array. Example: "some.path.to.array.item".
+        """
+
+        strm  = self._request_stream(
+            log, url, method, params, json, form, True
+        )
+        async for obj in ijson.items_async(_AsyncStreamWrapper(strm), prefix):
+            yield cls.model_validate(obj)
 
     @abc.abstractmethod
     def _request_stream(
