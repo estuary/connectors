@@ -1,4 +1,5 @@
 from datetime import timedelta
+import functools
 from logging import Logger
 from typing import AsyncGenerator
 import re
@@ -40,11 +41,6 @@ def get_spreadsheet_id(url: str):
 
 def sheet(http: HTTPSession, spreadsheet_id: str, sheet: Sheet):
 
-    async def snapshot(log: Logger) -> AsyncGenerator[Row, None]:
-        rows = await fetch_rows(log, http, spreadsheet_id, sheet)
-        for row in rows:
-            yield row
-
     def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -57,7 +53,7 @@ def sheet(http: HTTPSession, spreadsheet_id: str, sheet: Sheet):
             binding_index,
             state,
             task,
-            fetch_snapshot=snapshot,
+            fetch_snapshot=functools.partial(fetch_rows, http, spreadsheet_id, sheet),
             tombstone=Row(_meta=Row.Meta(op="d")),
         )
 
