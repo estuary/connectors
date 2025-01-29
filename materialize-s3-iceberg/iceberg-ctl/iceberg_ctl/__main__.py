@@ -355,14 +355,16 @@ def append_files(
     if cp == next_checkpoint:
         print(f"checkpoint is already '{next_checkpoint}'")
         return  # already appended these files
-    elif cp != "" and cp != prev_checkpoint:
-        # An absent checkpoint table property is allowed to accommodate cases
-        # where the user may have manually dropped the table and the
-        # materialization automatically re-created it, outside the normal
-        # backfill counter increment process.
-        raise Exception(
-            f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
-        )
+    # TODO(whb): Re-enable this sanity check after any tasks effected by the
+    # disabled bindings state tracking bug have moved past it.
+    # elif cp != "" and cp != prev_checkpoint:
+    #     # An absent checkpoint table property is allowed to accommodate cases
+    #     # where the user may have manually dropped the table and the
+    #     # materialization automatically re-created it, outside the normal
+    #     # backfill counter increment process.
+    #     raise Exception(
+    #         f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
+    #     )
     
     # Files are only added if the table checkpoint property has the prior checkpoint. The checkpoint
     # property is updated to the current checkpoint in an atomic operation with appending the files.
@@ -388,7 +390,7 @@ def append_files(
             attempt += 1
 
     tbl = catalog.load_table(table)
-    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get("flow_checkpoints_v1")} after {attempt} attempts") 
+    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get("flow_checkpoints_v1")} from {cp} after {attempt} attempts") 
 
 if __name__ == "__main__":
     run(auto_envvar_prefix="ICEBERG")
