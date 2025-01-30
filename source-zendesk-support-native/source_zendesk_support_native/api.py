@@ -1,5 +1,6 @@
 import base64
 from datetime import datetime, UTC
+import json
 from logging import Logger
 from typing import Any, AsyncGenerator
 
@@ -11,6 +12,7 @@ from .models import (
     FullRefreshCursorPaginatedResponse,
     ZendeskResource,
     TimestampedResource,
+    IncrementalCursorExportResponse,
     TicketsResponse,
     UsersResponse,
     ClientSideIncrementalCursorPaginatedResponse,
@@ -222,6 +224,22 @@ async def backfill_incremental_cursor_paginated_resources(
         yield response.meta.after_cursor
 
 
+async def _make_incremental_cursor_export_request(
+    http: HTTPSession,
+    url: str,
+    params: dict[str, str | int],
+    response_model: type[IncrementalCursorExportResponse],
+    log: Logger,
+) -> IncrementalCursorExportResponse:
+    # Instead of using Pydantic's model_validate_json that uses json.loads internally,
+    # use json.JSONDecoder().raw_decode to reduce memory overhead when processing the response.
+    raw_response_bytes = await http.request(log, url, params=params)
+    obj, _ = json.JSONDecoder().raw_decode(raw_response_bytes.decode('utf-8'))
+    # model_construct is used to avoid validating & transforming all resources within large response bodies at once
+    # to reduce memory overhead. Instead, resources are validated & transformed one-by-one as they are yielded.
+    return response_model.model_construct(**obj)
+
+
 async def _fetch_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
@@ -253,9 +271,10 @@ async def _fetch_incremental_cursor_export_resources(
         params["cursor"] = _base64_encode(cursor)
 
     while True:
-        response = response_model.model_validate_json(
-            await http.request(log, url, params=params)
-        )
+        response = await _make_incremental_cursor_export_request(http, url, params, response_model, log)
+
+        next_page_cursor = response.after_cursor
+        end_of_stream = response.end_of_stream
 
         next_page_cursor = response.after_cursor
         end_of_stream = response.end_of_stream
@@ -264,7 +283,9 @@ async def _fetch_incremental_cursor_export_resources(
             return
 
         for resource in response.resources:
-            yield resource
+            # Since _make_incremental_cursor_export_request does not validate & transform all resources at once,
+            # we validate them one-by-one as they're yielded.
+            yield TimestampedResource.model_validate(resource)
 
         yield _base64_decode(next_page_cursor)
 
