@@ -1,0 +1,2 @@
+postgres://will:secret1234@example.com:5432/somedb?sslmode=whoops-this-isnt-right
+invalid 'sslmode' configuration: unknown setting "whoops-this-isnt-right"
