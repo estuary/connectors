@@ -26,6 +26,14 @@ Binding 0:
                 "null"
               ]
             },
+            "DEFAULTNUM": {
+              "format": "number",
+              "description": "(source type: NUMBER)",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
             "DOUBLE_PRECISION": {
               "format": "number",
               "description": "(source type: FLOAT)",

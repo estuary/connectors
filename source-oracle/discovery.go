@@ -331,23 +331,30 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		var format string
 		var jsonType string
 		var isInteger = dataScale.Int16 == 0
-		if dataType == "NUMBER" && isInteger {
-			if precision <= 18 {
-				t = reflect.TypeFor[int64]()
-				jsonType = "integer"
-			} else {
+		if dataType == "NUMBER" && !dataScale.Valid && !dataPrecision.Valid {
+			// when scale and precision are both null, both have the maximum value possible
+			// equivalent to NUMBER(38, 127)
+			t = reflect.TypeFor[string]()
+			format = "number"
+			jsonType = "string"
+		} else if dataType == "NUMBER" && isInteger {
+			// data_precision null defaults to precision 38
+			if precision > 18 || !dataPrecision.Valid {
 				t = reflect.TypeFor[string]()
 				format = "integer"
 				jsonType = "string"
+			} else {
+				t = reflect.TypeFor[int64]()
+				jsonType = "integer"
 			}
 		} else if slices.Contains([]string{"FLOAT", "NUMBER"}, dataType) {
-			if precision <= 18 {
-				t = reflect.TypeFor[float64]()
-				jsonType = "number"
-			} else {
+			if precision > 18 || !dataPrecision.Valid {
 				t = reflect.TypeFor[string]()
 				format = "number"
 				jsonType = "string"
+			} else {
+				t = reflect.TypeFor[float64]()
+				jsonType = "number"
 			}
 		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
 			t = reflect.TypeFor[string]()
