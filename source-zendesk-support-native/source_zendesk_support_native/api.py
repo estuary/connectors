@@ -24,7 +24,6 @@ from .models import (
 )
 
 CURSOR_PAGINATION_PAGE_SIZE = 100
-MIN_CHECKPOINT_COUNT = 1500
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
 # Zendesk errors out if a start or end time parameter is more recent than 60 seconds in the past.
 TIME_PARAMETER_DELAY = timedelta(seconds=60)
@@ -157,25 +156,27 @@ async def fetch_incremental_cursor_paginated_resources(
     }
 
     last_seen_dt = log_cursor
-    count = 0
 
     while True:
         response = response_model.model_validate_json(
             await http.request(log, url, params=params)
         )
 
-        for resource in response.resources:
-            resource_dt = _str_to_dt(getattr(resource, cursor_field))
-            if resource_dt > last_seen_dt:
-                if count > MIN_CHECKPOINT_COUNT:
-                    yield last_seen_dt
-                    count = 0
+        if (
+            last_seen_dt > log_cursor
+            and response.resources
+            and _str_to_dt(getattr(response.resources[0], cursor_field)) > last_seen_dt
+        ):
+            yield last_seen_dt
 
+
+        for resource in response.resources:
+            resource_dt = _str_to_dt(getattr(response.resources[0], cursor_field))
+            if resource_dt > last_seen_dt:
                 last_seen_dt = resource_dt
 
             if resource_dt > log_cursor:
                 yield resource
-                count += 1
 
         if not response.meta.has_more:
             if last_seen_dt > log_cursor:
@@ -543,24 +544,26 @@ async def fetch_audit_logs(
     }
 
     last_seen_dt = log_cursor
-    count = 0
 
     while True:
         response = AuditLogsResponse.model_validate_json(
             await http.request(log, url, params=params)
         )
 
+        if (
+            last_seen_dt > log_cursor
+            and response.resources
+            and response.resources[0].created_at > last_seen_dt
+        ):
+            yield last_seen_dt
+
+
         for audit_log in response.resources:
             if audit_log.created_at > last_seen_dt:
-                if count > MIN_CHECKPOINT_COUNT:
-                    yield last_seen_dt
-                    count = 0
-
                 last_seen_dt = audit_log.created_at
             
             if audit_log.created_at > log_cursor:
                 yield audit_log
-                count += 1
 
         if not response.meta.has_more:
             if last_seen_dt > log_cursor:
