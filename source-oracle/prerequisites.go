@@ -41,6 +41,9 @@ func (db *oracleDatabase) prerequisiteSupplementalLogging(ctx context.Context, o
 		}
 
 		if owner != "" && tableName != "" {
+			if err := db.switchToPDB(ctx); err != nil {
+				return err
+			}
 			row = db.conn.QueryRowContext(ctx, "SELECT LOG_GROUP_TYPE FROM ALL_LOG_GROUPS WHERE OWNER=:1 AND TABLE_NAME=:2", owner, tableName)
 			var logType string
 
