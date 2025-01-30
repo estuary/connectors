@@ -395,9 +395,6 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 
 		if isPrimaryKey {
 			var streamID = sqlcapture.JoinStreamID(sc.TableSchema, sc.TableName)
-			if format == "number" {
-				return nil, nil, fmt.Errorf("floating point numbers cannot be primary keys: %s.%s", streamID, sc.Name)
-			}
 
 			pks[streamID] = append(pks[streamID], sc.Name)
 		}
