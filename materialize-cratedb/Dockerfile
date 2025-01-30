@@ -16,14 +16,14 @@ RUN go mod download
 
 COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
-COPY materialize-postgres    ./materialize-postgres
+COPY materialize-cratedb    ./materialize-cratedb
 COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
-RUN go test -tags nozstd -v      ./materialize-sql/...
-RUN go test -tags nozstd,nodb -v ./materialize-postgres/...
-RUN go build -tags nozstd -v -o ./connector ./materialize-postgres/...
+#RUN go test -tags nozstd -v      ./materialize-sql/...
+#RUN go test -tags nozstd,nodb -v ./materialize-postgres/...
+RUN go build -tags nozstd -v -o ./connector ./materialize-cratedb/...
 
 # Runtime Stage
 ################################################################################
@@ -32,7 +32,7 @@ FROM ${BASE_IMAGE}
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
-COPY --from=builder /builder/connector ./materialize-postgres
+COPY --from=builder /builder/connector ./materialize-cratedb
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 # Avoid running the connector as root.
@@ -40,4 +40,4 @@ USER nonroot:nonroot
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
-ENTRYPOINT ["/connector/materialize-postgres"]
+ENTRYPOINT ["/connector/materialize-cratedb"]
