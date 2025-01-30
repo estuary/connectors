@@ -1,0 +1,202 @@
+{
+  "config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-postgres/config",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Address",
+        "description": "Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "Database user to connect as.",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "title": "Password",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Name of the logical database to materialize to.",
+        "order": 3
+      },
+      "schema": {
+        "type": "string",
+        "title": "Database Schema",
+        "description": "Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables",
+        "default": "public",
+        "order": 4
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 5
+      },
+      "dbt_job_trigger": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job ID",
+            "description": "dbt job ID"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account ID",
+            "description": "dbt account ID"
+          },
+          "access_url": {
+            "type": "string",
+            "title": "Access URL",
+            "description": "dbt access URL can be found in your Account Settings. See go.estuary.dev/dbt-cloud-trigger",
+            "pattern": "^https://.+$"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "API Key",
+            "description": "dbt API Key",
+            "secret": true
+          },
+          "cause": {
+            "type": "string",
+            "title": "Cause Message",
+            "description": "You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary Flow'."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "replace",
+              "ignore"
+            ],
+            "title": "Job Trigger Mode",
+            "description": "Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.",
+            "default": "skip"
+          },
+          "interval": {
+            "type": "string",
+            "title": "Minimum Run Interval",
+            "description": "Minimum time between dbt job triggers. This interval is only triggered if data has been materialized by your task.",
+            "default": "30m"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "account_id",
+          "api_key"
+        ],
+        "title": "dbt Cloud Job Trigger",
+        "description": "Trigger a dbt Job when new data is available"
+      },
+      "advanced": {
+        "properties": {
+          "sslmode": {
+            "type": "string",
+            "enum": [
+              "disable",
+              "allow",
+              "prefer",
+              "require",
+              "verify-ca",
+              "verify-full"
+            ],
+            "title": "SSL Mode",
+            "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password"
+    ],
+    "title": "SQL Connection"
+  },
+  "resource_config_schema_json": {
+    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-postgres/table-config",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional)",
+        "x-schema-name": true
+      },
+      "additional_table_create_sql": {
+        "type": "string",
+        "title": "Additional Table Create SQL",
+        "description": "Additional SQL statement(s) to be run in the same transaction that creates the table.",
+        "multiline": true
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
+        "default": false,
+        "x-delta-updates": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "SQL Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-postgresql"
+}
