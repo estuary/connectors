@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime, UTC
+from datetime import datetime, timedelta, UTC
 import json
 from logging import Logger
 from typing import Any, AsyncGenerator
@@ -17,6 +17,7 @@ from .models import (
     UsersResponse,
     ClientSideIncrementalCursorPaginatedResponse,
     IncrementalCursorPaginatedResponse,
+    SatisfactionRatingsResponse,
     AuditLog,
     AuditLogsResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
@@ -24,6 +25,9 @@ from .models import (
 
 CURSOR_PAGINATION_PAGE_SIZE = 100
 MIN_CHECKPOINT_COUNT = 1500
+MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
+# Zendesk errors out if a start or end time parameter is more recent than 60 seconds in the past.
+TIME_PARAMETER_DELAY = timedelta(seconds=60)
 
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
@@ -222,6 +226,90 @@ async def backfill_incremental_cursor_paginated_resources(
 
     if response.meta.after_cursor:
         yield response.meta.after_cursor
+
+
+async def _fetch_satisfaction_ratings_between(
+    http: HTTPSession,
+    subdomain: str,
+    start: int,
+    end: int,
+    log: Logger,
+) -> AsyncGenerator[ZendeskResource, None]:
+    url = f"{url_base(subdomain)}/satisfaction_ratings"
+
+    params: dict[str, str | int] = {
+        "start_time": start,
+        "end_time": end,
+        "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
+    }
+
+    while True:
+        response = SatisfactionRatingsResponse.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        for satisfaction_rating in response.resources:
+            yield satisfaction_rating
+
+        if not response.meta.has_more:
+            break
+
+        if response.meta.after_cursor:
+            params["page[after]"] = response.meta.after_cursor
+
+
+async def fetch_satisfaction_ratings(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    end = min(datetime.now(tz=UTC) - TIME_PARAMETER_DELAY, log_cursor + MAX_SATISFACTION_RATINGS_WINDOW_SIZE)
+
+    generator = _fetch_satisfaction_ratings_between(
+        http=http,
+        subdomain=subdomain,
+        start=_dt_to_s(log_cursor),
+        end=_dt_to_s(end),
+        log=log,
+    )
+
+    async for satisfaction_rating in generator:
+        yield satisfaction_rating
+
+    yield end
+
+
+async def backfill_satisfaction_ratings(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ZendeskResource | PageCursor, None]:
+    assert isinstance(page, int)
+    assert isinstance(cutoff, datetime)
+    cutoff_ts = _dt_to_s(cutoff)
+
+    if page >= cutoff_ts:
+        return
+
+    end = min(cutoff_ts, page + int(MAX_SATISFACTION_RATINGS_WINDOW_SIZE.total_seconds()))
+
+    generator = _fetch_satisfaction_ratings_between(
+        http=http,
+        subdomain=subdomain,
+        start=page,
+        end=end,
+        log=log,
+    )
+
+    async for satisfaction_rating in generator:
+        yield satisfaction_rating
+
+    yield end
 
 
 async def _make_incremental_cursor_export_request(
