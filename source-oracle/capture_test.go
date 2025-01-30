@@ -56,6 +56,7 @@ func testAllTypes(t *testing.T, configFile string) {
 		{"num", "NUMBER(38, 9)", 123456789.123456789},
 		{"num19", "NUMBER(19, 0)", 1234567891234567891},
 		{"num15", "NUMBER(15, 0)", 123456789123456},
+		{"defaultnum", "NUMBER", NewRawTupleValue("123456789123456.123456789")},
 		{"small_int", "SMALLINT", 123456789.123456789},
 		{"integ", "INTEGER", NewRawTupleValue("18446744073709551615")},
 		{"double_precision", "DOUBLE PRECISION", 123456789.123456789},
