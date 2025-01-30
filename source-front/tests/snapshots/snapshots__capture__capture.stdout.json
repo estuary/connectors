@@ -104,6 +104,7 @@
       "is_available": true,
       "is_blocked": false,
       "last_name": "Bair",
+      "type": "user",
       "username": "alexb"
     }
   ],
