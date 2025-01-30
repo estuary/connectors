@@ -30,21 +30,21 @@ from .api import (
     backfill_audit_logs,
     backfill_incremental_cursor_export_resources,
     backfill_incremental_cursor_paginated_resources,
+    backfill_satisfaction_ratings,
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
     fetch_audit_logs,
     fetch_client_side_incremental_cursor_paginated_resources,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
+    fetch_satisfaction_ratings,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
     snapshot_cursor_paginated_resources,
     url_base,
     _dt_to_s,
+    TIME_PARAMETER_DELAY,
 )
-
-# Zendesk errors out if a start or end time parameter is more recent than 60 seconds in the past.
-TIME_PARAMETER_DELAY = timedelta(seconds=60)
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -260,6 +260,52 @@ def client_side_filtered_cursor_paginated_resources(
     return resources
 
 
+def satisfaction_ratings(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_satisfaction_ratings,
+                http,
+                config.subdomain,
+            ),
+            fetch_page=functools.partial(
+                backfill_satisfaction_ratings,
+                http,
+                config.subdomain,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+
+    return common.Resource(
+        name="satisfaction_ratings",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+        ),
+        initial_config=ResourceConfig(
+            name="satisfaction_ratings", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
 def incremental_cursor_paginated_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -450,6 +496,7 @@ async def all_resources(
         ticket_metrics(log, http, config),
         *full_refresh_cursor_paginated_resources(log, http, config),
         *client_side_filtered_cursor_paginated_resources(log, http, config),
+        satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
