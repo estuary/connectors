@@ -171,7 +171,6 @@ class TicketMetricEventsResponse(IncrementalCursorPaginatedResponse):
 # Incremental resources that can be filtered by a start_time query param.
 # Tuples contain the name, path, cursor field, and response model for each resource. 
 INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, str, type[IncrementalCursorPaginatedResponse]]] = [
-    ("satisfaction_ratings", "satisfaction_ratings", "updated_at", SatisfactionRatingsResponse),
     ("ticket_skips", "skips", "updated_at", TicketSkipsResponse),
     ("ticket_metric_events", "incremental/ticket_metric_events", "time", TicketMetricEventsResponse)
 ]
