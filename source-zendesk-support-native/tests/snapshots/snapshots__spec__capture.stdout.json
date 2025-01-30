@@ -3,6 +3,20 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
+        "Advanced": {
+          "properties": {
+            "incremental_export_page_size": {
+              "default": 1000,
+              "description": "Page size for incremental cursor export streams. Leave as the default unless the connector encounters memory issues, then decrease the page size.",
+              "exclusiveMinimum": 0,
+              "maximum": 1000,
+              "title": "Incremental Export Page Size",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
         "ApiToken": {
           "properties": {
             "credentials_title": {
@@ -91,6 +105,12 @@
             }
           ],
           "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [

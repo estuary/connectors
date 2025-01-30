@@ -19,6 +19,8 @@ from estuary_cdk.http import HTTPSession
 
 from pydantic import AfterValidator, AwareDatetime, BaseModel, Field
 
+MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
+
 
 def urlencode_field(field: str):
     return "{{#urlencode}}{{{ " + field + " }}}{{/urlencode}}"
@@ -93,7 +95,21 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
+    class Advanced(BaseModel):
+        incremental_export_page_size: Annotated[int, Field(
+            description="Page size for incremental cursor export streams. Leave as the default unless the connector encounters memory issues, then decrease the page size.",
+            title="Incremental Export Page Size",
+            default=MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
+            gt=0,
+            le=MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
+        )]
 
+    advanced: Advanced = Field(
+        default_factory=Advanced, #type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
+    )
 
 ConnectorState = GenericConnectorState[ResourceState]
 

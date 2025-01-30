@@ -226,6 +226,7 @@ async def _fetch_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
+    page_size: int,
     start_date: datetime | None,
     cursor: str | None,
     log: Logger,
@@ -242,7 +243,10 @@ async def _fetch_incremental_cursor_export_resources(
         case _:
             raise RuntimeError(f"Unknown incremental cursor pagination resource type {name}.")
 
-    params: dict[str, str | int] = {}
+    params: dict[str, str | int] = {
+        "per_page": page_size,
+    }
+
     if sideload_params:
         params.update(sideload_params)
 
@@ -281,6 +285,7 @@ async def fetch_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -294,7 +299,7 @@ async def fetch_incremental_cursor_export_resources(
         start_date = _s_to_dt(int(cursor))
         cursor = None
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, cursor, log)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, page_size, start_date, cursor, log)
 
     async for result in generator:
         if isinstance(result, str):
@@ -307,6 +312,7 @@ async def backfill_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
+    page_size: int,
     start_date: datetime,
     log: Logger,
     page: PageCursor | None,
@@ -316,7 +322,7 @@ async def backfill_incremental_cursor_export_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page, log)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, page_size, start_date, page, log)
 
     async for result in generator:
         if isinstance(result, str) or result.updated_at < cutoff:
@@ -356,6 +362,7 @@ async def fetch_ticket_child_resources(
     http: HTTPSession,
     subdomain: str,
     path: str,
+    page_size: int,
     response_model: type[IncrementalCursorPaginatedResponse],
     log: Logger,
     log_cursor: LogCursor,
@@ -370,7 +377,7 @@ async def fetch_ticket_child_resources(
         start_date = _s_to_dt(int(cursor))
         cursor = None
 
-    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log)
+    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", page_size, start_date, cursor, log)
 
     async for result in tickets_generator:
         if isinstance(result, str):
@@ -388,6 +395,7 @@ async def backfill_ticket_child_resources(
     http: HTTPSession,
     subdomain: str,
     path: str,
+    page_size: int,
     response_model: type[IncrementalCursorPaginatedResponse],
     start_date: datetime,
     log: Logger,
@@ -398,7 +406,7 @@ async def backfill_ticket_child_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", page_size, start_date, page, log)
 
     async for result in generator:
         if isinstance(result, str):
@@ -504,6 +512,7 @@ async def backfill_audit_logs(
 async def fetch_ticket_metrics(
     http: HTTPSession,
     subdomain: str,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
@@ -521,7 +530,7 @@ async def fetch_ticket_metrics(
         "include": "metric_sets"
     }
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log, sideload_params)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", page_size, start_date, cursor, log, sideload_params)
 
     async for result in generator:
         if isinstance(result, str):
@@ -536,6 +545,7 @@ async def fetch_ticket_metrics(
 async def backfill_ticket_metrics(
     http: HTTPSession,
     subdomain: str,
+    page_size: int,
     start_date: datetime,
     log: Logger,
     page: PageCursor | None,
@@ -549,7 +559,7 @@ async def backfill_ticket_metrics(
         "include": "metric_sets"
     }
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log, sideload_params)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", page_size, start_date, page, log, sideload_params)
 
     async for result in generator:
 

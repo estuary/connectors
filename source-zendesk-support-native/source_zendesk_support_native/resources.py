@@ -133,11 +133,13 @@ def ticket_metrics(
                 fetch_ticket_metrics,
                 http,
                 config.subdomain,
+                config.advanced.incremental_export_page_size
             ),
             fetch_page=functools.partial(
                 backfill_ticket_metrics,
                 http,
                 config.subdomain,
+                config.advanced.incremental_export_page_size,
                 config.start_date,
             )
         )
@@ -343,12 +345,14 @@ def incremental_cursor_export_resources(
                 http,
                 config.subdomain,
                 name,
+                config.advanced.incremental_export_page_size,
             ),
             fetch_page=functools.partial(
                 backfill_incremental_cursor_export_resources,
                 http,
                 config.subdomain,
                 name,
+                config.advanced.incremental_export_page_size,
                 config.start_date,
             )
         )
@@ -402,6 +406,7 @@ def ticket_child_resources(
                 http,
                 config.subdomain,
                 path,
+                config.advanced.incremental_export_page_size,
                 response_model,
             ),
             fetch_page=functools.partial(
@@ -409,6 +414,7 @@ def ticket_child_resources(
                 http,
                 config.subdomain,
                 path,
+                config.advanced.incremental_export_page_size,
                 response_model,
                 config.start_date,
             )
