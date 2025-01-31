@@ -35,8 +35,8 @@ var pgDialect = func() sql.Dialect {
 					})),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
-					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime)),
+					"date":      sql.MapStatic("TIMESTAMP WITH TIME ZONE", sql.UsingConverter(sql.ClampDate)),
+					"date-time": sql.MapStatic("TIMESTAMP WITH TIME ZONE", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime)),
 					"duration":  sql.MapStatic("INTERVAL"),
 					"ipv4":      sql.MapStatic("CIDR"),
 					"ipv6":      sql.MapStatic("CIDR"),
