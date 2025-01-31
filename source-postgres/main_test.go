@@ -30,6 +30,8 @@ var (
 	dbCapturePass    = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
 
 	readOnlyCapture = flag.Bool("read_only_capture", false, "When true, run test captures in read-only mode")
+
+	testFeatureFlags = flag.String("feature_flags", "", "Feature flags to apply to all test captures.")
 )
 
 const testSchemaName = "test"
@@ -75,6 +77,7 @@ func postgresTestBackend(t testing.TB) *testBackend {
 		Password: *dbCapturePass,
 		Database: *dbName,
 	}
+	captureConfig.Advanced.FeatureFlags = *testFeatureFlags
 	captureConfig.Advanced.BackfillChunkSize = 16
 	if *readOnlyCapture {
 		captureConfig.Advanced.ReadOnlyCapture = true

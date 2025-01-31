@@ -104,6 +104,11 @@
             "type": "boolean",
             "title": "Read-Only Capture",
             "description": "When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,
