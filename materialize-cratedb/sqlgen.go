@@ -134,10 +134,6 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- end }}
 );
 
-COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
-{{- range $col := .Columns }}
-COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment}};
-{{- end}}
 {{ end }}
 
 -- Templated query which performs table alterations by adding columns and/or
