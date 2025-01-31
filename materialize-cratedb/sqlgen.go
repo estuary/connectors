@@ -67,7 +67,7 @@ var pgDialect = func() sql.Dialect {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its empty the
 				// default postgres schema "public" will implicitly be used.
-				return sql.InfoTableLocation{TableSchema: "public", TableName: truncatedIdentifier(path[0])}
+				return sql.InfoTableLocation{TableSchema: "doc", TableName: truncatedIdentifier(path[0])}
 			} else {
 				return sql.InfoTableLocation{TableSchema: truncatedIdentifier(path[0]), TableName: truncatedIdentifier(path[1])}
 			}
