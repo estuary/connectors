@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -18,7 +19,34 @@ func (db *oracleDatabase) SetupPrerequisites(ctx context.Context) []error {
 		}
 	}
 
+	if err := db.prerequisiteArchiveLogRetention(ctx); err != nil {
+		errs = append(errs, err)
+	}
+
 	return errs
+}
+
+func (db *oracleDatabase) prerequisiteArchiveLogRetention(ctx context.Context) error {
+	if err := db.switchToCDB(ctx); err != nil {
+		return err
+	}
+	var row = db.conn.QueryRowContext(ctx, "SELECT MIN(FIRST_TIME) FROM V$ARCHIVED_LOG A WHERE A.NAME IS NOT NULL")
+	var minTimestamp time.Time
+	if err := row.Scan(&minTimestamp); err != nil {
+		return fmt.Errorf("querying minimum archived log timestamp from V$ARCHIVED_LOG: %w", err)
+	}
+
+	if time.Since(minTimestamp) < (time.Hour * 24) {
+		return fmt.Errorf("archived log retention is less than 24 hours. Please increase archived log retention to at least 24 hours")
+	}
+
+	if time.Since(minTimestamp) < (time.Hour * 24 * 7) {
+		log.WithFields(log.Fields{
+			"retention": time.Since(minTimestamp),
+		}).Warn("archive log retention is less than 7 days, we highly recommend a higher log retention to ensure data consistency.")
+	}
+
+	return nil
 }
 
 func (db *oracleDatabase) prerequisiteSupplementalLogging(ctx context.Context, owner, tableName string) error {
