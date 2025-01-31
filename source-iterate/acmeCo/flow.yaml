@@ -1,0 +1,10 @@
+---
+collections:
+  acmeCo/survey_responses:
+    schema: survey_responses.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/surveys:
+    schema: surveys.schema.yaml
+    key:
+      - /_meta/row_id
