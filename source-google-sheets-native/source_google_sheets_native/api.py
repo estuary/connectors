@@ -5,6 +5,8 @@ from logging import Logger
 from typing import AsyncGenerator, Any
 from zoneinfo import ZoneInfo
 
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
+
 from .models import (
     NumberType,
     Row,
@@ -55,7 +57,12 @@ async def fetch_rows(
     lotus_epoch = datetime(1899, 12, 30, tzinfo=user_tz)
 
     params["fields"] = "sheets.data(rowData.values(effectiveFormat(numberFormat(type)),effectiveValue))"
-    async for row in http.request_object_stream(log, RowData, "sheets.item.data.item.rowData.item", url, params=params):
+
+    async for row in IncrementalJsonProcessor(
+        await http.request_stream(log, url, params=params),
+        "sheets.item.data.item.rowData.item",
+        RowData,
+    ):
         if headers_from_frozen:
             assert row.values is not None
             for ind, column in enumerate(row.values):
