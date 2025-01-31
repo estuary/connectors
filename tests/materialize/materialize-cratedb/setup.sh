@@ -57,7 +57,7 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "Multiple Types"
+      "table": "MultipleTypes"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
     "fields": {
@@ -72,7 +72,7 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "Formatted Strings"
+      "table": "FormattedStrings"
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
     "fields": {
