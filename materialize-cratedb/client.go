@@ -55,6 +55,11 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
+	// Fixme (CrateDB - Ivan): We early return here on purpose to avoid the
+	// db.PingContext below, for some reason it quickly returns
+	// bad connection. We should probably look it up.
+	return errs
+
 	if err := db.PingContext(ctx); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var pgErr *pgconn.ConnectError
