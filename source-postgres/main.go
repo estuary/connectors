@@ -76,7 +76,15 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 		}
 	}
 
-	var db = &postgresDatabase{config: &config}
+	var featureFlags = boilerplate.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	if config.Advanced.FeatureFlags != "" {
+		logrus.WithField("flags", featureFlags).Info("parsed feature flags")
+	}
+
+	var db = &postgresDatabase{
+		config:       &config,
+		featureFlags: featureFlags,
+	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -107,7 +115,10 @@ type advancedConfig struct {
 	MinimumBackfillXID    string   `json:"min_backfill_xid,omitempty" jsonschema:"title=Minimum Backfill XID,description=Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases." jsonschema_extras:"pattern=^[0-9]+$"`
 	MaximumBackfillXID    string   `json:"max_backfill_xid,omitempty" jsonschema:"title=Maximum Backfill XID,description=Only backfill rows with XMIN values smaller (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases." jsonschema_extras:"pattern=^[0-9]+$"`
 	ReadOnlyCapture       bool     `json:"read_only_capture,omitempty" jsonschema:"title=Read-Only Capture,description=When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."`
+	FeatureFlags          string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
+
+var featureFlagDefaults = map[string]bool{}
 
 // Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
@@ -226,6 +237,8 @@ type postgresDatabase struct {
 	explained       map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs    map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
+
+	featureFlags map[string]bool // Parsed feature flag settings with defaults applied
 }
 
 func (db *postgresDatabase) HistoryMode() bool {
