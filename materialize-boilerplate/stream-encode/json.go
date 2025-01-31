@@ -26,6 +26,7 @@ const (
 
 type jsonConfig struct {
 	disableCompression bool
+	skipNulls          bool
 }
 
 type JsonOption func(*jsonConfig)
@@ -33,6 +34,12 @@ type JsonOption func(*jsonConfig)
 func WithJsonDisableCompression() JsonOption {
 	return func(cfg *jsonConfig) {
 		cfg.disableCompression = true
+	}
+}
+
+func WithJsonSkipNulls() JsonOption {
+	return func(cfg *jsonConfig) {
+		cfg.skipNulls = true
 	}
 }
 
@@ -77,6 +84,9 @@ func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *Json
 		// serialized as JSON, and escaping HTML is not desired so as to avoid escaping values like
 		// <, >, &, etc. if they are present in the materialized collection's data.
 		enc.shape.SetFlags(json.TrustRawMessage)
+		if cfg.skipNulls {
+			enc.shape.SkipNulls()
+		}
 	}
 
 	return enc
