@@ -18,10 +18,10 @@ var pgDialect = func() sql.Dialect {
 			),
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("JSON"),
+			sql.OBJECT:         sql.MapStatic("OBJECT"),
 			sql.ARRAY:          sql.MapStatic("JSON"),
 			sql.BINARY:         sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.MULTIPLE:       sql.MapStatic("OBJECT", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
