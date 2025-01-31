@@ -1,11 +1,11 @@
 import base64
 from datetime import datetime, timedelta, UTC
-import json
 from logging import Logger
 from typing import Any, AsyncGenerator
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
     FullRefreshResource,
@@ -313,23 +313,6 @@ async def backfill_satisfaction_ratings(
     yield end
 
 
-async def _fetch_top_level_fields(
-    http: HTTPSession,
-    url: str,
-    params: dict[str, str | int],
-    response_model: type[IncrementalCursorExportResponse],
-    log: Logger,
-) -> tuple[str | None, bool]:
-    # Instead of using Pydantic's model_validate_json that uses json.loads internally,
-    # use json.JSONDecoder().raw_decode to reduce memory overhead when processing the response.
-    raw_response_bytes = await http.request(log, url, params=params)
-    obj, _ = json.JSONDecoder().raw_decode(raw_response_bytes.decode('utf-8'))
-    # model_construct is used to avoid validating & transforming all resources within large response bodies at once
-    # to reduce memory overhead. Instead, resources are validated & transformed one-by-one as they are yielded.
-    response =  response_model.model_construct(**obj)
-    return (response.after_cursor, response.end_of_stream)
-
-
 async def _fetch_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
@@ -361,13 +344,21 @@ async def _fetch_incremental_cursor_export_resources(
         params["cursor"] = _base64_encode(cursor)
 
     while True:
-        next_page_cursor, end_of_stream = await _fetch_top_level_fields(http, url, params, response_model, log)
+        processor = IncrementalJsonProcessor(
+            await http.request_stream(log, url, params=params),
+            f"{name}.item",
+            TimestampedResource,
+            response_model,
+        )
 
-        if next_page_cursor is None:
-            return
-
-        async for resource in http.request_object_stream(log, TimestampedResource, f"{name}.item", url, params=params):
+        async for resource in processor:
             yield resource
+
+        remainder = processor.get_remainder()
+        next_page_cursor, end_of_stream = remainder.after_cursor, remainder.end_of_stream
+        
+        if not next_page_cursor:
+            return
 
         yield _base64_decode(next_page_cursor)
 
