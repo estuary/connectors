@@ -222,7 +222,7 @@
       "flow_document": "{\"_meta\":{\"uuid\":\"81ca0080-1dda-11b2-8000-071353030311\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
       "flow_published_at": "1970-01-01T01:00:21Z",
       "id": 8,
-      "multiple": "null",
+      "multiple": null,
       "nested": "{\"id\":\"i8\"}",
       "nullable_int": 8,
       "str_field": "str8 v2"
@@ -235,7 +235,7 @@
       "flow_document": "{\"_meta\":{\"uuid\":\"82629700-1dda-11b2-8000-071353030311\"},\"array_int\":[91,92],\"binary_field\":\"YWxvaGEK\",\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
       "flow_published_at": "1970-01-01T01:00:22Z",
       "id": 9,
-      "multiple": "null",
+      "multiple": null,
       "nested": "{\"id\":\"i9\"}",
       "nullable_int": null,
       "str_field": "str9 v2"
@@ -248,7 +248,7 @@
       "flow_document": "{\"_meta\":{\"uuid\":\"82fb2d80-1dda-11b2-8000-071353030311\"},\"array_int\":[1,2],\"binary_field\":\"c2F5xY1uYXJhCg==\",\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
       "flow_published_at": "1970-01-01T01:00:23Z",
       "id": 10,
-      "multiple": "null",
+      "multiple": null,
       "nested": "{\"id\":\"i10\"}",
       "nullable_int": 10,
       "str_field": "str10 v2"

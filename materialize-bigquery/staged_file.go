@@ -63,7 +63,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	fName := uuid.NewString()
 	writer := f.client.Bucket(f.bucket).Object(path.Join(f.prefix, fName)).NewWriter(ctx)
-	f.encoder = enc.NewJsonEncoder(writer, f.fields)
+	f.encoder = enc.NewJsonEncoder(writer, f.fields, enc.WithJsonSkipNulls())
 	f.uploaded = append(f.uploaded, fName)
 }
 

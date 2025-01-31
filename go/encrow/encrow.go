@@ -10,10 +10,11 @@ import (
 
 // A Shape represents the structure of a particular document.
 type Shape struct {
-	arity    int
-	prefixes []string
-	swizzle  []int
-	flags    json.AppendFlags
+	arity     int
+	prefixes  []string
+	swizzle   []int
+	flags     json.AppendFlags
+	skipNulls bool
 }
 
 // NewShape constructs a new Shape corresponding to the provided field names.
@@ -47,6 +48,11 @@ func (s *Shape) SetFlags(flags json.AppendFlags) {
 	s.flags = flags
 }
 
+// SkipNulls will cause serialized results to omit fields with a `nil` value.
+func (s *Shape) SkipNulls() {
+	s.skipNulls = true
+}
+
 func generatePrefixes(fields []string) []string {
 	var prefixes []string
 	for idx, fieldName := range fields {
@@ -76,8 +82,13 @@ func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 
 	buf = buf[:0]
 	for idx, vidx := range s.swizzle {
+		v := values[vidx]
+		if s.skipNulls && v == nil {
+			continue
+		}
+
 		buf = append(buf, s.prefixes[idx]...)
-		buf, err = json.Append(buf, values[vidx], s.flags)
+		buf, err = json.Append(buf, v, s.flags)
 		if err != nil {
 			return nil, err
 		}
