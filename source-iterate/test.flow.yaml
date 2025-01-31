@@ -1,0 +1,24 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-iterate:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_iterate
+        config:
+          credentials:
+            credentials_title: Private App Credentials
+            access_token: secret_token
+    bindings:
+      - resource:
+          name: surveys
+          interval: PT5M
+        target: acmeCo/surveys
+      - resource:
+          name: survey_responses
+          interval: PT5M
+        target: acmeCo/survey_responses
