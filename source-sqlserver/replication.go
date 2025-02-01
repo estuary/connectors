@@ -175,14 +175,16 @@ func (rs *sqlserverReplicationStream) deactivateTable(streamID string) error {
 }
 
 func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
-	// Activate replication for the watermarks table.
-	var watermarks = rs.db.config.Advanced.WatermarksTable
-	var watermarksInfo = discovery[watermarks]
-	if watermarksInfo == nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: table missing from latest autodiscovery", watermarks)
-	}
-	if err := rs.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
-		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	// Activate replication for the watermarks table (if this isn't a read-only capture).
+	if !rs.db.featureFlags["read_only"] {
+		var watermarks = rs.db.config.Advanced.WatermarksTable
+		var watermarksInfo = discovery[watermarks]
+		if watermarksInfo == nil {
+			return fmt.Errorf("error activating replication for watermarks table %q: table missing from latest autodiscovery", watermarks)
+		}
+		if err := rs.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
+			return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+		}
 	}
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
@@ -344,45 +346,10 @@ func (rs *sqlserverReplicationStream) establishFencePosition(ctx context.Context
 		// when there's no prior information cached.
 		var transactionsPerSessionLimit = 500
 
-		// Query the list of completed scan sessions. Descending order means the most recent one is index 0.
-		//
-		// The 'sys.dm_cdc_log_scan_sessions' management view requires either the 'VIEW DATABASE STATE'
-		// permission, or in SQL Server 2022+ the 'VIEW DATABASE PERFORMANCE STATE' permission is also
-		// acceptable. To grant the required permission, run one of the following queries:
-		//
-		//   GRANT VIEW DATABASE PERFORMANCE STATE TO flow_capture
-		//   GRANT VIEW DATABASE STATE TO flow_capture
-		//
-		const query = `
-		    SELECT session_id, start_time, end_time, scan_phase, start_lsn, end_lsn, tran_count, last_commit_lsn, empty_scan_count
-			    FROM sys.dm_cdc_log_scan_sessions
-				WHERE scan_phase = 'Done'
-				ORDER BY session_id DESC;`
-		type logScanSession struct {
-			sessionID                        int
-			startTime, endTime               time.Time
-			scanPhase                        string
-			startLSN, endLSN, lastCommitLSN  LSN
-			transactionCount, emptyScanCount int
-		}
-		var sessions []logScanSession
-		var rows, err = rs.conn.QueryContext(ctx, query)
+		// List CDC worker runs
+		var sessions, err = listCDCLogScanSessions(ctx, rs.conn)
 		if err != nil {
-			return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
-		}
-		for rows.Next() {
-			var x logScanSession
-			var startLSN, endLSN, lastCommitLSN string
-			if err := rows.Scan(&x.sessionID, &x.startTime, &x.endTime, &x.scanPhase, &startLSN, &endLSN, &x.transactionCount, &lastCommitLSN, &x.emptyScanCount); err != nil {
-				return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
-			}
-			x.startLSN = parseTextualLSN(strings.TrimRight(startLSN, "\x00"))
-			x.endLSN = parseTextualLSN(strings.TrimRight(endLSN, "\x00"))
-			x.lastCommitLSN = parseTextualLSN(strings.TrimRight(lastCommitLSN, "\x00"))
-			sessions = append(sessions, x)
-		}
-		if err := rows.Err(); err != nil {
-			return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
+			return nil, err
 		}
 
 		if len(sessions) == 0 {
@@ -430,6 +397,50 @@ func (rs *sqlserverReplicationStream) establishFencePosition(ctx context.Context
 	}
 	log.WithField("lastEndTime", rs.lastScanSessionEndTime.Format(time.RFC3339)).Error("failed to establish fence position")
 	return nil, fmt.Errorf("failed to establish a valid fence position after %s, the CDC worker may not be running", establishFenceTimeout.String())
+}
+
+type logScanSession struct {
+	sessionID                        int
+	startTime, endTime               time.Time
+	scanPhase                        string
+	startLSN, endLSN, lastCommitLSN  LSN
+	transactionCount, emptyScanCount int
+}
+
+// Query the list of completed scan sessions. Descending order means the most recent one is index 0.
+//
+// The 'sys.dm_cdc_log_scan_sessions' management view requires either the 'VIEW DATABASE STATE'
+// permission, or in SQL Server 2022+ the 'VIEW DATABASE PERFORMANCE STATE' permission is also
+// acceptable. To grant the required permission, run one of the following queries:
+//
+//	GRANT VIEW DATABASE PERFORMANCE STATE TO flow_capture
+//	GRANT VIEW DATABASE STATE TO flow_capture
+func listCDCLogScanSessions(ctx context.Context, conn *sql.DB) ([]logScanSession, error) {
+	const query = `
+		    SELECT session_id, start_time, end_time, scan_phase, start_lsn, end_lsn, tran_count, last_commit_lsn, empty_scan_count
+			    FROM sys.dm_cdc_log_scan_sessions
+				WHERE scan_phase = 'Done'
+				ORDER BY session_id DESC;`
+	var sessions []logScanSession
+	var rows, err = conn.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
+	}
+	for rows.Next() {
+		var x logScanSession
+		var startLSN, endLSN, lastCommitLSN string
+		if err := rows.Scan(&x.sessionID, &x.startTime, &x.endTime, &x.scanPhase, &startLSN, &endLSN, &x.transactionCount, &lastCommitLSN, &x.emptyScanCount); err != nil {
+			return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
+		}
+		x.startLSN = parseTextualLSN(strings.TrimRight(startLSN, "\x00"))
+		x.endLSN = parseTextualLSN(strings.TrimRight(endLSN, "\x00"))
+		x.lastCommitLSN = parseTextualLSN(strings.TrimRight(lastCommitLSN, "\x00"))
+		sessions = append(sessions, x)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
+	}
+	return sessions, nil
 }
 
 func parseTextualLSN(lsn string) LSN {
