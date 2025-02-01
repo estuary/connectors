@@ -18,6 +18,8 @@ CREATE LOGIN flow_capture WITH PASSWORD = 'we2rie1E';
 GO
 CREATE USER flow_capture FOR LOGIN flow_capture;
 GO
+GRANT VIEW DATABASE STATE TO flow_capture;
+GO
 GRANT SELECT ON SCHEMA :: dbo TO flow_capture;
 GO
 GRANT SELECT ON SCHEMA :: cdc TO flow_capture;
