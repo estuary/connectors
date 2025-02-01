@@ -38,6 +38,17 @@ const (
 	// some. This should never be hit in normal operation, and exists only so that certain
 	// rare failure modes produce an error rather than blocking forever.
 	streamToFenceWatchdogTimeout = 5 * time.Minute
+
+	// establishFenceTimeout is the length of time after with an establish-fence-position
+	// operation will error out. Since the CDC worker should be running on the database
+	// every 5 seconds by default, it should never take much longer than that for us to
+	// establish a valid fence position.
+	//
+	// Technically it's possible for the CDC agent polling interval to be manually set as
+	// high as 24 hours, so the logic might be more robust if we scaled our timeout based
+	// on the actual `pollinginterval` setting in `cdc.dbo_jobs`. I suspect this will never
+	// actually be an issue.
+	establishFenceTimeout = 5 * time.Minute
 )
 
 // LSN is just a type alias for []byte to make the code that works with LSN values a bit clearer.
@@ -309,13 +320,39 @@ func (rs *sqlserverReplicationStream) streamToPositionalFence(ctx context.Contex
 }
 
 func (rs *sqlserverReplicationStream) establishFencePosition(ctx context.Context) (LSN, error) {
-	const establishFenceTimeout = 5 * time.Minute // TODO(wgd): Move to global scope with other time constants
 	var deadline = time.Now().Add(establishFenceTimeout)
-	for ctx.Err() == nil && time.Now().Before(deadline) {
+	for time.Now().Before(deadline) {
+		// Allow context cancellation to terminate the fence-position loop early
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		// TODO(wgd): This needs to be established at runtime by querying dbo.cdc_jobs and multiplying maxtrans * maxscans
+		//
+		// The CDC worker maximums are in table dbo.cdc_jobs:
+		//   maxtrans 	int 	The maximum number of transactions to process in each scan cycle.
+		//                      maxtrans is valid only for capture jobs.
+		//   maxscans 	int 	The maximum number of scan cycles to execute in order to extract all rows from the log.
+		//                      maxscans is valid only for capture jobs.
+		//
+		// In that table is also 'pollinginterval' which tells us how often the job is supposed to be running,
+		// which may be useful if we decide that just retrying this loop once per second with a timeout after
+		// 5 minutes is insufficient in some very non-default setups.
+		//
+		// The easiest way to use 'dbo.cdc_jobs' info would be to query that table once at the start of
+		// each StreamToFence cycle. Or even cache the results in the stream state and just query it once
+		// when there's no prior information cached.
+		var transactionsPerSessionLimit = 500
+
 		// Query the list of completed scan sessions. Descending order means the most recent one is index 0.
 		//
-		// The 'sys.dm_cdc_log_scan_sessions' management view requires the 'VIEW DATABASE STATE' permission
-		// to read. Or maybe it's now 'VIEW DATABASE PERFORMANCE STATE' for SQL Server 2022 and later?
+		// The 'sys.dm_cdc_log_scan_sessions' management view requires either the 'VIEW DATABASE STATE'
+		// permission, or in SQL Server 2022+ the 'VIEW DATABASE PERFORMANCE STATE' permission is also
+		// acceptable. To grant the required permission, run one of the following queries:
+		//
+		//   GRANT VIEW DATABASE PERFORMANCE STATE TO flow_capture
+		//   GRANT VIEW DATABASE STATE TO flow_capture
+		//
 		const query = `
 		    SELECT session_id, start_time, end_time, scan_phase, start_lsn, end_lsn, tran_count, last_commit_lsn, empty_scan_count
 			    FROM sys.dm_cdc_log_scan_sessions
@@ -350,37 +387,48 @@ func (rs *sqlserverReplicationStream) establishFencePosition(ctx context.Context
 
 		if len(sessions) == 0 {
 			log.Warn("dm_cdc_log_scan_sessions contains no completed scans, will retry")
+			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		var transactionsPerSessionLimit = 500 // TODO(wgd): Establish this by querying dbo.cdc_jobs
-
 		var latestSessionEndTime = sessions[0].endTime
-		var latestSessionEndLSN = sessions[0].endLSN
+		var latestSessionCommitLSN = sessions[0].lastCommitLSN
 		var latestSessionTransactionCount = sessions[0].transactionCount
+
 		if rs.lastScanSessionEndTime.IsZero() {
 			log.WithField("end_time", latestSessionEndTime.Format(time.RFC3339)).Debug("initialized CDC end_time state")
 			rs.lastScanSessionEndTime = latestSessionEndTime
 			continue
 		}
-		if string(sessions[0].endLSN) == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" {
+		if string(sessions[0].lastCommitLSN) == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" {
 			if len(sessions) > 2 {
-				log.WithField("prev_lsn", fmt.Sprintf("%X", sessions[1].endLSN)).Debug("latest CDC scan is empty, consulting previous end_lsn")
-				latestSessionEndLSN = sessions[1].endLSN
+				log.WithField("prev_lsn", fmt.Sprintf("%X", sessions[1].lastCommitLSN)).Debug("latest CDC scan is empty, consulting previous commit LSN")
+				latestSessionCommitLSN = sessions[1].lastCommitLSN
 			} else {
 				log.Warn("zero end lsn but no previous session, will retry")
+				time.Sleep(1 * time.Second)
 				continue
 			}
 		}
+
+		log.WithFields(log.Fields{
+			"session":   sessions[0].sessionID,
+			"endTime":   latestSessionEndTime.Format(time.RFC3339),
+			"prevTime":  rs.lastScanSessionEndTime.Format(time.RFC3339),
+			"commitLSN": fmt.Sprintf("%X", latestSessionCommitLSN),
+			"tranCount": latestSessionTransactionCount,
+		}).Debug("queried latest CDC scan session")
+
 		if latestSessionEndTime.After(rs.lastScanSessionEndTime) && latestSessionTransactionCount < transactionsPerSessionLimit {
-			log.WithField("fenceLSN", fmt.Sprintf("%X", latestSessionEndLSN)).Debug("established new CDC fence position")
+			log.WithField("fenceLSN", fmt.Sprintf("%X", latestSessionCommitLSN)).Debug("established new CDC fence position")
 			rs.lastScanSessionEndTime = latestSessionEndTime
-			return latestSessionEndLSN, nil
+			return latestSessionCommitLSN, nil
 		}
 
 		// Short sleep to give the database a little while to run another CDC scan session before checking again
 		time.Sleep(1 * time.Second)
 	}
+	log.WithField("lastEndTime", rs.lastScanSessionEndTime.Format(time.RFC3339)).Error("failed to establish fence position")
 	return nil, fmt.Errorf("failed to establish a valid fence position after %s, the CDC worker may not be running", establishFenceTimeout.String())
 }
 
