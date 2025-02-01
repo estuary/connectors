@@ -183,7 +183,7 @@ func currentUserHasDBOwner(ctx context.Context, conn *sql.DB) (bool, error) {
 }
 
 func (db *sqlserverDatabase) prerequisiteViewCDCScanHistory(ctx context.Context) error {
-	var _, err = listCDCLogScanSessions(ctx, db.conn)
+	var _, err = latestCDCLogScanSession(ctx, db.conn)
 	if err != nil {
 		log.WithField("err", err).Error("failed to list CDC log scan sessions")
 		var msErr mssqldb.Error
