@@ -5,7 +5,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -88,6 +87,7 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor 
 		}
 		stream.fromLSN = resumeLSN
 	}
+	stream.fenceLSN = stream.fromLSN
 
 	return stream, nil
 }
@@ -321,6 +321,17 @@ func (rs *sqlserverReplicationStream) streamToPositionalFence(ctx context.Contex
 	}
 }
 
+// establishFencePosition polls the 'sys.dm_cdc_log_scan_sessions' database management view to
+// determine when a new CDC log scan has completed, and then obtains a CDC LSN which is not-before
+// the completion of that log scan session.
+//
+// It is, strictly speaking, a bit inefficient to do things this way because we block until one or
+// two scan cycles complete, and in a heavily loaded database it might be preferable to keep on
+// processing change data in between queries.
+//
+// TODO(wgd): Factor out the single-query portion of this logic and modify the streamToPositionalFence
+// implementation so that it calls the single-query part once per second until successful and handles
+// ongoing event processing in between.
 func (rs *sqlserverReplicationStream) establishFencePosition(ctx context.Context) (LSN, error) {
 	var deadline = time.Now().Add(establishFenceTimeout)
 	for time.Now().Before(deadline) {
@@ -346,50 +357,36 @@ func (rs *sqlserverReplicationStream) establishFencePosition(ctx context.Context
 		// when there's no prior information cached.
 		var transactionsPerSessionLimit = 500
 
-		// List CDC worker runs
-		var sessions, err = listCDCLogScanSessions(ctx, rs.conn)
+		// Obtain information about the latest CDC log scan session and the current maximum CDC LSN.
+		// The order in which we fetch these is important, because we need to know that the CDC max-LSN
+		// value is causally not-before the log scan session we examine.
+		session, err := latestCDCLogScanSession(ctx, rs.conn)
+		if err != nil {
+			return nil, err
+		}
+		cdcMaxLSN, err := cdcGetMaxLSN(ctx, rs.conn)
 		if err != nil {
 			return nil, err
 		}
 
-		if len(sessions) == 0 {
-			log.Warn("dm_cdc_log_scan_sessions contains no completed scans, will retry")
+		log.WithFields(log.Fields{
+			"sessionID": session.SessionID,
+			"endTime":   session.EndTime.Format(time.RFC3339),
+			"tranCount": session.TransactionCount,
+			"cdcMaxLSN": fmt.Sprintf("%X", cdcMaxLSN),
+		}).Debug("queried latest CDC log scan information")
+
+		if rs.lastScanSessionEndTime.IsZero() {
+			log.WithField("end_time", session.EndTime.Format(time.RFC3339)).Debug("initialized CDC end_time state")
+			rs.lastScanSessionEndTime = session.EndTime
 			time.Sleep(1 * time.Second)
 			continue
 		}
 
-		var latestSessionEndTime = sessions[0].endTime
-		var latestSessionCommitLSN = sessions[0].lastCommitLSN
-		var latestSessionTransactionCount = sessions[0].transactionCount
-
-		if rs.lastScanSessionEndTime.IsZero() {
-			log.WithField("end_time", latestSessionEndTime.Format(time.RFC3339)).Debug("initialized CDC end_time state")
-			rs.lastScanSessionEndTime = latestSessionEndTime
-			continue
-		}
-		if string(sessions[0].lastCommitLSN) == "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00" {
-			if len(sessions) > 2 {
-				log.WithField("prev_lsn", fmt.Sprintf("%X", sessions[1].lastCommitLSN)).Debug("latest CDC scan is empty, consulting previous commit LSN")
-				latestSessionCommitLSN = sessions[1].lastCommitLSN
-			} else {
-				log.Warn("zero end lsn but no previous session, will retry")
-				time.Sleep(1 * time.Second)
-				continue
-			}
-		}
-
-		log.WithFields(log.Fields{
-			"session":   sessions[0].sessionID,
-			"endTime":   latestSessionEndTime.Format(time.RFC3339),
-			"prevTime":  rs.lastScanSessionEndTime.Format(time.RFC3339),
-			"commitLSN": fmt.Sprintf("%X", latestSessionCommitLSN),
-			"tranCount": latestSessionTransactionCount,
-		}).Debug("queried latest CDC scan session")
-
-		if latestSessionEndTime.After(rs.lastScanSessionEndTime) && latestSessionTransactionCount < transactionsPerSessionLimit {
-			log.WithField("fenceLSN", fmt.Sprintf("%X", latestSessionCommitLSN)).Debug("established new CDC fence position")
-			rs.lastScanSessionEndTime = latestSessionEndTime
-			return latestSessionCommitLSN, nil
+		if session.EndTime.After(rs.lastScanSessionEndTime) && session.TransactionCount < transactionsPerSessionLimit {
+			log.WithField("fenceLSN", fmt.Sprintf("%X", cdcMaxLSN)).Debug("established new CDC fence position")
+			rs.lastScanSessionEndTime = session.EndTime
+			return cdcMaxLSN, nil
 		}
 
 		// Short sleep to give the database a little while to run another CDC scan session before checking again
@@ -400,14 +397,12 @@ func (rs *sqlserverReplicationStream) establishFencePosition(ctx context.Context
 }
 
 type logScanSession struct {
-	sessionID                        int
-	startTime, endTime               time.Time
-	scanPhase                        string
-	startLSN, endLSN, lastCommitLSN  LSN
-	transactionCount, emptyScanCount int
+	SessionID        int
+	EndTime          time.Time
+	TransactionCount int
 }
 
-// Query the list of completed scan sessions. Descending order means the most recent one is index 0.
+// Return the timestamp of the latest completed CDC log scan session.
 //
 // The 'sys.dm_cdc_log_scan_sessions' management view requires either the 'VIEW DATABASE STATE'
 // permission, or in SQL Server 2022+ the 'VIEW DATABASE PERFORMANCE STATE' permission is also
@@ -415,41 +410,13 @@ type logScanSession struct {
 //
 //	GRANT VIEW DATABASE PERFORMANCE STATE TO flow_capture
 //	GRANT VIEW DATABASE STATE TO flow_capture
-func listCDCLogScanSessions(ctx context.Context, conn *sql.DB) ([]logScanSession, error) {
-	const query = `
-		    SELECT session_id, start_time, end_time, scan_phase, start_lsn, end_lsn, tran_count, last_commit_lsn, empty_scan_count
-			    FROM sys.dm_cdc_log_scan_sessions
-				WHERE scan_phase = 'Done'
-				ORDER BY session_id DESC;`
-	var sessions []logScanSession
-	var rows, err = conn.QueryContext(ctx, query)
-	if err != nil {
+func latestCDCLogScanSession(ctx context.Context, conn *sql.DB) (*logScanSession, error) {
+	const query = `SELECT session_id, end_time, tran_count FROM sys.dm_cdc_log_scan_sessions WHERE scan_phase = 'Done' ORDER BY session_id DESC OFFSET 0 ROWS FETCH FIRST 1 ROW ONLY;`
+	var s logScanSession
+	if err := conn.QueryRowContext(ctx, query).Scan(&s.SessionID, &s.EndTime, &s.TransactionCount); err != nil {
 		return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
 	}
-	for rows.Next() {
-		var x logScanSession
-		var startLSN, endLSN, lastCommitLSN string
-		if err := rows.Scan(&x.sessionID, &x.startTime, &x.endTime, &x.scanPhase, &startLSN, &endLSN, &x.transactionCount, &lastCommitLSN, &x.emptyScanCount); err != nil {
-			return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
-		}
-		x.startLSN = parseTextualLSN(strings.TrimRight(startLSN, "\x00"))
-		x.endLSN = parseTextualLSN(strings.TrimRight(endLSN, "\x00"))
-		x.lastCommitLSN = parseTextualLSN(strings.TrimRight(lastCommitLSN, "\x00"))
-		sessions = append(sessions, x)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("error querying sys.dm_cdc_log_scan_sessions: %w", err)
-	}
-	return sessions, nil
-}
-
-func parseTextualLSN(lsn string) LSN {
-	lsn = strings.ReplaceAll(lsn, ":", "") // Remove colon separators
-	var bs, err = hex.DecodeString(lsn)
-	if err != nil {
-		panic("internal error: lsn decoding failure")
-	}
-	return LSN(bs)
+	return &s, nil
 }
 
 func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
@@ -660,7 +627,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 
 	// For any streams without a valid capture instance to use, emit TableDropEvents and deactivate.
 	for _, streamID := range failed {
-		log.WithFields(log.Fields{"stream": streamID, "pollFromLSN": rs.fromLSN}).Info("dropping stream with no valid capture instance(s)")
+		log.WithFields(log.Fields{"stream": streamID, "pollFromLSN": fmt.Sprintf("%X", rs.fromLSN)}).Info("dropping stream with no valid capture instance(s)")
 		if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
 			StreamID: streamID,
 			Cause:    fmt.Sprintf("table %q has no (valid) capture instances", streamID),
