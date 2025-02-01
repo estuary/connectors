@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -18,14 +20,23 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 		log.WithField("err", err).Debug("server version prerequisite failed")
 	}
 
-	for _, prereq := range []func(ctx context.Context) error{
+	var checks = []func(ctx context.Context) error{
 		db.prerequisiteCDCEnabled,
 		db.prerequisiteChangeTableCleanup,
 		db.prerequisiteCaptureInstanceManagement,
-		db.prerequisiteWatermarksTable,
-		db.prerequisiteWatermarksCaptureInstance,
 		db.prerequisiteMaximumLSN,
-	} {
+	}
+	if db.featureFlags["read_only"] {
+		checks = append(checks,
+			db.prerequisiteViewCDCScanHistory,
+		)
+	} else {
+		checks = append(checks,
+			db.prerequisiteWatermarksTable,
+			db.prerequisiteWatermarksCaptureInstance,
+		)
+	}
+	for _, prereq := range checks {
 		if err := prereq(ctx); err != nil {
 			errs = append(errs, err)
 		}
@@ -171,6 +182,19 @@ func currentUserHasDBOwner(ctx context.Context, conn *sql.DB) (bool, error) {
 	return false, nil
 }
 
+func (db *sqlserverDatabase) prerequisiteViewCDCScanHistory(ctx context.Context) error {
+	var _, err = listCDCLogScanSessions(ctx, db.conn)
+	if err != nil {
+		log.WithField("err", err).Error("failed to list CDC log scan sessions")
+		var msErr mssqldb.Error
+		if errors.As(err, &msErr) && msErr.SQLErrorNumber() == 297 { // Error 297 = "The user does not have permission to perform this action"
+			return fmt.Errorf("user %q needs the VIEW DATABASE STATE permission", db.config.User)
+		}
+		return fmt.Errorf("failed to query sys.dm_cdc_log_scan_sessions: %w", err)
+	}
+	return nil
+}
+
 func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
 	var table = db.config.Advanced.WatermarksTable
 	var logEntry = log.WithField("table", table)
@@ -208,12 +232,6 @@ func splitStreamID(streamID string) (string, string) {
 }
 
 func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
-	// By writing a watermark here we ensure that there is at least one change event for
-	// the agent process to observe, and thus the "get max LSN" query should eventually
-	// yield a non-empty result. We ignore errors here, because the watermarks table
-	// prerequisite is responsible for reporting those.
-	_ = db.WriteWatermark(ctx, "dummy-value")
-
 	var maxLSN []byte
 	// Retry loop with a 1s delay between retries, in case the watermarks table
 	// capture instance was the first one created on this database.
