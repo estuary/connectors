@@ -106,6 +106,14 @@ Example:
 }
 ```
 
+#### `secret` annotation only supports `string` type
+
+When you have a secret you must have it be a single type of `string`. This is currently a limitation by the UI implementation and could change if required with some work.
+
+#### Remember to test `edit` while using `secret`
+
+Please make sure both flows work well, have a solid UX, and are rendering the input as a `password` that masks the value being entered. Due to how we encrypt  data with SOPs the UI has to handle editing configurations a little different. This means that inputs that might look good with `create` will be messed up in the `edit` flow. This is mainly because we need to force users to re-enter any encrypted field during `edit`.
+
 ### Use `advanced` annotation for objects that should be collapsed by default
 
 Some configuration tends to be used only in certain less common scenarios. Network tunneling is a
