@@ -60,10 +60,15 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-var bqDialect = func() sql.Dialect {
+func bqDialect(objAndArrayAsJson bool) sql.Dialect {
+	objAndArrayCol := sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
+	if objAndArrayAsJson {
+		objAndArrayCol = sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.ARRAY:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
+			sql.ARRAY:   objAndArrayCol,
 			sql.BINARY:  sql.MapStatic("STRING"),
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
@@ -73,8 +78,10 @@ var bqDialect = func() sql.Dialect {
 			// We used to materialize these as "BIGNUMERIC(38,0)", so
 			// pre-existing columns of that type are allowed for
 			// backward-compatibility.
-			sql.NUMBER:   sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float", "bignumeric")),
-			sql.OBJECT:   sql.MapStatic("STRING", sql.UsingConverter(jsonConverter)),
+			sql.NUMBER: sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float", "bignumeric")),
+			sql.OBJECT: objAndArrayCol,
+			// Note that MULTIPLE fields have always been materialized into JSON
+			// columns, so there is no configurability for these.
 			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				// BigQuery's table metadata APIs include the precision and
@@ -134,7 +141,7 @@ var bqDialect = func() sql.Dialect {
 		MaxColumnCharLength:    300,
 		CaseInsensitiveColumns: true,
 	}
-}()
+}
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`FORMAT_TIMESTAMP('%%Y-%%m-%%dT%%H:%%M:%%E*SZ', %s, 'UTC') `, migration.Identifier)
@@ -148,8 +155,19 @@ func toBigNumericCast(m sql.ColumnTypeMigration) string {
 	return fmt.Sprintf("CAST(%s AS BIGNUMERIC)", m.Identifier)
 }
 
-var (
-	tplAll = sql.MustParseTemplate(bqDialect, "root", `
+type templates struct {
+	tempTableName     *template.Template
+	createTargetTable *template.Template
+	alterTableColumns *template.Template
+	installFence      *template.Template
+	updateFence       *template.Template
+	loadQuery         *template.Template
+	storeInsert       *template.Template
+	storeUpdate       *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "tempTableName" -}}
 flow_temp_table_{{ $.Binding }}
 {{- end }}
@@ -243,7 +261,11 @@ ON {{ range $ind, $bound := $.Bounds }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
 {{- if $.Document }}
-WHEN MATCHED AND r.c{{ Add (len $.Columns) -1 }}='"delete"' THEN
+WHEN MATCHED AND {{ if $.ObjAndArrayAsJson -}}
+	TO_JSON_STRING(r.c{{ Add (len $.Columns) -1 }})
+{{- else -}}
+	r.c{{ Add (len $.Columns) -1 }}
+{{- end }}='"delete"' THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
@@ -339,26 +361,31 @@ UPDATE {{ Identifier $.TablePath }}
 	AND fence={{ $.Fence }};
 {{ end }}
 `)
-	tplTempTableName     = tplAll.Lookup("tempTableName")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplStoreInsert       = tplAll.Lookup("storeInsert")
-	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
-)
+
+	return templates{
+		tempTableName:     tplAll.Lookup("tempTableName"),
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		installFence:      tplAll.Lookup("installFence"),
+		updateFence:       tplAll.Lookup("updateFence"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		storeInsert:       tplAll.Lookup("storeInsert"),
+		storeUpdate:       tplAll.Lookup("storeUpdate"),
+	}
+}
 
 type queryParams struct {
 	sql.Table
-	Bounds []sql.MergeBound
+	Bounds            []sql.MergeBound
+	ObjAndArrayAsJson bool
 }
 
-func renderQueryTemplate(table sql.Table, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+func renderQueryTemplate(table sql.Table, tpl *template.Template, bounds []sql.MergeBound, objAndArrayAsJson bool) (string, error) {
 	var w strings.Builder
 	if err := tpl.Execute(&w, &queryParams{
-		Table:  table,
-		Bounds: bounds,
+		Table:             table,
+		Bounds:            bounds,
+		ObjAndArrayAsJson: objAndArrayAsJson,
 	}); err != nil {
 		return "", err
 	}

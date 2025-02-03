@@ -59,7 +59,7 @@ func TestValidateAndApply(t *testing.T) {
 		projectID: cfg.ProjectID,
 	}
 
-	client, err := cfg.client(ctx)
+	client, err := cfg.client(ctx, &sql.Endpoint{Dialect: testDialect})
 	require.NoError(t, err)
 	defer client.Close()
 
@@ -76,7 +76,7 @@ func TestValidateAndApply(t *testing.T) {
 			t.Helper()
 			_, _ = client.query(ctx, fmt.Sprintf(
 				"drop table %s;",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
+				testDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
 			))
 		},
 	)
@@ -93,7 +93,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		projectID: cfg.ProjectID,
 	}
 
-	client, err := cfg.client(ctx)
+	client, err := cfg.client(ctx, &sql.Endpoint{Dialect: testDialect})
 	require.NoError(t, err)
 	defer client.Close()
 
@@ -111,13 +111,13 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			var keys = make([]string, len(cols))
 			for i, col := range cols {
-				keys[i] = bqDialect.Identifier(col)
+				keys[i] = testDialect.Identifier(col)
 			}
-			keys = append(keys, bqDialect.Identifier("_meta/flow_truncated"))
+			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
 			values = append(values, "false")
-			keys = append(keys, bqDialect.Identifier("flow_published_at"))
+			keys = append(keys, testDialect.Identifier("flow_published_at"))
 			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, bqDialect.Identifier("flow_document"))
+			keys = append(keys, testDialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
 
 			// bigquery does not support more than 6 fractional second precision, and will fail if we try
@@ -130,7 +130,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			_, err = client.query(ctx, fmt.Sprintf(
 				"insert into %s (%s) VALUES (%s);",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","),
+				testDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","),
 			))
 
 			require.NoError(t, err)
@@ -139,7 +139,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			t.Helper()
 			var b strings.Builder
 
-			var sql = fmt.Sprintf("select * from %s order by %s asc;", bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), bqDialect.Identifier("key"))
+			var sql = fmt.Sprintf("select * from %s order by %s asc;", testDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), testDialect.Identifier("key"))
 
 			job, err := client.query(ctx, sql)
 			require.NoError(t, err)
@@ -183,7 +183,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			t.Helper()
 			_, _ = client.query(ctx, fmt.Sprintf(
 				"drop table %s;",
-				bqDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
+				testDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
 			))
 		},
 	)
@@ -196,17 +196,19 @@ func TestFencingCases(t *testing.T) {
 	cfg := mustGetCfg(t)
 
 	var ctx = context.Background()
-	client, err := cfg.client(ctx)
+	client, err := cfg.client(ctx, &sql.Endpoint{Dialect: testDialect})
 	require.NoError(t, err)
+
+	var templates = renderTemplates(testDialect)
 
 	sql.RunFenceTestCases(t,
 		client,
 		[]string{cfg.ProjectID, cfg.Dataset, "temp_test_fencing_checkpoints"},
-		bqDialect,
-		tplCreateTargetTable,
+		testDialect,
+		templates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+			if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			} else if _, err := client.query(ctx, fenceUpdate.String()); err != nil {
 				return fmt.Errorf("executing fence update: %w", err)
@@ -325,8 +327,8 @@ func dumpSchema(t *testing.T, ctx context.Context, client *client, cfg config, r
 
 	job, err := client.query(ctx, fmt.Sprintf(
 		"select column_name, is_nullable, data_type from %s where table_name = %s;",
-		bqDialect.Identifier(cfg.Dataset, "INFORMATION_SCHEMA", "COLUMNS"),
-		bqDialect.Literal(resourceConfig.Table),
+		testDialect.Identifier(cfg.Dataset, "INFORMATION_SCHEMA", "COLUMNS"),
+		testDialect.Literal(resourceConfig.Table),
 	))
 	require.NoError(t, err)
 

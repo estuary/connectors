@@ -80,7 +80,7 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) client(ctx context.Context) (*client, error) {
+func (c *config) client(ctx context.Context, ep *sql.Endpoint) (*client, error) {
 	var clientOpts []option.ClientOption
 
 	clientOpts = append(clientOpts,
@@ -114,6 +114,7 @@ func (c *config) client(ctx context.Context) (*client, error) {
 		bigqueryClient:     bigqueryClient,
 		cloudStorageClient: cloudStorageClient,
 		cfg:                *c,
+		ep:                 ep,
 	}, nil
 }
 
@@ -179,14 +180,18 @@ func newBigQueryDriver() *sql.Driver {
 				log.WithField("flags", featureFlags).Info("parsed feature flags")
 			}
 
+			objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
+			dialect := bqDialect(objAndArrayAsJson)
+			templates := renderTemplates(dialect)
+
 			return &sql.Endpoint{
 				Config:              cfg,
-				Dialect:             bqDialect,
+				Dialect:             dialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.ProjectID, cfg.Dataset}),
 				NewClient:           newClient,
-				CreateTableTemplate: tplCreateTargetTable,
+				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				NewTransactor:       prepareNewTransactor(dialect, templates, objAndArrayAsJson),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
 			}, nil

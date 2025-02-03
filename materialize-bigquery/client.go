@@ -28,22 +28,23 @@ type client struct {
 	bigqueryClient     *bigquery.Client
 	cloudStorageClient *storage.Client
 	cfg                config
+	ep                 *sql.Endpoint
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	cfg := ep.Config.(*config)
-	return cfg.client(ctx)
+	return cfg.client(ctx, ep)
 }
 
 func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
 	is := boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(bqDialect.TableLocator),
-		bqDialect.ColumnLocator,
+		sql.ToLocatePathFn(c.ep.TableLocator),
+		c.ep.ColumnLocator,
 	)
 
 	rpDatasets := make(map[string]struct{})
 	for _, p := range resourcePaths {
-		rpDatasets[bqDialect.TableLocator(p).TableSchema] = struct{}{}
+		rpDatasets[c.ep.TableLocator(p).TableSchema] = struct{}{}
 	}
 
 	// Fetch table and column metadata using the metadata API. This API is free to use, and has very
@@ -117,7 +118,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", bqDialect.Identifier(path...))
+	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.query(ctx, stmt)
@@ -178,7 +179,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	var stmts []string
 	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
 		var alterColumnStmtBuilder strings.Builder
-		if err := tplAlterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
+		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 		alterColumnStmt := alterColumnStmtBuilder.String()
@@ -187,7 +188,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.ColumnTypeChanges) > 0 {
 		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, bqDialect, ta.Table, m, columnMigrationSteps...); err != nil {
+			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, columnMigrationSteps...); err != nil {
 				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 			} else {
 				stmts = append(stmts, steps...)
@@ -236,7 +237,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
 	errs := &sql.PrereqErr{}
 
 	cfg := conf.(*config)
-	c, err := cfg.client(ctx)
+	c, err := cfg.client(ctx, nil)
 	if err != nil {
 		errs.Err(fmt.Errorf("creating client: %w", err))
 		return errs
@@ -316,7 +317,7 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) (sql.Fence, error) {
 	var query strings.Builder
-	if err := tplInstallFence.Execute(&query, fence); err != nil {
+	if err := renderTemplates(c.ep.Dialect).installFence.Execute(&query, fence); err != nil {
 		return fence, fmt.Errorf("evaluating fence template: %w", err)
 	}
 
