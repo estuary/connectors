@@ -425,7 +425,7 @@ async def backfill_incremental_cursor_export_resources(
             return
 
 
-async def _fetch_ticket_child_resource(
+async def _fetch_ticket_child_resources(
     http: HTTPSession,
     subdomain: str,
     path: str,
@@ -496,7 +496,7 @@ async def fetch_ticket_child_resources(
                 if ticket.status == 'deleted':
                     continue
 
-                async for child_resource in _fetch_ticket_child_resource(http, subdomain, path, response_model, ticket.id, log):
+                async for child_resource in _fetch_ticket_child_resources(http, subdomain, path, response_model, ticket.id, log):
                     yield child_resource
 
             yield (next_page_cursor,)
@@ -519,13 +519,13 @@ async def backfill_ticket_child_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
+    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
 
     tickets: list[AbbreviatedTicket] = []
 
     while True:
         next_page_cursor: str | None = None
-        async for result in generator:
+        async for result in tickets_generator:
             if isinstance(result, TimestampedResource):
                 tickets.append(AbbreviatedTicket(
                     id=result.id, 
@@ -543,7 +543,7 @@ async def backfill_ticket_child_resources(
                 if ticket.status == 'deleted':
                     continue
 
-                async for child_resource in _fetch_ticket_child_resource(http, subdomain, path, response_model, ticket.id, log):
+                async for child_resource in _fetch_ticket_child_resources(http, subdomain, path, response_model, ticket.id, log):
                     yield child_resource
 
             yield next_page_cursor
