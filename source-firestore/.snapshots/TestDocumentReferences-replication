@@ -1,0 +1,10 @@
+# ================================
+# Collection "flow_source_tests/*/docs": 2 Documents
+# ================================
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/3","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"data":3}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/4","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>"},"ref":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/3"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"flow_source_tests%2F%2A%2Fdocs":{"Backfill":{"Completed":true,"Cursor":"","MTime":"<TIMESTAMP>","StartAfter":"<TIMESTAMP>"},"ReadTime":"<TIMESTAMP>"}}}
+
