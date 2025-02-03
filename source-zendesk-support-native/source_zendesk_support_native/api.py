@@ -25,6 +25,7 @@ from .models import (
 )
 
 CURSOR_PAGINATION_PAGE_SIZE = 100
+MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
 # Zendesk errors out if a start or end time parameter is more recent than 60 seconds in the past.
 TIME_PARAMETER_DELAY = timedelta(seconds=60)
@@ -321,7 +322,8 @@ async def _fetch_incremental_cursor_export_resources(
     start_date: datetime | None,
     cursor: str | None,
     log: Logger,
-    sideload_params: dict[str, str] | None = None
+    sideload_params: dict[str, str] | None = None,
+    page_size: int = MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
 ) -> AsyncGenerator[TimestampedResource | str, None]:
     url = f"{url_base(subdomain)}/incremental"
     match name:
@@ -334,7 +336,10 @@ async def _fetch_incremental_cursor_export_resources(
         case _:
             raise RuntimeError(f"Unknown incremental cursor pagination resource type {name}.")
 
-    params: dict[str, str | int] = {}
+    params: dict[str, str | int] = {
+        "per_page": page_size,
+    }
+
     if sideload_params:
         params.update(sideload_params)
 
@@ -656,7 +661,12 @@ async def fetch_ticket_metrics(
         "include": "metric_sets"
     }
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log, sideload_params)
+    # Sideloading metric sets can cause Zendesk's API to take a while to respond. If we try to use the max page size,
+    # Zendesk can take long enough to respond that the intermediate routers/gateways assume return a 504 response.
+    # The page size used for ticket metrics is reduced to 500 to mitigate these 504 responses.
+    page_size = 500
+
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log, sideload_params, page_size)
 
     async for result in generator:
         if isinstance(result, str):
@@ -684,7 +694,9 @@ async def backfill_ticket_metrics(
         "include": "metric_sets"
     }
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log, sideload_params)
+    page_size = 500
+
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log, sideload_params, page_size)
 
     async for result in generator:
 
