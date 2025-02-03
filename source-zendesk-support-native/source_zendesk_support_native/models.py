@@ -188,6 +188,12 @@ class TicketCommentsResponse(IncrementalCursorPaginatedResponse):
     resources: list[ZendeskResource] = Field(alias="comments")
 
 
+class AbbreviatedTicket(BaseModel):
+    id: int
+    status: str
+    updated_at: AwareDatetime
+
+
 # Resources that are fetched by following the tickets stream & fetching resources for updated tickets in a separate request.
 # Tuples contain the name, path, and response model for each resource.
 TICKET_CHILD_RESOURCES: list[tuple[str, str, type[IncrementalCursorPaginatedResponse]]] = [
