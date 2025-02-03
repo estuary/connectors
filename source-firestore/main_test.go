@@ -498,3 +498,29 @@ func (c *firestoreClient) Delete(ctx context.Context, t testing.TB, names ...str
 	var _, err = wb.Commit(ctx)
 	require.NoError(t, err)
 }
+
+func TestDocumentReferences(t *testing.T) {
+	var ctx = testContext(t, 10*time.Second)
+	var capture = simpleCapture(t, "docs")
+	var client = testFirestoreClient(ctx, t)
+	t.Run("backfill", func(t *testing.T) {
+		client.Conn.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+			var docA = client.Conn.Doc(client.Prefix + "docs/1")
+			var docB = client.Conn.Doc(client.Prefix + "docs/2")
+			tx.Set(docA, map[string]any{"data": 1}, firestore.MergeAll)
+			tx.Set(docB, map[string]any{"ref": docA}, firestore.MergeAll)
+			return nil
+		})
+		verifyCapture(ctx, t, capture)
+	})
+	t.Run("replication", func(t *testing.T) {
+		client.Conn.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+			var docA = client.Conn.Doc(client.Prefix + "docs/3")
+			var docB = client.Conn.Doc(client.Prefix + "docs/4")
+			tx.Set(docA, map[string]any{"data": 3}, firestore.MergeAll)
+			tx.Set(docB, map[string]any{"ref": docA}, firestore.MergeAll)
+			return nil
+		})
+		verifyCapture(ctx, t, capture)
+	})
+}
