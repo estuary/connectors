@@ -19,8 +19,11 @@ import (
 )
 
 type transactor struct {
-	fence *sql.Fence
-	cfg   *config
+	fence             *sql.Fence
+	cfg               *config
+	dialect           sql.Dialect
+	templates         templates
+	objAndArrayAsJson bool
 
 	client     *client
 	bucketPath string
@@ -32,77 +35,86 @@ type transactor struct {
 	loggedStorageApiMessage bool
 }
 
-func newTransactor(
-	ctx context.Context,
-	ep *sql.Endpoint,
-	fence sql.Fence,
-	bindings []sql.Table,
-	open pm.Request_Open,
-	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-	cfg := ep.Config.(*config)
+func prepareNewTransactor(
+	dialect sql.Dialect,
+	templates templates,
+	objAndArrayAsStr bool,
+) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+	return func(
+		ctx context.Context,
+		ep *sql.Endpoint,
+		fence sql.Fence,
+		bindings []sql.Table,
+		open pm.Request_Open,
+		is *boilerplate.InfoSchema,
+		be *boilerplate.BindingEvents,
+	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
+		cfg := ep.Config.(*config)
 
-	client, err := cfg.client(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	t := &transactor{
-		cfg:        cfg,
-		fence:      &fence,
-		client:     client,
-		bucketPath: cfg.BucketPath,
-		bucket:     cfg.Bucket,
-		be:         be,
-	}
-
-	for _, binding := range bindings {
-		// The name of the table itself is always the last element of the path.
-		table := binding.TableShape.Path[len(binding.TableShape.Path)-1]
-
-		// The dataset for the table is always the second to last element of the path. Dataset names
-		// can only contain letters, numbers, and underscores, so translateFlowIdentifier is not
-		// needed when using this part of the path directly.
-		dataset := binding.TableShape.Path[len(binding.TableShape.Path)-2]
-
-		// Lookup metadata for the table to build the schema for the external file that will be used
-		// for loading data. Schema definitions from the actual table columns are queried instead of
-		// directly using the dialect's output for JSON schema type to provide some degree in
-		// flexibility in changing the dialect and having it still work for existing tables. As long
-		// as the JSON encoding of the values is the same they may be used for columns that would
-		// have been created differently due to evolution of the dialect's column types.
-		meta, err := client.bigqueryClient.DatasetInProject(cfg.ProjectID, dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
+		client, err := cfg.client(ctx, ep)
 		if err != nil {
-			return nil, nil, fmt.Errorf("getting table metadata: %w", err)
+			return nil, nil, err
 		}
 
-		log.WithFields(log.Fields{
-			"table":      table,
-			"collection": binding.Source.String(),
-			"schemaJson": meta.Schema,
-		}).Debug("bigquery schema for table")
-
-		fieldSchemas := make(map[string]*bigquery.FieldSchema)
-		for _, f := range meta.Schema {
-			fieldSchemas[f.Name] = f
+		t := &transactor{
+			cfg:               cfg,
+			fence:             &fence,
+			dialect:           dialect,
+			templates:         templates,
+			objAndArrayAsJson: objAndArrayAsStr,
+			client:            client,
+			bucketPath:        cfg.BucketPath,
+			bucket:            cfg.Bucket,
+			be:                be,
 		}
 
-		if err = t.addBinding(binding, fieldSchemas, &ep.Dialect); err != nil {
-			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+		for _, binding := range bindings {
+			// The name of the table itself is always the last element of the path.
+			table := binding.TableShape.Path[len(binding.TableShape.Path)-1]
+
+			// The dataset for the table is always the second to last element of the path. Dataset names
+			// can only contain letters, numbers, and underscores, so translateFlowIdentifier is not
+			// needed when using this part of the path directly.
+			dataset := binding.TableShape.Path[len(binding.TableShape.Path)-2]
+
+			// Lookup metadata for the table to build the schema for the external file that will be used
+			// for loading data. Schema definitions from the actual table columns are queried instead of
+			// directly using the dialect's output for JSON schema type to provide some degree in
+			// flexibility in changing the dialect and having it still work for existing tables. As long
+			// as the JSON encoding of the values is the same they may be used for columns that would
+			// have been created differently due to evolution of the dialect's column types.
+			meta, err := client.bigqueryClient.DatasetInProject(cfg.ProjectID, dataset).Table(translateFlowIdentifier(table)).Metadata(ctx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("getting table metadata: %w", err)
+			}
+
+			log.WithFields(log.Fields{
+				"table":      table,
+				"collection": binding.Source.String(),
+				"schemaJson": meta.Schema,
+			}).Debug("bigquery schema for table")
+
+			fieldSchemas := make(map[string]*bigquery.FieldSchema)
+			for _, f := range meta.Schema {
+				fieldSchemas[f.Name] = f
+			}
+
+			if err = t.addBinding(binding, fieldSchemas, &ep.Dialect); err != nil {
+				return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			}
 		}
+
+		opts := &boilerplate.MaterializeOptions{
+			ExtendedLogging: true,
+			AckSchedule: &boilerplate.AckScheduleOption{
+				Config: cfg.Schedule,
+				Jitter: []byte(cfg.ProjectID + cfg.Dataset),
+			},
+			DBTJobTrigger: &cfg.DBTJobTrigger,
+		}
+
+		return t, opts, nil
 	}
-
-	opts := &boilerplate.MaterializeOptions{
-		ExtendedLogging: true,
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: cfg.Schedule,
-			Jitter: []byte(cfg.ProjectID + cfg.Dataset),
-		},
-		DBTJobTrigger: &cfg.DBTJobTrigger,
-	}
-
-	return t, opts, nil
 }
 
 func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigquery.FieldSchema, dialect *sql.Dialect) error {
@@ -128,8 +140,8 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.tempTableName, tplTempTableName},
-		{&b.storeInsertSQL, tplStoreInsert},
+		{&b.tempTableName, t.templates.tempTableName},
+		{&b.storeInsertSQL, t.templates.storeInsert},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -195,7 +207,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		loadQuery, err := renderQueryTemplate(b.target, tplLoadQuery, b.loadMergeBounds.Build())
+		loadQuery, err := renderQueryTemplate(b.target, t.templates.loadQuery, b.loadMergeBounds.Build(), t.objAndArrayAsJson)
 		if err != nil {
 			return fmt.Errorf("rendering load query template: %w", err)
 		}
@@ -351,7 +363,7 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 
 	// First we must validate the fence has not been modified.
 	var fenceUpdate strings.Builder
-	if err := tplUpdateFence.Execute(&fenceUpdate, t.fence); err != nil {
+	if err := t.templates.updateFence.Execute(&fenceUpdate, t.fence); err != nil {
 		return fmt.Errorf("evaluating fence template: %w", err)
 	}
 	subqueries = append(subqueries, fenceUpdate.String())
@@ -370,7 +382,7 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 		if !b.mustMerge {
 			subqueries = append(subqueries, b.storeInsertSQL)
 		} else {
-			mergeQuery, err := renderQueryTemplate(b.target, tplStoreUpdate, b.storeMergeBounds.Build())
+			mergeQuery, err := renderQueryTemplate(b.target, t.templates.storeUpdate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
 			if err != nil {
 				return fmt.Errorf("rendering merge query template: %w", err)
 			}
