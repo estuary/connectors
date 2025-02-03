@@ -1,4 +1,4 @@
-package boilerplate
+package common
 
 import "strings"
 

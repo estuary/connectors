@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -175,7 +176,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	cfg.SetDefaults()
 
-	var featureFlags = boilerplate.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
 	log.WithField("flags", featureFlags).Info("parsed feature flags")
 
 	var db, err = drv.Connect(ctx, &cfg)
@@ -632,7 +633,7 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 	cfg.SetDefaults()
 
-	var featureFlags = boilerplate.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
 	log.WithField("flags", featureFlags).Info("parsed feature flags")
 
 	var db, err = drv.Connect(stream.Context(), &cfg)

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
@@ -177,7 +178,7 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 	}
 	config.SetDefaults()
 
-	var featureFlags = boilerplate.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
 	if config.Advanced.FeatureFlags != "" {
 		log.WithField("flags", featureFlags).Info("parsed feature flags")
 	}
