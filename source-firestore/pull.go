@@ -1139,6 +1139,8 @@ func sanitizeValue(x interface{}) interface{} {
 			x[key] = sanitizeValue(value)
 		}
 		return x
+	case *firestore.DocumentRef:
+		return x.Path
 	}
 	return x
 }

@@ -2,7 +2,7 @@
 # Collection "flow_source_tests/*/docs": 2 Documents
 # ================================
 {"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/1","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"data":1}
-{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"ref":{"Parent":{"Parent":{"Parent":{"Parent":null,"Path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests","ID":"flow_source_tests"},"Path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences","ID":"TestDocumentReferences"},"Path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs","ID":"docs"},"Path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/1","ID":"1"}}
+{"_meta":{"path":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/2","ctime":"<TIMESTAMP>","mtime":"<TIMESTAMP>","snapshot":true},"ref":"projects/project-id-123456/databases/(default)/documents/flow_source_tests/TestDocumentReferences/docs/1"}
 # ================================
 # Final State Checkpoint
 # ================================
