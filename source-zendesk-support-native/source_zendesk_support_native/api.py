@@ -12,6 +12,7 @@ from .models import (
     FullRefreshCursorPaginatedResponse,
     ZendeskResource,
     TimestampedResource,
+    AbbreviatedTicket,
     IncrementalCursorExportResponse,
     TicketsResponse,
     UsersResponse,
@@ -466,16 +467,37 @@ async def fetch_ticket_child_resources(
 
     tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log)
 
-    async for result in tickets_generator:
-        if isinstance(result, str):
-            yield (result,)
-        else:
-            status = getattr(result, "status")
-            if status == "deleted":
-                continue
+    tickets: list[AbbreviatedTicket] = []
 
-            async for child_resource in _fetch_ticket_child_resource(http, subdomain, path, response_model, result.id, log):
-                yield child_resource
+    while True:
+        # Fetching comments for each ticket as we're streaming a tickets response often triggers aiohttp's TimeoutError.
+        # To avoid these TimeoutErrors, we fetch all ticket ids in a single response, then fetch the child resources for 
+        # those ticket ids.
+
+        next_page_cursor: str | None = None
+        async for result in tickets_generator:
+            if isinstance(result, TimestampedResource):
+                tickets.append(AbbreviatedTicket(
+                    id=result.id, 
+                    status=getattr(result, "status"),
+                    updated_at=result.updated_at
+                ))
+            elif isinstance(result, str):
+                next_page_cursor = result
+                break
+
+        if len(tickets) > 0 and next_page_cursor:
+            for ticket in tickets:
+                if ticket.status == 'deleted':
+                    continue
+
+                async for child_resource in _fetch_ticket_child_resource(http, subdomain, path, response_model, ticket.id, log):
+                    yield child_resource
+
+            yield (next_page_cursor,)
+            tickets = []
+        elif not next_page_cursor:
+            break
 
 
 async def backfill_ticket_child_resources(
@@ -494,18 +516,35 @@ async def backfill_ticket_child_resources(
 
     generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
 
-    async for result in generator:
-        if isinstance(result, str):
-            yield result
-        elif result.updated_at < cutoff:
-            status = getattr(result, "status")
-            if status == "deleted":
-                continue
+    tickets: list[AbbreviatedTicket] = []
 
-            async for child_resource in _fetch_ticket_child_resource(http, subdomain, path, response_model, result.id, log):
-                yield child_resource
-        else:
-            return
+    while True:
+        next_page_cursor: str | None = None
+        async for result in generator:
+            if isinstance(result, TimestampedResource):
+                tickets.append(AbbreviatedTicket(
+                    id=result.id, 
+                    status=getattr(result, "status"),
+                    updated_at=result.updated_at
+                ))
+            elif isinstance(result, str):
+                next_page_cursor = result
+                break
+
+        if len(tickets) > 0 and next_page_cursor:
+            for ticket in tickets:
+                if ticket.updated_at >= cutoff:
+                    return
+                if ticket.status == 'deleted':
+                    continue
+
+                async for child_resource in _fetch_ticket_child_resource(http, subdomain, path, response_model, ticket.id, log):
+                    yield child_resource
+
+            yield next_page_cursor
+            tickets = []
+        elif not next_page_cursor:
+            break
 
 
 async def fetch_audit_logs(
