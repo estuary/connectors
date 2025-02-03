@@ -58,7 +58,7 @@
       },
       "multiple_types": {
         "Table": "multiple_types",
-        "Query": "\nCOPY INTO multiple_types (\n\tid, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, $1[6] AS multiple, $1[7] AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS flow_document\n\tFROM <uuid>\n);\n",
+        "Query": "\nCOPY INTO multiple_types (\n\tid, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document\n) FROM (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS flow_document\n\tFROM <uuid>\n);\n",
         "StagedDir": "<uuid>",
         "PipeName": "",
         "PipeFiles": null,
@@ -148,7 +148,7 @@
       },
       "multiple_types": {
         "Table": "multiple_types",
-        "Query": "\nMERGE INTO multiple_types AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, $1[6] AS multiple, $1[7] AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS flow_document\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r.flow_document='delete' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.binary_field = r.binary_field, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field, l.flow_document = r.flow_document\nWHEN NOT MATCHED and r.flow_document!='delete' THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.id, r.array_int, r.binary_field, r.bool_field, r.float_field, r.flow_published_at, r.multiple, r.nested, r.nullable_int, r.str_field, r.flow_document);\n",
+        "Query": "\nMERGE INTO multiple_types AS l\nUSING (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS flow_document\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r.flow_document='delete' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.binary_field = r.binary_field, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field, l.flow_document = r.flow_document\nWHEN NOT MATCHED and r.flow_document!='delete' THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.id, r.array_int, r.binary_field, r.bool_field, r.float_field, r.flow_published_at, r.multiple, r.nested, r.nullable_int, r.str_field, r.flow_document);\n",
         "StagedDir": "<uuid>",
         "PipeName": "",
         "PipeFiles": null,
@@ -219,7 +219,7 @@
       },
       "multiple_types": {
         "PipeName": "",
-        "Query": "\nMERGE INTO multiple_types AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, $1[6] AS multiple, $1[7] AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS flow_document\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r.flow_document='delete' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.binary_field = r.binary_field, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field, l.flow_document = r.flow_document\nWHEN NOT MATCHED and r.flow_document!='delete' THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.id, r.array_int, r.binary_field, r.bool_field, r.float_field, r.flow_published_at, r.multiple, r.nested, r.nullable_int, r.str_field, r.flow_document);\n",
+        "Query": "\nMERGE INTO multiple_types AS l\nUSING (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS flow_document\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r.flow_document='delete' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.binary_field = r.binary_field, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field, l.flow_document = r.flow_document\nWHEN NOT MATCHED and r.flow_document!='delete' THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.id, r.array_int, r.binary_field, r.bool_field, r.float_field, r.flow_published_at, r.multiple, r.nested, r.nullable_int, r.str_field, r.flow_document);\n",
         "StagedDir": "<uuid>",
         "Table": "multiple_types",
         "Version": "ffffffffffffffff"
@@ -548,7 +548,7 @@
       "FLOAT_FIELD": 88.88,
       "FLOW_PUBLISHED_AT": "1970-01-01T01:00:21Z",
       "ID": "8",
-      "MULTIPLE": "null",
+      "MULTIPLE": null,
       "NESTED": "{\n  \"id\": \"i8\"\n}",
       "NULLABLE_INT": "8",
       "STR_FIELD": "str8 v2"
@@ -560,7 +560,7 @@
       "FLOAT_FIELD": 99.99,
       "FLOW_PUBLISHED_AT": "1970-01-01T01:00:22Z",
       "ID": "9",
-      "MULTIPLE": "null",
+      "MULTIPLE": null,
       "NESTED": "{\n  \"id\": \"i9\"\n}",
       "NULLABLE_INT": null,
       "STR_FIELD": "str9 v2"
@@ -572,7 +572,7 @@
       "FLOAT_FIELD": 1010.101,
       "FLOW_PUBLISHED_AT": "1970-01-01T01:00:23Z",
       "ID": "10",
-      "MULTIPLE": "null",
+      "MULTIPLE": null,
       "NESTED": "{\n  \"id\": \"i10\"\n}",
       "NULLABLE_INT": "10",
       "STR_FIELD": "str10 v2"

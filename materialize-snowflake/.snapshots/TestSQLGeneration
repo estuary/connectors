@@ -95,7 +95,7 @@ ALTER TABLE "a-schema".key_value ALTER COLUMN
 --- Begin "a-schema".key_value mergeInto ---
 MERGE INTO "a-schema".key_value AS l
 USING (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, NULLIF($1[10], PARSE_JSON('null')) AS multiple, $1[11] AS number, $1[12] AS numberCastToString, NULLIF($1[13], PARSE_JSON('null')) AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
 	FROM test-file
 ) AS r
 ON 
@@ -125,7 +125,7 @@ SELECT 0, "a-schema".key_value.flow_document
 COPY INTO "a-schema".key_value (
 	key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document
 ) FROM (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", $1[3] AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, $1[10] AS multiple, $1[11] AS number, $1[12] AS numberCastToString, $1[13] AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, NULLIF($1[10], PARSE_JSON('null')) AS multiple, $1[11] AS number, $1[12] AS numberCastToString, NULLIF($1[13], PARSE_JSON('null')) AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
 	FROM test-file
 );
 --- End "a-schema".key_value copyInto ---

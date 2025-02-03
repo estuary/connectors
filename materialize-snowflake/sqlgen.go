@@ -249,7 +249,7 @@ CREATE PIPE {{ template "pipe_name" . }}
 ) FROM (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 	{{- if $ind }}, {{ end -}}
-	$1[{{$ind}}] AS {{$key.Identifier -}}
+	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM @flow_v1
 );
@@ -264,7 +264,7 @@ COPY INTO {{ $.Table.Identifier }} (
 ) FROM (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 	{{- if $ind }}, {{ end -}}
-	$1[{{$ind}}] AS {{$key.Identifier -}}
+	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM {{ $.File }}
 );
@@ -276,7 +276,7 @@ MERGE INTO {{ $.Table.Identifier }} AS l
 USING (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
-		$1[{{$ind}}] AS {{$key.Identifier -}}
+		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM {{ $.File }}
 ) AS r
