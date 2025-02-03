@@ -18,6 +18,7 @@ from .models import (
     ResourceState,
     TimestampedResource,
     ZendeskResource,
+    EPOCH,
     CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES,
     FULL_REFRESH_CURSOR_PAGINATED_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_RESOURCES,
@@ -45,8 +46,6 @@ from .api import (
     _dt_to_s,
     TIME_PARAMETER_DELAY,
 )
-
-EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 async def validate_credentials(
         log: Logger, http: HTTPMixin, config: EndpointConfig
