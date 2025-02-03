@@ -20,6 +20,9 @@ from estuary_cdk.http import HTTPSession
 from pydantic import AfterValidator, AwareDatetime, BaseModel, Field
 
 
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+
 def urlencode_field(field: str):
     return "{{#urlencode}}{{{ " + field + " }}}{{/urlencode}}"
 
@@ -88,6 +91,7 @@ class EndpointConfig(BaseModel):
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
         title="Start Date",
         default_factory=default_start_date,
+        ge=EPOCH,
     )
     credentials: OAuth2Credentials | ApiToken = Field(
         discriminator="credentials_title",
