@@ -106,6 +106,14 @@ Example:
 }
 ```
 
+#### `secret` annotation only supports `string` type
+
+When you have a secret you must have it be a single type of `string`. This is currently a limitation by the UI implementation and could change if required with some work.
+
+#### Remember to test `edit` while using `secret`
+
+Please make sure both flows work well, have a solid UX, and are rendering the input as a `password` that masks the value being entered. Due to how we encrypt  data with SOPs the UI has to handle editing configurations a little different. This means that inputs that might look good with `create` will be messed up in the `edit` flow. This is mainly because we need to force users to re-enter any encrypted field during `edit`.
+
 ### Use `advanced` annotation for objects that should be collapsed by default
 
 Some configuration tends to be used only in certain less common scenarios. Network tunneling is a
@@ -283,3 +291,17 @@ Keep in mind - it will display at the top of the group that contains the propert
   ...
 }
 ```
+
+### Using a `type` of `[null, _scalar_]` has some limitations
+
+The UI can handle rendering several inputs as "nullable". The UI handles this if there is exactly *two* types and one of them is `null` and the other is one of the following: `string`, `number`, `integer`. The order in the `type` array does not matter. 
+
+```json
+{
+  "title": "A string that can be null",
+  "description": "",
+  "type": ["string", "null"]
+}
+```
+
+If you set `type` to an array outside of this then JSONForms will try to handle the rendering as best it can.
