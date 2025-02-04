@@ -50,6 +50,9 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 			// We want to exclude the watermarks table from the output bindings, but we still discover it
 			table.OmitBinding = true
 		}
+		if db.featureFlags["use_schema_inference"] {
+			table.UseSchemaInference = true
+		}
 		tableMap[streamID] = table
 	}
 	for _, column := range columns {

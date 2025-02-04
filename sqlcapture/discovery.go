@@ -192,6 +192,9 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 				{Ref: "#" + anchor},
 			},
 		}
+		if table.UseSchemaInference {
+			schema.Extras = map[string]any{"x-infer-schema": true}
+		}
 
 		var rawSchema, err = schema.MarshalJSON()
 		if err != nil {
