@@ -21,6 +21,7 @@ from pydantic import AfterValidator, AwareDatetime, BaseModel, Field
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 
 
 def urlencode_field(field: str):
@@ -96,6 +97,21 @@ class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials | ApiToken = Field(
         discriminator="credentials_title",
         title="Authentication",
+    )
+    class Advanced(BaseModel):
+        incremental_export_page_size: Annotated[int, Field(
+            description="Page size for incremental export streams. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+            title="Incremental Export Streams' Page Size",
+            default=MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
+            le=MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
+            gt=0,
+        )]
+
+    advanced: Advanced = Field(
+        default_factory=Advanced, #type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
     )
 
 
