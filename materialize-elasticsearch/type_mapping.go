@@ -58,7 +58,7 @@ func propForProjection(p *pf.Projection, types []string, fc json.RawMessage) (pr
 		}
 	}
 
-	if numericString, ok := boilerplate.AsFormattedNumeric(p); ok {
+	if numericString, ok := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference); ok {
 		return property{Type: numericStringTypes[numericString], Coerce: true}, nil
 	}
 
@@ -141,7 +141,7 @@ func boolPtr(b bool) *bool {
 type constrainter struct{}
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(p)
+	_, isNumeric := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
@@ -211,7 +211,7 @@ func typesWithoutNull(ts []string) []string {
 }
 
 func mustWrapAndFlatten(p *pf.Projection) bool {
-	if _, isNumeric := boilerplate.AsFormattedNumeric(p); isNumeric {
+	if _, isNumeric := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference); isNumeric {
 		return false
 	}
 

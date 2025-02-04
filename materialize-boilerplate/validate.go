@@ -470,7 +470,7 @@ const (
 	StringFormatNumber  StringWithNumericFormat = "stringFormatNumber"
 )
 
-func AsFormattedNumeric(projection *pf.Projection) (StringWithNumericFormat, bool) {
+func AsFormattedNumeric(isPrimaryKey bool, inference pf.Inference) (StringWithNumericFormat, bool) {
 	typesMatch := func(actual, allowed []string) bool {
 		for _, t := range actual {
 			if !slices.Contains(allowed, t) {
@@ -480,11 +480,11 @@ func AsFormattedNumeric(projection *pf.Projection) (StringWithNumericFormat, boo
 		return true
 	}
 
-	if !projection.IsPrimaryKey && projection.Inference.String_ != nil {
+	if !isPrimaryKey && inference.String_ != nil {
 		switch {
-		case projection.Inference.String_.Format == "integer" && typesMatch(projection.Inference.Types, []string{"integer", "null", "string"}):
+		case inference.String_.Format == "integer" && typesMatch(inference.Types, []string{"integer", "null", "string"}):
 			return StringFormatInteger, true
-		case projection.Inference.String_.Format == "number" && typesMatch(projection.Inference.Types, []string{"null", "number", "string"}):
+		case inference.String_.Format == "number" && typesMatch(inference.Types, []string{"null", "number", "string"}):
 			return StringFormatNumber, true
 		default:
 			// Fallthrough.

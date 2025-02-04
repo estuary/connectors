@@ -338,7 +338,7 @@ func (t *transactor) Destroy() {}
 // StdConstraints represents standard constraints for a projection when materializing columns of
 // data to files.
 func StdConstraints(p *pf.Projection) *pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(p)
+	_, isNumeric := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference)
 
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {

@@ -512,10 +512,7 @@ func TestAsFormattedNumeric(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			formatted, ok := AsFormattedNumeric(&pf.Projection{
-				Inference:    tt.inference,
-				IsPrimaryKey: tt.isPrimaryKey,
-			})
+			formatted, ok := AsFormattedNumeric(tt.isPrimaryKey, tt.inference)
 
 			require.Equal(t, tt.want, formatted)
 			if tt.want == "" {
@@ -538,7 +535,7 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 }
 
 func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, numericString := AsFormattedNumeric(p)
+	_, numericString := AsFormattedNumeric(p.IsPrimaryKey, p.Inference)
 
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {

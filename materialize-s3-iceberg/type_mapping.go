@@ -103,7 +103,7 @@ func parquetTypeToIcebergType(pqt enc.ParquetDataType) icebergType {
 type icebergConstrainter struct{}
 
 func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(p)
+	_, isNumeric := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {

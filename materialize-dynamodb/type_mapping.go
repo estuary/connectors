@@ -48,7 +48,7 @@ func mapType(p *pf.Projection) mappedType {
 		field: p.Field,
 	}
 
-	if _, ok := boilerplate.AsFormattedNumeric(p); ok {
+	if _, ok := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference); ok {
 		// A string field formatted as an integer or number, with a possible additional
 		// corresponding integer or number type.
 		out.converter = convertNumeric

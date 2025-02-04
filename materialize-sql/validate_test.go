@@ -90,7 +90,7 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 }
 
 func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, numericString := boilerplate.AsFormattedNumeric(p)
+	_, numericString := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference)
 
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {
