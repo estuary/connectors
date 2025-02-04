@@ -623,7 +623,9 @@ pub fn openapi_spec<'a>(
 
         let openapi_schema =
             serde_json::from_str::<openapi::Schema>(&binding.collection.write_schema_json)
-                .context("deserializing collection schema")?;
+                .context("The collection JSON schema (or writeSchema) could not be parsed as an \
+                    OpenAPI schema. Please ensure that no fields have multiple types or conditional \
+                    schemas, as those are unsupported by the connector at this time")?;
 
         let mut content_builder = openapi::content::ContentBuilder::new().schema(openapi_schema);
 
