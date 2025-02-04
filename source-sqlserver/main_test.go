@@ -21,13 +21,15 @@ import (
 )
 
 var (
-	dbAddress = flag.String("db_addr", "127.0.0.1:1433", "Connect to the specified address/port for tests")
-	dbName    = flag.String("db_name", "test", "Connect to the named database for tests")
+	dbName = flag.String("db_name", "test", "Connect to the named database for tests")
 
-	dbControlUser = flag.String("db_control_user", "sa", "The user for test setup/control operations")
-	dbControlPass = flag.String("db_control_pass", "gf6w6dkD", "The password the the test setup/control user")
-	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
-	dbCapturePass = flag.String("db_capture_pass", "we2rie1E", "The password for the capture user")
+	dbControlAddress = flag.String("db_control_addr", "127.0.0.1:1433", "The database server address to use for test setup/control operations")
+	dbControlUser    = flag.String("db_control_user", "sa", "The user for test setup/control operations")
+	dbControlPass    = flag.String("db_control_pass", "gf6w6dkD", "The password the the test setup/control user")
+
+	dbCaptureAddress = flag.String("db_capture_addr", "127.0.0.1:1433", "The database server address to use for test captures")
+	dbCaptureUser    = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
+	dbCapturePass    = flag.String("db_capture_pass", "we2rie1E", "The password for the capture user")
 
 	enableCDCWhenCreatingTables = flag.Bool("enable_cdc_when_creating_tables", true, "Set to true if CDC should be enabled before the test capture runs")
 	testSchemaName              = flag.String("test_schema_name", "dbo", "The schema in which to create test tables.")
@@ -57,14 +59,14 @@ func sqlserverTestBackend(t *testing.T) *testBackend {
 
 	// Open control connection
 	var controlURI = (&Config{
-		Address:  *dbAddress,
+		Address:  *dbControlAddress,
 		User:     *dbControlUser,
 		Password: *dbControlPass,
 		Database: *dbName,
 	}).ToURI()
 	log.WithFields(log.Fields{
 		"user": *dbControlUser,
-		"addr": *dbAddress,
+		"addr": *dbControlAddress,
 	}).Info("opening control connection")
 	var conn, err = sql.Open("sqlserver", controlURI)
 	require.NoError(t, err)
@@ -72,7 +74,7 @@ func sqlserverTestBackend(t *testing.T) *testBackend {
 
 	// Construct the capture config
 	var captureConfig = Config{
-		Address:  *dbAddress,
+		Address:  *dbCaptureAddress,
 		User:     *dbCaptureUser,
 		Password: *dbCapturePass,
 		Database: *dbName,
