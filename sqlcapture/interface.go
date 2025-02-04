@@ -214,6 +214,8 @@ type DiscoveryInfo struct {
 	BaseTable   bool                  // True if the table type is 'BASE TABLE' and false for views or other not-physical-table entities.
 	OmitBinding bool                  // True if the table should be omitted from discovery catalog generation.
 
+	UseSchemaInference bool // True if generated JSON schemas for this table should request schema inference.
+
 	// UnpredictableKeyOrdering will be true when the connector is unable to guarantee
 	// (for a particular table) that serialized RowKey values will accurately reproduce
 	// (when compared bytewise lexicographically) the database sort ordering of the same
