@@ -87,14 +87,16 @@ func buildProjection(p *pf.Projection, rawFieldConfig json.RawMessage) Projectio
 
 // AsFlatType returns the Projection's FlatType.
 func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
-	mustExist = p.Inference.Exists == pf.Inference_MUST
-	if slices.Contains(p.Inference.Types, "null") {
+	inference := resolveInference(p.Projection)
+
+	mustExist = inference.Exists == pf.Inference_MUST
+	if slices.Contains(inference.Types, "null") {
 		mustExist = false
 	}
 
 	// Compatible numeric formatted strings can be materialized as either integers or numbers,
 	// depending on the format string.
-	if format, ok := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference); ok && !p.IsPrimaryKey {
+	if format, ok := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, inference); ok && !p.IsPrimaryKey {
 		switch format {
 		case boilerplate.StringFormatInteger:
 			return STRING_INTEGER, mustExist
@@ -104,11 +106,10 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	}
 
 	var types []FlatType
-	for _, ty := range p.Inference.Types {
+	for _, ty := range inference.Types {
 		switch ty {
 		case "string":
-
-			if p.Inference.String_.ContentEncoding == "base64" {
+			if inference.String_.ContentEncoding == "base64" {
 				types = append(types, BINARY)
 			} else {
 				types = append(types, STRING)
@@ -134,6 +135,20 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	default:
 		return MULTIPLE, mustExist
 	}
+}
+
+// resolveInference defers to the write schema projection inference if the type
+// from the read schema is either only `null`, or it has no types (cannot
+// exist). This allows columns to be mapped for fields where the write schema
+// defines a type for a field, but schema inference has not yet observed a
+// document for that field with a non-null value.
+func resolveInference(p pf.Projection) pf.Inference {
+	out := p.Inference
+	if (len(out.Types) == 0 || slices.Equal(out.Types, []string{"null"})) && p.WriteInference != nil {
+		out = *p.WriteInference
+	}
+
+	return out
 }
 
 // CompatibleColumnTypes is a list of column types that the mapped type
@@ -412,7 +427,7 @@ type constrainter struct {
 }
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	inference := p.Inference
+	inference := resolveInference(*p)
 
 	switch {
 	case p.IsPrimaryKey:
@@ -429,10 +444,6 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 		return &pm.Response_Validated_Constraint{
 			Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
 			Reason: "The root document must be materialized",
-		}
-	case len(p.Inference.Types) == 0 || slices.Equal(p.Inference.Types, []string{"null"}):
-		if p.WriteInference != nil {
-			inference = *p.WriteInference
 		}
 	}
 
