@@ -25,7 +25,6 @@ from .models import (
 )
 
 CURSOR_PAGINATION_PAGE_SIZE = 100
-MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
 # Zendesk errors out if a start or end time parameter is more recent than 60 seconds in the past.
 TIME_PARAMETER_DELAY = timedelta(seconds=60)
@@ -320,10 +319,10 @@ async def _fetch_incremental_cursor_export_resources(
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
     start_date: datetime | None,
+    page_size: int,
     cursor: str | None,
     log: Logger,
     sideload_params: dict[str, str] | None = None,
-    page_size: int = MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
 ) -> AsyncGenerator[TimestampedResource | str, None]:
     url = f"{url_base(subdomain)}/incremental"
     match name:
@@ -381,6 +380,7 @@ async def fetch_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -394,7 +394,7 @@ async def fetch_incremental_cursor_export_resources(
         start_date = _s_to_dt(int(cursor))
         cursor = None
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, cursor, log)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page_size, cursor, log)
 
     async for result in generator:
         if isinstance(result, str):
@@ -408,6 +408,7 @@ async def backfill_incremental_cursor_export_resources(
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
     start_date: datetime,
+    page_size: int,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -416,7 +417,7 @@ async def backfill_incremental_cursor_export_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page, log)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page_size, page, log)
 
     async for result in generator:
         if isinstance(result, str) or result.updated_at < cutoff:
@@ -457,6 +458,7 @@ async def fetch_ticket_child_resources(
     subdomain: str,
     path: str,
     response_model: type[IncrementalCursorPaginatedResponse],
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
@@ -470,7 +472,7 @@ async def fetch_ticket_child_resources(
         start_date = _s_to_dt(int(cursor))
         cursor = None
 
-    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log)
+    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, cursor, log)
 
     tickets: list[AbbreviatedTicket] = []
 
@@ -511,6 +513,7 @@ async def backfill_ticket_child_resources(
     path: str,
     response_model: type[IncrementalCursorPaginatedResponse],
     start_date: datetime,
+    page_size: int,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -519,7 +522,7 @@ async def backfill_ticket_child_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
+    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, page, log)
 
     tickets: list[AbbreviatedTicket] = []
 
@@ -644,6 +647,7 @@ async def backfill_audit_logs(
 async def fetch_ticket_metrics(
     http: HTTPSession,
     subdomain: str,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
@@ -661,12 +665,7 @@ async def fetch_ticket_metrics(
         "include": "metric_sets"
     }
 
-    # Sideloading metric sets can cause Zendesk's API to take a while to respond. If we try to use the max page size,
-    # Zendesk can take long enough to respond that the intermediate routers/gateways assume return a 504 response.
-    # The page size used for ticket metrics is reduced to 500 to mitigate these 504 responses.
-    page_size = 500
-
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log, sideload_params, page_size)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, cursor, log, sideload_params)
 
     async for result in generator:
         if isinstance(result, str):
@@ -682,6 +681,7 @@ async def backfill_ticket_metrics(
     http: HTTPSession,
     subdomain: str,
     start_date: datetime,
+    page_size: int,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -694,9 +694,7 @@ async def backfill_ticket_metrics(
         "include": "metric_sets"
     }
 
-    page_size = 500
-
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log, sideload_params, page_size)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, page, log, sideload_params)
 
     async for result in generator:
 
