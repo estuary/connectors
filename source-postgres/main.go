@@ -118,7 +118,11 @@ type advancedConfig struct {
 	FeatureFlags          string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// When set, discovered collection schemas will request that schema inference be
+	// used _in addition to_ the full column/types discovery we already do.
+	"use_schema_inference": false,
+}
 
 // Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
