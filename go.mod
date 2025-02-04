@@ -33,7 +33,7 @@ require (
 	github.com/databricks/databricks-sql-go v1.5.5
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.5.9
+	github.com/estuary/flow v0.5.11-0.20250201230124-0f5989b804de
 	github.com/estuary/vitess v0.15.10
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/firebolt-db/firebolt-go-sdk v1.2.0
@@ -67,13 +67,13 @@ require (
 	github.com/trinodb/trino-go-client v0.313.0
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
-	go.gazette.dev/core v0.100.0
+	go.gazette.dev/core v0.100.1-0.20250121155033-f172f5b079db
 	go.mongodb.org/mongo-driver v1.16.1
-	golang.org/x/crypto v0.24.0
+	golang.org/x/crypto v0.31.0
 	golang.org/x/exp v0.0.0-20240613232115-7f521ea00fb8
 	golang.org/x/oauth2 v0.21.0
-	golang.org/x/sync v0.7.0
-	golang.org/x/text v0.16.0
+	golang.org/x/sync v0.10.0
+	golang.org/x/text v0.21.0
 	golang.org/x/time v0.5.0
 	google.golang.org/api v0.184.0
 	google.golang.org/genproto v0.0.0-20240610135401-a8a62080eff3
@@ -235,9 +235,9 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.27.0 // indirect
 	golang.org/x/mod v0.18.0 // indirect
-	golang.org/x/net v0.26.0 // indirect
-	golang.org/x/sys v0.22.0 // indirect
-	golang.org/x/term v0.22.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/term v0.27.0 // indirect
 	golang.org/x/tools v0.22.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
