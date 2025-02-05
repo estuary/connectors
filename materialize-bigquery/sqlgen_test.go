@@ -24,7 +24,6 @@ func TestSQLGeneration(t *testing.T) {
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
 				tplCreateTargetTable,
-				tplLoadQuery,
 				tplStoreInsert,
 			},
 			TplAddColumns:    tplAlterTableColumns,
@@ -35,8 +34,10 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	)
 
-	{
-		tpl := tplStoreUpdate
+	for _, tpl := range []*template.Template{
+		tplStoreUpdate,
+		tplLoadQuery,
+	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
@@ -59,7 +60,7 @@ func TestSQLGeneration(t *testing.T) {
 			},
 		}
 
-		tf := mergeQueryInput{
+		tf := queryParams{
 			Table:  tbl,
 			Bounds: bounds,
 		}

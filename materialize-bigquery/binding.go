@@ -10,15 +10,15 @@ import (
 
 type binding struct {
 	target         sql.Table
-	loadQuerySQL   string
 	storeInsertSQL string
 
-	loadFile      *stagedFile
-	storeFile     *stagedFile
-	tempTableName string
-	hasData       bool
-	mustMerge     bool
-	mergeBounds   *sql.MergeBoundsBuilder
+	loadFile         *stagedFile
+	storeFile        *stagedFile
+	tempTableName    string
+	hasData          bool
+	mustMerge        bool
+	loadMergeBounds  *sql.MergeBoundsBuilder
+	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
 // bindingDocument is used by the load operation to fetch binding flow_document values
