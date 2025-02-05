@@ -117,10 +117,11 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 	}
 
 	b := &binding{
-		target:      target,
-		loadFile:    newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, loadSchema),
-		storeFile:   newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, storeSchema),
-		mergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
+		target:           target,
+		loadFile:         newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, loadSchema),
+		storeFile:        newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, storeSchema),
+		loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
+		storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
 	}
 
 	for _, m := range []struct {
@@ -128,7 +129,6 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		tpl *template.Template
 	}{
 		{&b.tempTableName, tplTempTableName},
-		{&b.loadQuerySQL, tplLoadQuery},
 		{&b.storeInsertSQL, tplStoreInsert},
 	} {
 		var err error
@@ -172,13 +172,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var b = t.bindings[it.Binding]
 		b.loadFile.start()
 
-		converted, err := b.target.ConvertKey(it.Key)
-		if err != nil {
+		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting load key: %w", err)
-		}
-
-		if err = b.loadFile.encodeRow(ctx, converted); err != nil {
+		} else if err = b.loadFile.encodeRow(ctx, converted); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
+		} else {
+			b.loadMergeBounds.NextKey(converted)
 		}
 	}
 	if it.Err() != nil {
@@ -196,7 +195,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		subqueries = append(subqueries, b.loadQuerySQL)
+		loadQuery, err := renderQueryTemplate(b.target, tplLoadQuery, b.loadMergeBounds.Build())
+		if err != nil {
+			return fmt.Errorf("rendering load query template: %w", err)
+		}
+		subqueries = append(subqueries, loadQuery)
 
 		delete, err := b.loadFile.flush()
 		if err != nil {
@@ -299,14 +302,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		b.storeFile.start()
 		b.hasData = true
-		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
-		if err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		}
-		if err = b.storeFile.encodeRow(ctx, converted); err != nil {
+		} else if err = b.storeFile.encodeRow(ctx, converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
+		} else {
+			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
-		b.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
@@ -368,7 +370,7 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 		if !b.mustMerge {
 			subqueries = append(subqueries, b.storeInsertSQL)
 		} else {
-			mergeQuery, err := renderMergeQueryTemplate(b.target, b.mergeBounds.Build())
+			mergeQuery, err := renderQueryTemplate(b.target, tplStoreUpdate, b.storeMergeBounds.Build())
 			if err != nil {
 				return fmt.Errorf("rendering merge query template: %w", err)
 			}

@@ -6,6 +6,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"text/template"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -206,9 +207,10 @@ ALTER TABLE {{$.Identifier}}
 SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	FROM {{ $.Identifier }} AS l
 	JOIN {{ template "tempTableName" . }} AS r
-	{{- range $ind, $key := $.Keys }}
+	{{- range $ind, $bound := $.Bounds }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{ $key.Identifier }} = r.c{{$ind}}
+		l.{{ $bound.Identifier }} = r.c{{$ind}}
+		{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 	{{- end }}
 {{ else }}
 SELECT -1, NULL LIMIT 0
@@ -347,14 +349,14 @@ UPDATE {{ Identifier $.TablePath }}
 	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
 )
 
-type mergeQueryInput struct {
+type queryParams struct {
 	sql.Table
 	Bounds []sql.MergeBound
 }
 
-func renderMergeQueryTemplate(table sql.Table, bounds []sql.MergeBound) (string, error) {
+func renderQueryTemplate(table sql.Table, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
 	var w strings.Builder
-	if err := tplStoreUpdate.Execute(&w, &mergeQueryInput{
+	if err := tpl.Execute(&w, &queryParams{
 		Table:  table,
 		Bounds: bounds,
 	}); err != nil {
