@@ -61,7 +61,6 @@ func TestValidateAndApply(t *testing.T) {
 	resourceConfig := resource{
 		Namespace: "test_namespace",
 		Table:     "test_table",
-		Delta:     true,
 	}
 
 	catalog := catalog{
