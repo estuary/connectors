@@ -124,7 +124,7 @@ func parse8601(in string) (time.Duration, error) {
 type resource struct {
 	Table     string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Namespace string `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative namespace for this table (optional)."`
-	Delta     bool   `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
+	Delta     *bool  `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
 }
 
 func newResource(cfg config) resource {
@@ -158,7 +158,7 @@ func (r resource) Validate() error {
 		return fmt.Errorf("table %q must not contain dots", r.Table)
 	} else if strings.Contains(r.Namespace, ".") {
 		return fmt.Errorf("namespace %q must not contain dots", r.Namespace)
-	} else if !r.Delta {
+	} else if r.Delta != nil && !*r.Delta {
 		return fmt.Errorf("connector only supports delta update mode: delta update must be enabled")
 	}
 
@@ -271,9 +271,14 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	for idx, binding := range req.Bindings {
 		res := resources[idx]
 
+		deltaUpdates := true
+		if res.Delta != nil {
+			deltaUpdates = *res.Delta
+		}
+
 		constraints, err := validator.ValidateBinding(
 			res.path(),
-			res.Delta,
+			deltaUpdates,
 			binding.Backfill,
 			binding.Collection,
 			binding.FieldConfigJsonMap,
@@ -285,7 +290,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 
 		out = append(out, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
-			DeltaUpdates: res.Delta,
+			DeltaUpdates: deltaUpdates,
 			ResourcePath: res.path(),
 		})
 	}
