@@ -32,8 +32,9 @@ func (ms MigrationSpecs) FindMigrationSpec(sourceType string, targetDDL string) 
 type CastSQLFunc func(migration ColumnTypeMigration) string
 
 type MigrationSpec struct {
-	targetDDLs []string
-	CastSQL    CastSQLFunc
+	targetDDLs         []string
+	CastSQL            CastSQLFunc
+	PreviouslyOnlyNull bool
 }
 
 func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) MigrationSpec {

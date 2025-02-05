@@ -217,7 +217,7 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (constrainter) Compatible(existing boilerplate.EndpointField, proposed pf.Projection, _ *pf.Projection, _ json.RawMessage) (bool, error) {
 	// Non-key fields have no compatibility restrictions and can be changed in any way at any time.
 	// This relies on the assumption that the key of an establish Flow collection cannot be changed
 	// after the fact.
@@ -225,7 +225,7 @@ func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.
 		return true, nil
 	}
 
-	return strings.EqualFold(existing.Type, string(mapType(proposed).ddbScalarType)), nil
+	return strings.EqualFold(existing.Type, string(mapType(&proposed).ddbScalarType)), nil
 }
 
 func (constrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {

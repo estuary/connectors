@@ -482,8 +482,8 @@ func buildConstraint(field string, inference pf.Inference) *pm.Response_Validate
 	return &constraint
 }
 
-func (c constrainter) compatibleType(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	proj := buildProjection(proposed, rawFieldConfig)
+func (c constrainter) compatibleType(existing boilerplate.EndpointField, proposed pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+	proj := buildProjection(&proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
 		return false, fmt.Errorf("mapping type: %w", err)
@@ -503,11 +503,29 @@ func (c constrainter) compatibleType(existing boilerplate.EndpointField, propose
 	return isCompatibleType, nil
 }
 
-func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
-	proj := buildProjection(proposed, rawFieldConfig)
+func (c constrainter) migratable(
+	existing boilerplate.EndpointField,
+	proposed pf.Projection,
+	lastProposed *pf.Projection,
+	rawFieldConfig json.RawMessage,
+) (bool, *MigrationSpec, error) {
+	proj := buildProjection(&proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
 		return false, nil, fmt.Errorf("mapping type: %w", err)
+	}
+
+	// A no-op migration is possible if the prior spec indicated that this
+	// projection only had null values.
+	if lastProposed != nil {
+		if len(lastProposed.Inference.Types) == 0 || slices.Equal(lastProposed.Inference.Types, []string{"null"}) {
+			return true, &MigrationSpec{
+				CastSQL: func(m ColumnTypeMigration) string {
+					return m.Identifier
+				},
+				PreviouslyOnlyNull: true,
+			}, nil
+		}
 	}
 
 	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, mapped.NullableDDL); migrationSpec != nil {
@@ -517,13 +535,18 @@ func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *p
 	return false, nil, nil
 }
 
-func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+func (c constrainter) Compatible(
+	existing boilerplate.EndpointField,
+	proposed pf.Projection,
+	lastProposed *pf.Projection,
+	rawFieldConfig json.RawMessage,
+) (bool, error) {
 	if compatible, err := c.compatibleType(existing, proposed, rawFieldConfig); err != nil {
 		return false, err
 	} else if compatible {
 		return true, nil
 	} else {
-		migratable, _, err := c.migratable(existing, proposed, rawFieldConfig)
+		migratable, _, err := c.migratable(existing, proposed, lastProposed, rawFieldConfig)
 		return migratable, err
 	}
 }

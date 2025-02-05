@@ -161,7 +161,7 @@ func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, bo
 	}, nil
 }
 
-func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) UpdateResource(_ context.Context, spec pf.MaterializationSpec, _ *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	if len(bindingUpdate.NewProjections) == 0 && len(bindingUpdate.NewlyNullableFields) == 0 {
 		// Nothing to do, since only adding new columns or dropping nullability
 		// constraints is supported currently.

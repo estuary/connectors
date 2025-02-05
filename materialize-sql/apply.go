@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -98,8 +99,8 @@ type ColumnTypeMigration struct {
 // Column name suffix used during column migration using the rename method
 const ColumnMigrationTemporarySuffix = "_flowtmp1"
 
-func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
-	table, err := getTable(a.endpoint, spec, bindingIndex)
+func (a *sqlApplier) UpdateResource(ctx context.Context, spec pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+	table, err := getTable(a.endpoint, &spec, bindingIndex)
 	if err != nil {
 		return "", nil, err
 	}
@@ -140,33 +141,49 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 	var binding = spec.Bindings[bindingIndex]
 	var collection = binding.Collection
 	for _, field := range binding.FieldSelection.AllFields() {
-		proposed := *collection.GetProjection(field)
+		projection := *collection.GetProjection(field)
 		if slices.ContainsFunc(bindingUpdate.NewProjections, func(p pf.Projection) bool {
-			return p.Field == proposed.Field
+			return p.Field == projection.Field
 		}) {
 			// Migration does not apply to newly included projections.
 			continue
 		}
 
-		existing, err := a.is.GetField(table.Path, proposed.Field)
-		if err != nil {
-			return "", nil, fmt.Errorf("getting existing field information for migration %q: %w", proposed.Field, err)
+		// The last applied projection's spec may be used for migration if it is
+		// known that the prior projection only could have had null values.
+		var lastProjection *pf.Projection
+		if lastSpec != nil {
+			for _, lastBinding := range lastSpec.Bindings {
+				if collection.Name == lastBinding.Collection.Name {
+					if idx, ok := slices.BinarySearchFunc(lastBinding.Collection.Projections, projection, func(a, b pf.Projection) int {
+						return cmp.Compare(a.Field, b.Field)
+					}); ok {
+						lastProjection = &lastBinding.Collection.Projections[idx]
+					}
+					break
+				}
+			}
 		}
 
-		var rawFieldConfig = binding.FieldSelection.FieldConfigJsonMap[proposed.Field]
-		compatible, err := a.constrainter.compatibleType(existing, &proposed, rawFieldConfig)
+		existing, err := a.is.GetField(table.Path, projection.Field)
 		if err != nil {
-			return "", nil, fmt.Errorf("checking compatibility of %q: %w", proposed.Field, err)
+			return "", nil, fmt.Errorf("getting existing field information for migration %q: %w", projection.Field, err)
 		}
 
-		migratable, migrationSpec, err := a.constrainter.migratable(existing, &proposed, rawFieldConfig)
+		var rawFieldConfig = binding.FieldSelection.FieldConfigJsonMap[projection.Field]
+		compatible, err := a.constrainter.compatibleType(existing, projection, rawFieldConfig)
 		if err != nil {
-			return "", nil, fmt.Errorf("checking migratability of %q: %w", proposed.Field, err)
+			return "", nil, fmt.Errorf("checking compatibility of %q: %w", projection.Field, err)
+		}
+
+		migratable, migrationSpec, err := a.constrainter.migratable(existing, projection, lastProjection, rawFieldConfig)
+		if err != nil {
+			return "", nil, fmt.Errorf("checking migratability of %q: %w", projection.Field, err)
 		}
 
 		// If the types are not compatible, but are migratable, attempt to migrate
 		if !compatible && migratable {
-			col, err := getColumn(proposed.Field)
+			col, err := getColumn(projection.Field)
 			if err != nil {
 				return "", nil, err
 			}

@@ -181,8 +181,8 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
-	prop, err := propForProjection(proposed, proposed.Inference.Types, fc)
+func (constrainter) Compatible(existing boilerplate.EndpointField, proposed pf.Projection, _ *pf.Projection, fc json.RawMessage) (bool, error) {
+	prop, err := propForProjection(&proposed, proposed.Inference.Types, fc)
 	if err != nil {
 		return false, err
 	}

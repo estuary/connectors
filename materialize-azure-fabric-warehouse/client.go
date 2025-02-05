@@ -186,7 +186,9 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 				return m.Identifier == col.Identifier
 			}); n != -1 {
 				m := ta.ColumnTypeChanges[n]
-				mCol.CastSQL = m.CastSQL(m)
+				if !m.PreviouslyOnlyNull {
+					mCol.CastSQL = m.CastSQL(m)
+				}
 			}
 
 			params.Columns = append(params.Columns, mCol)

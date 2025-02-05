@@ -143,8 +143,8 @@ func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *
 	return &constraint
 }
 
-func (icebergConstrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
-	s, err := projectionToParquetSchemaElement(*proposed, fc)
+func (icebergConstrainter) Compatible(existing boilerplate.EndpointField, proposed pf.Projection, _ *pf.Projection, fc json.RawMessage) (bool, error) {
+	s, err := projectionToParquetSchemaElement(proposed, fc)
 	if err != nil {
 		return false, err
 	}

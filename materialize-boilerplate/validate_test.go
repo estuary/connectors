@@ -526,7 +526,7 @@ func TestAsFormattedNumeric(t *testing.T) {
 
 type testConstrainter struct{}
 
-func (testConstrainter) Compatible(existing EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (testConstrainter) Compatible(existing EndpointField, proposed pf.Projection, _ *pf.Projection, _ json.RawMessage) (bool, error) {
 	return existing.Type == strings.Join(proposed.Inference.Types, ","), nil
 }
 

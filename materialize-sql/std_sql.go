@@ -528,7 +528,18 @@ func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, m
 	var tempColumnIdentifier = dialect.Identifier(migration.Field + ColumnMigrationTemporarySuffix)
 
 	var renderedSteps []string
-	for i, s := range steps[step:] {
+	for i, s := range steps {
+		if i < step {
+			// Skip previously completed steps.
+			continue
+		}
+
+		if migration.PreviouslyOnlyNull && i == 1 {
+			// Skip the "cast" step, since previously the values in the column
+			// were known to exclusively be null.
+			continue
+		}
+
 		newStep, err := s(dialect, table, migration, tempColumnIdentifier)
 		if err != nil {
 			return nil, fmt.Errorf("rendering step %d: %w", i, err)
