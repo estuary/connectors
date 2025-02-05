@@ -16,7 +16,7 @@ import (
 )
 
 var deleteTable = flag.Bool("delete", false, "delete the table instead of dumping its contents")
-var deleteSpecs = flag.Bool("delete-specs", false, "stored materialize checkpoint and specs")
+var deleteSpecs = flag.Bool("delete-specs", false, "delete stored checkpoint")
 
 func main() {
 	flag.Parse()
@@ -64,11 +64,7 @@ func main() {
 		}
 		os.Exit(0)
 	} else if *deleteSpecs {
-		query := fmt.Sprintf(
-			"delete from %s.flow_checkpoints_v1 where materialization='tests/materialize-bigquery/materialize';delete from %s.flow_materializations_v2 where materialization='tests/materialize-bigquery/materialize';",
-			dataset,
-			dataset,
-		)
+		query := fmt.Sprintf("delete from %s.flow_checkpoints_v1 where materialization='tests/materialize-bigquery/materialize'", dataset)
 
 		job, err := client.Query(query).Run(ctx)
 		if err != nil {
