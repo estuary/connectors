@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
@@ -27,6 +28,8 @@ import (
 
 	_ "time/tzdata"
 )
+
+var featureFlagDefaults = map[string]bool{}
 
 type sshForwarding struct {
 	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
@@ -79,7 +82,15 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 		}
 	}
 
-	var db = &mysqlDatabase{config: &config}
+	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	if config.Advanced.FeatureFlags != "" {
+		logrus.WithField("flags", featureFlags).Info("parsed feature flags")
+	}
+
+	var db = &mysqlDatabase{
+		config:       &config,
+		featureFlags: featureFlags,
+	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
 	}
@@ -106,6 +117,7 @@ type advancedConfig struct {
 	SkipBackfills            string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize        int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 	DiscoverSchemas          []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
+	FeatureFlags             string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 
 	// Deprecated config options which no longer do much of anything.
 	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present."`
@@ -191,6 +203,8 @@ type mysqlDatabase struct {
 	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
 	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
 	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
+
+	featureFlags map[string]bool // Parsed feature flag settings with defaults applied
 }
 
 func (db *mysqlDatabase) HistoryMode() bool {
