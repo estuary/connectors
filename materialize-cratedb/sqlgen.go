@@ -12,10 +12,7 @@ import (
 var pgDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer")),
-				sql.MapStatic("NUMERIC"),
-			),
+			sql.INTEGER:        sql.MapStatic("INTEGER"),
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:         sql.MapStatic("OBJECT"),
