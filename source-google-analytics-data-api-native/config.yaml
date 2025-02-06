@@ -1,0 +1,21 @@
+credentials:
+    credentials_title: OAuth Credentials
+    client_id_sops: ENC[AES256_GCM,data:5xiK/bKNLundU1KFZbnE2omS67SqMF2Qo7vNVVsHOcbwVH26eKGdCKp0isKEsq4FgMKIKddx42bU+F3VaS5hxIi+62wvKW3MYQ==,iv:gr2U2fsO6wf08/hHPzdBv3UNwjn1m+A5gfdAgD8MRQU=,tag:QUHU9w7g7SZ3JSWLow3Y2w==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:RYNUAoL22Y5lkK0kJUh/B5vxYVQHQlM7+maCSX2RQLzBvWc=,iv:VojT2qA+LJIqNX+kQkbjD0MJJz1RV7QAQ6QSP1sciHY=,tag:SZMmIyL1/S8EPUC4gplSfA==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:5KeBhlEfn6bb6zpE/T5v/HDKJmab07w1idKsa2W9ExrSR8uaXiBj5wshFiKvQCFXDcmfXSnjefMAEO6GU8jRP8Ri8EIzQmUjHhHT37CRDcy5JAcjl7Aks+KGUykyYsRBLDckmN4QTw==,iv:XRLuIBBxzlCTM/FCCxn9siUu8GmKFKt5hL7JQInqHK0=,tag:rCIJlPuJZGCSKY26x/rGTA==,type:str]
+start_date: "2025-02-07T00:00:00Z"
+property_id: "477126949"
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-07-26T15:53:37Z"
+          enc: CiQAdmEdwpmP0/Kcv6L1SnM3nPbsYLywIaUeOL1mz7cZjFUwWt0SSQD5lVw43Of1YI96anxUVo7d7ALi0DYnCNvxTHCgHX5ZeDBPlfXwLNpmYb6y3hJSsHG7NupwDQT/qIpUvlqQnq5IVkgJEFHPU1s=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-02-07T18:25:27Z"
+    mac: ENC[AES256_GCM,data:Z5wI79NlUk3wUIdbpFxPTjiQjjPDe6aabQ/VViYZfR72v3vGq8xdACVW2tEo2q60ox7+QEE1yX8bnOgpKgt54GDOHAXWNu8YE3IbXfoJcQc64fS1xUYyrCa5yta6ifUTVrVcn4nGIOaZ7+y1xV+Hm4scLYE6fDeyu/EAcfI7YGE=,iv:ZENk1xeULs54BhtNTsGzQJZqpIlsTJ+AurND9X2soX4=,tag:FXvMNTBCWGFliSBsI4/UbQ==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3
