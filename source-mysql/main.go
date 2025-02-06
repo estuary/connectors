@@ -29,7 +29,11 @@ import (
 	_ "time/tzdata"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// When true, date columns will be discovered as `type: string, format: date`
+	// instead of simply `type: string`
+	"date_schema_format": false,
+}
 
 type sshForwarding struct {
 	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
