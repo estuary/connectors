@@ -165,9 +165,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 	for streamID, discoveryInfo := range discovery {
 		logrus.WithFields(logrus.Fields{
-			"table":      streamID,
-			"primaryKey": discoveryInfo.PrimaryKey,
-			"columns":    discoveryInfo.Columns,
+			"table":     streamID,
+			"discovery": discoveryInfo,
 		}).Debug("discovered table")
 	}
 
