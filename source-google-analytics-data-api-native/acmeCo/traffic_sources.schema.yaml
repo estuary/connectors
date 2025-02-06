@@ -1,0 +1,108 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  date:
+    title: Date
+    type: string
+  sessionSource:
+    title: Sessionsource
+    type: string
+  sessionMedium:
+    title: Sessionmedium
+    type: string
+  totalUsers:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Totalusers
+  newUsers:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Newusers
+  sessions:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Sessions
+  sessionsPerUser:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Sessionsperuser
+  averageSessionDuration:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Averagesessionduration
+  screenPageViews:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Screenpageviews
+  screenPageViewsPerSession:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Screenpageviewspersession
+  bounceRate:
+    anyOf:
+      - type: string
+      - type: integer
+      - type: number
+    title: Bouncerate
+  property_id:
+    title: Property Id
+    type: string
+  report_date:
+    title: Report Date
+    type: string
+required:
+  - date
+  - sessionSource
+  - sessionMedium
+  - totalUsers
+  - newUsers
+  - sessions
+  - sessionsPerUser
+  - averageSessionDuration
+  - screenPageViews
+  - screenPageViewsPerSession
+  - bounceRate
+  - property_id
+  - report_date
+title: traffic_sources
+type: object
+x-infer-schema: true

@@ -1,0 +1,60 @@
+---
+collections:
+  acmeCo/daily_active_users:
+    schema: daily_active_users.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
+  acmeCo/devices:
+    schema: devices.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
+      - /deviceCategory
+      - /operatingSystem
+      - /browser
+  acmeCo/four_weekly_active_users:
+    schema: four_weekly_active_users.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
+  acmeCo/locations:
+    schema: locations.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /region
+      - /country
+      - /city
+      - /date
+  acmeCo/pages:
+    schema: pages.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
+      - /hostName
+      - /pagePathPlusQueryString
+  acmeCo/traffic_sources:
+    schema: traffic_sources.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
+      - /sessionSource
+      - /sessionMedium
+  acmeCo/website_overview:
+    schema: website_overview.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
+  acmeCo/weekly_active_users:
+    schema: weekly_active_users.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
