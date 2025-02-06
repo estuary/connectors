@@ -35,6 +35,8 @@ var (
 
 	useMyISAM                = flag.Bool("use_myisam_engine", false, "When set, all test tables will be created using the MyISAM storage engine")
 	skipBinlogRetentionCheck = flag.Bool("skip_binlog_retention_check", false, "When set, skips the binlog retention sanity check")
+
+	testFeatureFlags = flag.String("feature_flags", "", "Feature flags to apply to all test captures.")
 )
 
 const testSchemaName = "test"
@@ -90,6 +92,7 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 			SkipBinlogRetentionCheck: *skipBinlogRetentionCheck,
 		},
 	}
+	captureConfig.Advanced.FeatureFlags = *testFeatureFlags
 	captureConfig.Advanced.BackfillChunkSize = 16
 	if err := captureConfig.Validate(); err != nil {
 		t.Fatalf("error validating capture config: %v", err)
