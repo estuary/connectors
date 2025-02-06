@@ -1,0 +1,45 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-google-analytics-data-api-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_google_analytics_data_api_native
+        config: config.yaml
+    bindings:
+      - resource:
+          name: daily_active_users
+          interval: PT5M
+        target: acmeCo/daily_active_users
+      - resource:
+          name: weekly_active_users
+          interval: PT5M
+        target: acmeCo/weekly_active_users
+      - resource:
+          name: four_weekly_active_users
+          interval: PT5M
+        target: acmeCo/four_weekly_active_users
+      - resource:
+          name: devices
+          interval: PT5M
+        target: acmeCo/devices
+      - resource:
+          name: locations
+          interval: PT5M
+        target: acmeCo/locations
+      - resource:
+          name: pages
+          interval: PT5M
+        target: acmeCo/pages
+      - resource:
+          name: traffic_sources
+          interval: PT5M
+        target: acmeCo/traffic_sources
+      - resource:
+          name: website_overview
+          interval: PT5M
+        target: acmeCo/website_overview
