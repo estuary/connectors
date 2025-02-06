@@ -1,0 +1,76 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  date:
+    title: Date
+    type: string
+  totalUsers:
+    title: Totalusers
+    type: string
+  newUsers:
+    title: Newusers
+    type: string
+  sessions:
+    title: Sessions
+    type: string
+  sessionsPerUser:
+    title: Sessionsperuser
+    type: string
+  averageSessionDuration:
+    title: Averagesessionduration
+    type: string
+  screenPageViews:
+    title: Screenpageviews
+    type: string
+  screenPageViewsPerSession:
+    title: Screenpageviewspersession
+    type: string
+  bounceRate:
+    title: Bouncerate
+    type: string
+  property_id:
+    title: Property Id
+    type: string
+  report_date:
+    title: Report Date
+    type: string
+required:
+  - date
+  - totalUsers
+  - newUsers
+  - sessions
+  - sessionsPerUser
+  - averageSessionDuration
+  - screenPageViews
+  - screenPageViewsPerSession
+  - bounceRate
+  - property_id
+  - report_date
+title: website_overview
+type: object
+x-infer-schema: true
