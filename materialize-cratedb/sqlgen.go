@@ -34,16 +34,16 @@ var pgDialect = func() sql.Dialect {
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      sql.MapStatic("TIMESTAMP WITH TIME ZONE", sql.UsingConverter(sql.ClampDate)),
 					"date-time": sql.MapStatic("TIMESTAMP WITH TIME ZONE", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime)),
-					"duration":  sql.MapStatic("INTERVAL"),
-					"ipv4":      sql.MapStatic("CIDR"),
-					"ipv6":      sql.MapStatic("CIDR"),
-					"macaddr":   sql.MapStatic("MACADDR"),
-					"macaddr8":  sql.MapStatic("MACADDR8"),
-					"time":      sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone")),
+					"duration":  sql.MapStatic("INTEGER"),
+					"ipv4":      sql.MapStatic("IP"),
+					"ipv6":      sql.MapStatic("IP"),
+					"macaddr":   sql.MapStatic("TEXT"),
+					"macaddr8":  sql.MapStatic("TEXT"),
+					"time":      sql.MapStatic("TIMESTAMP", sql.AlsoCompatibleWith("time without time zone")),
 					// UUID format was added on 30-Sept-2024, and pre-existing
 					// text type of columns are allowed to validate for
 					// compatibility with pre-existing columns.
-					"uuid": sql.MapStatic("UUID", sql.AlsoCompatibleWith("text", "character varying")),
+					"uuid": sql.MapStatic("TEXT", sql.AlsoCompatibleWith("text", "character varying")),
 				},
 			}),
 		},
