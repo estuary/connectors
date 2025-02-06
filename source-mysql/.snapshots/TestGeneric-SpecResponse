@@ -74,6 +74,11 @@
             "title": "Discovery Schema Selection",
             "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
           },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          },
           "watermarks_table": {
             "type": "string",
             "title": "Watermarks Table Name",
