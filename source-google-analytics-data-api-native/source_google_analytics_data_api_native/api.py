@@ -28,12 +28,21 @@ MAX_REPORT_RESULTS_LIMIT = 250_000
 
 
 def _convert_to_python_type(
+    name: str,
     value: str,
     metric_type: MetricTypes,
 ) -> str | float | int:
+    # It seems like the metric type for custom metrics is not always 100% accurate.
+    # The only case I've seen so far is that TYPE_INTEGER custom metrics can actually be floats.
     match metric_type:
         case MetricTypes.INTEGER:
-            return int(value)
+            try:
+                return int(value)
+            except ValueError:
+                try:
+                    return float(value)
+                except ValueError:
+                    raise ValueError(f"Cannot convert {value} to a number despite metric {name}'s type being {metric_type}.")
         case MetricTypes.UNSPECIFIED:
             return value
         case _:
@@ -57,7 +66,7 @@ def _transform_into_record(
         metric_name = metric_headers[index].name
         metric_type = metric_headers[index].type
 
-        record[metric_name] = _convert_to_python_type(metric_value.value, metric_type)
+        record[metric_name] = _convert_to_python_type(metric_name, metric_value.value, metric_type)
 
     # Add report identifying fields.
     record["property_id"] = property_id
