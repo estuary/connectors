@@ -41,7 +41,7 @@ use-case and workflow.
 var (
 	logLevel = flag.String("log_level", "info", "The log level to print at.")
 
-	taskType   = flag.String("type", "capture", "The type of catalog spec to list (typically 'capture' or 'materialization').")
+	taskType   = flag.String("type", "", "The type of catalog spec to list (typically 'capture' or 'materialization'). If unspecified the task listing will not be filtered by type.")
 	imageName  = flag.String("connector", "", "The connector image name to filter on. Can be a full URL like 'ghcr.io/estuary/source-mysql' or a short name like 'source-mysql', and in the latter case the name will be expanded into a full URL including all variants. If unspecified the task list will not be filtered by connector.")
 	namePrefix = flag.String("prefix", "", "The task name prefix to filter on. If unspecified the task listing will not be filtered by name.")
 
