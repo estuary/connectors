@@ -18,7 +18,9 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	"objects_and_arrays_as_strings": false,
+	// When set, object and array field types will be materialized as JSON
+	// columns, instead of the historical behavior of strings.
+	"objects_and_arrays_as_json": false,
 }
 
 type config struct {
@@ -176,6 +178,7 @@ func newBigQueryDriver() *sql.Driver {
 			if cfg.Advanced.FeatureFlags != "" {
 				log.WithField("flags", featureFlags).Info("parsed feature flags")
 			}
+
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             bqDialect,
