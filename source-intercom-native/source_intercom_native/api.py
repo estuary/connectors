@@ -26,7 +26,6 @@ from .models import (
 API = "https://api.intercom.io"
 SEARCH_PAGE_SIZE = 150
 COMPANIES_LIST_LIMIT = 10_000
-MIN_CHECKPOINT_INTERVAL = SEARCH_PAGE_SIZE * 50
 
 COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API"
 COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX = r"scroll already exists for this workspace"
@@ -282,17 +281,20 @@ async def fetch_tickets(
                 'start': _s_to_dt(start),
             })
 
+        if (
+            last_seen_ts > start
+            and response.tickets
+            and response.tickets[0].updated_at > last_seen_ts
+        ):
+            yield _s_to_dt(last_seen_ts)
+
         for ticket in response.tickets:
             if ticket.updated_at > last_seen_ts:
-                if count >= MIN_CHECKPOINT_INTERVAL:
-                    yield _s_to_dt(last_seen_ts)
-                    count = 0
-
                 last_seen_ts = ticket.updated_at
 
             if ticket.updated_at > start:
-                    yield ticket
-                    count += 1
+                yield ticket
+                count += 1
 
         if response.pages.next is None:
             yield _s_to_dt(last_seen_ts)
@@ -334,17 +336,20 @@ async def fetch_conversations(
                 'start': _s_to_dt(start),
             })
 
+        if (
+            last_seen_ts > start
+            and response.conversations
+            and response.conversations[0].updated_at > last_seen_ts
+        ):
+            yield _s_to_dt(last_seen_ts)
+
         for conversation in response.conversations:
             if conversation.updated_at > last_seen_ts:
-                if count >= MIN_CHECKPOINT_INTERVAL:
-                    yield _s_to_dt(last_seen_ts)
-                    count = 0
-
                 last_seen_ts = conversation.updated_at
 
             if conversation.updated_at > start:
-                    yield conversation
-                    count += 1
+                yield conversation
+                count += 1
 
         if response.pages.next is None:
             yield _s_to_dt(last_seen_ts)
