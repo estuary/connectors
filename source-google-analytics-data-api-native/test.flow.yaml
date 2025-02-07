@@ -43,3 +43,7 @@ captures:
           name: website_overview
           interval: PT5M
         target: acmeCo/website_overview
+      - resource:
+          name: my_custom_report_with_a_filter
+          interval: PT5M
+        target: acmeCo/my_custom_report_with_a_filter
