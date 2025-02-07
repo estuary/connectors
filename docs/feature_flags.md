@@ -25,6 +25,16 @@ The process for changing a default connector behavior is as follows:
  - Add a feature flag `new_thing` with default value false, which controls the relevant
    connector behavior via an `if featureFlags["new_thing"] {...}` at the appropriate
    point(s) in the code.
+   - If this is the first feature flag added to a particular connector, you may need
+     to add the feature flag boilerplate, which consists of a default-values map
+     `featureFlagDefaults` and some startup logic to parse the config property and
+     store the results in the connector state. See the "Worked Example" section for
+     links to example PRs.
+   - Even though the default value is generally false, you should add all feature flags
+     to the `featureFlagDefaults` map with a couple of lines of comment explaining what
+     exactly changes when it's true or false. This way we have a single location to
+     check to answer questions like "what feature flags does this connector have" and
+     "what happens if I toggle this flag?"
  - Edit the endpoint configs of all tasks that currently exist in production to add the
    `no_new_thing` flag setting.
  - Merge another PR which changes the connector default for `new_thing` to true.
