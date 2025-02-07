@@ -70,7 +70,12 @@ def _build_report_body(
         "offset": offset,
     }
 
-    # TODO(bair): add support for dimension filters & metric filters.
+    if report.dimensionFilter:
+        body["dimensionFilter"] = report.dimensionFilter
+
+    if report.metricFilter:
+        body["metricFilter"] = report.metricFilter
+
     return body
 
 
