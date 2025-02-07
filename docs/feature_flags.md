@@ -36,14 +36,16 @@ simultaneously with the endpoint config edit, and doing things in the opposite o
 would behave even worse (if a task got unlucky and restarted at the wrong moment,
 it would pick up the default-change PR before the `no_new_thing` flag setting and
 exhibit the new behavior temporarily before going back to the old behavior). The window
-here is minutes at most and it only impacts new task creation, so just try keep an eye
-on that and perform the two operations fairly close together.
+here is minutes at most and it only impacts new task creation, so just try to perform the
+two operations close together and keep an eye on whether any new tasks were created during
+the process.
 
 ## Experimental Features
 
 An experimental feature is even simpler, just add a feature flag controlling the new
 behavior. Normally this should be default-off, but if it makes things clearer there
-shouldn't be anything wrong with adding a default-on flag instead.
+shouldn't be anything wrong with adding a default-on flag instead and having `no_foobar`
+be the setting which opts into the new behavior.
 
 ## Bulk Editing Process
 
