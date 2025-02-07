@@ -30,6 +30,13 @@ collections:
       - /country
       - /city
       - /date
+  acmeCo/my_custom_report_with_a_filter:
+    schema: my_custom_report_with_a_filter.schema.yaml
+    key:
+      - /property_id
+      - /report_date
+      - /date
+      - /browser
   acmeCo/pages:
     schema: pages.schema.yaml
     key:
