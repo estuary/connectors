@@ -1,3 +1,4 @@
+custom_reports: '[{"name": "my_custom_report_with_a_filter", "dimensions": ["date", "browser"], "metrics": ["totalUsers"], "dimensionFilter": {"filter": {"fieldName": "browser", "stringFilter": {"value": "Chrome"}}}}]'
 credentials:
     credentials_title: OAuth Credentials
     client_id_sops: ENC[AES256_GCM,data:5xiK/bKNLundU1KFZbnE2omS67SqMF2Qo7vNVVsHOcbwVH26eKGdCKp0isKEsq4FgMKIKddx42bU+F3VaS5hxIi+62wvKW3MYQ==,iv:gr2U2fsO6wf08/hHPzdBv3UNwjn1m+A5gfdAgD8MRQU=,tag:QUHU9w7g7SZ3JSWLow3Y2w==,type:str]
@@ -14,8 +15,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-02-07T18:25:27Z"
-    mac: ENC[AES256_GCM,data:Z5wI79NlUk3wUIdbpFxPTjiQjjPDe6aabQ/VViYZfR72v3vGq8xdACVW2tEo2q60ox7+QEE1yX8bnOgpKgt54GDOHAXWNu8YE3IbXfoJcQc64fS1xUYyrCa5yta6ifUTVrVcn4nGIOaZ7+y1xV+Hm4scLYE6fDeyu/EAcfI7YGE=,iv:ZENk1xeULs54BhtNTsGzQJZqpIlsTJ+AurND9X2soX4=,tag:FXvMNTBCWGFliSBsI4/UbQ==,type:str]
+    lastmodified: "2025-02-07T19:04:41Z"
+    mac: ENC[AES256_GCM,data:Baef8+VyQ9ZqonlMbrwANTEDqA0jMLm6HPPOT8uxT49R/1KpIAnyCsQHHP2sVcX4EpG8kMmjqdQVMXlyfayLJRj9LCR/XVYTXURZVdSyrx5DiTT92minPCOgtuWTmfqAfTHo376c/6Gd3ccbypBvk/f1F7/1tRPdNf0fprKVMxo=,iv:ZiqDK5MzkFSj8mC0sHcXQKZGqLXE6D0E3hit3fQMJlM=,tag:zuBFp4S5zRinv2M7Vgo4Pg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.7.3
