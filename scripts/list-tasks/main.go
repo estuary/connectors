@@ -1,5 +1,6 @@
 // The list-tasks script enumerates all tasks using any variant of a particular
-// connector, and add them to the active flowctl draft.
+// connector, and optionally either fetches the task specs or adds the tasks to
+// the active flowctl draft.
 //
 // It consults 'https://raw.githubusercontent.com/estuary/connectors/refs/heads/main/<connector>/VARIANTS'
 // to get an updated list of all variant names of a particular connector, and then lists all matching
@@ -16,13 +17,15 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 	"os/exec"
+	"path"
 	"sort"
 	"strings"
 
@@ -31,8 +34,8 @@ import (
 
 var scriptDescription = `
 The list-tasks script enumerates all tasks using any variant of a
-particular connector, and optionally add them to the active flowctl
-draft.
+particular connector, and optionally pulls the task specs or adds
+them to the active flowctl draft.
 
 Refer to 'docs/feature_flags.md' for more information on the intended
 use-case and workflow.
@@ -45,7 +48,10 @@ var (
 	imageName  = flag.String("connector", "", "The connector image name to filter on. Can be a full URL like 'ghcr.io/estuary/source-mysql' or a short name like 'source-mysql', and in the latter case the name will be expanded into a full URL including all variants. If unspecified the task list will not be filtered by connector.")
 	namePrefix = flag.String("prefix", "", "The task name prefix to filter on. If unspecified the task listing will not be filtered by name.")
 
-	addToDraft = flag.Bool("draft", false, "When true, all listed tasks will be added to the active flowctl draft")
+	addToDraft = flag.Bool("draft", false, "When true, all listed tasks will be added to the active flowctl draft.")
+
+	pullSpecs = flag.Bool("pull", false, "When true, all listed tasks will be fetched using 'flowctl catalog pull-specs'. Output files are in a flattened directory structure which plays more nicely with the bulk publishing script.")
+	outputDir = flag.String("dir", "./specs", "The directory to write specs under when using the '--pull' flag.")
 )
 
 func main() {
@@ -61,32 +67,44 @@ func main() {
 		log.SetLevel(lvl)
 	}
 
-	var ctx = context.Background()
+	if err := performListing(context.Background()); err != nil {
+		log.WithField("err", err).Fatal("error listing tasks")
+	}
+}
 
+func performListing(ctx context.Context) error {
 	var imageNames []string
 	if strings.Contains(*imageName, "/") {
 		imageNames = append(imageNames, *imageName)
 	} else if variants, err := listVariants(*imageName); err != nil {
-		log.Fatalf("error listing variants of connector %q: %v", *imageName, err)
+		return fmt.Errorf("error listing variants of connector %q: %w", *imageName, err)
 	} else {
 		imageNames = variants
 	}
 
 	var tasks, err = listTasks(ctx, *taskType, imageNames, *namePrefix)
 	if err != nil {
-		log.Fatalf("error listing tasks: %v", err)
+		return fmt.Errorf("error listing tasks: %w", err)
 	}
 	sort.Slice(tasks, func(i, j int) bool { return strings.Compare(tasks[i].CatalogName, tasks[j].CatalogName) < 0 })
 	for _, task := range tasks {
 		if *addToDraft {
 			if err := addTaskToDraft(ctx, task.CatalogName); err != nil {
-				log.Fatalf("error adding task %q to flowctl draft: %v", task.CatalogName, err)
+				return fmt.Errorf("error adding task %q to flowctl draft: %w", task.CatalogName, err)
 			}
 			fmt.Printf("added %q to draft\n", task.CatalogName)
-		} else {
+		}
+		if *pullSpecs {
+			if err := pullTaskSpec(ctx, task.CatalogName); err != nil {
+				return fmt.Errorf("error pulling spec for task %q: %w", task.CatalogName, err)
+			}
+			fmt.Printf("pulled spec for %q\n", task.CatalogName)
+		}
+		if !*addToDraft && !*pullSpecs {
 			fmt.Println(task.CatalogName)
 		}
 	}
+	return nil
 }
 
 type taskSpec struct {
@@ -136,7 +154,7 @@ func listVariants(connectorName string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
-	bs, err := ioutil.ReadAll(resp.Body)
+	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching variants list: %w", err)
 	}
@@ -150,8 +168,30 @@ func listVariants(connectorName string) ([]string, error) {
 }
 
 func addTaskToDraft(ctx context.Context, taskName string) error {
-	var command = []string{"flowctl", "catalog", "draft", "--name", taskName}
-	log.WithField("command", command).Debug("executing flowctl command")
-	var _, err = exec.CommandContext(ctx, command[0], command[1:]...).Output()
+	return flowctl(ctx, "catalog", "draft", "--name", taskName)
+}
+
+func pullTaskSpec(ctx context.Context, taskName string) error {
+	// Most of the work this function does is related to computing a target
+	// directory name to write the spec file(s) into. This is so that later
+	// on the bulk-publishing tool can assume every 'flow.yaml' file is
+	// definitely a single isolated task that can be published independently.
+	var taskHash = fmt.Sprintf("%x", sha256.Sum256([]byte(taskName)))
+	var dirName = taskName
+	dirName = dirName[:strings.LastIndex(dirName, "/")] // Strip the final /connector-name component of the task name
+	dirName = strings.ReplaceAll(dirName, "/", "_")     // Replace slashes with underscores to get a single level directory hierarchy
+	dirName = dirName + "_" + taskHash[:8]              // Add a unique hash to the directory name just so there definitely aren't any collisions
+	var targetDir = path.Join(*outputDir, dirName)
+
+	// Make sure the target directory and its parent(s) exist, then pull the task spec.
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("error creating target directory: %w", err)
+	}
+	return flowctl(ctx, "catalog", "pull-specs", "--name", taskName, "--overwrite", "--flat", "--target", targetDir+"/flow.yaml")
+}
+
+func flowctl(ctx context.Context, args ...string) error {
+	log.WithField("command", args).Debug("executing flowctl command")
+	var _, err = exec.CommandContext(ctx, "flowctl", args...).Output()
 	return err
 }
