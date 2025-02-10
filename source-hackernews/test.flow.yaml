@@ -2,7 +2,7 @@
 import:
   - acmeCo/flow.yaml
 captures:
-  acmeCo/source-google-sheets:
+  acmeCo/source-hackernews:
     endpoint:
       local:
         command:
