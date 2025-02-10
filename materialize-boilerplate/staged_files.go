@@ -115,6 +115,10 @@ func (sf *StagedFiles[T]) CleanupCurrentTransaction(ctx context.Context) error {
 
 		var uris []string
 		for _, f := range sf.stagedFiles {
+			if !f.started {
+				continue
+			}
+
 			for _, u := range f.uploaded {
 				uris = append(uris, sf.client.URI(u))
 			}
