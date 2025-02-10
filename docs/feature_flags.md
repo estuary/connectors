@@ -72,20 +72,32 @@ on whether any new tasks were created during the process.
 There are a couple of scripts I've written which make it easier to add a feature flag
 to all production tasks using a particular connector.
 
-The `scripts/list-tasks.sh` script queries the Supabase `live_specs` table for all
-tasks running a particular connector, and optionally can add them all to the active
-`flowctl` draft automatically.
+The script `list-tasks.sh` queries the Supabase `live_specs` table for all
+tasks running a particular connector, and optionally can either pull them itself or
+add them to the active `flowctl` draft automatically. It is recommended to use the
+`--pull` option, which writes the task specs in a flattened directory hierarchy that
+guarantees that each task can be published independently.
 
-The `scripts/bulk-config-editor.sh` script can modify every `*.config.yaml` file
-under the current directory to add a feature flag setting to the appropriate property.
+The script `bulk-config-editor.sh` modifies every `*.config.yaml` file under the
+current directory to add a feature flag setting to the appropriate property. It
+handles both plaintext and SOPS-encrypted configs, so long as you have access to
+the necessary KMS keys.
+
+The script `bulk-publish.sh` independently publishes each `flow.yaml` file defining
+catalog entities, so that a validation failure when publishing one doesn't prevent
+the others from being published. Optionally with the `--mark` flag, the script will
+also rename each `flow.yaml` file to `flow.published.yaml` so that a second run of
+the same script will only retry the ones which previously failed.
 
 The complete workflow goes something like this:
 
 ```bash
-$ ../scripts/list-tasks.sh --connector=source-mysql --pull --dir=./specs     # Fetch task specs for every source-mysql (and variants) capture in production
-$ ../scripts/bulk-config-editor.sh --set_flag=do_some_thing --dir=./specs    # Add the 'do_some_thing' feature flag to the local endpoint configs, with interactive diffs
-$ flowctl draft author --source flow.yaml                      # Upload modified specs to the draft
-$ flowctl draft publish                                        # Publish the uploaded specs
+# Fetch task specs for every source-mysql (and variants) capture in production.
+$ ../scripts/list-tasks.sh --connector=source-mysql --pull --dir=./specs
+# Add the 'do_some_thing' feature flag to the local endpoint configs, with interactive diffs.
+$ ../scripts/bulk-config-editor.sh --set_flag=do_some_thing --dir=./specs
+# Upload modified specs to the draft, renaming the local files when successful.
+$ ../scripts/bulk-publish.sh --mark --dir=./specs
 ```
 
 ## Worked Example
@@ -117,7 +129,7 @@ and introduce some startup logic to parse the flags property, merge with default
 and save the parsed flag settings into the appropriate state struct.
 
 ```go
-    var featureFlags = boilerplate.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+    var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
     if config.Advanced.FeatureFlags != "" {
         log.WithField("flags", featureFlags).Info("parsed feature flags")
     }
