@@ -38,7 +38,7 @@ type transactor struct {
 func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates templates,
-	objAndArrayAsStr bool,
+	objAndArrayAsJson bool,
 ) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	return func(
 		ctx context.Context,
@@ -61,7 +61,7 @@ func prepareNewTransactor(
 			fence:             &fence,
 			dialect:           dialect,
 			templates:         templates,
-			objAndArrayAsJson: objAndArrayAsStr,
+			objAndArrayAsJson: objAndArrayAsJson,
 			client:            client,
 			bucketPath:        cfg.BucketPath,
 			bucket:            cfg.Bucket,
