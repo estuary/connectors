@@ -219,15 +219,16 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
 	FROM {{ $.Table.Identifier }}
 	JOIN (
-		SELECT {{ range $ind, $key := $.Table.Keys }}
+		SELECT {{ range $ind, $bound := $.Bounds }}
 		{{- if $ind }}, {{ end -}}
-		$1[{{$ind}}] AS {{$key.Identifier -}}
+		$1[{{$ind}}] AS {{$bound.Identifier -}}
 		{{- end }}
 		FROM {{ $.File }}
 	) AS r
-	ON {{ range $ind, $key := $.Table.Keys }}
-	{{- if $ind }} AND {{ end -}}
-	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }}AND {{ else }}ON {{ end -}}
+	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
@@ -403,15 +404,15 @@ func renderCopyHistoryTemplate(tableName string, files []string, tpl *template.T
 	return s, nil
 }
 
-type mergeQueryInput struct {
+type boundedQueryInput struct {
 	Table  sql.Table
 	File   string
 	Bounds []sql.MergeBound
 }
 
-func renderMergeQueryTemplate(tpl *template.Template, table sql.Table, file string, bounds []sql.MergeBound) (string, error) {
+func renderBoundedQueryTemplate(tpl *template.Template, table sql.Table, file string, bounds []sql.MergeBound) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &mergeQueryInput{
+	if err := tpl.Execute(&w, &boundedQueryInput{
 		Table:  table,
 		File:   file,
 		Bounds: bounds,
