@@ -140,8 +140,8 @@ async def _paginate_through_report_results(
 
         remainder = processor.get_remainder()
 
-        if remainder.rows is None or remainder.rowCount is None:
-            raise RuntimeError(f"Missing rows or rowCount in API response. Verify property's timezone is a valid IANA timezone.")
+        if remainder.rowCount is None:
+            return
 
         offset += MAX_REPORT_RESULTS_LIMIT
         if offset >= remainder.rowCount:
