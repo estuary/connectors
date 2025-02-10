@@ -284,8 +284,9 @@ type binding struct {
 	pipeName string
 	// Variables exclusively used by Load.
 	load struct {
-		loadQuery string
-		stage     *stagedFile
+		loadQuery   string
+		stage       *stagedFile
+		mergeBounds *sql.MergeBoundsBuilder
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
@@ -302,6 +303,7 @@ func (d *transactor) addBinding(target sql.Table) error {
 	b.target = target
 
 	b.load.stage = newStagedFile(os.TempDir())
+	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.stage = newStagedFile(os.TempDir())
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
@@ -334,6 +336,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err = b.load.stage.encodeRow(converted); err != nil {
 			return fmt.Errorf("encoding Load key to scratch file: %w", err)
+		} else {
+			b.load.mergeBounds.NextKey(converted)
 		}
 	}
 	if it.Err() != nil {
@@ -347,7 +351,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
-		} else if subqueries[i], err = renderTableAndFileTemplate(b.target, dir, d.templates.loadQuery); err != nil {
+		} else if subqueries[i], err = renderBoundedQueryTemplate(d.templates.loadQuery, b.target, dir, b.load.mergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			filesToCleanup = append(filesToCleanup, dir)
@@ -487,7 +491,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if b.store.mustMerge {
-			mergeIntoQuery, err := renderMergeQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
+			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}
