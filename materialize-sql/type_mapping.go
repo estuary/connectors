@@ -474,6 +474,16 @@ func (c constrainter) compatibleType(existing boilerplate.EndpointField, propose
 }
 
 func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
+	if proposed.IsRootDocumentProjection() {
+		// Do not allow migration of the root document column. There is
+		// currently no known case where this would be useful, and in cases of
+		// pre-existing materializations where the document field was
+		// materialized as stringified JSON migrating it to a JSON column will
+		// most likely break the materialization, since the migrated value will
+		// be a JSON string instead of an object.
+		return false, nil, nil
+	}
+
 	proj := buildProjection(proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
