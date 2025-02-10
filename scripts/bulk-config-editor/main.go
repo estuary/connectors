@@ -36,7 +36,7 @@ use-case and workflow.
 
 var (
 	logLevel   = flag.String("log_level", "info", "The log level to print at.")
-	configsDir = flag.String("dir", ".", "The directory within which to edit configs.")
+	configsDir = flag.String("dir", "./specs", "The directory beneath which to edit configs.")
 	setFlag    = flag.String("set_flag", "", "A feature-flag setting to add to every task.")
 )
 
