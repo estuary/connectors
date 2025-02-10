@@ -39,3 +39,4 @@ class Item(BaseDocument):
     title: Optional[str] = Field(None, description='HTML')
     parts: List[int] = Field(default_factory=list, description="List of related pollopts")
     descendants: Optional[int] = Field(None, description="Total comment count for stories or polls")
+
