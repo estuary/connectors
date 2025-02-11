@@ -2,6 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 from typing import Optional
+from urllib import parse
 from unittest import mock
 
 import pendulum
@@ -429,11 +430,15 @@ class TestCampaignsStream:
 
         stream = Campaigns(api_key=API_KEY)
         requests_mock.register_uri(
-            "GET", "https://a.klaviyo.com/api/campaigns?sort=updated_at", status_code=200, json={"data": input_records}, complete_qs=True
+            "GET",
+            "https://a.klaviyo.com/api/campaigns?" + parse.urlencode({"filter": "equals(messages.channel,'email')", "sort": "updated_at"}),
+            status_code=200,
+            json={"data": input_records},
+            complete_qs=True,
         )
         requests_mock.register_uri(
             "GET",
-            "https://a.klaviyo.com/api/campaigns?sort=updated_at&filter=equals(archived,true)",
+            "https://a.klaviyo.com/api/campaigns?" + parse.urlencode({"filter": "and(equals(messages.channel,'email'),equals(archived,true))", "sort": "updated_at"}),
             status_code=200,
             json={"data": input_records_archived},
             complete_qs=True,
