@@ -150,3 +150,74 @@ point(s):
 ```go
 captureConfig.Advanced.FeatureFlags = *testFeatureFlags
 ```
+
+## Appendix: Script Usage Notes and Error Conditions
+
+An assortment of notes about these scripts and some edge cases that could theoretically occur.
+
+### Configs in YAML vs JSON
+
+Task configs in the control plane are stored as JSON. The config encryption service tells SOPS
+to output JSON. But when we pull the task specs locally they get converted to YAML.
+
+This is important to note because you actually get slightly different outputs if you ask SOPS
+to emit YAML versus asking SOPS to emit JSON and then converting that to YAML yourself. For
+instance, an unset property in the SOPS stanza will be represented like `kms: null` in JSON
+but `kms: []` in YAML output mode. Thus if we want to minimize spurious diffs we also need to
+ask SOPS to emit YAML.
+
+That means that if you pay attention, the endpoint configs will be idiomatic YAML after running
+the `list-tasks` script and be transformed into JSON after running `bulk-config-editor`. Since
+YAML is a superset of JSON this is fine, and the diffs printed by that tool are in terms of the
+reserialized YAML form of both the original and modified configs for this as well as other reasons.
+
+### Publication Races and Expected Publication ID
+
+When pulling specs with `list-tasks --pull` each task spec will have an `expectPubId` property.
+This property remains unmodified through the bulk feature flag editing process, and could cause
+a publication to fail if the task was modified by some other source before we finished.
+
+This is generally the desired outcome. To resolve this you should probably just re-pull that
+task's spec (you can use `list-tasks --pull --prefix=<name>` to do this easily) and modify the
+latest version again.
+
+### Non-Leaf Task Specs
+
+The `bulk-publish` script relies on an assumption that for each task there exists a leaf `flow.yaml`
+file which just defines that task and doesn't include any others. Branch files which just import
+other subdirectory `flow.yaml` files are automatically ignored for publication. But it's possible
+in theory to get an error that says:
+
+    file foo/bar/flow.yaml imports other files and also contains other non-import data, which is not supported
+
+This most likely means that there are two tasks where one's name is a prefix of the other, like:
+
+    acmeCo/foo/bar/source-whatever
+    acmeCo/foo/source-whatever
+
+And that you didn't use `list-tasks --pull` to fetch them but instead probably used `flowctl develop`.
+The fact that this is possible is one reason why the `list-tasks --pull` command exists, because it
+writes its output files in a modified directory structure where each task is fully independent.
+
+### Inlined Endpoint Configs
+
+The way `flowctl catalog pull-specs` works is it breaks out the endpoint config (and resource
+configs and whatnot) into separate files if they exceed a threshold (512 bytes, at the time of
+this writing). If the endpoint config is below this threshold it will be inlined into the task
+`flow.yaml` instead.
+
+In general this doesn't happen because the SOPS stanza of an encrypted endpoint config is over
+700 bytes just on its own. And most plaintext configs (of which there are a few in production)
+exceed 512 bytes for other reasons.
+
+But it's theoretically possible to have a task whose endpoint config doesn't get broken out as
+a separate file. The bulk config editing script checks for this and will emit an error like:
+
+    task dir specs/acmeCo_foobar has no corresponding config file
+    FATA[0000] error        err="found 7 task directories but only 6 endpoint configs"
+
+If this happens, the easiest solution if you want to use the bulk editing and publishing scripts
+is to go modify the problematic task spec(s) by hand to break out the config. Or you could go
+make the bulk editing tool smart enough to do that automatically. Or you could go improve the
+task listing tool so it pulls its own task specs and fully controls how they're written to disk
+instead of relying on `flowctl catalog pull-specs` to do that.
