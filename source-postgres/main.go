@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -76,7 +77,7 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 		}
 	}
 
-	var featureFlags = boilerplate.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
 	if config.Advanced.FeatureFlags != "" {
 		logrus.WithField("flags", featureFlags).Info("parsed feature flags")
 	}
