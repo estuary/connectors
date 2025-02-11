@@ -66,6 +66,10 @@ func main() {
 	} else {
 		log.SetLevel(lvl)
 	}
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+		PadLevelText:  true,
+	})
 
 	if err := performListing(context.Background()); err != nil {
 		log.WithField("err", err).Fatal("error listing tasks")

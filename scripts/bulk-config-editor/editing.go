@@ -35,16 +35,30 @@ func editPlaintextTaskConfig(cfg any, edits []configEdit) (any, error) {
 }
 
 func editEncryptedTaskConfig(ctx context.Context, configFile string, edits []configEdit) error {
-	// Execute sops commands to perform the specified edits
+	// Execute sops commands to perform the specified edits. Note that even though the input
+	// is typically YAML we're explicitly requesting JSON output from SOPS.
+	//
+	// This is because SOPS handles unset properties in the SOPS stanza slightly differently
+	// in YAML vs JSON output formats. In JSON an unset property is like `kms: null` but in
+	// YAML it's like `kms: []`. Our config-encryption service produces JSON output which is
+	// only YAML here because that's what 'flowctl catalog pull-specs' writes, so to produce
+	// the most minimal diffs we need to mirror that "JSON from SOPS" behavior. Since YAML
+	// is a superset of JSON it's fine to just leave the file in JSON format after editing.
+	//
+	// We could in principle have the 'list-tasks' helper script output JSON instead, but that
+	// is surprisingly tricky. Just telling 'flowctl catalog pull-specs' to output JSON only
+	// seems to impact the 'flow.json' file and the broken-out configs are still YAML. Also
+	// it seemed better in general to make this script's behavior work with the default output
+	// of a 'flowctl draft develop' if possible.
 	for _, edit := range edits {
 		log.WithField("edit", edit.String()).Debug("applying edit")
 
-		// TODO(wgd): Allow unsetting if edit.Value is nil?
+		// TODO(wgd): Implement unsetting if edit.Value is nil?
 		var bs, err = json.Marshal(edit.Value)
 		if err != nil {
 			return fmt.Errorf("error serializing edited value: %w", err)
 		}
-		var cmd = exec.CommandContext(ctx, "sops", "set", configFile, asPyDictIndex(edit.Path), string(bs))
+		var cmd = exec.CommandContext(ctx, "sops", "set", "--output-type", "json", configFile, asPyDictIndex(edit.Path), string(bs))
 		if _, err = cmd.Output(); err != nil {
 			if err, ok := err.(*exec.ExitError); ok {
 				return fmt.Errorf("error editing with SOPS: %s", strings.TrimSpace(string(err.Stderr)))

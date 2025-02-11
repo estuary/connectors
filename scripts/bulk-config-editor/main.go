@@ -10,7 +10,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -52,6 +51,10 @@ func main() {
 	} else {
 		log.SetLevel(lvl)
 	}
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+		PadLevelText:  true,
+	})
 
 	if err := performEdits(context.Background()); err != nil {
 		log.WithField("err", err).Fatal("error")
@@ -59,18 +62,43 @@ func main() {
 }
 
 func performEdits(ctx context.Context) error {
-	// As a sanity check, verify that there's a flow.yaml file in the current directory
-	if _, err := os.Stat("./flow.yaml"); errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("no flow.yaml in the current directory")
+	// List all task directories (dirs containing leaf flow.yaml files) and endpoint configs
+	// (*.config.yaml files) under the current directory. This allows us to do a couple of
+	// basic sanity checks to ensure that we'll be sucessful.
+	//
+	// The way you could end up with a task directory but no corresponding config file is if
+	// that task's config is plaintext and also short enough to fall below the 512 byte threshold
+	// for 'flowctl catalog pull-specs' to break it out into a separate file. An encrypted config
+	// can never fall below this threshold because the SOPS stanza is around 700 bytes alone, and
+	// in practice this almost never happens. If it does happen, you will need to manually edit
+	// that task spec to break out the config into a separate file if you want to use this script
+	// to modify it.
+	var taskDirs, err = listTaskSpecDirs(*configsDir)
+	if err != nil {
+		return fmt.Errorf("error listing task specs: %w", err)
 	}
-
-	// List all *.config.yaml files under the current directory
-	var configFiles, err = listConfigFiles(*configsDir)
+	configFiles, err := listConfigFiles(*configsDir)
 	if err != nil {
 		return fmt.Errorf("error listing config files: %w", err)
 	}
 	if len(configFiles) == 0 {
 		return fmt.Errorf("no files named '*.config.yaml' under the current directory")
+	}
+	if len(taskDirs) > len(configFiles) {
+		// Find the directory which doesn't have a corresponding config file
+		for _, taskDir := range taskDirs {
+			var found bool
+			for _, configFile := range configFiles {
+				if strings.HasPrefix(configFile, taskDir) {
+					found = true
+					break
+				}
+			}
+			if !found {
+				fmt.Printf("task dir %q has no corresponding config file\n", taskDir)
+			}
+		}
+		return fmt.Errorf("found %d task directories but only %d endpoint configs", len(taskDirs), len(configFiles))
 	}
 
 	// Compute edits for each config file
@@ -87,6 +115,8 @@ func performEdits(ctx context.Context) error {
 			fmt.Printf("%s\n", err.Error())
 		}
 	}
+	var successCount = len(configFiles) - len(errs)
+	fmt.Printf("edited %d/%d configs\n", successCount, len(configFiles))
 	return nil
 }
 
@@ -168,12 +198,68 @@ func listConfigFiles(dir string) ([]string, error) {
 		if err != nil {
 			return err
 		}
-		if !info.IsDir() && strings.HasSuffix(info.Name(), ".config.yaml") {
+		// List only files ending in '.config.yaml' and exclude any with names like 'source-foo.resource.1.config.yaml'
+		// (which are written when Flow decides to break out a resource config into a separate file).
+		if !info.IsDir() && strings.HasSuffix(info.Name(), ".config.yaml") && !strings.Contains(info.Name(), ".resource.") {
 			filePaths = append(filePaths, path)
 		}
 		return nil
 	})
 	return filePaths, err
+}
+
+func listTaskSpecDirs(dir string) ([]string, error) {
+	var allFiles, err = listFilesNamed(dir, "flow.yaml")
+	if err != nil {
+		return nil, fmt.Errorf("error listing flow.yaml files: %w", err)
+	}
+	var leafDirs []string
+	for _, file := range allFiles {
+		if hasImports, hasOnlyImports, err := checkForImports(file); err != nil {
+			return nil, fmt.Errorf("error checking for imports in %q: %w", file, err)
+		} else if hasImports && !hasOnlyImports {
+			return nil, fmt.Errorf("file %q imports other files and also contains other non-import data, which is not supported", file)
+		} else if hasImports && hasOnlyImports {
+			log.WithField("file", file).Warn("skipping import-only flow.yaml")
+		} else {
+			leafDirs = append(leafDirs, strings.TrimSuffix(file, "/flow.yaml"))
+		}
+	}
+	return leafDirs, nil
+}
+
+// listFilesNamed returns a list of all files under the given directory (recursively) with the given name.
+func listFilesNamed(dir, filename string) ([]string, error) {
+	var files []string
+	var err = filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !info.IsDir() && info.Name() == filename {
+			files = append(files, path)
+		}
+		return nil
+	})
+	return files, err
+}
+
+// checkForImports reads the file at the given path and checks whether it has a top-level property named 'import'.
+func checkForImports(file string) (hasImports bool, hasOnlyImports bool, err error) {
+	bs, err := os.ReadFile(file)
+	if err != nil {
+		return false, false, fmt.Errorf("error reading file: %w", err)
+	}
+	var doc any
+	if err := yaml.Unmarshal(bs, &doc); err != nil {
+		return false, false, fmt.Errorf("error unmarshalling YAML: %w", err)
+	}
+	if m, ok := doc.(map[string]any); ok {
+		if _, hasImports := m["import"]; hasImports {
+			return true, len(m) == 1, nil
+		}
+	}
+
+	return false, false, nil
 }
 
 func printYAMLDiff(old, new any, description string, colorize bool) error {
