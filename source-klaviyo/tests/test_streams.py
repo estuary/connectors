@@ -311,15 +311,15 @@ class TestProfilesStream:
             (
                 {"page[cursor]": "aaA0aAo0aAA0A"},
                 None,
-                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics", "sort": "updated"},
+                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"},
             ),
             (
                 {"page[cursor]": "aaA0aAo0aAA0A"},
                 100,
-                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics", "sort": "updated"},
+                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"},
             ),
-            (None, None, {"additional-fields[profile]": "predictive_analytics", "sort": "updated"}),
-            (None, 100, {"page[size]": 100, "additional-fields[profile]": "predictive_analytics", "sort": "updated"}),
+            (None, None, {"additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"}),
+            (None, 100, {"page[size]": 100, "additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"}),
         ),
     )
     def test_request_params(self, next_page_token: Optional[dict], page_size: Optional[int], expected_params: dict):

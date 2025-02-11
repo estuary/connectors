@@ -279,7 +279,6 @@ class Profiles(IncrementalKlaviyoStream):
 
     cursor_field = "updated"
     comparison_operator = 'greater-than'
-    api_revision = "2023-02-22"
     page_size = 100
     state_checkpoint_interval = 100  # API can return maximum 100 records per page
 
@@ -293,7 +292,7 @@ class Profiles(IncrementalKlaviyoStream):
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
-        params.update({"additional-fields[profile]": "predictive_analytics"})
+        params.update({"additional-fields[profile]": "predictive_analytics,subscriptions"})
         return params
 
 
