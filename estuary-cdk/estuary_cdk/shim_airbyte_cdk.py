@@ -352,7 +352,7 @@ class CaptureShim(BaseCaptureConnector):
             await asyncio.sleep(0)
 
             if task.stopping.event.is_set():
-                task.log.debug(f"Airbyte shim is yielding to stop.")
+                task.log.info(f"Airbyte shim is yielding to stop.")
                 return
 
             if record := message.record:
@@ -449,5 +449,6 @@ class CaptureShim(BaseCaptureConnector):
                 raise RuntimeError("unexpected AirbyteMessage", message)
 
         # Emit a final checkpoint before exiting.
+        task.log.info("Emitting final checkpoint for sweep.")
         task.checkpoint(connector_state, merge_patch=False)
         return None
