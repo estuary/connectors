@@ -46,6 +46,10 @@ func main() {
 	} else {
 		log.SetLevel(lvl)
 	}
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp: true,
+		PadLevelText:  true,
+	})
 
 	if err := performPublishing(context.Background()); err != nil {
 		log.WithError(err).Fatal("error")
@@ -70,7 +74,7 @@ func performPublishing(ctx context.Context) error {
 		} else if hasImports && !hasOnlyImports {
 			return fmt.Errorf("file %q imports other files and also contains other non-import data, which is not supported", file)
 		} else if hasImports && hasOnlyImports {
-			log.WithField("file", file).Warn("skipping file with imports")
+			log.WithField("file", file).Warn("skipping import-only flow.yaml")
 		} else {
 			leafFiles = append(leafFiles, file)
 		}
@@ -150,10 +154,9 @@ func publishFile(ctx context.Context, file string) error {
 		return fmt.Errorf("error creating draft: %w", err)
 	} else if err := flowctl(ctx, "draft", "author", "--source", file); err != nil {
 		return fmt.Errorf("error authoring draft: %w", err)
+	} else if err := flowctl(ctx, "draft", "publish"); err != nil {
+		return fmt.Errorf("error publishing draft: %w", err)
 	}
-
-	// TODO(wgd): Run 'flowctl draft publish'
-	panic("unfinished")
 	return nil
 }
 
