@@ -3,10 +3,13 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"regexp"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
@@ -231,4 +234,49 @@ func TestScanKeyTypes(t *testing.T) {
 			cupaloy.SnapshotT(t, summary)
 		})
 	}
+}
+
+func TestMariaDBTypeUUID(t *testing.T) {
+	if os.Getenv("TEST_MARIADB") != "yes" {
+		t.Skip("Skipping MariaDB specific test, set TEST_MARIADB=yes to enable")
+	}
+
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "58628907"
+	var tableDef = "(id UUID PRIMARY KEY, data TEXT)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	t.Run("discovery", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+
+	t.Run("capture", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+		cs.Validator = &st.OrderedCaptureValidator{}
+		sqlcapture.TestShutdownAfterCaughtUp = true
+		t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+		tb.Insert(ctx, t, tableName, [][]any{{"8ab72a54-2cd9-42af-a789-445fa1f11c83", "zero"}, {"ef4556a8-e6e7-4aa0-b803-8e495290ccbd", "one"}})
+		cs.Capture(ctx, t, nil)
+		tb.Insert(ctx, t, tableName, [][]any{{"ba1662b6-865f-461f-9ac9-88d57dc152da", "three"}, {"37f36cc8-b64d-4839-b1ba-7e6f1d4aa750", "four"}})
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+
+	t.Run("scankey", func(t *testing.T) {
+		tb.Insert(ctx, t, tableName, [][]any{
+			{"5fca7dcd-78c5-4a63-8f34-2f6753fe4fc8", "2f6753fe4fc8"}, {"7742b82f-c366-40cc-9e1d-a4cd5f4e9226", "a4cd5f4e9226"},
+			{"05c9db45-53c0-498b-ba2d-ebc3b2bde68a", "ebc3b2bde68a"}, {"332ad8a4-3296-45d4-9743-546620eea7ca", "546620eea7ca"},
+			{"b2a97b0a-510c-4914-8198-9a2eb8189bc1", "9a2eb8189bc1"}, {"396f7888-0341-4551-a3c1-f0fb6354d77c", "f0fb6354d77c"},
+			{"90a58f67-ed67-4253-ba18-a7f5ac42fa9d", "a7f5ac42fa9d"}, {"2d5eae06-2ba0-42c2-87a7-dc9144b2b492", "dc9144b2b492"},
+			{"e1e89e8d-7c8d-4a9e-b2f3-d01f1092bf3f", "d01f1092bf3f"}, {"eadc9356-e40d-4f0f-9164-364ead9cb370", "364ead9cb370"},
+			{"98b3f921-4f07-43d1-9621-1225774732f8", "1225774732f8"}, {"85c62b8f-9e2f-429e-a6bf-85cd827655ac", "85cd827655ac"},
+			{"341e786d-70a0-4f3b-adf4-9c5ab2b1020e", "9c5ab2b1020e"}, {"80a72534-96b8-4da9-ace3-47f0ffdcd55e", "47f0ffdcd55e"},
+			{"c0c52adc-5f9e-4cce-8093-cf1be4a016ba", "cf1be4a016ba"}, {"ec102b92-d4cc-46fc-9fba-6f9068b41881", "6f9068b41881"},
+		})
+		var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+		cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
+		var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
+		cupaloy.SnapshotT(t, summary)
+	})
 }
