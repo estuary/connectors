@@ -1,0 +1,270 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:0"}},"data":"1225774732f8","id":"98b3f921-4f07-43d1-9621-1225774732f8"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":1,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATk4YjNmOTIxLTRmMDctNDNkMS05NjIxLTEyMjU3NzQ3MzJmOAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATk4YjNmOTIxLTRmMDctNDNkMS05NjIxLTEyMjU3NzQ3MzJmOAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:1"}},"data":"2f6753fe4fc8","id":"5fca7dcd-78c5-4a63-8f34-2f6753fe4fc8"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATVmY2E3ZGNkLTc4YzUtNGE2My04ZjM0LTJmNjc1M2ZlNGZjOAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATVmY2E3ZGNkLTc4YzUtNGE2My04ZjM0LTJmNjc1M2ZlNGZjOAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:2"}},"data":"364ead9cb370","id":"eadc9356-e40d-4f0f-9164-364ead9cb370"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AWVhZGM5MzU2LWU0MGQtNGYwZi05MTY0LTM2NGVhZDljYjM3MAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWVhZGM5MzU2LWU0MGQtNGYwZi05MTY0LTM2NGVhZDljYjM3MAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:3"}},"data":"zero","id":"8ab72a54-2cd9-42af-a789-445fa1f11c83"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":4,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AThhYjcyYTU0LTJjZDktNDJhZi1hNzg5LTQ0NWZhMWYxMWM4MwA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AThhYjcyYTU0LTJjZDktNDJhZi1hNzg5LTQ0NWZhMWYxMWM4MwA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:4"}},"data":"47f0ffdcd55e","id":"80a72534-96b8-4da9-ace3-47f0ffdcd55e"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":5,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATgwYTcyNTM0LTk2YjgtNGRhOS1hY2UzLTQ3ZjBmZmRjZDU1ZQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATgwYTcyNTM0LTk2YjgtNGRhOS1hY2UzLTQ3ZjBmZmRjZDU1ZQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:5"}},"data":"546620eea7ca","id":"332ad8a4-3296-45d4-9743-546620eea7ca"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":6,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATMzMmFkOGE0LTMyOTYtNDVkNC05NzQzLTU0NjYyMGVlYTdjYQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATMzMmFkOGE0LTMyOTYtNDVkNC05NzQzLTU0NjYyMGVlYTdjYQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:6"}},"data":"6f9068b41881","id":"ec102b92-d4cc-46fc-9fba-6f9068b41881"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":7,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AWVjMTAyYjkyLWQ0Y2MtNDZmYy05ZmJhLTZmOTA2OGI0MTg4MQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWVjMTAyYjkyLWQ0Y2MtNDZmYy05ZmJhLTZmOTA2OGI0MTg4MQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:7"}},"data":"four","id":"37f36cc8-b64d-4839-b1ba-7e6f1d4aa750"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":8,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATM3ZjM2Y2M4LWI2NGQtNDgzOS1iMWJhLTdlNmYxZDRhYTc1MAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATM3ZjM2Y2M4LWI2NGQtNDgzOS1iMWJhLTdlNmYxZDRhYTc1MAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:8"}},"data":"85cd827655ac","id":"85c62b8f-9e2f-429e-a6bf-85cd827655ac"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":9,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATg1YzYyYjhmLTllMmYtNDI5ZS1hNmJmLTg1Y2Q4Mjc2NTVhYwA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATg1YzYyYjhmLTllMmYtNDI5ZS1hNmJmLTg1Y2Q4Mjc2NTVhYwA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:9"}},"data":"three","id":"ba1662b6-865f-461f-9ac9-88d57dc152da"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":10,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AWJhMTY2MmI2LTg2NWYtNDYxZi05YWM5LTg4ZDU3ZGMxNTJkYQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWJhMTY2MmI2LTg2NWYtNDYxZi05YWM5LTg4ZDU3ZGMxNTJkYQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:10"}},"data":"one","id":"ef4556a8-e6e7-4aa0-b803-8e495290ccbd"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":11,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AWVmNDU1NmE4LWU2ZTctNGFhMC1iODAzLThlNDk1MjkwY2NiZAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWVmNDU1NmE4LWU2ZTctNGFhMC1iODAzLThlNDk1MjkwY2NiZAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:11"}},"data":"9a2eb8189bc1","id":"b2a97b0a-510c-4914-8198-9a2eb8189bc1"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":12,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AWIyYTk3YjBhLTUxMGMtNDkxNC04MTk4LTlhMmViODE4OWJjMQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWIyYTk3YjBhLTUxMGMtNDkxNC04MTk4LTlhMmViODE4OWJjMQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:12"}},"data":"9c5ab2b1020e","id":"341e786d-70a0-4f3b-adf4-9c5ab2b1020e"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":13,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATM0MWU3ODZkLTcwYTAtNGYzYi1hZGY0LTljNWFiMmIxMDIwZQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATM0MWU3ODZkLTcwYTAtNGYzYi1hZGY0LTljNWFiMmIxMDIwZQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:13"}},"data":"a4cd5f4e9226","id":"7742b82f-c366-40cc-9e1d-a4cd5f4e9226"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":14,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATc3NDJiODJmLWMzNjYtNDBjYy05ZTFkLWE0Y2Q1ZjRlOTIyNgA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATc3NDJiODJmLWMzNjYtNDBjYy05ZTFkLWE0Y2Q1ZjRlOTIyNgA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:14"}},"data":"a7f5ac42fa9d","id":"90a58f67-ed67-4253-ba18-a7f5ac42fa9d"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":15,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATkwYTU4ZjY3LWVkNjctNDI1My1iYTE4LWE3ZjVhYzQyZmE5ZAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATkwYTU4ZjY3LWVkNjctNDI1My1iYTE4LWE3ZjVhYzQyZmE5ZAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:15"}},"data":"cf1be4a016ba","id":"c0c52adc-5f9e-4cce-8093-cf1be4a016ba"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":16,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AWMwYzUyYWRjLTVmOWUtNGNjZS04MDkzLWNmMWJlNGEwMTZiYQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWMwYzUyYWRjLTVmOWUtNGNjZS04MDkzLWNmMWJlNGEwMTZiYQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:16"}},"data":"d01f1092bf3f","id":"e1e89e8d-7c8d-4a9e-b2f3-d01f1092bf3f"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":17,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"AWUxZTg5ZThkLTdjOGQtNGE5ZS1iMmYzLWQwMWYxMDkyYmYzZgA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AWUxZTg5ZThkLTdjOGQtNGE5ZS1iMmYzLWQwMWYxMDkyYmYzZgA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:17"}},"data":"dc9144b2b492","id":"2d5eae06-2ba0-42c2-87a7-dc9144b2b492"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":18,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATJkNWVhZTA2LTJiYTAtNDJjMi04N2E3LWRjOTE0NGIyYjQ5MgA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATJkNWVhZTA2LTJiYTAtNDJjMi04N2E3LWRjOTE0NGIyYjQ5MgA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:18"}},"data":"ebc3b2bde68a","id":"05c9db45-53c0-498b-ba2d-ebc3b2bde68a"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":19,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATA1YzlkYjQ1LTUzYzAtNDk4Yi1iYTJkLWViYzNiMmJkZTY4YQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATA1YzlkYjQ1LTUzYzAtNDk4Yi1iYTJkLWViYzNiMmJkZTY4YQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:19"}},"data":"f0fb6354d77c","id":"396f7888-0341-4551-a3c1-f0fb6354d77c"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":20,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"UnfilteredBackfill","scanned":"ATM5NmY3ODg4LTAzNDEtNDU1MS1hM2MxLWYwZmI2MzU0ZDc3YwA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "ATM5NmY3ODg4LTAzNDEtNDU1MS1hM2MxLWYwZmI2MzU0ZDc3YwA="
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":20,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
+
+

@@ -15,6 +15,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/encoding/charmap"
@@ -174,6 +175,12 @@ func predictableColumnOrder(colType any) bool {
 	// https://github.com/estuary/connectors/issues/1343 for more details.
 	if t, ok := colType.(*mysqlColumnType); ok {
 		return !slices.Contains([]string{"char", "varchar", "text", "tinytext", "mediumtext", "longtext"}, t.Type)
+	}
+	// Consider the MariaDB UUID column type as unpredictable since they're not ordered in
+	// the obvious way which would allow lexicographic comparison of the string representation
+	// to work and this is simpler than implementing the necessary FDB tuple encoding logic.
+	if colType == "uuid" {
+		return false
 	}
 	return true
 }
@@ -400,6 +407,14 @@ func (db *mysqlDatabase) translateRecordField(isBackfill bool, columnType interf
 				return t.UTC().Format(time.RFC3339Nano), nil
 			case "date":
 				return normalizeMySQLDate(string(val)), nil
+			case "uuid": // The 'UUID' column type is only in MariaDB
+				if parsed, err := uuid.Parse(string(val)); err == nil {
+					return parsed.String(), nil
+				} else if parsed, err := uuid.FromBytes(val); err == nil {
+					return parsed.String(), nil
+				} else {
+					return nil, fmt.Errorf("error parsing UUID: %w", err)
+				}
 			}
 		}
 		if len(val) > truncateColumnThreshold {
@@ -997,4 +1012,6 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"year":      {jsonType: "integer"},
 
 	"json": {},
+
+	"uuid": {jsonType: "string", format: "uuid"}, // Only present in MariaDB
 }

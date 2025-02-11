@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test/mariadbtypeuuid_58628907": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:0"}},"data":"zero","id":"8ab72a54-2cd9-42af-a789-445fa1f11c83"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"MariaDBTypeUUID_58628907","cursor":"backfill:1"}},"data":"one","id":"ef4556a8-e6e7-4aa0-b803-8e495290ccbd"}
+{"_meta":{"op":"c","source":{"schema":"test","table":"MariaDBTypeUUID_58628907","cursor":"binlog.000123:56789:123"}},"data":"three","id":"ba1662b6-865f-461f-9ac9-88d57dc152da"}
+{"_meta":{"op":"c","source":{"schema":"test","table":"MariaDBTypeUUID_58628907","cursor":"binlog.000123:56789:123"}},"data":"four","id":"37f36cc8-b64d-4839-b1ba-7e6f1d4aa750"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FMariaDBTypeUUID_58628907":{"backfilled":2,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":"uuid"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
