@@ -20,7 +20,7 @@ import (
 var featureFlagDefaults = map[string]bool{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
-	"objects_and_arrays_as_json": false,
+	"objects_and_arrays_as_json": true,
 }
 
 type config struct {
