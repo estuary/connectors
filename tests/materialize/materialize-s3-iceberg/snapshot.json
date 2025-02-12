@@ -10,19 +10,19 @@
         "iceberg-test%2Fduplicate_keys_delta": {
           "currentCheckpoint": "ce03a88604a70da2",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fmultiple_types_delta": {
           "currentCheckpoint": "ce03a88604a70da2",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fsimple_delta": {
           "currentCheckpoint": "ce03a88604a70da2",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
           ]
         }
       }
@@ -38,21 +38,21 @@
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fmultiple_types_delta": {
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fsimple_delta": {
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
           ]
         }
       }
@@ -68,21 +68,21 @@
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fmultiple_types_delta": {
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fsimple_delta": {
           "previousCheckpoint": "ce03a88604a70da2",
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-iceberg-test/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
+            "s3://estuary-connector-test-bucket/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
           ]
         }
       }

@@ -66,7 +66,6 @@ func mustDSN() string {
 }
 
 var deleteTable = flag.Bool("delete", false, "delete the table instead of dumping its contents")
-var deleteSpecs = flag.Bool("delete-specs", false, "stored materialize checkpoint and specs")
 
 func main() {
 	flag.Parse()
@@ -97,13 +96,6 @@ func main() {
 			fmt.Println(fmt.Errorf("could not drop table %s: %w", tables[0], err))
 		}
 		fmt.Printf("dropped table %s\n", tables[0])
-		os.Exit(0)
-	} else if *deleteSpecs {
-		query := "delete from FLOW_MATERIALIZATIONS_V2 where MATERIALIZATION='tests/materialize-snowflake/materialize';"
-		if _, err := db.ExecContext(ctx, query); err != nil {
-			fmt.Println(fmt.Errorf("could not delete stored materialization spec/checkpoint: %w", err))
-		}
-		fmt.Println("deleted stored materialization spec & checkpoint")
 		os.Exit(0)
 	}
 

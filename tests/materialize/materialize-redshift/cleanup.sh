@@ -23,4 +23,3 @@ dropTable "deletions"
 # Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
 # runs start from scratch.
 echo "delete from FLOW_CHECKPOINTS_V1 where MATERIALIZATION='tests/materialize-redshift/materialize';" | psql postgres://${REDSHIFT_USER}:${REDSHIFT_PASSWORD}@${REDSHIFT_ADDRESS}/${REDSHIFT_DATABASE}
-echo "delete from FLOW_MATERIALIZATIONS_V2 where MATERIALIZATION='tests/materialize-redshift/materialize';" | psql postgres://${REDSHIFT_USER}:${REDSHIFT_PASSWORD}@${REDSHIFT_ADDRESS}/${REDSHIFT_DATABASE}
