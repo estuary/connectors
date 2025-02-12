@@ -1,0 +1,6 @@
+---
+collections:
+  acmeCo/boards:
+    schema: boards.schema.yaml
+    key:
+      - /_meta/row_id

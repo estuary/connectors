@@ -1,0 +1,17 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-monday:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_monday
+        config: config.yaml
+    bindings:
+      - resource:
+          name: boards
+          interval: PT10S
+        target: acmeCo/boards
