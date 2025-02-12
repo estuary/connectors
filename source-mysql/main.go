@@ -32,7 +32,7 @@ import (
 var featureFlagDefaults = map[string]bool{
 	// When true, date columns will be discovered as `type: string, format: date`
 	// instead of simply `type: string`
-	"date_schema_format": false,
+	"date_schema_format": true,
 }
 
 type sshForwarding struct {
