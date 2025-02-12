@@ -126,12 +126,12 @@ var featureFlagDefaults = map[string]bool{
 
 	// When true, DATE columns are captured as YYYY-MM-DD dates. Historically these
 	// used to be captured as RFC3339 timestamps, which is usually not what users expect.
-	"date_as_date": false,
+	"date_as_date": true,
 
 	// When true, TIME WITHOUT TIME ZONE columns (also known as TIME) are captured as strings
 	// satisfying `format: time`. Historically these used to be captured as Unix microseconds,
 	// which is usually not what users expect.
-	"time_as_time": false,
+	"time_as_time": true,
 }
 
 // Validate checks that the configuration possesses all required properties.
