@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/c__flow_test_logminer_float_nans_10511": 3 Documents
+# ================================
+{"A_DOUBLE":2,"A_FLOAT":"NaN","ID":"0","TXID":999999,"_meta":{"polled":"<TIMESTAMP>","index":999}}
+{"A_DOUBLE":"Infinity","A_FLOAT":"-Infinity","ID":"2","TXID":999999,"_meta":{"polled":"<TIMESTAMP>","index":999}}
+{"A_DOUBLE":"NaN","A_FLOAT":3,"ID":"1","TXID":999999,"_meta":{"polled":"<TIMESTAMP>","index":999}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"c__flow_test_logminer_float_nans_10511":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+

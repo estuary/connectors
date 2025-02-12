@@ -1,0 +1,25 @@
+user: c##flow_test_logminer
+password_sops: ENC[AES256_GCM,data:8ZzAMqo8P8BDb+Xexv4K/g==,iv:P3WBCG658USMguqW10CCPBiIo20TsatG3+DU9z7f/Bo=,tag:/01GPk1BLhzj2yrxRNWz6A==,type:str]
+address: estuarytest.sub06191706070.testvcn.oraclevcn.com:1521
+database: MYPDB.sub06191706070.testvcn.oraclevcn.com
+advanced:
+    discover_schemas:
+        - C##FLOW_TEST_LOGMINER
+networkTunnel:
+    sshForwarding:
+        sshEndpoint: ssh://opc@150.136.127.80:22
+        privateKey_sops: ENC[AES256_GCM,data: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,iv:G1VUtRlXnFQN2H84MDbZAaQTftHZeRQBIKXFI7wKcrE=,tag:qplwMjPqE0r8Owr1zzCmfQ==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2024-12-19T09:52:09Z"
+    mac: ENC[AES256_GCM,data:ajqErfrqO2tfiVIlXnwAJN1eWe06VtUrn8OsCEu3Nl6h1PjboJRq2KsLHs1vIq0+LEQoiwHbUBaIZIq0d7yjeQyg0eMMYKWnZSeIRSZq3JRgbFT5zW8VLnluvAbuXRW+o3XYHhCoKmnUhd9HSHa5HjkxoSXruDEdsdUWcUOIv6w=,iv:yPIRnne6Ghh0KX01xayc/r/x1NYrh3w4t/A8iocqiqs=,tag:iVHXGD6Wjhn4KSHWEzQHOA==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.8.1
