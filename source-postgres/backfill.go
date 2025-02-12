@@ -130,7 +130,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
-		if err := db.translateRecordFields(info, fields); err != nil {
+		if err := translateRecordFields(info, fields); err != nil {
 			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
