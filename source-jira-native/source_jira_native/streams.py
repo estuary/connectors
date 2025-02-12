@@ -1250,6 +1250,11 @@ class ScreenTabs(JiraStream):
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"screens/{stream_slice['screen_id']}/tabs"
 
+    # This endpoint doesn't have pagination, so we override the pagination strategy defined in JiraStream to avoid
+    # getting stuck in a loop making the same request endlessly.
+    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+        return None
+
     def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
         for screen in read_full_refresh(self.screens_stream):
             yield from self.read_tab_records(stream_slice={"screen_id": screen["id"]}, **kwargs)
@@ -1284,6 +1289,11 @@ class ScreenTabFields(JiraStream):
 
     def path(self, stream_slice: Mapping[str, Any], **kwargs) -> str:
         return f"screens/{stream_slice['screen_id']}/tabs/{stream_slice['tab_id']}/fields"
+
+    # This endpoint doesn't have pagination, so we override the pagination strategy defined in JiraStream to avoid
+    # getting stuck in a loop making the same request endlessly.
+    def next_page_token(self, response: requests.Response) -> Optional[Mapping[str, Any]]:
+        return None
 
     def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
         for screen in read_full_refresh(self.screens_stream):
