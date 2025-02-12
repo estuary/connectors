@@ -27,6 +27,21 @@ class Annotations(DateSlicesMixin, MixpanelStream):
 
     primary_key: str = "id"
 
+    def __init__(
+        self,
+        date_window_size: int = 30,
+        **kwargs,
+    ):
+        # This stream rarely has much data, and its not incremental, so there's no benefit
+        # to doing date window slices for annotations when we *should* be able to fetch all records
+        # in a single request. Using an extremely large date window will cause the connector to
+        # use a single request to fetch all records.
+
+        super().__init__(
+            date_window_size = 100_000,
+            **kwargs,
+        )
+
     @property
     def data_field(self):
         return "results" if self.project_id else "annotations"
