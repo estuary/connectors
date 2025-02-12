@@ -166,12 +166,12 @@ ALTER TABLE {{$.Identifier}}
 -- Templated creation of a temporary load table:
 
 {{ define "createLoadTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
+CREATE TABLE {{ template "temp_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
-) ON COMMIT DELETE ROWS;
+);
 {{ end }}
 
 -- Templated insertion into the temporary load table:
