@@ -56,6 +56,10 @@ func TestDatatypes(t *testing.T) {
 
 		// Date/Time/Timestamp Types
 		{ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
+		{ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 22021'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
+		// Replacement tests for the previous two once "date_as_date" is the default
+		// {ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08"`},
+		// {ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date"}`, InputValue: `'January 8, 22021'`, ExpectValue: `"0000-01-01"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
 		{ColumnType: `timestamp without time zone`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999'`, ExpectValue: `"1999-01-08T00:00:00Z"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'infinity'`, ExpectValue: `"9999-12-31T23:59:59Z"`},
@@ -64,9 +68,11 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'20222-08-31T00:00:00Z'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
 		{ColumnType: `timestamp`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 99 BC'`, ExpectValue: `"0000-01-01T00:00:00Z"`},
 		{ColumnType: `timestamp with time zone`, ExpectType: `{"type":["string","null"],"format":"date-time"}`, InputValue: `'January 8, 1999 UTC'`, ExpectValue: `"1999-01-07T16:00:00-08:00"`},
-		// For historical reasons, times without time zone are captured as Unix second timestamps. We can change this if we ever do a version bump or otherwise break compatibility.
 		{ColumnType: `time`, ExpectType: `{"type":["integer","null"]}`, InputValue: `'04:05:06 PST'`, ExpectValue: `14706000000`},
 		{ColumnType: `time without time zone`, ExpectType: `{"type":["integer","null"]}`, InputValue: `'04:05:06 PST'`, ExpectValue: `14706000000`},
+		// Replacement tests for the previous two once "time_as_time" is the default
+		// {ColumnType: `time`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06 PST'`, ExpectValue: `"04:05:06Z"`},
+		// {ColumnType: `time without time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06 PST'`, ExpectValue: `"04:05:06Z"`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06 PST'`, ExpectValue: `"04:05:06-08:00"`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06 UTC'`, ExpectValue: `"04:05:06Z"`},
 		{ColumnType: `time with time zone`, ExpectType: `{"type":["string","null"],"format":"time"}`, InputValue: `'04:05:06.123 UTC'`, ExpectValue: `"04:05:06.123Z"`},
