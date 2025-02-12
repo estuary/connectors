@@ -1,4 +1,18 @@
 credentials:
     credentials_title: Private App Credentials
-    access_token: eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjQ3MTU4Mjg2MSwiYWFpIjo0MTA3MjAsInVpZCI6NzE5ODU0MTYsImlhZCI6IjIwMjUtMDItMTJUMTQ6NTI6MzQuMDY5WiIsInBlciI6ImJvYXJkczpyZWFkLHVzZXJzOnJlYWQsdGFnczpyZWFkLHRlYW1zOnJlYWQiLCJhY3RpZCI6Mjc5MjU2ODcsInJnbiI6InVzZTEifQ.ryCp_WKKt2vqd2qSPqV5uG19B1MGF4BgpQ3aGk5gnlA
+    access_token_sops: ENC[AES256_GCM,data:dHzR0y4+AQPm48MrbJ/tsyc8Lg3GyfYT20EVgUEOehZmJltTwm4bed50IDzG2jw7d9wzUyIn6EU2V3ahio75tC17AN2MthB39tLRQ0RcM3POmOYerv6PCtvEOE7u3Q+8vQhJZHvdNgSLJxyzYahdxopNqgunEjB5MkfvFwQH03gK86m4X3/wSRrpiJbFANgyOi4KV8twthX896SilfhO++/VVc+zLDrI0/4BlloqstXgRzYRY2TCijoDu3ke48afwoHXsiWxwDvNEP8f7NyRy2G2EQJMlUBtDrHdyfENROIUjZ3XDfE07DaQr3qUj+MBi6YeDRsQUOQdqj7r3j1gvCkDTfFUtFIWzixE/Ahp2V1i8IDcs2mkjCGsUUoUfyOSNyVQMRJ9Jh1Vin286WZ663fK5bt1pmKUpce11CeS+kCZd6NPa05JUw==,iv:pHQm9nAmkOkROwf90mCU6kxjxhB8+nQ/Aj6KKGX762c=,tag:PP5EIxTUm+PdchAMf9qL7g==,type:str]
 subdomain: estuarydev
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2025-02-12T22:43:43Z"
+          enc: CiQAdmEdwscbBT04Qeai0nsq6H8UJC72BPpUyB//ormnVkdk/ggSSQCtUdBGRWohuGvYhCwPFRAcY7v3s3AuF72C85WlpUxXk4SPXn7VCwXH0Y+K3bl9rYs6dUb2PCqS9tv+DqTSJVF7dr+fPbqqeEY=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-02-12T22:43:43Z"
+    mac: ENC[AES256_GCM,data:jo9ZyDm5ceY7P4ASUsdtXbBU0NeQzB32frPAB9HrWDvJxVuScaG9mS1INgA/sWXuOtM+/nJVYMWppJ2PfJtODUSA9kULJ/GyDKxfqVSmENgZK0tEUeVzB4QqTX7MSjPYOY0hQTbXBAK01ngroPC4FBDnHLJuvlI/VUImV+SeEbQ=,iv:SlPYD6WuduA0Zclndub5Y5RIL63DbB/bQ/k5Jwsc5u8=,tag:WWd2uZ1Eljjs8F2rQUhYuw==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.4
