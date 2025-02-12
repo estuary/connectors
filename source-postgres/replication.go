@@ -661,10 +661,10 @@ func (s *replicationStream) decodeChangeEvent(
 	if !ok {
 		return nil, fmt.Errorf("unknown discovery info for stream %q", streamID)
 	}
-	if err := s.db.translateRecordFields(discovery, bf); err != nil {
+	if err := translateRecordFields(discovery, bf); err != nil {
 		return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
 	}
-	if err := s.db.translateRecordFields(discovery, af); err != nil {
+	if err := translateRecordFields(discovery, af); err != nil {
 		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
 	}
 
