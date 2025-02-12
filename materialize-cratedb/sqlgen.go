@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
 	"strings"
@@ -9,6 +10,18 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
+var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
+	switch ii := te.(type) {
+	case []byte:
+		return string(ii), nil
+	case json.RawMessage:
+		return string(ii), nil
+	case nil:
+		return string(json.RawMessage(nil)), nil
+	default:
+		return nil, fmt.Errorf("invalid type %#v for variant", te)
+	}
+}
 var pgDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -16,7 +29,7 @@ var pgDialect = func() sql.Dialect {
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:         sql.MapStatic("OBJECT"),
-			sql.ARRAY:          sql.MapStatic("ARRAY(TEXT)"),
+			sql.ARRAY:          sql.MapStatic("TEXT", sql.UsingConverter(jsonConverter)),
 			sql.BINARY:         sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
 			sql.MULTIPLE:       sql.MapStatic("OBJECT", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(20, 0)"),
