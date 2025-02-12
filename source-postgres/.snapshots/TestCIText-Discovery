@@ -15,7 +15,6 @@ Binding 0:
           "$anchor": "TestCitext_58810479",
           "properties": {
             "arr": {
-              "type": "object",
               "required": [
                 "dimensions",
                 "elements"
