@@ -23,4 +23,3 @@ dropTable "deletions"
 # Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
 # runs start from scratch.
 duckdb md: "delete from ${MOTHERDUCK_DATABASE}.${MOTHERDUCK_SCHEMA}.flow_checkpoints_v1 where materialization='tests/materialize-motherduck/materialize';"
-duckdb md: "delete from ${MOTHERDUCK_DATABASE}.${MOTHERDUCK_SCHEMA}.flow_materializations_v2 where materialization='tests/materialize-motherduck/materialize';"
