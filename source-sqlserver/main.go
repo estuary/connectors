@@ -44,10 +44,8 @@ var featureFlagDefaults = map[string]bool{
 	"uppercase_discovery_queries": false,
 
 	// When true, the capture will use a fence mechanism based on observing CDC worker runs
-	// and LSN positions rather than watermark writes. This mechanism may require additional
-	// permissions, so the plan is to flip this to default-true for new users first and then
-	// see if we can migrate existing captures to read-only operation.
-	"read_only": false,
+	// and LSN positions rather than the old watermark write mechanism.
+	"read_only": true,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
