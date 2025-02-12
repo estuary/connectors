@@ -71,7 +71,7 @@ var pgDialect = func() sql.Dialect {
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
-			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"*":                        {sql.NewMigrationSpec([]string{"OBJECT"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
