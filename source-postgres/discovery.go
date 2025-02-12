@@ -206,15 +206,6 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
-	if !db.featureFlags["date_as_date"] {
-		// Historically DATE columns were captured as RFC3339 timestamps.
-		postgresTypeToJSON["date"] = columnSchema{jsonTypes: []string{"string"}, format: "date-time"}
-	}
-	if !db.featureFlags["time_as_time"] {
-		// Historically TIME columns were captured as Unix seconds.
-		postgresTypeToJSON["time"] = columnSchema{jsonTypes: []string{"integer"}}
-	}
-
 	var arrayColumn = false
 	var colSchema columnSchema
 
@@ -350,10 +341,10 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"jsonpath": {jsonTypes: []string{"string"}},
 
 	// Domain-Specific Types
-	"date":        {jsonTypes: []string{"string"}, format: "date"},
+	"date":        {jsonTypes: []string{"string"}, format: "date-time"},
 	"timestamp":   {jsonTypes: []string{"string"}, format: "date-time"},
 	"timestamptz": {jsonTypes: []string{"string"}, format: "date-time"},
-	"time":        {jsonTypes: []string{"string"}, format: "time"},
+	"time":        {jsonTypes: []string{"integer"}},
 	"timetz":      {jsonTypes: []string{"string"}, format: "time"},
 	"interval":    {jsonTypes: []string{"string"}},
 	"money":       {jsonTypes: []string{"string"}},

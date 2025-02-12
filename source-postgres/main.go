@@ -123,15 +123,6 @@ var featureFlagDefaults = map[string]bool{
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
 	"use_schema_inference": false,
-
-	// When true, DATE columns are captured as YYYY-MM-DD dates. Historically these
-	// used to be captured as RFC3339 timestamps, which is usually not what users expect.
-	"date_as_date": false,
-
-	// When true, TIME WITHOUT TIME ZONE columns (also known as TIME) are captured as strings
-	// satisfying `format: time`. Historically these used to be captured as Unix microseconds,
-	// which is usually not what users expect.
-	"time_as_time": false,
 }
 
 // Validate checks that the configuration possesses all required properties.
