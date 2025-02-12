@@ -56,7 +56,7 @@ var pgDialect = func() sql.Dialect {
 					// UUID format was added on 30-Sept-2024, and pre-existing
 					// text type of columns are allowed to validate for
 					// compatibility with pre-existing columns.
-					"uuid": sql.MapStatic("TEXT", sql.AlsoCompatibleWith("text", "character varying")),
+					"uuid": sql.MapStatic("TEXT"),
 				},
 			}),
 		},
