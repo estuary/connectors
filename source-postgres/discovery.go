@@ -256,7 +256,6 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, 
 		colSchema.nullable = true
 
 		jsonType = &jsonschema.Schema{
-			Type: "object",
 			Extras: map[string]interface{}{
 				"properties": map[string]*jsonschema.Schema{
 					"dimensions": {
@@ -275,6 +274,8 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, 
 		// The column value itself may be null if the column is nullable.
 		if column.IsNullable {
 			jsonType.Extras["type"] = []string{"object", "null"}
+		} else {
+			jsonType.Type = "object"
 		}
 	} else {
 		colSchema.nullable = column.IsNullable
