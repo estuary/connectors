@@ -292,19 +292,12 @@ limit 1
 {{ end }}
 
 {{ define "updateFence" }}
-DO $$
-BEGIN
-	UPDATE {{ Identifier $.TablePath }}
-		SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
-		WHERE materialization = {{ Literal $.Materialization.String }}
-		AND   key_begin = {{ $.KeyBegin }}
-		AND   key_end   = {{ $.KeyEnd }}
-		AND   fence     = {{ $.Fence }};
-
-	IF NOT FOUND THEN
-		RAISE 'This instance was fenced off by another';
-	END IF;
-END $$;
+UPDATE {{ Identifier $.TablePath }}
+	SET   checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
+	WHERE materialization = {{ Literal $.Materialization.String }}
+	AND   key_begin = {{ $.KeyBegin }}
+	AND   key_end   = {{ $.KeyEnd }}
+	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
