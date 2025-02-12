@@ -61,9 +61,9 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 }
 
 func bqDialect(objAndArrayAsJson bool) sql.Dialect {
-	objAndArrayCol := sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
-	if objAndArrayAsJson {
-		objAndArrayCol = sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
+	if !objAndArrayAsJson {
+		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
 	}
 
 	mapper := sql.NewDDLMapper(

@@ -118,7 +118,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			keys = append(keys, testDialect.Identifier("flow_published_at"))
 			values = append(values, "'2024-09-13 01:01:01'")
 			keys = append(keys, testDialect.Identifier("flow_document"))
-			values = append(values, "'{}'")
+			values = append(values, "JSON '{}'")
 
 			// bigquery does not support more than 6 fractional second precision, and will fail if we try
 			// to insert a value with 9
@@ -132,7 +132,6 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 				"insert into %s (%s) VALUES (%s);",
 				testDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","),
 			))
-
 			require.NoError(t, err)
 		},
 		func(t *testing.T) string {
