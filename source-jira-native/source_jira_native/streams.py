@@ -1073,6 +1073,10 @@ class ProjectEmail(JiraStream):
 
     def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
         for project in read_full_refresh(self.projects_stream):
+            # Skip fetching emails for deleted projects since attempting to do so will return a 404 error.
+            if project.get('deleted', None):
+                continue
+
             yield from super().read_records(stream_slice={"project_id": project["id"]}, **kwargs)
 
     def transform(self, record: MutableMapping[str, Any], stream_slice: Mapping[str, Any], **kwargs) -> MutableMapping[str, Any]:
@@ -1148,6 +1152,10 @@ class ProjectVersions(JiraStream):
 
     def read_records(self, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
         for project in read_full_refresh(self.projects_stream):
+            # Skip fetching emails for deleted projects since attempting to do so will return a 404 error.
+            if project.get('deleted', None):
+                continue
+
             yield from super().read_records(stream_slice={"key": project["key"]}, **kwargs)
 
 
