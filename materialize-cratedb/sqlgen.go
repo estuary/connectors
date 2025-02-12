@@ -52,7 +52,7 @@ var pgDialect = func() sql.Dialect {
 					"ipv6":      sql.MapStatic("IP"),
 					"macaddr":   sql.MapStatic("TEXT"),
 					"macaddr8":  sql.MapStatic("TEXT"),
-					"time":      sql.MapStatic("TIMESTAMP", sql.AlsoCompatibleWith("time without time zone")),
+					"time":      sql.MapStatic("TEXT"),
 					// UUID format was added on 30-Sept-2024, and pre-existing
 					// text type of columns are allowed to validate for
 					// compatibility with pre-existing columns.
