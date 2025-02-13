@@ -10,5 +10,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"dbo%2Ftest_ComputedPrimaryKey_10118243":{"backfilled":3,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+{"bindingStateV1":{"dbo%2Ftest_ComputedPrimaryKey_10118243":{"backfilled":3,"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
 

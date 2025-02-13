@@ -2,6 +2,7 @@ Binding 0:
 {
     "recommended_name": "dbo/test_computedprimarykey_10118243",
     "resource_config_json": {
+      "mode": "Without Primary Key",
       "namespace": "dbo",
       "stream": "test_ComputedPrimaryKey_10118243"
     },
@@ -9,9 +10,6 @@ Binding 0:
       "$defs": {
         "DboTest_ComputedPrimaryKey_10118243": {
           "type": "object",
-          "required": [
-            "id"
-          ],
           "$anchor": "DboTest_ComputedPrimaryKey_10118243",
           "properties": {
             "actual_id": {
@@ -132,7 +130,8 @@ Binding 0:
       ]
     },
     "key": [
-      "/id"
+      "/_meta/source/lsn",
+      "/_meta/source/seqval"
     ]
   }
 
