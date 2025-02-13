@@ -77,7 +77,7 @@ func TestCsvWriter(t *testing.T) {
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			csvw := newCsvWriter(&buf)
+			csvw := newCsvWriter(&buf, '"')
 			require.NoError(t, csvw.writeRow(tt.row))
 			require.Equal(t, tt.want, buf.String())
 		})
