@@ -36,6 +36,10 @@ captures:
           interval: PT5M
         target: acmeCo/groups
       - resource:
+          name: group_memberships
+          interval: PT5M
+        target: acmeCo/group_memberships
+      - resource:
           name: macros
           interval: PT5M
         target: acmeCo/macros

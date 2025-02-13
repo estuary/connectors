@@ -253,6 +253,10 @@ class GroupsResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="groups")
 
 
+class GroupMembershipsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="group_memberships")
+
+
 class MacrosResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="macros")
 
@@ -266,6 +270,7 @@ class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedRespon
 CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, str | int] | None, type[ClientSideIncrementalCursorPaginatedResponse]]] = [
     ("brands", "brands", None, BrandsResponse),
     ("groups", "groups", {"exclude_deleted": "false"}, GroupsResponse),
+    ("group_memberships", "group_memberships", None, GroupMembershipsResponse),
     ("macros", "macros", None, MacrosResponse),
     ("organization_memberships", "organization_memberships", None, OrganizationMembershipsResponse),
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),

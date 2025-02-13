@@ -8,6 +8,10 @@ collections:
     schema: brands.schema.yaml
     key:
       - /id
+  acmeCo/group_memberships:
+    schema: group_memberships.schema.yaml
+    key:
+      - /id
   acmeCo/groups:
     schema: groups.schema.yaml
     key:
