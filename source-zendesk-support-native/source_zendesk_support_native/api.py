@@ -26,8 +26,8 @@ from .models import (
 
 CURSOR_PAGINATION_PAGE_SIZE = 100
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
-# Zendesk errors out if a start or end time parameter is more recent than 60 seconds in the past.
-TIME_PARAMETER_DELAY = timedelta(seconds=60)
+# Zendesk errors out if a start or end time parameter is 60 seconds or less in the past. 
+TIME_PARAMETER_DELAY = timedelta(seconds=61)
 
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
