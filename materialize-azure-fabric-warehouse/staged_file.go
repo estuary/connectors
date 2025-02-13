@@ -42,7 +42,7 @@ type stagedFileClient struct {
 }
 
 func (s *stagedFileClient) NewEncoder(w io.WriteCloser, fields []string) boilerplate.Encoder {
-	return enc.NewCsvEncoder(w, fields, enc.WithCsvSkipHeaders())
+	return enc.NewCsvEncoder(w, fields, enc.WithCsvSkipHeaders(), enc.WithCsvQuoteChar('`'))
 }
 
 func (s *stagedFileClient) NewObject(uuid string) azureBlobObject {

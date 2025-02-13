@@ -1,12 +1,13 @@
 package stream_encode
 
 import (
+	"bytes"
 	"compress/flate"
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/big"
 	"strconv"
-	"strings"
 	"unicode"
 	"unicode/utf8"
 
@@ -17,6 +18,7 @@ const csvCompressionlevel = flate.BestSpeed
 
 type csvConfig struct {
 	skipHeaders bool
+	quoteChar   rune
 }
 
 type CsvEncoder struct {
@@ -35,6 +37,12 @@ func WithCsvSkipHeaders() CsvOption {
 	}
 }
 
+func WithCsvQuoteChar(char rune) CsvOption {
+	return func(cfg *csvConfig) {
+		cfg.quoteChar = char
+	}
+}
+
 func NewCsvEncoder(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvEncoder {
 	var cfg csvConfig
 	for _, o := range opts {
@@ -48,9 +56,14 @@ func NewCsvEncoder(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvEnc
 		panic("invalid compression level for gzip.NewWriterLevel")
 	}
 
+	quoteChar := '"'
+	if cfg.quoteChar != 0 {
+		quoteChar = cfg.quoteChar
+	}
+
 	return &CsvEncoder{
 		cfg:    cfg,
-		csv:    newCsvWriter(gz),
+		csv:    newCsvWriter(gz, byte(quoteChar)),
 		cwc:    cwc,
 		gz:     gz,
 		fields: fields,
@@ -87,106 +100,98 @@ func (e *CsvEncoder) Close() error {
 }
 
 type csvWriter struct {
-	w io.Writer
+	w         io.Writer
+	buf       []byte
+	quoteChar byte
 }
 
-func newCsvWriter(w io.Writer) *csvWriter {
-	return &csvWriter{w: w}
+func newCsvWriter(w io.Writer, quoteChar byte) *csvWriter {
+	return &csvWriter{
+		w:         w,
+		quoteChar: quoteChar,
+	}
 }
 
 func (w *csvWriter) writeRow(row []any) error {
+	w.buf = w.buf[:0]
+
 	for n, v := range row {
 		if n > 0 {
-			if _, err := w.w.Write([]byte(",")); err != nil {
-				return err
-			}
+			w.buf = append(w.buf, ',')
 		}
 
-		var field string
 		switch value := v.(type) {
 		case json.RawMessage:
-			field = string(value)
+			w.buf = w.appendString(w.buf, value)
 		case []byte:
-			field = string(value)
+			w.buf = w.appendString(w.buf, value)
 		case string:
-			field = value
+			w.buf = w.appendString(w.buf, []byte(value))
 		case bool:
-			field = strconv.FormatBool(value)
+			w.buf = strconv.AppendBool(w.buf, value)
 		case int64:
-			field = strconv.Itoa(int(value))
+			w.buf = strconv.AppendInt(w.buf, value, 10)
 		case int:
-			field = strconv.Itoa(value)
+			w.buf = strconv.AppendInt(w.buf, int64(value), 10)
 		case float64:
-			field = strconv.FormatFloat(value, 'f', -1, 64)
+			w.buf = strconv.AppendFloat(w.buf, value, 'f', -1, 64)
 		case float32:
-			field = strconv.FormatFloat(float64(value), 'f', -1, 64)
+			w.buf = strconv.AppendFloat(w.buf, float64(value), 'f', -1, 64)
+		case *big.Int:
+			w.buf = append(w.buf, value.String()...)
 		case nil:
 			continue
 		default:
-			field = fmt.Sprintf("%v", value)
-		}
-
-		if err := w.writeField(field); err != nil {
-			return err
+			return fmt.Errorf("unsupported value type: %T of value %#v", value, value)
 		}
 	}
 
-	if _, err := w.w.Write([]byte("\n")); err != nil {
+	w.buf = append(w.buf, '\n')
+	if _, err := w.w.Write(w.buf); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (w *csvWriter) writeField(field string) error {
-	if !w.fieldNeedsQuotes(field) {
-		if _, err := w.w.Write([]byte(field)); err != nil {
-			return err
-		}
+func (w *csvWriter) appendString(buf []byte, field []byte) []byte {
+	if !w.stringNeedsQuotes(field) {
+		buf = append(buf, field...)
 	} else {
-		if _, err := w.w.Write([]byte(`"`)); err != nil {
-			return err
-		}
+		buf = append(buf, w.quoteChar)
 		for len(field) > 0 {
 			// Escape quote characters present in the string by replacing them
 			// with double quotes.
-			i := strings.Index(field, `"`)
+			i := bytes.IndexByte(field, w.quoteChar)
 			if i < 0 {
 				i = len(field)
 			}
 
-			if _, err := w.w.Write([]byte(field[:i])); err != nil {
-				return err
-			}
-
+			buf = append(buf, field[:i]...)
 			field = field[i:]
 			if len(field) > 0 {
-				if _, err := w.w.Write([]byte(`""`)); err != nil {
-					return err
-				}
+				buf = append(buf, w.quoteChar, w.quoteChar)
 				field = field[1:]
 			}
 		}
-		if _, err := w.w.Write([]byte(`"`)); err != nil {
-			return err
-		}
+		buf = append(buf, w.quoteChar)
 	}
 
-	return nil
+	return buf
 }
 
-func (w *csvWriter) fieldNeedsQuotes(field string) bool {
-	if field == "" {
+func (w *csvWriter) stringNeedsQuotes(field []byte) bool {
+	if len(field) == 0 {
 		return true
 	}
 
 	for i := 0; i < len(field); i++ {
 		c := field[i]
-		if c == '\n' || c == '\r' || c == '"' || c == ',' {
+		if c == w.quoteChar || c == '\n' || c == '\r' || c == ',' {
 			return true
 		}
 	}
 
-	r1, _ := utf8.DecodeRuneInString(field)
+	r1, _ := utf8.DecodeRune(field)
 	return unicode.IsSpace(r1)
 }

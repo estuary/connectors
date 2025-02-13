@@ -26,6 +26,7 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		"Contains":   func(s string, substr string) bool { return strings.Contains(s, substr) },
 		"Last":       func(s []string) string { return s[len(s)-1] },
 		"First":      func(s []string) string { return s[0] },
+		"Backtick":   func() string { return "`" }, // Go string literals don't allow a ` character
 	})
 	return template.Must(tpl.Parse(body))
 }
