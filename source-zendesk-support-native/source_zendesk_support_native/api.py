@@ -9,6 +9,7 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
     FullRefreshResource,
+    FullRefreshOffsetPaginatedResponse,
     FullRefreshCursorPaginatedResponse,
     ZendeskResource,
     TimestampedResource,
@@ -65,6 +66,36 @@ def _is_timestamp(string: str) -> bool:
         return True
     except ValueError:
         return False
+
+
+async def snapshot_offset_paginated_resources(
+    http: HTTPSession,
+    subdomain: str,
+    path: str,
+    response_model: type[FullRefreshOffsetPaginatedResponse],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(subdomain)}/{path}"
+    page_num = 1
+    params: dict[str, str | int] = {
+        "per_page": CURSOR_PAGINATION_PAGE_SIZE,
+        "page": page_num,
+    }
+
+    while True:
+        response = response_model.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        for resource in response.resources:
+            yield resource
+
+        if not response.next_page:
+            return
+
+        page_num += 1
+
+        params["page"] = page_num
 
 
 async def snapshot_cursor_paginated_resources(

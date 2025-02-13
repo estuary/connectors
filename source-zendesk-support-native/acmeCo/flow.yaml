@@ -24,6 +24,10 @@ collections:
     schema: satisfaction_ratings.schema.yaml
     key:
       - /id
+  acmeCo/sla_policies:
+    schema: sla_policies.schema.yaml
+    key:
+      - /_meta/row_id
   acmeCo/tags:
     schema: tags.schema.yaml
     key:
