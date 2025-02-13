@@ -9,6 +9,7 @@ from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
     AuditLog,
+    ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
     EndpointConfig,
     FullRefreshOffsetPaginatedResponse,
@@ -20,6 +21,7 @@ from .models import (
     TimestampedResource,
     ZendeskResource,
     EPOCH,
+    CLIENT_SIDE_FILTERED_OFFSET_PAGINATED_RESOURCES,
     CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES,
     FULL_REFRESH_OFFSET_PAGINATED_RESOURCES,
     FULL_REFRESH_CURSOR_PAGINATED_RESOURCES,
@@ -37,6 +39,7 @@ from .api import (
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
     fetch_audit_logs,
+    fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
@@ -254,6 +257,55 @@ def full_refresh_cursor_paginated_resources(
             schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_CURSOR_PAGINATED_RESOURCES
+    ]
+
+    return resources
+
+
+def client_side_filtered_offset_paginated_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+            path: str,
+            response_model: type[ClientSideIncrementalOffsetPaginatedResponse],
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_client_side_incremental_offset_paginated_resources,
+                http,
+                config.subdomain,
+                path,
+                response_model,
+            ),
+        )
+
+    resources = [
+        common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, path, response_model),
+            initial_state=ResourceState(
+                # Set the initial state of these streams to be the epoch so all results are initially 
+                # emitted, then only updated results are emitted on subsequent sweeps.
+                inc=ResourceState.Incremental(cursor=EPOCH)
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in CLIENT_SIDE_FILTERED_OFFSET_PAGINATED_RESOURCES
     ]
 
     return resources
@@ -550,6 +602,7 @@ async def all_resources(
         ticket_metrics(log, http, config),
         *full_refresh_offset_paginated_resources(log, http, config),
         *full_refresh_cursor_paginated_resources(log, http, config),
+        *client_side_filtered_offset_paginated_resources(log, http, config),
         *client_side_filtered_cursor_paginated_resources(log, http, config),
         satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
