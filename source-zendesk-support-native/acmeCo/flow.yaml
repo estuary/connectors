@@ -8,6 +8,10 @@ collections:
     schema: brands.schema.yaml
     key:
       - /id
+  acmeCo/custom_roles:
+    schema: custom_roles.schema.yaml
+    key:
+      - /id
   acmeCo/group_memberships:
     schema: group_memberships.schema.yaml
     key:
@@ -46,6 +50,10 @@ collections:
       - /id
   acmeCo/ticket_fields:
     schema: ticket_fields.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_forms:
+    schema: ticket_forms.schema.yaml
     key:
       - /id
   acmeCo/ticket_metric_events:
