@@ -598,3 +598,26 @@ func TestPrimaryKeyUpdate(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+func TestComputedPrimaryKey(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "10118243"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(actual_id INTEGER NOT NULL, data VARCHAR(32), id AS actual_id PRIMARY KEY)")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+	sqlcapture.TestShutdownAfterCaughtUp = true
+
+	t.Run("discovery", func(t *testing.T) {
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+
+	t.Run("capture", func(t *testing.T) {
+		tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+		cs.Capture(ctx, t, nil)
+		tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
