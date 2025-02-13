@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"text/template"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -134,40 +135,18 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 	return conn, nil
 }
 
-const tableQueryTemplateTemplate = `{{/***********************************************************
-   * This is a generic query template which is provided so that *
-   * discovered bindings can have a vaguely reasonable default  *
-   * behavior.                                                  *
-   *                                                            *
-   * You are entirely free to delete this template and replace  *
-   * it with whatever query you want to execute. Just be aware  *
-   * that this query will be executed over and over every poll  *
-   * interval, and if you intend to lower the polling interval  *
-   * from its default of 24h you should probably try and use a  *
-   * cursor to capture only new rows each time.                 *
-   *                                                            *
-   * By default this template generates a 'SELECT * FROM table' *
-   * query which will read the whole table on each poll.        *
-   *                                                            *
-   * If the table has a suitable "cursor" column (or columns)   *
-   * which can be used to identify only changed rows, add the   *
-   * name(s) to the "Cursor" property of this binding. If you   *
-   * do that, the generated query will have the form:           *
-   *                                                            *
-   *     SELECT * FROM table                                    *
-   *       WHERE (ka > :0) OR (ka = :0 AND kb > :1)             *
-   *       ORDER BY ka, kb;                                     *
-   *                                                            *
-   * This can be used to incrementally capture new rows if the  *
-   * table has a serial ID column or a 'created_at' timestamp,  *
-   * or it could be used to capture updated rows if the table   *
-   * has an 'updated_at' timestamp.                             *
-   ***********************************************************/ -}}
-{{if .CursorFields -}}
+func selectQueryTemplate(res *Resource) (string, error) {
+	if res.Template != "" {
+		return res.Template, nil
+	}
+	return tableQueryTemplate, nil
+}
+
+const tableQueryTemplate = `{{if .CursorFields -}}
   {{- if .IsFirstQuery -}}
-    SELECT * FROM %[1]s
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
   {{- else -}}
-    SELECT * FROM %[1]s
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
 	{{- range $i, $k := $.CursorFields -}}
 	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
       {{- range $j, $n := $.CursorFields -}}
@@ -179,32 +158,42 @@ const tableQueryTemplateTemplate = `{{/*****************************************
 	) 
   {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
 {{- else -}}
-  SELECT * FROM %[1]s;
+  SELECT * FROM {{quoteTableName .SchemaName .TableName}};
 {{- end}}`
 
+var templateFuncs = template.FuncMap{
+	"quoteTableName":  quoteTableName,
+	"quoteIdentifier": quoteIdentifier,
+}
+
 func quoteTableName(schema, table string) string {
-	return fmt.Sprintf("`%s`.`%s`", schema, table)
+	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
+}
+
+func quoteIdentifier(name string) string {
+	// Per https://dev.mysql.com/doc/refman/8.0/en/identifiers.html, the identifier quote character
+	// is the backtick (`). If the identifier itself contains a backtick, it must be doubled.
+	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
 func generateMySQLResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	var queryTemplate string
-	if strings.EqualFold(tableType, "BASE TABLE") {
-		queryTemplate = fmt.Sprintf(tableQueryTemplateTemplate, quoteTableName(schemaName, tableName))
-	} else {
+	if !strings.EqualFold(tableType, "BASE TABLE") {
 		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 	}
 
 	return &Resource{
-		Name:     resourceName,
-		Template: queryTemplate,
+		Name:       resourceName,
+		SchemaName: schemaName,
+		TableName:  tableName,
 	}, nil
 }
 
 var mysqlDriver = &BatchSQLDriver{
-	DocumentationURL: "https://go.estuary.dev/source-mysql-batch",
-	ConfigSchema:     generateConfigSchema(),
-	Connect:          connectMySQL,
-	GenerateResource: generateMySQLResource,
+	DocumentationURL:    "https://go.estuary.dev/source-mysql-batch",
+	ConfigSchema:        generateConfigSchema(),
+	Connect:             connectMySQL,
+	GenerateResource:    generateMySQLResource,
+	SelectQueryTemplate: selectQueryTemplate,
 	ExcludedSystemSchemas: []string{
 		"information_schema",
 		"mysql",

@@ -52,7 +52,10 @@ func TestQueryTemplate(t *testing.T) {
 	res, err := mysqlDriver.GenerateResource("test_foobar", "test", "foobar", "BASE TABLE")
 	require.NoError(t, err)
 
-	tmpl, err := template.New("query").Parse(res.Template)
+	tmplString, err := mysqlDriver.SelectQueryTemplate(res)
+	require.NoError(t, err)
+
+	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tmplString)
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
@@ -74,6 +77,8 @@ func TestQueryTemplate(t *testing.T) {
 			require.NoError(t, tmpl.Execute(buf, map[string]any{
 				"IsFirstQuery": tc.IsFirst,
 				"CursorFields": tc.Cursor,
+				"SchemaName":   res.SchemaName,
+				"TableName":    res.TableName,
 			}))
 			cupaloy.SnapshotT(t, buf.String())
 		})
