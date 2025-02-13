@@ -38,7 +38,7 @@ func (e *elasticApplier) DeleteResource(ctx context.Context, path []string) (str
 	}, nil
 }
 
-func (e *elasticApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (e *elasticApplier) UpdateResource(ctx context.Context, spec pf.MaterializationSpec, _ *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	binding := spec.Bindings[bindingIndex]
 
 	// ElasticSearch only considers new projections, since index mappings are always nullable.

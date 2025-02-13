@@ -218,7 +218,7 @@ func ProjectionToParquetSchemaElement(p pf.Projection, opts ...ParquetSchemaOpti
 		Required: p.Inference.Exists == pf.Inference_MUST,
 	}
 
-	if numFormat, ok := boilerplate.AsFormattedNumeric(&p); ok {
+	if numFormat, ok := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference); ok {
 		if numFormat == boilerplate.StringFormatInteger {
 			out.DataType = PrimitiveTypeInteger
 		} else {

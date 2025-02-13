@@ -80,7 +80,7 @@ func TestValidateMigrations(t *testing.T) {
 
 type testConstrainter struct{}
 
-func (testConstrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (testConstrainter) Compatible(existing boilerplate.EndpointField, proposed pf.Projection, _ *pf.Projection, _ json.RawMessage) (bool, error) {
 	var migratable = existing.Type == "integer,string" && strings.Join(proposed.Inference.Types, ",") == "string"
 	return existing.Type == strings.Join(proposed.Inference.Types, ",") || migratable, nil
 }
@@ -90,7 +90,7 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 }
 
 func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, numericString := boilerplate.AsFormattedNumeric(p)
+	_, numericString := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, p.Inference)
 
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {

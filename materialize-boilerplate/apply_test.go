@@ -159,7 +159,7 @@ func (a *testApplier) DeleteResource(ctx context.Context, path []string) (string
 	}, nil
 }
 
-func (a *testApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate BindingUpdate) (string, ActionApplyFn, error) {
+func (a *testApplier) UpdateResource(ctx context.Context, spec pf.MaterializationSpec, _ *pf.MaterializationSpec, bindingIndex int, bindingUpdate BindingUpdate) (string, ActionApplyFn, error) {
 	binding := spec.Bindings[bindingIndex]
 
 	if len(bindingUpdate.NewProjections) == 0 &&

@@ -60,7 +60,8 @@ type Applier interface {
 	// the destination. It's called for every binding, although it may not have any `BindingUpdate`
 	// parameters. This is to allow materializations to perform additional specific actions on
 	// binding changes that are not covered by the general cases of the `BindingUpdate` parameters.
-	UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate BindingUpdate) (string, ActionApplyFn, error)
+	// `lastSpec` is non-nil if this is an update to a previously applied materialization.
+	UpdateResource(ctx context.Context, spec pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, bindingIndex int, bindingUpdate BindingUpdate) (string, ActionApplyFn, error)
 }
 
 // ApplyChanges applies changes to an endpoint. It computes these changes from the apply request and
@@ -185,7 +186,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 				}
 			}
 
-			desc, action, err := applier.UpdateResource(ctx, req.Materialization, bindingIdx, params)
+			desc, action, err := applier.UpdateResource(ctx, *req.Materialization, req.LastMaterialization, bindingIdx, params)
 			if err != nil {
 				return nil, fmt.Errorf("getting UpdateResource action: %w", err)
 			}

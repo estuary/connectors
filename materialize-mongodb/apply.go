@@ -27,7 +27,7 @@ func (a *mongoApplier) DeleteResource(ctx context.Context, path []string) (strin
 	}, nil
 }
 
-func (e *mongoApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (e *mongoApplier) UpdateResource(ctx context.Context, spec pf.MaterializationSpec, _ *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
 	// No-op since nothing in particular is currently configured for created collection.
 	return "", nil, nil
 }

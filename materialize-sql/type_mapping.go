@@ -87,14 +87,16 @@ func buildProjection(p *pf.Projection, rawFieldConfig json.RawMessage) Projectio
 
 // AsFlatType returns the Projection's FlatType.
 func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
-	mustExist = p.Inference.Exists == pf.Inference_MUST
-	if slices.Contains(p.Inference.Types, "null") {
+	inference := resolveInference(p.Projection)
+
+	mustExist = inference.Exists == pf.Inference_MUST
+	if slices.Contains(inference.Types, "null") {
 		mustExist = false
 	}
 
 	// Compatible numeric formatted strings can be materialized as either integers or numbers,
 	// depending on the format string.
-	if format, ok := boilerplate.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
+	if format, ok := boilerplate.AsFormattedNumeric(p.IsPrimaryKey, inference); ok && !p.IsPrimaryKey {
 		switch format {
 		case boilerplate.StringFormatInteger:
 			return STRING_INTEGER, mustExist
@@ -104,11 +106,10 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	}
 
 	var types []FlatType
-	for _, ty := range p.Inference.Types {
+	for _, ty := range inference.Types {
 		switch ty {
 		case "string":
-
-			if p.Inference.String_.ContentEncoding == "base64" {
+			if inference.String_.ContentEncoding == "base64" {
 				types = append(types, BINARY)
 			} else {
 				types = append(types, STRING)
@@ -134,6 +135,20 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	default:
 		return MULTIPLE, mustExist
 	}
+}
+
+// resolveInference defers to the write schema projection inference if the type
+// from the read schema is either only `null`, or it has no types (cannot
+// exist). This allows columns to be mapped for fields where the write schema
+// defines a type for a field, but schema inference has not yet observed a
+// document for that field with a non-null value.
+func resolveInference(p pf.Projection) pf.Inference {
+	out := p.Inference
+	if (len(out.Types) == 0 || slices.Equal(out.Types, []string{"null"})) && p.WriteInference != nil {
+		out = *p.WriteInference
+	}
+
+	return out
 }
 
 // CompatibleColumnTypes is a list of column types that the mapped type
@@ -412,35 +427,50 @@ type constrainter struct {
 }
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(p)
+	inference := resolveInference(*p)
+
+	switch {
+	case p.IsPrimaryKey:
+		return &pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+			Reason: "All Locations that are part of the collections key are required",
+		}
+	case p.IsRootDocumentProjection() && deltaUpdates:
+		return &pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
+			Reason: "The root document should usually be materialized",
+		}
+	case p.IsRootDocumentProjection():
+		return &pm.Response_Validated_Constraint{
+			Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+			Reason: "The root document must be materialized",
+		}
+	}
+
+	return buildConstraint(p.Field, inference)
+}
+
+func buildConstraint(field string, inference pf.Inference) *pm.Response_Validated_Constraint {
+	_, isNumeric := boilerplate.AsFormattedNumeric(false, inference)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
-	case p.IsPrimaryKey:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "All Locations that are part of the collections key are required"
-	case p.IsRootDocumentProjection() && deltaUpdates:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The root document should usually be materialized"
-	case p.IsRootDocumentProjection():
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "The root document must be materialized"
-	case len(p.Inference.Types) == 0:
+	case len(inference.Types) == 0:
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize a field with no types"
-	case p.Field == "_meta/op":
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The operation type should usually be materialized"
-	case strings.HasPrefix(p.Field, "_meta/"):
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "Metadata fields are able to be materialized"
-	case p.Inference.IsSingleScalarType() || isNumeric:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The projection has a single scalar type"
-	case slices.Equal(p.Inference.Types, []string{"null"}):
+	case slices.Equal(inference.Types, []string{"null"}):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
-	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
+	case field == "_meta/op":
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The operation type should usually be materialized"
+	case strings.HasPrefix(field, "_meta/"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Metadata fields are able to be materialized"
+	case inference.IsSingleScalarType() || isNumeric:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The projection has a single scalar type"
+	case inference.IsSingleType() && slices.Contains(inference.Types, "object"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "Object fields may be materialized"
 	default:
@@ -452,8 +482,8 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	return &constraint
 }
 
-func (c constrainter) compatibleType(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	proj := buildProjection(proposed, rawFieldConfig)
+func (c constrainter) compatibleType(existing boilerplate.EndpointField, proposed pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+	proj := buildProjection(&proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
 		return false, fmt.Errorf("mapping type: %w", err)
@@ -473,11 +503,29 @@ func (c constrainter) compatibleType(existing boilerplate.EndpointField, propose
 	return isCompatibleType, nil
 }
 
-func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
-	proj := buildProjection(proposed, rawFieldConfig)
+func (c constrainter) migratable(
+	existing boilerplate.EndpointField,
+	proposed pf.Projection,
+	lastProposed *pf.Projection,
+	rawFieldConfig json.RawMessage,
+) (bool, *MigrationSpec, error) {
+	proj := buildProjection(&proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
 		return false, nil, fmt.Errorf("mapping type: %w", err)
+	}
+
+	// A no-op migration is possible if the prior spec indicated that this
+	// projection only had null values.
+	if lastProposed != nil {
+		if len(lastProposed.Inference.Types) == 0 || slices.Equal(lastProposed.Inference.Types, []string{"null"}) {
+			return true, &MigrationSpec{
+				CastSQL: func(m ColumnTypeMigration) string {
+					return m.Identifier
+				},
+				PreviouslyOnlyNull: true,
+			}, nil
+		}
 	}
 
 	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, mapped.NullableDDL); migrationSpec != nil {
@@ -487,13 +535,18 @@ func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *p
 	return false, nil, nil
 }
 
-func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+func (c constrainter) Compatible(
+	existing boilerplate.EndpointField,
+	proposed pf.Projection,
+	lastProposed *pf.Projection,
+	rawFieldConfig json.RawMessage,
+) (bool, error) {
 	if compatible, err := c.compatibleType(existing, proposed, rawFieldConfig); err != nil {
 		return false, err
 	} else if compatible {
 		return true, nil
 	} else {
-		migratable, _, err := c.migratable(existing, proposed, rawFieldConfig)
+		migratable, _, err := c.migratable(existing, proposed, lastProposed, rawFieldConfig)
 		return migratable, err
 	}
 }
