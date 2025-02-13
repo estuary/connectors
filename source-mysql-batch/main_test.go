@@ -1,10 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"regexp"
 	"strings"
@@ -39,6 +43,131 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func testCaptureSpec(t testing.TB) *st.CaptureSpec {
+	t.Helper()
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
+	}
+
+	var endpointSpec = &Config{
+		Address:  *dbAddress,
+		User:     *dbCaptureUser,
+		Password: *dbCapturePass,
+		Advanced: advancedConfig{
+			PollSchedule: "200ms",
+		},
+	}
+
+	var sanitizers = make(map[string]*regexp.Regexp)
+	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
+	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
+
+	return &st.CaptureSpec{
+		Driver:       mysqlDriver,
+		EndpointSpec: endpointSpec,
+		Validator:    &st.OrderedCaptureValidator{},
+		Sanitizers:   sanitizers,
+	}
+}
+
+func discoverBindings(ctx context.Context, t testing.TB, cs *st.CaptureSpec, matchers ...*regexp.Regexp) []*pf.CaptureSpec_Binding {
+	t.Helper()
+
+	var discovery = cs.Discover(ctx, t, matchers...)
+	var bindings []*pf.CaptureSpec_Binding
+	for _, discovered := range discovery {
+		var res Resource
+		require.NoError(t, json.Unmarshal(discovered.ResourceConfigJson, &res))
+		bindings = append(bindings, &pf.CaptureSpec_Binding{
+			ResourceConfigJson: discovered.ResourceConfigJson,
+			Collection: pf.CollectionSpec{
+				Name:           pf.Collection("acmeCo/test/" + discovered.RecommendedName),
+				ReadSchemaJson: discovered.DocumentSchemaJson,
+				Key:            discovered.Key,
+			},
+			ResourcePath: []string{res.Name},
+			StateKey:     res.Name,
+		})
+	}
+	return bindings
+}
+
+func testMySQLClient(t testing.TB) *client.Conn {
+	t.Helper()
+	var control, err = client.Connect(*dbAddress, *dbControlUser, *dbControlPass, "mysql")
+	require.NoError(t, err)
+	t.Cleanup(func() { control.Close() })
+	return control
+}
+
+func testTableName(t *testing.T, uniqueID string) (name, id string) {
+	t.Helper()
+	const testSchemaName = "test"
+	var baseName = strings.ToLower(strings.TrimPrefix(t.Name(), "Test"))
+	for _, str := range []string{"/", "=", "(", ")"} {
+		baseName = strings.ReplaceAll(baseName, str, "_")
+	}
+	return fmt.Sprintf("%s.%s_%s", testSchemaName, baseName, uniqueID), uniqueID
+}
+
+func createTestTable(t testing.TB, control *client.Conn, tableName, definition string) {
+	t.Helper()
+	control.Execute(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	control.Execute(fmt.Sprintf("CREATE TABLE %s %s", tableName, definition))
+	t.Cleanup(func() { control.Execute(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+}
+
+func summarizeBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) string {
+	t.Helper()
+	var summary = new(strings.Builder)
+	for idx, binding := range bindings {
+		fmt.Fprintf(summary, "Binding %d:\n", idx)
+		bs, err := json.MarshalIndent(binding, "  ", "  ")
+		require.NoError(t, err)
+		io.Copy(summary, bytes.NewReader(bs))
+		fmt.Fprintf(summary, "\n")
+	}
+	if len(bindings) == 0 {
+		fmt.Fprintf(summary, "(no output)")
+	}
+	return summary.String()
+}
+
+func executeControlQuery(t testing.TB, control *client.Conn, query string, args ...any) {
+	t.Helper()
+	var results, err = control.Execute(query, args...)
+	require.NoError(t, err)
+	results.Close()
+}
+
+func setShutdownAfterQuery(t testing.TB, setting bool) {
+	var oldSetting = TestShutdownAfterQuery
+	TestShutdownAfterQuery = setting
+	t.Cleanup(func() { TestShutdownAfterQuery = oldSetting })
+}
+
+func setResourceCursor(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...string) {
+	var res Resource
+	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
+	res.Cursor = cursor
+	var bs, err = json.Marshal(res)
+	require.NoError(t, err)
+	binding.ResourceConfigJson = bs
+}
+
+func uniqueTableID(t testing.TB, extra ...string) string {
+	t.Helper()
+	var h = sha256.New()
+	h.Write([]byte(t.Name()))
+	for _, x := range extra {
+		h.Write([]byte{':'})
+		h.Write([]byte(x))
+	}
+	var x = binary.BigEndian.Uint32(h.Sum(nil)[0:4])
+	return fmt.Sprintf("%d", (x%900000)+100000)
+}
+
+// TestSpec verifies the connector's response to the Spec RPC against a snapshot.
 func TestSpec(t *testing.T) {
 	response, err := mysqlDriver.Spec(context.Background(), &pc.Request_Spec{})
 	require.NoError(t, err)
@@ -48,14 +177,13 @@ func TestSpec(t *testing.T) {
 	cupaloy.SnapshotT(t, string(formatted))
 }
 
+// TestQueryTemplate is a unit test which verifies that the default query template produces
+// the expected output for initial/subsequent polling queries with different cursors.
 func TestQueryTemplate(t *testing.T) {
 	res, err := mysqlDriver.GenerateResource("test_foobar", "test", "foobar", "BASE TABLE")
 	require.NoError(t, err)
 
-	tmplString, err := mysqlDriver.SelectQueryTemplate(res)
-	require.NoError(t, err)
-
-	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tmplString)
+	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tableQueryTemplate)
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
@@ -85,6 +213,8 @@ func TestQueryTemplate(t *testing.T) {
 	}
 }
 
+// TestQueryPlaceholderExpansion is a unit test which verifies that the expandQueryPlaceholders
+// function is doing its job properly.
 func TestQueryPlaceholderExpansion(t *testing.T) {
 	var querySource = `SELECT * FROM "test"."foobar" WHERE (ka > @flow_cursor_value[0]) OR (ka = @flow_cursor_value[0] AND kb > @flow_cursor_value[1]) OR (ka = @flow_cursor_value[0] AND kb = @flow_cursor_value[1] AND kc > @flow_cursor_value[2]) OR (x > ?) OR (y > ?);`
 	var argvals = []any{1, "two", 3.0, "xval", "yval"}
@@ -98,96 +228,58 @@ func TestQueryPlaceholderExpansion(t *testing.T) {
 	cupaloy.SnapshotT(t, buf.String())
 }
 
-func TestBasicCapture(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var uniqueID = "826935"
-	var tableName = fmt.Sprintf("test.basic_capture_%s", uniqueID)
+// TestSimpleCapture exercises the simplest use-case of a capture first doing a full refresh
+// and subsequently capturing new rows using ["id"] as the cursor.
+func TestSimpleCapture(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
 
-	// Connect to the test database and create the test table
-	var conn, err = client.Connect(*dbAddress, *dbControlUser, *dbControlPass, "mysql")
-	require.NoError(t, err)
-	t.Cleanup(func() { conn.Close() })
-	conn.Execute(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
-	t.Cleanup(func() { conn.Execute(fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
-	conn.Execute(fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data TEXT)", tableName))
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
 
-	// Discover the table and then set a cursor
-	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
-	var res Resource
-	require.NoError(t, json.Unmarshal(cs.Bindings[0].ResourceConfigJson, &res))
-	res.Cursor = []string{"id"}
-	cs.Bindings[0].ResourceConfigJson = marshal(t, res)
-
-	// Spawn a worker thread which will insert 250 rows of data over the course of 25 seconds.
-	go func() {
-		for i := 0; i < 250; i++ {
-			time.Sleep(100 * time.Millisecond)
-			conn.Execute(fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
-			log.WithField("i", i).Debug("inserted row")
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
 		}
-	}()
-
-	// Perform six captures each running for 5 seconds, then verify that
-	// the resulting data is correct.
-	for i := 0; i < 6; i++ {
-		var captureCtx, cancelCapture = context.WithCancel(ctx)
-		time.AfterFunc(5*time.Second, cancelCapture)
-		cs.Capture(captureCtx, t, nil)
-	}
-	cupaloy.SnapshotT(t, cs.Summary())
+		cs.Capture(ctx, t, nil)
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
 }
 
-func marshal(t testing.TB, v any) []byte {
-	var bs, err = json.Marshal(v)
-	require.NoError(t, err)
-	return bs
-}
+// TestAsyncCapture performs a capture with periodic restarts, in parallel with a bunch of inserts.
+func TestAsyncCapture(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
 
-func testCaptureSpec(t testing.TB) *st.CaptureSpec {
-	t.Helper()
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
-	}
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
 
-	var endpointSpec = &Config{
-		Address:  *dbAddress,
-		User:     *dbCaptureUser,
-		Password: *dbCapturePass,
-		Advanced: advancedConfig{
-			PollSchedule: "200ms",
-		},
-	}
+	t.Run("Capture", func(t *testing.T) {
+		// Spawn a worker thread which will insert 250 rows of data over the course of 25 seconds.
+		go func() {
+			for i := 0; i < 250; i++ {
+				time.Sleep(100 * time.Millisecond)
+				control.Execute(fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+				log.WithField("i", i).Debug("inserted row")
+			}
+		}()
 
-	var sanitizers = make(map[string]*regexp.Regexp)
-	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
-	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
-
-	return &st.CaptureSpec{
-		Driver:       mysqlDriver,
-		EndpointSpec: endpointSpec,
-		Validator:    &st.OrderedCaptureValidator{},
-		Sanitizers:   sanitizers,
-	}
-}
-
-func discoverStreams(ctx context.Context, t testing.TB, cs *st.CaptureSpec, matchers ...*regexp.Regexp) []*pf.CaptureSpec_Binding {
-	t.Helper()
-
-	var discovery = cs.Discover(ctx, t, matchers...)
-	var bindings []*pf.CaptureSpec_Binding
-	for _, discovered := range discovery {
-		var res Resource
-		require.NoError(t, json.Unmarshal(discovered.ResourceConfigJson, &res))
-		bindings = append(bindings, &pf.CaptureSpec_Binding{
-			ResourceConfigJson: discovered.ResourceConfigJson,
-			Collection: pf.CollectionSpec{
-				Name:           pf.Collection("acmeCo/test/" + discovered.RecommendedName),
-				ReadSchemaJson: discovered.DocumentSchemaJson,
-				Key:            discovered.Key,
-			},
-			ResourcePath: []string{res.Name},
-			StateKey:     res.Name,
-		})
-	}
-	return bindings
+		// Perform six captures each running for 5 seconds, then verify that
+		// the resulting data is correct.
+		for i := 0; i < 6; i++ {
+			var captureCtx, cancelCapture = context.WithCancel(ctx)
+			time.AfterFunc(5*time.Second, cancelCapture)
+			cs.Capture(captureCtx, t, nil)
+		}
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
 }
