@@ -50,6 +50,13 @@ const (
 	pollingWatchdogTimeout = 5 * time.Minute
 )
 
+var (
+	// TestShutdownAfterQuery is a test behavior flag which causes the capture to
+	// shut down after issuing one query to each binding. It is always false in
+	// normal operation.
+	TestShutdownAfterQuery = false
+)
+
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
 // by a config schema, connect function, and value translation logic.
 type BatchSQLDriver struct {
@@ -574,6 +581,9 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	for ctx.Err() == nil {
 		if err := c.poll(ctx, binding, queryTemplate); err != nil {
 			return fmt.Errorf("error polling binding %q: %w", res.Name, err)
+		}
+		if TestShutdownAfterQuery {
+			return nil // In tests, we want each worker to shut down after one poll
 		}
 	}
 	return ctx.Err()
