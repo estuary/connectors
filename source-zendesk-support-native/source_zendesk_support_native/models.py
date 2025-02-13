@@ -152,7 +152,26 @@ INCREMENTAL_CURSOR_EXPORT_RESOURCES: list[INCREMENTAL_CURSOR_EXPORT_TYPES] = [
 ]
 
 
-class FullRefreshCursorPaginatedResponse(BaseModel, extra="allow"):
+class FullRefreshResponse(BaseModel, extra="allow"):
+    resources: list[FullRefreshResource]
+
+
+class FullRefreshOffsetPaginatedResponse(FullRefreshResponse):
+    next_page: str | None
+
+
+class SlaPoliciesResponse(FullRefreshOffsetPaginatedResponse):
+    resources: list[FullRefreshResource] = Field(alias="sla_policies")
+
+
+# Full refresh resources that paginted with page offsets.
+# Tuples contain the name, path, and response model for each resource.
+FULL_REFRESH_OFFSET_PAGINATED_RESOURCES: list[tuple[str, str, type[FullRefreshOffsetPaginatedResponse]]] = [
+    ("sla_policies", "slas/policies", SlaPoliciesResponse),
+]
+
+
+class FullRefreshCursorPaginatedResponse(FullRefreshResponse):
     class Meta(BaseModel, extra="forbid"):
         has_more: bool
         after_cursor: str | None

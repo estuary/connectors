@@ -114,6 +114,78 @@
     }
   ],
   [
+    "acmeCo/sla_policies",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2024-08-01T13:54:40Z",
+      "description": "Details copied form Zendesk API code sample. For urgent incidents, we will respond to tickets in 10 minutes",
+      "filter": {
+        "all": [
+          {
+            "field": "ticket_type_id",
+            "operator": "is",
+            "value": "2"
+          }
+        ],
+        "any": []
+      },
+      "id": 29006807867284,
+      "metric_settings": null,
+      "policy_metrics": [
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "low",
+          "target": 180,
+          "target_in_seconds": 10800
+        },
+        {
+          "business_hours": false,
+          "metric": "first_reply_time",
+          "priority": "normal",
+          "target": 30,
+          "target_in_seconds": 1800
+        },
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "normal",
+          "target": 160,
+          "target_in_seconds": 9600
+        },
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "high",
+          "target": 140,
+          "target_in_seconds": 8400
+        },
+        {
+          "business_hours": false,
+          "metric": "first_reply_time",
+          "priority": "urgent",
+          "target": 10,
+          "target_in_seconds": 600
+        },
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "urgent",
+          "target": 120,
+          "target_in_seconds": 7200
+        }
+      ],
+      "position": 1,
+      "title": "Test SLA Policy",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/slas/policies/29006807867284.json"
+    }
+  ],
+  [
     "acmeCo/ticket_audits",
     {
       "_meta": {

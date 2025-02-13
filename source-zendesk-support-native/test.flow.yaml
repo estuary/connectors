@@ -20,6 +20,10 @@ captures:
           interval: PT5M
         target: acmeCo/ticket_metrics
       - resource:
+          name: sla_policies
+          interval: PT5M
+        target: acmeCo/sla_policies
+      - resource:
           name: tags
           interval: PT5M
         target: acmeCo/tags
