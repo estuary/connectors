@@ -27,6 +27,22 @@
     }
   ],
   [
+    "acmeCo/group_memberships",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-07-26T15:41:00Z",
+      "default": true,
+      "group_id": 28835740822676,
+      "id": 28835714743188,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/group_memberships/28835714743188.json",
+      "user_id": 28835702984212
+    }
+  ],
+  [
     "acmeCo/groups",
     {
       "_meta": {
