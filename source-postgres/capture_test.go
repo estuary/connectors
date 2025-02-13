@@ -654,3 +654,35 @@ func TestPrimaryKeyUpdate(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+func TestGeneratedColumn(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "91418628"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), generated VARCHAR(64) GENERATED ALWAYS AS (COALESCE(a, b)) STORED)")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+	sqlcapture.TestShutdownAfterCaughtUp = true
+
+	t.Run("discovery", func(t *testing.T) {
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+
+	t.Run("capture", func(t *testing.T) {
+		tb.Insert(ctx, t, tableName, [][]any{{0, "a0", "b0"}, {1, nil, "b1"}, {2, "a2", nil}, {3, nil, nil}})
+		cs.Capture(ctx, t, nil)
+		tb.Insert(ctx, t, tableName, [][]any{{4, "a4", "b4"}, {5, nil, "b5"}, {6, "a6", nil}, {7, nil, nil}})
+		cs.Capture(ctx, t, nil)
+		tb.Update(ctx, t, tableName, "id", 4, "a", "a4-modified")
+		tb.Update(ctx, t, tableName, "id", 5, "b", "b5-modified")
+		tb.Update(ctx, t, tableName, "id", 6, "a", "a6-modified")
+		cs.Capture(ctx, t, nil)
+		tb.Delete(ctx, t, tableName, "id", 4)
+		tb.Delete(ctx, t, tableName, "id", 5)
+		tb.Delete(ctx, t, tableName, "id", 6)
+		tb.Delete(ctx, t, tableName, "id", 7)
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}

@@ -32,6 +32,10 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
+	generatedColumns, err := getGeneratedColumns(ctx, db.conn)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database generated columns: %w", err)
+	}
 
 	// Column descriptions just add a bit of user-friendliness. They're so unimportant
 	// that failure to list them shouldn't even be a fatal error.
@@ -99,6 +103,22 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 		}).Trace("queried primary key")
 		info.PrimaryKey = key
 		tableMap[streamID] = info
+	}
+
+	// Add generated columns information
+	for streamID, table := range tableMap {
+		if details, ok := table.ExtraDetails.(*postgresTableDiscoveryDetails); ok {
+			details.GeneratedColumns = generatedColumns[streamID]
+		}
+		for _, columnName := range generatedColumns[streamID] {
+			logrus.WithFields(logrus.Fields{
+				"table":  streamID,
+				"column": columnName,
+			}).Debug("omitting generated column from schema generation")
+			var info = table.Columns[columnName]
+			info.OmitColumn = true
+			table.Columns[columnName] = info
+		}
 	}
 
 	// For tables which have no primary key but have a valid secondary index,
@@ -364,6 +384,10 @@ var postgresTypeToJSON = map[string]columnSchema{
 	"uuid":        {jsonTypes: []string{"string"}, format: "uuid"},
 }
 
+type postgresTableDiscoveryDetails struct {
+	GeneratedColumns []string // List of the names of generated columns in this table, in no particular order.
+}
+
 const queryDiscoverTables = `
   SELECT n.nspname, c.relname
   FROM pg_catalog.pg_class c
@@ -396,10 +420,11 @@ func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([
 			omitBinding = true
 		}
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
-			Schema:      tableSchema,
-			Name:        tableName,
-			BaseTable:   true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
-			OmitBinding: omitBinding,
+			Schema:       tableSchema,
+			Name:         tableName,
+			BaseTable:    true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
+			OmitBinding:  omitBinding,
+			ExtraDetails: &postgresTableDiscoveryDetails{},
 		})
 	}
 	return tables, rows.Err()
@@ -599,6 +624,37 @@ func getSecondaryIndexes(ctx context.Context, conn *pgx.Conn) (map[string]map[st
 	}
 
 	return streamIndexColumns, rows.Err()
+}
+
+const queryListGeneratedColumns = `
+	SELECT n.nspname AS table_schema,
+       c.relname AS table_name,
+       a.attname AS column_name
+	FROM pg_catalog.pg_attribute a
+	JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+	JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+	WHERE a.attgenerated = 's'
+	ORDER BY n.nspname, c.relname, a.attname;
+`
+
+func getGeneratedColumns(ctx context.Context, conn *pgx.Conn) (map[sqlcapture.StreamID][]string, error) {
+	logrus.Debug("listing generated columns")
+	var rows, err = conn.Query(ctx, queryListGeneratedColumns)
+	if err != nil {
+		return nil, fmt.Errorf("error querying generated columns: %w", err)
+	}
+	defer rows.Close()
+
+	var generatedColumns = make(map[sqlcapture.StreamID][]string)
+	for rows.Next() {
+		var tableSchema, tableName, columnName string
+		if err := rows.Scan(&tableSchema, &tableName, &columnName); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+		var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
+		generatedColumns[streamID] = append(generatedColumns[streamID], columnName)
+	}
+	return generatedColumns, nil
 }
 
 const queryColumnDescriptions = `
