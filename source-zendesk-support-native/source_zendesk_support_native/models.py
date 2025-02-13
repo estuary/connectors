@@ -237,6 +237,26 @@ TICKET_CHILD_RESOURCES: list[tuple[str, str, type[IncrementalCursorPaginatedResp
 ]
 
 
+class ClientSideIncrementalOffsetPaginatedResponse(FullRefreshOffsetPaginatedResponse):
+    resources: list[TimestampedResource]
+
+
+class CustomRolesResponse(ClientSideIncrementalOffsetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="custom_roles")
+
+
+class TicketFormsResponse(ClientSideIncrementalOffsetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="ticket_forms")
+
+
+# Incremental client side resources that are paginated with page offsets.
+# Tuples contain the name, path, and response model for each resource.
+CLIENT_SIDE_FILTERED_OFFSET_PAGINATED_RESOURCES: list[tuple[str, str, type[ClientSideIncrementalOffsetPaginatedResponse]]] = [
+    ("custom_roles", "custom_roles", CustomRolesResponse),
+    ("ticket_forms", "ticket_forms", TicketFormsResponse),
+]
+
+
 class ClientSideIncrementalCursorPaginatedResponse(FullRefreshCursorPaginatedResponse):
     resources: list[TimestampedResource]
 

@@ -27,6 +27,82 @@
     }
   ],
   [
+    "acmeCo/custom_roles",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "configuration": {
+        "assign_agent_statuses": false,
+        "assign_tickets_to_any_group": false,
+        "chat_access": false,
+        "custom_objects": {},
+        "end_user_list_access": "full",
+        "end_user_profile_access": "readonly",
+        "explore_access": "readonly",
+        "explore_reports": {
+          "ticket_access": "all",
+          "ticket_access_selected_groups": []
+        },
+        "forum_access": "readonly",
+        "forum_access_restricted_content": false,
+        "group_access": false,
+        "light_agent": true,
+        "macro_access": "readonly",
+        "manage_automations": false,
+        "manage_business_rules": false,
+        "manage_contextual_workspaces": false,
+        "manage_deletion_schedules": "none",
+        "manage_dynamic_content": false,
+        "manage_extensions_and_channels": false,
+        "manage_facebook": false,
+        "manage_group_memberships": false,
+        "manage_groups": false,
+        "manage_macro_content_suggestions": false,
+        "manage_malicious_attachments": false,
+        "manage_organization_fields": false,
+        "manage_organizations": false,
+        "manage_roles": "none",
+        "manage_skills": false,
+        "manage_slas": false,
+        "manage_suspended_tickets": false,
+        "manage_ticket_fields": false,
+        "manage_ticket_forms": false,
+        "manage_triggers": false,
+        "manage_user_fields": false,
+        "moderate_forums": false,
+        "organization_editing": false,
+        "organization_notes_editing": false,
+        "read_macro_content_suggestions": false,
+        "report_access": "readonly",
+        "side_conversation_create": true,
+        "ticket_access": "within-groups",
+        "ticket_comment_access": "none",
+        "ticket_deletion": false,
+        "ticket_editing": false,
+        "ticket_merge": false,
+        "ticket_redaction": false,
+        "ticket_tag_editing": false,
+        "twitter_search_access": false,
+        "user_view_access": "none",
+        "view_access": "readonly",
+        "view_deleted_tickets": false,
+        "view_filter_tickets": true,
+        "view_reduced_count": false,
+        "voice_access": false,
+        "voice_dashboard_access": false
+      },
+      "created_at": "2024-07-26T15:40:56Z",
+      "description": "Can view and add private comments to tickets",
+      "id": 28835714382484,
+      "name": "Light agent",
+      "role_type": 1,
+      "team_member_count": 0,
+      "updated_at": "redacted"
+    }
+  ],
+  [
     "acmeCo/group_memberships",
     {
       "_meta": {
@@ -387,6 +463,42 @@
       "updated_at": "redacted",
       "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_fields/28835714573076.json",
       "visible_in_portal": true
+    }
+  ],
+  [
+    "acmeCo/ticket_forms",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "active": true,
+      "agent_conditions": [],
+      "created_at": "2024-07-26T15:40:58Z",
+      "default": true,
+      "display_name": "Default Ticket Form",
+      "end_user_conditions": [],
+      "end_user_visible": true,
+      "id": 28835740693908,
+      "in_all_brands": true,
+      "name": "Default Ticket Form",
+      "position": 0,
+      "raw_display_name": "Default Ticket Form",
+      "raw_name": "Default Ticket Form",
+      "restricted_brand_ids": [],
+      "ticket_field_ids": [
+        28835714573076,
+        28835740681620,
+        28835740683540,
+        28835740685844,
+        28835714576020,
+        28835740687508,
+        28835740688660,
+        28835714575124,
+        28835767646868
+      ],
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_forms/28835740693908.json"
     }
   ],
   [

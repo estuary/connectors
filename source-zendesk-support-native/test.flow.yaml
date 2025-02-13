@@ -28,6 +28,14 @@ captures:
           interval: PT5M
         target: acmeCo/tags
       - resource:
+          name: custom_roles
+          interval: PT5M
+        target: acmeCo/custom_roles
+      - resource:
+          name: ticket_forms
+          interval: PT5M
+        target: acmeCo/ticket_forms
+      - resource:
           name: brands
           interval: PT5M
         target: acmeCo/brands
