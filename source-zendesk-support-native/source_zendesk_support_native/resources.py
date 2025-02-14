@@ -12,6 +12,7 @@ from .models import (
     ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
     EndpointConfig,
+    FullRefreshResponse,
     FullRefreshOffsetPaginatedResponse,
     FullRefreshCursorPaginatedResponse,
     FullRefreshResource,
@@ -23,6 +24,7 @@ from .models import (
     EPOCH,
     CLIENT_SIDE_FILTERED_OFFSET_PAGINATED_RESOURCES,
     CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES,
+    FULL_REFRESH_RESOURCES,
     FULL_REFRESH_OFFSET_PAGINATED_RESOURCES,
     FULL_REFRESH_CURSOR_PAGINATED_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_RESOURCES,
@@ -46,6 +48,7 @@ from .api import (
     fetch_satisfaction_ratings,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
+    snapshot_resources,
     snapshot_offset_paginated_resources,
     snapshot_cursor_paginated_resources,
     url_base,
@@ -168,6 +171,52 @@ def ticket_metrics(
         ),
         schema_inference=True,
     )
+
+
+def full_refresh_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+            path: str,
+            response_model: type[FullRefreshResponse],
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_resources,
+                http,
+                config.subdomain,
+                path,
+                response_model,
+            ),
+            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
+        )
+
+    resources = [
+        common.Resource(
+            name=name,
+            key=["/_meta/row_id"],
+            model=FullRefreshResource,
+            open=functools.partial(open, path, response_model),
+            initial_state=ResourceState(),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in FULL_REFRESH_RESOURCES
+    ]
+
+    return resources
 
 
 def full_refresh_offset_paginated_resources(
@@ -600,6 +649,7 @@ async def all_resources(
     return [
         audit_logs(log, http, config),
         ticket_metrics(log, http, config),
+        *full_refresh_resources(log, http, config),
         *full_refresh_offset_paginated_resources(log, http, config),
         *full_refresh_cursor_paginated_resources(log, http, config),
         *client_side_filtered_offset_paginated_resources(log, http, config),
