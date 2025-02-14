@@ -27,22 +27,27 @@ Example catalog:
           - resource:
               name: "foobar"
               template: >
-                {{if .IsFirstQuery}}
-                  SELECT xmin, * FROM public.foobar;
-                {{else}}
-                  SELECT xmin, * FROM public.foobar
-                    WHERE xmin::text::bigint > $1
-                    ORDER BY xmin::text::bigint;
-                {{end}}
-              cursor: ["xmin"]
+                {{if .IsFirstQuery -}}
+                  SELECT ORA_ROWSCN AS TXID, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}} ORDER BY ORA_ROWSCN
+                {{- else -}}
+                  SELECT ORA_ROWSCN AS TXID, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}}
+                    WHERE ORA_ROWSCN > :1
+                    ORDER BY ORA_ROWSCN
+                {{- end}}
+              cursor: ["TXID"]
               poll: 5s
             target: "acmeCo/something/foobar"
     
     collections:
       acmeCo/something/foobar:
-        key: [/xmin]
+        key: [/_meta/polled, /_meta/index]
         schema:
           properties:
-            xmin: {type: integer}
-          required: [xmin]
+            _meta:
+              type: object
+              properties:
+                polled: {type: string, format: date-time}
+                index: {type: integer}
+              required: [polled, index]
+          required: [_meta]
           type: object
