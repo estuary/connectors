@@ -63,6 +63,24 @@ from .api import (
     TIME_PARAMETER_DELAY,
 )
 
+
+ENTERPRISE_STREAMS = ["audit_logs", "account_attributes"]
+
+
+async def _is_enterprise_account(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> bool:
+    try:
+        await http.request(log, f"{url_base(config.subdomain)}/audit_logs")
+    except HTTPError as err:
+        if err.code == 403 and "You do not have access to this page." in err.message:
+            return False
+        else:
+            raise err
+
+    return True
+
+
 async def validate_credentials(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ):
@@ -798,7 +816,7 @@ async def all_resources(
 ) -> list[common.Resource]:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
 
-    return [
+    resources = [
         audit_logs(log, http, config),
         ticket_metrics(log, http, config),
         *full_refresh_resources(log, http, config),
@@ -814,3 +832,8 @@ async def all_resources(
         *post_child_resources(log, http, config),
         post_comment_votes(log, http, config),
     ]
+
+    if not await _is_enterprise_account(log, http, config):
+        resources = [r for r in resources if r.name not in ENTERPRISE_STREAMS]
+
+    return resources
