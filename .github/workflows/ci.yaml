@@ -182,6 +182,7 @@ jobs:
             "source-mysql",
             "source-mysql-batch",
             "source-postgres",
+            "source-postgres-batch",
             "source-sftp",
             "source-sqlserver",
             "source-mongodb"
