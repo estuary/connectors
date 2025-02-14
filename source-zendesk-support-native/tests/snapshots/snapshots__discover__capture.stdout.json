@@ -3,7 +3,7 @@
     "recommendedName": "account_attributes",
     "resourceConfig": {
       "name": "account_attributes",
-      "interval": "PT5M"
+      "interval": "PT1H"
     },
     "documentSchema": {
       "$defs": {
@@ -118,7 +118,7 @@
     "recommendedName": "automations",
     "resourceConfig": {
       "name": "automations",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -182,7 +182,7 @@
     "recommendedName": "brands",
     "resourceConfig": {
       "name": "brands",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -246,7 +246,7 @@
     "recommendedName": "custom_roles",
     "resourceConfig": {
       "name": "custom_roles",
-      "interval": "PT5M"
+      "interval": "PT30M"
     },
     "documentSchema": {
       "$defs": {
@@ -310,7 +310,7 @@
     "recommendedName": "group_memberships",
     "resourceConfig": {
       "name": "group_memberships",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -374,7 +374,7 @@
     "recommendedName": "groups",
     "resourceConfig": {
       "name": "groups",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -438,7 +438,7 @@
     "recommendedName": "macros",
     "resourceConfig": {
       "name": "macros",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -502,7 +502,7 @@
     "recommendedName": "organization_memberships",
     "resourceConfig": {
       "name": "organization_memberships",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -630,7 +630,7 @@
     "recommendedName": "post_comment_votes",
     "resourceConfig": {
       "name": "post_comment_votes",
-      "interval": "PT5M"
+      "interval": "PT30M"
     },
     "documentSchema": {
       "$defs": {
@@ -688,7 +688,7 @@
     "recommendedName": "post_comments",
     "resourceConfig": {
       "name": "post_comments",
-      "interval": "PT5M"
+      "interval": "PT30M"
     },
     "documentSchema": {
       "$defs": {
@@ -746,7 +746,7 @@
     "recommendedName": "post_votes",
     "resourceConfig": {
       "name": "post_votes",
-      "interval": "PT5M"
+      "interval": "PT30M"
     },
     "documentSchema": {
       "$defs": {
@@ -804,7 +804,7 @@
     "recommendedName": "posts",
     "resourceConfig": {
       "name": "posts",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -926,7 +926,7 @@
     "recommendedName": "schedules",
     "resourceConfig": {
       "name": "schedules",
-      "interval": "PT5M"
+      "interval": "PT1H"
     },
     "documentSchema": {
       "$defs": {
@@ -977,7 +977,7 @@
     "recommendedName": "sla_policies",
     "resourceConfig": {
       "name": "sla_policies",
-      "interval": "PT5M"
+      "interval": "PT1H"
     },
     "documentSchema": {
       "$defs": {
@@ -1028,7 +1028,7 @@
     "recommendedName": "tags",
     "resourceConfig": {
       "name": "tags",
-      "interval": "PT5M"
+      "interval": "PT1H"
     },
     "documentSchema": {
       "$defs": {
@@ -1195,7 +1195,7 @@
     "recommendedName": "ticket_fields",
     "resourceConfig": {
       "name": "ticket_fields",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -1259,7 +1259,7 @@
     "recommendedName": "ticket_forms",
     "resourceConfig": {
       "name": "ticket_forms",
-      "interval": "PT5M"
+      "interval": "PT30M"
     },
     "documentSchema": {
       "$defs": {
@@ -1561,7 +1561,7 @@
     "recommendedName": "topics",
     "resourceConfig": {
       "name": "topics",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
