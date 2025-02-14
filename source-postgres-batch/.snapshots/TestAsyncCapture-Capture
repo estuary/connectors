@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_basic_capture_826935": 250 Documents
+# Collection "acmeCo/test/test_asynccapture_817595": 250 Documents
 # ================================
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 0","id":0,"txid":999999}
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 1","id":1,"txid":999999}
@@ -254,5 +254,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_basic_capture_826935":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_asynccapture_817595":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
 

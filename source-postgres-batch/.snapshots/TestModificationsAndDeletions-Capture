@@ -1,0 +1,22 @@
+# ================================
+# Collection "acmeCo/test/test_modificationsanddeletions_172811": 14 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 0","id":0,"txid":999999,"version":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 1","id":1,"txid":999999,"version":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 2","id":2,"txid":999999,"version":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 3","id":3,"txid":999999,"version":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 4","id":4,"txid":999999,"version":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 1 (updated)","id":1,"txid":999999,"version":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 3 (updated)","id":3,"txid":999999,"version":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Reused ID 2","id":2,"txid":999999,"version":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Reused ID 4","id":4,"txid":999999,"version":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 0 (final update)","id":0,"txid":999999,"version":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 1 (updated) (final update)","id":1,"txid":999999,"version":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Initial version of row 3 (updated) (final update)","id":3,"txid":999999,"version":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Reused ID 2 (final update)","id":2,"txid":999999,"version":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"description":"Reused ID 4 (final update)","id":4,"txid":999999,"version":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_modificationsanddeletions_172811":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+

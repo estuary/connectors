@@ -1,0 +1,15 @@
+# ================================
+# Collection "acmeCo/test/test_geometrictypes_696406": 7 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"box_col":"(2,2),(1,1)","circle_col":"\u003c(0,0),1\u003e","id":0,"line_col":"{1,-1,0}","lseg_col":"[(1,1),(2,2)]","path_col":"((1,1),(2,2),(3,3))","point_col":"(1,2)","polygon_col":"((1,1),(2,2),(3,3))","txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"box_col":"(100,100),(-100,-100)","circle_col":"\u003c(5,5),5\u003e","id":1,"line_col":"{0,1,-1}","lseg_col":"[(0,0),(100,100)]","path_col":"((0,0),(1,1),(2,0),(1,-1),(0,0))","point_col":"(0,0)","polygon_col":"((0,0),(2,0),(2,2),(0,2))","txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"box_col":"(-1,-1),(-2,-2)","circle_col":"\u003c(-5,-5),3\u003e","id":2,"line_col":"{1,1,0}","lseg_col":"[(-1,-1),(-2,-2)]","path_col":"((-1,-1),(-2,-2),(-3,-3))","point_col":"(-1,-1)","polygon_col":"((-1,-1),(-1,1),(1,1),(1,-1))","txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"box_col":"(2.5,2.5),(1.5,1.5)","circle_col":"\u003c(2.5,2.5),1.5\u003e","id":3,"line_col":"{1.5,-2.5,3.5}","lseg_col":"[(1.1,1.1),(2.2,2.2)]","path_col":"((1.1,1.1),(2.2,2.2),(3.3,3.3))","point_col":"(1.5,2.5)","polygon_col":"((0,0),(1.5,1.5),(3,0))","txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"box_col":"(9999,9999),(-9999,-9999)","circle_col":"\u003c(0,0),999999\u003e","id":4,"line_col":"{1000,2000,3000}","lseg_col":"[(9999,9999),(-9999,-9999)]","path_col":"((1000,1000),(2000,2000),(3000,3000))","point_col":"(1000000,-1000000)","polygon_col":"((1000,1000),(2000,2000),(3000,1000))","txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"box_col":"(0,0),(0,0)","circle_col":"\u003c(0,0),0\u003e","id":5,"line_col":"{1,0,0}","lseg_col":"[(0,0),(0,1)]","path_col":"[(0,0)]","point_col":"(0,0)","polygon_col":"((0,0),(0,1),(1,0))","txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"box_col":null,"circle_col":null,"id":6,"line_col":null,"lseg_col":null,"path_col":null,"point_col":null,"polygon_col":null,"txid":999999}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_geometrictypes_696406":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+

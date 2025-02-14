@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_basic_datatypes_13111208",
+      "name": "test_asynccapture_817595",
       "schema": "test",
-      "table": "basic_datatypes_13111208",
+      "table": "asynccapture_817595",
       "cursor": [
         "txid"
       ]
     },
     "resource_path": [
-      "test_basic_datatypes_13111208"
+      "test_asynccapture_817595"
     ],
     "collection": {
-      "name": "acmeCo/test/test_basic_datatypes_13111208",
+      "name": "acmeCo/test/test_asynccapture_817595",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -53,6 +53,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_basic_datatypes_13111208"
+    "state_key": "test_asynccapture_817595"
   }
 
