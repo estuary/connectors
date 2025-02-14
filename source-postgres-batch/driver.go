@@ -59,10 +59,10 @@ type BatchSQLDriver struct {
 	DocumentationURL string
 	ConfigSchema     json.RawMessage
 
-	Connect              func(ctx context.Context, cfg *Config) (*sql.DB, error)
-	TranslateValue       func(val any, databaseTypeName string) (any, error)
-	GenerateResource     func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
-	DefaultQueryTemplate string
+	Connect             func(ctx context.Context, cfg *Config) (*sql.DB, error)
+	TranslateValue      func(val any, databaseTypeName string) (any, error)
+	GenerateResource    func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
+	SelectQueryTemplate func(res *Resource) (string, error)
 }
 
 // Resource represents the capture configuration of a single resource binding.
@@ -476,7 +476,7 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 		bindings = append(bindings, bindingInfo{
-			resource: res,
+			resource: &res,
 			index:    idx,
 			stateKey: boilerplate.StateKey(binding.StateKey),
 		})
@@ -499,13 +499,13 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 
 	var capture = &capture{
-		Config:               &cfg,
-		State:                &state,
-		DB:                   db,
-		Bindings:             bindings,
-		Output:               stream,
-		TranslateValue:       drv.TranslateValue,
-		DefaultQueryTemplate: drv.DefaultQueryTemplate,
+		Driver:         drv,
+		Config:         &cfg,
+		State:          &state,
+		DB:             db,
+		Bindings:       bindings,
+		Output:         stream,
+		TranslateValue: drv.TranslateValue,
 	}
 	return capture.Run(stream.Context())
 }
@@ -535,17 +535,17 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 }
 
 type capture struct {
-	Config               *Config
-	State                *captureState
-	DB                   *sql.DB
-	Bindings             []bindingInfo
-	Output               *boilerplate.PullOutput
-	TranslateValue       func(val any, databaseTypeName string) (any, error)
-	DefaultQueryTemplate string
+	Driver         *BatchSQLDriver
+	Config         *Config
+	State          *captureState
+	DB             *sql.DB
+	Bindings       []bindingInfo
+	Output         *boilerplate.PullOutput
+	TranslateValue func(val any, databaseTypeName string) (any, error)
 }
 
 type bindingInfo struct {
-	resource Resource
+	resource *Resource
 	index    int
 	stateKey boilerplate.StateKey
 }
@@ -591,11 +591,11 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 		"poll":   res.PollSchedule,
 	}).Info("starting worker")
 
-	var templateString = res.Template
-	if templateString == "" {
-		templateString = c.DefaultQueryTemplate
+	templateString, err := c.Driver.SelectQueryTemplate(res)
+	if err != nil {
+		return fmt.Errorf("error selecting query template: %w", err)
 	}
-	var queryTemplate, err = template.New("query").Funcs(templateFuncs).Parse(templateString)
+	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(templateString)
 	if err != nil {
 		return fmt.Errorf("error parsing template: %w", err)
 	}
