@@ -16,7 +16,3 @@ dropTable "formatted_strings"
 dropTable "symbols"
 dropTable "unsigned_bigint"
 dropTable "deletions"
-
-# Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
-# runs start from scratch.
-go run ${TEST_DIR}/materialize-snowflake/fetch-data.go --delete-specs notable

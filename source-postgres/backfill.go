@@ -27,6 +27,11 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		columnTypes[name] = column.DataType
 	}
 
+	var generatedColumns []string
+	if details, ok := info.ExtraDetails.(*postgresTableDiscoveryDetails); ok {
+		generatedColumns = details.GeneratedColumns
+	}
+
 	// Compute backfill query and arguments list
 	var disableParallelWorkers bool
 	var query string
@@ -109,6 +114,13 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
+		for _, name := range generatedColumns {
+			// Generated column values cannot be captured via CDC, so we have to exclude them from
+			// backfills as well or we could end up with incorrect/stale values. Better not to have
+			// a property at all in those circumstances.
+			delete(fields, name)
+		}
+
 		var rowKey []byte
 		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			var ctid = fields["ctid"].(pgtype.TID)

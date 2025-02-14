@@ -15,6 +15,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/go-mysql-org/go-mysql/client"
+	"github.com/google/uuid"
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/encoding/charmap"
@@ -175,6 +176,12 @@ func predictableColumnOrder(colType any) bool {
 	if t, ok := colType.(*mysqlColumnType); ok {
 		return !slices.Contains([]string{"char", "varchar", "text", "tinytext", "mediumtext", "longtext"}, t.Type)
 	}
+	// Consider the MariaDB UUID column type as unpredictable since they're not ordered in
+	// the obvious way which would allow lexicographic comparison of the string representation
+	// to work and this is simpler than implementing the necessary FDB tuple encoding logic.
+	if colType == "uuid" {
+		return false
+	}
 	return true
 }
 
@@ -188,6 +195,22 @@ func columnsNonNullable(columnsInfo map[string]sqlcapture.ColumnInfo, columnName
 }
 
 func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
+	if !db.featureFlags["date_schema_format"] {
+		// NOTE(2025-02-06): As part of github.com/estuary/connectors/issues/1994 we fixed
+		// a long-standing complaint, that MySQL discovered date columns as a bare `type: string`
+		// rather than `type: string, format: date`.
+		//
+		// A long time ago MySQL date values were captured as the raw strings coming from MySQL.
+		// Unfortunately, MySQL supports date values which illegal under the `format: date` rules,
+		// for example '0000-00-00'. This value may exist in an unknown number of collections and
+		// materialization targets, so we can't unconditionally add `format: date` to our discovery
+		// for all captures.
+		//
+		// This feature flag maintains backwards-compatibility for preexisting captures while allowing
+		// us to change the default for new captures going forward.
+		mysqlTypeToJSON["date"] = columnSchema{jsonType: "string"}
+	}
+
 	var schema columnSchema
 	if typeName, ok := column.DataType.(string); ok {
 		schema, ok = mysqlTypeToJSON[typeName]
@@ -384,6 +407,14 @@ func (db *mysqlDatabase) translateRecordField(isBackfill bool, columnType interf
 				return t.UTC().Format(time.RFC3339Nano), nil
 			case "date":
 				return normalizeMySQLDate(string(val)), nil
+			case "uuid": // The 'UUID' column type is only in MariaDB
+				if parsed, err := uuid.Parse(string(val)); err == nil {
+					return parsed.String(), nil
+				} else if parsed, err := uuid.FromBytes(val); err == nil {
+					return parsed.String(), nil
+				} else {
+					return nil, fmt.Errorf("error parsing UUID: %w", err)
+				}
 			}
 		}
 		if len(val) > truncateColumnThreshold {
@@ -973,19 +1004,7 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"enum": {jsonType: "string"},
 	"set":  {jsonType: "string"},
 
-	// NOTE(2024-09-13): We deliberately don't translate 'date' columns to a JSON schema
-	// with 'format: date'. This is because originally these values were just emitted as
-	// strings and so the MySQL zero value of '0000-00-00' exists in an unknown number
-	// of collections and materialized destinations.
-	//
-	// As of September 2024 we've changed the serialization logic so that the zero date
-	// is now translated to '0001-01-01' which satisfies 'format: date' validation, but
-	// the schema can't change unless/until we're confident that nothing we care about
-	// will be broken by that change.
-	//
-	// Until then, users who want these columns materialized with a destination-specific
-	// date type can modify their read schema to specify 'format: date' as needed.
-	"date": {jsonType: "string"},
+	"date": {jsonType: "string", format: "date"},
 
 	"datetime":  {jsonType: "string", format: "date-time"},
 	"timestamp": {jsonType: "string", format: "date-time"},
@@ -993,4 +1012,6 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"year":      {jsonType: "integer"},
 
 	"json": {},
+
+	"uuid": {jsonType: "string", format: "uuid"}, // Only present in MariaDB
 }

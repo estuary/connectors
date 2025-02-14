@@ -9,10 +9,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = bqDialect(true)
+
 func TestSQLGeneration(t *testing.T) {
+	var templates = renderTemplates(testDialect)
+
 	snap, tables := sql.RunSqlGenTests(
 		t,
-		bqDialect,
+		testDialect,
 		func(table string, delta bool) sql.Resource {
 			return tableConfig{
 				Table:     table,
@@ -23,20 +27,20 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				tplCreateTargetTable,
-				tplStoreInsert,
+				templates.createTargetTable,
+				templates.storeInsert,
 			},
-			TplAddColumns:    tplAlterTableColumns,
-			TplDropNotNulls:  tplAlterTableColumns,
-			TplCombinedAlter: tplAlterTableColumns,
-			TplInstallFence:  tplInstallFence,
-			TplUpdateFence:   tplUpdateFence,
+			TplAddColumns:    templates.alterTableColumns,
+			TplDropNotNulls:  templates.alterTableColumns,
+			TplCombinedAlter: templates.alterTableColumns,
+			TplInstallFence:  templates.installFence,
+			TplUpdateFence:   templates.updateFence,
 		},
 	)
 
 	for _, tpl := range []*template.Template{
-		tplStoreUpdate,
-		tplLoadQuery,
+		templates.storeUpdate,
+		templates.loadQuery,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
@@ -45,8 +49,8 @@ func TestSQLGeneration(t *testing.T) {
 		bounds := []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
-				LiteralLower: bqDialect.Literal(int64(10)),
-				LiteralUpper: bqDialect.Literal(int64(100)),
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
 			},
 			{
 				Column: tbl.Keys[1],
@@ -55,8 +59,8 @@ func TestSQLGeneration(t *testing.T) {
 			},
 			{
 				Column:       tbl.Keys[2],
-				LiteralLower: bqDialect.Literal("aGVsbG8K"),
-				LiteralUpper: bqDialect.Literal("Z29vZGJ5ZQo="),
+				LiteralLower: testDialect.Literal("aGVsbG8K"),
+				LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo="),
 			},
 		}
 

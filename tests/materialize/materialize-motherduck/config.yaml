@@ -1,6 +1,6 @@
-awsAccessKeyId: AKIA3PYBORRDH4TGOSGZ
-awsSecretAccessKey_sops: ENC[AES256_GCM,data:QDU+90NPyMy9PfDOxp2HiA9nwzOPMAVkPtAGyUFR/ZbSqk6uHm07Yg==,iv:8V3mdCzzssKnS709VKKydcrm1yGo/LYJb4VvMyReMek=,tag:tm+1ufUKrwda/MVI7vCrsA==,type:str]
-bucket: whb-test-bucket
+awsAccessKeyId_sops: ENC[AES256_GCM,data:2J3EfC99PfoIXXBz7Hbf+lP31e8=,iv:se8cw6MJK5FX8l4N8UNiF7VpPUR/nJQAV1fJgjJCk9I=,tag:GAQgCyq72XemTEaL9du9mw==,type:str]
+awsSecretAccessKey_sops: ENC[AES256_GCM,data:nNgdzzTIw3VhoEgLrD/B9feVWW8ObdOj13puMkkq5ayaxJx646akJg==,iv:7wVj9SQj71asRcrn+RO6/oQe8oP09wgSIPdOUQx3sKw=,tag:fffXv+4//JaT450o+vuImA==,type:str]
+bucket: estuary-connector-test-bucket
 database: test_db
 region: us-east-2
 schema: main
@@ -15,8 +15,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-09-17T21:33:05Z"
-    mac: ENC[AES256_GCM,data:q5ySBAKHL2oJtMhrpR0yTs9Ie1uNeQvhYBoe7Qd23avx2zHLlMw1QkZBnU9oKuFuWIiuagJw8ctw6Wp6OjQYc5NCnQOPxk1epXmN7VuKo6uymWNnaIp28mqASD5xh6/N2X9Wyg7oqddWT4azcah7/Kweydxn+XK9FC3Tjds3jCg=,iv:qnRbe1KzXdPdHhYdAWta0JbjfIoJVOx3Bst0gmLSkEc=,tag:mM5Cnl9CO4wf1kIpRCnbUA==,type:str]
+    lastmodified: "2025-02-12T15:47:27Z"
+    mac: ENC[AES256_GCM,data:MZHrzQtTqalHm6qGHVWec58naVeg2kMZKObeLgSXM/IBqccqYb/EFiywYvs05GQAh6uaG3qosqTRkuBDJusVIfHDazO9qPbjkEDqJXkBh7V3CUz6CV2lf0Q4ZrL1RcLx57QcQr3W4IfHkrdNT6QHqV/Yt72JIofgTeVYbzI0dXA=,iv:PNscGQB6lBitSsaqAagfQvvSBfKck9vrA7gwdFEnlAU=,tag:Za3gm9Sjv1UVE7++nAcO6A==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.8.1
+    version: 3.9.4

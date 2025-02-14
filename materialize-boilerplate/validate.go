@@ -193,6 +193,16 @@ func (v Validator) validateMatchesExistingBinding(
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "This field is the document in the current materialization",
 				}
+
+				// Do not allow incompatible type changes to the root document
+				// field if it has already been materialized.
+				if existingField, err := v.is.GetField(path, p.Field); err == nil {
+					if constraintFromExisting, err := v.constraintForExistingField(boundCollection, p, existingField, fieldConfigJsonMap); err != nil {
+						return nil, err
+					} else if constraintFromExisting.Type.IsForbidden() {
+						c = constraintFromExisting
+					}
+				}
 			} else {
 				c = &pm.Response_Validated_Constraint{
 					Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,

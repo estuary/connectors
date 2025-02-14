@@ -34,8 +34,10 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	)
 
-	{
-		tpl := templates.mergeInto
+	for _, tpl := range []*template.Template{
+		templates.loadQuery,
+		templates.mergeInto,
+	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()
@@ -58,7 +60,7 @@ func TestSQLGeneration(t *testing.T) {
 			},
 		}
 
-		tf := mergeQueryInput{
+		tf := boundedQueryInput{
 			Table:  tbl,
 			File:   "test-file",
 			Bounds: bounds,
@@ -70,7 +72,6 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		templates.loadQuery,
 		templates.copyInto,
 	} {
 		tbl := tables[0]
