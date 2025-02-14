@@ -216,7 +216,7 @@ def full_refresh_resources(
             open=functools.partial(open, path, response_model),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=60)
             ),
             schema_inference=True,
         )
@@ -262,7 +262,7 @@ def full_refresh_offset_paginated_resources(
             open=functools.partial(open, path, response_model),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=60)
             ),
             schema_inference=True,
         )
@@ -291,11 +291,11 @@ def full_refresh_cursor_paginated_resources(
             state,
             task,
             fetch_snapshot=functools.partial(
-            snapshot_cursor_paginated_resources,
-            http,
-            config.subdomain,
-            path,
-            response_model,
+                snapshot_cursor_paginated_resources,
+                http,
+                config.subdomain,
+                path,
+                response_model,
         ),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
@@ -308,7 +308,7 @@ def full_refresh_cursor_paginated_resources(
             open=functools.partial(open, path, response_model),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=60)
             ),
             schema_inference=True,
         )
@@ -357,7 +357,7 @@ def client_side_filtered_offset_paginated_resources(
                 inc=ResourceState.Incremental(cursor=EPOCH)
             ),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=30)
             ),
             schema_inference=True,
         )
@@ -408,7 +408,7 @@ def client_side_filtered_cursor_paginated_resources(
                 inc=ResourceState.Incremental(cursor=EPOCH)
             ),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=15)
             ),
             schema_inference=True,
         )
@@ -745,7 +745,7 @@ def post_child_resources(
                 inc=ResourceState.Incremental(cursor=config.start_date),
             ),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=30)
             ),
             schema_inference=True,
         )
@@ -787,7 +787,7 @@ def post_comment_votes(
             inc=ResourceState.Incremental(cursor=config.start_date),
         ),
         initial_config=ResourceConfig(
-            name="post_comment_votes", interval=timedelta(minutes=5)
+            name="post_comment_votes", interval=timedelta(minutes=30)
         ),
         schema_inference=True,
     )
