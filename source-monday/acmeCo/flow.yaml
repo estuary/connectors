@@ -4,3 +4,19 @@ collections:
     schema: boards.schema.yaml
     key:
       - /_meta/row_id
+  acmeCo/items:
+    schema: items.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/tags:
+    schema: tags.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/teams:
+    schema: teams.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /_meta/row_id
