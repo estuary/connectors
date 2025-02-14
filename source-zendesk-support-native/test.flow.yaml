@@ -24,6 +24,10 @@ captures:
           interval: PT5M
         target: acmeCo/schedules
       - resource:
+          name: account_attributes
+          interval: PT5M
+        target: acmeCo/account_attributes
+      - resource:
           name: sla_policies
           interval: PT5M
         target: acmeCo/sla_policies
