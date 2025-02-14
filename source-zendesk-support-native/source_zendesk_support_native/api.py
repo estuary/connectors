@@ -27,6 +27,9 @@ from .models import (
     AuditLogsResponse,
     Post,
     PostsResponse,
+    PostComment,
+    PostCommentsResponse,
+    PostCommentVotesResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
 )
 
@@ -952,6 +955,36 @@ async def fetch_post_child_resources(
             async for child_resource in snapshot_cursor_paginated_resources(http, subdomain, path, response_model, log):
                 yield ZendeskResource.model_validate({
                     "post_id": post.id,
+                    **child_resource.model_dump(exclude={"meta_"}),
+                })
+
+        else:
+            yield result
+
+
+async def fetch_post_comment_votes(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    post_comments_generator = fetch_post_child_resources(http, subdomain, "comments", PostCommentsResponse, log, log_cursor)
+
+    async for result in post_comments_generator:
+
+        if isinstance(result, ZendeskResource):
+            post_comment = PostComment.model_validate(result.model_dump())  
+
+            if post_comment.vote_count == 0:
+                continue
+
+            path = f"community/posts/{post_comment.post_id}/comments/{post_comment.id}/votes"
+
+            async for child_resource in snapshot_cursor_paginated_resources(http, subdomain, path, PostCommentVotesResponse, log):
+                yield ZendeskResource.model_validate({
+                    "post_id": post_comment.post_id,
                     **child_resource.model_dump(exclude={"meta_"}),
                 })
 

@@ -51,6 +51,7 @@ from .api import (
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
     fetch_post_child_resources,
+    fetch_post_comment_votes,
     fetch_satisfaction_ratings,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
@@ -754,6 +755,44 @@ def post_child_resources(
     return resources
 
 
+def post_comment_votes(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_post_comment_votes,
+                http,
+                config.subdomain,
+            ),
+        )
+
+    return common.Resource(
+        name="post_comment_votes",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=config.start_date),
+        ),
+        initial_config=ResourceConfig(
+            name="post_comment_votes", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -773,4 +812,5 @@ async def all_resources(
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
         *post_child_resources(log, http, config),
+        post_comment_votes(log, http, config),
     ]

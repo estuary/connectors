@@ -119,3 +119,7 @@ captures:
           name: post_comments
           interval: PT5M
         target: acmeCo/post_comments
+      - resource:
+          name: post_comment_votes
+          interval: PT5M
+        target: acmeCo/post_comment_votes
