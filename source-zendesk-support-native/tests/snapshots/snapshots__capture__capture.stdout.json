@@ -1,5 +1,20 @@
 [
   [
+    "acmeCo/account_attributes",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2024-08-01T12:48:41Z",
+      "id": "6149ea30-5004-11ef-ba4d-1fb32c16a1d3",
+      "name": "Test attribute",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/routing/attributes/6149ea30-5004-11ef-ba4d-1fb32c16a1d3.json"
+    }
+  ],
+  [
     "acmeCo/automations",
     {
       "_meta": {

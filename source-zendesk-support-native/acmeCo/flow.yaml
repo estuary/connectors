@@ -1,5 +1,9 @@
 ---
 collections:
+  acmeCo/account_attributes:
+    schema: account_attributes.schema.yaml
+    key:
+      - /_meta/row_id
   acmeCo/audit_logs:
     schema: audit_logs.schema.yaml
     key:
