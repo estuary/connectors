@@ -323,8 +323,13 @@ class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedRespon
     resources: list[TimestampedResource] = Field(alias="organization_memberships")
 
 
+class Post(TimestampedResource):
+    comment_count: int
+    vote_count: int
+
+
 class PostsResponse(ClientSideIncrementalCursorPaginatedResponse):
-    resources: list[TimestampedResource] = Field(alias="posts")
+    resources: list[Post] = Field(alias="posts")
 
 
 class TopicsResponse(ClientSideIncrementalCursorPaginatedResponse):
@@ -343,6 +348,22 @@ CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, 
     ("posts", "community/posts", None, PostsResponse),
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),
     ("topics", "community/topics", None, TopicsResponse),
+]
+
+
+class PostVotesResponse(IncrementalCursorPaginatedResponse):
+    resources: list[ZendeskResource] = Field(alias="votes")
+
+
+class PostCommentsResponse(IncrementalCursorPaginatedResponse):
+    resources: list[ZendeskResource] = Field(alias="comments")
+
+
+# Resources that are fetched by following the posts stream & fetching resources for updated posts in a separate request.
+# Tuples contain the name, path segment, and response model for each resource.
+POST_CHILD_RESOURCES: list[tuple[str, str, type[IncrementalCursorPaginatedResponse]]] = [
+    ("post_votes", "votes", PostVotesResponse),
+    ("post_comments", "comments", PostCommentsResponse),
 ]
 
 

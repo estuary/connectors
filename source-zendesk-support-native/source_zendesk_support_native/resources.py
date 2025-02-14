@@ -34,6 +34,7 @@ from .models import (
     INCREMENTAL_CURSOR_PAGINATED_RESOURCES,
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
+    POST_CHILD_RESOURCES,
 )
 from .api import (
     backfill_audit_logs,
@@ -49,6 +50,7 @@ from .api import (
     fetch_incremental_time_export_resources,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
+    fetch_post_child_resources,
     fetch_satisfaction_ratings,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
@@ -705,6 +707,53 @@ def ticket_child_resources(
     return resources
 
 
+def post_child_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        path_segment: str,
+        response_model: type[IncrementalCursorPaginatedResponse],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_post_child_resources,
+                http,
+                config.subdomain,
+                path_segment,
+                response_model,
+            ),
+        )
+
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=ZendeskResource,
+            open=functools.partial(open, path_segment, response_model),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=config.start_date),
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, path_segment, response_model) in POST_CHILD_RESOURCES
+    ]
+
+    return resources
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -723,4 +772,5 @@ async def all_resources(
         *incremental_time_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
+        *post_child_resources(log, http, config),
     ]
