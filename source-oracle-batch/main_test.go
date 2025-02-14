@@ -258,7 +258,7 @@ func TestKeyDiscovery(t *testing.T) {
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
 	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(k_smallint SMALLINT, k_int INTEGER, k_bool NUMBER(1), k_str VARCHAR(8), data VARCHAR(200), PRIMARY KEY (k_smallint, k_int, k_bool, k_str))", tableName))
 
-	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
+	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"C##FLOW_TEST_LOGMINER"}
 	snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
 }
 
