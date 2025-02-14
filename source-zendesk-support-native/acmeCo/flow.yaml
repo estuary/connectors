@@ -40,6 +40,14 @@ collections:
     schema: organizations.schema.yaml
     key:
       - /id
+  acmeCo/post_comments:
+    schema: post_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/post_votes:
+    schema: post_votes.schema.yaml
+    key:
+      - /id
   acmeCo/posts:
     schema: posts.schema.yaml
     key:

@@ -25,6 +25,8 @@ from .models import (
     SatisfactionRatingsResponse,
     AuditLog,
     AuditLogsResponse,
+    Post,
+    PostsResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
 )
 
@@ -921,3 +923,37 @@ async def backfill_ticket_metrics(
                 yield ZendeskResource.model_validate(metrics)
         else:
             return
+
+
+async def fetch_post_child_resources(
+    http: HTTPSession,
+    subdomain: str,
+    path_segment: str,
+    response_model: type[IncrementalCursorPaginatedResponse],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    posts_generator = fetch_client_side_incremental_cursor_paginated_resources(http, subdomain, "community/posts", None, PostsResponse, log, log_cursor)
+
+    async for result in posts_generator:
+        if isinstance(result, TimestampedResource):
+            post = Post.model_validate(result)
+
+            if (
+                (path_segment == "votes" and post.vote_count == 0) or 
+                (path_segment == "comments" and post.comment_count == 0)
+            ):
+                continue
+
+            path = f"community/posts/{post.id}/{path_segment}"
+
+            async for child_resource in snapshot_cursor_paginated_resources(http, subdomain, path, response_model, log):
+                yield ZendeskResource.model_validate({
+                    "post_id": post.id,
+                    **child_resource.model_dump(exclude={"meta_"}),
+                })
+
+        else:
+            yield result

@@ -111,3 +111,11 @@ captures:
           name: ticket_comments
           interval: PT5M
         target: acmeCo/ticket_comments
+      - resource:
+          name: post_votes
+          interval: PT5M
+        target: acmeCo/post_votes
+      - resource:
+          name: post_comments
+          interval: PT5M
+        target: acmeCo/post_comments
