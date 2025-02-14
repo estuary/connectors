@@ -290,6 +290,10 @@ class ClientSideIncrementalCursorPaginatedResponse(FullRefreshCursorPaginatedRes
     resources: list[TimestampedResource]
 
 
+class AutomationsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="automations")
+
+
 class BrandsResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="brands")
 
@@ -314,15 +318,26 @@ class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedRespon
     resources: list[TimestampedResource] = Field(alias="organization_memberships")
 
 
+class PostsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="posts")
+
+
+class TopicsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="topics")
+
+
 # Incremental client side resources that are paginated with a cursor.
 # Tuples contain the name, path, any additional request query params, and response model for each resource.
 CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, str | int] | None, type[ClientSideIncrementalCursorPaginatedResponse]]] = [
+    ("automations", "automations", None, AutomationsResponse),
     ("brands", "brands", None, BrandsResponse),
     ("groups", "groups", {"exclude_deleted": "false"}, GroupsResponse),
     ("group_memberships", "group_memberships", None, GroupMembershipsResponse),
     ("macros", "macros", None, MacrosResponse),
     ("organization_memberships", "organization_memberships", None, OrganizationMembershipsResponse),
+    ("posts", "community/posts", None, PostsResponse),
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),
+    ("topics", "community/topics", None, TopicsResponse),
 ]
 
 

@@ -40,6 +40,10 @@ captures:
           interval: PT5M
         target: acmeCo/ticket_forms
       - resource:
+          name: automations
+          interval: PT5M
+        target: acmeCo/automations
+      - resource:
           name: brands
           interval: PT5M
         target: acmeCo/brands
@@ -60,9 +64,17 @@ captures:
           interval: PT5M
         target: acmeCo/organization_memberships
       - resource:
+          name: posts
+          interval: PT5M
+        target: acmeCo/posts
+      - resource:
           name: ticket_fields
           interval: PT5M
         target: acmeCo/ticket_fields
+      - resource:
+          name: topics
+          interval: PT5M
+        target: acmeCo/topics
       - resource:
           name: satisfaction_ratings
           interval: PT5M

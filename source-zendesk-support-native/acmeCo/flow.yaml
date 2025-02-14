@@ -4,6 +4,10 @@ collections:
     schema: audit_logs.schema.yaml
     key:
       - /id
+  acmeCo/automations:
+    schema: automations.schema.yaml
+    key:
+      - /id
   acmeCo/brands:
     schema: brands.schema.yaml
     key:
@@ -30,6 +34,10 @@ collections:
       - /id
   acmeCo/organizations:
     schema: organizations.schema.yaml
+    key:
+      - /id
+  acmeCo/posts:
+    schema: posts.schema.yaml
     key:
       - /id
   acmeCo/satisfaction_ratings:
@@ -82,6 +90,10 @@ collections:
       - /id
   acmeCo/tickets:
     schema: tickets.schema.yaml
+    key:
+      - /id
+  acmeCo/topics:
+    schema: topics.schema.yaml
     key:
       - /id
   acmeCo/users:
