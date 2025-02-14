@@ -17,6 +17,7 @@ from .models import (
     FullRefreshCursorPaginatedResponse,
     FullRefreshResource,
     IncrementalCursorPaginatedResponse,
+    IncrementalTimeExportResponse,
     ResourceConfig,
     ResourceState,
     TimestampedResource,
@@ -27,6 +28,7 @@ from .models import (
     FULL_REFRESH_RESOURCES,
     FULL_REFRESH_OFFSET_PAGINATED_RESOURCES,
     FULL_REFRESH_CURSOR_PAGINATED_RESOURCES,
+    INCREMENTAL_TIME_EXPORT_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
     INCREMENTAL_CURSOR_PAGINATED_RESOURCES,
@@ -35,6 +37,7 @@ from .models import (
 )
 from .api import (
     backfill_audit_logs,
+    backfill_incremental_time_export_resources,
     backfill_incremental_cursor_export_resources,
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
@@ -43,6 +46,7 @@ from .api import (
     fetch_audit_logs,
     fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_incremental_time_export_resources,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
     fetch_satisfaction_ratings,
@@ -518,6 +522,66 @@ def incremental_cursor_paginated_resources(
     return resources
 
 
+def incremental_time_export_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        name: str,
+        path: str,
+        response_model: type[IncrementalTimeExportResponse],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_time_export_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_time_export_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, name, path, response_model),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in INCREMENTAL_TIME_EXPORT_RESOURCES
+    ]
+
+    return resources
+
+
 def incremental_cursor_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -656,6 +720,7 @@ async def all_resources(
         *client_side_filtered_cursor_paginated_resources(log, http, config),
         satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
+        *incremental_time_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
     ]

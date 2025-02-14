@@ -28,6 +28,10 @@ collections:
     schema: organization_memberships.schema.yaml
     key:
       - /id
+  acmeCo/organizations:
+    schema: organizations.schema.yaml
+    key:
+      - /id
   acmeCo/satisfaction_ratings:
     schema: satisfaction_ratings.schema.yaml
     key:
