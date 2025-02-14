@@ -542,3 +542,241 @@ func TestJSONType(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestFullRefresh exercises the scenario of a table without a configured cursor,
+// which causes the capture to perform a full refresh every time it runs.
+func TestFullRefresh(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithUpdatedAtCursor exercises the use-case of a capture using a non-primary-key updated_at column as the cursor.
+func TestCaptureWithUpdatedAtCursor(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT, updated_at TIMESTAMP)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "updated_at")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithTwoColumnCursor exercises the use-case of a capture using a multiple-column compound cursor.
+func TestCaptureWithTwoColumnCursor(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, col1 INTEGER, col2 INTEGER, data TEXT)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "col1", "col2")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, 1, 1, "Value for row 0"}, {1, 1, 2, "Value for row 1"}, {2, 1, 3, "Value for row 2"},
+			{3, 2, 1, "Value for row 3"}, {4, 2, 2, "Value for row 4"}, {5, 2, 3, "Value for row 5"},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, col1, col2, data) VALUES (?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		for _, row := range [][]any{
+			{6, 0, 9, "Value ignored because col1 is too small"},
+			{7, 2, 0, "Value ignored because col2 is too small"},
+			{8, 3, 1, "Value for row 8"}, {9, 3, 2, "Value for row 9"}, {10, 3, 3, "Value for row 10"},
+			{11, 4, 1, "Value for row 11"}, {12, 4, 2, "Value for row 12"}, {13, 4, 3, "Value for row 13"},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, col1, col2, data) VALUES (?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithModifications exercises the use-case of a capture using an updated_at
+// cursor where some rows are modified and deleted between captures.
+func TestCaptureWithModifications(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT, updated_at TIMESTAMP)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "updated_at")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Initial value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Update and delete some rows, as well as inserting a few more.
+		executeControlQuery(t, control, fmt.Sprintf("UPDATE %s SET data = ?, updated_at = ? WHERE id = ?", tableName),
+			"Modified value for row 3", baseTime.Add(15*time.Minute).Format("2006-01-02 15:04:05"), 3)
+		executeControlQuery(t, control, fmt.Sprintf("UPDATE %s SET data = ?, updated_at = ? WHERE id = ?", tableName),
+			"Modified value for row 7", baseTime.Add(16*time.Minute).Format("2006-01-02 15:04:05"), 7)
+		executeControlQuery(t, control, fmt.Sprintf("DELETE FROM %s WHERE id IN (2, 5)", tableName))
+		for i := 10; i < 15; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i+10)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithEmptyPoll exercises the scenario where a polling interval finds no new rows.
+func TestCaptureWithEmptyPoll(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT, updated_at TIMESTAMP)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "updated_at")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// First batch of rows
+		for i := 0; i < 5; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// No changes
+		cs.Capture(ctx, t, nil)
+
+		// Second batch of rows with later timestamps
+		for i := 5; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i+10)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithNullCursor exercises the handling of NULL values in cursor columns.
+func TestCaptureWithNullCursor(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT, sort_col INTEGER)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "sort_col")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		// First batch with mix of NULL and non-NULL cursor values
+		for _, row := range [][]any{
+			{0, "Value with NULL cursor", nil},
+			{1, "Value with cursor 10", 10},
+			{2, "Another NULL cursor", nil},
+			{3, "Value with cursor 20", 20},
+			{4, "Third NULL cursor", nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, sort_col) VALUES (?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Second batch testing NULL handling after initial cursor
+		for _, row := range [][]any{
+			{5, "Late NULL cursor", nil},    // Will not be captured
+			{6, "Value with cursor 15", 15}, // Will not be captured (cursor 20 is already seen)
+			{7, "Value with cursor 25", 25},
+			{8, "Another late NULL", nil}, // Will not be captured
+			{9, "Final value cursor 30", 30},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, sort_col) VALUES (?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestQueryTemplateOverride exercises a capture configured with an explicit query template
+// in the resource spec rather than a blank template and specified table name/schema.
+//
+// This is the behavior of preexisting bindings which were created before the table/schema
+// change in February 2025.
+func TestQueryTemplateOverride(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT, updated_at TIMESTAMP)")
+
+	// Create a binding with a query template override instead of table/schema
+	var res = Resource{
+		Name:     "query_template_override",
+		Template: fmt.Sprintf(`SELECT * FROM %[1]s {{if not .IsFirstQuery}} WHERE updated_at > @flow_cursor_value[0] {{end}} ORDER BY updated_at`, tableName),
+		Cursor:   []string{"updated_at"},
+	}
+	bs, err := json.Marshal(res)
+	require.NoError(t, err)
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cs.Bindings[0].ResourceConfigJson = bs
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// Initial rows
+		for i := 0; i < 5; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// More rows with later timestamps
+		for i := 5; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES (?, ?, ?)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i+5)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
