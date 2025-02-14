@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_float_nans_10511",
+      "name": "test_modificationsanddeletions_172811",
       "schema": "test",
-      "table": "float_nans_10511",
+      "table": "modificationsanddeletions_172811",
       "cursor": [
         "txid"
       ]
     },
     "resource_path": [
-      "test_float_nans_10511"
+      "test_modificationsanddeletions_172811"
     ],
     "collection": {
-      "name": "acmeCo/test/test_float_nans_10511",
+      "name": "acmeCo/test/test_modificationsanddeletions_172811",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -53,6 +53,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_float_nans_10511"
+    "state_key": "test_modificationsanddeletions_172811"
   }
 

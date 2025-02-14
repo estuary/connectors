@@ -1,0 +1,17 @@
+# ================================
+# Collection "acmeCo/test/test_binarytypes_537491": 9 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"101","bit_col":"1","bitvar5_col":"10101","bitvar_col":"1010","bool_col":true,"bytea_col":"SGVsbG8=","id":0,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"000","bit_col":"0","bitvar5_col":"00000","bitvar_col":"0","bool_col":false,"bytea_col":"AAAA","id":1,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"111","bit_col":"1","bitvar5_col":"11111","bitvar_col":"111111","bool_col":true,"bytea_col":"////","id":2,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"110","bit_col":"0","bitvar5_col":"10110","bitvar_col":"1100","bool_col":true,"bytea_col":"qrvM","id":3,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"000","bit_col":"0","bitvar5_col":"","bitvar_col":"","bool_col":false,"bytea_col":"","id":4,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":null,"bit_col":null,"bitvar5_col":null,"bitvar_col":null,"bool_col":null,"bytea_col":null,"id":5,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"101","bit_col":"1","bitvar5_col":"10101","bitvar_col":"1010","bool_col":true,"bytea_col":"AAECAwQF/w==","id":6,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"010","bit_col":"0","bitvar5_col":"01010","bitvar_col":"0101","bool_col":false,"bytea_col":"SGVsbG8g5LiW55WM","id":7,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bit3_col":"111","bit_col":"1","bitvar5_col":"11111","bitvar_col":"1111","bool_col":true,"bytea_col":"AP9/gAEjRWeJq83v","id":8,"txid":999999}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_binarytypes_537491":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+

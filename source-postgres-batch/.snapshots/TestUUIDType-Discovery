@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_basic_capture_826935",
+      "name": "test_uuidtype_694251",
       "schema": "test",
-      "table": "basic_capture_826935",
+      "table": "uuidtype_694251",
       "cursor": [
         "txid"
       ]
     },
     "resource_path": [
-      "test_basic_capture_826935"
+      "test_uuidtype_694251"
     ],
     "collection": {
-      "name": "acmeCo/test/test_basic_capture_826935",
+      "name": "acmeCo/test/test_uuidtype_694251",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -53,6 +53,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_basic_capture_826935"
+    "state_key": "test_uuidtype_694251"
   }
 
