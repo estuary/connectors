@@ -1,29 +1,42 @@
 from pydantic import BaseModel, Field
+from typing import TYPE_CHECKING, Optional
 
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
     BaseDocument,
-    ClientCredentialsOAuth2Credentials,
-    ClientCredentialsOAuth2Spec,
+    AuthorizationCodeFlowOAuth2Credentials,
+    OAuth2Spec,
     AccessToken,
     ResourceState,
 )
 
 
-def urlencode_field(field: str):
-    return "{{#urlencode}}{{{ " + field + " }}}{{/urlencode}}"
-
-
-OAUTH2_SPEC = ClientCredentialsOAuth2Spec(
+OAUTH2_SPEC = OAuth2Spec(
+    provider="monday",
+    authUrlTemplate=(
+        "https://auth.monday.com/oauth2/authorize?"
+        r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
+    ),
     accessTokenUrlTemplate="https://auth.monday.com/oauth2/token",
-    accessTokenResponseMap={"access_token": "/access_token"},
+    accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
+    accessTokenBody=(
+        r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        r"&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}"
+        r"&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
+    ),
+    accessTokenResponseMap={
+        "access_token": "/access_token",
+    },
 )
 
 
-# The class name appears in the UI's Authentication section, so we wrap the non-user friendly name in a slighly better name.
-# TODO(alex): figure out why the class name is appearing in the UI & determine if there's some property to set that overrides it.
-class OAuth(ClientCredentialsOAuth2Credentials):
-    pass
+if TYPE_CHECKING:
+    OAuth2Credentials = AuthorizationCodeFlowOAuth2Credentials
+else:
+    OAuth2Credentials = AuthorizationCodeFlowOAuth2Credentials.for_provider(
+        OAUTH2_SPEC.provider
+    )
 
 
 class EndpointConfig(BaseModel):
@@ -31,7 +44,7 @@ class EndpointConfig(BaseModel):
         title="Subdomain",
         description="This is your Monday subdomain that can be found in your Monday account URL. For example, in https://{MY_SUBDOMAIN}.monday.com, where MY_SUBDOMAIN is the value of your subdomain.",
     )
-    credentials: OAuth | AccessToken = Field(
+    credentials: OAuth2Credentials | AccessToken = Field(
         title="Authentication",
         discriminator="credentials_title",
     )
@@ -40,5 +53,10 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class Board(BaseDocument, extra="allow"):
+class GraphQLResponse(BaseModel):
+    data: Optional[dict] = None
+    errors: Optional[list[dict]] = None
+
+
+class GraphQLDocument(BaseDocument, extra="allow"):
     pass

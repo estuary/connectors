@@ -15,11 +15,8 @@ from estuary_cdk.capture import (
 from estuary_cdk.http import HTTPMixin
 from estuary_cdk.capture.common import ResourceConfig
 
-from .resources import all_resources, validate_credentials
-from .models import (
-    ConnectorState,
-    EndpointConfig,
-)
+from source_monday.resources import all_resources, validate_credentials
+from source_monday.models import ConnectorState, EndpointConfig, OAUTH2_SPEC
 
 
 class Connector(
@@ -32,6 +29,7 @@ class Connector(
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
+            oauth2=OAUTH2_SPEC,
             documentationUrl="https://docs.estuary.dev",
             resourceConfigSchema=ResourceConfig.model_json_schema(),
             resourcePathPointers=ResourceConfig.PATH_POINTERS,
