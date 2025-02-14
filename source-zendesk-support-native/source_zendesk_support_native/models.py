@@ -156,6 +156,17 @@ class FullRefreshResponse(BaseModel, extra="allow"):
     resources: list[FullRefreshResource]
 
 
+class SchedulesResponse(FullRefreshResponse):
+    resources: list[FullRefreshResource] = Field(alias="schedules")
+
+
+# Full refresh resources with no pagination.
+# Tuples contain the name, path, and response model for each resource.
+FULL_REFRESH_RESOURCES: list[tuple[str, str, type[FullRefreshResponse]]] = [
+    ("schedules", "business_hours/schedules", SchedulesResponse),
+]
+
+
 class FullRefreshOffsetPaginatedResponse(FullRefreshResponse):
     next_page: str | None
 
