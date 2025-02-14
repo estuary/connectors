@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_schemafilter_428403",
+      "name": "test_capturewithemptypoll_890703",
       "schema": "test",
-      "table": "schemafilter_428403",
+      "table": "capturewithemptypoll_890703",
       "cursor": [
         "txid"
       ]
     },
     "resource_path": [
-      "test_schemafilter_428403"
+      "test_capturewithemptypoll_890703"
     ],
     "collection": {
-      "name": "acmeCo/test/test_schemafilter_428403",
+      "name": "acmeCo/test/test_capturewithemptypoll_890703",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -53,6 +53,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_schemafilter_428403"
+    "state_key": "test_capturewithemptypoll_890703"
   }
 

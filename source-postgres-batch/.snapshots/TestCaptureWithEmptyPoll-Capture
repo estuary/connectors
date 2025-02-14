@@ -1,0 +1,18 @@
+# ================================
+# Collection "acmeCo/test/test_capturewithemptypoll_890703": 10 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 0","id":0,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 1","id":1,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 2","id":2,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 3","id":3,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 4","id":4,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 5","id":5,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 6","id":6,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 7","id":7,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 8","id":8,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 9","id":9,"txid":999999}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_capturewithemptypoll_890703":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+
