@@ -42,6 +42,11 @@ func TestMain(m *testing.M) {
 	} else {
 		log.SetLevel(log.InfoLevel)
 	}
+	// Some tested behaviors (TestDateAndTimeTypes) are timezone-sensitive. This
+	// is arguably a bug, but the goal of the current work is just to document
+	// via test snapshots the current behavior. So we set the timezone to a known
+	// value to avoid test failures due to timezone differences, especially in CI.
+	os.Setenv("TZ", "America/New_York")
 	os.Exit(m.Run())
 }
 
