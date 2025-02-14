@@ -128,9 +128,9 @@ func connectOracle(ctx context.Context, cfg *Config) (*sql.DB, error) {
 // It follows that this column cannot be used as a primary key, but it can be used
 // as a cursor.
 const tableQueryTemplate = `{{if .IsFirstQuery -}}
-  SELECT ORA_ROWSCN AS txid, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}} ORDER BY ORA_ROWSCN
+  SELECT ORA_ROWSCN AS TXID, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}} ORDER BY ORA_ROWSCN
 {{- else -}}
-  SELECT ORA_ROWSCN AS txid, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}}
+  SELECT ORA_ROWSCN AS TXID, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}}
     WHERE ORA_ROWSCN > :1
     ORDER BY ORA_ROWSCN
 {{- end}}`
@@ -149,7 +149,7 @@ func generateOracleResource(resourceName, owner, tableName, tableType string) (*
 		Name:      resourceName,
 		Owner:     owner,
 		TableName: tableName,
-		Cursor:    []string{"txid"},
+		Cursor:    []string{"TXID"},
 	}, nil
 }
 
