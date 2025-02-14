@@ -1,0 +1,57 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "query_template_override",
+      "cursor": [
+        "updated_at"
+      ],
+      "template": "SELECT * FROM test.querytemplateoverride_638679 {{if not .IsFirstQuery}} WHERE updated_at \u003e @flow_cursor_value[0] {{end}} ORDER BY updated_at"
+    },
+    "resource_path": [
+      "test_querytemplateoverride_638679"
+    ],
+    "collection": {
+      "name": "acmeCo/test/test_querytemplateoverride_638679",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "id"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-mysql-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index"
+            ]
+          },
+          "id": {
+            "type": "integer"
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ],
+      "projections": null
+    },
+    "state_key": "test_querytemplateoverride_638679"
+  }
+
