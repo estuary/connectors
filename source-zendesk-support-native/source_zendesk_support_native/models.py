@@ -355,8 +355,13 @@ class PostVotesResponse(IncrementalCursorPaginatedResponse):
     resources: list[ZendeskResource] = Field(alias="votes")
 
 
+class PostComment(ZendeskResource):
+    post_id: int
+    vote_count: int
+
+
 class PostCommentsResponse(IncrementalCursorPaginatedResponse):
-    resources: list[ZendeskResource] = Field(alias="comments")
+    resources: list[PostComment] = Field(alias="comments")
 
 
 # Resources that are fetched by following the posts stream & fetching resources for updated posts in a separate request.
@@ -373,3 +378,7 @@ class AuditLog(ZendeskResource):
 
 class AuditLogsResponse(FullRefreshCursorPaginatedResponse):
     resources: list[AuditLog] = Field(alias="audit_logs")
+
+
+class PostCommentVotesResponse(PostVotesResponse):
+    pass
