@@ -228,8 +228,8 @@ func TestQueryPlaceholderExpansion(t *testing.T) {
 	cupaloy.SnapshotT(t, buf.String())
 }
 
-// TestSimpleCapture exercises the simplest use-case of a capture first doing a full refresh
-// and subsequently capturing new rows using ["id"] as the cursor.
+// TestSimpleCapture exercises the simplest use-case of a capture first doing an initial
+// backfill and subsequently capturing new rows using ["id"] as the cursor.
 func TestSimpleCapture(t *testing.T) {
 	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
 	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
@@ -280,6 +280,265 @@ func TestAsyncCapture(t *testing.T) {
 			time.AfterFunc(5*time.Second, cancelCapture)
 			cs.Capture(captureCtx, t, nil)
 		}
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestIntegerTypes exercises discovery and capture of the integer types
+// TINYINT, SMALLINT, MEDIUMINT, INTEGER, and BIGINT.
+func TestIntegerTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        tinyint_col TINYINT,
+        smallint_col SMALLINT,
+        mediumint_col MEDIUMINT,
+        integer_col INTEGER,
+        bigint_col BIGINT
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, -128, -32768, -8388608, -2147483648, -9223372036854775808},
+			{1, 127, 32767, 8388607, 2147483647, 9223372036854775807},
+			{2, 0, 0, 0, 0, 0},
+			{3, nil, nil, nil, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestNumericTypes exercises discovery and capture of the numeric types
+// FLOAT, DOUBLE, DECIMAL, BIT, and BOOLEAN.
+func TestNumericTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        float_col FLOAT,
+        double_col DOUBLE,
+        decimal_col DECIMAL(10, 2),
+        bit_col BIT(1),
+        boolean_col BOOLEAN
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, 1.23, 2.34, 123.45, 1, true},
+			{1, -1.23, -2.34, -123.45, 0, false},
+			{2, 0.0, 0.0, 0.00, 1, true},
+			{3, nil, nil, nil, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestDateAndTimeTypes exercises discovery and capture of the date and time types
+// DATE, DATETIME, TIMESTAMP, TIME, and YEAR.
+func TestDateAndTimeTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        date_col DATE,
+        datetime_col DATETIME,
+        timestamp_col TIMESTAMP,
+        time_col TIME,
+        year_col YEAR
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, "2025-02-13", "2025-02-13 12:34:56", "2025-02-13 12:34:56", "12:34:56", 2025},
+			{1, "2000-01-01", "2000-01-01 00:00:00", "2000-01-01 00:00:00", "00:00:00", 2000},
+			{2, "1999-12-31", "1999-12-31 23:59:59", "1999-12-31 23:59:59", "23:59:59", 1999},
+			{3, nil, nil, nil, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestStringTypes exercises discovery and capture of the string types
+// CHAR, VARCHAR, TINYTEXT, TEXT, MEDIUMTEXT, and LONGTEXT.
+func TestStringTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        char_col CHAR(10),
+        varchar_col VARCHAR(255),
+        tinytext_col TINYTEXT,
+        text_col TEXT,
+        mediumtext_col MEDIUMTEXT,
+        longtext_col LONGTEXT
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, "char_val", "varchar_val", "tinytext_val", "text_val", "mediumtext_val", "longtext_val"},
+			{1, "short", "short", "short", "short", "short", "short"},
+			{2, "", "", "", "", "", ""},
+			{3, nil, nil, nil, nil, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?, ?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestBinaryTypes exercises discovery and capture of the binary types
+// BINARY, VARBINARY, TINYBLOB, BLOB, MEDIUMBLOB, and LONGBLOB.
+func TestBinaryTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        binary_col BINARY(16),
+        varbinary_col VARBINARY(255),
+        tinyblob_col TINYBLOB,
+        blob_col BLOB,
+        mediumblob_col MEDIUMBLOB,
+        longblob_col LONGBLOB
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, []byte("binary_data_1234"), []byte("varbinary_data"), []byte("tinyblob_data"), []byte("blob_data"), []byte("mediumblob_data"), []byte("longblob_data")},
+			{1, []byte("short"), []byte("short"), []byte("short"), []byte("short"), []byte("short"), []byte("short")},
+			{2, []byte(""), []byte(""), []byte(""), []byte(""), []byte(""), []byte("")},
+			{3, nil, nil, nil, nil, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?, ?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestEnumAndSetTypes exercises discovery and capture of the domain-specific string types ENUM and SET.
+func TestEnumAndSetTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        enum_col ENUM('value1', 'value2', 'value3'),
+        set_col SET('a', 'b', 'c', 'd')
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, "value1", "a,b"},
+			{1, "value2", "b,c"},
+			{2, "value3", "c,d"},
+			{3, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestSpatialTypes exercises discovery and capture of the spatial types
+// GEOMETRY, POINT, LINESTRING, and POLYGON.
+func TestSpatialTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        geometry_col GEOMETRY,
+        point_col POINT,
+        linestring_col LINESTRING,
+        polygon_col POLYGON
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, "POINT(1 1)", "POINT(1 1)", "LINESTRING(0 0, 1 1, 2 2)", "POLYGON((0 0, 1 1, 1 0, 0 0))"},
+			{1, "POINT(2 2)", "POINT(2 2)", "LINESTRING(2 2, 3 3, 4 4)", "POLYGON((1 1, 2 2, 2 1, 1 1))"},
+			{2, "POINT(3 3)", "POINT(3 3)", "LINESTRING(3 3, 4 4, 5 5)", "POLYGON((2 2, 3 3, 3 2, 2 2))"},
+			{3, nil, nil, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ST_GeomFromText(?), ST_GeomFromText(?), ST_GeomFromText(?), ST_GeomFromText(?))", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestJSONType exercises discovery and capture of the JSON column type.
+func TestJSONType(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        json_col JSON
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, `{"key1": "value1", "key2": 123, "key3": true}`},
+			{1, `"A bare string"`},
+			{2, `12345`},
+			{3, `true`},
+			{4, `null`},
+			{5, nil},
+			{6, `{"nested": {"key": "value", "array": [1, 2, 3]}}`},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }

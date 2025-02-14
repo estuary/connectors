@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test_dateandtimetypes_307398": 4 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"date_col":"2025-02-13","datetime_col":"2025-02-13 12:34:56","id":0,"time_col":"12:34:56","timestamp_col":"2025-02-13 12:34:56","year_col":2025}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"date_col":"2000-01-01","datetime_col":"2000-01-01 00:00:00","id":1,"time_col":"00:00:00","timestamp_col":"2000-01-01 00:00:00","year_col":2000}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"date_col":"1999-12-31","datetime_col":"1999-12-31 23:59:59","id":2,"time_col":"23:59:59","timestamp_col":"1999-12-31 23:59:59","year_col":1999}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"date_col":null,"datetime_col":null,"id":3,"time_col":null,"timestamp_col":null,"year_col":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_dateandtimetypes_307398":{"CursorNames":["id"],"CursorValues":[3],"LastPolled":"<TIMESTAMP>"}}}
+

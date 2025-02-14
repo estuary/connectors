@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test_enumandsettypes_344361": 4 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"enum_col":"value1","id":0,"set_col":"a,b"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"enum_col":"value2","id":1,"set_col":"b,c"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"enum_col":"value3","id":2,"set_col":"c,d"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"enum_col":null,"id":3,"set_col":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_enumandsettypes_344361":{"CursorNames":["id"],"CursorValues":[3],"LastPolled":"<TIMESTAMP>"}}}
+

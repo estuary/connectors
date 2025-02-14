@@ -1,0 +1,58 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "test_enumandsettypes_344361",
+      "schema": "test",
+      "table": "enumandsettypes_344361",
+      "cursor": [
+        "id"
+      ]
+    },
+    "resource_path": [
+      "test_enumandsettypes_344361"
+    ],
+    "collection": {
+      "name": "acmeCo/test/test_enumandsettypes_344361",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "id"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-mysql-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index"
+            ]
+          },
+          "id": {
+            "type": "integer"
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ],
+      "projections": null
+    },
+    "state_key": "test_enumandsettypes_344361"
+  }
+
