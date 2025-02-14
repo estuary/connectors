@@ -265,6 +265,24 @@
     }
   ],
   [
+    "acmeCo/post_comment_votes",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-08-01T13:19:33Z",
+      "id": 29005807715092,
+      "item_id": 29005581511700,
+      "item_type": "PostComment",
+      "post_id": 28847424303764,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/votes/29005807715092.json",
+      "user_id": 28835702984212,
+      "value": 1
+    }
+  ],
+  [
     "acmeCo/post_comments",
     {
       "_meta": {
