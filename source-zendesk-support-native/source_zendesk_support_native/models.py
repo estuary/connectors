@@ -130,6 +130,24 @@ class TimestampedResource(ZendeskResource):
     updated_at: AwareDatetime
 
 
+class IncrementalTimeExportResponse(BaseModel, extra="allow"):
+    next_page: str | None
+    count: int
+    end_of_stream: bool
+    end_time: int | None
+    resources: list[TimestampedResource]
+
+
+class OrganizationsResponse(IncrementalTimeExportResponse):
+    resources: list[TimestampedResource] = Field(alias="organizations")
+
+# Incremental time based export resources.
+# Tuples contain the name, path, and response model for each resource.
+INCREMENTAL_TIME_EXPORT_RESOURCES: list[tuple[str, str, type[IncrementalTimeExportResponse]]] = [
+    ("organizations", "organizations", OrganizationsResponse),
+]
+
+
 class IncrementalCursorExportResponse(BaseModel, extra="allow"):
     after_cursor: str | None
     end_of_stream: bool
