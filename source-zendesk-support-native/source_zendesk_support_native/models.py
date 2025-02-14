@@ -189,6 +189,10 @@ class FullRefreshOffsetPaginatedResponse(FullRefreshResponse):
     next_page: str | None
 
 
+class AccountAttributesResponse(FullRefreshOffsetPaginatedResponse):
+    resources: list[FullRefreshResource] = Field(alias="attributes")
+
+
 class SlaPoliciesResponse(FullRefreshOffsetPaginatedResponse):
     resources: list[FullRefreshResource] = Field(alias="sla_policies")
 
@@ -196,7 +200,8 @@ class SlaPoliciesResponse(FullRefreshOffsetPaginatedResponse):
 # Full refresh resources that paginted with page offsets.
 # Tuples contain the name, path, and response model for each resource.
 FULL_REFRESH_OFFSET_PAGINATED_RESOURCES: list[tuple[str, str, type[FullRefreshOffsetPaginatedResponse]]] = [
-    ("sla_policies", "slas/policies", SlaPoliciesResponse),
+        ("account_attributes", "routing/attributes", AccountAttributesResponse),
+        ("sla_policies", "slas/policies", SlaPoliciesResponse),
 ]
 
 
