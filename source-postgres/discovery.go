@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"sort"
@@ -10,6 +11,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,7 +36,14 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 	}
 	generatedColumns, err := getGeneratedColumns(ctx, db.conn)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list database generated columns: %w", err)
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "42703" {
+			// Failure is expected on pre-12 versions of PostgreSQL which don't have
+			// the 'attgenerated' column. Other errors should still be logged but
+			// also probably don't warrant a fatal error.
+			logrus.WithError(err).Warn("unable to list database generated columns")
+		}
+		generatedColumns = make(map[string][]string) // Empty map makes downstream logic simpler
 	}
 
 	// Column descriptions just add a bit of user-friendliness. They're so unimportant
