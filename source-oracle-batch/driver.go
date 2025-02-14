@@ -23,13 +23,15 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
+var (
 	// When processing large tables we like to emit checkpoints every so often. But
 	// emitting a checkpoint after every row could be a significant drag on overall
 	// throughput, and isn't really needed anyway. So instead we emit one for every
 	// N rows, plus another when the query results are fully processed.
 	documentsPerCheckpoint = 1000
+)
 
+const (
 	// We have a watchdog timeout which fires if we're sitting there waiting for query
 	// results but haven't received anything for a while. This constant specifies the
 	// duration of that timeout while waiting for for the first result row.
@@ -729,6 +731,15 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	var rowValues = make([]any, len(columnNames)+1)
 	var serializedDocument []byte
 
+	// When capturing with ORA_ROWSCN (txid), since this cursor is not unique for rows,
+	// we need to ensure we only emit a checkpoint after we have captured all of the rows
+	// with the same SCN
+	var scnCursor = len(cursorNames) == 1 && cursorNames[0] == "TXID"
+	var lastSCN any
+	if scnCursor && state.CursorValues != nil {
+		lastSCN = state.CursorValues[0]
+	}
+
 	var count int
 	for rows.Next() {
 		if err := rows.Scan(columnPointers...); err != nil {
@@ -763,7 +774,18 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		for i, j := range cursorIndices {
 			cursorValues[i] = rowValues[j]
 		}
-		state.CursorValues = cursorValues
+
+		// If ORA_ROWSCN is our cursor, only emit a checkpoint when we have captured all of the rows with the same SCN
+		if scnCursor {
+			if lastSCN == nil {
+				lastSCN = cursorValues[0]
+			} else if lastSCN != cursorValues[0] {
+				state.CursorValues = []any{lastSCN}
+				lastSCN = cursorValues[0]
+			}
+		} else {
+			state.CursorValues = cursorValues
+		}
 
 		count++
 		if count%documentsPerCheckpoint == 0 {
@@ -803,6 +825,7 @@ func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamSt
 	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 		return fmt.Errorf("error emitting checkpoint: %w", err)
 	}
+
 	return nil
 }
 

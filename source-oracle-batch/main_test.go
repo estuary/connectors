@@ -73,11 +73,79 @@ func TestBasicCapture(t *testing.T) {
 		// Run the capture over and over for 5 seconds each time until all inserts have finished, then verify results.
 		for !insertsDone.Load() {
 			var captureCtx, cancelCapture = context.WithCancel(ctx)
-			time.AfterFunc(6*time.Second, cancelCapture)
+			time.AfterFunc(5*time.Second, cancelCapture)
 			cs.Capture(captureCtx, t, nil)
 		}
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
+}
+
+type doc struct {
+	Id string `json:"ID"`
+}
+
+func TestCaptureCheckpointSCN(t *testing.T) {
+	documentsPerCheckpoint = 10
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "216995"
+	var tableName = fmt.Sprintf("c##flow_test_logminer.check_scn_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data VARCHAR(200))", tableName))
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+	t.Run("Capture", func(t *testing.T) {
+		// Insert 600 documents in 20 transactions
+		for i := 0; i < 20; i++ {
+			time.Sleep(100 * time.Millisecond)
+			// INSERT 30 documents as part of a single transaction so they share a ROWSCN
+			executeControlQuery(ctx, t, control, fmt.Sprintf(`BEGIN
+        FOR i IN (%d*30) .. (((%d+1)*30)-1)
+        LOOP
+          INSERT INTO %s VALUES (i, 'value for row ' || i);
+        END LOOP;
+      END;`, i, i, tableName))
+			log.WithField("i", i).Debug("inserted batch of rows")
+		}
+
+		var captureCtx, cancelCapture = context.WithCancel(ctx)
+		var ids = make(map[string]bool)
+
+		// On first run, capture until checkpoint. We checkpoint early by having changed `documentsPerCheckpoint` so that we don't capture all documents
+		// of the same ROWSCN in one run
+		cs.Capture(captureCtx, t, func(data json.RawMessage) {
+
+			if strings.Contains(string(data), "bindingStateV1") {
+				log.Info("cancelling capture")
+				cancelCapture()
+			} else {
+				var d doc
+				err := json.Unmarshal(data, &d)
+				require.NoError(t, err)
+				ids[d.Id] = true
+			}
+		})
+		time.Sleep(5 * time.Second)
+
+		// Then run the capture again and see if we capture all documents
+		captureCtx, cancelCapture = context.WithCancel(ctx)
+		time.AfterFunc(5*time.Second, cancelCapture)
+		cs.Capture(captureCtx, t, func(data json.RawMessage) {
+			if !strings.Contains(string(data), "bindingStateV1") {
+				var d doc
+				err := json.Unmarshal(data, &d)
+				require.NoError(t, err)
+				ids[d.Id] = true
+			}
+		})
+
+		require.Equal(t, 600, len(ids))
+	})
+
+	documentsPerCheckpoint = 1000
 }
 
 func TestBasicDatatypes(t *testing.T) {
@@ -253,13 +321,13 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 
 	var ctx = context.Background()
 	var endpointSpec = testConfig(ctx, t)
-	endpointSpec.Advanced.PollSchedule = "1s"
+	endpointSpec.Advanced.PollSchedule = "200s"
 
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
-	sanitizers[`"TXID":999999`] = regexp.MustCompile(`"TXID":"[0-9]+"`)
+	sanitizers[`"TXID":"999999"`] = regexp.MustCompile(`"TXID":"[0-9]+"`)
 	sanitizers[`"CursorNames":["txid"],"CursorValues":[999999]`] = regexp.MustCompile(`"CursorNames":\["txid"\],"CursorValues":\["[0-9]+\"]`)
 
 	return &st.CaptureSpec{
