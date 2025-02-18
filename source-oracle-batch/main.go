@@ -135,6 +135,13 @@ const tableQueryTemplate = `{{if .IsFirstQuery -}}
     ORDER BY ORA_ROWSCN
 {{- end}}`
 
+func selectQueryTemplate(res *Resource) (string, error) {
+	if res.Template != "" {
+		return res.Template, nil
+	}
+	return tableQueryTemplate, nil
+}
+
 func quoteTableName(schema, table string) string {
 	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
 }
@@ -168,12 +175,12 @@ func translateOracleValue(val any, databaseTypeName string) (any, error) {
 }
 
 var oracleDriver = &BatchSQLDriver{
-	DocumentationURL:     "https://go.estuary.dev/source-oracle-batch",
-	ConfigSchema:         generateConfigSchema(),
-	Connect:              connectOracle,
-	GenerateResource:     generateOracleResource,
-	TranslateValue:       translateOracleValue,
-	DefaultQueryTemplate: tableQueryTemplate,
+	DocumentationURL:    "https://go.estuary.dev/source-oracle-batch",
+	ConfigSchema:        generateConfigSchema(),
+	Connect:             connectOracle,
+	GenerateResource:    generateOracleResource,
+	TranslateValue:      translateOracleValue,
+	SelectQueryTemplate: selectQueryTemplate,
 }
 
 func generateConfigSchema() json.RawMessage {

@@ -5,5 +5,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"c__flow_test_logminer_basic_datatypes_13111208":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"c__flow_test_logminer_basic_datatypes_13111208":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
 

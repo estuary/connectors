@@ -5,7 +5,7 @@ Binding 0:
       "owner": "C##FLOW_TEST_LOGMINER",
       "table": "FLOAT_NANS_10511",
       "cursor": [
-        "txid"
+        "TXID"
       ]
     },
     "resource_path": [

@@ -5,7 +5,7 @@ Binding 0:
       "owner": "C##FLOW_TEST_LOGMINER",
       "table": "SCHEMA_FILTERING_22492",
       "cursor": [
-        "txid"
+        "TXID"
       ]
     },
     "resource_path": [
