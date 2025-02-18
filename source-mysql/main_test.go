@@ -505,6 +505,28 @@ func TestAlterTable_AddUnsignedColumn(t *testing.T) {
 	t.Run("rebackfilled", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+// TestAlterTable_RenameColumnCaseInsensitive verifies that column renames work correctly
+// even when the ALTER TABLE query uses different capitalization than the original column
+// definition. MySQL always treats column identifiers as case-insensitive.
+func TestAlterTable_RenameColumnCaseInsensitive(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "41432361"
+	var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, dataColumn TEXT)")
+	tb.Insert(ctx, t, table, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Use different capitalization in the rename query
+	tb.Insert(ctx, t, table, [][]interface{}{{3, "ccc"}})
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s RENAME COLUMN `DATACOLUMN` TO `new_data`;", table))
+	tb.Insert(ctx, t, table, [][]interface{}{{4, "ddd"}})
+	t.Run("renamed", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Verify schema discovery still works after the rename
+	t.Run("discover", func(t *testing.T) { tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID)) })
+}
+
 func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
