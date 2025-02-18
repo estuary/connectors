@@ -254,10 +254,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"c__flow_test_logminer_basic_capture_826935":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
-# ================================
-# Captures Terminated With Errors
-# ================================
-capture terminated with error: error polling binding "c__flow_test_logminer_basic_capture_826935": error processing results iterator: ORA-01013: user requested cancel of current operation
-
+{"bindingStateV1":{"c__flow_test_logminer_basic_capture_826935":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
 
