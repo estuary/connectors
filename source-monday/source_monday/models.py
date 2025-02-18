@@ -40,10 +40,6 @@ else:
 
 
 class EndpointConfig(BaseModel):
-    subdomain: str = Field(
-        title="Subdomain",
-        description="This is your Monday subdomain that can be found in your Monday account URL. For example, in https://{MY_SUBDOMAIN}.monday.com, where MY_SUBDOMAIN is the value of your subdomain.",
-    )
     credentials: OAuth2Credentials | AccessToken = Field(
         title="Authentication",
         discriminator="credentials_title",

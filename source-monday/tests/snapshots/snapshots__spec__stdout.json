@@ -58,11 +58,6 @@
         }
       },
       "properties": {
-        "subdomain": {
-          "description": "This is your Monday subdomain that can be found in your Monday account URL. For example, in https://{MY_SUBDOMAIN}.monday.com, where MY_SUBDOMAIN is the value of your subdomain.",
-          "title": "Subdomain",
-          "type": "string"
-        },
         "credentials": {
           "discriminator": {
             "mapping": {
@@ -83,7 +78,6 @@
         }
       },
       "required": [
-        "subdomain",
         "credentials"
       ],
       "title": "EndpointConfig",
@@ -115,14 +109,14 @@
     "documentationUrl": "https://docs.estuary.dev",
     "oauth2": {
       "provider": "monday",
-      "authUrlTemplate": "https://api.monday.com/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "authUrlTemplate": "https://auth.monday.com/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
       "accessTokenUrlTemplate": "https://auth.monday.com/oauth2/token",
-      "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"code\": \"{{{ code }}}\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\", \"scope\": \"read\"}",
+      "accessTokenBody": "client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
       "accessTokenHeaders": {
-        "content-type": "application/json"
+        "content-type": "application/x-www-form-urlencoded"
       },
       "accessTokenResponseMap": {
-        "access_token": "/token"
+        "access_token": "/access_token"
       }
     },
     "resourcePathPointers": [
