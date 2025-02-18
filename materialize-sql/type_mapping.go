@@ -411,7 +411,7 @@ type constrainter struct {
 	dialect Dialect
 }
 
-func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, fc json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	_, isNumeric := boilerplate.AsFormattedNumeric(p)
 
 	var constraint = pm.Response_Validated_Constraint{}
@@ -449,10 +449,10 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 		constraint.Reason = "This field is able to be materialized"
 	}
 
-	return &constraint
+	return &constraint, nil
 }
 
-func (c constrainter) compatibleType(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+func (c constrainter) compatibleType(existing boilerplate.ExistingField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
 	proj := buildProjection(proposed, rawFieldConfig)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
@@ -473,7 +473,7 @@ func (c constrainter) compatibleType(existing boilerplate.EndpointField, propose
 	return isCompatibleType, nil
 }
 
-func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
+func (c constrainter) migratable(existing boilerplate.ExistingField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
 	if proposed.IsRootDocumentProjection() {
 		// Do not allow migration of the root document column. There is
 		// currently no known case where this would be useful, and in cases of
@@ -497,7 +497,7 @@ func (c constrainter) migratable(existing boilerplate.EndpointField, proposed *p
 	return false, nil, nil
 }
 
-func (c constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
+func (c constrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
 	if compatible, err := c.compatibleType(existing, proposed, rawFieldConfig); err != nil {
 		return false, err
 	} else if compatible {

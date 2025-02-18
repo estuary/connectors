@@ -9,7 +9,6 @@ import (
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 )
 
 type client struct {
@@ -27,11 +26,11 @@ type indexSettings struct {
 }
 
 type indexMappings struct {
-	Properties map[string]property `json:"properties"`
+	Properties map[string]mappedProperty `json:"properties"`
 }
 
 // createIndex creates a new index and sets its mappings per indexProps if it doesn't already exist.
-func (c *client) createIndex(ctx context.Context, index string, shards *int, replicas *int, indexProps map[string]property) error {
+func (c *client) createIndex(ctx context.Context, index string, shards *int, replicas *int, indexProps map[string]mappedProperty) error {
 	existResp, err := c.es.Indices.Exists(
 		[]string{index},
 		c.es.Indices.Exists.WithContext(ctx),
@@ -91,10 +90,10 @@ func (c *client) deleteIndex(ctx context.Context, index string) error {
 	return nil
 }
 
-func (c *client) addMappingToIndex(ctx context.Context, index string, field string, prop property) error {
+func (c *client) addMappingToIndex(ctx context.Context, index string, field string, prop mappedProperty) error {
 	res, err := c.es.Indices.PutMapping(
 		[]string{index},
-		esutil.NewJSONReader(map[string]map[string]property{"properties": {field: prop}}),
+		esutil.NewJSONReader(map[string]map[string]mappedProperty{"properties": {field: prop}}),
 		c.es.Indices.PutMapping.WithContext(ctx),
 	)
 	if err != nil {
@@ -106,56 +105,6 @@ func (c *client) addMappingToIndex(ctx context.Context, index string, field stri
 	}
 
 	return nil
-}
-
-type indexMetaResponse struct {
-	Mappings struct {
-		Properties map[string]property `json:"properties"`
-	} `json:"mappings"`
-}
-
-func (c *client) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error) {
-	res, err := c.es.Indices.Get(
-		[]string{"*"}, // Get info for all indices the connector has access to.
-		c.es.Indices.Get.WithContext(ctx),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("getting index metadata: %w", err)
-	}
-	defer res.Body.Close()
-	if res.IsError() {
-		return nil, fmt.Errorf("getting index metadata error response [%s] %s", res.Status(), res.String())
-	}
-
-	is := boilerplate.NewInfoSchema(
-		func(rp []string) []string {
-			// Pass-through the index name as-is, since it is the only component of the resource
-			// path and the required transformations are assumed to already be done as part of the
-			// Validate response.
-			return rp
-		},
-		translateField,
-	)
-
-	var indexMeta map[string]indexMetaResponse
-	if err := json.NewDecoder(res.Body).Decode(&indexMeta); err != nil {
-		return nil, fmt.Errorf("decoding index metadata response: %w", err)
-	}
-
-	for index, meta := range indexMeta {
-		is.PushResource(index)
-
-		for field, prop := range meta.Mappings.Properties {
-			is.PushField(boilerplate.EndpointField{
-				Name:               field,
-				Nullable:           true,
-				Type:               string(prop.Type),
-				CharacterMaxLength: 0,
-			}, index)
-		}
-	}
-
-	return is, nil
 }
 
 func (c *client) isServerless(ctx context.Context) (bool, error) {

@@ -3,91 +3,45 @@
     "$schema": "http://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-elasticsearch/config",
     "properties": {
+      "credentials": {
+        "properties": {
+          "username": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          },
+          "apiKey": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object"
+      },
       "endpoint": {
-        "type": "string",
-        "title": "Endpoint",
-        "description": "Endpoint host or URL. Must start with http:// or https://. If using Elastic Cloud this follows the format https://CLUSTER_ID.REGION.CLOUD_PLATFORM.DOMAIN:PORT",
-        "pattern": "^(http://|https://).+$",
-        "order": 0
+        "type": "string"
       },
       "hardDelete": {
-        "type": "boolean",
-        "title": "Hard Delete",
-        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
-        "default": false,
-        "order": 1
-      },
-      "credentials": {
-        "type": "object",
-        "order": 1,
-        "oneOf": [
-          {
-            "type": "object",
-            "title": "Username and Password",
-            "properties": {
-              "username": {
-                "type": "string",
-                "title": "Username",
-                "description": "Username to use with the Elasticsearch API."
-              },
-              "password": {
-                "type": "string",
-                "secret": true,
-                "title": "Password",
-                "description": "Password for the user."
-              }
-            },
-            "required": [
-              "username",
-              "password"
-            ]
-          },
-          {
-            "type": "object",
-            "title": "API Key",
-            "properties": {
-              "apiKey": {
-                "type": "string",
-                "secret": true,
-                "title": "API Key",
-                "description": "API key for authenticating with the Elasticsearch API. Must be the 'encoded' API key credentials, which is the Base64-encoding of the UTF-8 representation of the id and api_key joined by a colon (:)."
-              }
-            },
-            "required": [
-              "apiKey"
-            ]
-          }
-        ]
+        "type": "boolean"
       },
       "advanced": {
         "properties": {
           "number_of_replicas": {
-            "type": "integer",
-            "title": "Index Replicas",
-            "description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+            "type": "integer"
           }
         },
-        "type": "object",
-        "title": "Advanced Options",
-        "description": "Options for advanced users. You should not typically need to modify these.",
-        "advanced": true
+        "additionalProperties": false,
+        "type": "object"
       },
       "networkTunnel": {
         "properties": {
           "sshForwarding": {
             "properties": {
               "sshEndpoint": {
-                "type": "string",
-                "title": "SSH Endpoint",
-                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
-                "pattern": "^ssh://.+@.+$"
+                "type": "string"
               },
               "privateKey": {
-                "type": "string",
-                "title": "SSH Private Key",
-                "description": "Private key to connect to the remote SSH server.",
-                "multiline": true,
-                "secret": true
+                "type": "string"
               }
             },
             "additionalProperties": false,
@@ -95,22 +49,19 @@
             "required": [
               "sshEndpoint",
               "privateKey"
-            ],
-            "title": "SSH Forwarding"
+            ]
           }
         },
         "additionalProperties": false,
-        "type": "object",
-        "title": "Network Tunnel",
-        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+        "type": "object"
       }
     },
     "type": "object",
     "required": [
-      "endpoint",
-      "credentials"
+      "credentials",
+      "endpoint"
     ],
-    "title": "Elasticsearch Connection"
+    "title": "configSchema"
   },
   "resource_config_schema_json": {
     "$schema": "http://json-schema.org/draft/2020-12/schema",
@@ -137,7 +88,7 @@
       "index",
       "delta_updates"
     ],
-    "title": "Elasticsearch Index"
+    "title": "resourceConfigSchema"
   },
   "documentation_url": "https://go.estuary.dev/materialize-elasticsearch"
 }

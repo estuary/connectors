@@ -437,11 +437,7 @@ func (t *transactor) addBinding(
 	allColumns := target.Columns()
 	columnMetas := make([]varcharColumnMeta, len(allColumns))
 	for idx, col := range allColumns {
-		existing, err := is.GetField(target.Path, col.Field)
-		if err != nil {
-			return fmt.Errorf("getting existing column metadata: %w", err)
-		}
-
+		existing := is.GetResource(target.Path).GetField(col.Field)
 		if existing.Type == "character varying" {
 			columnMetas[idx] = varcharColumnMeta{
 				identifier: col.Identifier,

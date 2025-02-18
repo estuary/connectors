@@ -11,7 +11,9 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
@@ -50,7 +52,7 @@ type binding struct {
 }
 
 type transactor struct {
-	cfg          *config
+	hardDelete   bool
 	client       *client
 	bindings     []binding
 	isServerless bool
@@ -59,6 +61,9 @@ type transactor struct {
 	indexToBinding map[string]int
 }
 
+func (t *transactor) Open(ctx context.Context, req pm.Request_Open) (boilerplate.RuntimeCheckpoint, error) {
+	return nil, nil
+}
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
@@ -209,7 +214,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var action string
 		var bodyReader *bytes.Reader = bytes.NewReader([]byte{})
-		if it.Delete && t.cfg.HardDelete {
+		if it.Delete && t.hardDelete {
 			if it.Exists {
 				action = "delete"
 			} else {

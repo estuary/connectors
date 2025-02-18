@@ -28,82 +28,50 @@ func TestInfoSchema(t *testing.T) {
 
 	is := NewInfoSchema(transformPath, transform)
 
-	nullableField := EndpointField{
+	nullableField := ExistingField{
 		Name:               transform("nullableField"),
 		Nullable:           true,
 		Type:               transform("string"),
 		CharacterMaxLength: 0,
 	}
 	loc1 := []string{"first", "location"}
+	res1 := is.PushResource(transformPath(loc1)...)
+	// Idempotent resource pushing.
+	require.Equal(t, res1, is.PushResource(transformPath(loc1)...))
 
-	nonNullableField := EndpointField{
+	nonNullableField := ExistingField{
 		Name:               transform("nonNullableField"),
 		Nullable:           false,
 		Type:               transform("integer"),
 		CharacterMaxLength: 0,
 	}
 	loc2 := []string{"second", "location"}
+	res2 := is.PushResource(transformPath(loc2)...)
 
-	is.PushField(nullableField, transformPath(loc1)...)
-	is.PushField(nonNullableField, transformPath(loc2)...)
-
-	loc3 := []string{"third", "location"}
-
-	is.PushResource(transformPath(loc3)...)
+	res1.PushField(nullableField)
+	res2.PushField(nonNullableField)
 
 	t.Run("can't push a duplicate", func(t *testing.T) {
-		require.Panics(t, func() { is.PushField(nullableField, transformPath(loc1)...) })
+		require.Panics(t, func() { res1.PushField(nullableField) })
 	})
 
 	t.Run("GetField", func(t *testing.T) {
 		// Gets the first field alright.
-		got, err := is.GetField(loc1, untransform(nullableField.Name))
-		require.NoError(t, err)
-		require.Equal(t, nullableField, got)
+		got := res1.GetField(untransform(nullableField.Name))
+		require.Equal(t, nullableField, *got)
 
 		// Also gets the second field.
-		got, err = is.GetField(loc2, untransform(nonNullableField.Name))
-		require.NoError(t, err)
-		require.Equal(t, nonNullableField, got)
+		got = res2.GetField(untransform(nonNullableField.Name))
+		require.Equal(t, nonNullableField, *got)
 
-		// Wrong path.
-		got, err = is.GetField(loc2, untransform(nullableField.Name))
-		require.Equal(t, EndpointField{}, got)
-		require.Error(t, err)
-
-		// Right path but wrong field.
-		got, err = is.GetField(loc1, untransform(nullableField.Name)+"d'oh")
-		require.Equal(t, EndpointField{}, got)
-		require.Error(t, err)
-
-		// Bogus path.
-		got, err = is.GetField([]string{"d'", "oh"}, untransform(nullableField.Name))
-		require.Equal(t, EndpointField{}, got)
-		require.Error(t, err)
-	})
-
-	t.Run("HasField", func(t *testing.T) {
-		require.True(t, is.HasField(loc1, untransform(nullableField.Name)))
-		require.False(t, is.HasField([]string{"d'", "oh"}, untransform(nullableField.Name)))
-		require.False(t, is.HasField(loc1, untransform(nullableField.Name)+"d'oh"))
-	})
-
-	t.Run("HasResource", func(t *testing.T) {
-		require.True(t, is.HasResource(loc1))
-		require.False(t, is.HasResource([]string{"d'", "oh"}))
-		require.True(t, is.HasResource(loc3))
-	})
-
-	t.Run("FieldsForResource", func(t *testing.T) {
-		// Exists.
-		got, err := is.FieldsForResource(loc1)
-		require.NoError(t, err)
-		require.Len(t, got, 1)
-
-		// Doesn't exist - wrong resource path.
-		got, err = is.FieldsForResource([]string{"d'", "oh"})
-		require.Error(t, err)
+		// Resource doesn't have the field.
+		got = res2.GetField(untransform(nullableField.Name))
 		require.Nil(t, got)
+	})
+
+	t.Run("AllFields", func(t *testing.T) {
+		got := res1.AllFields()
+		require.Len(t, got, 1)
 	})
 
 	t.Run("InSelectedFields", func(t *testing.T) {

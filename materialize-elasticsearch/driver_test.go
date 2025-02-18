@@ -42,7 +42,7 @@ func TestValidateAndApply(t *testing.T) {
 
 	boilerplate.RunValidateAndApplyTestCases(
 		t,
-		driver{},
+		&driver{},
 		cfg,
 		resourceConfig,
 		func(t *testing.T) string {
