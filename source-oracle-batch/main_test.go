@@ -44,6 +44,7 @@ func TestSpec(t *testing.T) {
 }
 
 func TestBasicCapture(t *testing.T) {
+	documentsPerCheckpoint = 50
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "826935"
@@ -70,14 +71,26 @@ func TestBasicCapture(t *testing.T) {
 			insertsDone.Store(true)
 		}()
 
+		var ids = make(map[string]bool)
 		// Run the capture over and over for 5 seconds each time until all inserts have finished, then verify results.
 		for !insertsDone.Load() {
 			var captureCtx, cancelCapture = context.WithCancel(ctx)
 			time.AfterFunc(5*time.Second, cancelCapture)
-			cs.Capture(captureCtx, t, nil)
+			cs.Capture(captureCtx, t, func(data json.RawMessage) {
+				if !strings.Contains(string(data), "bindingStateV1") {
+					var d doc
+					err := json.Unmarshal(data, &d)
+					require.NoError(t, err)
+					ids[d.Id] = true
+				}
+			})
 		}
+
+		require.Equal(t, 250, len(ids))
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
+
+	documentsPerCheckpoint = 1000
 }
 
 type doc struct {
@@ -117,7 +130,6 @@ func TestCaptureCheckpointSCN(t *testing.T) {
 		// On first run, capture until checkpoint. We checkpoint early by having changed `documentsPerCheckpoint` so that we don't capture all documents
 		// of the same ROWSCN in one run
 		cs.Capture(captureCtx, t, func(data json.RawMessage) {
-
 			if strings.Contains(string(data), "bindingStateV1") {
 				log.Info("cancelling capture")
 				cancelCapture()
@@ -314,6 +326,8 @@ func executeControlQuery(ctx context.Context, t testing.TB, client *sql.DB, quer
 }
 
 func testCaptureSpec(t testing.TB) *st.CaptureSpec {
+	TestShutdownAfterQuery = true
+
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
@@ -321,14 +335,14 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 
 	var ctx = context.Background()
 	var endpointSpec = testConfig(ctx, t)
-	endpointSpec.Advanced.PollSchedule = "200s"
+	endpointSpec.Advanced.PollSchedule = "200ms"
 
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
 	sanitizers[`"TXID":"999999"`] = regexp.MustCompile(`"TXID":"[0-9]+"`)
-	sanitizers[`"CursorNames":["txid"],"CursorValues":[999999]`] = regexp.MustCompile(`"CursorNames":\["txid"\],"CursorValues":\["[0-9]+\"]`)
+	sanitizers[`"CursorNames":["TXID"],"CursorValues":[999999]`] = regexp.MustCompile(`"CursorNames":\["TXID"\],"CursorValues":\["[0-9]+\"]`)
 
 	return &st.CaptureSpec{
 		Driver:       oracleDriver,
