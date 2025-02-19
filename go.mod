@@ -1,8 +1,6 @@
 module github.com/estuary/connectors
 
-go 1.22.4
-
-toolchain go1.22.5
+go 1.24.0
 
 require (
 	cloud.google.com/go v0.115.0
@@ -56,6 +54,7 @@ require (
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pinecone-io/go-pinecone v1.1.1
 	github.com/pkg/sftp v1.13.6
+	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 	github.com/segmentio/encoding v0.4.0
 	github.com/senseyeio/duration v0.0.0-20180430131211-7c2a214ada46
 	github.com/sijms/go-ora/v2 v2.8.19
@@ -79,6 +78,7 @@ require (
 	google.golang.org/genproto v0.0.0-20240610135401-a8a62080eff3
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
+	gopkg.in/yaml.v3 v3.0.1
 	vitess.io/vitess v0.15.3
 )
 
@@ -199,7 +199,6 @@ require (
 	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_golang v1.19.1 // indirect
 	github.com/prometheus/client_model v0.6.1 // indirect
 	github.com/prometheus/common v0.54.0 // indirect
@@ -249,7 +248,6 @@ require (
 	gopkg.in/jcmturner/dnsutils.v1 v1.0.1 // indirect
 	gopkg.in/jcmturner/gokrb5.v6 v6.1.1 // indirect
 	gopkg.in/jcmturner/rpc.v1 v1.1.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 	gotest.tools/gotestsum v1.8.2 // indirect
 	k8s.io/apimachinery v0.23.17 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
