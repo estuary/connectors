@@ -38,7 +38,7 @@ Binding 0:
             "type": "string"
           },
           "_meta": {
-            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/source-oracle-batch/document-metadata",
             "properties": {
               "polled": {

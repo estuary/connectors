@@ -60,7 +60,7 @@ type advancedConfig struct {
 // instead of being generated from the structs.
 func configSchema() json.RawMessage {
 	var schemaStr = `{
-		"$schema": "http://json-schema.org/draft/2020-12/schema",
+		"$schema": "https://json-schema.org/draft/2020-12/schema",
 		"$id": "https://github.com/estuary/connectors/materialize-elasticsearch/config",
 		"properties": {
 		  "endpoint": {

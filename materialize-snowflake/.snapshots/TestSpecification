@@ -1,6 +1,6 @@
 {
   "config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-snowflake/config",
     "properties": {
       "host": {
@@ -233,7 +233,7 @@
     "title": "SQL Connection"
   },
   "resource_config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-snowflake/table-config",
     "properties": {
       "table": {

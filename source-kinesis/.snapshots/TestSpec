@@ -1,6 +1,6 @@
 {
   "config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-kinesis/config",
     "properties": {
       "region": {
@@ -40,7 +40,7 @@
     "title": "Kinesis"
   },
   "resource_config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-kinesis/resource",
     "properties": {
       "stream": {

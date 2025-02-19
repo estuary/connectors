@@ -12,7 +12,7 @@ Binding 0:
       ],
       "properties": {
         "_meta": {
-          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://github.com/estuary/connectors/source-firestore/document-metadata",
           "properties": {
             "path": {
@@ -76,7 +76,7 @@ Binding 1:
       ],
       "properties": {
         "_meta": {
-          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://github.com/estuary/connectors/source-firestore/document-metadata",
           "properties": {
             "path": {
@@ -140,7 +140,7 @@ Binding 2:
       ],
       "properties": {
         "_meta": {
-          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://github.com/estuary/connectors/source-firestore/document-metadata",
           "properties": {
             "path": {
@@ -204,7 +204,7 @@ Binding 3:
       ],
       "properties": {
         "_meta": {
-          "$schema": "http://json-schema.org/draft/2020-12/schema",
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
           "$id": "https://github.com/estuary/connectors/source-firestore/document-metadata",
           "properties": {
             "path": {
