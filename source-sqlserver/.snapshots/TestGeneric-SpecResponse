@@ -42,11 +42,6 @@
       },
       "advanced": {
         "properties": {
-          "watermarksTable": {
-            "type": "string",
-            "description": "The name of the table used for watermark writes during backfills. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
-            "default": "dbo.flow_watermarks"
-          },
           "skip_backfills": {
             "type": "string",
             "title": "Skip Backfills",
@@ -84,6 +79,11 @@
             "type": "string",
             "title": "Feature Flags",
             "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          },
+          "watermarksTable": {
+            "type": "string",
+            "description": "This property is deprecated for new captures as they will no longer use watermark writes by default. The name of the table used for watermark writes during backfills. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
+            "default": "dbo.flow_watermarks"
           }
         },
         "additionalProperties": false,
