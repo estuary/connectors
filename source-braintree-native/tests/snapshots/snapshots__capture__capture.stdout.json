@@ -198,6 +198,7 @@
         "last_4": "1881",
         "payroll": "Unknown",
         "prepaid": "No",
+        "prepaid_reloadable": "Unknown",
         "product_id": "Unknown",
         "token": "haq682e0",
         "unique_number_identifier": "e5eee7178906142775d0d7fc48d66fb0",
@@ -227,6 +228,7 @@
         "last_4": "1881",
         "payroll": "Unknown",
         "prepaid": "No",
+        "prepaid_reloadable": "Unknown",
         "product_id": "Unknown",
         "token": "haq682e0",
         "unique_number_identifier": "e5eee7178906142775d0d7fc48d66fb0",
@@ -515,8 +517,14 @@
       "reference_number": null,
       "reply_by_date": "2024-12-02",
       "response_deadline": "2024-12-01T05:59:59Z",
-      "status": "disputed",
+      "status": "lost",
       "status_history": [
+        {
+          "disbursement_date": null,
+          "effective_date": "2025-01-31",
+          "status": "lost",
+          "timestamp": "2025-01-31T06:18:52Z"
+        },
         {
           "disbursement_date": null,
           "effective_date": "2024-11-26",
@@ -552,7 +560,7 @@
         "payment_instrument_subtype": "Visa",
         "purchase_order_number": "123654"
       },
-      "updated_at": "2024-11-26T14:26:30Z"
+      "updated_at": "2025-01-31T06:18:52Z"
     }
   ],
   [
@@ -681,6 +689,7 @@
             "last_4": "1881",
             "payroll": "Unknown",
             "prepaid": "No",
+            "prepaid_reloadable": "Unknown",
             "product_id": "Unknown",
             "token": "haq682e0",
             "unique_number_identifier": "e5eee7178906142775d0d7fc48d66fb0",
@@ -710,6 +719,7 @@
             "last_4": "1881",
             "payroll": "Unknown",
             "prepaid": "No",
+            "prepaid_reloadable": "Unknown",
             "product_id": "Unknown",
             "token": "haq682e0",
             "unique_number_identifier": "e5eee7178906142775d0d7fc48d66fb0",
@@ -981,6 +991,7 @@
           "last_4": "8028",
           "payroll": "Unknown",
           "prepaid": "Unknown",
+          "prepaid_reloadable": "Unknown",
           "product_id": "Unknown",
           "subscriptions": [],
           "token": "k55e5psg",
@@ -1031,6 +1042,7 @@
           "last_4": "8028",
           "payroll": "Unknown",
           "prepaid": "Unknown",
+          "prepaid_reloadable": "Unknown",
           "product_id": "Unknown",
           "subscriptions": [],
           "token": "k55e5psg",
