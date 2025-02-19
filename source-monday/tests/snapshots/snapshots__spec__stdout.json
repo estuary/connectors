@@ -23,6 +23,19 @@
           "title": "AccessToken",
           "type": "object"
         },
+        "Advanced": {
+          "properties": {
+            "limit": {
+              "default": 1,
+              "description": "Limit used in queries for incremental streams. This should be left as the default value unless connector errors indicate a smaller limit is required.",
+              "exclusiveMinimum": 0,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
         "_OAuth2Credentials": {
           "properties": {
             "credentials_title": {
@@ -75,6 +88,12 @@
             }
           ],
           "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [

@@ -17,12 +17,44 @@
       "picture_url": "https://cdn.monday.com/images/dapulse_team_default.png",
       "users": [
         {
-          "account": {
-            "id": "27925687"
-          },
           "id": "71985416"
         }
       ]
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "birthday": null,
+      "country_code": "US",
+      "created_at": "2025-02-07T20:03:21Z",
+      "email": "justin@estuary.dev",
+      "enabled": true,
+      "id": "71985416",
+      "is_admin": true,
+      "is_guest": false,
+      "is_pending": false,
+      "is_verified": true,
+      "is_view_only": false,
+      "join_date": null,
+      "location": null,
+      "mobile_phone": null,
+      "name": "Justin Smith",
+      "phone": "",
+      "photo_original": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_small": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_thumb": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_thumb_small": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_tiny": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "time_zone_identifier": "America/Chicago",
+      "title": null,
+      "url": "https://estuarydev.monday.com/users/71985416",
+      "utc_hours_diff": -6
     }
   ],
   [
@@ -39,794 +71,281 @@
     }
   ],
   [
-    "acmeCo/items",
+    "acmeCo/boards",
     {
       "_meta": {
-        "op": "c",
-        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "board": {
-        "id": "8479227267",
-        "name": "Subitems of Test 1"
-      },
-      "column_values": [
+      "board_kind": "public",
+      "columns": [
         {
+          "archived": false,
+          "description": null,
+          "id": "name",
+          "settings_str": "{}",
+          "title": "Name",
+          "type": "name",
+          "width": 300
+        },
+        {
+          "archived": false,
+          "description": null,
           "id": "person",
-          "text": "",
-          "value": null
+          "settings_str": "{}",
+          "title": "Owner",
+          "type": "people",
+          "width": 98
         },
         {
+          "archived": false,
+          "description": null,
           "id": "status",
-          "text": null,
-          "value": null
+          "settings_str": "{\"done_colors\":[1],\"hide_footer\":true,\"labels\":{\"0\":\"Working on it\",\"1\":\"Done\",\"2\":\"Stuck\"},\"labels_positions_v2\":{\"0\":1,\"1\":2,\"2\":0,\"3\":3,\"4\":4,\"5\":9,\"6\":5,\"8\":6,\"9\":7,\"10\":8},\"labels_colors\":{\"0\":{\"color\":\"#fdab3d\",\"border\":\"#e99729\",\"var_name\":\"orange\"},\"1\":{\"color\":\"#00c875\",\"border\":\"#00b461\",\"var_name\":\"green-shadow\"},\"2\":{\"color\":\"#df2f4a\",\"border\":\"#ce3048\",\"var_name\":\"red-shadow\"}}}",
+          "title": "Status",
+          "type": "status",
+          "width": 136
         },
         {
+          "archived": false,
+          "description": null,
           "id": "date0",
-          "text": "",
-          "value": null
+          "settings_str": "{}",
+          "title": "Date",
+          "type": "date",
+          "width": 140
         }
       ],
-      "created_at": "2025-02-14T16:17:02Z",
+      "communication": null,
       "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
+        "id": "71985416"
       },
-      "group": {
-        "id": "topics",
-        "title": "Subitems"
+      "description": null,
+      "groups": [
+        {
+          "archived": false,
+          "color": "#579bfc",
+          "deleted": false,
+          "id": "topics",
+          "position": "65536",
+          "title": "Subitems"
+        }
+      ],
+      "id": "8479227267",
+      "name": "Subitems of Dev Board",
+      "owners": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "permissions": "everyone",
+      "state": "active",
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "tags": [],
+      "top_group": {
+        "id": "topics"
       },
-      "id": "8484676209",
-      "name": "Subitem 1",
-      "updated_at": "2025-02-14T16:17:02Z"
+      "type": "sub_items_board",
+      "updated_at": "2025-02-19T22:44:13Z",
+      "updates": [],
+      "views": [],
+      "workspace": {
+        "description": null,
+        "id": "9823810",
+        "kind": "open",
+        "name": "Main workspace"
+      }
     }
   ],
   [
-    "acmeCo/items",
+    "acmeCo/boards",
     {
       "_meta": {
-        "op": "c",
-        "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "board": {
-        "id": "8479227267",
-        "name": "Subitems of Test 1"
-      },
-      "column_values": [
+      "board_kind": "public",
+      "columns": [
         {
+          "archived": false,
+          "description": null,
+          "id": "name",
+          "settings_str": "{}",
+          "title": "Name",
+          "type": "name",
+          "width": 300
+        },
+        {
+          "archived": false,
+          "description": null,
           "id": "person",
-          "text": "",
-          "value": null
+          "settings_str": "{}",
+          "title": "Owner",
+          "type": "people",
+          "width": 98
         },
         {
+          "archived": false,
+          "description": null,
           "id": "status",
-          "text": null,
-          "value": null
+          "settings_str": "{\"done_colors\":[1],\"hide_footer\":true,\"labels\":{\"0\":\"Working on it\",\"1\":\"Done\",\"2\":\"Stuck\"},\"labels_positions_v2\":{\"0\":1,\"1\":2,\"2\":0,\"3\":3,\"4\":4,\"5\":9,\"6\":5,\"8\":6,\"9\":7,\"10\":8},\"labels_colors\":{\"0\":{\"color\":\"#fdab3d\",\"border\":\"#e99729\",\"var_name\":\"orange\"},\"1\":{\"color\":\"#00c875\",\"border\":\"#00b461\",\"var_name\":\"green-shadow\"},\"2\":{\"color\":\"#df2f4a\",\"border\":\"#ce3048\",\"var_name\":\"red-shadow\"}}}",
+          "title": "Status",
+          "type": "status",
+          "width": 136
         },
         {
+          "archived": false,
+          "description": null,
           "id": "date0",
-          "text": "",
-          "value": null
+          "settings_str": "{}",
+          "title": "Date",
+          "type": "date",
+          "width": 140
         }
       ],
-      "created_at": "2025-02-14T16:17:24Z",
+      "communication": null,
       "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
+        "id": "71985416"
       },
-      "group": {
-        "id": "topics",
-        "title": "Subitems"
+      "description": null,
+      "groups": [
+        {
+          "archived": false,
+          "color": "#579bfc",
+          "deleted": false,
+          "id": "topics",
+          "position": "65536",
+          "title": "Subitems"
+        }
+      ],
+      "id": "8483610893",
+      "name": "Subitems of Estuary",
+      "owners": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "permissions": "everyone",
+      "state": "active",
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "tags": [],
+      "top_group": {
+        "id": "topics"
       },
-      "id": "8484679547",
-      "name": "another",
-      "updated_at": "2025-02-14T16:17:25Z"
+      "type": "sub_items_board",
+      "updated_at": "2025-02-14T14:34:12Z",
+      "updates": [],
+      "views": [],
+      "workspace": {
+        "description": null,
+        "id": "9823810",
+        "kind": "open",
+        "name": "Main workspace"
+      }
     }
   ],
   [
-    "acmeCo/items",
+    "acmeCo/boards",
     {
       "_meta": {
-        "op": "c",
-        "row_id": 2,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "board": {
-        "id": "8479227267",
-        "name": "Subitems of Test 1"
-      },
-      "column_values": [
+      "board_kind": "public",
+      "columns": [
         {
+          "archived": false,
+          "description": null,
+          "id": "name",
+          "settings_str": "{}",
+          "title": "Name",
+          "type": "name",
+          "width": 400
+        },
+        {
+          "archived": false,
+          "description": null,
           "id": "person",
-          "text": "",
-          "value": null
+          "settings_str": "{}",
+          "title": "Person",
+          "type": "people",
+          "width": null
         },
         {
+          "archived": false,
+          "description": null,
           "id": "status",
-          "text": null,
-          "value": null
+          "settings_str": "{\"done_colors\":[1],\"labels\":{\"0\":\"Working on it\",\"1\":\"Done\",\"2\":\"Stuck\"},\"labels_positions_v2\":{\"0\":0,\"1\":2,\"2\":1,\"5\":3},\"labels_colors\":{\"0\":{\"color\":\"#fdab3d\",\"border\":\"#e99729\",\"var_name\":\"orange\"},\"1\":{\"color\":\"#00c875\",\"border\":\"#00b461\",\"var_name\":\"green-shadow\"},\"2\":{\"color\":\"#df2f4a\",\"border\":\"#ce3048\",\"var_name\":\"red-shadow\"}}}",
+          "title": "Status",
+          "type": "status",
+          "width": null
         },
         {
-          "id": "date0",
-          "text": "",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-14T16:17:31Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "topics",
-        "title": "Subitems"
-      },
-      "id": "8484680399",
-      "name": "another 1",
-      "updated_at": "2025-02-14T16:17:31Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 3,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475293993",
-        "name": "Test 1"
-      },
-      "column_values": [
-        {
-          "id": "subitems_mkn4kff6",
-          "text": null,
-          "value": "{}"
-        },
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": "Done",
-          "value": "{\"index\":1,\"post_id\":null,\"changed_at\":\"2019-03-01T17:28:23.178Z\"}"
-        },
-        {
+          "archived": false,
+          "description": null,
           "id": "date4",
-          "text": "2025-02-16",
-          "value": "{\"date\":\"2025-02-16\",\"icon\":null,\"changed_at\":\"2025-02-13T16:17:28.186Z\"}"
+          "settings_str": "{}",
+          "title": "Date",
+          "type": "date",
+          "width": null
         }
       ],
-      "created_at": "2025-02-13T16:17:27Z",
+      "communication": null,
       "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
+        "id": "71985416"
       },
-      "group": {
-        "id": "topics",
-        "title": "Group Title"
-      },
-      "id": "8475294103",
-      "name": "Item 2",
-      "updated_at": "2025-02-13T16:17:28Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 4,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475293993",
-        "name": "Test 1"
-      },
-      "column_values": [
+      "description": null,
+      "groups": [
         {
-          "id": "subitems_mkn4kff6",
-          "text": null,
-          "value": "{}"
+          "archived": false,
+          "color": "#579bfc",
+          "deleted": false,
+          "id": "topics",
+          "position": "65536",
+          "title": "Group Title"
         },
         {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "value": null
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-16",
-          "value": "{\"date\":\"2025-02-16\",\"icon\":null,\"changed_at\":\"2025-02-13T16:17:28.186Z\"}"
+          "archived": false,
+          "color": "#a25ddc",
+          "deleted": false,
+          "id": "group_title",
+          "position": "98304",
+          "title": "Group Title"
         }
       ],
-      "created_at": "2025-02-13T16:17:27Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "group_title",
-        "title": "Group Title"
-      },
-      "id": "8475294137",
-      "name": "Item 4",
-      "updated_at": "2025-02-13T16:17:28Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 5,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475293993",
-        "name": "Test 1"
-      },
-      "column_values": [
+      "id": "8523186540",
+      "name": "Renamed Board",
+      "owners": [
         {
-          "id": "subitems_mkn4kff6",
-          "text": null,
-          "value": "{}"
-        },
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "value": "{\"index\":5,\"post_id\":null,\"changed_at\":\"2019-03-01T17:25:02.248Z\"}"
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-10",
-          "value": "{\"date\":\"2025-02-10\",\"icon\":null,\"changed_at\":\"2025-02-13T16:17:28.397Z\"}"
+          "id": "71985416"
         }
       ],
-      "created_at": "2025-02-13T16:17:27Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "topics",
-        "title": "Group Title"
-      },
-      "id": "8475294114",
-      "name": "Item 3",
-      "updated_at": "2025-02-13T16:17:28Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 6,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475293993",
-        "name": "Test 1"
-      },
-      "column_values": [
+      "permissions": "everyone",
+      "state": "active",
+      "subscribers": [
         {
-          "id": "subitems_mkn4kff6",
-          "text": null,
-          "value": "{}"
-        },
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "value": null
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-13",
-          "value": "{\"date\":\"2025-02-13\",\"icon\":null,\"changed_at\":\"2025-02-13T16:17:28.571Z\"}"
+          "id": "71985416"
         }
       ],
-      "created_at": "2025-02-13T16:17:27Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
+      "tags": [],
+      "top_group": {
+        "id": "topics"
       },
-      "group": {
-        "id": "group_title",
-        "title": "Group Title"
-      },
-      "id": "8475294122",
-      "name": "Item 5",
-      "updated_at": "2025-02-13T16:17:28Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 7,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475293993",
-        "name": "Test 1"
-      },
-      "column_values": [
-        {
-          "id": "subitems_mkn4kff6",
-          "text": null,
-          "value": "{}"
-        },
-        {
-          "id": "person",
-          "text": "Justin Smith, Team 1",
-          "value": "{\"changed_at\":\"2025-02-13T22:08:28.402Z\",\"personsAndTeams\":[{\"id\":71985416,\"kind\":\"person\"},{\"id\":1202780,\"kind\":\"team\"}]}"
-        },
-        {
-          "id": "status",
-          "text": "Working on it",
-          "value": "{\"index\":0,\"post_id\":null,\"changed_at\":\"2019-03-01T17:24:57.321Z\"}"
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-14",
-          "value": "{\"date\":\"2025-02-14\",\"icon\":null,\"changed_at\":\"2025-02-13T16:17:29.000Z\"}"
-        }
-      ],
-      "created_at": "2025-02-13T16:17:27Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "topics",
-        "title": "Group Title"
-      },
-      "id": "8475294083",
-      "name": "Itemdfd 1",
-      "updated_at": "2025-02-13T22:08:28Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 8,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475293993",
-        "name": "Test 1"
-      },
-      "column_values": [
-        {
-          "id": "subitems_mkn4kff6",
-          "text": null,
-          "value": "{\"changed_at\":\"2025-02-14 16:17:31 +0000\",\"linkedPulseIds\":[{\"linkedPulseId\":8484676209},{\"linkedPulseId\":8484679547},{\"linkedPulseId\":8484680399}]}"
-        },
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "value": null
-        },
-        {
-          "id": "date4",
-          "text": "",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-13T21:33:29Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "topics",
-        "title": "Group Title"
-      },
-      "id": "8478941807",
-      "name": "TEST UPDATE",
-      "updated_at": "2025-02-14T16:17:31Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 9,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475198225",
-        "name": "Dev"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": "Done",
-          "value": "{\"index\":1,\"post_id\":null,\"changed_at\":\"2019-03-01T17:28:23.178Z\"}"
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-14",
-          "value": "{\"date\":\"2025-02-14\",\"icon\":null,\"changed_at\":\"2025-02-13T16:08:08.173Z\"}"
-        }
-      ],
-      "created_at": "2025-02-13T16:08:07Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "topics",
-        "title": "Group Title"
-      },
-      "id": "8475198682",
-      "name": "Item 2",
-      "updated_at": "2025-02-13T16:08:08Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 10,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475198225",
-        "name": "Dev"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "value": null
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-13",
-          "value": "{\"date\":\"2025-02-13\",\"icon\":null,\"changed_at\":\"2025-02-13T16:08:08.454Z\"}"
-        }
-      ],
-      "created_at": "2025-02-13T16:08:07Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "group_title",
-        "title": "Group Title"
-      },
-      "id": "8475198800",
-      "name": "Item 4",
-      "updated_at": "2025-02-13T16:08:08Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 11,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475198225",
-        "name": "Dev"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "value": "{\"index\":5,\"post_id\":null,\"changed_at\":\"2019-03-01T17:25:02.248Z\"}"
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-09",
-          "value": "{\"date\":\"2025-02-09\",\"icon\":null,\"changed_at\":\"2025-02-13T16:08:08.686Z\"}"
-        }
-      ],
-      "created_at": "2025-02-13T16:08:07Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "topics",
-        "title": "Group Title"
-      },
-      "id": "8475198722",
-      "name": "Item 3",
-      "updated_at": "2025-02-13T16:08:08Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 12,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475198225",
-        "name": "Dev"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "value": null
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-13",
-          "value": "{\"date\":\"2025-02-13\",\"icon\":null,\"changed_at\":\"2025-02-13T16:08:08.454Z\"}"
-        }
-      ],
-      "created_at": "2025-02-13T16:08:07Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "group_title",
-        "title": "Group Title"
-      },
-      "id": "8475198758",
-      "name": "Item 5",
-      "updated_at": "2025-02-13T16:08:08Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 13,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8475198225",
-        "name": "Dev"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "Justin Smith",
-          "value": "{\"personsAndTeams\":[{\"id\":71985416,\"kind\":\"person\"}]}"
-        },
-        {
-          "id": "status",
-          "text": "Working on it",
-          "value": "{\"index\":0,\"post_id\":null,\"changed_at\":\"2019-03-01T17:24:57.321Z\"}"
-        },
-        {
-          "id": "date4",
-          "text": "2025-02-14",
-          "value": "{\"date\":\"2025-02-14\",\"icon\":null,\"changed_at\":\"2025-02-13T16:08:09.246Z\"}"
-        }
-      ],
-      "created_at": "2025-02-13T16:08:07Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "topics",
-        "title": "Group Title"
-      },
-      "id": "8475198607",
-      "name": "Item 1",
-      "updated_at": "2025-02-13T16:08:09Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 14,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8431289505",
-        "name": "Estuary"
-      },
-      "column_values": [
-        {
-          "id": "subitems_mkn5v6ah",
-          "text": null,
-          "value": "{}"
-        },
-        {
-          "id": "project_owner",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "project_status",
-          "text": "Stuck",
-          "value": "{\"index\":2,\"post_id\":null,\"changed_at\":\"2023-04-27T16:17:50.181Z\"}"
-        },
-        {
-          "id": "date",
-          "text": "2025-02-08",
-          "value": "{\"date\":\"2025-02-08\",\"changed_at\":\"2023-11-08T17:43:01.765Z\"}"
-        },
-        {
-          "id": "tags_mkmy3r3g",
-          "text": "",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-07T20:04:18Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "new_group29179",
-        "title": "To-Do"
-      },
-      "id": "8431291727",
-      "name": "Task 3",
-      "updated_at": "2023-11-08T18:30:39Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 15,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8431289505",
-        "name": "Estuary"
-      },
-      "column_values": [
-        {
-          "id": "subitems_mkn5v6ah",
-          "text": null,
-          "value": "{}"
-        },
-        {
-          "id": "project_owner",
-          "text": "Justin Smith",
-          "value": "{\"changed_at\":\"2023-08-23T12:42:09.066Z\",\"personsAndTeams\":[{\"id\":71985416,\"kind\":\"person\"}]}"
-        },
-        {
-          "id": "project_status",
-          "text": "Working on it",
-          "value": "{\"index\":0,\"post_id\":null,\"changed_at\":\"2023-03-06T14:43:16.460Z\"}"
-        },
-        {
-          "id": "date",
-          "text": "2025-02-06",
-          "value": "{\"date\":\"2025-02-06\",\"changed_at\":\"2023-11-08T17:42:20.136Z\"}"
-        },
-        {
-          "id": "tags_mkmy3r3g",
-          "text": "",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-07T20:04:17Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "new_group29179",
-        "title": "To-Do"
-      },
-      "id": "8431291616",
-      "name": "Task 1",
-      "updated_at": "2025-02-07T20:04:19Z"
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 16,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board": {
-        "id": "8431289505",
-        "name": "Estuary"
-      },
-      "column_values": [
-        {
-          "id": "subitems_mkn5v6ah",
-          "text": null,
-          "value": "{}"
-        },
-        {
-          "id": "project_owner",
-          "text": "",
-          "value": null
-        },
-        {
-          "id": "project_status",
-          "text": "Done",
-          "value": "{\"index\":1,\"post_id\":null,\"changed_at\":\"2023-04-27T16:16:13.187Z\"}"
-        },
-        {
-          "id": "date",
-          "text": "2025-02-07",
-          "value": "{\"date\":\"2025-02-07\",\"changed_at\":\"2023-11-08T17:42:23.641Z\"}"
-        },
-        {
-          "id": "tags_mkmy3r3g",
-          "text": "test",
-          "value": "{\"tag_ids\":[25399873]}"
-        }
-      ],
-      "created_at": "2025-02-07T20:04:18Z",
-      "creator": {
-        "id": "71985416",
-        "name": "Justin Smith"
-      },
-      "group": {
-        "id": "new_group29179",
-        "title": "To-Do"
-      },
-      "id": "8431291686",
-      "name": "Task 2",
-      "updated_at": "2025-02-07T20:08:26Z"
+      "type": "board",
+      "updated_at": "2025-02-19T23:07:17Z",
+      "updates": [],
+      "views": [],
+      "workspace": {
+        "description": null,
+        "id": "9823810",
+        "kind": "open",
+        "name": "Main workspace"
+      }
     }
   ]
 ]

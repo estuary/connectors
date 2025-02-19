@@ -3,11 +3,11 @@ collections:
   acmeCo/boards:
     schema: boards.schema.yaml
     key:
-      - /_meta/row_id
+      - /id
   acmeCo/items:
     schema: items.schema.yaml
     key:
-      - /_meta/row_id
+      - /id
   acmeCo/tags:
     schema: tags.schema.yaml
     key:

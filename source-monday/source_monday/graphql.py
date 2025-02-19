@@ -1,5 +1,7 @@
 import asyncio
-from typing import Dict, Any
+import json
+from datetime import datetime
+from typing import Dict, Any, Literal
 from logging import Logger
 
 from estuary_cdk.http import HTTPSession
@@ -39,6 +41,67 @@ async def execute_query(
     return response
 
 
+async def fetch_recently_updated(
+    resource: Literal["board", "item"],
+    http: HTTPSession,
+    log: Logger,
+    start: datetime,
+) -> list[int]:
+    """
+    Fetch IDs of recently updated resources.
+    Returns parent item IDs even when only subitems were updated.
+    """
+    data = await execute_query(http, log, ACTIVITY_LOGS, {"start": start})
+
+    boards = data.data.get("boards", [])
+    if not boards:
+        return datetime.fromisoformat(start), []
+
+    ids = set()
+
+    for board in boards:
+        activity_logs_obj = board.get("activity_logs", {})
+
+        if isinstance(activity_logs_obj, dict):
+            logs_str = activity_logs_obj.get("activity_logs", [])
+            try:
+                activity_logs = json.loads(logs_str)
+            except json.JSONDecodeError as e:
+                log.error(f"Error decoding activity logs: {e}")
+                continue
+        elif isinstance(activity_logs_obj, list):
+            activity_logs = activity_logs_obj
+        else:
+            activity_logs = []
+
+        for event in activity_logs:
+            event_data_str = event.get("data", {})
+            try:
+                event_data = json.loads(event_data_str)
+            except json.JSONDecodeError as e:
+                log.error(f"Failed to parse event data: {event_data_str}, error: {e}")
+                continue
+
+            if resource == "board":
+                value = event_data.get("board_id")
+            elif resource == "item":
+                # Get both the pulse_id (item_id) and parent_item_id
+                value = event_data.get("pulse_id")
+                parent_id = event_data.get("parent_item_id")
+                # If this is a subitem (has parent_id), use the parent_id instead
+                if parent_id is not None:
+                    value = parent_id
+
+            if value is not None:
+                try:
+                    ids.add(int(value))
+                except (ValueError, TypeError) as e:
+                    log.error(f"Failed to convert ID to integer: {value}, error: {e}")
+                    continue
+
+    return list(ids)
+
+
 async def check_complexity(http: HTTPSession, log: Logger, threshold: int) -> None:
     """Check API complexity and wait if necessary."""
     data = await execute_query(http, log, COMPLEXITY)
@@ -61,653 +124,242 @@ query GetComplexity {
 }
 """
 
-
-ACCOUNT_FIELDS = """
-fragment AccountFields on Account {
-  active_members_count
-  country_code
-  first_day_of_the_week
-  id
-  logo
-  name
-  plan {
-    max_users
-    period
-    tier
-    version
-  }
-  products {
-    default_workspace_id
-    id
-    kind
-  }
-  show_timeline_weekends
-  sign_up_product_kind
-  slug
-  tier
-}
-"""
-
-TEAM_FIELDS = """
-fragment TeamFields on Team {
-  id
-  name
-  owners {
-    id
-    # Cannot use ...UserFields - Fill on the client side (code)
-  }
-  picture_url
-  users {
-    id
-    account {
+# Query for getting activity logs.
+# This query retrieves activity logs for boards.
+ACTIVITY_LOGS = """
+query GetActivityLogs($start: ISO8601DateTime!) {
+  boards {
+    activity_logs(from: $start) {
       id
+      event
+      data
+      created_at
     }
   }
 }
 """
 
-USER_FIELDS = f"""
-fragment UserFields on User {{
-  birthday
-  country_code
-  created_at
-  current_language
-  email
-  enabled
-  id
-  is_admin
-  is_guest
-  is_pending
-  is_view_only
-  is_verified
-  join_date
-  last_activity
-  location
-  mobile_phone
-  name
-  out_of_office {{
-    active
-    disable_notifications
-    end_date
-    start_date
-    type
-  }}
-  phone
-  photo_original
-  photo_small
-  photo_thumb
-  photo_thumb_small
-  photo_tiny
-  sign_up_product_kind
-  # Teams
-  teams {{
-    ...TeamFields
-  }}
-  # Accounts
-  account {{
-    ...AccountFields
-  }}
-}}
-{ACCOUNT_FIELDS}
-{TEAM_FIELDS}
-"""
-
-TAG_FIELDS = """
-fragment TagFields on Tag {
-  color
-  id
-  name
-}
-"""
-
-ACTIVITY_LOGS_FIELDS = """
-fragment ActivityLogsFields on ActivityLogType {
-  account_id
-  data
-  entity
-  event
-  id
-  user_id
-  created_at
-}
-"""
-
-COLUMN_FIELDS = """
-fragment ColumnFields on Column {
-  archived
-  description
-  id
-  settings_str
-  title
-  type
-  width
-}
-"""
-
-BOARDS = f"""
-query GetBoards($order_by: BoardsOrderBy!, $limit: Int!, $page: Int!) {{
-  boards(order_by: $order_by, limit: $limit, page: $page, state: active) {{
-    board_folder_id
+# Query for getting boards.
+BOARDS = """
+query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) {
+  boards(order_by: $order_by, page: $page, limit: $limit) {
+    id
+    name
     board_kind
+    type
+    columns {
+      archived
+      description
+      id
+      settings_str
+      title
+      type
+      width
+    }
     communication
     description
-    id
-    item_terminology
-    items_count
-    name
+    groups {
+      archived
+      color
+      deleted
+      id
+      position
+      title
+    }
+    owners {
+      id
+    }
+    creator {
+      id
+    }
     permissions
     state
-    type
-    updated_at
-    url
-    workspace_id
-    
-    # Activity Logs
-    activity_logs {{
-      ...ActivityLogsFields
-    }}
-    # Columns
-    columns {{
-      ...ColumnFields
-    }}
-    # Users
-    creator {{
-      ...UserFields
-    }}
-    # Groups
-    groups {{
+    subscribers {
       id
-      title
-      archived
-      color
-      items_page {{
-        cursor
-        # Items
-        items {{
-          id
-        }}
-      }}
-      position
-    }}
-    items_page {{
-      cursor
-      # Items
-      items {{
-        id
-      }}
-    }}
-    # Users
-    owners {{
-      ...UserFields
-    }}
-    # Users
-    subscribers {{
-      ...UserFields
-    }}
-    tags {{
+    }
+    tags {
       id
-      color
       name
-    }}
-    # Teams
-    team_owners {{
+    }
+    top_group {
       id
-      # Users
-      owners {{
-        id
-      }}
-    }}
-    # Teams
-    team_subscribers
-    {{
+    }
+    updated_at
+    updates {
       id
-      # Users
-      owners {{
-        id
-      }}
-    }}
-    top_group {{
+    }
+    views {
       id
-      title
-      archived
-      color
-      items_page {{
-        cursor
-        # Items
-        items {{
-          id
-        }}
-      }}
-    }}
-    # Updates
-    updates {{
+      name
+      settings_str
+      type
+      view_specific_data_str
+    }
+    workspace {
       id
-    }}
-    # Board Views
-    views {{
-      id
-    }}
-    # Workspace
-    workspace {{
-      id
-    }}
-  }}
-}}
-{USER_FIELDS}
-{COLUMN_FIELDS}
-{ACTIVITY_LOGS_FIELDS}
+      name
+      kind
+      description
+    }
+  }
+}
 """
 
-TEAMS = f"""
-query GetTeams {{
-  teams {{
-    ...TeamFields
-  }}
-}}
-{TEAM_FIELDS}
-"""
-
-USERS = f"""
-query GetUsers {{
-  users {{
-    ...UserFields
-  }}
-}}
-{USER_FIELDS}
-"""
-
-ITEMS_INITIAL = """
-query GetItems(
-  $boards_order_by: BoardsOrderBy!,
-  $boards_limit: Int!,
-  $boards_page: Int!,
-  $items_limit: Int!,
-  $items_order_by: String!,
-  $items_order_direction: ItemsOrderByDirection!
-) {
-  boards(
-    order_by: $boards_order_by,
-    limit: $boards_limit,
-    page: $boards_page,
-    state: active
-  ) {
+# Query for getting teams.
+# This query retrieves all fields that the Monday API returns for teams.
+TEAMS = """
+query {
+  teams {
     id
     name
-    items_page(
-      limit: $items_limit,
-      query_params: {
-        order_by:[{ column_id: $items_order_by, direction: $items_order_direction }]
-      }
-    ) {
-      cursor
-      items {
-        id
-        name
-        board {
-          id
-          name
-        }
-        group {
-          id
-          title
-        }
-        column_values {
-          id
-          text
-          value
-        }
-        creator {
-          id
-          name
-        }
-        created_at
-        updated_at
-      }
-    }
-  }
-}
-"""
-
-NEXT_ITEMS_PAGE = """
-query GetNextItemsPage($cursor: String!, $items_limit: Int!) {
-  next_items_page (limit: $items_limit, cursor: $cursor) {
-    cursor
-    items {
+    picture_url
+    users {
       id
-      name
-      board {
-        id
-        name
-      }
-      group {
-        id
-        title
-      }
-      column_values {
-        id
-        text
-        value
-      }
-      creator {
-        id
-        name
-      }
-      created_at
-      updated_at
+    }
+    owners {
+      id
     }
   }
 }
 """
 
-ITEMS = """
-query GetItems($order_by: BoardsOrderBy!, $limit: Int!, $page: Int!) {
-  boards(order_by: $order_by, limit: $limit, page: $page, state: active) {
-    items_page {
-      items {
-        id
-        board {
-          id
-        }
-        updates {
-          id
-          body
-          creator_id
-          edited_at
-          edited_at
-          creator {
-            id
-            account {
-              id
-            }
-            account_products {
-              default_workspace_id
-              id
-              kind
-            }
-            custom_field_metas {
-              id
-            }
-            custom_field_values {
-              custom_field_meta_id
-              value
-            }
-            teams {
-              id
-              owners {
-                id
-                account {
-                  id
-                  products {
-                    default_workspace_id
-                    id
-                    kind
-                  }
-                }
-                account_products {
-                  default_workspace_id
-                  id
-                  kind
-                }
-                custom_field_metas {
-                  id
-                }
-                custom_field_values {
-                  custom_field_meta_id
-                  value
-                }
-              }
-            }
-          }
-          likes {
-            id
-            creator_id
-            creator {
-              id
-              account {
-                id
-                plan {
-                  max_users
-                  period
-                  tier
-                  version
-                }
-                products {
-                  default_workspace_id
-                  id
-                  kind
-                }
-              }
-              account_products {
-                default_workspace_id
-                id
-                kind
-              }
-              custom_field_metas {
-                id
-              }
-              custom_field_values {
-                custom_field_meta_id
-                value
-              }
-              teams {
-                id
-                owners {
-                  id
-                  account {
-                    id
-                    products {
-                      default_workspace_id
-                      id
-                      kind
-                    }
-                  }
-                  account_products {
-                    default_workspace_id
-                    id
-                    kind
-                  }
-                  custom_field_metas {
-                    id
-                  }
-                  custom_field_values {
-                    custom_field_meta_id
-                    value
-                  }
-                }
-              }
-            }
-          }
-          pinned_to_top {
-            item_id
-          }
-          watchers {
-            user_id
-            medium
-            user {
-              id
-              account {
-                active_members_count
-                country_code
-                first_day_of_the_week
-                id
-                logo
-                name
-                plan {
-                  max_users
-                  period
-                  tier
-                  version
-                }
-                products {
-                  default_workspace_id
-                  id
-                  kind
-                }
-                show_timeline_weekends
-                sign_up_product_kind
-                slug
-                tier
-              }
-              account_products {
-                default_workspace_id
-                id
-                kind
-              }
-              birthday
-              country_code
-              created_at
-              current_language
-              custom_field_metas {
-                description
-                editable
-                field_type
-                flagged
-                icon
-                id
-                position
-                title
-              }
-              custom_field_values {
-                custom_field_meta_id
-                value
-              }
-              email
-              enabled
-              is_admin
-              is_guest
-              is_pending
-              is_verified
-              is_verified
-              is_view_only
-              join_date
-              last_activity
-              location
-              mobile_phone
-              name
-              out_of_office {
-                active
-                disable_notifications
-                end_date
-                start_date
-              }
-              phone
-              photo_original
-              photo_small
-              photo_thumb
-              photo_thumb_small
-              photo_tiny
-              sign_up_product_kind
-              teams {
-                id
-                owners {
-                  id
-                  account {
-                    active_members_count
-                    country_code
-                    first_day_of_the_week
-                    id
-                    logo
-                    name
-                    plan {
-                      max_users
-                      period
-                      tier
-                      version
-                    }
-                    products {
-                      default_workspace_id
-                      id
-                      kind
-                    }
-                    show_timeline_weekends
-                    sign_up_product_kind
-                    slug
-                    tier
-                  }
-                  account_products {
-                    default_workspace_id
-                    id
-                    kind
-                  }
-                  birthday
-                  country_code
-                  created_at
-                  current_language
-                  custom_field_metas {
-                    description
-                    editable
-                    field_type
-                    flagged
-                    icon
-                    id
-                    position
-                    title
-                  }
-                  custom_field_values {
-                    custom_field_meta_id
-                    value
-                  }
-                  email
-                  enabled
-                  is_admin
-                  is_guest
-                  is_pending
-                  is_verified
-                  is_verified
-                  is_view_only
-                  join_date
-                  last_activity
-                  location
-                  mobile_phone
-                  name
-                  out_of_office {
-                    active
-                    disable_notifications
-                    end_date
-                    start_date
-                  }
-                  phone
-                  photo_original
-                  photo_small
-                  photo_thumb
-                  photo_thumb_small
-                  photo_tiny
-                  sign_up_product_kind
-                }
-              }
-              time_zone_identifier
-              title
-              url
-              utc_hours_diff
-            }
-          }
-          created_at
-          updated_at
-          item_id
-          item {
-            id
-          }
-          replies {
-            id
-            # TODO
-          }
-          assets {
-            id
-            # TODO
-          }
-          text_body
-        }
-      }
-    }
+# Query for getting users.
+# This query returns a comprehensive set of user fields.
+USERS = """
+query {
+  users {
+    birthday
+    country_code
+    created_at
+    join_date
+    email
+    enabled
+    id
+    is_admin
+    is_guest
+    is_pending
+    is_view_only
+    is_verified
+    location
+    mobile_phone
+    name
+    phone
+    photo_original
+    photo_small
+    photo_thumb
+    photo_thumb_small
+    photo_tiny
+    time_zone_identifier
+    title
+    url
+    utc_hours_diff
   }
 }
 """
 
-TAGS = f"""
-query GetTags {{
-  tags {{
-    ...TagFields
+# Query for getting tags.
+# This query returns all available tag fields from Monday.
+TAGS = """
+query {
+  tags {
+    id
+    name
+    color
+  }
+}
+"""
+
+
+# Item fields fragment.
+_ITEM_FIELDS = """
+fragment _ItemFields on Item {
+  id
+  name
+  assets {
+    created_at
+    file_extension
+    file_size
+    id
+    name
+    original_geometry
+    public_url
+    uploaded_by {
+      id
+    }
+    url
+    url_thumbnail
+  }
+  board {
+    id
+    name
+  }
+  column_values {
+    id
+    text
+    type
+    value
+  }
+  created_at
+  creator_id
+  group {
+    id
+  }
+  parent_item {
+    id
+  }
+  state
+  subscribers {
+    id
+  }
+  updated_at
+  updates {
+    id
+  }
+}
+fragment ItemFields on Item {
+  ..._ItemFields
+  subitems {
+    ..._ItemFields
+  }
+}
+"""
+
+# Query for getting items for a board.
+# This query returns all items for a given board.
+ITEMS = f"""
+query GetBoardItems($boardIds: [ID!], $limit: Int = 20) {{
+  boards(ids: $boardIds) {{
+    id
+    items_page(limit: $limit) {{
+      cursor
+      items {{
+        ...ItemFields
+      }}
+    }}
   }}
 }}
-{TAG_FIELDS}
+{_ITEM_FIELDS}
+"""
+
+# Query for getting next page of items for a board.
+NEXT_ITEMS = f"""
+query GetNextItems($cursor: String!, $limit: Int = 20) {{
+  next_items_page(limit: $limit, cursor: $cursor) {{
+    cursor
+    items {{
+      ...ItemFields
+    }}
+  }}
+}}
+{_ITEM_FIELDS}
+"""
+
+# Query for getting items by their IDs.
+ITEMS_BY_IDS = f"""
+query GetItemsByIds($ids: [ID!]!, $page: Int = 1, $limit: Int = 20) {{
+  items(ids: $ids, page: $page, limit: $limit, newest_first: true) {{
+    ...ItemFields
+  }}
+}}
+{_ITEM_FIELDS}
 """

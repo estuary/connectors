@@ -26,6 +26,16 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-title: GraphQLDocument
+  id:
+    title: Id
+    type: string
+  updated_at:
+    format: date-time
+    title: Updated At
+    type: string
+required:
+  - id
+  - updated_at
+title: IncrementalResource
 type: object
 x-infer-schema: true

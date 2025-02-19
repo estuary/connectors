@@ -1,14 +1,18 @@
-from pydantic import BaseModel, Field
-from typing import TYPE_CHECKING, Optional
+from pydantic import AwareDatetime, BaseModel, Field
+from typing import Annotated, AsyncGenerator, Callable, TYPE_CHECKING, Optional
+from logging import Logger
 
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
     BaseDocument,
     AuthorizationCodeFlowOAuth2Credentials,
+    LogCursor,
+    PageCursor,
     OAuth2Spec,
     AccessToken,
     ResourceState,
 )
+from estuary_cdk.http import HTTPSession
 
 
 OAUTH2_SPEC = OAuth2Spec(
@@ -45,6 +49,24 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
     )
 
+    class Advanced(BaseModel):
+        limit: Annotated[
+            int,
+            Field(
+                description="Limit used in queries for incremental streams. This should be left as the default value unless connector errors indicate a smaller limit is required.",
+                title="Limit",
+                default=1,
+                gt=0,
+            ),
+        ]
+
+    advanced: Advanced = Field(
+        default_factory=Advanced,
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
+    )
+
 
 ConnectorState = GenericConnectorState[ResourceState]
 
@@ -54,5 +76,29 @@ class GraphQLResponse(BaseModel):
     errors: Optional[list[dict]] = None
 
 
-class GraphQLDocument(BaseDocument, extra="allow"):
+class FullRefreshResource(BaseDocument, extra="allow"):
     pass
+
+
+class IncrementalResource(BaseDocument, extra="allow"):
+    id: str
+    updated_at: AwareDatetime
+
+
+class Board(IncrementalResource):
+    updated_at: AwareDatetime
+
+
+FullRefreshResourceFetchFn = Callable[
+    [HTTPSession, Logger], AsyncGenerator[FullRefreshResource, None]
+]
+
+IncrementalResourceFetchChangesFn = Callable[
+    [HTTPSession, Logger, LogCursor],
+    AsyncGenerator[IncrementalResource | LogCursor, None],
+]
+
+IncrementalResourceFetchPageFn = Callable[
+    [HTTPSession, Logger, PageCursor, LogCursor],
+    AsyncGenerator[IncrementalResource | PageCursor, None],
+]

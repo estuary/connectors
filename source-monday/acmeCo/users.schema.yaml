@@ -26,6 +26,6 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-title: GraphQLDocument
+title: FullRefreshResource
 type: object
 x-infer-schema: true

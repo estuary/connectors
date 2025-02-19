@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, UTC
 import functools
 from logging import Logger
 
@@ -11,16 +11,37 @@ from source_monday.models import (
     EndpointConfig,
     OAUTH2_SPEC,
     ResourceState,
-    GraphQLDocument,
+    FullRefreshResource,
+    IncrementalResource,
+    FullRefreshResourceFetchFn,
+    IncrementalResourceFetchChangesFn,
+    IncrementalResourceFetchPageFn,
 )
 from source_monday.api import (
-    snapshot_boards,
+    fetch_boards_changes,
+    fetch_boards_page,
+    fetch_items_changes,
+    fetch_items_page,
     snapshot_teams,
     snapshot_users,
     snapshot_tags,
-    snapshot_items,
 )
 from source_monday.graphql import API
+
+
+# Supported full refresh resources and their corresponding name and snapshot function.
+FULL_REFRESH_RESOURCES = [
+    ("teams", snapshot_teams),
+    ("users", snapshot_users),
+    ("tags", snapshot_tags),
+]
+
+
+# Supported incremental resources and their corresponding name, fetch_changes function, and fetch_page function.
+INCREMENTAL_RESOURCES = [
+    ("boards", fetch_boards_changes, fetch_boards_page),
+    ("items", fetch_items_changes, fetch_items_page),
+]
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
@@ -43,8 +64,9 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError([msg])
 
 
-def boards(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resource:
+def full_refresh_resouces(log: Logger, http: HTTPMixin, config: EndpointConfig):
     def open(
+        fetch_snapshot_fn: FullRefreshResourceFetchFn,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -56,23 +78,29 @@ def boards(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resou
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(snapshot_boards, http),
-            tombstone=GraphQLDocument(_meta=GraphQLDocument.Meta(op="d")),
+            fetch_snapshot=functools.partial(fetch_snapshot_fn, http),
+            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d")),
         )
 
-    return common.Resource(
-        name="boards",
-        key=["/_meta/row_id"],
-        model=GraphQLDocument,
-        open=open,
-        initial_state=ResourceState(),
-        initial_config=ResourceConfig(name="boards", interval=timedelta(minutes=5)),
-        schema_inference=True,
-    )
+    return [
+        common.Resource(
+            name=name,
+            key=["/_meta/row_id"],
+            model=FullRefreshResource,
+            open=functools.partial(open, fetch_snapshot_fn),
+            initial_state=ResourceState(),
+            initial_config=ResourceConfig(name=name, interval=timedelta(seconds=30)),
+            schema_inference=True,
+        )
+        for name, fetch_snapshot_fn in FULL_REFRESH_RESOURCES
+    ]
 
 
-def teams(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resource:
+def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     def open(
+        fetch_changes_fn: IncrementalResourceFetchChangesFn,
+        fetch_page_fn: IncrementalResourceFetchPageFn,
+        limit: int,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -84,103 +112,32 @@ def teams(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resour
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(snapshot_teams, http),
-            tombstone=GraphQLDocument(_meta=GraphQLDocument.Meta(op="d")),
+            fetch_changes=functools.partial(fetch_changes_fn, http, limit),
+            fetch_page=functools.partial(fetch_page_fn, http, limit),
         )
 
-    return common.Resource(
-        name="teams",
-        key=["/_meta/row_id"],
-        model=GraphQLDocument,
-        open=open,
-        initial_state=ResourceState(),
-        initial_config=ResourceConfig(name="teams", interval=timedelta(minutes=5)),
-        schema_inference=True,
-    )
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
 
-
-def users(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resource:
-    def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_snapshot=functools.partial(snapshot_users, http),
-            tombstone=GraphQLDocument(_meta=GraphQLDocument.Meta(op="d")),
+    return [
+        common.Resource(
+            name=name,
+            key=["/id"],
+            model=IncrementalResource,
+            open=functools.partial(
+                open,
+                fetch_changes_fn,
+                fetch_page_fn,
+                config.advanced.limit,
+            ),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=1),
+            ),
+            initial_config=ResourceConfig(name=name, interval=timedelta(seconds=30)),
+            schema_inference=True,
         )
-
-    return common.Resource(
-        name="users",
-        key=["/_meta/row_id"],
-        model=GraphQLDocument,
-        open=open,
-        initial_state=ResourceState(),
-        initial_config=ResourceConfig(name="users", interval=timedelta(minutes=5)),
-        schema_inference=True,
-    )
-
-
-def tags(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resource:
-    def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_snapshot=functools.partial(snapshot_tags, http),
-            tombstone=GraphQLDocument(_meta=GraphQLDocument.Meta(op="d")),
-        )
-
-    return common.Resource(
-        name="tags",
-        key=["/_meta/row_id"],
-        model=GraphQLDocument,
-        open=open,
-        initial_state=ResourceState(),
-        initial_config=ResourceConfig(name="tags", interval=timedelta(minutes=5)),
-        schema_inference=True,
-    )
-
-
-def items(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resource:
-    def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_snapshot=functools.partial(snapshot_items, http),
-            tombstone=GraphQLDocument(_meta=GraphQLDocument.Meta(op="d")),
-        )
-
-    return common.Resource(
-        name="items",
-        key=["/_meta/row_id"],
-        model=GraphQLDocument,
-        open=open,
-        initial_state=ResourceState(),
-        initial_config=ResourceConfig(name="items", interval=timedelta(minutes=5)),
-        schema_inference=True,
-    )
+        for name, fetch_changes_fn, fetch_page_fn in INCREMENTAL_RESOURCES
+    ]
 
 
 async def all_resources(
@@ -191,9 +148,6 @@ async def all_resources(
     )
 
     return [
-        boards(log, http, config),
-        teams(log, http, config),
-        users(log, http, config),
-        tags(log, http, config),
-        items(log, http, config),
+        *full_refresh_resouces(log, http, config),
+        *incremental_resources(log, http, config),
     ]
