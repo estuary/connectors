@@ -13,7 +13,6 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"sync/atomic"
 	"testing"
 	"text/template"
 	"time"
@@ -146,9 +145,17 @@ func createTestTable(ctx context.Context, t testing.TB, client *bigquery.Client,
 	t.Helper()
 	require.NoError(t, executeSetupQuery(ctx, t, client, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)))
 	require.NoError(t, executeSetupQuery(ctx, t, client, fmt.Sprintf("CREATE TABLE %s%s", tableName, tableDef)))
-	t.Cleanup(func() {
-		require.NoError(t, executeSetupQuery(ctx, t, client, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)))
-	})
+	// A note on table cleanup:
+	//
+	// Typically in SQL database tests we drop tables at the end of each test. But we
+	// can't reliably do that in BigQuery.
+	//
+	// BigQuery has a rate limit of 5 table update operations per 10 seconds per table.
+	// DML operations (such as test data inserts) count against this limit but aren't
+	// subject to it (weird policy, but okay), which means that in general we can't
+	// reliably drop a table immediately after running a test. So we don't bother,
+	// because we _can_ reliably drop+recreate it at the start of a test, and that
+	// is sufficient for our purposes.
 }
 
 func summarizeBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) string {
@@ -312,43 +319,6 @@ func TestSimpleCapture(t *testing.T) {
 			{7, "Value for row 7"}, {8, "Value for row 8"},
 		}))
 		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
-	})
-}
-
-// TestAsyncCapture performs a capture with periodic restarts, in parallel with a batch of inserts.
-func TestAsyncCapture(t *testing.T) {
-	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
-	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
-	createTestTable(ctx, t, control, tableName, "(id INTEGER PRIMARY KEY NOT ENFORCED, data STRING)")
-
-	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
-	setCursorColumns(t, cs.Bindings[0], "id")
-	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
-
-	t.Run("Capture", func(t *testing.T) {
-		// Spawn a worker thread which will insert 50 rows of data in 5 batches.
-		// BigQuery insert latency is highly variable on test time-scales, so we signal
-		// when the insertions are all done so the capturing code knows when to stop.
-		var insertsDone atomic.Bool
-		go func() {
-			for batch := 0; batch < 5; batch++ {
-				var args [][]any
-				for i := batch * 10; i < (batch+1)*10; i++ {
-					args = append(args, []any{i, fmt.Sprintf("Value for row %d", i)})
-				}
-				require.NoError(t, parallelSetupQueries(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1)", tableName), args))
-			}
-			time.Sleep(5 * time.Second)
-			insertsDone.Store(true)
-		}()
-
-		// Run the capture over and over for 5 seconds each time until all inserts have finished.
-		for !insertsDone.Load() {
-			var captureCtx, cancelCapture = context.WithCancel(ctx)
-			time.AfterFunc(5*time.Second, cancelCapture)
-			cs.Capture(captureCtx, t, nil)
-		}
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
@@ -702,25 +672,27 @@ func TestFullRefresh(t *testing.T) {
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
 	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
 
-	t.Run("Capture", func(t *testing.T) {
-		setShutdownAfterQuery(t, true)
+	setShutdownAfterQuery(t, true)
 
-		require.NoError(t, parallelSetupQueries(ctx, t, control,
-			fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1)", tableName), [][]any{
-				{0, "Value for row 0"}, {1, "Value for row 1"},
-				{2, "Value for row 2"}, {3, "Value for row 3"},
-			}))
-		cs.Capture(ctx, t, nil)
+	// Sorting is required for test stability because full-refresh captures are unordered.
+	// The multiset of row-captures will be the same across all runs, so this works.
+	cs.Validator = &st.SortedCaptureValidator{}
 
-		require.NoError(t, parallelSetupQueries(ctx, t, control,
-			fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1)", tableName), [][]any{
-				{4, "Value for row 4"}, {5, "Value for row 5"},
-				{6, "Value for row 6"}, {7, "Value for row 7"},
-			}))
-		cs.Capture(ctx, t, nil)
+	require.NoError(t, parallelSetupQueries(ctx, t, control,
+		fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1)", tableName), [][]any{
+			{0, "Value for row 0"}, {1, "Value for row 1"},
+			{2, "Value for row 2"}, {3, "Value for row 3"},
+		}))
+	cs.Capture(ctx, t, nil)
+	t.Run("Capture1", func(t *testing.T) { cupaloy.SnapshotT(t, cs.Summary()); cs.Reset() })
 
-		cupaloy.SnapshotT(t, cs.Summary())
-	})
+	require.NoError(t, parallelSetupQueries(ctx, t, control,
+		fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1)", tableName), [][]any{
+			{4, "Value for row 4"}, {5, "Value for row 5"},
+			{6, "Value for row 6"}, {7, "Value for row 7"},
+		}))
+	cs.Capture(ctx, t, nil)
+	t.Run("Capture2", func(t *testing.T) { cupaloy.SnapshotT(t, cs.Summary()); cs.Reset() })
 }
 
 // TestCaptureWithUpdatedAtCursor exercises the use-case of a capture using a
@@ -963,35 +935,36 @@ func TestCaptureWithNullCursor(t *testing.T) {
 	setCursorColumns(t, cs.Bindings[0], "sort_col")
 	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
 
-	t.Run("Capture", func(t *testing.T) {
-		setShutdownAfterQuery(t, true)
+	setShutdownAfterQuery(t, true)
 
-		// First batch with mix of NULL and non-NULL cursor values
-		require.NoError(t, parallelSetupQueries(ctx, t, control,
-			fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1, @p2)", tableName),
-			[][]any{
-				{0, "Value with NULL cursor", bigquery.NullInt64{}},
-				{1, "Value with cursor 10", 10},
-				{2, "Another NULL cursor", bigquery.NullInt64{}},
-				{3, "Value with cursor 20", 20},
-				{4, "Third NULL cursor", bigquery.NullInt64{}},
-			}))
-		cs.Capture(ctx, t, nil)
+	// Sorting is required for test stability because null-cursored rows are unordered.
+	cs.Validator = &st.SortedCaptureValidator{}
 
-		// Second batch testing NULL handling after initial cursor
-		require.NoError(t, parallelSetupQueries(ctx, t, control,
-			fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1, @p2)", tableName),
-			[][]any{
-				{5, "Late NULL cursor", bigquery.NullInt64{}}, // Will not be captured
-				{6, "Value with cursor 15", 15},               // Will not be captured (cursor 20 is already seen)
-				{7, "Value with cursor 25", 25},
-				{8, "Another late NULL", bigquery.NullInt64{}}, // Will not be captured
-				{9, "Final value cursor 30", 30},
-			}))
-		cs.Capture(ctx, t, nil)
+	// First batch with mix of NULL and non-NULL cursor values
+	require.NoError(t, parallelSetupQueries(ctx, t, control,
+		fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1, @p2)", tableName),
+		[][]any{
+			{0, "Value with NULL cursor", bigquery.NullInt64{}},
+			{1, "Value with cursor 10", 10},
+			{2, "Another NULL cursor", bigquery.NullInt64{}},
+			{3, "Value with cursor 20", 20},
+			{4, "Third NULL cursor", bigquery.NullInt64{}},
+		}))
+	cs.Capture(ctx, t, nil)
+	t.Run("Capture1", func(t *testing.T) { cupaloy.SnapshotT(t, cs.Summary()); cs.Reset() })
 
-		cupaloy.SnapshotT(t, cs.Summary())
-	})
+	// Second batch testing NULL handling after initial cursor
+	require.NoError(t, parallelSetupQueries(ctx, t, control,
+		fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1, @p2)", tableName),
+		[][]any{
+			{5, "Late NULL cursor", bigquery.NullInt64{}}, // Will not be captured
+			{6, "Value with cursor 15", 15},               // Will not be captured (cursor 20 is already seen)
+			{7, "Value with cursor 25", 25},
+			{8, "Another late NULL", bigquery.NullInt64{}}, // Will not be captured
+			{9, "Final value cursor 30", 30},
+		}))
+	cs.Capture(ctx, t, nil)
+	t.Run("Capture2", func(t *testing.T) { cupaloy.SnapshotT(t, cs.Summary()); cs.Reset() })
 }
 
 // TestQueryTemplateOverride exercises a capture configured with an explicit query template

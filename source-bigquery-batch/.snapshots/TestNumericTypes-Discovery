@@ -2,7 +2,8 @@ Binding 0:
 {
     "resource_config_json": {
       "name": "numerictypes_559424",
-      "template": "{{/* Default query template which adapts to cursor field selection */}}\n{{- if not .CursorFields -}}\n  SELECT * FROM `testdata`.`numerictypes_559424`;\n{{- else -}}\n  SELECT * FROM `testdata`.`numerictypes_559424`\n  {{- if not .IsFirstQuery -}}\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = @p{{$j}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e @p{{$i}}\n\t{{- end -}})\n  {{- end}}\n  ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- end}}",
+      "schema": "testdata",
+      "table": "numerictypes_559424",
       "cursor": [
         "id"
       ]
