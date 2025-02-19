@@ -421,6 +421,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			Queries:  queries,
 			ToDelete: fullPaths,
 		}
+		b.needsMerge = false // reset for next round
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
