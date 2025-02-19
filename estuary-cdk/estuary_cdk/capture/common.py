@@ -18,6 +18,7 @@ from typing import (
 )
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
+from ..cron import next_fire
 from ..flow import (
     AccessToken,
     BaseOAuth2Credentials,
@@ -112,6 +113,25 @@ class ResourceConfig(BaseResourceConfig):
 _ResourceConfig = TypeVar("_ResourceConfig", bound=ResourceConfig)
 
 
+CRON_REGEX = (r"^"
+    r"((?:[0-5]?\d(?:-[0-5]?\d)?|\*(?:/[0-5]?\d)?)(?:,(?:[0-5]?\d(?:-[0-5]?\d)?|\*(?:/[0-5]?\d)?))*)\s+"  # minute
+    r"((?:[01]?\d|2[0-3]|(?:[01]?\d|2[0-3])-(?:[01]?\d|2[0-3])|\*(?:/[01]?\d|/2[0-3])?)(?:,(?:[01]?\d|2[0-3]|(?:[01]?\d|2[0-3])-(?:[01]?\d|2[0-3])|\*(?:/[01]?\d|/2[0-3])?))*)\s+"  # hour
+    r"((?:0?[1-9]|[12]\d|3[01]|(?:0?[1-9]|[12]\d|3[01])-(?:0?[1-9]|[12]\d|3[01])|\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\d|3[01]|(?:0?[1-9]|[12]\d|3[01])-(?:0?[1-9]|[12]\d|3[01])|\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\s+"  # day of month
+    r"((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\*(?:/[1-9]|/1[0-2])?))*)\s+"  # month
+    r"((?:[0-6]|(?:[0-6])-(?:[0-6])|\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\*(?:/[0-6])?))*)"  # day of week
+    r"$|^$" # Empty string to signify no schedule
+)
+
+
+class ResourceConfigWithSchedule(ResourceConfig):
+    schedule: str = Field(
+        default="",
+        title="Schedule",
+        description="Schedule to automatically rebackfill this binding. Accepts a cron expression.",
+        pattern=CRON_REGEX
+    )
+
+
 class BaseResourceState(abc.ABC, BaseModel, extra="forbid"):
     """
     AbstractResourceState is a base class for ResourceState classes.
@@ -168,6 +188,8 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     )
 
     snapshot: Snapshot | None = Field(default=None, description="Snapshot progress")
+
+    last_initialized: datetime | None = Field(default=None, description="The last time this state was initialized.")
 
 
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
@@ -409,19 +431,55 @@ def open(
                     )
                 )
 
+        soonest_future_scheduled_initialization: datetime | None = None
+
         for index, (binding, resource) in enumerate(resolved_bindings):
             state: _ResourceState | None = open.state.bindingStateV1.get(
                 binding.stateKey
             )
 
-            if state is None or binding.stateKey in backfill_requests:
+            should_initialize = state is None or binding.stateKey in backfill_requests
+
+            if state:
+                if state.last_initialized is None:
+                    state.last_initialized = datetime.now(tz=UTC)
+                    task.checkpoint(
+                        ConnectorState(
+                            bindingStateV1={binding.stateKey: state}
+                        )
+                    )
+
+                if isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
+                    cron_schedule = binding.resourceConfig.schedule
+                    next_scheduled_initialization = next_fire(cron_schedule, state.last_initialized)
+
+                    if next_scheduled_initialization and next_scheduled_initialization < datetime.now(tz=UTC):
+                    # Re-initialize the binding if we missed a scheduled re-initialization.
+                        should_initialize = True
+                        if state.backfill:
+                            task.log.warning(
+                                f"Scheduled backfill for binding {resource.name} is taking precedence over its ongoing backfill."
+                                " Please extend the binding's configured cron schedule if you'd like the previous backfill to"
+                                " complete before the next scheduled backfill starts."
+                            )
+
+                        next_scheduled_initialization = next_fire(cron_schedule, datetime.now(tz=UTC))
+
+                    if next_scheduled_initialization and soonest_future_scheduled_initialization:
+                        soonest_future_scheduled_initialization = min(soonest_future_scheduled_initialization, next_scheduled_initialization)
+                    elif next_scheduled_initialization:
+                        soonest_future_scheduled_initialization = next_scheduled_initialization
+
+            if should_initialize:
                 # Checkpoint the binding's initialized state prior to any processing.
+                state = resource.initial_state
+                state.last_initialized = datetime.now(tz=UTC)
+
                 task.checkpoint(
                     ConnectorState(
-                        bindingStateV1={binding.stateKey: resource.initial_state}
+                        bindingStateV1={binding.stateKey: state}
                     )
                 )
-                state = resource.initial_state
 
             resource.open(
                 binding,
@@ -430,6 +488,18 @@ def open(
                 task,
                 resolved_bindings
             )
+
+        async def scheduled_stop(future_dt: datetime | None) -> None:
+            if not future_dt:
+                return None
+
+            sleep_duration = future_dt - datetime.now(tz=UTC)
+            await asyncio.sleep(sleep_duration.total_seconds())
+            task.stopping.event.set()
+
+        # Gracefully exit to ensure relatively close adherance to any bindings'
+        # re-initialization schedules.
+        asyncio.create_task(scheduled_stop(soonest_future_scheduled_initialization))
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 
