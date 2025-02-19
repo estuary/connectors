@@ -1,0 +1,15 @@
+# ================================
+# Collection "acmeCo/test/capturewithnullcursor_662607": 7 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value with NULL cursor","id":0,"sort_col":null}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Third NULL cursor","id":4,"sort_col":null}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Another NULL cursor","id":2,"sort_col":null}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value with cursor 10","id":1,"sort_col":10}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value with cursor 20","id":3,"sort_col":20}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value with cursor 25","id":7,"sort_col":25}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Final value cursor 30","id":9,"sort_col":30}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"capturewithnullcursor_662607":{"CursorNames":["sort_col"],"CursorValues":[30],"LastPolled":"<TIMESTAMP>"}}}
+
