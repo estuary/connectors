@@ -12,7 +12,7 @@ from estuary_cdk.http import HTTPMixin
 
 from .models import (
     EndpointConfig,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
     FullRefreshResource,
     IncrementalResource,
@@ -85,7 +85,7 @@ def full_refresh_resources(
             gateway: BraintreeGateway,
             gateway_property: str,
             gateway_response_field: str | None,
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -112,7 +112,7 @@ def full_refresh_resources(
             model=FullRefreshResource,
             open=functools.partial(open, _create_gateway(config), gateway_property, gateway_response_field),
             initial_state=ResourceState(),
-            initial_config=ResourceConfig(
+            initial_config=ResourceConfigWithSchedule(
                 name=name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
@@ -130,7 +130,7 @@ def incremental_resources(
             fetch_page_fn: IncrementalResourceFetchPageFn,
             gateway: BraintreeGateway,
             window_size: int,
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -165,8 +165,8 @@ def incremental_resources(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(next_page=_dt_to_str(config.start_date), cutoff=cutoff)
             ),
-            initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+            initial_config=ResourceConfigWithSchedule(
+                name=name, interval=timedelta(minutes=5), schedule="0 20 * * 5",
             ),
             schema_inference=True,
         )
@@ -181,7 +181,7 @@ def transactions(
     def open(
             gateway: BraintreeGateway,
             window_size: int,
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -215,7 +215,7 @@ def transactions(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=_dt_to_str(config.start_date), cutoff=cutoff)
         ),
-        initial_config=ResourceConfig(
+        initial_config=ResourceConfigWithSchedule(
             name='transactions', interval=timedelta(minutes=5)
         ),
         schema_inference=True,

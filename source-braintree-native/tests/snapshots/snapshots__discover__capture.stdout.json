@@ -207,7 +207,8 @@
     "recommendedName": "credit_card_verifications",
     "resourceConfig": {
       "name": "credit_card_verifications",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 20 * * 5"
     },
     "documentSchema": {
       "$defs": {
@@ -271,7 +272,8 @@
     "recommendedName": "customers",
     "resourceConfig": {
       "name": "customers",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 20 * * 5"
     },
     "documentSchema": {
       "$defs": {
@@ -335,7 +337,8 @@
     "recommendedName": "disputes",
     "resourceConfig": {
       "name": "disputes",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 20 * * 5"
     },
     "documentSchema": {
       "$defs": {
@@ -399,7 +402,8 @@
     "recommendedName": "subscriptions",
     "resourceConfig": {
       "name": "subscriptions",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 20 * * 5"
     },
     "documentSchema": {
       "$defs": {
