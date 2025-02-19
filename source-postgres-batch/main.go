@@ -119,6 +119,13 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	return db, nil
 }
 
+func selectQueryTemplate(res *Resource) (string, error) {
+	if res.Template != "" {
+		return res.Template, nil
+	}
+	return tableQueryTemplate, nil
+}
+
 // A discussion on the use of XIDs as query cursors:
 //
 // XID values are 32-bit unsigned integers with implicit wraparound on overflow and underflow.
@@ -194,12 +201,12 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 }
 
 var postgresDriver = &BatchSQLDriver{
-	DocumentationURL:     "https://go.estuary.dev/source-postgres-batch",
-	ConfigSchema:         generateConfigSchema(),
-	Connect:              connectPostgres,
-	GenerateResource:     generatePostgresResource,
-	TranslateValue:       translatePostgresValue,
-	DefaultQueryTemplate: tableQueryTemplate,
+	DocumentationURL:    "https://go.estuary.dev/source-postgres-batch",
+	ConfigSchema:        generateConfigSchema(),
+	Connect:             connectPostgres,
+	GenerateResource:    generatePostgresResource,
+	TranslateValue:      translatePostgresValue,
+	SelectQueryTemplate: selectQueryTemplate,
 }
 
 func generateConfigSchema() json.RawMessage {

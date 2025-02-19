@@ -9,43 +9,77 @@ from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
     AuditLog,
+    ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
     EndpointConfig,
+    FullRefreshResponse,
+    FullRefreshOffsetPaginatedResponse,
     FullRefreshCursorPaginatedResponse,
     FullRefreshResource,
     IncrementalCursorPaginatedResponse,
+    IncrementalTimeExportResponse,
     ResourceConfig,
     ResourceState,
     TimestampedResource,
     ZendeskResource,
     EPOCH,
+    CLIENT_SIDE_FILTERED_OFFSET_PAGINATED_RESOURCES,
     CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES,
+    FULL_REFRESH_RESOURCES,
+    FULL_REFRESH_OFFSET_PAGINATED_RESOURCES,
     FULL_REFRESH_CURSOR_PAGINATED_RESOURCES,
+    INCREMENTAL_TIME_EXPORT_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
     INCREMENTAL_CURSOR_PAGINATED_RESOURCES,
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
+    POST_CHILD_RESOURCES,
 )
 from .api import (
     backfill_audit_logs,
+    backfill_incremental_time_export_resources,
     backfill_incremental_cursor_export_resources,
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
     fetch_audit_logs,
+    fetch_client_side_incremental_offset_paginated_resources,
     fetch_client_side_incremental_cursor_paginated_resources,
+    fetch_incremental_time_export_resources,
     fetch_incremental_cursor_export_resources,
     fetch_incremental_cursor_paginated_resources,
+    fetch_post_child_resources,
+    fetch_post_comment_votes,
     fetch_satisfaction_ratings,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
+    snapshot_resources,
+    snapshot_offset_paginated_resources,
     snapshot_cursor_paginated_resources,
     url_base,
     _dt_to_s,
     TIME_PARAMETER_DELAY,
 )
+
+
+ENTERPRISE_STREAMS = ["audit_logs", "account_attributes"]
+
+
+async def _is_enterprise_account(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> bool:
+    try:
+        await http.request(log, f"{url_base(config.subdomain)}/audit_logs")
+    except HTTPError as err:
+        if err.code == 403 and "You do not have access to this page." in err.message:
+            return False
+        else:
+            raise err
+
+    return True
+
 
 async def validate_credentials(
         log: Logger, http: HTTPMixin, config: EndpointConfig
@@ -164,6 +198,98 @@ def ticket_metrics(
     )
 
 
+def full_refresh_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+            path: str,
+            response_model: type[FullRefreshResponse],
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_resources,
+                http,
+                config.subdomain,
+                path,
+                response_model,
+            ),
+            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
+        )
+
+    resources = [
+        common.Resource(
+            name=name,
+            key=["/_meta/row_id"],
+            model=FullRefreshResource,
+            open=functools.partial(open, path, response_model),
+            initial_state=ResourceState(),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=60)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in FULL_REFRESH_RESOURCES
+    ]
+
+    return resources
+
+
+def full_refresh_offset_paginated_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+            path: str,
+            response_model: type[FullRefreshOffsetPaginatedResponse],
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_offset_paginated_resources,
+                http,
+                config.subdomain,
+                path,
+                response_model,
+            ),
+            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
+        )
+
+    resources = [
+        common.Resource(
+            name=name,
+            key=["/_meta/row_id"],
+            model=FullRefreshResource,
+            open=functools.partial(open, path, response_model),
+            initial_state=ResourceState(),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=60)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in FULL_REFRESH_OFFSET_PAGINATED_RESOURCES
+    ]
+
+    return resources
+
+
 def full_refresh_cursor_paginated_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -183,11 +309,11 @@ def full_refresh_cursor_paginated_resources(
             state,
             task,
             fetch_snapshot=functools.partial(
-            snapshot_cursor_paginated_resources,
-            http,
-            config.subdomain,
-            path,
-            response_model,
+                snapshot_cursor_paginated_resources,
+                http,
+                config.subdomain,
+                path,
+                response_model,
         ),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
@@ -200,11 +326,60 @@ def full_refresh_cursor_paginated_resources(
             open=functools.partial(open, path, response_model),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=60)
             ),
             schema_inference=True,
         )
         for (name, path, response_model) in FULL_REFRESH_CURSOR_PAGINATED_RESOURCES
+    ]
+
+    return resources
+
+
+def client_side_filtered_offset_paginated_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+            path: str,
+            response_model: type[ClientSideIncrementalOffsetPaginatedResponse],
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_client_side_incremental_offset_paginated_resources,
+                http,
+                config.subdomain,
+                path,
+                response_model,
+            ),
+        )
+
+    resources = [
+        common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, path, response_model),
+            initial_state=ResourceState(
+                # Set the initial state of these streams to be the epoch so all results are initially 
+                # emitted, then only updated results are emitted on subsequent sweeps.
+                inc=ResourceState.Incremental(cursor=EPOCH)
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=30)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in CLIENT_SIDE_FILTERED_OFFSET_PAGINATED_RESOURCES
     ]
 
     return resources
@@ -251,7 +426,7 @@ def client_side_filtered_cursor_paginated_resources(
                 inc=ResourceState.Incremental(cursor=EPOCH)
             ),
             initial_config=ResourceConfig(
-                name=name, interval=timedelta(minutes=5)
+                name=name, interval=timedelta(minutes=15)
             ),
             schema_inference=True,
         )
@@ -363,6 +538,66 @@ def incremental_cursor_paginated_resources(
             schema_inference=True,
         )
         for (name, path, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES
+    ]
+
+    return resources
+
+
+def incremental_time_export_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        name: str,
+        path: str,
+        response_model: type[IncrementalTimeExportResponse],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental_time_export_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+            ),
+            fetch_page=functools.partial(
+                backfill_incremental_time_export_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, name, path, response_model),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in INCREMENTAL_TIME_EXPORT_RESOURCES
     ]
 
     return resources
@@ -491,18 +726,114 @@ def ticket_child_resources(
     return resources
 
 
+def post_child_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        path_segment: str,
+        response_model: type[IncrementalCursorPaginatedResponse],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_post_child_resources,
+                http,
+                config.subdomain,
+                path_segment,
+                response_model,
+            ),
+        )
+
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=ZendeskResource,
+            open=functools.partial(open, path_segment, response_model),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=config.start_date),
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=30)
+            ),
+            schema_inference=True,
+        )
+        for (name, path_segment, response_model) in POST_CHILD_RESOURCES
+    ]
+
+    return resources
+
+
+def post_comment_votes(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_post_comment_votes,
+                http,
+                config.subdomain,
+            ),
+        )
+
+    return common.Resource(
+        name="post_comment_votes",
+        key=["/id"],
+        model=ZendeskResource,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=config.start_date),
+        ),
+        initial_config=ResourceConfig(
+            name="post_comment_votes", interval=timedelta(minutes=30)
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
 
-    return [
+    resources = [
         audit_logs(log, http, config),
         ticket_metrics(log, http, config),
+        *full_refresh_resources(log, http, config),
+        *full_refresh_offset_paginated_resources(log, http, config),
         *full_refresh_cursor_paginated_resources(log, http, config),
+        *client_side_filtered_offset_paginated_resources(log, http, config),
         *client_side_filtered_cursor_paginated_resources(log, http, config),
         satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
+        *incremental_time_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
+        *post_child_resources(log, http, config),
+        post_comment_votes(log, http, config),
     ]
+
+    if not await _is_enterprise_account(log, http, config):
+        resources = [r for r in resources if r.name not in ENTERPRISE_STREAMS]
+
+    return resources

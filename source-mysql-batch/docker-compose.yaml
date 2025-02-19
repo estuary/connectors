@@ -1,0 +1,28 @@
+services:
+  db:
+    image: 'mysql:8.4'
+    command: []
+    ports:
+      - "3306:3306"
+    volumes:
+      - type: bind
+        source: ./docker-initdb.sh
+        target: /docker-entrypoint-initdb.d/init-user-db.sh
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "--silent" ]
+    environment:
+      MYSQL_DATABASE: mysql
+      MYSQL_ROOT_PASSWORD: secret1234
+    networks:
+      - flow-test
+    cap_add:
+      - SYS_NICE # Prevents 'mbind: Operation not permitted' errors. In theory those are benign but it's better to not have them.
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  mysql_data: {}

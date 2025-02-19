@@ -130,6 +130,24 @@ class TimestampedResource(ZendeskResource):
     updated_at: AwareDatetime
 
 
+class IncrementalTimeExportResponse(BaseModel, extra="allow"):
+    next_page: str | None
+    count: int
+    end_of_stream: bool
+    end_time: int | None
+    resources: list[TimestampedResource]
+
+
+class OrganizationsResponse(IncrementalTimeExportResponse):
+    resources: list[TimestampedResource] = Field(alias="organizations")
+
+# Incremental time based export resources.
+# Tuples contain the name, path, and response model for each resource.
+INCREMENTAL_TIME_EXPORT_RESOURCES: list[tuple[str, str, type[IncrementalTimeExportResponse]]] = [
+    ("organizations", "organizations", OrganizationsResponse),
+]
+
+
 class IncrementalCursorExportResponse(BaseModel, extra="allow"):
     after_cursor: str | None
     end_of_stream: bool
@@ -152,7 +170,42 @@ INCREMENTAL_CURSOR_EXPORT_RESOURCES: list[INCREMENTAL_CURSOR_EXPORT_TYPES] = [
 ]
 
 
-class FullRefreshCursorPaginatedResponse(BaseModel, extra="allow"):
+class FullRefreshResponse(BaseModel, extra="allow"):
+    resources: list[FullRefreshResource]
+
+
+class SchedulesResponse(FullRefreshResponse):
+    resources: list[FullRefreshResource] = Field(alias="schedules")
+
+
+# Full refresh resources with no pagination.
+# Tuples contain the name, path, and response model for each resource.
+FULL_REFRESH_RESOURCES: list[tuple[str, str, type[FullRefreshResponse]]] = [
+    ("schedules", "business_hours/schedules", SchedulesResponse),
+]
+
+
+class FullRefreshOffsetPaginatedResponse(FullRefreshResponse):
+    next_page: str | None
+
+
+class AccountAttributesResponse(FullRefreshOffsetPaginatedResponse):
+    resources: list[FullRefreshResource] = Field(alias="attributes")
+
+
+class SlaPoliciesResponse(FullRefreshOffsetPaginatedResponse):
+    resources: list[FullRefreshResource] = Field(alias="sla_policies")
+
+
+# Full refresh resources that paginted with page offsets.
+# Tuples contain the name, path, and response model for each resource.
+FULL_REFRESH_OFFSET_PAGINATED_RESOURCES: list[tuple[str, str, type[FullRefreshOffsetPaginatedResponse]]] = [
+        ("account_attributes", "routing/attributes", AccountAttributesResponse),
+        ("sla_policies", "slas/policies", SlaPoliciesResponse),
+]
+
+
+class FullRefreshCursorPaginatedResponse(FullRefreshResponse):
     class Meta(BaseModel, extra="forbid"):
         has_more: bool
         after_cursor: str | None
@@ -218,8 +271,32 @@ TICKET_CHILD_RESOURCES: list[tuple[str, str, type[IncrementalCursorPaginatedResp
 ]
 
 
+class ClientSideIncrementalOffsetPaginatedResponse(FullRefreshOffsetPaginatedResponse):
+    resources: list[TimestampedResource]
+
+
+class CustomRolesResponse(ClientSideIncrementalOffsetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="custom_roles")
+
+
+class TicketFormsResponse(ClientSideIncrementalOffsetPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="ticket_forms")
+
+
+# Incremental client side resources that are paginated with page offsets.
+# Tuples contain the name, path, and response model for each resource.
+CLIENT_SIDE_FILTERED_OFFSET_PAGINATED_RESOURCES: list[tuple[str, str, type[ClientSideIncrementalOffsetPaginatedResponse]]] = [
+    ("custom_roles", "custom_roles", CustomRolesResponse),
+    ("ticket_forms", "ticket_forms", TicketFormsResponse),
+]
+
+
 class ClientSideIncrementalCursorPaginatedResponse(FullRefreshCursorPaginatedResponse):
     resources: list[TimestampedResource]
+
+
+class AutomationsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="automations")
 
 
 class BrandsResponse(ClientSideIncrementalCursorPaginatedResponse):
@@ -234,6 +311,10 @@ class GroupsResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="groups")
 
 
+class GroupMembershipsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="group_memberships")
+
+
 class MacrosResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="macros")
 
@@ -242,14 +323,52 @@ class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedRespon
     resources: list[TimestampedResource] = Field(alias="organization_memberships")
 
 
+class Post(TimestampedResource):
+    comment_count: int
+    vote_count: int
+
+
+class PostsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[Post] = Field(alias="posts")
+
+
+class TopicsResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="topics")
+
+
 # Incremental client side resources that are paginated with a cursor.
 # Tuples contain the name, path, any additional request query params, and response model for each resource.
 CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, str | int] | None, type[ClientSideIncrementalCursorPaginatedResponse]]] = [
+    ("automations", "automations", None, AutomationsResponse),
     ("brands", "brands", None, BrandsResponse),
     ("groups", "groups", {"exclude_deleted": "false"}, GroupsResponse),
+    ("group_memberships", "group_memberships", None, GroupMembershipsResponse),
     ("macros", "macros", None, MacrosResponse),
     ("organization_memberships", "organization_memberships", None, OrganizationMembershipsResponse),
+    ("posts", "community/posts", None, PostsResponse),
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),
+    ("topics", "community/topics", None, TopicsResponse),
+]
+
+
+class PostVotesResponse(IncrementalCursorPaginatedResponse):
+    resources: list[ZendeskResource] = Field(alias="votes")
+
+
+class PostComment(ZendeskResource):
+    post_id: int
+    vote_count: int
+
+
+class PostCommentsResponse(IncrementalCursorPaginatedResponse):
+    resources: list[PostComment] = Field(alias="comments")
+
+
+# Resources that are fetched by following the posts stream & fetching resources for updated posts in a separate request.
+# Tuples contain the name, path segment, and response model for each resource.
+POST_CHILD_RESOURCES: list[tuple[str, str, type[IncrementalCursorPaginatedResponse]]] = [
+    ("post_votes", "votes", PostVotesResponse),
+    ("post_comments", "comments", PostCommentsResponse),
 ]
 
 
@@ -259,3 +378,7 @@ class AuditLog(ZendeskResource):
 
 class AuditLogsResponse(FullRefreshCursorPaginatedResponse):
     resources: list[AuditLog] = Field(alias="audit_logs")
+
+
+class PostCommentVotesResponse(PostVotesResponse):
+    pass

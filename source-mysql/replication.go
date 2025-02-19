@@ -776,23 +776,26 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var oldName = alter.OldName.Name.String()
 			var newName = alter.NewName.Name.String()
 
-			var colIndex = slices.Index(meta.Schema.Columns, oldName)
+			var colIndex = findColumnIndex(meta.Schema.Columns, oldName)
 			if colIndex == -1 {
 				return fmt.Errorf("unknown column %q", oldName)
 			}
+			oldName = meta.Schema.Columns[colIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns[colIndex] = newName
 
 			var colType = meta.Schema.ColumnTypes[oldName]
 			meta.Schema.ColumnTypes[oldName] = nil
 			meta.Schema.ColumnTypes[newName] = colType
+			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed RENAME COLUMN alteration")
 		case *sqlparser.RenameTableName:
 			return fmt.Errorf("unsupported table alteration (go.estuary.dev/eVVwet): %s", query)
 		case *sqlparser.ChangeColumn:
 			var oldName = alter.OldColumn.Name.String()
-			var oldIndex = slices.Index(meta.Schema.Columns, oldName)
+			var oldIndex = findColumnIndex(meta.Schema.Columns, oldName)
 			if oldIndex == -1 {
 				return fmt.Errorf("unknown column %q", oldName)
 			}
+			oldName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
 			var newName = alter.NewColDefinition.Name.String()
@@ -802,7 +805,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 				newIndex = 0
 			} else if alter.After != nil {
 				var afterName = alter.After.Name.String()
-				var afterIndex = slices.Index(meta.Schema.Columns, afterName)
+				var afterIndex = findColumnIndex(meta.Schema.Columns, afterName)
 				if afterIndex == -1 {
 					return fmt.Errorf("unknown column %q", afterName)
 				}
@@ -814,10 +817,11 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
 		case *sqlparser.ModifyColumn:
 			var colName = alter.NewColDefinition.Name.String()
-			var oldIndex = slices.Index(meta.Schema.Columns, colName)
+			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
 				return fmt.Errorf("unknown column %q", colName)
 			}
+			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
 			var newType = translateDataType(meta, alter.NewColDefinition.Type)
@@ -826,7 +830,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 				newIndex = 0
 			} else if alter.After != nil {
 				var afterName = alter.After.Name.String()
-				var afterIndex = slices.Index(meta.Schema.Columns, afterName)
+				var afterIndex = findColumnIndex(meta.Schema.Columns, afterName)
 				if afterIndex == -1 {
 					return fmt.Errorf("unknown column %q", afterName)
 				}
@@ -841,7 +845,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			if alter.First {
 				insertAt = 0
 			} else if after := alter.After; after != nil {
-				var afterIndex = slices.Index(meta.Schema.Columns, after.Name.String())
+				var afterIndex = findColumnIndex(meta.Schema.Columns, after.Name.String())
 				if afterIndex == -1 {
 					return fmt.Errorf("unknown column %q", after.Name.String())
 				}
@@ -859,10 +863,11 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
 		case *sqlparser.DropColumn:
 			var colName = alter.Name.Name.String()
-			var oldIndex = slices.Index(meta.Schema.Columns, colName)
+			var oldIndex = findColumnIndex(meta.Schema.Columns, colName)
 			if oldIndex == -1 {
 				return fmt.Errorf("unknown column %q", colName)
 			}
+			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 			meta.Schema.ColumnTypes[colName] = nil // Set to nil rather than delete so that JSON patch merging deletes it
 			logrus.WithField("columns", meta.Schema.Columns).WithField("types", meta.Schema.ColumnTypes).Info("processed CHANGE COLUMN alteration")
@@ -883,6 +888,20 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 	}
 
 	return nil
+}
+
+// findColumnIndex performs a case-insensitive search for a column name in a slice of column names.
+// It returns the index of the first matching column, or -1 if no match is found.
+//
+// According to https://dev.mysql.com/doc/refman/8.4/en/identifier-case-sensitivity.html:
+// > [...] column [...] names are not case-sensitive on any platform, nor are column aliases.
+func findColumnIndex(columns []string, name string) int {
+	for i, col := range columns {
+		if strings.EqualFold(col, name) {
+			return i
+		}
+	}
+	return -1
 }
 
 func translateDataType(meta *mysqlTableMetadata, t sqlparser.ColumnType) any {

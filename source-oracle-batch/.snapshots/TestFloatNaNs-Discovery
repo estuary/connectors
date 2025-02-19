@@ -1,28 +1,32 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_float_nans_10511",
-      "schema": "test",
-      "table": "float_nans_10511",
+      "name": "c__flow_test_logminer_float_nans_10511",
+      "owner": "C##FLOW_TEST_LOGMINER",
+      "table": "FLOAT_NANS_10511",
       "cursor": [
-        "txid"
+        "TXID"
       ]
     },
     "resource_path": [
-      "test_float_nans_10511"
+      "c__flow_test_logminer_float_nans_10511"
     ],
     "collection": {
-      "name": "acmeCo/test/test_float_nans_10511",
+      "name": "acmeCo/test/c__flow_test_logminer_float_nans_10511",
       "read_schema_json": {
         "type": "object",
         "required": [
           "_meta",
-          "id"
+          "ID"
         ],
         "properties": {
+          "ID": {
+            "type": "string",
+            "format": "integer"
+          },
           "_meta": {
-            "$schema": "http://json-schema.org/draft/2020-12/schema",
-            "$id": "https://github.com/estuary/connectors/source-postgres-batch/document-metadata",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-oracle-batch/document-metadata",
             "properties": {
               "polled": {
                 "type": "string",
@@ -41,18 +45,15 @@ Binding 0:
               "polled",
               "index"
             ]
-          },
-          "id": {
-            "type": "integer"
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/id"
+        "/ID"
       ],
       "projections": null
     },
-    "state_key": "test_float_nans_10511"
+    "state_key": "c__flow_test_logminer_float_nans_10511"
   }
 

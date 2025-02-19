@@ -95,6 +95,11 @@ class BaseConnector(Generic[Request], abc.ABC):
                 if task is this_task:
                     continue
 
+                log.info("Attempting to inject SIGQUIT exception into task.", {
+                    "task.get_name()": task.get_name(),
+                    "task.get_coro().__name__": task.get_coro().__name__,
+                })
+
                 # Reach inside the task coroutine to inject an exception, which
                 # will unwind the task stack and lets us print a precise stack trace.
                 try:

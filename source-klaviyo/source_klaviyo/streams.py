@@ -147,6 +147,8 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
     # and others only support "greater-than". comparison_operator must be specified for each incremental stream.
     comparison_operator: str = "greater-or-equal"
 
+    additional_filter_condition: str | None = None
+
     def request_params(
         self,
         stream_state: Optional[Mapping[str, Any]],
@@ -177,6 +179,15 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
                 latest_cursor = min(latest_cursor, pendulum.now().subtract(seconds=3))
                 params["filter"] = f"{self.comparison_operator}({self.cursor_field},{latest_cursor.isoformat()})"
             params["sort"] = self.cursor_field
+
+        filter_param = params.get("filter", None)
+
+        if self.additional_filter_condition:
+            if filter_param and self.additional_filter_condition not in filter_param:
+                params["filter"] += f",{self.additional_filter_condition}"
+            elif not filter_param:
+                params["filter"] = f"{self.additional_filter_condition}"
+
         return params
 
 
@@ -209,12 +220,14 @@ class SemiIncrementalKlaviyoStream(KlaviyoStream, ABC):
 
 
 class ArchivedRecordsStream(IncrementalKlaviyoStream):
-    def __init__(self, path: str, cursor_field: str, start_date: Optional[str] = None, api_revision: Optional[str] = None, **kwargs):
+    def __init__(self, path: str, cursor_field: str, start_date: Optional[str] = None, api_revision: Optional[str] = None, additional_filter_condition: Optional[str] = None, **kwargs):
         super().__init__(start_date=start_date, **kwargs)
         self._path = path
         self._cursor_field = cursor_field
         if api_revision:
             self.api_revision = api_revision
+        if additional_filter_condition:
+            self.additional_filter_condition = additional_filter_condition
 
     @property
     def cursor_field(self) -> Union[str, List[str]]:
@@ -244,7 +257,7 @@ class ArchivedRecordsMixin(IncrementalKlaviyoStream, ABC):
 
     @property
     def archived_campaigns(self) -> ArchivedRecordsStream:
-        return ArchivedRecordsStream(self.path(), self.cursor_field, self._start_ts, self.api_revision, api_key=self._api_key)
+        return ArchivedRecordsStream(self.path(), self.cursor_field, self._start_ts, self.api_revision, api_key=self._api_key, additional_filter_condition=self.additional_filter_condition)
 
     def get_updated_state(self, current_stream_state: MutableMapping[str, Any], latest_record: Mapping[str, Any]) -> Mapping[str, Any]:
         """
@@ -279,7 +292,6 @@ class Profiles(IncrementalKlaviyoStream):
 
     cursor_field = "updated"
     comparison_operator = 'greater-than'
-    api_revision = "2023-02-22"
     page_size = 100
     state_checkpoint_interval = 100  # API can return maximum 100 records per page
 
@@ -293,7 +305,7 @@ class Profiles(IncrementalKlaviyoStream):
         next_page_token: Optional[Mapping[str, Any]] = None,
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state=stream_state, stream_slice=stream_slice, next_page_token=next_page_token)
-        params.update({"additional-fields[profile]": "predictive_analytics"})
+        params.update({"additional-fields[profile]": "predictive_analytics,subscriptions"})
         return params
 
 
@@ -301,7 +313,7 @@ class Campaigns(ArchivedRecordsMixin, IncrementalKlaviyoStream):
     """Docs: https://developers.klaviyo.com/en/v2023-06-15/reference/get_campaigns"""
 
     cursor_field = "updated_at"
-    api_revision = "2023-06-15"
+    additional_filter_condition = "equals(messages.channel,'email')"
 
     def path(self, **kwargs) -> str:
         return "campaigns"

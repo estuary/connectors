@@ -1,5 +1,59 @@
 [
   [
+    "acmeCo/account_attributes",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2024-08-01T12:48:41Z",
+      "id": "6149ea30-5004-11ef-ba4d-1fb32c16a1d3",
+      "name": "Test attribute",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/routing/attributes/6149ea30-5004-11ef-ba4d-1fb32c16a1d3.json"
+    }
+  ],
+  [
+    "acmeCo/automations",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "actions": [
+        {
+          "field": "status",
+          "value": "closed"
+        }
+      ],
+      "active": true,
+      "conditions": {
+        "all": [
+          {
+            "field": "status",
+            "operator": "is",
+            "value": "solved"
+          },
+          {
+            "field": "SOLVED",
+            "operator": "greater_than",
+            "value": "72"
+          }
+        ],
+        "any": []
+      },
+      "created_at": "2024-07-26T15:41:01Z",
+      "default": true,
+      "id": 28835714782868,
+      "position": 0,
+      "raw_title": "Close ticket 3 days after status is set to solved",
+      "title": "Close ticket 3 days after status is set to solved",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/automations/28835714782868.json"
+    }
+  ],
+  [
     "acmeCo/brands",
     {
       "_meta": {
@@ -24,6 +78,98 @@
       ],
       "updated_at": "redacted",
       "url": "https://d3v-estuary.zendesk.com/api/v2/brands/28835714705684.json"
+    }
+  ],
+  [
+    "acmeCo/custom_roles",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "configuration": {
+        "assign_agent_statuses": false,
+        "assign_tickets_to_any_group": false,
+        "chat_access": false,
+        "custom_objects": {},
+        "end_user_list_access": "full",
+        "end_user_profile_access": "readonly",
+        "explore_access": "readonly",
+        "explore_reports": {
+          "ticket_access": "all",
+          "ticket_access_selected_groups": []
+        },
+        "forum_access": "readonly",
+        "forum_access_restricted_content": false,
+        "group_access": false,
+        "light_agent": true,
+        "macro_access": "readonly",
+        "manage_automations": false,
+        "manage_business_rules": false,
+        "manage_contextual_workspaces": false,
+        "manage_deletion_schedules": "none",
+        "manage_dynamic_content": false,
+        "manage_extensions_and_channels": false,
+        "manage_facebook": false,
+        "manage_group_memberships": false,
+        "manage_groups": false,
+        "manage_macro_content_suggestions": false,
+        "manage_malicious_attachments": false,
+        "manage_organization_fields": false,
+        "manage_organizations": false,
+        "manage_roles": "none",
+        "manage_skills": false,
+        "manage_slas": false,
+        "manage_suspended_tickets": false,
+        "manage_ticket_fields": false,
+        "manage_ticket_forms": false,
+        "manage_triggers": false,
+        "manage_user_fields": false,
+        "moderate_forums": false,
+        "organization_editing": false,
+        "organization_notes_editing": false,
+        "read_macro_content_suggestions": false,
+        "report_access": "readonly",
+        "side_conversation_create": true,
+        "ticket_access": "within-groups",
+        "ticket_comment_access": "none",
+        "ticket_deletion": false,
+        "ticket_editing": false,
+        "ticket_merge": false,
+        "ticket_redaction": false,
+        "ticket_tag_editing": false,
+        "twitter_search_access": false,
+        "user_view_access": "none",
+        "view_access": "readonly",
+        "view_deleted_tickets": false,
+        "view_filter_tickets": true,
+        "view_reduced_count": false,
+        "voice_access": false,
+        "voice_dashboard_access": false
+      },
+      "created_at": "2024-07-26T15:40:56Z",
+      "description": "Can view and add private comments to tickets",
+      "id": 28835714382484,
+      "name": "Light agent",
+      "role_type": 1,
+      "team_member_count": 0,
+      "updated_at": "redacted"
+    }
+  ],
+  [
+    "acmeCo/group_memberships",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-07-26T15:41:00Z",
+      "default": true,
+      "group_id": 28835740822676,
+      "id": 28835714743188,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/group_memberships/28835714743188.json",
+      "user_id": 28835702984212
     }
   ],
   [
@@ -93,6 +239,120 @@
     }
   ],
   [
+    "acmeCo/organizations",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-07-26T15:41:00Z",
+      "deleted_at": null,
+      "details": "",
+      "domain_names": [],
+      "external_id": null,
+      "group_id": null,
+      "id": 28835714737428,
+      "name": "Estuary",
+      "notes": "",
+      "organization_fields": {},
+      "shared_comments": false,
+      "shared_tickets": false,
+      "tags": [
+        "test-tag"
+      ],
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/organizations/28835714737428.json"
+    }
+  ],
+  [
+    "acmeCo/post_comment_votes",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-08-01T13:19:33Z",
+      "id": 29005807715092,
+      "item_id": 29005581511700,
+      "item_type": "PostComment",
+      "post_id": 28847424303764,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/votes/29005807715092.json",
+      "user_id": 28835702984212,
+      "value": 1
+    }
+  ],
+  [
+    "acmeCo/post_comments",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "author_id": 28835702984212,
+      "body": "A test post comment.",
+      "created_at": "2024-08-01T13:10:11Z",
+      "html_url": "https://d3v-estuary.zendesk.com/hc/en-us/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests/comments/29005581511700",
+      "id": 29005581511700,
+      "non_author_editor_id": null,
+      "non_author_updated_at": null,
+      "official": false,
+      "post_id": 28847424303764,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/community/posts/28847424303764/comments/29005581511700.json",
+      "vote_count": 1,
+      "vote_sum": 1
+    }
+  ],
+  [
+    "acmeCo/post_votes",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2024-08-01T13:15:00Z",
+      "id": 29005734783508,
+      "item_id": 28847424303764,
+      "item_type": "Post",
+      "post_id": 28847424303764,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/votes/29005734783508.json",
+      "user_id": 28835702984212,
+      "value": 1
+    }
+  ],
+  [
+    "acmeCo/posts",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "author_id": 28835702984212,
+      "closed": false,
+      "comment_count": 2,
+      "content_tag_ids": [],
+      "created_at": "2024-07-26T20:41:46Z",
+      "details": "<p>You can add a topic like this one in your community. End users can add feature requests and describe their use cases. Other users can comment on the requests and vote for them. Product managers can review feature requests and provide feedback.</p>",
+      "featured": false,
+      "follower_count": 1,
+      "frozen": false,
+      "html_url": "https://d3v-estuary.zendesk.com/hc/en-us/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests",
+      "id": 28847424303764,
+      "non_author_editor_id": null,
+      "non_author_updated_at": null,
+      "pinned": false,
+      "status": "none",
+      "title": "I'd like a way for users to submit feature requests",
+      "topic_id": 28847452157844,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/community/posts/28847424303764-I-d-like-a-way-for-users-to-submit-feature-requests.json",
+      "vote_count": 1,
+      "vote_sum": 1
+    }
+  ],
+  [
     "acmeCo/satisfaction_ratings",
     {
       "_meta": {
@@ -111,6 +371,115 @@
       "ticket_id": 29,
       "updated_at": "redacted",
       "url": "https://d3v-estuary.zendesk.com/api/v2/satisfaction_ratings/29013431981588.json"
+    }
+  ],
+  [
+    "acmeCo/schedules",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2024-08-01T13:29:59Z",
+      "id": 29006094707860,
+      "intervals": [
+        {
+          "end_time": 2460,
+          "start_time": 1980
+        },
+        {
+          "end_time": 3900,
+          "start_time": 3420
+        },
+        {
+          "end_time": 5340,
+          "start_time": 4860
+        },
+        {
+          "end_time": 6780,
+          "start_time": 6300
+        },
+        {
+          "end_time": 8220,
+          "start_time": 7740
+        }
+      ],
+      "name": "Test schedule",
+      "time_zone": "Eastern Time (US & Canada)",
+      "updated_at": "redacted"
+    }
+  ],
+  [
+    "acmeCo/sla_policies",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2024-08-01T13:54:40Z",
+      "description": "Details copied form Zendesk API code sample. For urgent incidents, we will respond to tickets in 10 minutes",
+      "filter": {
+        "all": [
+          {
+            "field": "ticket_type_id",
+            "operator": "is",
+            "value": "2"
+          }
+        ],
+        "any": []
+      },
+      "id": 29006807867284,
+      "metric_settings": null,
+      "policy_metrics": [
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "low",
+          "target": 180,
+          "target_in_seconds": 10800
+        },
+        {
+          "business_hours": false,
+          "metric": "first_reply_time",
+          "priority": "normal",
+          "target": 30,
+          "target_in_seconds": 1800
+        },
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "normal",
+          "target": 160,
+          "target_in_seconds": 9600
+        },
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "high",
+          "target": 140,
+          "target_in_seconds": 8400
+        },
+        {
+          "business_hours": false,
+          "metric": "first_reply_time",
+          "priority": "urgent",
+          "target": 10,
+          "target_in_seconds": 600
+        },
+        {
+          "business_hours": false,
+          "metric": "requester_wait_time",
+          "priority": "urgent",
+          "target": 120,
+          "target_in_seconds": 7200
+        }
+      ],
+      "position": 1,
+      "title": "Test SLA Policy",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/slas/policies/29006807867284.json"
     }
   ],
   [
@@ -299,6 +668,42 @@
       "updated_at": "redacted",
       "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_fields/28835714573076.json",
       "visible_in_portal": true
+    }
+  ],
+  [
+    "acmeCo/ticket_forms",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "active": true,
+      "agent_conditions": [],
+      "created_at": "2024-07-26T15:40:58Z",
+      "default": true,
+      "display_name": "Default Ticket Form",
+      "end_user_conditions": [],
+      "end_user_visible": true,
+      "id": 28835740693908,
+      "in_all_brands": true,
+      "name": "Default Ticket Form",
+      "position": 0,
+      "raw_display_name": "Default Ticket Form",
+      "raw_name": "Default Ticket Form",
+      "restricted_brand_ids": [],
+      "ticket_field_ids": [
+        28835714573076,
+        28835740681620,
+        28835740683540,
+        28835740685844,
+        28835714576020,
+        28835740687508,
+        28835740688660,
+        28835714575124,
+        28835767646868
+      ],
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/ticket_forms/28835740693908.json"
     }
   ],
   [
@@ -517,6 +922,27 @@
           "to": {}
         }
       }
+    }
+  ],
+  [
+    "acmeCo/topics",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "community_id": 28847452144020,
+      "created_at": "2024-07-26T20:41:45Z",
+      "description": null,
+      "follower_count": 1,
+      "html_url": "https://d3v-estuary.zendesk.com/hc/en-us/community/topics/28847452144788-General-Discussion",
+      "id": 28847452144788,
+      "manageable_by": "managers",
+      "name": "General Discussion",
+      "position": 0,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/help_center/community/topics/28847452144788.json",
+      "user_segment_id": null
     }
   ],
   [

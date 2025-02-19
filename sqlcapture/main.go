@@ -310,8 +310,9 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var hackyCursorReplacements = map[string]map[string]string{
 		"TASKHASH415b69936fe1324600d67943e50235fc57fb7e0196b8f5f0TASKHASH": {"binlog.000123:456789": "binlog.000123:456789"}, // Example
 
-		// Added 2024-11-21
-		"f976b2fd842a663be34d55f54bf0cabd9d85c4abf62d37345dc082b37ddd1d78": {"bin.064767:104548992": "bin.064563:4"},
+		// Added 2025-02-18
+		"cec31becf409bcdd486898a57a02850ad73d1fdf04d0fce71663e913f339778e": {"mysql-bin.079013:2708461504": "mysql-bin.079013:4"},
+		"7414746d7079ddf14cb3afff10762f873b99dc8e66d63a9ed98d6bde40b46080": {"mysql-bin.079013:2717599422": "mysql-bin.079013:4"},
 	}
 	var hasher = sha256.New()
 	hasher.Write([]byte(open.Capture.Name))

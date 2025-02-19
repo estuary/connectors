@@ -151,6 +151,7 @@ func listTasks(ctx context.Context, taskType string, imageNames []string, namePr
 
 func listVariants(connectorName string) ([]string, error) {
 	var variantsURL = fmt.Sprintf("https://raw.githubusercontent.com/estuary/connectors/refs/heads/main/%s/VARIANTS", connectorName)
+	var variants = []string{fmt.Sprintf("ghcr.io/estuary/%s", connectorName)}
 
 	resp, err := http.Get(variantsURL)
 	if err != nil {
@@ -158,13 +159,16 @@ func listVariants(connectorName string) ([]string, error) {
 	}
 	defer resp.Body.Close()
 
+	// Return just the primary name if VARIANTS file doesn't exist
+	if resp.StatusCode == http.StatusNotFound {
+		return variants, nil
+	}
+
 	bs, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error fetching variants list: %w", err)
 	}
 
-	var variants []string
-	variants = append(variants, fmt.Sprintf("ghcr.io/estuary/%s", connectorName))
 	for _, v := range strings.Split(string(bs), "\n") {
 		variants = append(variants, fmt.Sprintf("ghcr.io/estuary/%s", v))
 	}

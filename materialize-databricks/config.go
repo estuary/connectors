@@ -7,8 +7,8 @@ import (
 
 	"github.com/estuary/connectors/go/dbt"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	"github.com/iancoleman/orderedmap"
 	"github.com/invopop/jsonschema"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 // config represents the endpoint configuration for sql server.
@@ -55,7 +55,7 @@ func (c *credentialConfig) validatePATCreds() error {
 // github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
 // our oauth
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
-	patProps := orderedmap.New()
+	patProps := orderedmap.New[string, *jsonschema.Schema]()
 	patProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: PAT_AUTH_TYPE,

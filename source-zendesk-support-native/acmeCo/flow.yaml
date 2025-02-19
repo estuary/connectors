@@ -1,11 +1,27 @@
 ---
 collections:
+  acmeCo/account_attributes:
+    schema: account_attributes.schema.yaml
+    key:
+      - /_meta/row_id
   acmeCo/audit_logs:
     schema: audit_logs.schema.yaml
     key:
       - /id
+  acmeCo/automations:
+    schema: automations.schema.yaml
+    key:
+      - /id
   acmeCo/brands:
     schema: brands.schema.yaml
+    key:
+      - /id
+  acmeCo/custom_roles:
+    schema: custom_roles.schema.yaml
+    key:
+      - /id
+  acmeCo/group_memberships:
+    schema: group_memberships.schema.yaml
     key:
       - /id
   acmeCo/groups:
@@ -20,10 +36,38 @@ collections:
     schema: organization_memberships.schema.yaml
     key:
       - /id
+  acmeCo/organizations:
+    schema: organizations.schema.yaml
+    key:
+      - /id
+  acmeCo/post_comment_votes:
+    schema: post_comment_votes.schema.yaml
+    key:
+      - /id
+  acmeCo/post_comments:
+    schema: post_comments.schema.yaml
+    key:
+      - /id
+  acmeCo/post_votes:
+    schema: post_votes.schema.yaml
+    key:
+      - /id
+  acmeCo/posts:
+    schema: posts.schema.yaml
+    key:
+      - /id
   acmeCo/satisfaction_ratings:
     schema: satisfaction_ratings.schema.yaml
     key:
       - /id
+  acmeCo/schedules:
+    schema: schedules.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/sla_policies:
+    schema: sla_policies.schema.yaml
+    key:
+      - /_meta/row_id
   acmeCo/tags:
     schema: tags.schema.yaml
     key:
@@ -38,6 +82,10 @@ collections:
       - /id
   acmeCo/ticket_fields:
     schema: ticket_fields.schema.yaml
+    key:
+      - /id
+  acmeCo/ticket_forms:
+    schema: ticket_forms.schema.yaml
     key:
       - /id
   acmeCo/ticket_metric_events:
@@ -58,6 +106,10 @@ collections:
       - /id
   acmeCo/tickets:
     schema: tickets.schema.yaml
+    key:
+      - /id
+  acmeCo/topics:
+    schema: topics.schema.yaml
     key:
       - /id
   acmeCo/users:

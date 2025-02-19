@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test_integertypes_795898": 4 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":-9223372036854775808,"id":0,"integer_col":-2147483648,"mediumint_col":-8388608,"smallint_col":-32768,"tinyint_col":-128}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":9223372036854775807,"id":1,"integer_col":2147483647,"mediumint_col":8388607,"smallint_col":32767,"tinyint_col":127}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":0,"id":2,"integer_col":0,"mediumint_col":0,"smallint_col":0,"tinyint_col":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":null,"id":3,"integer_col":null,"mediumint_col":null,"smallint_col":null,"tinyint_col":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_integertypes_795898":{"CursorNames":["id"],"CursorValues":[3],"LastPolled":"<TIMESTAMP>"}}}
+

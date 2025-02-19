@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_key_discovery_329932",
+      "name": "test_keydiscovery_608585",
       "schema": "test",
-      "table": "key_discovery_329932",
+      "table": "keydiscovery_608585",
       "cursor": [
         "txid"
       ]
     },
     "resource_path": [
-      "test_key_discovery_329932"
+      "test_keydiscovery_608585"
     ],
     "collection": {
-      "name": "acmeCo/test/test_key_discovery_329932",
+      "name": "acmeCo/test/test_keydiscovery_608585",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -25,7 +25,7 @@ Binding 0:
         ],
         "properties": {
           "_meta": {
-            "$schema": "http://json-schema.org/draft/2020-12/schema",
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/source-postgres-batch/document-metadata",
             "properties": {
               "polled": {
@@ -73,6 +73,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_key_discovery_329932"
+    "state_key": "test_keydiscovery_608585"
   }
 

@@ -180,7 +180,9 @@ jobs:
             "source-kafka",
             "source-kinesis",
             "source-mysql",
+            "source-mysql-batch",
             "source-postgres",
+            "source-postgres-batch",
             "source-sftp",
             "source-sqlserver",
             "source-mongodb"
@@ -221,7 +223,7 @@ jobs:
         uses: actions/setup-python@v5
         if: ${{matrix.python}}
         with:
-          python-version: '3.11' 
+          python-version: '3.11'
 
       - name: Install Poetry
         if: ${{matrix.python}}

@@ -1,3 +1,4 @@
+import asyncio
 import base64
 from datetime import datetime, timedelta, UTC
 from logging import Logger
@@ -9,27 +10,40 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
     FullRefreshResource,
+    FullRefreshResponse,
+    FullRefreshOffsetPaginatedResponse,
     FullRefreshCursorPaginatedResponse,
     ZendeskResource,
     TimestampedResource,
     AbbreviatedTicket,
-    IncrementalCursorExportResponse,
+    IncrementalTimeExportResponse,
     TicketsResponse,
     UsersResponse,
+    ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
     IncrementalCursorPaginatedResponse,
     SatisfactionRatingsResponse,
     AuditLog,
     AuditLogsResponse,
+    Post,
+    PostsResponse,
+    PostComment,
+    PostCommentsResponse,
+    PostCommentVotesResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
 )
 
+CHECKPOINT_INTERVAL = 1000
 CURSOR_PAGINATION_PAGE_SIZE = 100
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
-# Zendesk errors out if a start or end time parameter is more recent than 60 seconds in the past.
-TIME_PARAMETER_DELAY = timedelta(seconds=60)
+# Zendesk errors out if a start or end time parameter is 60 seconds or less in the past. 
+TIME_PARAMETER_DELAY = timedelta(seconds=61)
 
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+INCREMENTAL_TIME_EXPORT_REQ_PER_MIN_LIMIT = 10
+
+incremental_time_export_api_lock = asyncio.Lock()
+
 
 def url_base(subdomain: str) -> str:
     return f"https://{subdomain}.zendesk.com/api/v2"
@@ -67,6 +81,53 @@ def _is_timestamp(string: str) -> bool:
         return False
 
 
+async def snapshot_resources(
+    http: HTTPSession,
+    subdomain: str,
+    path: str,
+    response_model: type[FullRefreshResponse],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(subdomain)}/{path}"
+
+    response = response_model.model_validate_json(
+        await http.request(log, url)
+    )
+
+    for resource in response.resources:
+        yield resource
+
+
+async def snapshot_offset_paginated_resources(
+    http: HTTPSession,
+    subdomain: str,
+    path: str,
+    response_model: type[FullRefreshOffsetPaginatedResponse],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(subdomain)}/{path}"
+    page_num = 1
+    params: dict[str, str | int] = {
+        "per_page": CURSOR_PAGINATION_PAGE_SIZE,
+        "page": page_num,
+    }
+
+    while True:
+        response = response_model.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        for resource in response.resources:
+            yield resource
+
+        if not response.next_page:
+            return
+
+        page_num += 1
+
+        params["page"] = page_num
+
+
 async def snapshot_cursor_paginated_resources(
     http: HTTPSession,
     subdomain: str,
@@ -92,6 +153,47 @@ async def snapshot_cursor_paginated_resources(
 
         if response.meta.after_cursor:
             params["page[after]"] = response.meta.after_cursor
+
+
+async def fetch_client_side_incremental_offset_paginated_resources(
+    http: HTTPSession,
+    subdomain: str,
+    path: str,
+    response_model: type[ClientSideIncrementalOffsetPaginatedResponse],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    url = f"{url_base(subdomain)}/{path}"
+    page_num = 1
+    params: dict[str, str | int] = {
+        "per_page": CURSOR_PAGINATION_PAGE_SIZE,
+        "page": page_num,
+    }
+
+    last_seen = log_cursor
+
+    while True:
+        response = response_model.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        for resource in response.resources:
+            if resource.updated_at > log_cursor:
+                yield resource
+
+            if resource.updated_at > last_seen:
+                last_seen = resource.updated_at
+
+        if not response.next_page:
+            break
+
+        page_num += 1
+        params["page"] = page_num
+
+    if last_seen > log_cursor:
+        yield last_seen
 
 
 async def fetch_client_side_incremental_cursor_paginated_resources(
@@ -312,6 +414,123 @@ async def backfill_satisfaction_ratings(
         yield satisfaction_rating
 
     yield end
+
+
+async def _fetch_incremental_time_export_resources(
+    http: HTTPSession,
+    subdomain: str,
+    name: str,
+    path: str,
+    response_model: type[IncrementalTimeExportResponse],
+    start_date: datetime,
+    log: Logger,
+) -> AsyncGenerator[TimestampedResource | datetime, None]:
+    # Docs: https://developer.zendesk.com/documentation/ticketing/managing-tickets/using-the-incremental-export-api/#time-based-incremental-exports
+    # Incremental time export streams use timestamps for pagination that correlate to the updated_at timestamp for each record.
+    # The end_time returned in the response for fetching the next page is *always* the updated_at timestamp of the last
+    # record in the current response. This means that we'll always get at least one duplicate result when paginating. This also means
+    # that the stream could get stuck looping & making the same request if more than 1,000 results are updated at the same time, but
+    # an error should be raised if we detect that.
+    url = f"{url_base(subdomain)}/incremental/{path}"
+
+    params = {"start_time": _dt_to_s(start_date)}
+
+    last_seen_dt = start_date
+    count = 0
+
+    while True:
+        async with incremental_time_export_api_lock:
+            processor = IncrementalJsonProcessor(
+                await http.request_stream(log, url, params=params),
+                f"{name}.item",
+                TimestampedResource,
+                response_model,
+            )
+
+            async for resource in processor:
+                # Ignore duplicate results that were yielded on the previous sweep.
+                if resource.updated_at <= start_date:
+                    continue
+
+                # Checkpoint previously yielded documents if we see a new updated_at value.
+                if (
+                    resource.updated_at > last_seen_dt and 
+                    last_seen_dt != start_date and
+                    count >= CHECKPOINT_INTERVAL
+                ):
+                    yield last_seen_dt
+                    count = 0
+
+                yield resource
+                count += 1
+                last_seen_dt = resource.updated_at
+
+            remainder = processor.get_remainder()
+
+            # Handle empty responses. Since the end_time used to get the next page always overlaps with at least one
+            # record on the previous page, we should only see empty responses if users don't have any organizations updated
+            # on or afterthe start date.
+            if remainder.count == 0 or remainder.end_time is None:
+                return
+
+            # Error if 1000+ organizations have the same updated_at value. This stops the stream from
+            # looping & making the same request endlessly. If this happens, we can evaluate different strategies
+            # for users that hit this issue.
+            if params["start_time"] == remainder.end_time and remainder.count >= 1000:
+                raise RuntimeError(f"At least 1,000 organizations were updated at {remainder.end_time}, and this stream cannot progress without potentially missing data. Contact Estuary Support for help resolving this issue.")
+
+            if remainder.end_of_stream:
+                # Checkpoint the last document(s) if there were any updated records in this sweep.
+                if last_seen_dt > start_date:
+                    yield last_seen_dt
+
+                return
+
+            params["start_time"] = remainder.end_time
+
+            # Sleep to avoid excessively hitting this endpoint's more restricting 10 req/min limit.
+            await asyncio.sleep(60 / INCREMENTAL_TIME_EXPORT_REQ_PER_MIN_LIMIT)
+
+
+async def fetch_incremental_time_export_resources(
+    http: HTTPSession,
+    subdomain: str,
+    name: str,
+    path: str,
+    response_model: type[IncrementalTimeExportResponse],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    generator = _fetch_incremental_time_export_resources(http, subdomain, name, path, response_model, log_cursor, log)
+
+    async for result in generator:
+        yield result
+
+
+async def backfill_incremental_time_export_resources(
+    http: HTTPSession,
+    subdomain: str,
+    name: str,
+    path: str,
+    response_model: type[IncrementalTimeExportResponse],
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[TimestampedResource | PageCursor, None]:
+    assert isinstance(page, int)
+    assert isinstance(cutoff, datetime)
+
+    generator = _fetch_incremental_time_export_resources(http, subdomain, name, path, response_model, _s_to_dt(page), log)
+
+    async for result in generator:
+        if isinstance(result, datetime):
+            yield _dt_to_s(result)
+        elif result.updated_at > cutoff:
+            return
+        else:
+            yield result
 
 
 async def _fetch_incremental_cursor_export_resources(
@@ -707,3 +926,67 @@ async def backfill_ticket_metrics(
                 yield ZendeskResource.model_validate(metrics)
         else:
             return
+
+
+async def fetch_post_child_resources(
+    http: HTTPSession,
+    subdomain: str,
+    path_segment: str,
+    response_model: type[IncrementalCursorPaginatedResponse],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    posts_generator = fetch_client_side_incremental_cursor_paginated_resources(http, subdomain, "community/posts", None, PostsResponse, log, log_cursor)
+
+    async for result in posts_generator:
+        if isinstance(result, TimestampedResource):
+            post = Post.model_validate(result)
+
+            if (
+                (path_segment == "votes" and post.vote_count == 0) or 
+                (path_segment == "comments" and post.comment_count == 0)
+            ):
+                continue
+
+            path = f"community/posts/{post.id}/{path_segment}"
+
+            async for child_resource in snapshot_cursor_paginated_resources(http, subdomain, path, response_model, log):
+                yield ZendeskResource.model_validate({
+                    "post_id": post.id,
+                    **child_resource.model_dump(exclude={"meta_"}),
+                })
+
+        else:
+            yield result
+
+
+async def fetch_post_comment_votes(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    post_comments_generator = fetch_post_child_resources(http, subdomain, "comments", PostCommentsResponse, log, log_cursor)
+
+    async for result in post_comments_generator:
+
+        if isinstance(result, ZendeskResource):
+            post_comment = PostComment.model_validate(result.model_dump())  
+
+            if post_comment.vote_count == 0:
+                continue
+
+            path = f"community/posts/{post_comment.post_id}/comments/{post_comment.id}/votes"
+
+            async for child_resource in snapshot_cursor_paginated_resources(http, subdomain, path, PostCommentVotesResponse, log):
+                yield ZendeskResource.model_validate({
+                    "post_id": post_comment.post_id,
+                    **child_resource.model_dump(exclude={"meta_"}),
+                })
+
+        else:
+            yield result

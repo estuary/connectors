@@ -2,6 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 from typing import Optional
+from urllib import parse
 from unittest import mock
 
 import pendulum
@@ -311,15 +312,15 @@ class TestProfilesStream:
             (
                 {"page[cursor]": "aaA0aAo0aAA0A"},
                 None,
-                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics", "sort": "updated"},
+                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"},
             ),
             (
                 {"page[cursor]": "aaA0aAo0aAA0A"},
                 100,
-                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics", "sort": "updated"},
+                {"page[cursor]": "aaA0aAo0aAA0A", "additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"},
             ),
-            (None, None, {"additional-fields[profile]": "predictive_analytics", "sort": "updated"}),
-            (None, 100, {"page[size]": 100, "additional-fields[profile]": "predictive_analytics", "sort": "updated"}),
+            (None, None, {"additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"}),
+            (None, 100, {"page[size]": 100, "additional-fields[profile]": "predictive_analytics,subscriptions", "sort": "updated"}),
         ),
     )
     def test_request_params(self, next_page_token: Optional[dict], page_size: Optional[int], expected_params: dict):
@@ -429,11 +430,15 @@ class TestCampaignsStream:
 
         stream = Campaigns(api_key=API_KEY)
         requests_mock.register_uri(
-            "GET", "https://a.klaviyo.com/api/campaigns?sort=updated_at", status_code=200, json={"data": input_records}, complete_qs=True
+            "GET",
+            "https://a.klaviyo.com/api/campaigns?" + parse.urlencode({"filter": "equals(messages.channel,'email')", "sort": "updated_at"}),
+            status_code=200,
+            json={"data": input_records},
+            complete_qs=True,
         )
         requests_mock.register_uri(
             "GET",
-            "https://a.klaviyo.com/api/campaigns?sort=updated_at&filter=equals(archived,true)",
+            "https://a.klaviyo.com/api/campaigns?" + parse.urlencode({"filter": "and(equals(messages.channel,'email'),equals(archived,true))", "sort": "updated_at"}),
             status_code=200,
             json={"data": input_records_archived},
             complete_qs=True,
