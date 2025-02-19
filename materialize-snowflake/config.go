@@ -10,12 +10,11 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/iancoleman/orderedmap"
-	"github.com/invopop/jsonschema"
-
 	"github.com/estuary/connectors/go/dbt"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/invopop/jsonschema"
 	sf "github.com/snowflakedb/gosnowflake"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 // config represents the endpoint configuration for snowflake.
@@ -208,7 +207,7 @@ func (c *credentialConfig) validateJWTCreds() error {
 // github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
 // our oauth
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
-	uProps := orderedmap.New()
+	uProps := orderedmap.New[string, *jsonschema.Schema]()
 	uProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: UserPass,
@@ -232,7 +231,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 
-	jwtProps := orderedmap.New()
+	jwtProps := orderedmap.New[string, *jsonschema.Schema]()
 	jwtProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: JWT,

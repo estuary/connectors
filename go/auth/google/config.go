@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/iancoleman/orderedmap"
 	"github.com/invopop/jsonschema"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 )
@@ -86,7 +86,7 @@ func (c *CredentialConfig) GoogleCredentials(ctx context.Context, scopes ...stri
 // github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
 // our oauth connectors.
 func (CredentialConfig) JSONSchema() *jsonschema.Schema {
-	serviceAccountProps := orderedmap.New()
+	serviceAccountProps := orderedmap.New[string, *jsonschema.Schema]()
 	serviceAccountProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: SERVICE_AUTH_TYPE,
@@ -105,7 +105,7 @@ func (CredentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 
-	oauthProps := orderedmap.New()
+	oauthProps := orderedmap.New[string, *jsonschema.Schema]()
 	oauthProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
 		Default: CLIENT_AUTH_TYPE,

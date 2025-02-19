@@ -1,6 +1,6 @@
 {
   "config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-google-sheets/config",
     "properties": {
       "spreadsheetUrl": {
@@ -82,7 +82,7 @@
     "title": "Google Sheets Materialization"
   },
   "resource_config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-google-sheets/resource",
     "properties": {
       "sheet": {

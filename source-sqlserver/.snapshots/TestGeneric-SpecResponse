@@ -1,7 +1,7 @@
 {
   "protocol": 3032023,
   "config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-sqlserver/config",
     "properties": {
       "address": {
@@ -135,7 +135,7 @@
     "title": "SQL Server Connection"
   },
   "resource_config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/sqlcapture/resource",
     "properties": {
       "mode": {
