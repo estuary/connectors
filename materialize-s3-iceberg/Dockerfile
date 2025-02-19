@@ -19,7 +19,7 @@ RUN poetry install
 
 # Go build stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.22-bullseye as gobuilder
+FROM --platform=linux/amd64 golang:1.24-bullseye as gobuilder
 
 WORKDIR /builder
 
