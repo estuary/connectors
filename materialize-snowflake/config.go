@@ -208,30 +208,6 @@ func (c *credentialConfig) validateJWTCreds() error {
 // github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
 // our oauth
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
-	uProps := orderedmap.New()
-	uProps.Set("auth_type", &jsonschema.Schema{
-		Type:    "string",
-		Default: UserPass,
-		Const:   UserPass,
-	})
-	uProps.Set("user", &jsonschema.Schema{
-		Title:       "User",
-		Description: "The Snowflake user login name",
-		Type:        "string",
-		Extras: map[string]interface{}{
-			"order": 1,
-		},
-	})
-	uProps.Set("password", &jsonschema.Schema{
-		Title:       "Password",
-		Description: "The password for the provided user",
-		Type:        "string",
-		Extras: map[string]interface{}{
-			"secret": true,
-			"order":  2,
-		},
-	})
-
 	jwtProps := orderedmap.New()
 	jwtProps.Set("auth_type", &jsonschema.Schema{
 		Type:    "string",
@@ -248,7 +224,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 	})
 	jwtProps.Set("private_key", &jsonschema.Schema{
 		Title:       "Private Key",
-		Description: "Private Key to be used to sign the JWT token",
+		Description: "Private Key to be used to sign the JWT token, see go.estuary.dev/materialize-snowflake for more details",
 		Type:        "string",
 		Extras: map[string]interface{}{
 			"secret":    true,
@@ -263,12 +239,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		Default:     map[string]string{"auth_type": UserPass},
 		OneOf: []*jsonschema.Schema{
 			{
-				Title:      "User Password",
-				Required:   []string{"auth_type", "user", "password"},
-				Properties: uProps,
-			},
-			{
-				Title:      "Private Key (JWT)",
+				Title:      "Key-Pair Authentication (JWT)",
 				Required:   []string{"auth_type", "private_key"},
 				Properties: jwtProps,
 			},
