@@ -1,22 +1,26 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "datetime_cursor_132448",
-      "template": "{{/* Default query template which adapts to cursor field selection */}}\n{{- if not .CursorFields -}}\n  SELECT * FROM `testdata`.`datetime_cursor_132448`;\n{{- else -}}\n  SELECT * FROM `testdata`.`datetime_cursor_132448`\n  {{- if not .IsFirstQuery -}}\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = @p{{$j}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e @p{{$i}}\n\t{{- end -}})\n  {{- end}}\n  ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- end}}"
+      "name": "capturewithmodifications_786099",
+      "template": "{{/* Default query template which adapts to cursor field selection */}}\n{{- if not .CursorFields -}}\n  SELECT * FROM `testdata`.`capturewithmodifications_786099`;\n{{- else -}}\n  SELECT * FROM `testdata`.`capturewithmodifications_786099`\n  {{- if not .IsFirstQuery -}}\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = @p{{$j}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e @p{{$i}}\n\t{{- end -}})\n  {{- end}}\n  ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- end}}",
+      "cursor": [
+        "updated_at"
+      ]
     },
     "resource_path": [
-      "datetime_cursor_132448"
+      "capturewithmodifications_786099"
     ],
     "collection": {
-      "name": "acmeCo/test/datetime_cursor_132448",
+      "name": "acmeCo/test/capturewithmodifications_786099",
       "read_schema_json": {
         "type": "object",
         "required": [
-          "_meta"
+          "_meta",
+          "id"
         ],
         "properties": {
           "_meta": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/source-bigquery-batch/document-metadata",
             "properties": {
               "polled": {
@@ -36,16 +40,18 @@ Binding 0:
               "polled",
               "index"
             ]
+          },
+          "id": {
+            "type": "integer"
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/_meta/polled",
-        "/_meta/index"
+        "/id"
       ],
       "projections": null
     },
-    "state_key": "datetime_cursor_132448"
+    "state_key": "capturewithmodifications_786099"
   }
 

@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/compositetypes_483529": 3 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"array_struct":[[1,"first"],[2,"second"]],"id":1,"int_array":[1,2,3],"string_array":["a","b","c"],"struct_val":["Alice",25,[90.5,85,92.3]]}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"array_struct":null,"id":2,"int_array":null,"string_array":null,"struct_val":["Bob",30,null]}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"array_struct":null,"id":3,"int_array":null,"string_array":null,"struct_val":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"compositetypes_483529":{"CursorNames":["id"],"CursorValues":[3],"LastPolled":"<TIMESTAMP>"}}}
+
