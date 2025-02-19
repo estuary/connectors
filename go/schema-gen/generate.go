@@ -7,10 +7,6 @@ import (
 	"github.com/invopop/jsonschema"
 )
 
-/// Note: This file is also duplicated in the flow repo for now. If you make
-/// modifications to this file, you'll want to duplicate those edits. If you
-/// don't, some materialization connectors will not receive those updates.
-
 func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 	// By default, the library generates schemas with a top-level $ref that references a definition.
 	// That breaks UI code that tries to generate forms from the schemas, and is just weird and
@@ -26,7 +22,7 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 	schema.Title = title
 	walkSchema(
 		schema,
-		fixSchemaFlagBools(schema, "secret", "advanced", "multiline", "x-collection-name", "x-schema-name", "x-delta-updates"),
+		fixSchemaFlagBools("secret", "advanced", "multiline", "x-collection-name", "x-schema-name", "x-delta-updates"),
 		fixSchemaOrderingStrings,
 	)
 
@@ -38,21 +34,17 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 // accomplish the desired transformation.
 func walkSchema(root *jsonschema.Schema, visits ...func(t *jsonschema.Schema)) {
 	if root.Properties != nil {
-		for _, key := range root.Properties.Keys() {
-			if p, ok := root.Properties.Get(key); ok {
-				if p, ok := p.(*jsonschema.Schema); ok {
-					for _, visit := range visits {
-						visit(p)
-					}
-
-					walkSchema(p, visits...)
-				}
+		for pair := root.Properties.Oldest(); pair != nil; pair = pair.Next() {
+			for _, visit := range visits {
+				visit(pair.Value)
 			}
+
+			walkSchema(pair.Value, visits...)
 		}
 	}
 }
 
-func fixSchemaFlagBools(t *jsonschema.Schema, flagKeys ...string) func(t *jsonschema.Schema) {
+func fixSchemaFlagBools(flagKeys ...string) func(t *jsonschema.Schema) {
 	return func(t *jsonschema.Schema) {
 		for key, val := range t.Extras {
 			for _, flag := range flagKeys {

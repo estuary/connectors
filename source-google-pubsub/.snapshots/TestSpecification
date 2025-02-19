@@ -1,6 +1,6 @@
 {
   "config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-google-pubsub/config",
     "properties": {
       "projectId": {
@@ -32,7 +32,7 @@
     "title": "Source Google PubSub Spec"
   },
   "resource_config_schema_json": {
-    "$schema": "http://json-schema.org/draft/2020-12/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-google-pubsub/resource",
     "properties": {
       "topic": {
