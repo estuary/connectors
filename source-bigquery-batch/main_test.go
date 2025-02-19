@@ -254,7 +254,10 @@ func TestQueryTemplate(t *testing.T) {
 	res, err := bigqueryDriver.GenerateResource("foobar", "testdata", "foobar", "BASE TABLE")
 	require.NoError(t, err)
 
-	tmpl, err := template.New("query").Parse(res.Template)
+	tmplString, err := bigqueryDriver.SelectQueryTemplate(res)
+	require.NoError(t, err)
+
+	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tmplString)
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
@@ -276,6 +279,8 @@ func TestQueryTemplate(t *testing.T) {
 			require.NoError(t, tmpl.Execute(buf, map[string]any{
 				"IsFirstQuery": tc.IsFirst,
 				"CursorFields": tc.Cursor,
+				"SchemaName":   res.SchemaName,
+				"TableName":    res.TableName,
 			}))
 			cupaloy.SnapshotT(t, buf.String())
 		})
@@ -982,6 +987,61 @@ func TestCaptureWithNullCursor(t *testing.T) {
 				{7, "Value with cursor 25", 25},
 				{8, "Another late NULL", bigquery.NullInt64{}}, // Will not be captured
 				{9, "Final value cursor 30", 30},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestQueryTemplateOverride exercises a capture configured with an explicit query template
+// in the resource spec rather than a blank template and specified table name/schema.
+//
+// This is the behavior of preexisting bindings which were created before the table/schema
+// change in February 2025.
+func TestQueryTemplateOverride(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, "(id INTEGER PRIMARY KEY NOT ENFORCED, data STRING, updated_at TIMESTAMP)")
+
+	// Create a binding with a query template override instead of table/schema
+	var res = Resource{
+		Name:     "query_template_override",
+		Template: fmt.Sprintf(`SELECT * FROM %[1]s {{if not .IsFirstQuery}} WHERE updated_at > @p0 {{end}} ORDER BY updated_at`, tableName),
+		Cursor:   []string{"updated_at"},
+	}
+	bs, err := json.Marshal(res)
+	require.NoError(t, err)
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cs.Bindings[0].ResourceConfigJson = bs
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// Initial rows
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1, @p2)", tableName),
+			[][]any{
+				{0, "Value for row 0", baseTime.Add(0 * time.Minute)},
+				{1, "Value for row 1", baseTime.Add(1 * time.Minute)},
+				{2, "Value for row 2", baseTime.Add(2 * time.Minute)},
+				{3, "Value for row 3", baseTime.Add(3 * time.Minute)},
+				{4, "Value for row 4", baseTime.Add(4 * time.Minute)},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		// More rows with later timestamps
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1, @p2)", tableName),
+			[][]any{
+				{5, "Value for row 5", baseTime.Add(10 * time.Minute)},
+				{6, "Value for row 6", baseTime.Add(11 * time.Minute)},
+				{7, "Value for row 7", baseTime.Add(12 * time.Minute)},
+				{8, "Value for row 8", baseTime.Add(13 * time.Minute)},
+				{9, "Value for row 9", baseTime.Add(14 * time.Minute)},
 			}))
 		cs.Capture(ctx, t, nil)
 
