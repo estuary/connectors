@@ -1,14 +1,17 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "basic_capture_826935",
-      "template": "{{/* Default query template which adapts to cursor field selection */}}\n{{- if not .CursorFields -}}\n  SELECT * FROM `testdata`.`basic_capture_826935`;\n{{- else -}}\n  SELECT * FROM `testdata`.`basic_capture_826935`\n  {{- if not .IsFirstQuery -}}\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = @p{{$j}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e @p{{$i}}\n\t{{- end -}})\n  {{- end}}\n  ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- end}}"
+      "name": "binarytypes_537491",
+      "template": "{{/* Default query template which adapts to cursor field selection */}}\n{{- if not .CursorFields -}}\n  SELECT * FROM `testdata`.`binarytypes_537491`;\n{{- else -}}\n  SELECT * FROM `testdata`.`binarytypes_537491`\n  {{- if not .IsFirstQuery -}}\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = @p{{$j}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e @p{{$i}}\n\t{{- end -}})\n  {{- end}}\n  ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- end}}",
+      "cursor": [
+        "id"
+      ]
     },
     "resource_path": [
-      "basic_capture_826935"
+      "binarytypes_537491"
     ],
     "collection": {
-      "name": "acmeCo/test/basic_capture_826935",
+      "name": "acmeCo/test/binarytypes_537491",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -17,7 +20,7 @@ Binding 0:
         ],
         "properties": {
           "_meta": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/source-bigquery-batch/document-metadata",
             "properties": {
               "polled": {
@@ -49,6 +52,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "basic_capture_826935"
+    "state_key": "binarytypes_537491"
   }
 
