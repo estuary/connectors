@@ -1,15 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_keyless_discovery_10352",
+      "name": "test_keylessdiscovery_729953",
       "schema": "test",
-      "table": "keyless_discovery_10352"
+      "table": "keylessdiscovery_729953"
     },
     "resource_path": [
-      "test_keyless_discovery_10352"
+      "test_keylessdiscovery_729953"
     ],
     "collection": {
-      "name": "acmeCo/test/test_keyless_discovery_10352",
+      "name": "acmeCo/test/test_keylessdiscovery_729953",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -98,6 +98,6 @@ Binding 0:
       },
       "projections": null
     },
-    "state_key": "test_keyless_discovery_10352"
+    "state_key": "test_keylessdiscovery_729953"
   }
 

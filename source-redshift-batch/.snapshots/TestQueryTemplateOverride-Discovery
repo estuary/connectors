@@ -5,13 +5,13 @@ Binding 0:
       "cursor": [
         "updated_at"
       ],
-      "template": "SELECT * FROM test.query_template_override_22920624 {{if not .IsFirstQuery}} WHERE updated_at \u003e $1 {{end}} ORDER BY updated_at"
+      "template": "SELECT * FROM test.querytemplateoverride_638679 {{if not .IsFirstQuery}} WHERE updated_at \u003e $1 {{end}} ORDER BY updated_at"
     },
     "resource_path": [
-      "test_query_template_override_22920624"
+      "test_querytemplateoverride_638679"
     ],
     "collection": {
-      "name": "acmeCo/test/test_query_template_override_22920624",
+      "name": "acmeCo/test/test_querytemplateoverride_638679",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -64,6 +64,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_query_template_override_22920624"
+    "state_key": "test_querytemplateoverride_638679"
   }
 

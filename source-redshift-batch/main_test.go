@@ -225,10 +225,8 @@ func TestQueryTemplate(t *testing.T) {
 }
 
 func TestBasicCapture(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "826935"
-	var tableName = fmt.Sprintf("test.basic_capture_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
 
@@ -268,10 +266,8 @@ func TestBasicCapture(t *testing.T) {
 }
 
 func TestBasicDatatypes(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "13111208"
-	var tableName = fmt.Sprintf("test.basic_datatypes_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, a_real REAL, a_bool BOOL, a_date DATE, a_ts TIMESTAMP, a_tstz TIMESTAMPTZ)")
 
@@ -292,10 +288,8 @@ func TestBasicDatatypes(t *testing.T) {
 }
 
 func TestFloatNaNs(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "10511"
-	var tableName = fmt.Sprintf("test.float_nans_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, a_real REAL, a_double DOUBLE PRECISION)")
 
@@ -315,10 +309,8 @@ func TestFloatNaNs(t *testing.T) {
 }
 
 func TestSchemaFilter(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "22492"
-	var tableName = fmt.Sprintf("test.schema_filtering_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
 
@@ -338,34 +330,26 @@ func TestSchemaFilter(t *testing.T) {
 }
 
 func TestKeyDiscovery(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "329932"
-	var tableName = fmt.Sprintf("test.key_discovery_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(k_smallint SMALLINT, k_int INTEGER, k_bigint BIGINT, k_bool BOOLEAN, k_str VARCHAR(8), data TEXT, PRIMARY KEY (k_smallint, k_int, k_bigint, k_bool, k_str))")
-
 	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
 	cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 }
 
 func TestKeylessDiscovery(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "10352"
-	var tableName = fmt.Sprintf("test.keyless_discovery_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(v_smallint SMALLINT, v_int INTEGER, v_bigint BIGINT, v_bool BOOLEAN, v_str VARCHAR(8), v_ts TIMESTAMP, v_tstz TIMESTAMP WITH TIME ZONE, v_text TEXT, v_int_notnull INTEGER NOT NULL, v_text_notnull TEXT NOT NULL)")
-
 	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
 	cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 }
 
 func TestFeatureFlagUseSchemaInference(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "77244729"
-	var tableName = fmt.Sprintf("test.feature_flag_use_schema_inference_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	// Includes some extra junk to make sure the parsing helper logic is doing its job as intended
 	cs.EndpointSpec.(*Config).Advanced.FeatureFlags = "this_flag_does_not_exist,use_schema_inference,,,,no_this_flag_also_does_not_exist"
@@ -383,10 +367,8 @@ func TestFeatureFlagUseSchemaInference(t *testing.T) {
 // This is the behavior of preexisting bindings which were created before the table/schema
 // change in February 2025.
 func TestQueryTemplateOverride(t *testing.T) {
-	var ctx, cs = context.Background(), testCaptureSpec(t)
-	var control = testControlClient(t)
-	var uniqueID = "22920624"
-	var tableName = fmt.Sprintf("test.query_template_override_%s", uniqueID)
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT, updated_at TIMESTAMP)")
 

@@ -1,15 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_feature_flag_use_schema_inference_77244729",
+      "name": "test_featureflaguseschemainference_697727",
       "schema": "test",
-      "table": "feature_flag_use_schema_inference_77244729"
+      "table": "featureflaguseschemainference_697727"
     },
     "resource_path": [
-      "test_feature_flag_use_schema_inference_77244729"
+      "test_featureflaguseschemainference_697727"
     ],
     "collection": {
-      "name": "acmeCo/test/test_feature_flag_use_schema_inference_77244729",
+      "name": "acmeCo/test/test_featureflaguseschemainference_697727",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -56,6 +56,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_feature_flag_use_schema_inference_77244729"
+    "state_key": "test_featureflaguseschemainference_697727"
   }
 
