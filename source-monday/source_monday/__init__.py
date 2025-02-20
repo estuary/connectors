@@ -1,9 +1,6 @@
 from logging import Logger
-from typing import Callable, Awaitable
+from typing import Awaitable, Callable
 
-from estuary_cdk.flow import (
-    ConnectorSpec,
-)
 from estuary_cdk.capture import (
     BaseCaptureConnector,
     Request,
@@ -12,11 +9,14 @@ from estuary_cdk.capture import (
     request,
     response,
 )
-from estuary_cdk.http import HTTPMixin
 from estuary_cdk.capture.common import ResourceConfig
+from estuary_cdk.flow import (
+    ConnectorSpec,
+)
+from estuary_cdk.http import HTTPMixin
 
+from source_monday.models import OAUTH2_SPEC, ConnectorState, EndpointConfig
 from source_monday.resources import all_resources, validate_credentials
-from source_monday.models import ConnectorState, EndpointConfig, OAUTH2_SPEC
 
 
 class Connector(
@@ -30,7 +30,7 @@ class Connector(
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
             oauth2=OAUTH2_SPEC,
-            documentationUrl="https://docs.estuary.dev",
+            documentationUrl="https://go.estuary.dev/source-monday",
             resourceConfigSchema=ResourceConfig.model_json_schema(),
             resourcePathPointers=ResourceConfig.PATH_POINTERS,
         )

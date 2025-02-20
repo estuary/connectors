@@ -23,41 +23,6 @@
     }
   ],
   [
-    "acmeCo/users",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "birthday": null,
-      "country_code": "US",
-      "created_at": "2025-02-07T20:03:21Z",
-      "email": "justin@estuary.dev",
-      "enabled": true,
-      "id": "71985416",
-      "is_admin": true,
-      "is_guest": false,
-      "is_pending": false,
-      "is_verified": true,
-      "is_view_only": false,
-      "join_date": null,
-      "location": null,
-      "mobile_phone": null,
-      "name": "Justin Smith",
-      "phone": "",
-      "photo_original": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_small": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_thumb": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_thumb_small": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_tiny": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "time_zone_identifier": "America/Chicago",
-      "title": null,
-      "url": "https://estuarydev.monday.com/users/71985416",
-      "utc_hours_diff": -6
-    }
-  ],
-  [
     "acmeCo/tags",
     {
       "_meta": {
@@ -149,7 +114,7 @@
         "id": "topics"
       },
       "type": "sub_items_board",
-      "updated_at": "2025-02-19T22:44:13Z",
+      "updated_at": "2025-02-20T16:49:58Z",
       "updates": [],
       "views": [],
       "workspace": {
@@ -239,7 +204,7 @@
         "id": "topics"
       },
       "type": "sub_items_board",
-      "updated_at": "2025-02-14T14:34:12Z",
+      "updated_at": "2025-02-20T19:15:53Z",
       "updates": [],
       "views": [],
       "workspace": {
@@ -319,7 +284,7 @@
         }
       ],
       "id": "8523186540",
-      "name": "Renamed Board",
+      "name": "Main Items Board",
       "owners": [
         {
           "id": "71985416"
@@ -337,7 +302,7 @@
         "id": "topics"
       },
       "type": "board",
-      "updated_at": "2025-02-19T23:07:17Z",
+      "updated_at": "2025-02-20T16:32:05Z",
       "updates": [],
       "views": [],
       "workspace": {

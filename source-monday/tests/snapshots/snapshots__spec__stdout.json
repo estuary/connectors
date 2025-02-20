@@ -53,17 +53,11 @@
               "secret": true,
               "title": "Client Secret",
               "type": "string"
-            },
-            "access_token": {
-              "secret": true,
-              "title": "Access Token",
-              "type": "string"
             }
           },
           "required": [
             "client_id",
-            "client_secret",
-            "access_token"
+            "client_secret"
           ],
           "title": "OAuth",
           "type": "object",
@@ -125,7 +119,7 @@
       "title": "ResourceConfig",
       "type": "object"
     },
-    "documentationUrl": "https://docs.estuary.dev",
+    "documentationUrl": "https://go.estuary.dev/source-monday",
     "oauth2": {
       "provider": "monday",
       "authUrlTemplate": "https://auth.monday.com/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
