@@ -279,10 +279,8 @@ func TestBasicDatatypes(t *testing.T) {
 		executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s(id, a_real, a_bool, a_date, a_ts, a_tstz) VALUES ($1,$2,$3,$4,$5,$6)", tableName),
 			100, -12.34, true, "2024-02-26", time.Date(2024, 02, 26, 12, 34, 56, 00, time.UTC), time.Date(2024, 02, 26, 12, 34, 56, 00, time.UTC))
 
-		// Run the capture for 5 seconds, which should be plenty to pull down a few rows.
-		var captureCtx, cancelCapture = context.WithCancel(ctx)
-		time.AfterFunc(5*time.Second, cancelCapture)
-		cs.Capture(captureCtx, t, nil)
+		setShutdownAfterQuery(t, true)
+		cs.Capture(ctx, t, nil)
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
@@ -300,10 +298,8 @@ func TestFloatNaNs(t *testing.T) {
 	t.Run("Capture", func(t *testing.T) {
 		executeControlQuery(t, control, fmt.Sprintf(`INSERT INTO %s VALUES (0, 2.0, 'NaN'), (1, 'NaN', 3.0), (2, 'Infinity', '-Infinity')`, tableName))
 
-		// Run the capture for 1 second, which should be plenty to pull down a few rows.
-		var captureCtx, cancelCapture = context.WithCancel(ctx)
-		time.AfterFunc(1*time.Second, cancelCapture)
-		cs.Capture(captureCtx, t, nil)
+		setShutdownAfterQuery(t, true)
+		cs.Capture(ctx, t, nil)
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
