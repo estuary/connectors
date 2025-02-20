@@ -1,22 +1,23 @@
 from datetime import datetime, timedelta
-from typing import AsyncGenerator, Union
 from logging import Logger
+from typing import AsyncGenerator, Union
 
-from estuary_cdk.http import HTTPSession
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from source_monday.models import (
-    FullRefreshResource,
-    IncrementalResource,
-)
+from estuary_cdk.http import HTTPSession
+
 from source_monday.graphql import (
+    TAGS,
+    TEAMS,
+    USERS,
     execute_query,
-    fetch_recently_updated,
     fetch_boards,
     fetch_items_by_boards,
     fetch_items_by_ids,
-    TEAMS,
-    USERS,
-    TAGS,
+    fetch_recently_updated,
+)
+from source_monday.models import (
+    FullRefreshResource,
+    IncrementalResource,
 )
 
 
@@ -179,7 +180,9 @@ async def fetch_items_page(
 
 
 async def snapshot_teams(
-    http: HTTPSession, log: Logger
+    http: HTTPSession,
+    _: int,
+    log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     """
     Fetch all teams.
@@ -193,14 +196,15 @@ async def snapshot_teams(
 
 
 async def snapshot_users(
-    http: HTTPSession, log: Logger
+    http: HTTPSession,
+    limit: int,
+    log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     """
     Fetch all users.
 
     API Docs: https://developer.monday.com/api-reference/reference/users
     """
-    limit = 10
     variables = {
         "limit": limit,
         "page": 1,
@@ -222,7 +226,9 @@ async def snapshot_users(
 
 
 async def snapshot_tags(
-    http: HTTPSession, log: Logger
+    http: HTTPSession,
+    _: int,
+    log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     """
     Fetch all tags.
