@@ -12,6 +12,14 @@
 ]
 [
   "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
   {
     "updated": {}
   }
@@ -22,7 +30,7 @@
     "key": "{\"id\":10}",
     "offset": 3,
     "partition": 2,
-    "payload": "{\"canary\":\"glucose's\",\"flow_published_at\":\"1970-01-01T01:00:03.000000000Z\",\"id\":10}",
+    "payload": "{\"canary\":\"glucose's\",\"flow_published_at\":\"1970-01-01T02:00:03.000000000Z\",\"id\":10}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -31,7 +39,7 @@
     "key": "{\"id\":1}",
     "offset": 0,
     "partition": 0,
-    "payload": "{\"canary\":\"amputation's\",\"flow_published_at\":\"1970-01-01T00:00:00.000000000Z\",\"id\":1}",
+    "payload": "{\"canary\":\"amputation's\",\"flow_published_at\":\"1970-01-01T01:00:00.000000000Z\",\"id\":1}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -40,7 +48,7 @@
     "key": "{\"id\":2}",
     "offset": 0,
     "partition": 1,
-    "payload": "{\"canary\":\"armament's\",\"flow_published_at\":\"1970-01-01T00:00:01.000000000Z\",\"id\":2}",
+    "payload": "{\"canary\":\"armament's\",\"flow_published_at\":\"1970-01-01T01:00:01.000000000Z\",\"id\":2}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -49,7 +57,7 @@
     "key": "{\"id\":3}",
     "offset": 1,
     "partition": 0,
-    "payload": "{\"canary\":\"splatters\",\"flow_published_at\":\"1970-01-01T00:00:02.000000000Z\",\"id\":3}",
+    "payload": "{\"canary\":\"splatters\",\"flow_published_at\":\"1970-01-01T01:00:02.000000000Z\",\"id\":3}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -58,7 +66,7 @@
     "key": "{\"id\":4}",
     "offset": 0,
     "partition": 2,
-    "payload": "{\"canary\":\"strengthen\",\"flow_published_at\":\"1970-01-01T00:00:03.000000000Z\",\"id\":4}",
+    "payload": "{\"canary\":\"strengthen\",\"flow_published_at\":\"1970-01-01T01:00:03.000000000Z\",\"id\":4}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -67,7 +75,7 @@
     "key": "{\"id\":5}",
     "offset": 1,
     "partition": 2,
-    "payload": "{\"canary\":\"Kringle's\",\"flow_published_at\":\"1970-01-01T00:00:04.000000000Z\",\"id\":5}",
+    "payload": "{\"canary\":\"Kringle's\",\"flow_published_at\":\"1970-01-01T01:00:04.000000000Z\",\"id\":5}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -76,7 +84,7 @@
     "key": "{\"id\":6}",
     "offset": 1,
     "partition": 1,
-    "payload": "{\"canary\":\"grosbeak's\",\"flow_published_at\":\"1970-01-01T00:00:05.000000000Z\",\"id\":6}",
+    "payload": "{\"canary\":\"grosbeak's\",\"flow_published_at\":\"1970-01-01T01:00:05.000000000Z\",\"id\":6}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -85,7 +93,7 @@
     "key": "{\"id\":7}",
     "offset": 2,
     "partition": 1,
-    "payload": "{\"canary\":\"pieced\",\"flow_published_at\":\"1970-01-01T01:00:00.000000000Z\",\"id\":7}",
+    "payload": "{\"canary\":\"pieced\",\"flow_published_at\":\"1970-01-01T02:00:00.000000000Z\",\"id\":7}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -94,7 +102,7 @@
     "key": "{\"id\":8}",
     "offset": 2,
     "partition": 2,
-    "payload": "{\"canary\":\"roaches\",\"flow_published_at\":\"1970-01-01T01:00:01.000000000Z\",\"id\":8}",
+    "payload": "{\"canary\":\"roaches\",\"flow_published_at\":\"1970-01-01T02:00:01.000000000Z\",\"id\":8}",
     "topic": "simple",
     "tstype": "create"
   },
@@ -103,7 +111,7 @@
     "key": "{\"id\":9}",
     "offset": 2,
     "partition": 0,
-    "payload": "{\"canary\":\"devilish\",\"flow_published_at\":\"1970-01-01T01:00:02.000000000Z\",\"id\":9}",
+    "payload": "{\"canary\":\"devilish\",\"flow_published_at\":\"1970-01-01T02:00:02.000000000Z\",\"id\":9}",
     "topic": "simple",
     "tstype": "create"
   }

@@ -71,7 +71,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	rows, err := db.Query(fmt.Sprintf(`SELECT * FROM %q.%q ORDER BY id`, schema, tables[0]))
+	rows, err := db.Query(fmt.Sprintf(`SELECT * FROM %q.%q ORDER BY id, flow_published_at`, schema, tables[0]))
 	if err != nil {
 		log.Fatal(fmt.Errorf("running query: %w", err))
 	}
