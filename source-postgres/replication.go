@@ -89,7 +89,9 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		logrus.WithField("slot", slot).Warn("replication slot is already active (is another capture already running against this database?)")
 	} else if slotInfo.WALStatus == "lost" {
 		logrus.WithField("slot", slot).Warn("replication slot was invalidated by the server, it must be deleted and all bindings backfilled")
-	} else if startLSN < slotInfo.ConfirmedFlushLSN {
+	} else if slotInfo.ConfirmedFlushLSN == nil {
+		logrus.WithField("slot", slot).Warn("replication slot has no confirmed_flush_lsn and is likely still being created (but waiting on a long-running transaction)")
+	} else if startLSN < *slotInfo.ConfirmedFlushLSN {
 		logrus.WithFields(logrus.Fields{
 			"slot":         slot,
 			"confirmedLSN": slotInfo.ConfirmedFlushLSN.String(),
