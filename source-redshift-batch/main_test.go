@@ -27,12 +27,12 @@ import (
 )
 
 var (
-	dbAddress     = flag.String("db_address", "default-workgroup.123456789012.us-east-1.redshift-serverless.amazonaws.com:5439", "The database server address to use for tests")
-	dbName        = flag.String("db_name", "dev", "Use the named database for tests")
+	dbAddress     = flag.String("db_address", "localhost:5432", "The database server address to use for tests")
+	dbName        = flag.String("db_name", "postgres", "Use the named database for tests")
+	dbControlUser = flag.String("db_control_user", "postgres", "The user for test setup/control operations")
+	dbControlPass = flag.String("db_control_pass", "postgres", "The password the the test setup/control user")
 	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
 	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
-	dbControlUser = flag.String("db_control_user", "", "The user for test setup/control operations, if different from the capture user")
-	dbControlPass = flag.String("db_control_pass", "", "The password the the test setup/control user, if different from the capture password")
 )
 
 func TestMain(m *testing.M) {
