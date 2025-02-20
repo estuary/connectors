@@ -13,21 +13,21 @@ captures:
     bindings:
       - resource:
           name: teams
-          interval: PT30S
+          interval: PT5M
         target: acmeCo/teams
       - resource:
           name: users
-          interval: PT30S
+          interval: PT5M
         target: acmeCo/users
       - resource:
           name: tags
-          interval: PT30S
+          interval: PT5M
         target: acmeCo/tags
       - resource:
           name: boards
-          interval: PT30S
+          interval: PT5M
         target: acmeCo/boards
       - resource:
           name: items
-          interval: PT30S
+          interval: PT5M
         target: acmeCo/items
