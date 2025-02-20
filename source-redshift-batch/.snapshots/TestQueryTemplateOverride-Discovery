@@ -1,15 +1,17 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_basic_datatypes_13111208",
-      "schema": "test",
-      "table": "basic_datatypes_13111208"
+      "name": "query_template_override",
+      "cursor": [
+        "updated_at"
+      ],
+      "template": "SELECT * FROM test.query_template_override_22920624 {{if not .IsFirstQuery}} WHERE updated_at \u003e $1 {{end}} ORDER BY updated_at"
     },
     "resource_path": [
-      "test_basic_datatypes_13111208"
+      "test_query_template_override_22920624"
     ],
     "collection": {
-      "name": "acmeCo/test/test_basic_datatypes_13111208",
+      "name": "acmeCo/test/test_query_template_override_22920624",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -39,36 +41,7 @@ Binding 0:
               "index"
             ]
           },
-          "a_bool": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          },
-          "a_date": {
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "a_real": {
-            "format": "number",
-            "type": [
-              "number",
-              "string",
-              "null"
-            ]
-          },
-          "a_ts": {
-            "format": "date-time",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "a_tstz": {
-            "format": "date-time",
+          "data": {
             "type": [
               "string",
               "null"
@@ -76,6 +49,13 @@ Binding 0:
           },
           "id": {
             "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -84,6 +64,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_basic_datatypes_13111208"
+    "state_key": "test_query_template_override_22920624"
   }
 

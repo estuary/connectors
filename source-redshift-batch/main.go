@@ -8,6 +8,7 @@ import (
 	"math"
 	"net/url"
 	"strings"
+	"text/template"
 
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
@@ -119,11 +120,18 @@ func connectRedshift(ctx context.Context, cfg *Config) (*sql.DB, error) {
 	return db, nil
 }
 
+func selectQueryTemplate(res *Resource) (string, error) {
+	if res.Template != "" {
+		return res.Template, nil
+	}
+	return redshiftQueryTemplate, nil
+}
+
 const redshiftQueryTemplate = `{{if .CursorFields -}}
   {{- if .IsFirstQuery -}}
-    SELECT * FROM %[1]s
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
   {{- else -}}
-    SELECT * FROM %[1]s
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
 	{{- range $i, $k := $.CursorFields -}}
 	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
       {{- range $j, $n := $.CursorFields -}}
@@ -135,25 +143,29 @@ const redshiftQueryTemplate = `{{if .CursorFields -}}
 	) 
   {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
 {{- else -}}
-  SELECT * FROM %[1]s;
+  SELECT * FROM {{quoteTableName .SchemaName .TableName}};
 {{- end}}
 `
 
 func quoteTableName(schema, table string) string {
-	return fmt.Sprintf(`"%s"."%s"`, schema, table)
+	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
+}
+
+var templateFuncs = template.FuncMap{
+	"add":             func(a, b int) int { return a + b },
+	"quoteTableName":  quoteTableName,
+	"quoteIdentifier": quoteIdentifier,
 }
 
 func generateRedshiftResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	var queryTemplate string
-	if strings.EqualFold(tableType, "BASE TABLE") {
-		queryTemplate = fmt.Sprintf(redshiftQueryTemplate, quoteTableName(schemaName, tableName))
-	} else {
+	if !strings.EqualFold(tableType, "BASE TABLE") {
 		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 	}
 
 	return &Resource{
-		Name:     resourceName,
-		Template: queryTemplate,
+		Name:       resourceName,
+		SchemaName: schemaName,
+		TableName:  tableName,
 	}, nil
 }
 
@@ -180,11 +192,12 @@ func translateRedshiftValue(val any, databaseTypeName string) (any, error) {
 }
 
 var redshiftDriver = &BatchSQLDriver{
-	DocumentationURL: "https://go.estuary.dev/source-redshift-batch",
-	ConfigSchema:     generateConfigSchema(),
-	Connect:          connectRedshift,
-	GenerateResource: generateRedshiftResource,
-	TranslateValue:   translateRedshiftValue,
+	DocumentationURL:    "https://go.estuary.dev/source-redshift-batch",
+	ConfigSchema:        generateConfigSchema(),
+	Connect:             connectRedshift,
+	GenerateResource:    generateRedshiftResource,
+	TranslateValue:      translateRedshiftValue,
+	SelectQueryTemplate: selectQueryTemplate,
 }
 
 func generateConfigSchema() json.RawMessage {
