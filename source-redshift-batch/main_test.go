@@ -56,7 +56,10 @@ func TestQueryTemplate(t *testing.T) {
 	res, err := redshiftDriver.GenerateResource("foobar", "testdata", "foobar", "BASE TABLE")
 	require.NoError(t, err)
 
-	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(res.Template)
+	tmplString, err := redshiftDriver.SelectQueryTemplate(res)
+	require.NoError(t, err)
+
+	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tmplString)
 	require.NoError(t, err)
 
 	for _, tc := range []struct {
@@ -78,6 +81,8 @@ func TestQueryTemplate(t *testing.T) {
 			require.NoError(t, tmpl.Execute(buf, map[string]any{
 				"IsFirstQuery": tc.IsFirst,
 				"CursorFields": tc.Cursor,
+				"SchemaName":   res.SchemaName,
+				"TableName":    res.TableName,
 			}))
 			cupaloy.SnapshotT(t, buf.String())
 		})
@@ -329,6 +334,12 @@ func snapshotBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) {
 	cupaloy.SnapshotT(t, summary.String())
 }
 
+func setShutdownAfterQuery(t testing.TB, setting bool) {
+	var oldSetting = TestShutdownAfterQuery
+	TestShutdownAfterQuery = setting
+	t.Cleanup(func() { TestShutdownAfterQuery = oldSetting })
+}
+
 func TestFeatureFlagUseSchemaInference(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
@@ -345,4 +356,53 @@ func TestFeatureFlagUseSchemaInference(t *testing.T) {
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
 	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
+}
+
+// TestQueryTemplateOverride exercises a capture configured with an explicit query template
+// in the resource spec rather than a blank template and specified table name/schema.
+//
+// This is the behavior of preexisting bindings which were created before the table/schema
+// change in February 2025.
+func TestQueryTemplateOverride(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var uniqueID = "22920624"
+	var tableName = fmt.Sprintf("test.query_template_override_%s", uniqueID)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)) })
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data TEXT, updated_at TIMESTAMP)", tableName))
+
+	// Create a binding with a query template override instead of table/schema
+	var res = Resource{
+		Name:     "query_template_override",
+		Template: fmt.Sprintf(`SELECT * FROM %[1]s {{if not .IsFirstQuery}} WHERE updated_at > $1 {{end}} ORDER BY updated_at`, tableName),
+		Cursor:   []string{"updated_at"},
+	}
+	bs, err := json.Marshal(res)
+	require.NoError(t, err)
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cs.Bindings[0].ResourceConfigJson = bs
+
+	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// Initial rows
+		for i := 0; i < 5; i++ {
+			executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES ($1, $2, $3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// More rows with later timestamps
+		for i := 5; i < 10; i++ {
+			executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s (id, data, updated_at) VALUES ($1, $2, $3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i+5)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
 }
