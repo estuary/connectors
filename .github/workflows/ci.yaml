@@ -86,6 +86,7 @@ jobs:
           - source-mysql
           - source-mysql-batch
           - source-oracle
+          - source-oracle-batch
           - source-postgres
           - source-postgres-batch
           - source-redshift-batch
