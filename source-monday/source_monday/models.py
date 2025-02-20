@@ -1,19 +1,20 @@
-from pydantic import AwareDatetime, BaseModel, Field
-from typing import Annotated, AsyncGenerator, Callable, TYPE_CHECKING, Optional
 from logging import Logger
+from typing import TYPE_CHECKING, Annotated, AsyncGenerator, Callable, Optional
 
 from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
-    BaseDocument,
-    AuthorizationCodeFlowOAuth2Credentials,
-    LogCursor,
-    PageCursor,
-    OAuth2Spec,
     AccessToken,
+    AuthorizationCodeFlowOAuth2Credentials,
+    BaseDocument,
+    LogCursor,
+    OAuth2Spec,
+    PageCursor,
     ResourceState,
 )
+from estuary_cdk.capture.common import (
+    ConnectorState as GenericConnectorState,
+)
 from estuary_cdk.http import HTTPSession
-
+from pydantic import AwareDatetime, BaseModel, Field
 
 OAUTH2_SPEC = OAuth2Spec(
     provider="monday",
@@ -82,10 +83,6 @@ class FullRefreshResource(BaseDocument, extra="allow"):
 
 class IncrementalResource(BaseDocument, extra="allow"):
     id: str
-    updated_at: AwareDatetime
-
-
-class Board(IncrementalResource):
     updated_at: AwareDatetime
 
 
