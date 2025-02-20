@@ -1,0 +1,30 @@
+services:
+  db:
+    image: 'postgres:latest'
+    command: [ "postgres" ]
+    ports:
+      - "5432:5432"
+    environment:
+      {
+        "POSTGRES_DB": "postgres",
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": "postgres"
+      }
+    healthcheck:
+      test: "true"
+      interval: 3s
+    networks:
+      - flow-test
+    volumes:
+      - type: bind
+        source: ./docker-initdb.sh
+        target: /docker-entrypoint-initdb.d/init-user-db.sh
+      - postgres_data:/var/lib/postgresql/data
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  postgres_data: {}

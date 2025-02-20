@@ -20,7 +20,9 @@ RUN go install -v github.com/jackc/pgx/v5
 
 # Run tests and build the connector
 COPY source-redshift-batch ./source-redshift-batch
-RUN go test -v ./source-redshift-batch/...
+ARG TEST_DATABASE=yes
+ENV TEST_DATABASE=$TEST_DATABASE
+RUN go test -short -failfast -v ./source-redshift-batch/...
 RUN go build -o ./connector -v ./source-redshift-batch/...
 
 # Runtime Stage
