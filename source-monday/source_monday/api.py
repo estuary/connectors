@@ -11,13 +11,12 @@ from source_monday.models import (
 from source_monday.graphql import (
     execute_query,
     fetch_recently_updated,
-    BOARDS,
+    fetch_boards,
+    fetch_items_by_boards,
+    fetch_items_by_ids,
     TEAMS,
     USERS,
     TAGS,
-    ITEMS,
-    NEXT_ITEMS,
-    ITEMS_BY_IDS,
 )
 
 
@@ -53,7 +52,7 @@ async def fetch_boards_changes(
 
     has_updates = False
     # Then fetch the full board details for each updated ID
-    async for board in _fetch_boards(http, log, limit=limit, ids=updated_ids):
+    async for board in fetch_boards(http, log, limit=limit, ids=updated_ids):
         doc = IncrementalResource.model_validate(board)
         has_updates = True
         max_updated_at = max(max_updated_at, doc.updated_at)
@@ -84,7 +83,7 @@ async def fetch_boards_page(
     assert isinstance(cutoff, datetime)
 
     doc_count = 0
-    async for board in _fetch_boards(http, log, page=page, limit=limit):
+    async for board in fetch_boards(http, log, page=page, limit=limit):
         doc = IncrementalResource.model_validate(board)
 
         # Only yield boards updated before the cutoff
@@ -128,7 +127,7 @@ async def fetch_items_changes(
         return
 
     has_updates = False
-    async for item in _fetch_items_by_ids(
+    async for item in fetch_items_by_ids(
         http, log, item_ids=parent_item_ids, limit=limit
     ):
         doc = IncrementalResource.model_validate(item)
@@ -162,7 +161,7 @@ async def fetch_items_page(
     assert isinstance(cutoff, datetime)
 
     doc_count = 0
-    async for item in _fetch_items_by_boards(
+    async for item in fetch_items_by_boards(
         http,
         log,
         limit=limit,
@@ -177,144 +176,6 @@ async def fetch_items_page(
     # If we got any results, yield next page token
     if doc_count == limit:
         yield page + 1
-
-
-# Helper functions
-async def _fetch_boards(
-    http: HTTPSession,
-    log: Logger,
-    page: int | None = None,
-    limit: int | None = None,
-    ids: list[int] | None = None,
-) -> AsyncGenerator[dict, None]:
-    """
-    Helper function to fetch boards from the Monday.com API.
-    Handles pagination and supports filtering by IDs.
-
-    Yields:
-        dict: Raw board data from API
-    """
-    if page is not None and limit is None:
-        raise ValueError("limit is required when specifying page")
-
-    variables = {
-        "limit": limit,
-        "page": page if page is not None else 1,
-        "ids": ids,
-    }
-
-    while True:
-        response = await execute_query(http, log, BOARDS, variables)
-        boards = response.data.get("boards", [])
-
-        if not boards:
-            break
-
-        for board in boards:
-            yield board
-
-        # If fetching specific page or got less than limit, we're done
-        if page is not None or (limit and len(boards) < limit):
-            break
-
-        variables["page"] += 1
-
-
-async def _process_items(
-    items: list[dict],
-    processed_parent_items: set[str] | None = None,
-) -> AsyncGenerator[dict, None]:
-    """Helper function to process and filter items."""
-    for item in items:
-        item_id = str(item.get("id"))
-        # If we're tracking processed items, only yield unprocessed parent items
-        if processed_parent_items is not None:
-            if not item.get("parent_item") and item_id not in processed_parent_items:
-                processed_parent_items.add(item_id)
-                yield item
-        else:
-            yield item
-
-
-async def _fetch_items_by_ids(
-    http: HTTPSession,
-    log: Logger,
-    item_ids: list[int],
-    limit: int | None = None,
-) -> AsyncGenerator[dict, None]:
-    """Helper function to fetch items by their IDs."""
-    if not item_ids:
-        raise ValueError("No item IDs provided.")
-
-    page = 1
-    while True:
-        response = await execute_query(
-            http, log, ITEMS_BY_IDS, {"limit": limit, "ids": item_ids, "page": page}
-        )
-        items = response.data.get("items", [])
-        if not items:
-            break
-
-        async for item in _process_items(items):
-            yield item
-
-        if len(items) < limit:
-            break
-        page += 1
-
-
-async def _fetch_items_by_boards(
-    http: HTTPSession,
-    log: Logger,
-    limit: int | None = None,
-    board_ids: list[int] | None = None,
-) -> AsyncGenerator[dict, None]:
-    """Helper function to fetch items by boards."""
-    response = await execute_query(
-        http, log, ITEMS, {"limit": limit, "boardIds": board_ids}
-    )
-    boards_data = response.data.get("boards", [])
-    if not boards_data:
-        return
-
-    processed_parent_items = set()
-    board_cursors = {}
-
-    # Process initial items and collect cursors
-    for board in boards_data:
-        board_id = board.get("id")
-        if not board_id:
-            continue
-
-        items_page = board.get("items_page", {})
-        if items_page.get("cursor"):
-            board_cursors[board_id] = items_page["cursor"]
-
-        async for item in _process_items(
-            items_page.get("items", []), processed_parent_items
-        ):
-            yield item
-
-    # Continue fetching with cursors
-    while board_cursors:
-        for b_id, cur in list(board_cursors.items()):
-            # Fetch and process items for current cursor
-            response = await execute_query(
-                http,
-                log,
-                NEXT_ITEMS,
-                {"limit": limit, "cursor": cur, "boardId": b_id},
-            )
-            items = response.data.get("next_items_page", {}).get("items", [])
-            async for item in _process_items(items, processed_parent_items):
-                yield item
-
-            # Update cursor
-            next_cursor = response.data.get("next_items_page", {}).get("cursor")
-            if not next_cursor:
-                board_cursors.pop(b_id)
-            else:
-                board_cursors[b_id] = next_cursor
 
 
 async def snapshot_teams(
