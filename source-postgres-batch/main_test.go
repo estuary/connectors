@@ -156,6 +156,7 @@ func createTestTable(t testing.TB, control *sql.DB, tableName, definition string
 }
 
 func summarizeBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) string {
+	t.Helper()
 	var summary = new(strings.Builder)
 	for idx, binding := range bindings {
 		fmt.Fprintf(summary, "Binding %d:\n", idx)
@@ -178,6 +179,7 @@ func executeControlQuery(t testing.TB, client *sql.DB, query string, args ...int
 }
 
 func setShutdownAfterQuery(t testing.TB, setting bool) {
+	t.Helper()
 	var oldSetting = TestShutdownAfterQuery
 	TestShutdownAfterQuery = setting
 	t.Cleanup(func() { TestShutdownAfterQuery = oldSetting })
