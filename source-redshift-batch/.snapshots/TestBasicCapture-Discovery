@@ -1,15 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_basic_capture_826935",
+      "name": "test_basiccapture_884124",
       "schema": "test",
-      "table": "basic_capture_826935"
+      "table": "basiccapture_884124"
     },
     "resource_path": [
-      "test_basic_capture_826935"
+      "test_basiccapture_884124"
     ],
     "collection": {
-      "name": "acmeCo/test/test_basic_capture_826935",
+      "name": "acmeCo/test/test_basiccapture_884124",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -55,6 +55,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_basic_capture_826935"
+    "state_key": "test_basiccapture_884124"
   }
 
