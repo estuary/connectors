@@ -100,13 +100,121 @@ $ ../scripts/bulk-config-editor.sh --set_flag=do_some_thing --dir=./specs
 $ ../scripts/bulk-publish.sh --mark --dir=./specs
 ```
 
+### User-Managed KMS Keys
+
+Some users manage their own KMS keys for their task configs and merely grant our
+service account (`flow-258@helpful-kingdom-273219.iam.gserviceaccount.com`) access
+to the keys.
+
+This is fairly rare, but if even one or two users do that for a particular type
+of task then there will be some task specs you can't edit via SOPS as yourself.
+So to make this work in the general case, you may need to impersonate `flow-258`
+for the purpose of accessing these KMS keys. Assuming that you personally have
+the necessary authorization for that impersonation (setting that up is outside
+the scope of this bit of documentation), you can add it into the bulk editing
+workflow as follows:
+
+```bash
+$ gcloud auth application-default login --impersonate-service-account \
+        flow-258@helpful-kingdom-273219.iam.gserviceaccount.com
+$ ../scripts/list-tasks.sh --connector=source-postgres --pull --missing=no_foobar
+$ ../scripts/bulk-config-editor.sh --set_flag=no_foobar
+$ ../scripts/bulk-publish.sh --mark
+$ gcloud auth application-default login you@estuary.dev
+```
+
+### Failed Publications and Retrying
+
+Some number of task edits will generally fail to publish the first time around.
+There are two ways you can address this, and I recommend using first one and
+then the other.
+
+Firstly, you can simply try publishing them again. The `--mark` flag on the
+bulk publishing script will rename each successfully-published task spec so
+that a subsequent run of the script won't see that task any more, so if you
+simply run it twice you get two tries at publishing each update:
+
+```bash
+$ ../scripts/bulk-publish.sh --mark
+$ ../scripts/bulk-publish.sh --mark
+```
+
+Secondly, you can throw everything away, pull the set of tasks which still
+don't have the desired flag setting, and make the edit again. This helps if
+the reason for the failure is that some other publication came in and modified
+the task after you pulled the specs and before you published the change:
+
+```bash
+$ rm -r specs/
+$ ../scripts/list-tasks.sh --connector=source-mysql --pull --missing=no_foobar
+$ ../scripts/bulk-config-editor.sh --set_flag=no_foobar
+$ ../scripts/bulk-publish.sh --mark
+```
+
+Finally, some tasks may just not be able to be updated because they are in a
+persistent failure state and so validation always fails. This might happen, for
+instance, if the target database went offline last week and never came back. We
+don't want to just skip over these tasks (because then if the DB comes back the
+next day the task will exhibit an unintended change in behavior when the default
+in the connector is toggled), but they can't pass validation. So what do we do?
+
+In the long run I am told this will stop being a problem because we want automation
+which will automatically disable persistently-failing tasks. It is not intended
+behavior that a task can sit there failing every five minutes for weeks and then
+be guaranteed to come back up without user action when the DB is fixed, that's
+just how things happen to work today. So you can feel free to simply investigate
+any persistently failing tasks, establish that they are indeed failing over and
+over and have been for a while, and then disable them.
+
+After disabling the offenders, you can update their flags and since validation is
+not run on a disabled task the publication will go through. Note that the disable
+itself was a publication though, so you will have to re-pull the specs and edit
+them again:
+
+```bash
+$ rm -r specs/
+$ ../scripts/list-tasks.sh --connector=source-mysql --pull --missing=no_foobar
+$ ../scripts/bulk-config-editor.sh --set_flag=no_foobar
+$ ../scripts/bulk-publish.sh --mark
+```
+
 ## Worked Example
 
-TODO(wgd): Describe and add PR links when doing the MySQL `format: date` change.
+Here's a complete example of adding and toggling the MySQL `date_schema_format`
+flag (which added `format: date` to the JSON schemas of date columns).
 
-1. Adding the feature flags plumbing and a feature flag.
-2. Running through the commands to set no_flag.
-3. Flipping the default.
+First I merged a PR ([source-mysql: Feature-flagged date fix](https://github.com/estuary/connectors/pull/2374/commits))
+which added the feature flag with default value `false`, along with the implementation
+of that change. Since this was the first `source-mysql` feature flag I also had to add
+the feature flag boilerplate. These two actions are divided into two distinct commits
+in the linked PR.
+
+Second, I prepared another PR ([source-mysql: Make date_schema_format the default](https://github.com/estuary/connectors/pull/2384))
+which merely toggled the connector default from `false` to `true` and updated any
+tests which would demonstrate the change in default behavior. This PR was uploaded
+and approved beforehand with the understanding that I would merge it at the correct
+moment.
+
+Next, I modified all ~300 production `source-mysql` (and variants) tasks to add the
+explicit flag `no_date_schema_format` to each of them. As described in the section on
+retrying failed publications, this took a few rounds of work but eventually every last
+production task had been updated:
+
+```bash
+## Initial attempt to update everything
+$ ~/work/estuary/connectors/scripts/list-tasks.sh --connector=source-mysql --pull
+$ ~/work/estuary/connectors/scripts/bulk-config-editor.sh --set_flag=no_date_schema_format
+$ ~/work/estuary/connectors/scripts/bulk-publish.sh --mark
+## Repeat as necessary until all tasks are updated
+$ rm -r specs
+$ ~/work/estuary/connectors/scripts/list-tasks.sh --connector=source-mysql --pull --missing=no_date_schema_format
+$ ~/work/estuary/connectors/scripts/bulk-config-editor.sh --set_flag=no_date_schema_format
+$ ~/work/estuary/connectors/scripts/bulk-publish.sh --mark
+```
+
+Finally, and immediately after verifying that there were zero `source-mysql` tasks
+still missing that flag setting, I merged the aforementioned default-changing PR so
+that any future tasks will exhibit the new behavior from the start.
 
 ## Appendix: Feature Flag Boilerplate
 
