@@ -1,12 +1,12 @@
 import asyncio
 import json
 from datetime import datetime
-from typing import AsyncGenerator, Dict, Any, Literal
 from logging import Logger
+from typing import Any, AsyncGenerator, Dict, Literal
 
 from estuary_cdk.http import HTTPSession
-from source_monday.models import GraphQLResponse
 
+from source_monday.models import GraphQLResponse
 
 API = "https://api.monday.com/v2"
 
@@ -68,7 +68,7 @@ async def fetch_recently_updated(
                 activity_logs = json.loads(logs_str)
             except json.JSONDecodeError as e:
                 log.error(f"Error decoding activity logs: {e}")
-                continue
+                raise
         elif isinstance(activity_logs_obj, list):
             activity_logs = activity_logs_obj
         else:
@@ -76,28 +76,25 @@ async def fetch_recently_updated(
 
         for event in activity_logs:
             event_data_str = event.get("data", {})
+            entity = event.get("entity")
             try:
                 event_data = json.loads(event_data_str)
             except json.JSONDecodeError as e:
                 log.error(f"Failed to parse event data: {event_data_str}, error: {e}")
-                continue
+                raise
 
-            if resource == "board":
-                value = event_data.get("board_id")
-            elif resource == "item":
-                # Get both the pulse_id (item_id) and parent_item_id
-                value = event_data.get("pulse_id")
-                parent_id = event_data.get("parent_item_id")
-                # If this is a subitem (has parent_id), use the parent_id instead
-                if parent_id is not None:
-                    value = parent_id
+            id = None
+            if resource == "board" and entity == "board":
+                id = event_data.get("board_id")
+            elif resource == "item" and entity == "pulse":
+                id = event_data.get("pulse_id")
 
-            if value is not None:
+            if id is not None:
                 try:
-                    ids.add(int(value))
+                    ids.add(int(id))
                 except (ValueError, TypeError) as e:
-                    log.error(f"Failed to convert ID to integer: {value}, error: {e}")
-                    continue
+                    log.error(f"Failed to convert ID to integer: {id}, error: {e}")
+                    raise
 
     return list(ids)
 
@@ -262,12 +259,13 @@ query GetComplexity {
 """
 
 # Query for getting activity logs.
-# This query retrieves activity logs for boards.
 ACTIVITY_LOGS = """
 query GetActivityLogs($start: ISO8601DateTime!) {
   boards {
+    id
     activity_logs(from: $start) {
       id
+      entity
       event
       data
       created_at
@@ -343,7 +341,6 @@ query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) 
 """
 
 # Query for getting teams.
-# This query retrieves all fields that the Monday API returns for teams.
 TEAMS = """
 query {
   teams {
@@ -361,7 +358,6 @@ query {
 """
 
 # Query for getting users.
-# This query returns a comprehensive set of user fields.
 USERS = """
 query {
   users {
@@ -395,7 +391,6 @@ query {
 """
 
 # Query for getting tags.
-# This query returns all available tag fields from Monday.
 TAGS = """
 query {
   tags {
@@ -461,8 +456,7 @@ fragment ItemFields on Item {
 }
 """
 
-# Query for getting items for a board.
-# This query returns all items for a given board.
+# Query for getting items for a list of boards.
 ITEMS = f"""
 query GetBoardItems($boardIds: [ID!], $limit: Int = 20) {{
   boards(ids: $boardIds) {{
