@@ -1,0 +1,3 @@
+SELECT xmin AS txid, * FROM "test"."foobar"
+    WHERE (((xmin::text::bigint - $1::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3
+    ORDER BY (((xmin::text::bigint - $1::bigint)<<32)>>32);

@@ -1,0 +1,2 @@
+SELECT * FROM "test"."foobar" WHERE ("major" > $1) OR ("major" = $1 AND "minor" > $2) ORDER BY "major", "minor";
+
