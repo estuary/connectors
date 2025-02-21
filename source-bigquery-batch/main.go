@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"text/template"
 	"time"
 
 	"cloud.google.com/go/bigquery"
@@ -114,11 +115,17 @@ func executeQuery(ctx context.Context, client *bigquery.Client, query string) er
 	return nil
 }
 
-const tableQueryTemplateTemplate = `{{/* Default query template which adapts to cursor field selection */}}
-{{- if not .CursorFields -}}
-  SELECT * FROM %[1]s;
+func selectQueryTemplate(res *Resource) (string, error) {
+	if res.Template != "" {
+		return res.Template, nil
+	}
+	return tableQueryTemplate, nil
+}
+
+const tableQueryTemplate = `{{if not .CursorFields -}}
+  SELECT * FROM {{quoteTableName .SchemaName .TableName}};
 {{- else -}}
-  SELECT * FROM %[1]s
+  SELECT * FROM {{quoteTableName .SchemaName .TableName}}
   {{- if not .IsFirstQuery -}}
 	{{- range $i, $k := $.CursorFields -}}
 	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
@@ -132,29 +139,37 @@ const tableQueryTemplateTemplate = `{{/* Default query template which adapts to 
   ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
 {{- end}}`
 
+var templateFuncs = template.FuncMap{
+	"quoteTableName":  quoteTableName,
+	"quoteIdentifier": quoteIdentifier,
+}
+
 func quoteTableName(schema, table string) string {
 	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
 }
 
+func quoteIdentifier(name string) string {
+	return "`" + strings.ReplaceAll(name, "`", "\\`") + "`"
+}
+
 func generateBigQueryResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	var queryTemplate string
-	if strings.EqualFold(tableType, "BASE TABLE") {
-		queryTemplate = fmt.Sprintf(tableQueryTemplateTemplate, quoteTableName(schemaName, tableName))
-	} else {
+	if !strings.EqualFold(tableType, "BASE TABLE") {
 		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 	}
 
 	return &Resource{
-		Name:     resourceName,
-		Template: queryTemplate,
+		Name:       resourceName,
+		SchemaName: schemaName,
+		TableName:  tableName,
 	}, nil
 }
 
 var bigqueryDriver = &BatchSQLDriver{
-	DocumentationURL: "https://go.estuary.dev/source-bigquery-batch",
-	ConfigSchema:     generateConfigSchema(),
-	Connect:          connectBigQuery,
-	GenerateResource: generateBigQueryResource,
+	DocumentationURL:    "https://go.estuary.dev/source-bigquery-batch",
+	ConfigSchema:        generateConfigSchema(),
+	Connect:             connectBigQuery,
+	GenerateResource:    generateBigQueryResource,
+	SelectQueryTemplate: selectQueryTemplate,
 	ExcludedSystemSchemas: []string{
 		"information_schema",
 	},

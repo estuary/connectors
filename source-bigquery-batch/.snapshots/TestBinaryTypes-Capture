@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/binarytypes_537491": 6 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bool_val":true,"bytes_val":"aGVsbG8gd29ybGQ=","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bool_val":false,"bytes_val":"AAECAw==","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bool_val":null,"bytes_val":null,"id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bool_val":true,"bytes_val":null,"id":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bool_val":false,"bytes_val":"qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqg==","id":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"bool_val":true,"bytes_val":"SGVsbG8sIOS4lueVjCE=","id":6}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"binarytypes_537491":{"CursorNames":["id"],"CursorValues":[6],"LastPolled":"<TIMESTAMP>"}}}
+

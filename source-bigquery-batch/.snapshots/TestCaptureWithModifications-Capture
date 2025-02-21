@@ -1,0 +1,18 @@
+# ================================
+# Collection "acmeCo/test/capturewithmodifications_786099": 10 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Initial value for row 0","id":0,"updated_at":"2025-02-13T12:00:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Initial value for row 1","id":1,"updated_at":"2025-02-13T12:01:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Initial value for row 2","id":2,"updated_at":"2025-02-13T12:02:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Initial value for row 3","id":3,"updated_at":"2025-02-13T12:03:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Initial value for row 4","id":4,"updated_at":"2025-02-13T12:04:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Modified value for row 3","id":3,"updated_at":"2025-02-13T12:15:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Modified value for row 4","id":4,"updated_at":"2025-02-13T12:16:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 5","id":5,"updated_at":"2025-02-13T12:20:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 6","id":6,"updated_at":"2025-02-13T12:21:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 7","id":7,"updated_at":"2025-02-13T12:22:00Z"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"capturewithmodifications_786099":{"CursorNames":["updated_at"],"CursorValues":["2025-02-13T12:22:00Z"],"LastPolled":"<TIMESTAMP>"}}}
+

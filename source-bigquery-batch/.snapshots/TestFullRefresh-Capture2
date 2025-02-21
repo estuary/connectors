@@ -1,0 +1,16 @@
+# ================================
+# Collection "acmeCo/test/fullrefresh_902536": 8 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 0","id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 1","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 2","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 3","id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 4","id":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 5","id":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 6","id":6}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 7","id":7}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"fullrefresh_902536":{"LastPolled":"<TIMESTAMP>"}}}
+

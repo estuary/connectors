@@ -1,7 +1,6 @@
 # ================================
-# Collection "acmeCo/test/basic_capture_826935": 10 Documents
+# Collection "acmeCo/test/simplecapture_140272": 8 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 0","id":0}
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 1","id":1}
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 2","id":2}
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 3","id":3}
@@ -10,9 +9,8 @@
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 6","id":6}
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 7","id":7}
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 8","id":8}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 9","id":9}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"basic_capture_826935":{"CursorNames":["id"],"CursorValues":[9],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"simplecapture_140272":{"CursorNames":["id"],"CursorValues":[8],"LastPolled":"<TIMESTAMP>"}}}
 
