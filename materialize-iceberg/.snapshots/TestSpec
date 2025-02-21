@@ -1,0 +1,292 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-iceberg/config",
+    "properties": {
+      "namespace": {
+        "type": "string",
+        "title": "Namespace",
+        "description": "Namespace for bound collection tables (unless overridden within the binding resource configuration).",
+        "order": 0,
+        "pattern": "^[^.]*$"
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 1
+      },
+      "catalog": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-iceberg/rest-catalog-config",
+            "properties": {
+              "catalog_type": {
+                "type": "string",
+                "const": "Iceberg REST Server",
+                "default": "Iceberg REST Server",
+                "order": 0
+              },
+              "url": {
+                "type": "string",
+                "title": "URL",
+                "description": "Base URL for the REST catalog. Example: 'https://yourserver.com/api/catalog'",
+                "order": 1
+              },
+              "credential": {
+                "type": "string",
+                "title": "Credential",
+                "description": "Credential for connecting to the catalog usually in the format of '\u003cclient_id\u003e:\u003cclient_secret\u003e'",
+                "order": 2
+              },
+              "warehouse": {
+                "type": "string",
+                "title": "Warehouse",
+                "description": "Warehouse to connect to.",
+                "order": 3
+              },
+              "scope": {
+                "type": "string",
+                "title": "Scope",
+                "description": "Authorization scope for connecting to the catalog. Example: 'PRINCIPAL_ROLE:your_principal'",
+                "order": 4
+              }
+            },
+            "type": "object",
+            "required": [
+              "url",
+              "credential",
+              "warehouse"
+            ],
+            "title": "REST Catalog"
+          }
+        ],
+        "type": "object",
+        "title": "Catalog",
+        "default": {
+          "catalog_type": "Iceberg REST Server"
+        },
+        "discriminator": {
+          "propertyName": "catalog_type"
+        }
+      },
+      "compute": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-iceberg/emr-config",
+            "properties": {
+              "compute_type": {
+                "type": "string",
+                "const": "AWS EMR Serverless",
+                "default": "AWS EMR Serverless",
+                "order": 0
+              },
+              "aws_access_key_id": {
+                "type": "string",
+                "title": "AWS Access Key ID",
+                "description": "Access Key ID for authenticating with EMR and writing data to the staging bucket.",
+                "order": 1
+              },
+              "aws_secret_access_key": {
+                "type": "string",
+                "title": "AWS Secret Access key",
+                "description": "Secret Access Key for authenticating with EMR and writing data to the staging bucket.",
+                "order": 2,
+                "secret": true
+              },
+              "region": {
+                "type": "string",
+                "title": "Region",
+                "description": "Region of the EMR application and staging bucket.",
+                "order": 3
+              },
+              "application_id": {
+                "type": "string",
+                "title": "Application ID",
+                "description": "ID of the EMR serverless application.",
+                "order": 4
+              },
+              "execution_role_arn": {
+                "type": "string",
+                "title": "Execution Role ARN",
+                "description": "ARN of the EMR serverless execution role used to run jobs.",
+                "order": 5
+              },
+              "aws_bucket": {
+                "type": "string",
+                "title": "Bucket",
+                "description": "Bucket to store staged data files.",
+                "order": 6
+              },
+              "aws_bucket_path": {
+                "type": "string",
+                "title": "Bucket Path",
+                "description": "Optional prefix that will be used to store staged data files.",
+                "order": 7
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_access_key_id",
+              "aws_secret_access_key",
+              "region",
+              "application_id",
+              "execution_role_arn",
+              "aws_bucket"
+            ],
+            "title": "AWS EMR Serverless"
+          }
+        ],
+        "type": "object",
+        "title": "Compute",
+        "default": {
+          "compute_type": "AWS EMR Serverless"
+        },
+        "discriminator": {
+          "propertyName": "compute_type"
+        }
+      },
+      "syncSchedule": {
+        "properties": {
+          "syncFrequency": {
+            "type": "string",
+            "enum": [
+              "0s",
+              "30s",
+              "5m",
+              "15m",
+              "30m",
+              "1h",
+              "2h",
+              "4h"
+            ],
+            "title": "Sync Frequency",
+            "description": "Frequency at which transactions are executed when the materialization is fully caught up and streaming changes. May be enabled only for certain time periods and days of the week if configured below; otherwise it is effective 24/7. Defaults to 30 minutes if unset.",
+            "order": 0
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "Timezone applicable to sync time windows and active days. Must be a valid IANA time zone name or +HH:MM offset.",
+            "order": 1
+          },
+          "fastSyncStartTime": {
+            "type": "string",
+            "title": "Fast Sync Start Time",
+            "description": "Time of day that transactions begin executing at the configured Sync Frequency. Prior to this time transactions will be executed more slowly. Must be in the form of '09:00'.",
+            "order": 2,
+            "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "fastSyncStopTime": {
+            "type": "string",
+            "title": "Fast Sync Stop Time",
+            "description": "Time of day that transactions stop executing at the configured Sync Frequency. After this time transactions will be executed more slowly. Must be in the form of '17:00'.",
+            "order": 3,
+            "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "fastSyncEnabledDays": {
+            "type": "string",
+            "title": "Fast Sync Enabled Days",
+            "description": "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Tuesday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset.",
+            "order": 4
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Sync Schedule",
+        "description": "Configure schedule of transactions for the materialization."
+      },
+      "dbt_job_trigger": {
+        "properties": {
+          "job_id": {
+            "type": "string",
+            "title": "Job ID",
+            "description": "dbt job ID"
+          },
+          "account_id": {
+            "type": "string",
+            "title": "Account ID",
+            "description": "dbt account ID"
+          },
+          "access_url": {
+            "type": "string",
+            "title": "Access URL",
+            "description": "dbt access URL can be found in your Account Settings. See go.estuary.dev/dbt-cloud-trigger",
+            "pattern": "^https://.+$"
+          },
+          "api_key": {
+            "type": "string",
+            "title": "API Key",
+            "description": "dbt API Key",
+            "secret": true
+          },
+          "cause": {
+            "type": "string",
+            "title": "Cause Message",
+            "description": "You can set a custom 'cause' message for the job trigger. Defaults to 'Estuary Flow'."
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "skip",
+              "replace",
+              "ignore"
+            ],
+            "title": "Job Trigger Mode",
+            "description": "Specifies how should already-running jobs be treated. Defaults to 'skip' which skips the trigger if a job is already running; 'replace' cancels the running job and runs a new one; while 'ignore' triggers a new job regardless of existing jobs.",
+            "default": "skip"
+          },
+          "interval": {
+            "type": "string",
+            "title": "Minimum Run Interval",
+            "description": "Minimum time between dbt job triggers. This interval is only triggered if data has been materialized by your task.",
+            "default": "30m"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "job_id",
+          "account_id",
+          "api_key"
+        ],
+        "title": "dbt Cloud Job Trigger",
+        "description": "Trigger a dbt Job when new data is available"
+      }
+    },
+    "type": "object",
+    "required": [
+      "namespace",
+      "catalog",
+      "compute"
+    ],
+    "title": "configSchema"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-iceberg/resource",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table.",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Namespace",
+        "description": "Alternative Namespace for this table (optional).",
+        "x-schema-name": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "resourceConfigSchema"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-iceberg"
+}
