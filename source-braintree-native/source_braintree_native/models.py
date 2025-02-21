@@ -9,7 +9,7 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
     LogCursor,
     PageCursor,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
 )
 

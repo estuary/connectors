@@ -305,96 +305,97 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "author_id": 28835702984212,
-      "created_at": "2024-07-26T15:42:05Z",
+      "created_at": "2024-07-26T15:42:08Z",
       "events": [
         {
           "attachments": [],
-          "audit_id": 28835719459732,
-          "author_id": 28835719437332,
-          "body": "Can I still cancel my order?",
-          "html_body": "<div class=\"zd-comment\" dir=\"auto\">Can I still cancel my order?</div>",
-          "id": 28835719459860,
-          "plain_body": "Can I still cancel my order?",
+          "audit_id": 28835719670036,
+          "author_id": 28835751103252,
+          "body": "Hi there! Looks like I jumped the gun and, uh-oh, put the wrong delivery address on my order. I need to fix this fast but I\u2019m not sure how to go about it.\nCan you help me change the delivery address for my order? Or can I do it on the website? Also, is there a deadline for when I can make this change?\n\nThanks for your help!\n\nIngrid Van Dijk",
+          "html_body": "<div class=\"zd-comment\" dir=\"auto\">Hi there! Looks like I jumped the gun and, uh-oh, put the wrong delivery address on my order. I need to fix this fast but I\u2019m not sure how to go about it.<br>Can you help me change the delivery address for my order? Or can I do it on the website? Also, is there a deadline for when I can make this change?<br><br>Thanks for your help!<br><br>Ingrid Van Dijk</div>",
+          "id": 28835719670164,
+          "plain_body": "Hi there! Looks like I jumped the gun and, uh-oh, put the wrong delivery address on my order. I need to fix this fast but I\u2019m not sure how to go about it.\nCan you help me change the delivery address for my order? Or can I do it on the website? Also, is there a deadline for when I can make this change?\n\nThanks for your help!\n\nIngrid Van Dijk",
           "public": true,
           "type": "Comment"
         },
         {
-          "field_name": "priority",
-          "id": 28835719459988,
+          "field_name": "requester_id",
+          "id": 28835719670292,
           "type": "Create",
-          "value": "urgent"
+          "value": "28835751103252"
+        },
+        {
+          "field_name": "priority",
+          "id": 28835719670420,
+          "type": "Create",
+          "value": "normal"
         },
         {
           "field_name": "subject",
-          "id": 28835719460116,
+          "id": 28835719670548,
           "type": "Create",
-          "value": "SAMPLE TICKET: Cancel order"
+          "value": "SAMPLE TICKET: New delivery address"
         },
         {
           "field_name": "tags",
-          "id": 28835719460244,
+          "id": 28835719670676,
           "type": "Create",
           "value": [
-            "order",
+            "change_address",
+            "delivery",
             "sample_ticket"
           ]
         },
         {
-          "field_name": "28835767646868",
-          "id": 28835719460372,
-          "type": "Create",
-          "value": "order"
-        },
-        {
           "field_name": "type",
-          "id": 28835719460500,
+          "id": 28835719670804,
           "type": "Create",
           "value": null
         },
         {
           "field_name": "status",
-          "id": 28835719460628,
+          "id": 28835719670932,
           "type": "Create",
           "value": "open"
         },
         {
           "field_name": "assignee_id",
-          "id": 28835719460756,
+          "id": 28835719671060,
           "type": "Create",
           "value": "28835702984212"
         },
         {
           "field_name": "group_id",
-          "id": 28835719460884,
+          "id": 28835719671188,
           "type": "Create",
           "value": "28835740822676"
         },
         {
+          "field_name": "28835767646868",
+          "id": 28835719671316,
+          "type": "Create",
+          "value": "delivery"
+        },
+        {
           "field_name": "brand_id",
-          "id": 28835719461012,
+          "id": 28835719671444,
           "type": "Create",
           "value": "28835714705684"
         },
         {
           "field_name": "ticket_form_id",
-          "id": 28835719461140,
+          "id": 28835719671572,
           "type": "Create",
           "value": "28835740693908"
         },
         {
           "field_name": "custom_status_id",
-          "id": 28835719461268,
+          "id": 28835719671700,
           "type": "Create",
           "value": "28835714727188"
-        },
-        {
-          "field_name": "requester_id",
-          "id": 28835719461396,
-          "type": "Create",
-          "value": "28835719437332"
         }
       ],
-      "id": 28835719459732,
+      "id": 28835719670036,
       "metadata": {
         "custom": {},
         "system": {
@@ -405,7 +406,7 @@
           "longitude": -119.7257
         }
       },
-      "ticket_id": 12,
+      "ticket_id": 17,
       "via": {
         "channel": "sample_ticket",
         "source": {
@@ -813,6 +814,7 @@
         "manage_group_memberships": false,
         "manage_groups": false,
         "manage_macro_content_suggestions": false,
+        "manage_malicious_attachments": false,
         "manage_organization_fields": false,
         "manage_organizations": false,
         "manage_roles": "none",
