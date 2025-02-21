@@ -142,6 +142,43 @@ class ClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
     )
 
 
+class AuthorizationCodeFlowOAuth2Credentials(abc.ABC, BaseModel):
+    credentials_title: Literal["OAuth Credentials"] = Field(
+        default="OAuth Credentials", json_schema_extra={"type": "string"}
+    )
+    client_id: str = Field(
+        title="Client Id",
+        json_schema_extra={"secret": True},
+    )
+    client_secret: str = Field(
+        title="Client Secret",
+        json_schema_extra={"secret": True},
+    )
+
+    @abc.abstractmethod
+    def _you_must_build_oauth2_credentials_for_a_provider(self): ...
+
+    @staticmethod
+    def for_provider(
+        provider: str,
+    ) -> type["AuthorizationCodeFlowOAuth2Credentials"]:
+        """
+        Builds an OAuth2Credentials model for the given OAuth2 `provider`.
+        This routine is only available in Pydantic V2 environments.
+        """
+        from pydantic import ConfigDict
+
+        class _OAuth2Credentials(AuthorizationCodeFlowOAuth2Credentials):
+            model_config = ConfigDict(
+                json_schema_extra={"x-oauth2-provider": provider},
+                title="OAuth",
+            )
+
+            def _you_must_build_oauth2_credentials_for_a_provider(self): ...
+
+        return _OAuth2Credentials
+
+
 class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials",
