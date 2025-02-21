@@ -122,8 +122,10 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 func selectQueryTemplate(res *Resource) (string, error) {
 	if res.Template != "" {
 		return res.Template, nil
+	} else if len(res.Cursor) == 1 && res.Cursor[0] == "txid" {
+		return tableQueryTemplateXMIN, nil
 	}
-	return tableQueryTemplate, nil
+	return tableQueryTemplateCursor, nil
 }
 
 // A discussion on the use of XIDs as query cursors:
@@ -148,7 +150,7 @@ func selectQueryTemplate(res *Resource) (string, error) {
 // The xmin polling query below assumes that the source table is updated more frequently than
 // the XID epoch wraps around. If this assumption is violated it would in principle be doable
 // to `SELECT txid_current() as polled_txid, ...` and use "polled_txid" as the cursor value.
-const tableQueryTemplate = `{{if .IsFirstQuery -}}
+const tableQueryTemplateXMIN = `{{if .IsFirstQuery -}}
   SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} ORDER BY xmin::text::bigint;
 {{- else -}}
   SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}}
@@ -156,11 +158,32 @@ const tableQueryTemplate = `{{if .IsFirstQuery -}}
     ORDER BY (((xmin::text::bigint - $1::bigint)<<32)>>32);
 {{- end}}`
 
+const tableQueryTemplateCursor = `{{if .CursorFields -}}
+  {{- if .IsFirstQuery -}}
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
+  {{- else -}}
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
+	{{- range $i, $k := $.CursorFields -}}
+	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
+      {{- range $j, $n := $.CursorFields -}}
+		{{- if lt $j $i -}}
+		  {{$n}} = ${{add $j 1}} AND {{end -}}
+	  {{- end -}}
+	  {{$k}} > ${{add $i 1}}
+	{{- end -}}
+	) 
+  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
+{{- else -}}
+  SELECT * FROM {{quoteTableName .SchemaName .TableName}};
+{{- end}}
+`
+
 func quoteTableName(schema, table string) string {
 	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
 }
 
 var templateFuncs = template.FuncMap{
+	"add":             func(a, b int) int { return a + b },
 	"quoteTableName":  quoteTableName,
 	"quoteIdentifier": quoteIdentifier,
 }

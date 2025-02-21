@@ -185,6 +185,15 @@ func setShutdownAfterQuery(t testing.TB, setting bool) {
 	t.Cleanup(func() { TestShutdownAfterQuery = oldSetting })
 }
 
+func setResourceCursor(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...string) {
+	var res Resource
+	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
+	res.Cursor = cursor
+	var bs, err = json.Marshal(res)
+	require.NoError(t, err)
+	binding.ResourceConfigJson = bs
+}
+
 // TestSpec verifies the connector's response to the Spec RPC against a snapshot.
 func TestSpec(t *testing.T) {
 	response, err := postgresDriver.Spec(context.Background(), &pc.Request_Spec{})
@@ -1098,6 +1107,113 @@ func TestCaptureWithEmptyPoll(t *testing.T) {
 		}
 		cs.Capture(ctx, t, nil)
 
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestFullRefresh exercises the scenario of a table without a configured cursor,
+// which causes the capture to perform a full refresh every time it runs.
+func TestFullRefresh(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0]) // Empty cursor means full refresh behavior
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2)", tableName),
+				i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2)", tableName),
+				i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithUpdatedAtCursor exercises the use-case of a capture using
+// an updated_at timestamp column as the cursor.
+func TestCaptureWithUpdatedAtCursor(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "updated_at")
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute))
+		}
+		cs.Capture(ctx, t, nil)
+
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithTwoColumnCursor exercises the use-case of a capture using
+// a multiple-column compound cursor.
+func TestCaptureWithTwoColumnCursor(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        major INTEGER,
+        minor INTEGER,
+        data TEXT
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "major", "minor")
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		// First batch with lower version numbers
+		for _, row := range [][]any{
+			{0, 1, 1, "v1.1"}, {1, 1, 2, "v1.2"}, {2, 1, 3, "v1.3"},
+			{3, 2, 1, "v2.1"}, {4, 2, 2, "v2.2"}, {5, 2, 3, "v2.3"},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3, $4)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Second batch with higher version numbers
+		for _, row := range [][]any{
+			{6, 0, 9, "Value ignored because major is too small"},
+			{7, 2, 0, "Value ignored because minor is too small"},
+			{8, 3, 1, "v3.1"}, {9, 3, 2, "v3.2"}, {10, 3, 3, "v3.3"},
+			{11, 4, 1, "v4.1"}, {12, 4, 2, "v4.2"}, {13, 4, 3, "v4.3"},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3, $4)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
