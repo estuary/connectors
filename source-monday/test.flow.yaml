@@ -27,6 +27,7 @@ captures:
           name: boards
           interval: PT5M
         target: acmeCo/boards
+        disable: true
       - resource:
           name: items
           interval: PT5M
