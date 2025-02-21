@@ -67,22 +67,8 @@ func stripEncryptedSuffix(v interface{}, suffix string) interface{} {
 func parseConfig(t testing.TB, path string) *Config {
 	t.Helper()
 
-	// If GCP_SERVICE_ACCOUNT_KEY is specified (as it is in CI builds) then write
-	// it to a tempfile and set GOOGLE_APPLICATION_CREDENTIALS to that path so that
-	// SOPS can use it to decrypt the config.
-	var env = os.Environ()
-	if key := os.Getenv("GCP_SERVICE_ACCOUNT_KEY"); key != "" {
-		var tmpFile, err = os.CreateTemp("", "gcp-key-*.json")
-		require.NoError(t, err)
-		log.WithField("path", tmpFile.Name()).Debug("writing GCP service account key to tempfile")
-		defer os.Remove(tmpFile.Name())
-		require.NoError(t, os.WriteFile(tmpFile.Name(), []byte(key), 0600))
-		env = append(env, "GOOGLE_APPLICATION_CREDENTIALS="+tmpFile.Name())
-	}
-
 	// Run sops to decrypt the configuration file into JSON
 	var cmd = exec.Command("sops", "-d", "--output-type=json", path)
-	cmd.Env = env
 	var bs, err = cmd.Output()
 	require.NoError(t, err, "failed to decrypt config file %q", path)
 
