@@ -12,8 +12,6 @@ API = "https://api.monday.com/v2"
 
 
 class GraphQLError(RuntimeError):
-    """Raised when a GraphQL query returns an error."""
-
     def __init__(self, errors: list[dict]):
         super().__init__(f"GraphQL query returned errors. Errors: {errors}")
         self.errors = errors
@@ -22,8 +20,6 @@ class GraphQLError(RuntimeError):
 async def execute_query(
     http: HTTPSession, log: Logger, query: str, variables: Dict[str, Any] = None
 ) -> GraphQLResponse:
-    """Execute a GraphQL query and return the response."""
-
     response = GraphQLResponse.model_validate_json(
         await http.request(
             log,
@@ -49,7 +45,10 @@ async def fetch_recently_updated(
 ) -> list[int]:
     """
     Fetch IDs of recently updated resources.
-    Returns parent item IDs even when only subitems were updated.
+
+    Note: For `items` resource, this function will return IDs of parent items affected by updates.
+    So, if a subitem is updated, the parent item ID will be returned. If a parent item is updated,
+    the parent item ID will be returned.
     """
     data = await execute_query(http, log, ACTIVITY_LOGS, {"start": start})
 
@@ -107,11 +106,8 @@ async def fetch_boards(
     ids: list[int] | None = None,
 ) -> AsyncGenerator[dict, None]:
     """
-    Helper function to fetch boards from the Monday.com API.
-    Handles pagination and supports filtering by IDs.
-
-    Yields:
-        dict: Raw board data from API
+    Note: If `page` is specified, `limit` is required.
+    If `ids` is not provided, all boards will be fetched.
     """
     if page is not None and limit is None:
         raise ValueError("limit is required when specifying page")
@@ -132,7 +128,6 @@ async def fetch_boards(
         for board in boards:
             yield board
 
-        # If fetching specific page or got less than limit, we're done
         if page is not None or (limit and len(boards) < limit):
             break
 
@@ -143,10 +138,8 @@ async def _process_items(
     items: list[dict],
     processed_parent_items: set[str] | None = None,
 ) -> AsyncGenerator[dict, None]:
-    """Helper function to process and filter items."""
     for item in items:
         item_id = str(item.get("id"))
-        # If we're tracking processed items, only yield unprocessed parent items
         if processed_parent_items is not None:
             if not item.get("parent_item") and item_id not in processed_parent_items:
                 processed_parent_items.add(item_id)
@@ -161,7 +154,6 @@ async def fetch_items_by_ids(
     item_ids: list[int],
     limit: int | None = None,
 ) -> AsyncGenerator[dict, None]:
-    """Helper function to fetch items by their IDs."""
     if not item_ids:
         raise ValueError("No item IDs provided.")
 
@@ -188,7 +180,9 @@ async def fetch_items_by_boards(
     limit: int | None = None,
     board_ids: list[int] | None = None,
 ) -> AsyncGenerator[dict, None]:
-    """Helper function to fetch items by boards."""
+    """
+    Note: If `board_ids` is not provided, items from all boards will be fetched.
+    """
     response = await execute_query(
         http, log, ITEMS, {"limit": limit, "boardIds": board_ids}
     )
@@ -199,7 +193,6 @@ async def fetch_items_by_boards(
     processed_parent_items = set()
     board_cursors = {}
 
-    # Process initial items and collect cursors
     for board in boards_data:
         board_id = board.get("id")
         if not board_id:
@@ -214,10 +207,10 @@ async def fetch_items_by_boards(
         ):
             yield item
 
-    # Continue fetching with cursors
+    # Monday returns a cursor for each board's items_page. We use this cursor to fetch next items.
+    # Note that the cursor will expire in 60 minutes.
     while board_cursors:
         for b_id, cur in list(board_cursors.items()):
-            # Fetch and process items for current cursor
             response = await execute_query(
                 http,
                 log,
@@ -228,7 +221,6 @@ async def fetch_items_by_boards(
             async for item in _process_items(items, processed_parent_items):
                 yield item
 
-            # Update cursor
             next_cursor = response.data.get("next_items_page", {}).get("cursor")
             if not next_cursor:
                 board_cursors.pop(b_id)
@@ -237,7 +229,6 @@ async def fetch_items_by_boards(
 
 
 async def check_complexity(http: HTTPSession, log: Logger, threshold: int) -> None:
-    """Check API complexity and wait if necessary."""
     data = await execute_query(http, log, COMPLEXITY)
     complexity = data["data"]["complexity"]
 
@@ -258,7 +249,6 @@ query GetComplexity {
 }
 """
 
-# Query for getting activity logs.
 ACTIVITY_LOGS = """
 query GetActivityLogs($start: ISO8601DateTime!) {
   boards {
@@ -274,7 +264,6 @@ query GetActivityLogs($start: ISO8601DateTime!) {
 }
 """
 
-# Query for getting boards.
 BOARDS = """
 query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) {
   boards(order_by: $order_by, page: $page, limit: $limit) {
@@ -340,7 +329,6 @@ query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) 
 }
 """
 
-# Query for getting teams.
 TEAMS = """
 query {
   teams {
@@ -357,7 +345,6 @@ query {
 }
 """
 
-# Query for getting users.
 USERS = """
 query {
   users {
@@ -390,7 +377,6 @@ query {
 }
 """
 
-# Query for getting tags.
 TAGS = """
 query {
   tags {
@@ -402,7 +388,6 @@ query {
 """
 
 
-# Item fields fragment.
 _ITEM_FIELDS = """
 fragment _ItemFields on Item {
   id
@@ -456,7 +441,6 @@ fragment ItemFields on Item {
 }
 """
 
-# Query for getting items for a list of boards.
 ITEMS = f"""
 query GetBoardItems($boardIds: [ID!], $limit: Int = 20) {{
   boards(ids: $boardIds) {{
@@ -472,7 +456,6 @@ query GetBoardItems($boardIds: [ID!], $limit: Int = 20) {{
 {_ITEM_FIELDS}
 """
 
-# Query for getting next page of items for a board.
 NEXT_ITEMS = f"""
 query GetNextItems($cursor: String!, $limit: Int = 20) {{
   next_items_page(limit: $limit, cursor: $cursor) {{
@@ -485,7 +468,6 @@ query GetNextItems($cursor: String!, $limit: Int = 20) {{
 {_ITEM_FIELDS}
 """
 
-# Query for getting items by their IDs.
 ITEMS_BY_IDS = f"""
 query GetItemsByIds($ids: [ID!]!, $page: Int = 1, $limit: Int = 20) {{
   items(ids: $ids, page: $page, limit: $limit, newest_first: true) {{

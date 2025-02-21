@@ -18,7 +18,6 @@ from source_monday.api import (
 )
 from source_monday.graphql import API
 from source_monday.models import (
-    OAUTH2_SPEC,
     EndpointConfig,
     FullRefreshResource,
     FullRefreshResourceFetchFn,
@@ -28,7 +27,6 @@ from source_monday.models import (
     ResourceState,
 )
 
-# Supported full refresh resources and their corresponding name and snapshot function.
 FULL_REFRESH_RESOURCES = [
     ("teams", snapshot_teams),
     ("users", snapshot_users),
@@ -36,7 +34,6 @@ FULL_REFRESH_RESOURCES = [
 ]
 
 
-# Supported incremental resources and their corresponding name, fetch_changes function, and fetch_page function.
 INCREMENTAL_RESOURCES = [
     ("boards", fetch_boards_changes, fetch_boards_page),
     ("items", fetch_items_changes, fetch_items_page),
@@ -44,12 +41,7 @@ INCREMENTAL_RESOURCES = [
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
-    """
-    Checks if the provided client credentials belong to a valid OAuth app.
-    """
-    http.token_source = TokenSource(
-        oauth_spec=OAUTH2_SPEC, credentials=config.credentials
-    )
+    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
     try:
         await http.request(log, API, method="POST", json={"query": "query {me {id}}"})
@@ -143,9 +135,7 @@ def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    http.token_source = TokenSource(
-        oauth_spec=OAUTH2_SPEC, credentials=config.credentials
-    )
+    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
     return [
         *full_refresh_resouces(log, http, config),

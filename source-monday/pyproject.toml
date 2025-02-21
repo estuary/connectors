@@ -3,10 +3,9 @@ name = "source_monday"
 version = "0.1.0"
 description = ""
 authors = ["Justin Smith <justin@estuary.dev>"]
-readme = "README.md"
 
 [tool.poetry.dependencies]
-estuary-cdk = {path="../estuary-cdk", develop = true}
+estuary-cdk = { path = "../estuary-cdk", develop = true }
 pydantic = "^2"
 python = "^3.11"
 

@@ -15,7 +15,7 @@ from estuary_cdk.flow import (
 )
 from estuary_cdk.http import HTTPMixin
 
-from source_monday.models import OAUTH2_SPEC, ConnectorState, EndpointConfig
+from source_monday.models import ConnectorState, EndpointConfig
 from source_monday.resources import all_resources, validate_credentials
 
 
@@ -29,7 +29,6 @@ class Connector(
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
-            oauth2=OAUTH2_SPEC,
             documentationUrl="https://go.estuary.dev/source-monday",
             resourceConfigSchema=ResourceConfig.model_json_schema(),
             resourcePathPointers=ResourceConfig.PATH_POINTERS,

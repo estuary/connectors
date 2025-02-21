@@ -28,19 +28,10 @@ async def fetch_boards_changes(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Union[IncrementalResource, LogCursor], None]:
-    """
-    Fetch changes to boards since the last cursor using activity logs.
-
-    API Docs: https://developer.monday.com/api-reference/reference/boards
-
-    Yields:
-        Union[IncrementalResource, LogCursor]: Either a board document or next log cursor
-    """
     assert isinstance(log_cursor, datetime)
 
     max_updated_at = log_cursor
 
-    # First get IDs of recently updated boards from activity logs
     updated_ids = await fetch_recently_updated(
         "board",
         http,
@@ -52,7 +43,6 @@ async def fetch_boards_changes(
         return
 
     has_updates = False
-    # Then fetch the full board details for each updated ID
     async for board in fetch_boards(http, log, limit=limit, ids=updated_ids):
         doc = IncrementalResource.model_validate(board)
         has_updates = True
@@ -60,10 +50,8 @@ async def fetch_boards_changes(
         yield doc
 
     if not has_updates:
-        # If there were no documents, don't update the cursor.
         return
     else:
-        # Add 1 second to avoid re-fetching the same records
         yield max_updated_at + timedelta(seconds=1)
 
 
@@ -74,12 +62,6 @@ async def fetch_boards_page(
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Union[IncrementalResource, PageCursor], None]:
-    """
-    Fetch a page of boards for backfilling.
-
-    Yields:
-        Union[IncrementalResource, PageCursor]: Either a board document or next page token
-    """
     assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
@@ -87,36 +69,24 @@ async def fetch_boards_page(
     async for board in fetch_boards(http, log, page=page, limit=limit):
         doc = IncrementalResource.model_validate(board)
 
-        # Only yield boards updated before the cutoff
         if doc.updated_at < cutoff:
             yield doc
             doc_count += 1
 
-    # If we got any results, yield next page token
     if doc_count == limit:
         yield page + 1
 
 
-# Items functions
 async def fetch_items_changes(
     http: HTTPSession,
     limit: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Union[IncrementalResource, LogCursor], None]:
-    """
-    Fetch changes to items since the last cursor using activity logs.
-
-    API Docs: https://developer.monday.com/api-reference/reference/items
-
-    Yields:
-        Union[IncrementalResource, LogCursor]: Either a item document or next log cursor
-    """
     assert isinstance(log_cursor, datetime)
 
     max_updated_at = log_cursor
 
-    # First get IDs of recently updated parent items from activity logs
     parent_item_ids = await fetch_recently_updated(
         "item",
         http,
@@ -136,12 +106,9 @@ async def fetch_items_changes(
         has_updates = True
         yield doc
 
-    # Yield new cursor position if we found any updates
     if not has_updates:
-        # If there were no documents, don't update the cursor.
         return
     else:
-        # Add 1 second to avoid re-fetching the same records
         yield max_updated_at + timedelta(seconds=1)
 
 
@@ -152,12 +119,6 @@ async def fetch_items_page(
     page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Union[IncrementalResource, PageCursor], None]:
-    """
-    Fetch a page of items for all boards.
-
-    Yields:
-        Union[IncrementalResource, PageCursor]: Either a item document or next page token
-    """
     assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
@@ -169,12 +130,10 @@ async def fetch_items_page(
     ):
         doc = IncrementalResource.model_validate(item)
 
-        # Only yield items updated before the cutoff
         if doc.updated_at < cutoff:
             yield doc
             doc_count += 1
 
-    # If we got any results, yield next page token
     if doc_count == limit:
         yield page + 1
 
@@ -184,11 +143,6 @@ async def snapshot_teams(
     _: int,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    """
-    Fetch all teams.
-
-    API Docs: https://developer.monday.com/api-reference/reference/teams
-    """
     response = await execute_query(http, log, TEAMS)
 
     for team in response.data["teams"]:
@@ -200,11 +154,6 @@ async def snapshot_users(
     limit: int,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    """
-    Fetch all users.
-
-    API Docs: https://developer.monday.com/api-reference/reference/users
-    """
     variables = {
         "limit": limit,
         "page": 1,
@@ -230,11 +179,6 @@ async def snapshot_tags(
     _: int,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    """
-    Fetch all tags.
-
-    API Docs: https://developer.monday.com/api-reference/reference/tags
-    """
     response = await execute_query(http, log, TAGS)
 
     for tags in response.data["tags"]:

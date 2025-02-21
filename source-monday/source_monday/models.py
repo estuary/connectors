@@ -44,8 +44,10 @@ else:
     )
 
 
+# TODO(justin): Remove AccessToken and add OAuth2Credentials to EndpointConfig
+# when the OAuth app is created and approved by Monday.com for public use.
 class EndpointConfig(BaseModel):
-    credentials: OAuth2Credentials | AccessToken = Field(
+    credentials: AccessToken = Field(
         title="Authentication",
         discriminator="credentials_title",
     )
