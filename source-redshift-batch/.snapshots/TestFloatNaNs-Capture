@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_floatnans_198258": 3 Documents
+# Collection "acmeCo/test/floatnans_198258": 3 Documents
 # ================================
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"a_double":"NaN","a_real":2,"id":0}
 {"_meta":{"polled":"<TIMESTAMP>","index":999},"a_double":3,"a_real":"NaN","id":1}
@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_floatnans_198258":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"floatnans_198258":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>"}}}
 

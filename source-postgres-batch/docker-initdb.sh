@@ -10,6 +10,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
     GRANT SELECT ON ALL TABLES IN SCHEMA test TO flow_capture;
 
     GRANT CREATE, USAGE ON SCHEMA public TO flow_capture;
+    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT ON TABLES to flow_capture;
+    GRANT SELECT ON ALL TABLES IN SCHEMA public TO flow_capture;
 
     CREATE EXTENSION IF NOT EXISTS citext;
 EOSQL

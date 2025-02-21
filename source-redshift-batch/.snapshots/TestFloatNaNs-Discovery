@@ -1,15 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_floatnans_198258",
-      "schema": "test",
+      "name": "floatnans_198258",
+      "schema": "public",
       "table": "floatnans_198258"
     },
     "resource_path": [
-      "test_floatnans_198258"
+      "floatnans_198258"
     ],
     "collection": {
-      "name": "acmeCo/test/test_floatnans_198258",
+      "name": "acmeCo/test/floatnans_198258",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -65,6 +65,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_floatnans_198258"
+    "state_key": "floatnans_198258"
   }
 
