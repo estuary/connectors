@@ -1,15 +1,17 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "basiccapture_884124",
-      "schema": "public",
-      "table": "basiccapture_884124"
+      "name": "query_template_override",
+      "cursor": [
+        "updated_at"
+      ],
+      "template": "SELECT * FROM public.querytemplateoverride_638679 {{if not .IsFirstQuery}} WHERE updated_at \u003e $1 {{end}} ORDER BY updated_at"
     },
     "resource_path": [
-      "basiccapture_884124"
+      "querytemplateoverride_638679"
     ],
     "collection": {
-      "name": "acmeCo/test/basiccapture_884124",
+      "name": "acmeCo/test/querytemplateoverride_638679",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -47,6 +49,13 @@ Binding 0:
           },
           "id": {
             "type": "integer"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -55,6 +64,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "basiccapture_884124"
+    "state_key": "querytemplateoverride_638679"
   }
 

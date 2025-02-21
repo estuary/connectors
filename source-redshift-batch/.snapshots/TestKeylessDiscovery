@@ -1,14 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_keyless_discovery_10352",
-      "template": "{{if .CursorFields -}}\n  {{- if .IsFirstQuery -}}\n    SELECT * FROM \"test\".\"keyless_discovery_10352\"\n  {{- else -}}\n    SELECT * FROM \"test\".\"keyless_discovery_10352\"\n\t{{- range $i, $k := $.CursorFields -}}\n\t  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}\n      {{- range $j, $n := $.CursorFields -}}\n\t\t{{- if lt $j $i -}}\n\t\t  {{$n}} = ${{add $j 1}} AND {{end -}}\n\t  {{- end -}}\n\t  {{$k}} \u003e ${{add $i 1}}\n\t{{- end -}}\n\t) \n  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};\n{{- else -}}\n  SELECT * FROM \"test\".\"keyless_discovery_10352\";\n{{- end}}\n"
+      "name": "keylessdiscovery_729953",
+      "schema": "public",
+      "table": "keylessdiscovery_729953"
     },
     "resource_path": [
-      "test_keyless_discovery_10352"
+      "keylessdiscovery_729953"
     ],
     "collection": {
-      "name": "acmeCo/test/test_keyless_discovery_10352",
+      "name": "acmeCo/test/keylessdiscovery_729953",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -97,6 +98,6 @@ Binding 0:
       },
       "projections": null
     },
-    "state_key": "test_keyless_discovery_10352"
+    "state_key": "keylessdiscovery_729953"
   }
 
