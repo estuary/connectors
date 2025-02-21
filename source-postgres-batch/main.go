@@ -151,10 +151,15 @@ func selectQueryTemplate(res *Resource) (string, error) {
 // the XID epoch wraps around. If this assumption is violated it would in principle be doable
 // to `SELECT txid_current() as polled_txid, ...` and use "polled_txid" as the cursor value.
 const tableQueryTemplateXMIN = `{{if .IsFirstQuery -}}
-  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} ORDER BY xmin::text::bigint;
+  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}}
+    WHERE xmin::text::bigint >= 3
+      AND (((txid_current() - xmin::text::bigint)<<32)>>32) >= 0
+    ORDER BY xmin::text::bigint;
 {{- else -}}
   SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}}
-    WHERE (((xmin::text::bigint - $1::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3
+    WHERE xmin::text::bigint >= 3
+      AND (((txid_current() - xmin::text::bigint)<<32)>>32) >= 0
+      AND (((xmin::text::bigint - $1::bigint)<<32)>>32) > 0
     ORDER BY (((xmin::text::bigint - $1::bigint)<<32)>>32);
 {{- end}}`
 
