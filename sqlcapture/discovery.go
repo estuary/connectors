@@ -65,6 +65,22 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			continue
 		}
 
+		// The suggested collection key is just the discovered primary key of the table (which
+		// may be a unique secondary index if the database-specific discovery logic so chooses),
+		// except that if any of the columns are supposed to be omitted from the generated schema
+		// obviously it's not a suitable key and we should just act like this is a keyless table.
+		var suggestedCollectionKey = table.PrimaryKey
+		var suggestedKeyHasOmittedColumn = false
+		for _, key := range suggestedCollectionKey {
+			if table.Columns[key].OmitColumn {
+				suggestedKeyHasOmittedColumn = true
+				break
+			}
+		}
+		if suggestedKeyHasOmittedColumn {
+			suggestedCollectionKey = nil
+		}
+
 		// Don't discover materialized tables, since that is almost never what is intended, and
 		// causes problems with synthetic projection names. A column of "flow_published_at" is used
 		// as a sentinel for guessing if the table is from a materialization or not. Although not
@@ -86,7 +102,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 				continue // Skip adding properties corresponding to omitted columns
 			}
 
-			var isPrimaryKey = slices.Contains(table.PrimaryKey, column.Name)
+			var isPrimaryKey = slices.Contains(suggestedCollectionKey, column.Name)
 			var jsonType, err = db.TranslateDBToJSONType(column, isPrimaryKey)
 			if err != nil {
 				// Unhandled types are translated to the catch-all schema {} but with
@@ -121,7 +137,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 						"$anchor":    anchor,
 						"properties": properties,
 					},
-					Required: table.PrimaryKey,
+					Required: suggestedCollectionKey,
 				},
 			},
 			AllOf: []*jsonschema.Schema{
@@ -209,7 +225,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		}).Trace("translated table schema")
 
 		var keyPointers []string
-		for _, colName := range table.PrimaryKey {
+		for _, colName := range suggestedCollectionKey {
 			keyPointers = append(keyPointers, primaryKeyToCollectionKey(colName))
 		}
 
