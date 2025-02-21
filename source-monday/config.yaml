@@ -1,0 +1,19 @@
+credentials:
+    credentials_title: Private App Credentials
+    access_token_sops: ENC[AES256_GCM,data:Ui0iAumXNNh29kOHwfID+3f5TsJ/N6ui7pR5m4wvO2juZj/RjJ40aaS+Y0ggmIoI9PTaMf8CFyoIhmcBTILis2cOFzQ9Wi0F120pI+fDqZbuHa58LHaDAn0w8Xu89VyBN5PTFHkhquvJeTSmvw1ZN5u+VDv7xueOqi4T3+XngEAOgykj6v8aZI8MBU856w1hb6r1qrsIO4vrHsfqeh/EDJp7kwFRcYXAqrNkUFdWcMZqXNXZT2qeuXa5sKKsoX5gsy3/T41oxuBQQcL85yW/y7TNqyLgYyxZrohm+bpdnbhn9yHECBDylhlxWEsWww/c+BWhmByaAlEWh3nFq/CtVVzFiu3zxtTAM5zUvG7fIFMWQsNyvMHW5wQPqe9tJpRlIHLkd0PTBQsAW5AXzU5FSXn0mLFi0uNIlbouuhWv5UzO0gwqjxfvmg==,iv:YMGskK2HaRLDb1bHiz8hhbTklovwtyBmBE4etG7VbE4=,tag:68TDb2RQsp7uZ+ya1e+0+Q==,type:str]
+advanced:
+    limit: 5
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2025-02-24T14:54:10Z"
+          enc: CiQAdmEdwiUz2CBgjozzZ+kI6mdPPHJG78GFgZYD4nzyLyAaKBMSSQCtUdBGWueL8OoOPv0OZZCxgyA+GvyP2EEF0pjlk7hDFzZ2dwzntv9ENrhIYKTFm3o5JuzxTuS/UcISWzFUoVLYe+Nylj4sbug=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-02-24T14:54:11Z"
+    mac: ENC[AES256_GCM,data:nQS6I62N9We4MXBQSE8zs4HsTo0Tja6NtvF8FGP9bJ4yVMYpdYgxsvGh9VrSDax3jCZa3hU2T9j8LpdJGZh6joAdAwyzoHWnBwTPHaX0GphSqL+GteSuwPuMTFVVQvpKQZuqm96W2VkPzBlGiq55M1v4N4Fl+pChXKpvDH4JJGM=,iv:RqRrnm1V20PviKAGGBCVDMiDSYXyL+9mgMkvRu9s5GA=,tag:RgZV64TlYh6UfKjZm7Q6aA==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.4
