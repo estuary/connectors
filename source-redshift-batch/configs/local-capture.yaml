@@ -1,0 +1,18 @@
+address: localhost:5432
+database: postgres
+password_sops: ENC[AES256_GCM,data:uoni0s+mcA86sg==,iv:6N9KWESvA6zHmMwm5F9Dauc9ZXzwYeKwFsOwDaV/9tc=,tag:vEWj/kn0GckEgiJLOPVc4g==,type:str]
+user: flow_capture
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-02-21T18:45:23Z"
+    mac: ENC[AES256_GCM,data:Du8tu6ibiMeMh3bfKc0KWM1zIYLflw/pAWOG9KYI7svFfIOvfCXK1RRQJuHij17Xrd061g854jXfCdvEAYXyk5qGv9AB5NvFsUd2YQawPXjsxLSNGRABOFFiIbsOVKazQVcdyqC4mJpjlT99i3MP/VwK+VW7+NHpRQSAr9SqgUo=,iv:2eULdF7OrYwZSCRUpVx8jpoz59wx/OlLY6mYBSe0evA=,tag:wYhi+gzNQKDz1qINHrgZXg==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.4

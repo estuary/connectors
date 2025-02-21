@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"regexp"
 	"strings"
 	"sync/atomic"
@@ -27,12 +28,9 @@ import (
 )
 
 var (
-	dbAddress     = flag.String("db_address", "localhost:5432", "The database server address to use for tests")
-	dbName        = flag.String("db_name", "postgres", "Use the named database for tests")
-	dbControlUser = flag.String("db_control_user", "postgres", "The user for test setup/control operations")
-	dbControlPass = flag.String("db_control_pass", "postgres", "The password the the test setup/control user")
-	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
-	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+	cfgCapture = flag.String("cfg_capture", "configs/cloud-capture.yaml", "The path to an encrypted capture configuration file to use for test captures.")
+	cfgSetup   = flag.String("cfg_setup", "configs/cloud-setup.yaml", "The path to an encrypted configuration file containing the connection settings to use for test control operations.")
+	testSchema = flag.String("test_schema", "public", "The schema in which to create test entities.")
 )
 
 func TestMain(m *testing.M) {
@@ -45,21 +43,70 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+// stripEncryptedSuffix recursively removes the specified suffix from map keys
+func stripEncryptedSuffix(v interface{}, suffix string) interface{} {
+	switch x := v.(type) {
+	case map[string]interface{}:
+		result := make(map[string]interface{})
+		for k, v := range x {
+			newKey := strings.TrimSuffix(k, suffix)
+			result[newKey] = stripEncryptedSuffix(v, suffix)
+		}
+		return result
+	case []interface{}:
+		result := make([]interface{}, len(x))
+		for i, v := range x {
+			result[i] = stripEncryptedSuffix(v, suffix)
+		}
+		return result
+	default:
+		return v
+	}
+}
+
+func parseConfig(t testing.TB, path string) *Config {
+	t.Helper()
+
+	// If GCP_SERVICE_ACCOUNT_KEY is specified (as it is in CI builds) then write
+	// it to a tempfile and set GOOGLE_APPLICATION_CREDENTIALS to that path so that
+	// SOPS can use it to decrypt the config.
+	var env = os.Environ()
+	if key := os.Getenv("GCP_SERVICE_ACCOUNT_KEY"); key != "" {
+		var tmpFile, err = os.CreateTemp("", "gcp-key-*.json")
+		require.NoError(t, err)
+		log.WithField("path", tmpFile.Name()).Debug("writing GCP service account key to tempfile")
+		defer os.Remove(tmpFile.Name())
+		require.NoError(t, os.WriteFile(tmpFile.Name(), []byte(key), 0600))
+		env = append(env, "GOOGLE_APPLICATION_CREDENTIALS="+tmpFile.Name())
+	}
+
+	// Run sops to decrypt the configuration file into JSON
+	var cmd = exec.Command("sops", "-d", "--output-type=json", path)
+	cmd.Env = env
+	var bs, err = cmd.Output()
+	require.NoError(t, err, "failed to decrypt config file %q", path)
+
+	// First unmarshal into a generic map and strip the "_sops" suffix from any properties
+	var rawConfig map[string]interface{}
+	require.NoError(t, json.Unmarshal(bs, &rawConfig), "failed to unmarshal decrypted config")
+	var strippedConfig = stripEncryptedSuffix(rawConfig, "_sops")
+
+	// Marshal back to JSON and then parse that as a Config struct
+	bs, err = json.Marshal(strippedConfig)
+	require.NoError(t, err, "failed to marshal processed config")
+	var config Config
+	require.NoError(t, json.Unmarshal(bs, &config), "failed to parse stripped config %q", path)
+	return &config
+}
+
 func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
-	var endpointSpec = &Config{
-		Address:  *dbAddress,
-		User:     *dbCaptureUser,
-		Password: *dbCapturePass,
-		Database: *dbName,
-		Advanced: advancedConfig{
-			PollSchedule: "10s",
-		},
-	}
+	var endpointSpec = parseConfig(t, *cfgCapture)
+	endpointSpec.Advanced.PollSchedule = "5s" // Always poll frequently in tests
 
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
@@ -102,16 +149,12 @@ func testControlClient(t testing.TB) *sql.DB {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
-	var controlUser = *dbControlUser
-	if controlUser == "" {
-		controlUser = *dbCaptureUser
-	}
-	var controlPass = *dbControlPass
-	if controlPass == "" {
-		controlPass = *dbCapturePass
-	}
-	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, controlUser, controlPass, *dbAddress, *dbName)
-	log.WithField("uri", controlURI).Debug("opening database control connection")
+	var setupConfig = parseConfig(t, *cfgSetup)
+	var controlURI = setupConfig.ToURI()
+	log.WithFields(log.Fields{
+		"host": setupConfig.Address,
+		"user": setupConfig.User,
+	}).Debug("opening database control connection")
 	var conn, err = sql.Open("pgx", controlURI)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
@@ -121,12 +164,11 @@ func testControlClient(t testing.TB) *sql.DB {
 
 func testTableName(t *testing.T, uniqueID string) (name, id string) {
 	t.Helper()
-	const testSchemaName = "test"
 	var baseName = strings.ToLower(strings.TrimPrefix(t.Name(), "Test"))
 	for _, str := range []string{"/", "=", "(", ")"} {
 		baseName = strings.ReplaceAll(baseName, str, "_")
 	}
-	return fmt.Sprintf("%s.%s_%s", testSchemaName, baseName, uniqueID), uniqueID
+	return fmt.Sprintf("%s.%s_%s", *testSchema, baseName, uniqueID), uniqueID
 }
 
 func uniqueTableID(t testing.TB, extra ...string) string {
@@ -320,7 +362,7 @@ func TestSchemaFilter(t *testing.T) {
 		cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 	})
 	t.Run("FilteredIn", func(t *testing.T) {
-		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", "test"}
+		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", *testSchema}
 		cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 	})
 }
@@ -330,7 +372,7 @@ func TestKeyDiscovery(t *testing.T) {
 	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(k_smallint SMALLINT, k_int INTEGER, k_bigint BIGINT, k_bool BOOLEAN, k_str VARCHAR(8), data TEXT, PRIMARY KEY (k_smallint, k_int, k_bigint, k_bool, k_str))")
-	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
+	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{*testSchema}
 	cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 }
 
@@ -339,7 +381,7 @@ func TestKeylessDiscovery(t *testing.T) {
 	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 
 	createTestTable(t, control, tableName, "(v_smallint SMALLINT, v_int INTEGER, v_bigint BIGINT, v_bool BOOLEAN, v_str VARCHAR(8), v_ts TIMESTAMP, v_tstz TIMESTAMP WITH TIME ZONE, v_text TEXT, v_int_notnull INTEGER NOT NULL, v_text_notnull TEXT NOT NULL)")
-	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"test"}
+	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{*testSchema}
 	cupaloy.SnapshotT(t, summarizeBindings(t, discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))))
 }
 
