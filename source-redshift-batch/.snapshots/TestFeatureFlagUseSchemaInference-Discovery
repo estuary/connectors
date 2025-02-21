@@ -1,15 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_featureflaguseschemainference_697727",
-      "schema": "test",
+      "name": "featureflaguseschemainference_697727",
+      "schema": "public",
       "table": "featureflaguseschemainference_697727"
     },
     "resource_path": [
-      "test_featureflaguseschemainference_697727"
+      "featureflaguseschemainference_697727"
     ],
     "collection": {
-      "name": "acmeCo/test/test_featureflaguseschemainference_697727",
+      "name": "acmeCo/test/featureflaguseschemainference_697727",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -56,6 +56,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_featureflaguseschemainference_697727"
+    "state_key": "featureflaguseschemainference_697727"
   }
 

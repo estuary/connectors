@@ -1,15 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_basicdatatypes_261881",
-      "schema": "test",
+      "name": "basicdatatypes_261881",
+      "schema": "public",
       "table": "basicdatatypes_261881"
     },
     "resource_path": [
-      "test_basicdatatypes_261881"
+      "basicdatatypes_261881"
     ],
     "collection": {
-      "name": "acmeCo/test/test_basicdatatypes_261881",
+      "name": "acmeCo/test/basicdatatypes_261881",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -84,6 +84,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_basicdatatypes_261881"
+    "state_key": "basicdatatypes_261881"
   }
 

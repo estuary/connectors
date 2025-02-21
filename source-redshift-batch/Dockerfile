@@ -18,11 +18,9 @@ RUN go install -v ./go/...
 RUN go install -v ./source-boilerplate/...
 RUN go install -v github.com/jackc/pgx/v5
 
-# Run tests and build the connector
+# Build the connector. We skip running tests here because CI tests for
+# this connector are run as a separate step in the CI pipeline.
 COPY source-redshift-batch ./source-redshift-batch
-ARG TEST_DATABASE=yes
-ENV TEST_DATABASE=$TEST_DATABASE
-RUN go test -short -failfast -v ./source-redshift-batch/...
 RUN go build -o ./connector -v ./source-redshift-batch/...
 
 # Runtime Stage
