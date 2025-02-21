@@ -61,7 +61,7 @@ type BatchSQLDriver struct {
 
 	Connect             func(ctx context.Context, cfg *Config) (*sql.DB, error)
 	TranslateValue      func(val any, databaseTypeName string) (any, error)
-	GenerateResource    func(resourceName, schemaName, tableName, tableType string) (*Resource, error)
+	GenerateResource    func(cfg *Config, resourceName, schemaName, tableName, tableType string) (*Resource, error)
 	SelectQueryTemplate func(res *Resource) (string, error)
 }
 
@@ -223,7 +223,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		var tableID = table.Schema + "." + table.Name
 
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
-		var res, err = drv.GenerateResource(recommendedName, table.Schema, table.Name, table.Type)
+		var res, err = drv.GenerateResource(&cfg, recommendedName, table.Schema, table.Name, table.Type)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"reason": err,
