@@ -1,0 +1,494 @@
+[
+  [
+    "acmeCo/teams",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "1202780",
+      "name": "Team 1",
+      "owners": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "picture_url": "https://cdn.monday.com/images/dapulse_team_default.png",
+      "users": [
+        {
+          "id": "71985416"
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/users",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "birthday": null,
+      "country_code": "US",
+      "created_at": "2025-02-07T20:03:21Z",
+      "email": "justin@estuary.dev",
+      "enabled": true,
+      "id": "71985416",
+      "is_admin": true,
+      "is_guest": false,
+      "is_pending": false,
+      "is_verified": true,
+      "is_view_only": false,
+      "join_date": null,
+      "location": null,
+      "mobile_phone": null,
+      "name": "Justin Smith",
+      "phone": "",
+      "photo_original": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_small": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_thumb": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_thumb_small": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_tiny": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "time_zone_identifier": "America/Chicago",
+      "title": null,
+      "url": "https://estuarydev.monday.com/users/71985416",
+      "utc_hours_diff": -6.0
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "color": "#579bfc",
+      "id": "25399873",
+      "name": "test"
+    }
+  ],
+  [
+    "acmeCo/boards",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "board_kind": "public",
+      "columns": [
+        {
+          "archived": false,
+          "description": null,
+          "id": "name",
+          "settings_str": "{}",
+          "title": "Name",
+          "type": "name",
+          "width": 331
+        },
+        {
+          "archived": false,
+          "description": null,
+          "id": "subitems_mkn5v6ah",
+          "settings_str": "{\"allowMultipleItems\":true,\"itemTypeName\":\"column.subtasks.title\",\"displayType\":\"BOARD_INLINE\",\"boardIds\":[8483610893]}",
+          "title": "Subitems",
+          "type": "subtasks",
+          "width": null
+        },
+        {
+          "archived": false,
+          "description": "",
+          "id": "project_owner",
+          "settings_str": "{\"max_people_allowed\":\"0\"}",
+          "title": "Owner",
+          "type": "people",
+          "width": null
+        },
+        {
+          "archived": false,
+          "description": null,
+          "id": "project_status",
+          "settings_str": "{\"done_colors\":[1],\"color_mapping\":{\"8\":11,\"11\":8},\"labels\":{\"0\":\"Working on it\",\"1\":\"Done\",\"2\":\"Stuck\",\"5\":\"Not Started\"},\"labels_positions_v2\":{\"0\":1,\"1\":0,\"2\":2,\"5\":3},\"labels_colors\":{\"0\":{\"color\":\"#fdab3d\",\"border\":\"#e99729\",\"var_name\":\"orange\"},\"1\":{\"color\":\"#00c875\",\"border\":\"#00b461\",\"var_name\":\"green-shadow\"},\"2\":{\"color\":\"#df2f4a\",\"border\":\"#ce3048\",\"var_name\":\"red-shadow\"},\"5\":{\"color\":\"#c4c4c4\",\"border\":\"#b0b0b0\",\"var_name\":\"grey\"}}}",
+          "title": "Status",
+          "type": "status",
+          "width": 134
+        },
+        {
+          "archived": false,
+          "description": null,
+          "id": "date",
+          "settings_str": "{\"hide_footer\":false}",
+          "title": "Due date",
+          "type": "date",
+          "width": null
+        },
+        {
+          "archived": false,
+          "description": null,
+          "id": "tags_mkmy3r3g",
+          "settings_str": "{\"hide_footer\":false}",
+          "title": "Tags",
+          "type": "tags",
+          "width": null
+        }
+      ],
+      "communication": null,
+      "creator": {
+        "id": "71985416"
+      },
+      "description": "Manage any type of project. Assign owners, set timelines and keep track of where your project stands.",
+      "groups": [
+        {
+          "archived": false,
+          "color": "#579bfc",
+          "deleted": false,
+          "id": "new_group29179",
+          "position": 65472,
+          "title": "To-Do"
+        },
+        {
+          "archived": false,
+          "color": "#00c875",
+          "deleted": false,
+          "id": "new_group43041",
+          "position": 98208,
+          "title": "Completed"
+        }
+      ],
+      "id": "8431289505",
+      "name": "Estuary",
+      "owners": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "permissions": "everyone",
+      "state": "active",
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "tags": [],
+      "top_group": {
+        "id": "new_group29179"
+      },
+      "type": "board",
+      "updated_at": "2025-02-24T14:57:35Z",
+      "updates": [],
+      "views": [],
+      "workspace": {
+        "description": null,
+        "id": "9823810",
+        "kind": "open",
+        "name": "Main workspace"
+      }
+    }
+  ],
+  [
+    "acmeCo/boards",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "board_kind": "public",
+      "columns": [
+        {
+          "archived": false,
+          "description": null,
+          "id": "name",
+          "settings_str": "{}",
+          "title": "Name",
+          "type": "name",
+          "width": 300
+        },
+        {
+          "archived": false,
+          "description": null,
+          "id": "person",
+          "settings_str": "{}",
+          "title": "Owner",
+          "type": "people",
+          "width": 98
+        },
+        {
+          "archived": false,
+          "description": null,
+          "id": "status",
+          "settings_str": "{\"done_colors\":[1],\"hide_footer\":true,\"labels\":{\"0\":\"Working on it\",\"1\":\"Done\",\"2\":\"Stuck\"},\"labels_positions_v2\":{\"0\":1,\"1\":2,\"2\":0,\"3\":3,\"4\":4,\"5\":9,\"6\":5,\"8\":6,\"9\":7,\"10\":8},\"labels_colors\":{\"0\":{\"color\":\"#fdab3d\",\"border\":\"#e99729\",\"var_name\":\"orange\"},\"1\":{\"color\":\"#00c875\",\"border\":\"#00b461\",\"var_name\":\"green-shadow\"},\"2\":{\"color\":\"#df2f4a\",\"border\":\"#ce3048\",\"var_name\":\"red-shadow\"}}}",
+          "title": "Status",
+          "type": "status",
+          "width": 136
+        },
+        {
+          "archived": false,
+          "description": null,
+          "id": "date0",
+          "settings_str": "{}",
+          "title": "Date",
+          "type": "date",
+          "width": 140
+        }
+      ],
+      "communication": null,
+      "creator": {
+        "id": "71985416"
+      },
+      "description": null,
+      "groups": [
+        {
+          "archived": false,
+          "color": "#579bfc",
+          "deleted": false,
+          "id": "topics",
+          "position": 65536,
+          "title": "Subitems"
+        }
+      ],
+      "id": "8483610893",
+      "name": "Subitems of Estuary",
+      "owners": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "permissions": "everyone",
+      "state": "active",
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "tags": [],
+      "top_group": {
+        "id": "topics"
+      },
+      "type": "sub_items_board",
+      "updated_at": "2025-02-24T14:57:24Z",
+      "updates": [],
+      "views": [],
+      "workspace": {
+        "description": null,
+        "id": "9823810",
+        "kind": "open",
+        "name": "Main workspace"
+      }
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assets": [],
+      "board": {
+        "id": "8431289505",
+        "name": "Estuary"
+      },
+      "column_values": [
+        {
+          "id": "subitems_mkn5v6ah",
+          "text": null,
+          "type": "subtasks",
+          "value": "{\"changed_at\":\"2025-02-20 19:15:53 +0000\",\"linkedPulseIds\":[{\"linkedPulseId\":8531539316},{\"linkedPulseId\":8531684828}]}"
+        },
+        {
+          "id": "project_owner",
+          "text": "",
+          "type": "people",
+          "value": null
+        },
+        {
+          "id": "project_status",
+          "text": "Not Started",
+          "type": "status",
+          "value": null
+        },
+        {
+          "id": "date",
+          "text": "",
+          "type": "date",
+          "value": null
+        },
+        {
+          "id": "tags_mkmy3r3g",
+          "text": "",
+          "type": "tags",
+          "value": null
+        }
+      ],
+      "created_at": "2025-02-20T18:52:56Z",
+      "creator_id": "71985416",
+      "group": {
+        "id": "new_group29179"
+      },
+      "id": "8531390039",
+      "name": "Parent Item",
+      "parent_item": null,
+      "state": "active",
+      "subitems": [
+        {
+          "assets": [],
+          "board": {
+            "id": "8483610893",
+            "name": "Subitems of Estuary"
+          },
+          "column_values": [
+            {
+              "id": "person",
+              "text": "",
+              "type": "people",
+              "value": null
+            },
+            {
+              "id": "status",
+              "text": null,
+              "type": "status",
+              "value": null
+            },
+            {
+              "id": "date0",
+              "text": "",
+              "type": "date",
+              "value": null
+            }
+          ],
+          "created_at": "2025-02-20T19:03:22Z",
+          "creator_id": "71985416",
+          "group": {
+            "id": "topics"
+          },
+          "id": "8531539316",
+          "name": "SubItem Number One",
+          "parent_item": {
+            "id": "8531390039"
+          },
+          "state": "active",
+          "subscribers": [
+            {
+              "id": "71985416"
+            }
+          ],
+          "updated_at": "2025-02-24T14:57:20Z",
+          "updates": []
+        },
+        {
+          "assets": [],
+          "board": {
+            "id": "8483610893",
+            "name": "Subitems of Estuary"
+          },
+          "column_values": [
+            {
+              "id": "person",
+              "text": "",
+              "type": "people",
+              "value": null
+            },
+            {
+              "id": "status",
+              "text": null,
+              "type": "status",
+              "value": null
+            },
+            {
+              "id": "date0",
+              "text": "",
+              "type": "date",
+              "value": null
+            }
+          ],
+          "created_at": "2025-02-20T19:15:53Z",
+          "creator_id": "71985416",
+          "group": {
+            "id": "topics"
+          },
+          "id": "8531684828",
+          "name": "Second SubItem",
+          "parent_item": {
+            "id": "8531390039"
+          },
+          "state": "active",
+          "subscribers": [
+            {
+              "id": "71985416"
+            }
+          ],
+          "updated_at": "2025-02-24T14:57:24Z",
+          "updates": []
+        }
+      ],
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "updated_at": "2025-02-24T14:57:13Z",
+      "updates": []
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assets": [],
+      "board": {
+        "id": "8431289505",
+        "name": "Estuary"
+      },
+      "column_values": [
+        {
+          "id": "subitems_mkn5v6ah",
+          "text": null,
+          "type": "subtasks",
+          "value": "{}"
+        },
+        {
+          "id": "project_owner",
+          "text": "",
+          "type": "people",
+          "value": null
+        },
+        {
+          "id": "project_status",
+          "text": "Not Started",
+          "type": "status",
+          "value": null
+        },
+        {
+          "id": "date",
+          "text": "",
+          "type": "date",
+          "value": null
+        },
+        {
+          "id": "tags_mkmy3r3g",
+          "text": "",
+          "type": "tags",
+          "value": null
+        }
+      ],
+      "created_at": "2025-02-24T02:14:12Z",
+      "creator_id": "71985416",
+      "group": {
+        "id": "new_group29179"
+      },
+      "id": "8547821762",
+      "name": "Parent Item 2",
+      "parent_item": null,
+      "state": "active",
+      "subitems": [],
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "updated_at": "2025-02-24T14:57:32Z",
+      "updates": []
+    }
+  ]
+]
