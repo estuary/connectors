@@ -1,19 +1,19 @@
 credentials:
     credentials_title: Private App Credentials
-    access_token_sops: ENC[AES256_GCM,data:sXhDTkHUyg4HOS4B3t5S4ykdSIB46/kIp1iJDeH/kpP2PxWKj+2e6H7wgU1KJpEwzeBDItqpAt/BTpY3B4F4fvJrQUwlx942eqe1zn6cJXUovbblUx0HH1SoEGcj46BAG0lDj3tVgV76T5Dut+8swlK90decSQyUVqPqSZQk/oHA8VHiP0/El9rrNyCREeJzXXUwy4YY9ncuOc8uEuTFszGAkIhiRJ2sBpKwsiNEQf17NH0clX3i8yKtGGbQSFlCEgXcauPkRcNA/cYCCMEDAWJlcmmLxQWYkaOIFOcvhauq3Mow/Nc0S9mszeURMzfI2J2etI7ErIyHwgXzRhdYx0JwMlvtx6J6skw4x4OZQ27PUKqOFZAYEhkGLOigDazY4XqT3B8pAuGAZ2gefMfC5IyRulB7a5QKaTUkbextNXCR/+Hiiwq1Xw==,iv:OMs+zqw3eAPlvWfoxKPWZjkTtM+KdrxruGJ132rzrk0=,tag:unqCvdnDgFuJ7QmgZ4LM1g==,type:str]
-advaned:
+    access_token_sops: ENC[AES256_GCM,data:fBDGBtSUWhUbuwWTpOq3EcV2VhdX08xaX+fPoWZG+InqwsVEYQfdJkGSRqi6AofoXWyO1NlifZFzFNItFJsatY6lZvusoGZcBqSHuvbytsAEdfhC1m2KVB/arfQq3fJ1m+nIolthCY5Gc7dhzh5gib33tJX0goYEud9k/tLl0bEWHm+kkwtcTfg/UFVtfiQvKcgCmL6LQ4zZKqqSbZrEYcxM9WKiM2w/aeXavHKmOGB0dZux5rJO47xqwYvlp1004QjDdAfWku7DabmFrIPHMDE29beSVpQEBynuWjD7nCn26xoEYBS82bipBclYO1m6Ncm1JAXCM+EKZ6kg7Ra9I3SGgFWuvBCCru4CoQ56UsBWTUSBHoj23SBfKpNIu9qbFJLBPxPoHTqbfzSvXQapMUqjDvB7uWOAqBcPEg4jzJN/DgLq/e4JCQ==,iv:L75cnQq2ZADJIzA07ofn8d20Na4P6gwRah6Ur15kq6Y=,tag:Ux0VGQGmfpk9xgUS5TQtWg==,type:str]
+advanced:
     limit: 1
 sops:
     kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2025-02-19T23:15:40Z"
-          enc: CiQAdmEdwqD3oF/iVLTCBnaEv6+Isvs+pRfwZ/Ebmq5HLSVsRpISSQCtUdBG2ejulq8aZ2ofjBiAcFC9J5Gu2YA6qy5TVMncMmXn7YvqxZoRrdVo8uY6n202ylJtdmwvVJ5re0iWGNx9XpWOwgGZ3GU=
+          created_at: "2025-02-21T13:54:43Z"
+          enc: CiQAdmEdwtZvNa0dw50BLN92GJVICnVEggvotXVZdc+K1rvw1YsSSACtUdBGuIIdLpR2LHItEt41Dof9NdFYME8p8Kfj7Xb4XuAhH36sHZE2Muvrvm0eDdbbCssFBD4BtobVMww8qZrT3JsR6o7KFg==
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-02-19T23:15:41Z"
-    mac: ENC[AES256_GCM,data:O4UMs/dwgoUo27gGtSZTOGzGXREeWlAGi2Yqh/TGzsllEhwN7rooJpy971jcqYEXdbW0kInZJhbjTLKbewn7q/f3Z+ydKk5s/kKCHwXnhkZa95BBozZYjXbwfhDeEmlARr22iNoVoMM5BdIpUfom8oQPD3RvkwOSkuwUBAA9mSk=,iv:prsly0EXUSrP+mLAlAE/wtb5sk6Pc16a5epmpFuj8w0=,tag:G8jDmAVQ3UAXF+9bLNDlsg==,type:str]
+    lastmodified: "2025-02-21T13:54:43Z"
+    mac: ENC[AES256_GCM,data:xJyBMnCvrocWtLrRbtBFmvVePiniu6MGYmHRfkesmDcLKT/nvORKkAI0+CooQAegFdulQRYmU+jYK5CeGGV007Es5UyvefUtrIluYYuNJB+VB5gkvquTdBQ3ZsF1TPc2mjauCPv+TLlEjdaAMwhiyXPFTQTCu3emKxFXX+4+RSw=,iv:rd+VoXYMAaXySCqbdPKv2QweNXYWXShiOqLmT9950Nk=,tag:115mjhcVRX5dG6ybhur7Mw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4
