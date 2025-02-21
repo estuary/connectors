@@ -1217,3 +1217,38 @@ func TestCaptureWithTwoColumnCursor(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestQueryTemplates exercises the selection and execution of query templates
+// for various combinations of resource spec and stream state.
+func TestQueryTemplates(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		cursor       []string
+		cursorValues []any
+	}{
+		{name: "XMinFirstQuery", cursor: []string{"txid"}},
+		{name: "XMinSubsequentQuery", cursor: []string{"txid"}, cursorValues: []any{12345}},
+		{name: "SingleCursorFirstQuery", cursor: []string{"updated_at"}},
+		{name: "SingleCursorSubsequentQuery", cursor: []string{"updated_at"}, cursorValues: []any{"2024-02-20 12:00:00"}},
+		{name: "MultiCursorFirstQuery", cursor: []string{"major", "minor"}},
+		{name: "MultiCursorSubsequentQuery", cursor: []string{"major", "minor"}, cursorValues: []any{1, 2}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var resource = &Resource{
+				Name:       "test_foobar",
+				SchemaName: "test",
+				TableName:  "foobar",
+				Cursor:     tc.cursor,
+			}
+			var state = &streamState{
+				CursorNames:  tc.cursor,
+				CursorValues: tc.cursorValues,
+			}
+			var query, err = postgresDriver.buildQuery(resource, state)
+			require.NoError(t, err)
+			cupaloy.SnapshotT(t, query)
+		})
+	}
+}

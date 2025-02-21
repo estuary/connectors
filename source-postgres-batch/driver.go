@@ -510,6 +510,38 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	return capture.Run(stream.Context())
 }
 
+func (drv *BatchSQLDriver) buildQuery(res *Resource, state *streamState) (string, error) {
+	templateString, err := drv.SelectQueryTemplate(res)
+	if err != nil {
+		return "", fmt.Errorf("error selecting query template: %w", err)
+	}
+	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(templateString)
+	if err != nil {
+		return "", fmt.Errorf("error parsing template: %w", err)
+	}
+
+	var cursorNames = state.CursorNames
+	var cursorValues = state.CursorValues
+
+	var quotedCursorNames []string
+	for _, cursorName := range cursorNames {
+		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
+	}
+
+	var templateArg = map[string]any{
+		"IsFirstQuery": len(cursorValues) == 0,
+		"CursorFields": quotedCursorNames,
+		"SchemaName":   res.SchemaName,
+		"TableName":    res.TableName,
+	}
+
+	var queryBuf = new(strings.Builder)
+	if err := queryTemplate.Execute(queryBuf, templateArg); err != nil {
+		return "", fmt.Errorf("error generating query: %w", err)
+	}
+	return queryBuf.String(), nil
+}
+
 func updateResourceStates(prevState captureState, bindings []bindingInfo) (captureState, error) {
 	var newState = captureState{
 		Streams: make(map[boilerplate.StateKey]*streamState),
@@ -586,22 +618,14 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	var res = binding.resource
 	log.WithFields(log.Fields{
 		"name":   res.Name,
-		"tmpl":   res.Template,
+		"schema": res.SchemaName,
+		"table":  res.TableName,
 		"cursor": res.Cursor,
 		"poll":   res.PollSchedule,
 	}).Info("starting worker")
 
-	templateString, err := c.Driver.SelectQueryTemplate(res)
-	if err != nil {
-		return fmt.Errorf("error selecting query template: %w", err)
-	}
-	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(templateString)
-	if err != nil {
-		return fmt.Errorf("error parsing template: %w", err)
-	}
-
 	for ctx.Err() == nil {
-		if err := c.poll(ctx, binding, queryTemplate); err != nil {
+		if err := c.poll(ctx, binding); err != nil {
 			return fmt.Errorf("error polling binding %q: %w", res.Name, err)
 		}
 		if TestShutdownAfterQuery {
@@ -611,7 +635,7 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	return ctx.Err()
 }
 
-func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template.Template) error {
+func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var res = binding.resource
 	var stateKey = binding.stateKey
 	var state, ok = c.State.Streams[stateKey]
@@ -620,18 +644,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	}
 	var cursorNames = state.CursorNames
 	var cursorValues = state.CursorValues
-
-	var quotedCursorNames []string
-	for _, cursorName := range cursorNames {
-		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
-	}
-
-	var templateArg = map[string]any{
-		"IsFirstQuery": len(cursorValues) == 0,
-		"CursorFields": quotedCursorNames,
-		"SchemaName":   res.SchemaName,
-		"TableName":    res.TableName,
-	}
 
 	// Polling schedule can be configured per binding. If unset, falls back to the
 	// connector global polling schedule.
@@ -656,11 +668,10 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		"poll": pollScheduleStr,
 	}).Info("ready to poll")
 
-	var queryBuf = new(strings.Builder)
-	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
-		return fmt.Errorf("error generating query: %w", err)
+	query, err := c.Driver.buildQuery(res, state)
+	if err != nil {
+		return fmt.Errorf("error building query: %w", err)
 	}
-	var query = queryBuf.String()
 
 	log.WithFields(log.Fields{
 		"query": query,
