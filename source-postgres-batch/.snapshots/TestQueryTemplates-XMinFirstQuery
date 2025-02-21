@@ -1,0 +1,1 @@
+SELECT xmin AS txid, * FROM "test"."foobar" ORDER BY xmin::text::bigint;
