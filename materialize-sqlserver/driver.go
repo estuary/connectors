@@ -533,8 +533,10 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
-	if _, err := batches[lastBinding].ExecContext(ctx); err != nil {
-		return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
+	if lastBinding != -1 {
+		if _, err := batches[lastBinding].ExecContext(ctx); err != nil {
+			return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {

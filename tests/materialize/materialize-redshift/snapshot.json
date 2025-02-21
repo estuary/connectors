@@ -12,6 +12,14 @@
 ]
 [
   "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
   {
     "updated": {}
   }
@@ -21,52 +29,52 @@
   "rows": [
     {
       "canary": "amputation's",
-      "flow_published_at": "1970-01-01 00:00:00 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:00 +0000 UTC",
       "id": 1
     },
     {
       "canary": "armament's",
-      "flow_published_at": "1970-01-01 00:00:01 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:01 +0000 UTC",
       "id": 2
     },
     {
       "canary": "splatters",
-      "flow_published_at": "1970-01-01 00:00:02 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:02 +0000 UTC",
       "id": 3
     },
     {
       "canary": "strengthen",
-      "flow_published_at": "1970-01-01 00:00:03 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:03 +0000 UTC",
       "id": 4
     },
     {
       "canary": "Kringle's",
-      "flow_published_at": "1970-01-01 00:00:04 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:04 +0000 UTC",
       "id": 5
     },
     {
       "canary": "grosbeak's",
-      "flow_published_at": "1970-01-01 00:00:05 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:05 +0000 UTC",
       "id": 6
     },
     {
       "canary": "pieced",
-      "flow_published_at": "1970-01-01 01:00:00 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:00 +0000 UTC",
       "id": 7
     },
     {
       "canary": "roaches",
-      "flow_published_at": "1970-01-01 01:00:01 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:01 +0000 UTC",
       "id": 8
     },
     {
       "canary": "devilish",
-      "flow_published_at": "1970-01-01 01:00:02 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:02 +0000 UTC",
       "id": 9
     },
     {
       "canary": "glucose's",
-      "flow_published_at": "1970-01-01 01:00:03 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:03 +0000 UTC",
       "id": 10
     }
   ]
@@ -75,34 +83,64 @@
   "_table": "duplicate_keys_standard",
   "rows": [
     {
-      "flow_published_at": "1970-01-01 01:00:04 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:04 +0000 UTC",
       "id": 1,
       "int": 7,
       "str": "str 6"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:05 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:05 +0000 UTC",
       "id": 2,
       "int": 9,
       "str": "str 7"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:06 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:06 +0000 UTC",
       "id": 3,
       "int": 11,
       "str": "str 8"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:07 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:07 +0000 UTC",
       "id": 4,
       "int": 13,
       "str": "str 9"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:08 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:08 +0000 UTC",
       "id": 5,
       "int": 15,
       "str": "str 10"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:00 +0000 UTC",
+      "id": 6,
+      "int": 11,
+      "str": "str 11"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:01 +0000 UTC",
+      "id": 7,
+      "int": 12,
+      "str": "str 12"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:02 +0000 UTC",
+      "id": 8,
+      "int": 13,
+      "str": "str 13"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:03 +0000 UTC",
+      "id": 9,
+      "int": 14,
+      "str": "str 14"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:04 +0000 UTC",
+      "id": 10,
+      "int": 15,
+      "str": "str 15"
     }
   ]
 }
@@ -110,64 +148,94 @@
   "_table": "duplicate_keys_delta",
   "rows": [
     {
-      "flow_published_at": "1970-01-01 00:00:06 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:06 +0000 UTC",
       "id": 1,
       "int": 1,
       "str": "str 1"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:04 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:04 +0000 UTC",
       "id": 1,
       "int": 6,
       "str": "str 6"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:07 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:07 +0000 UTC",
       "id": 2,
       "int": 2,
       "str": "str 2"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:05 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:05 +0000 UTC",
       "id": 2,
       "int": 7,
       "str": "str 7"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:08 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:08 +0000 UTC",
       "id": 3,
       "int": 3,
       "str": "str 3"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:06 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:06 +0000 UTC",
       "id": 3,
       "int": 8,
       "str": "str 8"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:09 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:09 +0000 UTC",
       "id": 4,
       "int": 4,
       "str": "str 4"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:07 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:07 +0000 UTC",
       "id": 4,
       "int": 9,
       "str": "str 9"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:10 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:10 +0000 UTC",
       "id": 5,
       "int": 5,
       "str": "str 5"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:08 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:08 +0000 UTC",
       "id": 5,
       "int": 10,
       "str": "str 10"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:00 +0000 UTC",
+      "id": 6,
+      "int": 11,
+      "str": "str 11"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:01 +0000 UTC",
+      "id": 7,
+      "int": 12,
+      "str": "str 12"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:02 +0000 UTC",
+      "id": 8,
+      "int": 13,
+      "str": "str 13"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:03 +0000 UTC",
+      "id": 9,
+      "int": 14,
+      "str": "str 14"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:04 +0000 UTC",
+      "id": 10,
+      "int": 15,
+      "str": "str 15"
     }
   ]
 }
@@ -175,64 +243,94 @@
   "_table": "duplicate_keys_delta_exclude_flow_doc",
   "rows": [
     {
-      "flow_published_at": "1970-01-01 00:00:06 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:06 +0000 UTC",
       "id": 1,
       "int": 1,
       "str": "str 1"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:04 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:04 +0000 UTC",
       "id": 1,
       "int": 6,
       "str": "str 6"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:07 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:07 +0000 UTC",
       "id": 2,
       "int": 2,
       "str": "str 2"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:05 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:05 +0000 UTC",
       "id": 2,
       "int": 7,
       "str": "str 7"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:08 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:08 +0000 UTC",
       "id": 3,
       "int": 3,
       "str": "str 3"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:06 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:06 +0000 UTC",
       "id": 3,
       "int": 8,
       "str": "str 8"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:09 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:09 +0000 UTC",
       "id": 4,
       "int": 4,
       "str": "str 4"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:07 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:07 +0000 UTC",
       "id": 4,
       "int": 9,
       "str": "str 9"
     },
     {
-      "flow_published_at": "1970-01-01 00:00:10 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:10 +0000 UTC",
       "id": 5,
       "int": 5,
       "str": "str 5"
     },
     {
-      "flow_published_at": "1970-01-01 01:00:08 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:08 +0000 UTC",
       "id": 5,
       "int": 10,
       "str": "str 10"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:00 +0000 UTC",
+      "id": 6,
+      "int": 11,
+      "str": "str 11"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:01 +0000 UTC",
+      "id": 7,
+      "int": 12,
+      "str": "str 12"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:02 +0000 UTC",
+      "id": 8,
+      "int": 13,
+      "str": "str 13"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:03 +0000 UTC",
+      "id": 9,
+      "int": 14,
+      "str": "str 14"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:04 +0000 UTC",
+      "id": 10,
+      "int": 15,
+      "str": "str 15"
     }
   ]
 }
@@ -244,7 +342,7 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 1.1,
-      "flow_published_at": "1970-01-01 00:00:13 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:13 +0000 UTC",
       "id": 1,
       "multiple": "1",
       "nested": "{\"id\":\"i1\"}",
@@ -256,7 +354,7 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 2.2,
-      "flow_published_at": "1970-01-01 00:00:14 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:14 +0000 UTC",
       "id": 2,
       "multiple": "2.2000000000000002",
       "nested": "{\"id\":\"i2\"}",
@@ -268,7 +366,7 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 3.3,
-      "flow_published_at": "1970-01-01 00:00:15 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:15 +0000 UTC",
       "id": 3,
       "multiple": "true",
       "nested": "{\"id\":\"i3\"}",
@@ -280,7 +378,7 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 4.4,
-      "flow_published_at": "1970-01-01 00:00:16 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:16 +0000 UTC",
       "id": 4,
       "multiple": "false",
       "nested": "{\"id\":\"i4\"}",
@@ -292,7 +390,7 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 5.5,
-      "flow_published_at": "1970-01-01 00:00:17 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:17 +0000 UTC",
       "id": 5,
       "multiple": "\"string five\"",
       "nested": "{\"id\":\"i5\"}",
@@ -304,7 +402,7 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 66.66,
-      "flow_published_at": "1970-01-01 01:00:19 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:19 +0000 UTC",
       "id": 6,
       "multiple": "[\"one\",2,true]",
       "nested": "{\"id\":\"i6\"}",
@@ -316,7 +414,7 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 77.77,
-      "flow_published_at": "1970-01-01 01:00:20 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:20 +0000 UTC",
       "id": 7,
       "multiple": "{\"object\":\"seven\"}",
       "nested": "{\"id\":\"i7\"}",
@@ -328,7 +426,7 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 88.88,
-      "flow_published_at": "1970-01-01 01:00:21 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:21 +0000 UTC",
       "id": 8,
       "multiple": null,
       "nested": "{\"id\":\"i8\"}",
@@ -340,7 +438,7 @@
       "binary_field": "YWxvaGEK",
       "bool_field": false,
       "float_field": 99.99,
-      "flow_published_at": "1970-01-01 01:00:22 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:22 +0000 UTC",
       "id": 9,
       "multiple": null,
       "nested": "{\"id\":\"i9\"}",
@@ -352,7 +450,7 @@
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
       "float_field": 1010.101,
-      "flow_published_at": "1970-01-01 01:00:23 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:23 +0000 UTC",
       "id": 10,
       "multiple": null,
       "nested": "{\"id\":\"i10\"}",
@@ -367,7 +465,7 @@
     {
       "date": "0000-01-01 00:00:00 +0000 UTC",
       "datetime": "0000-01-01 00:00:00 +0000 UTC",
-      "flow_published_at": "1970-01-01 01:00:13 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:13 +0000 UTC",
       "id": 1,
       "int_and_str": "1",
       "int_str": "10",
@@ -378,7 +476,7 @@
     {
       "date": "1999-02-02 00:00:00 +0000 UTC",
       "datetime": "1999-02-02 14:20:12.33 +0000 UTC",
-      "flow_published_at": "1970-01-01 01:00:14 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:14 +0000 UTC",
       "id": 2,
       "int_and_str": "2",
       "int_str": "20",
@@ -389,7 +487,7 @@
     {
       "date": "1000-03-03 00:00:00 +0000 UTC",
       "datetime": "1000-03-03 23:59:38.1 +0000 UTC",
-      "flow_published_at": "1970-01-01 00:00:11 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:11 +0000 UTC",
       "id": 3,
       "int_and_str": "3",
       "int_str": "30",
@@ -400,7 +498,7 @@
     {
       "date": "2023-08-29 00:00:00 +0000 UTC",
       "datetime": "2023-08-29 23:59:38 +0000 UTC",
-      "flow_published_at": "1970-01-01 00:00:12 +0000 UTC",
+      "flow_published_at": "1970-01-01 01:00:12 +0000 UTC",
       "id": 4,
       "int_and_str": "4",
       "int_str": "40",
@@ -411,7 +509,7 @@
     {
       "date": "9999-12-31 00:00:00 +0000 UTC",
       "datetime": "9999-12-31 23:59:59 +0000 UTC",
-      "flow_published_at": "1970-01-01 01:00:15 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:15 +0000 UTC",
       "id": 5,
       "int_and_str": "5",
       "int_str": "50",
@@ -422,7 +520,7 @@
     {
       "date": null,
       "datetime": null,
-      "flow_published_at": "1970-01-01 01:00:16 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:16 +0000 UTC",
       "id": 8,
       "int_and_str": null,
       "int_str": null,
@@ -433,7 +531,7 @@
     {
       "date": null,
       "datetime": null,
-      "flow_published_at": "1970-01-01 01:00:17 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:17 +0000 UTC",
       "id": 9,
       "int_and_str": null,
       "int_str": null,
@@ -444,7 +542,7 @@
     {
       "date": null,
       "datetime": null,
-      "flow_published_at": "1970-01-01 01:00:18 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:18 +0000 UTC",
       "id": 10,
       "int_and_str": null,
       "int_str": null,
@@ -458,7 +556,7 @@
   "_table": "long_string",
   "rows": [
     {
-      "flow_published_at": "1970-01-01 01:00:24 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:24 +0000 UTC",
       "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.",
       "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."
     }
@@ -469,12 +567,12 @@
   "rows": [
     {
       "_meta/op": "u",
-      "flow_published_at": "1970-01-01 01:00:26 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:26 +0000 UTC",
       "id": 2
     },
     {
       "_meta/op": "c",
-      "flow_published_at": "1970-01-01 01:00:27 +0000 UTC",
+      "flow_published_at": "1970-01-01 02:00:27 +0000 UTC",
       "id": 3
     }
   ]

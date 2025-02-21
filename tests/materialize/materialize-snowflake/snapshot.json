@@ -5,6 +5,13 @@
 [
   "connectorState",
   {
+    "updated": {},
+    "mergePatch": true
+  }
+]
+[
+  "connectorState",
+  {
     "updated": {
       "deletions": {
         "Table": "deletions",
@@ -22,7 +29,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 240
+            "Size": 242
           }
         ],
         "Version": "ffffffffffffffff"
@@ -170,18 +177,53 @@
   "connectorState",
   {
     "updated": {
-      "deletions": {
-        "PipeName": "",
-        "Query": "\nMERGE INTO deletions AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS \"_meta/op\", $1[2] AS flow_published_at, $1[3] AS flow_document\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 3\nWHEN MATCHED AND r.flow_document='delete' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.\"_meta/op\" = r.\"_meta/op\", l.flow_published_at = r.flow_published_at, l.flow_document = r.flow_document\nWHEN NOT MATCHED and r.flow_document!='delete' THEN\n\tINSERT (id, \"_meta/op\", flow_published_at, flow_document)\n\tVALUES (r.id, r.\"_meta/op\", r.flow_published_at, r.flow_document);\n",
+      "duplicate_keys_delta": {
+        "Table": "duplicate_keys_delta",
+        "Query": "",
         "StagedDir": "<uuid>",
-        "Table": "deletions",
+        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_DUPLICATE_KEYS_DELTA_00000000_FFFFFFFFFFFFFFFF",
+        "PipeFiles": [
+          {
+            "Path": "<uuid>",
+            "Size": 238
+          }
+        ],
         "Version": "ffffffffffffffff"
       },
+      "duplicate_keys_delta_exclude_flow_doc": {
+        "Table": "duplicate_keys_delta_exclude_flow_doc",
+        "Query": "",
+        "StagedDir": "<uuid>",
+        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC_00000000_FFFFFFFFFFFFFFFF",
+        "PipeFiles": [
+          {
+            "Path": "<uuid>",
+            "Size": 116
+          }
+        ],
+        "Version": "ffffffffffffffff"
+      },
+      "duplicate_keys_standard": {
+        "Table": "duplicate_keys_standard",
+        "Query": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS flow_document\n\tFROM <uuid>\n);\n",
+        "StagedDir": "<uuid>",
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
+      }
+    },
+    "mergePatch": true
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
       "duplicate_keys_delta": {
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 240
+            "Size": 238
           }
         ],
         "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_DUPLICATE_KEYS_DELTA_00000000_FFFFFFFFFFFFFFFF",
@@ -205,30 +247,9 @@
       },
       "duplicate_keys_standard": {
         "PipeName": "",
-        "Query": "\nMERGE INTO duplicate_keys_standard AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS flow_document\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 5\nWHEN MATCHED AND r.flow_document='delete' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.flow_published_at, l.int = r.int, l.str = r.str, l.flow_document = r.flow_document\nWHEN NOT MATCHED and r.flow_document!='delete' THEN\n\tINSERT (id, flow_published_at, int, str, flow_document)\n\tVALUES (r.id, r.flow_published_at, r.int, r.str, r.flow_document);\n",
+        "Query": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS flow_document\n\tFROM <uuid>\n);\n",
         "StagedDir": "<uuid>",
         "Table": "duplicate_keys_standard",
-        "Version": "ffffffffffffffff"
-      },
-      "formatted_strings": {
-        "PipeName": "",
-        "Query": "\nCOPY INTO formatted_strings (\n\tid, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS date, $1[2] AS datetime, $1[3] AS flow_published_at, $1[4] AS int_and_str, $1[5] AS int_str, $1[6] AS num_and_str, $1[7] AS num_str, $1[8] AS time, $1[9] AS flow_document\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
-        "Table": "formatted_strings",
-        "Version": ""
-      },
-      "multiple_types": {
-        "PipeName": "",
-        "Query": "\nMERGE INTO multiple_types AS l\nUSING (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS flow_document\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r.flow_document='delete' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.binary_field = r.binary_field, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field, l.flow_document = r.flow_document\nWHEN NOT MATCHED and r.flow_document!='delete' THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.id, r.array_int, r.binary_field, r.bool_field, r.float_field, r.flow_published_at, r.multiple, r.nested, r.nullable_int, r.str_field, r.flow_document);\n",
-        "StagedDir": "<uuid>",
-        "Table": "multiple_types",
-        "Version": "ffffffffffffffff"
-      },
-      "simple": {
-        "PipeName": "",
-        "Query": "\nCOPY INTO simple (\n\tid, canary, flow_published_at, flow_document\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS canary, $1[2] AS flow_published_at, $1[3] AS flow_document\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
-        "Table": "simple",
         "Version": ""
       }
     }
@@ -239,52 +260,52 @@
   "rows": [
     {
       "CANARY": "amputation's",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:00Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:00Z",
       "ID": "1"
     },
     {
       "CANARY": "armament's",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:01Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:01Z",
       "ID": "2"
     },
     {
       "CANARY": "splatters",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:02Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:02Z",
       "ID": "3"
     },
     {
       "CANARY": "strengthen",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:03Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:03Z",
       "ID": "4"
     },
     {
       "CANARY": "Kringle's",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:04Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:04Z",
       "ID": "5"
     },
     {
       "CANARY": "grosbeak's",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:05Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:05Z",
       "ID": "6"
     },
     {
       "CANARY": "pieced",
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:00Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:00Z",
       "ID": "7"
     },
     {
       "CANARY": "roaches",
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:01Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:01Z",
       "ID": "8"
     },
     {
       "CANARY": "devilish",
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:02Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:02Z",
       "ID": "9"
     },
     {
       "CANARY": "glucose's",
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:03Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:03Z",
       "ID": "10"
     }
   ]
@@ -293,34 +314,64 @@
   "_table": "duplicate_keys_standard",
   "rows": [
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:04Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:04Z",
       "ID": "1",
       "INT": "7",
       "STR": "str 6"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:05Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:05Z",
       "ID": "2",
       "INT": "9",
       "STR": "str 7"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:06Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:06Z",
       "ID": "3",
       "INT": "11",
       "STR": "str 8"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:07Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:07Z",
       "ID": "4",
       "INT": "13",
       "STR": "str 9"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:08Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:08Z",
       "ID": "5",
       "INT": "15",
       "STR": "str 10"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:00Z",
+      "ID": "6",
+      "INT": "11",
+      "STR": "str 11"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:01Z",
+      "ID": "7",
+      "INT": "12",
+      "STR": "str 12"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:02Z",
+      "ID": "8",
+      "INT": "13",
+      "STR": "str 13"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:03Z",
+      "ID": "9",
+      "INT": "14",
+      "STR": "str 14"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:04Z",
+      "ID": "10",
+      "INT": "15",
+      "STR": "str 15"
     }
   ]
 }
@@ -328,64 +379,94 @@
   "_table": "duplicate_keys_delta",
   "rows": [
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:06Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:06Z",
       "ID": "1",
       "INT": "1",
       "STR": "str 1"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:04Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:04Z",
       "ID": "1",
       "INT": "6",
       "STR": "str 6"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:07Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:07Z",
       "ID": "2",
       "INT": "2",
       "STR": "str 2"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:05Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:05Z",
       "ID": "2",
       "INT": "7",
       "STR": "str 7"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:08Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:08Z",
       "ID": "3",
       "INT": "3",
       "STR": "str 3"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:06Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:06Z",
       "ID": "3",
       "INT": "8",
       "STR": "str 8"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:09Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:09Z",
       "ID": "4",
       "INT": "4",
       "STR": "str 4"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:07Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:07Z",
       "ID": "4",
       "INT": "9",
       "STR": "str 9"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:10Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:10Z",
       "ID": "5",
       "INT": "5",
       "STR": "str 5"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:08Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:08Z",
       "ID": "5",
       "INT": "10",
       "STR": "str 10"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:00Z",
+      "ID": "6",
+      "INT": "11",
+      "STR": "str 11"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:01Z",
+      "ID": "7",
+      "INT": "12",
+      "STR": "str 12"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:02Z",
+      "ID": "8",
+      "INT": "13",
+      "STR": "str 13"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:03Z",
+      "ID": "9",
+      "INT": "14",
+      "STR": "str 14"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:04Z",
+      "ID": "10",
+      "INT": "15",
+      "STR": "str 15"
     }
   ]
 }
@@ -393,64 +474,94 @@
   "_table": "duplicate_keys_delta_exclude_flow_doc",
   "rows": [
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:06Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:06Z",
       "ID": "1",
       "INT": "1",
       "STR": "str 1"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:04Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:04Z",
       "ID": "1",
       "INT": "6",
       "STR": "str 6"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:07Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:07Z",
       "ID": "2",
       "INT": "2",
       "STR": "str 2"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:05Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:05Z",
       "ID": "2",
       "INT": "7",
       "STR": "str 7"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:08Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:08Z",
       "ID": "3",
       "INT": "3",
       "STR": "str 3"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:06Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:06Z",
       "ID": "3",
       "INT": "8",
       "STR": "str 8"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:09Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:09Z",
       "ID": "4",
       "INT": "4",
       "STR": "str 4"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:07Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:07Z",
       "ID": "4",
       "INT": "9",
       "STR": "str 9"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:10Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:10Z",
       "ID": "5",
       "INT": "5",
       "STR": "str 5"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:08Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:08Z",
       "ID": "5",
       "INT": "10",
       "STR": "str 10"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:00Z",
+      "ID": "6",
+      "INT": "11",
+      "STR": "str 11"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:01Z",
+      "ID": "7",
+      "INT": "12",
+      "STR": "str 12"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:02Z",
+      "ID": "8",
+      "INT": "13",
+      "STR": "str 13"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:03Z",
+      "ID": "9",
+      "INT": "14",
+      "STR": "str 14"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T03:00:04Z",
+      "ID": "10",
+      "INT": "15",
+      "STR": "str 15"
     }
   ]
 }
@@ -462,7 +573,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": false,
       "FLOAT_FIELD": 1.1,
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:13Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:13Z",
       "ID": "1",
       "MULTIPLE": "1",
       "NESTED": "{\n  \"id\": \"i1\"\n}",
@@ -474,7 +585,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": true,
       "FLOAT_FIELD": 2.2,
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:14Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:14Z",
       "ID": "2",
       "MULTIPLE": "2.2",
       "NESTED": "{\n  \"id\": \"i2\"\n}",
@@ -486,7 +597,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": false,
       "FLOAT_FIELD": 3.3,
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:15Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:15Z",
       "ID": "3",
       "MULTIPLE": "true",
       "NESTED": "{\n  \"id\": \"i3\"\n}",
@@ -498,7 +609,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": true,
       "FLOAT_FIELD": 4.4,
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:16Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:16Z",
       "ID": "4",
       "MULTIPLE": "false",
       "NESTED": "{\n  \"id\": \"i4\"\n}",
@@ -510,7 +621,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": false,
       "FLOAT_FIELD": 5.5,
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:17Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:17Z",
       "ID": "5",
       "MULTIPLE": "\"string five\"",
       "NESTED": "{\n  \"id\": \"i5\"\n}",
@@ -522,7 +633,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": true,
       "FLOAT_FIELD": 66.66,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:19Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:19Z",
       "ID": "6",
       "MULTIPLE": "[\n  \"one\",\n  2,\n  true\n]",
       "NESTED": "{\n  \"id\": \"i6\"\n}",
@@ -534,7 +645,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": false,
       "FLOAT_FIELD": 77.77,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:20Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:20Z",
       "ID": "7",
       "MULTIPLE": "{\n  \"object\": \"seven\"\n}",
       "NESTED": "{\n  \"id\": \"i7\"\n}",
@@ -546,7 +657,7 @@
       "BINARY_FIELD": null,
       "BOOL_FIELD": true,
       "FLOAT_FIELD": 88.88,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:21Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:21Z",
       "ID": "8",
       "MULTIPLE": null,
       "NESTED": "{\n  \"id\": \"i8\"\n}",
@@ -558,7 +669,7 @@
       "BINARY_FIELD": "YWxvaGEK",
       "BOOL_FIELD": false,
       "FLOAT_FIELD": 99.99,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:22Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:22Z",
       "ID": "9",
       "MULTIPLE": null,
       "NESTED": "{\n  \"id\": \"i9\"\n}",
@@ -570,7 +681,7 @@
       "BINARY_FIELD": "c2F5xY1uYXJhCg==",
       "BOOL_FIELD": true,
       "FLOAT_FIELD": 1010.101,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:23Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:23Z",
       "ID": "10",
       "MULTIPLE": null,
       "NESTED": "{\n  \"id\": \"i10\"\n}",
@@ -585,7 +696,7 @@
     {
       "DATE": "0000-01-01T00:00:00Z",
       "DATETIME": "0000-01-01T00:00:00Z",
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:13Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:13Z",
       "ID": "1",
       "INT_AND_STR": "1",
       "INT_STR": "10",
@@ -596,7 +707,7 @@
     {
       "DATE": "1999-02-02T00:00:00Z",
       "DATETIME": "1999-02-02T14:20:12.33Z",
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:14Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:14Z",
       "ID": "2",
       "INT_AND_STR": "2",
       "INT_STR": "20",
@@ -607,7 +718,7 @@
     {
       "DATE": "1000-03-03T00:00:00Z",
       "DATETIME": "1000-03-03T23:59:38.1Z",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:11Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:11Z",
       "ID": "3",
       "INT_AND_STR": "3",
       "INT_STR": "30",
@@ -618,7 +729,7 @@
     {
       "DATE": "2023-08-29T00:00:00Z",
       "DATETIME": "2023-08-29T23:59:38Z",
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:12Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:12Z",
       "ID": "4",
       "INT_AND_STR": "4",
       "INT_STR": "40",
@@ -629,7 +740,7 @@
     {
       "DATE": "9999-12-31T00:00:00Z",
       "DATETIME": "9999-12-31T23:59:59Z",
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:15Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:15Z",
       "ID": "5",
       "INT_AND_STR": "5",
       "INT_STR": "50",
@@ -640,7 +751,7 @@
     {
       "DATE": null,
       "DATETIME": null,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:16Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:16Z",
       "ID": "8",
       "INT_AND_STR": null,
       "INT_STR": null,
@@ -651,7 +762,7 @@
     {
       "DATE": null,
       "DATETIME": null,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:17Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:17Z",
       "ID": "9",
       "INT_AND_STR": null,
       "INT_STR": null,
@@ -662,7 +773,7 @@
     {
       "DATE": null,
       "DATETIME": null,
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:18Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:18Z",
       "ID": "10",
       "INT_AND_STR": null,
       "INT_STR": null,
@@ -676,7 +787,7 @@
   "_table": "symbols",
   "rows": [
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:27Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:27Z",
       "ID": "test",
       "testing (%s)": "test"
     }
@@ -686,7 +797,7 @@
   "_table": "unsigned_bigint",
   "rows": [
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T00:00:28Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:28Z",
       "ID": "1",
       "UNSIGNED_BIGINT": "18446744073709551615"
     }
@@ -696,12 +807,12 @@
   "_table": "deletions",
   "rows": [
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:26Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:26Z",
       "ID": "2",
       "_meta/op": "u"
     },
     {
-      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:27Z",
+      "FLOW_PUBLISHED_AT": "1970-01-01T02:00:27Z",
       "ID": "3",
       "_meta/op": "c"
     }
