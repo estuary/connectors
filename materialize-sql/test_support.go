@@ -220,7 +220,7 @@ func RunSqlGenTests(
 		{Identifier: "first_new_column", MappedType: MappedType{NullableDDL: "STRING"}},
 		{Identifier: "second_new_column", MappedType: MappedType{NullableDDL: "BOOL"}},
 	}
-	dropNotNulls := []boilerplate.EndpointField{
+	dropNotNulls := []boilerplate.ExistingField{
 		{
 			Name:               "first_required_column",
 			Nullable:           true,
@@ -238,7 +238,7 @@ func RunSqlGenTests(
 	for _, testcase := range []struct {
 		name         string
 		addColumns   []Column
-		dropNotNulls []boilerplate.EndpointField
+		dropNotNulls []boilerplate.ExistingField
 		tpl          *template.Template
 	}{
 		{

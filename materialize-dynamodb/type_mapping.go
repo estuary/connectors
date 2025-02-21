@@ -193,7 +193,7 @@ func convertBase64(te tuple.TupleElement) (any, error) {
 
 type constrainter struct{}
 
-func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	// By default only the collection key and root document fields are materialized, due to
 	// DynamoDB's 400kb single item size limit. Additional fields are optional and may be selected
 	// to materialize as top-level properties with the applicable conversion applied, if desired.
@@ -214,10 +214,10 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 		constraint.Reason = "This field is able to be materialized"
 	}
 
-	return &constraint
+	return &constraint, nil
 }
 
-func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (constrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	// Non-key fields have no compatibility restrictions and can be changed in any way at any time.
 	// This relies on the assumption that the key of an establish Flow collection cannot be changed
 	// after the fact.
@@ -266,13 +266,14 @@ func infoSchema(ctx context.Context, db *dynamodb.Client, tableNames []string) (
 			return nil, fmt.Errorf("describing table %q: %w", t, err)
 		}
 
+		res := is.PushResource(t)
 		for _, def := range d.Table.AttributeDefinitions {
-			is.PushField(boilerplate.EndpointField{
+			res.PushField(boilerplate.ExistingField{
 				Name:               *def.AttributeName,
 				Nullable:           false,                     // Table keys can never be nullable.
 				Type:               string(def.AttributeType), // "B", "S", or "N".
 				CharacterMaxLength: 0,
-			}, t)
+			})
 		}
 	}
 

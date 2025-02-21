@@ -214,10 +214,11 @@ func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec, transform f
 	}
 
 	for _, b := range s.Bindings {
+		res := is.PushResource(transformPath(b.ResourcePath)...)
 		for _, f := range b.FieldSelection.AllFields() {
 			proj := *b.Collection.GetProjection(f)
 
-			is.PushField(EndpointField{
+			res.PushField(ExistingField{
 				Name:     transform(f),
 				Nullable: proj.Inference.Exists != pf.Inference_MUST || slices.Contains(proj.Inference.Types, "null"),
 				Type:     strings.Join(proj.Inference.Types, ","),
@@ -227,7 +228,7 @@ func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec, transform f
 					}
 					return 0
 				}(),
-			}, transformPath(b.ResourcePath)...)
+			})
 		}
 	}
 

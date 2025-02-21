@@ -100,21 +100,20 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 				return nil, fmt.Errorf("iterating tables: %w", err)
 			}
 
-			is.PushResource(t.SchemaName, t.Name)
-
+			res := is.PushResource(t.SchemaName, t.Name)
 			for _, c := range t.Columns {
 				var colMeta columnMeta
 				if err := json.Unmarshal([]byte(c.TypeJson), &colMeta); err != nil {
 					return nil, fmt.Errorf("unmarshalling column metadata: %w", err)
 				}
 
-				is.PushField(boilerplate.EndpointField{
+				res.PushField(boilerplate.ExistingField{
 					Name:               c.Name,
 					Nullable:           c.Nullable,
 					Type:               string(c.TypeName),
 					CharacterMaxLength: 0, // TODO(whb): Currently not supported by us, although we could parse the metadata for VARCHAR columns.
 					HasDefault:         colMeta.Metadata.Default != nil,
-				}, t.SchemaName, t.Name)
+				})
 			}
 		}
 	}

@@ -211,7 +211,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		}
 	}
 
-	if endpoint.MetaCheckpoints != nil && !is.HasResource(endpoint.MetaCheckpoints.Path) {
+	if endpoint.MetaCheckpoints != nil && is.GetResource(endpoint.MetaCheckpoints.Path) == nil {
 		// Create the checkpoints table if it doesn't already exist.
 		if resolved, err := ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect); err != nil {
 			return nil, err
