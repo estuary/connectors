@@ -36,6 +36,7 @@ on:
       - "source-zendesk-support-native/**"
       - "source-iterate/**"
       - "source-google-analytics-data-api-native/**"
+      - "source-monday/**"
 
   pull_request:
     branches: [main]
@@ -74,6 +75,7 @@ on:
       - "source-zendesk-support-native/**"
       - "source-iterate/**"
       - "source-google-analytics-data-api-native/**"
+      - "source-monday/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -210,6 +212,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-google-analytics-data-api-native
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-monday
             type: capture
             version: v1
             usage_rate: "1.0"

@@ -24,6 +24,7 @@ from ..flow import (
     CaptureBinding,
     ClientCredentialsOAuth2Credentials,
     ClientCredentialsOAuth2Spec,
+    AuthorizationCodeFlowOAuth2Credentials,
     LongLivedClientCredentialsOAuth2Credentials,
     OAuth2Spec,
     ValidationError,

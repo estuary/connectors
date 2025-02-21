@@ -1,0 +1,38 @@
+[
+  [
+    "acmeCo/teams",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "1202780",
+      "name": "Team 1",
+      "owners": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "picture_url": "https://cdn.monday.com/images/dapulse_team_default.png",
+      "users": [
+        {
+          "id": "71985416"
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/tags",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "color": "#579bfc",
+      "id": "25399873",
+      "name": "test"
+    }
+  ]
+]
