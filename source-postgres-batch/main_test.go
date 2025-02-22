@@ -33,6 +33,8 @@ var (
 	dbControlPass = flag.String("db_control_pass", "postgres", "The password the the test setup/control user")
 	dbCaptureUser = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
 	dbCapturePass = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
+
+	testFeatureFlags = flag.String("feature_flags", "", "Feature flags to apply to all test captures.")
 )
 
 func TestMain(m *testing.M) {
@@ -63,6 +65,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 		Database: *dbName,
 		Advanced: advancedConfig{
 			PollSchedule: "200ms",
+			FeatureFlags: *testFeatureFlags,
 		},
 	}
 
