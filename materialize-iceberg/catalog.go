@@ -1,26 +1,8 @@
 package main
 
 import (
-	"context"
-
 	"github.com/apache/iceberg-go"
 )
-
-type catalog interface {
-	listNamespaces(ctx context.Context) ([]string, error)
-	createNamespace(ctx context.Context, ns string) error
-	listTables(ctx context.Context, namespace string) ([]string, error)
-	tableMetadata(ctx context.Context, namespace string, name string) (*tableMetadata, error)
-	createTable(ctx context.Context, namespace string, name string, schema *iceberg.Schema) error
-	deleteTable(ctx context.Context, namespace string, name string) error
-	updateTable(
-		ctx context.Context,
-		namespace string,
-		name string,
-		requirements []tableRequirement,
-		updates []tableUpdate,
-	) error
-}
 
 type tableMetadata struct {
 	FormatVersion   int              `json:"format-version"`

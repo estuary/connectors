@@ -68,16 +68,8 @@ func (c config) Validate() error {
 	return nil
 }
 
-func (c config) toCatalog(ctx context.Context) (catalog, error) {
-	switch c.Catalog.CatalogType {
-	case catalogTypeRest:
-		return newRestCatalog(ctx, c.Catalog.restCatalogConfig)
-	case catalogTypeGlue:
-		// TODO
-		return nil, nil
-	default:
-		panic(fmt.Sprintf("invalid catalog type %q", c.Catalog.CatalogType))
-	}
+func (c config) toCatalog(ctx context.Context) (*catalog, error) {
+	return newCatalog(ctx, c.Catalog)
 }
 
 func (c config) toS3Client(ctx context.Context) (*s3.Client, error) {
@@ -105,6 +97,7 @@ type catalogConfig struct {
 	CatalogType catalogType `json:"catalog_type"`
 
 	restCatalogConfig
+	glueCatalogConfig
 }
 
 type restCatalogConfig struct {
@@ -119,6 +112,31 @@ func (c restCatalogConfig) Validate() error {
 		{"url", c.URL},
 		{"credential", c.Credential},
 		{"warehouse", c.Warehouse},
+	}
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+
+	return nil
+}
+
+type glueCatalogConfig struct {
+	AWSAccessKeyID     string `json:"aws_access_key_id" jsonschema:"title=AWS Access Key ID,description=Access Key ID for authenticating with Glue." jsonschema_extras:"order=1"`
+	AWSSecretAccessKey string `json:"aws_secret_access_key" jsonschema:"title=AWS Secret Access key,description=Secret Access Key for authenticating with Glue." jsonschema_extras:"secret=true,order=2"`
+	Region             string `json:"region" jsonschema:"title=Region,description=Region of the Glue catalog." jsonschema_extras:"order=3"`
+	GlueWarehouse      string `json:"glue_warehouse" jsonschema:"title=Glue Warehouse (Account ID),description=Glue warehouse to connect to. This is usually your AWS account ID." jsonschema_extras:"order=4"`
+	Location           string `json:"location" jsonschema:"title=Location,description=Base location for the catalog tables. Example: 's3://your_bucket/your_prefix/'" jsonschema_extras:"order=5"`
+}
+
+func (c glueCatalogConfig) Validate() error {
+	var requiredProperties = [][]string{
+		{"aws_access_key_id", c.AWSAccessKeyID},
+		{"aws_secret_access_key", c.AWSSecretAccessKey},
+		{"region", c.Region},
+		{"glue_warehouse", c.GlueWarehouse},
+		{"location", c.Location},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -177,13 +195,14 @@ func (c emrConfig) Validate() error {
 
 func (catalogConfig) JSONSchema() *jsonschema.Schema {
 	return oneOfSchema("Catalog", "Catalog Configuration", "catalog_type", string(catalogTypeRest),
-		oneOfInput{"REST Catalog", restCatalogConfig{}},
+		oneOfInput{"REST Catalog", restCatalogConfig{}, string(catalogTypeRest)},
+		oneOfInput{"AWS Glue Catalog", glueCatalogConfig{}, string(catalogTypeGlue)},
 	)
 }
 
 func (computeConfig) JSONSchema() *jsonschema.Schema {
 	return oneOfSchema("Compute", "Compute Configuration", "compute_type", string(computeTypeEmrServerless),
-		oneOfInput{"AWS EMR Serverless", emrConfig{}},
+		oneOfInput{"AWS EMR Serverless", emrConfig{}, string(computeTypeEmrServerless)},
 	)
 }
 
@@ -223,6 +242,7 @@ func sanitizePath(path ...string) []string {
 type oneOfInput struct {
 	title    string
 	instance any
+	default_ string
 }
 
 func oneOfSchema(title, description, discriminator, default_ string, inputs ...oneOfInput) *jsonschema.Schema {
@@ -232,8 +252,8 @@ func oneOfSchema(title, description, discriminator, default_ string, inputs ...o
 		config := schemagen.GenerateSchema(input.title, input.instance)
 		config.Properties.Set(discriminator, &jsonschema.Schema{
 			Type:    "string",
-			Default: default_,
-			Const:   default_,
+			Default: input.default_,
+			Const:   input.default_,
 			Extras:  map[string]any{"order": 0},
 		})
 		config.Properties.MoveToFront(discriminator)

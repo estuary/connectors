@@ -28,7 +28,7 @@ var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &driver{
 
 type driver struct {
 	cfg     config
-	catalog catalog
+	catalog *catalog
 	s3      *s3.Client
 }
 
@@ -86,7 +86,7 @@ func (d *driver) Config() boilerplate.MaterializeCfg {
 			ExtendedLogging: true,
 			AckSchedule: &boilerplate.AckScheduleOption{
 				Config: d.cfg.Schedule,
-				Jitter: []byte(d.cfg.Catalog.Warehouse),
+				Jitter: []byte(d.cfg.Compute.ApplicationId),
 			},
 			DBTJobTrigger: &d.cfg.DBTJobTrigger,
 		},
@@ -124,6 +124,11 @@ func (d *driver) PopulateInfoSchema(ctx context.Context, resourcePaths [][]strin
 	processTableMetadata := func(ctx context.Context, ns string, t string) error {
 		meta, err := d.catalog.tableMetadata(ctx, ns, t)
 		if err != nil {
+			if errors.Is(err, errTableNotFound) {
+				// Most likely cause is this is not an Iceberg table, or it has
+				// been deleted very recently.
+				return nil
+			}
 			return fmt.Errorf("getting table: %w", err)
 		}
 

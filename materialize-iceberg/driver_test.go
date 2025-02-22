@@ -28,17 +28,34 @@ func testConfig(t *testing.T, ns string) config {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
-	cfg := config{
-		Namespace: ns,
-		Catalog: catalogConfig{
+	var catCfg catalogConfig
+	switch os.Getenv("ICEBERG_CATALOG_TYPE") {
+	case "rest":
+		catCfg = catalogConfig{
 			CatalogType: catalogTypeRest,
 			restCatalogConfig: restCatalogConfig{
 				URL:        os.Getenv("ICEBERG_CATALOG_URL"),
 				Credential: os.Getenv("ICEBERG_CATALOG_CREDENTIAL"),
-				Warehouse:  os.Getenv("ICEBERG_CATALOG_WAREHOUSE"),
+				Warehouse:  os.Getenv("ICEBERG_CATALOG_REST_WAREHOUSE"),
 				Scope:      os.Getenv("ICEBERG_CATALOG_SCOPE"),
 			},
-		},
+		}
+	case "glue":
+		catCfg = catalogConfig{
+			CatalogType: catalogTypeGlue,
+			glueCatalogConfig: glueCatalogConfig{
+				AWSAccessKeyID:     os.Getenv("ICEBERG_AWS_ACCESS_KEY_ID"),
+				AWSSecretAccessKey: os.Getenv("ICEBERG_AWS_SECRET_ACCESS_KEY"),
+				Region:             os.Getenv("ICEBERG_REGION_NAME"),
+				GlueWarehouse:      os.Getenv("ICEBERG_CATALOG_GLUE_WAREHOUSE"),
+				Location:           os.Getenv("ICEBERG_CATALOG_GLUE_LOCATION"),
+			},
+		}
+	}
+
+	cfg := config{
+		Namespace: ns,
+		Catalog:   catCfg,
 		Compute: computeConfig{
 			ComputeType: computeTypeEmrServerless,
 			emrConfig: emrConfig{

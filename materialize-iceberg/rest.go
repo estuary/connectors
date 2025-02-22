@@ -2,74 +2,116 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/apache/iceberg-go"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"golang.org/x/oauth2/clientcredentials"
 	"resty.dev/v3"
 )
 
 // TODO: In general these responses may need to handle pagination.
 
-var _ catalog = &restCatalog{}
+var (
+	// errTableNotFound may be returned when attempting to get metadata for a
+	// non-Iceberg table present in a Glue catalog.
+	errTableNotFound = fmt.Errorf("table not found")
+)
 
-type restCatalog struct {
-	http      *resty.Client
-	warehouse string
+type catalog struct {
+	rHttp    *resty.Client
+	location string
 }
 
-func newRestCatalog(ctx context.Context, cfg restCatalogConfig) (*restCatalog, error) {
-	baseURL, err := url.Parse(cfg.URL)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse base url: %w", err)
-	}
-	baseURL = baseURL.JoinPath("v1")
+func newCatalog(ctx context.Context, cfg catalogConfig) (*catalog, error) {
+	var (
+		rHttp     *resty.Client
+		warehouse string
+		baseURL   *url.URL
+		location  string
+		err       error
+	)
 
-	var scopes []string
-	if cfg.Scope != "" {
-		scopes = []string{cfg.Scope}
-	}
-
-	var http *resty.Client
-	clientID, clientSecret, ok := strings.Cut(cfg.Credential, ":")
-	if ok {
-		clientCredCfg := &clientcredentials.Config{
-			ClientID:     clientID,
-			ClientSecret: clientSecret,
-			TokenURL:     baseURL.JoinPath("/oauth/tokens").String(),
-			Scopes:       scopes,
+	switch cfg.CatalogType {
+	case catalogTypeRest:
+		rCfg := cfg.restCatalogConfig
+		warehouse = rCfg.Warehouse
+		if baseURL, err = url.Parse(rCfg.URL); err != nil {
+			return nil, fmt.Errorf("failed to parse base url: %w", err)
 		}
-		http = resty.NewWithClient(clientCredCfg.Client(ctx))
-	} else {
-		http = resty.New().SetAuthToken(cfg.Credential)
+		baseURL = baseURL.JoinPath("v1")
+
+		var scopes []string
+		if rCfg.Scope != "" {
+			scopes = []string{rCfg.Scope}
+		}
+
+		if clientID, clientSecret, ok := strings.Cut(rCfg.Credential, ":"); ok {
+			clientCredCfg := &clientcredentials.Config{
+				ClientID:     clientID,
+				ClientSecret: clientSecret,
+				TokenURL:     baseURL.JoinPath("/oauth/tokens").String(),
+				Scopes:       scopes,
+			}
+			rHttp = resty.NewWithClient(clientCredCfg.Client(ctx))
+		} else {
+			rHttp = resty.New().SetAuthToken(rCfg.Credential)
+		}
+	case catalogTypeGlue:
+		gCfg := cfg.glueCatalogConfig
+		warehouse = gCfg.GlueWarehouse
+		location = gCfg.Location
+		if baseURL, err = url.Parse(fmt.Sprintf("https://glue.%s.amazonaws.com/iceberg", gCfg.Region)); err != nil {
+			return nil, fmt.Errorf("failed to parse base url: %w", err)
+		}
+		baseURL = baseURL.JoinPath("v1")
+
+		rHttp = resty.New()
+		rHttp.SetTransport(&sigv4Transport{
+			delegate: rHttp.Transport(),
+			signer:   v4.NewSigner(),
+			region:   cfg.Region,
+			creds: aws.Credentials{
+				AccessKeyID:     cfg.AWSAccessKeyID,
+				SecretAccessKey: cfg.AWSSecretAccessKey,
+			},
+		})
+	default:
+		return nil, fmt.Errorf("unknown catalog type: %s", cfg.CatalogType)
 	}
 
-	rc := &restCatalog{
-		http:      http.SetBaseURL(baseURL.String()),
-		warehouse: cfg.Warehouse,
+	rc := &catalog{
+		rHttp:    rHttp.SetBaseURL(baseURL.String()),
+		location: location,
 	}
 
 	type configResponse struct {
 		Overrides map[string]string `json:"overrides"`
 	}
 
-	catalogCfg, err := doGet[configResponse](ctx, rc, "/config")
+	catalogCfg, err := doGet[configResponse](ctx, rc, "/config", [][]string{{"warehouse", warehouse}})
 	if err != nil {
 		return nil, err
 	}
 
 	if catalogCfg.Overrides != nil {
 		if prefix, ok := catalogCfg.Overrides["prefix"]; ok {
-			rc.http = rc.http.SetBaseURL(baseURL.JoinPath(prefix).String())
+			rc.rHttp = rc.rHttp.SetBaseURL(baseURL.JoinPath(prefix).String())
 		}
 	}
 
 	return rc, nil
 }
 
-func (c *restCatalog) listNamespaces(ctx context.Context) ([]string, error) {
+func (c *catalog) listNamespaces(ctx context.Context) ([]string, error) {
 	type resp struct {
 		Namespaces [][]string `json:"namespaces"`
 	}
@@ -87,7 +129,7 @@ func (c *restCatalog) listNamespaces(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (c *restCatalog) createNamespace(ctx context.Context, ns string) error {
+func (c *catalog) createNamespace(ctx context.Context, ns string) error {
 	if err := doPost(ctx, c, "/namespaces", map[string][]string{
 		"namespace": {ns},
 	}); err != nil {
@@ -97,7 +139,7 @@ func (c *restCatalog) createNamespace(ctx context.Context, ns string) error {
 	return nil
 }
 
-func (c *restCatalog) listTables(ctx context.Context, ns string) ([]string, error) {
+func (c *catalog) listTables(ctx context.Context, ns string) ([]string, error) {
 	type resp struct {
 		Identifiers []struct {
 			Name string `json:"name"`
@@ -117,7 +159,7 @@ func (c *restCatalog) listTables(ctx context.Context, ns string) ([]string, erro
 	return out, nil
 }
 
-func (c *restCatalog) tableMetadata(ctx context.Context, ns string, name string) (*tableMetadata, error) {
+func (c *catalog) tableMetadata(ctx context.Context, ns string, name string) (*tableMetadata, error) {
 	type resp struct {
 		Metadata tableMetadata `json:"metadata"`
 	}
@@ -130,19 +172,19 @@ func (c *restCatalog) tableMetadata(ctx context.Context, ns string, name string)
 	return &res.Metadata, nil
 }
 
-func (c *restCatalog) createTable(ctx context.Context, ns string, name string, sch *iceberg.Schema) error {
+func (c *catalog) createTable(ctx context.Context, ns string, name string, sch *iceberg.Schema) error {
 	type createTableRequest struct {
-		Name   string          `json:"name"`
-		Schema *iceberg.Schema `json:"schema"`
-		// TODO(whb): Might need to provide a location for some catalogs? It is
-		// needed for AWS Glue.
+		Name     string          `json:"name"`
+		Schema   *iceberg.Schema `json:"schema"`
+		Location string          `json:"location,omitempty"`
 		// TODO(whb): Consider partition-spec, write-order, and properties as
 		// additional inputs.
 	}
 
 	if err := doPost(ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), createTableRequest{
-		Name:   name,
-		Schema: sch,
+		Name:     name,
+		Schema:   sch,
+		Location: c.location,
 	}); err != nil {
 		return err
 	}
@@ -150,7 +192,7 @@ func (c *restCatalog) createTable(ctx context.Context, ns string, name string, s
 	return nil
 }
 
-func (c *restCatalog) deleteTable(ctx context.Context, ns string, name string) error {
+func (c *catalog) deleteTable(ctx context.Context, ns string, name string) error {
 	if got, err := c.baseReq(ctx).Delete(fmt.Sprintf("/namespaces/%s/tables/%s", ns, name)); err != nil {
 		return fmt.Errorf("failed to delete table %s.%s: %w", ns, name, err)
 	} else if !got.IsSuccess() {
@@ -160,7 +202,7 @@ func (c *restCatalog) deleteTable(ctx context.Context, ns string, name string) e
 	return nil
 }
 
-func (c *restCatalog) updateTable(ctx context.Context, ns string, name string, reqs []tableRequirement, upds []tableUpdate) error {
+func (c *catalog) updateTable(ctx context.Context, ns string, name string, reqs []tableRequirement, upds []tableUpdate) error {
 	type tableUpdateRequest struct {
 		Identifier struct {
 			Namespace []string `json:"namespace"`
@@ -184,33 +226,89 @@ func (c *restCatalog) updateTable(ctx context.Context, ns string, name string, r
 	return nil
 }
 
-func (c *restCatalog) baseReq(ctx context.Context) *resty.Request {
+type errorResponse struct {
+	Error struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Type    string `json:"type"`
+	} `json:"error"`
+}
+
+func (err *errorResponse) String() string {
+	return fmt.Sprintf("(Code: %d, Message: %s, Type: %s)", err.Error.Code, err.Error.Message, err.Error.Type)
+}
+
+func (c *catalog) baseReq(ctx context.Context) *resty.Request {
 	return c.
-		http.
+		rHttp.
 		NewRequest().
 		WithContext(ctx).
 		SetContentType("application/json").
-		SetQueryParam("warehouse", c.warehouse)
+		SetError(&errorResponse{})
 }
 
-func doGet[T any](ctx context.Context, client *restCatalog, path string) (*T, error) {
+func doGet[T any](ctx context.Context, client *catalog, path string, params ...[][]string) (*T, error) {
 	var res T
 
-	if got, err := client.baseReq(ctx).SetResult(&res).Get(path); err != nil {
+	req := client.baseReq(ctx)
+	if len(params) > 0 {
+		for _, param := range params[0] {
+			req.SetQueryParam(param[0], param[1])
+		}
+	}
+
+	if got, err := req.SetResult(&res).Get(path); err != nil {
 		return nil, fmt.Errorf("failed to get %s: %w", path, err)
 	} else if !got.IsSuccess() {
-		return nil, fmt.Errorf("failed to get %s: %s: %s", path, got.Status(), got.String())
+		if e := got.Error().(*errorResponse); e.Error.Type == "IcebergTableNotFoundException" {
+			return nil, errTableNotFound
+		} else {
+			return nil, fmt.Errorf("failed to GET %s: %s %s", got.Request.URL, got.Status(), e)
+		}
 	}
 
 	return &res, nil
 }
 
-func doPost(ctx context.Context, client *restCatalog, path string, body any) error {
+func doPost(ctx context.Context, client *catalog, path string, body any) error {
 	if got, err := client.baseReq(ctx).SetBody(body).Post(path); err != nil {
 		return fmt.Errorf("failed to post %s: %w", path, err)
 	} else if !got.IsSuccess() {
-		return fmt.Errorf("failed to post %s: %s: %s", path, got.Status(), got.String())
+		return fmt.Errorf("failed to POST %s: %s %s", got.Request.URL, got.Status(), got.Error().(*errorResponse))
 	}
 
 	return nil
+}
+
+// from https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/aws/signer/v4#Signer.SignHTTP
+const emptyStringHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+
+type sigv4Transport struct {
+	delegate http.RoundTripper
+	signer   *v4.Signer
+	region   string
+	creds    aws.Credentials
+}
+
+func (t *sigv4Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+	h := sha256.New()
+
+	var hsh string
+	if req.Body != nil {
+		if rdr, err := req.GetBody(); err != nil {
+			return nil, err
+		} else if _, err = io.Copy(h, rdr); err != nil {
+			return nil, err
+		} else {
+			hsh = hex.EncodeToString(h.Sum(nil))
+		}
+	} else {
+		hsh = emptyStringHash
+	}
+
+	if err := t.signer.SignHTTP(req.Context(), t.creds, req, hsh, "glue", t.region, time.Now()); err != nil {
+		return nil, err
+	}
+
+	return t.delegate.RoundTrip(req)
 }
