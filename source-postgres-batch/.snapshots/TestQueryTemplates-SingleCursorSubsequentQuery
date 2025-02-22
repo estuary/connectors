@@ -1,0 +1,2 @@
+SELECT * FROM "test"."foobar" WHERE ("updated_at" > $1) ORDER BY "updated_at";
+

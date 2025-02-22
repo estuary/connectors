@@ -29,6 +29,11 @@
       },
       "advanced": {
         "properties": {
+          "discover_views": {
+            "type": "boolean",
+            "title": "Discover Views",
+            "description": "When set views will be automatically discovered as resources. If unset only tables will be discovered."
+          },
           "poll": {
             "type": "string",
             "title": "Default Polling Schedule",

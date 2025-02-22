@@ -31,6 +31,7 @@ type Config struct {
 }
 
 type advancedConfig struct {
+	DiscoverViews   bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
 	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '5m' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	SSLMode         string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
@@ -122,8 +123,10 @@ func connectPostgres(ctx context.Context, cfg *Config) (*sql.DB, error) {
 func selectQueryTemplate(res *Resource) (string, error) {
 	if res.Template != "" {
 		return res.Template, nil
+	} else if len(res.Cursor) == 1 && res.Cursor[0] == "txid" {
+		return tableQueryTemplateXMIN, nil
 	}
-	return tableQueryTemplate, nil
+	return tableQueryTemplateCursor, nil
 }
 
 // A discussion on the use of XIDs as query cursors:
@@ -148,34 +151,66 @@ func selectQueryTemplate(res *Resource) (string, error) {
 // The xmin polling query below assumes that the source table is updated more frequently than
 // the XID epoch wraps around. If this assumption is violated it would in principle be doable
 // to `SELECT txid_current() as polled_txid, ...` and use "polled_txid" as the cursor value.
-const tableQueryTemplate = `{{if .IsFirstQuery -}}
-  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}} ORDER BY xmin::text::bigint;
+const tableQueryTemplateXMIN = `{{if .IsFirstQuery -}}
+  SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}}
+    WHERE xmin::text::bigint >= 3
+      AND (((txid_current() - xmin::text::bigint)<<32)>>32) >= 0
+    ORDER BY xmin::text::bigint;
 {{- else -}}
   SELECT xmin AS txid, * FROM {{quoteTableName .SchemaName .TableName}}
-    WHERE (((xmin::text::bigint - $1::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3
+    WHERE xmin::text::bigint >= 3
+      AND (((txid_current() - xmin::text::bigint)<<32)>>32) >= 0
+      AND (((xmin::text::bigint - $1::bigint)<<32)>>32) > 0
     ORDER BY (((xmin::text::bigint - $1::bigint)<<32)>>32);
 {{- end}}`
+
+const tableQueryTemplateCursor = `{{if .CursorFields -}}
+  {{- if .IsFirstQuery -}}
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
+  {{- else -}}
+    SELECT * FROM {{quoteTableName .SchemaName .TableName}}
+	{{- range $i, $k := $.CursorFields -}}
+	  {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
+      {{- range $j, $n := $.CursorFields -}}
+		{{- if lt $j $i -}}
+		  {{$n}} = ${{add $j 1}} AND {{end -}}
+	  {{- end -}}
+	  {{$k}} > ${{add $i 1}}
+	{{- end -}}
+	) 
+  {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
+{{- else -}}
+  SELECT * FROM {{quoteTableName .SchemaName .TableName}};
+{{- end}}
+`
 
 func quoteTableName(schema, table string) string {
 	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
 }
 
 var templateFuncs = template.FuncMap{
+	"add":             func(a, b int) int { return a + b },
 	"quoteTableName":  quoteTableName,
 	"quoteIdentifier": quoteIdentifier,
 }
 
-func generatePostgresResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	if !strings.EqualFold(tableType, "BASE TABLE") {
-		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
+func generatePostgresResource(cfg *Config, resourceName, schemaName, tableName, tableType string) (*Resource, error) {
+	if strings.EqualFold(tableType, "BASE TABLE") {
+		return &Resource{
+			Name:       resourceName,
+			SchemaName: schemaName,
+			TableName:  tableName,
+			Cursor:     []string{"txid"},
+		}, nil
 	}
-
-	return &Resource{
-		Name:       resourceName,
-		SchemaName: schemaName,
-		TableName:  tableName,
-		Cursor:     []string{"txid"},
-	}, nil
+	if strings.EqualFold(tableType, "VIEW") && cfg.Advanced.DiscoverViews {
+		return &Resource{
+			Name:       resourceName,
+			SchemaName: schemaName,
+			TableName:  tableName,
+		}, nil
+	}
+	return nil, fmt.Errorf("unsupported entity type %q", tableType)
 }
 
 func translatePostgresValue(val any, databaseTypeName string) (any, error) {

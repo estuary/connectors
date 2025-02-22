@@ -183,6 +183,15 @@ func setShutdownAfterQuery(t testing.TB, setting bool) {
 	t.Cleanup(func() { TestShutdownAfterQuery = oldSetting })
 }
 
+func setResourceCursor(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...string) {
+	var res Resource
+	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
+	res.Cursor = cursor
+	var bs, err = json.Marshal(res)
+	require.NoError(t, err)
+	binding.ResourceConfigJson = bs
+}
+
 // TestSpec verifies the connector's response to the Spec RPC against a snapshot.
 func TestSpec(t *testing.T) {
 	response, err := postgresDriver.Spec(context.Background(), &pc.Request_Spec{})
@@ -1094,6 +1103,209 @@ func TestCaptureWithEmptyPoll(t *testing.T) {
                 INSERT INTO %s (id, data) VALUES ($1, $2)`, tableName),
 				i, fmt.Sprintf("Value for row %d", i))
 		}
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestFullRefresh exercises the scenario of a table without a configured cursor,
+// which causes the capture to perform a full refresh every time it runs.
+func TestFullRefresh(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0]) // Empty cursor means full refresh behavior
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2)", tableName),
+				i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2)", tableName),
+				i, fmt.Sprintf("Value for row %d", i))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithUpdatedAtCursor exercises the use-case of a capture using
+// an updated_at timestamp column as the cursor.
+func TestCaptureWithUpdatedAtCursor(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        data TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "updated_at")
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute))
+		}
+		cs.Capture(ctx, t, nil)
+
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), baseTime.Add(time.Duration(i)*time.Minute))
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithTwoColumnCursor exercises the use-case of a capture using
+// a multiple-column compound cursor.
+func TestCaptureWithTwoColumnCursor(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        major INTEGER,
+        minor INTEGER,
+        data TEXT
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "major", "minor")
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		// First batch with lower version numbers
+		for _, row := range [][]any{
+			{0, 1, 1, "v1.1"}, {1, 1, 2, "v1.2"}, {2, 1, 3, "v1.3"},
+			{3, 2, 1, "v2.1"}, {4, 2, 2, "v2.2"}, {5, 2, 3, "v2.3"},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3, $4)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Second batch with higher version numbers
+		for _, row := range [][]any{
+			{6, 0, 9, "Value ignored because major is too small"},
+			{7, 2, 0, "Value ignored because minor is too small"},
+			{8, 3, 1, "v3.1"}, {9, 3, 2, "v3.2"}, {10, 3, 3, "v3.3"},
+			{11, 4, 1, "v4.1"}, {12, 4, 2, "v4.2"}, {13, 4, 3, "v4.3"},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES ($1, $2, $3, $4)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestQueryTemplates exercises the selection and execution of query templates
+// for various combinations of resource spec and stream state.
+func TestQueryTemplates(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		cursor       []string
+		cursorValues []any
+	}{
+		{name: "XMinFirstQuery", cursor: []string{"txid"}},
+		{name: "XMinSubsequentQuery", cursor: []string{"txid"}, cursorValues: []any{12345}},
+		{name: "SingleCursorFirstQuery", cursor: []string{"updated_at"}},
+		{name: "SingleCursorSubsequentQuery", cursor: []string{"updated_at"}, cursorValues: []any{"2024-02-20 12:00:00"}},
+		{name: "MultiCursorFirstQuery", cursor: []string{"major", "minor"}},
+		{name: "MultiCursorSubsequentQuery", cursor: []string{"major", "minor"}, cursorValues: []any{1, 2}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var resource = &Resource{
+				Name:       "test_foobar",
+				SchemaName: "test",
+				TableName:  "foobar",
+				Cursor:     tc.cursor,
+			}
+			var state = &streamState{
+				CursorNames:  tc.cursor,
+				CursorValues: tc.cursorValues,
+			}
+			var query, err = postgresDriver.buildQuery(resource, state)
+			require.NoError(t, err)
+			cupaloy.SnapshotT(t, query)
+		})
+	}
+}
+
+// TestCaptureFromView exercises discovery and capture from a view with an updated_at cursor.
+func TestCaptureFromView(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var baseTableName, tableID = testTableName(t, uniqueTableID(t))
+	var viewName, viewID = testTableName(t, uniqueTableID(t, "view"))
+
+	// Create base table and view
+	createTestTable(t, control, baseTableName, `(
+		id INTEGER PRIMARY KEY,
+		name TEXT,
+		visible BOOLEAN,
+		updated_at TIMESTAMP
+	)`)
+	executeControlQuery(t, control, fmt.Sprintf(`
+		CREATE VIEW %s AS
+		SELECT id, name, updated_at
+		FROM %s
+		WHERE visible = true`, viewName, baseTableName))
+	t.Cleanup(func() { executeControlQuery(t, control, fmt.Sprintf("DROP VIEW IF EXISTS %s", viewName)) })
+
+	// By default views should not be discovered.
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
+	t.Run("DiscoveryWithoutViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	// Enable view discovery and re-discover bindings, then set a cursor for capturing the view.
+	cs.EndpointSpec.(*Config).Advanced.DiscoverViews = true
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
+	t.Run("DiscoveryWithViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+	setResourceCursor(t, cs.Bindings[1], "updated_at")
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// First batch: Insert rows into base table, some visible in view
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf(`INSERT INTO %s VALUES ($1, $2, $3, $4)`, baseTableName),
+				i, fmt.Sprintf("Row %d", i), i%2 == 0, // Even numbered rows are visible
+				baseTime.Add(time.Duration(i)*time.Minute))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Second batch: More rows with later timestamps
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf(`INSERT INTO %s VALUES ($1, $2, $3, $4)`, baseTableName),
+				i, fmt.Sprintf("Row %d", i), i%2 == 0, // Even numbered rows are visible
+				baseTime.Add(time.Duration(i)*time.Minute))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Update some rows to change their visibility
+		executeControlQuery(t, control, fmt.Sprintf(`
+			UPDATE %s SET visible = NOT visible, updated_at = $1
+			WHERE id IN (2, 3, 4)`, baseTableName),
+			baseTime.Add(20*time.Minute))
 		cs.Capture(ctx, t, nil)
 
 		cupaloy.SnapshotT(t, cs.Summary())

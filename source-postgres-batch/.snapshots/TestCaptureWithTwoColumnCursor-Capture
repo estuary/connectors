@@ -1,0 +1,20 @@
+# ================================
+# Collection "acmeCo/test/test_capturewithtwocolumncursor_321285": 12 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v1.1","id":0,"major":1,"minor":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v1.2","id":1,"major":1,"minor":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v1.3","id":2,"major":1,"minor":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v2.1","id":3,"major":2,"minor":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v2.2","id":4,"major":2,"minor":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v2.3","id":5,"major":2,"minor":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v3.1","id":8,"major":3,"minor":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v3.2","id":9,"major":3,"minor":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v3.3","id":10,"major":3,"minor":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v4.1","id":11,"major":4,"minor":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v4.2","id":12,"major":4,"minor":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"v4.3","id":13,"major":4,"minor":3}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_capturewithtwocolumncursor_321285":{"CursorNames":["major","minor"],"CursorValues":[4,3],"LastPolled":"<TIMESTAMP>"}}}
+

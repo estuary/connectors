@@ -1,0 +1,38 @@
+# ================================
+# Collection "acmeCo/test/test_fullrefresh_902536": 30 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 0","id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 1","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 2","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 3","id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 4","id":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 5","id":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 6","id":6}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 7","id":7}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 8","id":8}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 9","id":9}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 0","id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 1","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 2","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 3","id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 4","id":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 5","id":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 6","id":6}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 7","id":7}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 8","id":8}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 9","id":9}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 10","id":10}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 11","id":11}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 12","id":12}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 13","id":13}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 14","id":14}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 15","id":15}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 16","id":16}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 17","id":17}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 18","id":18}
+{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 19","id":19}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_fullrefresh_902536":{"LastPolled":"<TIMESTAMP>"}}}
+
