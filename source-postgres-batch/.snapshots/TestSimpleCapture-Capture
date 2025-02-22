@@ -1,28 +1,28 @@
 # ================================
 # Collection "acmeCo/test/test_simplecapture_140272": 20 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 0","id":0,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 1","id":1,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 2","id":2,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 3","id":3,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 4","id":4,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 5","id":5,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 6","id":6,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 7","id":7,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 8","id":8,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 9","id":9,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 10","id":10,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 11","id":11,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 12","id":12,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 13","id":13,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 14","id":14,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 15","id":15,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 16","id":16,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 17","id":17,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 18","id":18,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"data":"Value for row 19","id":19,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"data":"Value for row 0","id":0,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"data":"Value for row 1","id":1,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"data":"Value for row 2","id":2,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"data":"Value for row 3","id":3,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"data":"Value for row 4","id":4,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5},"data":"Value for row 5","id":5,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6},"data":"Value for row 6","id":6,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7},"data":"Value for row 7","id":7,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8},"data":"Value for row 8","id":8,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9},"data":"Value for row 9","id":9,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":10},"data":"Value for row 10","id":10,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":11},"data":"Value for row 11","id":11,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":12},"data":"Value for row 12","id":12,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":13},"data":"Value for row 13","id":13,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":14},"data":"Value for row 14","id":14,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":15},"data":"Value for row 15","id":15,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":16},"data":"Value for row 16","id":16,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":17},"data":"Value for row 17","id":17,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":18},"data":"Value for row 18","id":18,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":19},"data":"Value for row 19","id":19,"txid":999999}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_simplecapture_140272":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_simplecapture_140272":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":20,"LastPolled":"<TIMESTAMP>"}}}
 
