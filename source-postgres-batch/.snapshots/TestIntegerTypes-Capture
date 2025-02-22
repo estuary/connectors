@@ -1,13 +1,13 @@
 # ================================
 # Collection "acmeCo/test/test_integertypes_795898": 5 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":42,"bigserial_col":42,"id":0,"int_col":42,"oid_col":42,"serial_col":42,"smallint_col":42,"smallserial_col":42,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":-9223372036854775808,"bigserial_col":1,"id":1,"int_col":-2147483648,"oid_col":0,"serial_col":1,"smallint_col":-32768,"smallserial_col":1,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":9223372036854775807,"bigserial_col":9223372036854775807,"id":2,"int_col":2147483647,"oid_col":4294967295,"serial_col":2147483647,"smallint_col":32767,"smallserial_col":32767,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":0,"bigserial_col":0,"id":3,"int_col":0,"oid_col":0,"serial_col":0,"smallint_col":0,"smallserial_col":0,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"bigint_col":null,"bigserial_col":5,"id":4,"int_col":null,"oid_col":null,"serial_col":5,"smallint_col":null,"smallserial_col":5,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"bigint_col":42,"bigserial_col":42,"id":0,"int_col":42,"oid_col":42,"serial_col":42,"smallint_col":42,"smallserial_col":42,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"bigint_col":-9223372036854775808,"bigserial_col":1,"id":1,"int_col":-2147483648,"oid_col":0,"serial_col":1,"smallint_col":-32768,"smallserial_col":1,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"bigint_col":9223372036854775807,"bigserial_col":9223372036854775807,"id":2,"int_col":2147483647,"oid_col":4294967295,"serial_col":2147483647,"smallint_col":32767,"smallserial_col":32767,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"bigint_col":0,"bigserial_col":0,"id":3,"int_col":0,"oid_col":0,"serial_col":0,"smallint_col":0,"smallserial_col":0,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"bigint_col":null,"bigserial_col":5,"id":4,"int_col":null,"oid_col":null,"serial_col":5,"smallint_col":null,"smallserial_col":5,"txid":999999}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_integertypes_795898":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_integertypes_795898":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>","DocumentCount":5}}}
 

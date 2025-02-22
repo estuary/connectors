@@ -1,19 +1,19 @@
 # ================================
 # Collection "acmeCo/test/test_uuidtype_694251": 11 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":0,"txid":999999,"uuid_col":"d36af820-6ac3-4052-ad19-7eba916a020b"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":1,"txid":999999,"uuid_col":"11111111-1111-1111-1111-111111111111"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":2,"txid":999999,"uuid_col":"00000000-0000-0000-0000-000000000000"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":3,"txid":999999,"uuid_col":"ffffffff-ffff-ffff-ffff-ffffffffffff"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":4,"txid":999999,"uuid_col":"a0eebc99-9c0b-11eb-a8b3-0242ac130003"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":5,"txid":999999,"uuid_col":"a0eebc99-9c0b-21eb-a8b3-0242ac130003"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":6,"txid":999999,"uuid_col":"a0eebc99-9c0b-31eb-a8b3-0242ac130003"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":7,"txid":999999,"uuid_col":"a0eebc99-9c0b-41eb-a8b3-0242ac130003"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":8,"txid":999999,"uuid_col":"a0eebc99-9c0b-51eb-a8b3-0242ac130003"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":9,"txid":999999,"uuid_col":"018df60a-0040-7000-a000-0242ac130003"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"id":10,"txid":999999,"uuid_col":null}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"id":0,"txid":999999,"uuid_col":"d36af820-6ac3-4052-ad19-7eba916a020b"}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"id":1,"txid":999999,"uuid_col":"11111111-1111-1111-1111-111111111111"}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"id":2,"txid":999999,"uuid_col":"00000000-0000-0000-0000-000000000000"}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"id":3,"txid":999999,"uuid_col":"ffffffff-ffff-ffff-ffff-ffffffffffff"}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"id":4,"txid":999999,"uuid_col":"a0eebc99-9c0b-11eb-a8b3-0242ac130003"}
+{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5},"id":5,"txid":999999,"uuid_col":"a0eebc99-9c0b-21eb-a8b3-0242ac130003"}
+{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6},"id":6,"txid":999999,"uuid_col":"a0eebc99-9c0b-31eb-a8b3-0242ac130003"}
+{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7},"id":7,"txid":999999,"uuid_col":"a0eebc99-9c0b-41eb-a8b3-0242ac130003"}
+{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8},"id":8,"txid":999999,"uuid_col":"a0eebc99-9c0b-51eb-a8b3-0242ac130003"}
+{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9},"id":9,"txid":999999,"uuid_col":"018df60a-0040-7000-a000-0242ac130003"}
+{"_meta":{"polled":"<TIMESTAMP>","index":10,"row_id":10},"id":10,"txid":999999,"uuid_col":null}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_uuidtype_694251":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_uuidtype_694251":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>","DocumentCount":11}}}
 
