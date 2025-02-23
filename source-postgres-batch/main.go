@@ -21,7 +21,9 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	// No feature flags defined yet - add them here as needed
+	// When true, the fallback collection key for keyless source tables will be
+	// ["/_meta/row_id"] instead of ["/_meta/polled", "/_meta/index"].
+	"keyless_row_id": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
