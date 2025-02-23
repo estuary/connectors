@@ -1319,3 +1319,189 @@ func TestCaptureFromView(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestKeylessCapture exercises discovery and capture from a table without
+// a defined primary key, but using the default XMIN cursor behavior.
+func TestKeylessCapture(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(data TEXT, value INTEGER)`) // Intentionally no PRIMARY KEY
+
+	// Set REPLICA IDENTITY FULL to permit updates/deletions, just in case there's a
+	// FOR ALL TABLES publication on the test database.
+	executeControlQuery(t, control, fmt.Sprintf(`ALTER TABLE %s REPLICA IDENTITY FULL`, tableName))
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		// Initial batch of data
+		for i := 0; i < 5; i++ {
+			executeControlQuery(t, control, fmt.Sprintf(`
+                INSERT INTO %s (data, value) VALUES ($1, $2)`, tableName),
+				fmt.Sprintf("Initial row %d", i), i)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Add more rows
+		for i := 5; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf(`
+                INSERT INTO %s (data, value) VALUES ($1, $2)`, tableName),
+				fmt.Sprintf("Additional row %d", i), i)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Update some rows
+		executeControlQuery(t, control, fmt.Sprintf(`
+            UPDATE %s SET data = data || ' (updated)'
+            WHERE value >= 3 AND value <= 7`, tableName))
+		cs.Capture(ctx, t, nil)
+
+		// Delete and reinsert rows to ensure XMIN tracking works
+		executeControlQuery(t, control, fmt.Sprintf(`
+            DELETE FROM %s WHERE value = 4 OR value = 6`, tableName))
+		executeControlQuery(t, control, fmt.Sprintf(`
+            INSERT INTO %s (data, value) VALUES ($1, $2), ($3, $4)`, tableName),
+			"Reinserted row 4", 4,
+			"Reinserted row 6", 6)
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestKeylessFullRefreshCapture exercises discovery and capture from a table
+// without a defined primary key, and with the cursor explicitly unset to test
+// full-refresh behavior. In real use-cases this is more likely to occur when
+// capturing a view, but there's no reason to include the extra complexity in
+// this test setup.
+func TestKeylessFullRefreshCapture(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(data TEXT, value INTEGER)`) // No PRIMARY KEY
+
+	// Set REPLICA IDENTITY FULL to permit updates/deletions, just in case there's a
+	// FOR ALL TABLES publication on the test database.
+	executeControlQuery(t, control, fmt.Sprintf(`ALTER TABLE %s REPLICA IDENTITY FULL`, tableName))
+
+	// Discover the table and verify discovery snapshot
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+	// Empty cursor forces full refresh behavior
+	setResourceCursor(t, cs.Bindings[0])
+
+	t.Run("Discovery", func(t *testing.T) {
+		cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+	})
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		// Initial batch of data
+		for i := 0; i < 5; i++ {
+			executeControlQuery(t, control,
+				fmt.Sprintf("INSERT INTO %s (data, value) VALUES ($1, $2)", tableName),
+				fmt.Sprintf("Initial row %d", i), i)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Add more rows - these should appear in the next full refresh
+		for i := 5; i < 10; i++ {
+			executeControlQuery(t, control,
+				fmt.Sprintf("INSERT INTO %s (data, value) VALUES ($1, $2)", tableName),
+				fmt.Sprintf("Additional row %d", i), i)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Modify some existing rows - changes should appear in next full refresh
+		executeControlQuery(t, control, fmt.Sprintf(
+			"UPDATE %s SET data = data || ' (updated)' WHERE value >= 3 AND value <= 7",
+			tableName))
+		cs.Capture(ctx, t, nil)
+
+		// Delete some rows and add new ones - changes should appear in next full refresh
+		executeControlQuery(t, control,
+			fmt.Sprintf("DELETE FROM %s WHERE value = 4 OR value = 6", tableName))
+		executeControlQuery(t, control,
+			fmt.Sprintf("INSERT INTO %s (data, value) VALUES ($1, $2), ($3, $4)", tableName),
+			"New row A", 20, "New row B", 21)
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestFeatureFlagKeylessRowID exercises discovery and capture from a keyless
+// full-refresh table (as in TestKeylessFullRefreshCapture), but with the
+// keyless_row_id feature flag explicitly set to true and false in distinct
+// subtests.
+func TestFeatureFlagKeylessRowID(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		flag string
+	}{
+		{"Enabled", "keyless_row_id"},
+		{"Disabled", "no_keyless_row_id"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var ctx, control = context.Background(), testControlClient(t)
+			var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+			createTestTable(t, control, tableName, `(data TEXT, value INTEGER)`) // No PRIMARY KEY
+
+			// Set REPLICA IDENTITY FULL for safety with publications
+			executeControlQuery(t, control, fmt.Sprintf(`ALTER TABLE %s REPLICA IDENTITY FULL`, tableName))
+
+			// Create capture spec with specific feature flag
+			var cs = testCaptureSpec(t)
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flag
+
+			// Discover the table and verify discovery snapshot
+			cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+			// Empty cursor forces full refresh behavior
+			setResourceCursor(t, cs.Bindings[0])
+
+			t.Run("Discovery", func(t *testing.T) {
+				cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+			})
+
+			t.Run("Capture", func(t *testing.T) {
+				setShutdownAfterQuery(t, true)
+
+				// Initial data batch
+				for i := 0; i < 5; i++ {
+					executeControlQuery(t, control,
+						fmt.Sprintf("INSERT INTO %s (data, value) VALUES ($1, $2)", tableName),
+						fmt.Sprintf("Initial row %d", i), i)
+				}
+				cs.Capture(ctx, t, nil)
+
+				// Add more rows
+				for i := 5; i < 10; i++ {
+					executeControlQuery(t, control,
+						fmt.Sprintf("INSERT INTO %s (data, value) VALUES ($1, $2)", tableName),
+						fmt.Sprintf("Additional row %d", i), i)
+				}
+				cs.Capture(ctx, t, nil)
+
+				// Modify some existing rows
+				executeControlQuery(t, control, fmt.Sprintf(
+					"UPDATE %s SET data = data || ' (updated)' WHERE value >= 3 AND value <= 7",
+					tableName))
+				cs.Capture(ctx, t, nil)
+
+				// Delete and add new rows
+				executeControlQuery(t, control,
+					fmt.Sprintf("DELETE FROM %s WHERE value = 4 OR value = 6", tableName))
+				executeControlQuery(t, control,
+					fmt.Sprintf("INSERT INTO %s (data, value) VALUES ($1, $2)", tableName),
+					"New row A", 20)
+				cs.Capture(ctx, t, nil)
+
+				cupaloy.SnapshotT(t, cs.Summary())
+			})
+		})
+	}
+}
