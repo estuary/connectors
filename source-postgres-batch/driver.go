@@ -114,8 +114,15 @@ type documentMetadata struct {
 	Op     string    `json:"op,omitempty" jsonschema:"title=Change Operation,description=Operation type (c: Create / u: Update / d: Delete),enum=c,enum=u,enum=d,default=u"`
 }
 
-// The fallback collection key just refers to the polling iteration and result index of each document.
-var fallbackKey = []string{"/_meta/polled", "/_meta/index"}
+var (
+	// The fallback key of discovered collections when the source table has no primary key.
+	fallbackKey = []string{"/_meta/row_id"}
+
+	// Old captures used a different fallback key which included a value identifying
+	// the specific polling iteration which produced the document. This proved less
+	// than ideal for full-refresh bindings on keyless tables.
+	fallbackKeyOld = []string{"/_meta/polled", "/_meta/index"}
+)
 
 func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
 	// Generate schema for the metadata via reflection
@@ -240,9 +247,12 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		}
 
 		// Try to generate a useful collection schema, but on error fall back to the
-		// minimal schema with the default key [/_meta/polled, /_meta/index].
+		// minimal schema with a fallback collection key which is always present.
 		var collectionSchema = minimalSchema
 		var collectionKey = fallbackKey
+		if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
+			collectionKey = fallbackKeyOld
+		}
 		if tableKey, ok := keysByTable[tableID]; ok {
 			if generatedSchema, err := generateCollectionSchema(tableKey.Columns, tableKey.ColumnTypes); err == nil {
 				collectionSchema = generatedSchema
