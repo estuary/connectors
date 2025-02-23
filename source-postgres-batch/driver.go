@@ -854,12 +854,12 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	// infer deletions whenever a refresh yields fewer rows than last time.
 	if isRowIDKey && isFullRefresh {
 		var pollTimestamp = pollTime.Format(time.RFC3339Nano)
-		for i := nextRowID; i < state.DocumentCount; i++ {
+		for i := int64(0); i < state.DocumentCount-nextRowID; i++ {
 			// These inferred-deletion documents are simple enough that we can generate
 			// them with a simple Sprintf rather than going through a whole JSON encoder.
 			var doc = fmt.Sprintf(
-				`{"_meta":{"index":%d,"op":"d","polled":%q,"row_id":%d}}`,
-				queryResultsCount+int(i), pollTimestamp, nextRowID+i)
+				`{"_meta":{"polled":%q,"index":%d,"row_id":%d,"op":"d"}}`,
+				pollTimestamp, queryResultsCount+int(i), nextRowID+i)
 			if err := c.Output.Documents(binding.index, json.RawMessage(doc)); err != nil {
 				return fmt.Errorf("error emitting document: %w", err)
 			}
