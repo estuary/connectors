@@ -263,8 +263,6 @@ async def fetch_tickets(
     url = f"{API}/tickets/search"
     body = _generate_conversations_or_tickets_search_body(start, end)
 
-    count = 0
-
     while True:
         response = TicketsSearchResponse.model_validate_json(
                 await http.request(log, url, "POST", json=body)
@@ -294,7 +292,6 @@ async def fetch_tickets(
 
             if ticket.updated_at > start:
                 yield ticket
-                count += 1
 
         if response.pages.next is None:
             yield _s_to_dt(last_seen_ts)
@@ -317,8 +314,6 @@ async def fetch_conversations(
 
     url = f"{API}/conversations/search"
     body = _generate_conversations_or_tickets_search_body(start, end)
-
-    count = 0
 
     while True:
         response = ConversationsSearchResponse.model_validate_json(
@@ -349,7 +344,6 @@ async def fetch_conversations(
 
             if conversation.updated_at > start:
                 yield conversation
-                count += 1
 
         if response.pages.next is None:
             yield _s_to_dt(last_seen_ts)
