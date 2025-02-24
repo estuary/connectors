@@ -208,8 +208,9 @@ FULL_REFRESH_OFFSET_PAGINATED_RESOURCES: list[tuple[str, str, type[FullRefreshOf
 class FullRefreshCursorPaginatedResponse(FullRefreshResponse):
     class Meta(BaseModel, extra="forbid"):
         has_more: bool
-        after_cursor: str | None
-        before_cursor: str | None
+        # after_cursor and before_cursor are not present in the response if there are no results.
+        after_cursor: str | None = None
+        before_cursor: str | None = None
 
     meta: Meta
     resources: list[FullRefreshResource]
