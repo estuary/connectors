@@ -43,6 +43,23 @@ class Funnels(DateSlicesMixin, IncrementalMixpanelStream):
         # we'll have to emit state every 15 records
         return 1000
 
+    def __init__(
+        self,
+        date_window_size: int = 30,
+        **kwargs,
+    ):
+        # This stream checks from the start_date to the end_date for each funnel. Typically,
+        # there's KB of data between the start_date & end_date for each funnel, and using
+        # small date windows causes the connector to make multiple requests for each funnel.
+        # Since we should be able to fetch all data for a funnel in a single request,
+        # we use an extremely large data window to force the connector to make a single request
+        # for all of a funnel's records between the start & end dates.
+
+        super().__init__(
+            date_window_size = 100_000,
+            **kwargs,
+        )
+
     def path(self, **kwargs) -> str:
         return "funnels"
 
