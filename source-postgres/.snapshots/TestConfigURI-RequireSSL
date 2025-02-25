@@ -1,2 +1,2 @@
-postgres://will:secret1234@example.com:5432/somedb?sslmode=verify-full
+postgres://will:secret1234@example.com:5432/somedb?application_name=estuary_flow&sslmode=verify-full
 config valid
