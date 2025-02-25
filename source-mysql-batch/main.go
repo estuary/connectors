@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
@@ -19,6 +20,12 @@ import (
 	"github.com/go-mysql-org/go-mysql/mysql"
 	log "github.com/sirupsen/logrus"
 )
+
+var featureFlagDefaults = map[string]bool{
+	// When true, the fallback collection key for keyless source tables will be
+	// ["/_meta/row_id"] instead of ["/_meta/polled", "/_meta/index"].
+	"keyless_row_id": false,
+}
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
@@ -34,6 +41,9 @@ type advancedConfig struct {
 	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	DBName          string   `json:"dbname,omitempty" jsonschema:"title=Database Name,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
+	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+
+	parsedFeatureFlags map[string]bool // Parsed feature flags setting with defaults applied
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -52,6 +62,12 @@ func (c *Config) Validate() error {
 		if err := schedule.Validate(c.Advanced.PollSchedule); err != nil {
 			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
 		}
+	}
+	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
+	// method that we can be sure always gets called before the config is used.
+	c.Advanced.parsedFeatureFlags = common.ParseFeatureFlags(c.Advanced.FeatureFlags, featureFlagDefaults)
+	if c.Advanced.FeatureFlags != "" {
+		log.WithField("flags", c.Advanced.parsedFeatureFlags).Info("parsed feature flags")
 	}
 	return nil
 }

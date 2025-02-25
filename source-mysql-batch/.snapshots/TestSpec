@@ -41,6 +41,11 @@
             "type": "string",
             "title": "Database Name",
             "description": "The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,

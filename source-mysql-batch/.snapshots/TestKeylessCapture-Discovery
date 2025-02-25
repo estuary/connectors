@@ -1,23 +1,22 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_capturewithupdatedatcursor_792371",
+      "name": "test_keylesscapture_315710",
       "schema": "test",
-      "table": "capturewithupdatedatcursor_792371",
+      "table": "keylesscapture_315710",
       "cursor": [
         "updated_at"
       ]
     },
     "resource_path": [
-      "test_capturewithupdatedatcursor_792371"
+      "test_keylesscapture_315710"
     ],
     "collection": {
-      "name": "acmeCo/test/test_capturewithupdatedatcursor_792371",
+      "name": "acmeCo/test/test_keylesscapture_315710",
       "read_schema_json": {
         "type": "object",
         "required": [
-          "_meta",
-          "id"
+          "_meta"
         ],
         "properties": {
           "_meta": {
@@ -58,18 +57,16 @@ Binding 0:
               "index",
               "row_id"
             ]
-          },
-          "id": {
-            "type": "integer"
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/id"
+        "/_meta/polled",
+        "/_meta/index"
       ],
       "projections": null
     },
-    "state_key": "test_capturewithupdatedatcursor_792371"
+    "state_key": "test_keylesscapture_315710"
   }
 
