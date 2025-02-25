@@ -38,12 +38,12 @@ const (
 	// subsequent rows, because sometimes when using a cursor the queries can have some
 	// nontrivial startup cost and we don't want to make things any more failure-prone
 	// than we have to.
-	pollingWatchdogFirstRowTimeout = 30 * time.Minute
+	pollingWatchdogFirstRowTimeout = 6 * time.Hour
 
 	// The duration of the no-data watchdog for subsequent rows after the first one.
 	// This timeout can be less generous, because after the first row is received we
 	// ought to be getting a consistent stream of results until the query completes.
-	pollingWatchdogTimeout = 5 * time.Minute
+	pollingWatchdogTimeout = 15 * time.Minute
 )
 
 var (
