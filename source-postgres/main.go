@@ -227,6 +227,7 @@ func (c *Config) ToURI() string {
 		uri.Path = "/" + c.Database
 	}
 	var params = make(url.Values)
+	params.Set("application_name", "estuary_flow")
 	if c.Advanced.SSLMode != "" {
 		params.Set("sslmode", c.Advanced.SSLMode)
 	}
