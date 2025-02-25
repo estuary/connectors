@@ -30,6 +30,8 @@ API = "https://api.stripe.com/v1"
 MAX_PAGE_LIMIT = 100
 
 MISSING_RESOURCE_REGEX = r"resource_missing.+No such.+"
+MISSING_LINE_ITEMS_FOR_CHECKOUT_SESSION_REGEX = r"Could not find line items for this Checkout Session. They may be missing for old testmode Checkout Sessions."
+MISSING_RESOURCE_REGEXES = [MISSING_RESOURCE_REGEX, MISSING_LINE_ITEMS_FOR_CHECKOUT_SESSION_REGEX]
 NOT_ON_LEGACY_BILLING_REGEX = r"Cannot list usage record summaries for.+because it is not on the legacy metered billing system"
 DO_NOT_HAVE_PLATFORM_CONTROLS_REGEX = r"You cannot perform this request as you do not have Platform Controls for the Stripe Dashboard on the account"
 
@@ -364,7 +366,10 @@ async def _capture_substreams(
             # It's possible for us to process events for deleted parent resources, making
             # the requests for the associated child resources fail. Stripe returns a 404
             # error & a message containing "resource_missing" and "No such" when this happens.
-            if err.code == 404 and bool(re.search(MISSING_RESOURCE_REGEX, err.message, re.DOTALL)):
+            if err.code == 404 and any(
+                re.search(regex, err.message, re.DOTALL)
+                for regex in MISSING_RESOURCE_REGEXES
+            ):
                 log.warning(
                     f"Missing resource error for URL {child_url}. Skipping to the next resource.",
                     {
