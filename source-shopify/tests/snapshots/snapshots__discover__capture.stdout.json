@@ -1330,8 +1330,10 @@
         "harmonized_system_code": {
           "type": [
             "number",
-            "null"
-          ]
+            "null",
+            "string"
+          ],
+          "format": "number"
         },
         "id": {
           "type": [
