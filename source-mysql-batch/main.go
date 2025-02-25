@@ -38,6 +38,7 @@ type Config struct {
 }
 
 type advancedConfig struct {
+	DiscoverViews   bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
 	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	DBName          string   `json:"dbname,omitempty" jsonschema:"title=Database Name,description=The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."`
@@ -192,16 +193,16 @@ func quoteIdentifier(name string) string {
 	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
-func generateMySQLResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	if !strings.EqualFold(tableType, "BASE TABLE") {
-		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
+func generateMySQLResource(cfg *Config, resourceName, schemaName, tableName, tableType string) (*Resource, error) {
+	if strings.EqualFold(tableType, "BASE TABLE") || (strings.EqualFold(tableType, "VIEW") && cfg.Advanced.DiscoverViews) {
+		return &Resource{
+			Name:       resourceName,
+			SchemaName: schemaName,
+			TableName:  tableName,
+		}, nil
 	}
+	return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
 
-	return &Resource{
-		Name:       resourceName,
-		SchemaName: schemaName,
-		TableName:  tableName,
-	}, nil
 }
 
 var mysqlDriver = &BatchSQLDriver{
