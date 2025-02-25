@@ -45,6 +45,8 @@ var (
 		"testdata",
 		"The dataset (schema) to create test tables in",
 	)
+
+	testFeatureFlags = flag.String("feature_flags", "", "Feature flags to apply to all test captures.")
 )
 
 func TestMain(m *testing.M) {
@@ -74,13 +76,13 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 		Dataset:         *testDataset,
 		Advanced: advancedConfig{
 			PollSchedule: "200ms",
+			FeatureFlags: *testFeatureFlags,
 		},
 	}
 
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
-	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
 
 	return &st.CaptureSpec{
 		Driver:       bigqueryDriver,
