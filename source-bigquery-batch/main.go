@@ -11,12 +11,19 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	"cloud.google.com/go/civil"
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 )
+
+var featureFlagDefaults = map[string]bool{
+	// When true, the fallback collection key for keyless source tables will be
+	// ["/_meta/row_id"] instead of ["/_meta/polled", "/_meta/index"].
+	"keyless_row_id": false,
+}
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
@@ -29,6 +36,9 @@ type Config struct {
 
 type advancedConfig struct {
 	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+
+	parsedFeatureFlags map[string]bool // Parsed feature flags setting with defaults applied
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -53,6 +63,12 @@ func (c *Config) Validate() error {
 		if err := schedule.Validate(c.Advanced.PollSchedule); err != nil {
 			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
 		}
+	}
+	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
+	// method that we can be sure always gets called before the config is used.
+	c.Advanced.parsedFeatureFlags = common.ParseFeatureFlags(c.Advanced.FeatureFlags, featureFlagDefaults)
+	if c.Advanced.FeatureFlags != "" {
+		log.WithField("flags", c.Advanced.parsedFeatureFlags).Info("parsed feature flags")
 	}
 	return nil
 }
