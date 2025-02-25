@@ -182,8 +182,11 @@ func TestSpec(t *testing.T) {
 // TestQueryTemplate is a unit test which verifies that the default query template produces
 // the expected output for initial/subsequent polling queries with different cursors.
 func TestQueryTemplate(t *testing.T) {
-	res, err := mysqlDriver.GenerateResource("test_foobar", "test", "foobar", "BASE TABLE")
-	require.NoError(t, err)
+	var res = &Resource{
+		Name:       "test_foobar",
+		SchemaName: "test",
+		TableName:  "foobar",
+	}
 
 	tmpl, err := template.New("query").Funcs(templateFuncs).Parse(tableQueryTemplate)
 	require.NoError(t, err)
@@ -949,4 +952,68 @@ func TestFeatureFlagKeylessRowID(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestCaptureFromView exercises discovery and capture from a view with an updated_at cursor.
+func TestCaptureFromView(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var baseTableName, tableID = testTableName(t, uniqueTableID(t))
+	var viewName, viewID = testTableName(t, uniqueTableID(t, "view"))
+
+	// Create base table and view
+	createTestTable(t, control, baseTableName, `(
+        id INTEGER PRIMARY KEY,
+        name TEXT,
+        visible BOOLEAN,
+        updated_at TIMESTAMP
+    )`)
+	executeControlQuery(t, control, fmt.Sprintf(`
+        CREATE VIEW %s AS
+        SELECT id, name, updated_at
+        FROM %s
+        WHERE visible = true`, viewName, baseTableName))
+	t.Cleanup(func() { executeControlQuery(t, control, fmt.Sprintf("DROP VIEW IF EXISTS %s", viewName)) })
+
+	// By default views should not be discovered.
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
+	t.Run("DiscoveryWithoutViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	// Enable view discovery and re-discover bindings, then set a cursor for capturing the view.
+	cs.EndpointSpec.(*Config).Advanced.DiscoverViews = true
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
+	t.Run("DiscoveryWithViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	// Update both the base table and the view incrementally using the updated_at column.
+	setResourceCursor(t, cs.Bindings[0], "updated_at")
+	setResourceCursor(t, cs.Bindings[1], "updated_at")
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// First batch: Insert rows into base table, some visible in view
+		for i := 0; i < 10; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, name, visible, updated_at) VALUES (?, ?, ?, ?)", baseTableName),
+				i, fmt.Sprintf("Row %d", i), i%2 == 0, // Even numbered rows are visible
+				baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Second batch: More rows with later timestamps
+		for i := 10; i < 20; i++ {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, name, visible, updated_at) VALUES (?, ?, ?, ?)", baseTableName),
+				i, fmt.Sprintf("Row %d", i), i%2 == 0, // Even numbered rows are visible
+				baseTime.Add(time.Duration(i)*time.Minute).Format("2006-01-02 15:04:05"))
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Update some rows to change their visibility
+		executeControlQuery(t, control, fmt.Sprintf(`
+            UPDATE %s SET visible = NOT visible, updated_at = ?
+            WHERE id IN (2, 3, 4)`, baseTableName),
+			baseTime.Add(20*time.Minute).Format("2006-01-02 15:04:05"))
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
 }
