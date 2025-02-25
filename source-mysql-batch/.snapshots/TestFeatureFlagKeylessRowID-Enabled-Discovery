@@ -1,27 +1,23 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_capturewithupdatedatcursor_792371",
+      "name": "test_featureflagkeylessrowid_enabled_905157",
       "schema": "test",
-      "table": "capturewithupdatedatcursor_792371",
-      "cursor": [
-        "updated_at"
-      ]
+      "table": "featureflagkeylessrowid_enabled_905157"
     },
     "resource_path": [
-      "test_capturewithupdatedatcursor_792371"
+      "test_featureflagkeylessrowid_enabled_905157"
     ],
     "collection": {
-      "name": "acmeCo/test/test_capturewithupdatedatcursor_792371",
+      "name": "acmeCo/test/test_featureflagkeylessrowid_enabled_905157",
       "read_schema_json": {
         "type": "object",
         "required": [
-          "_meta",
-          "id"
+          "_meta"
         ],
         "properties": {
           "_meta": {
-            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$schema": "http://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/source-mysql-batch/document-metadata",
             "properties": {
               "polled": {
@@ -58,18 +54,15 @@ Binding 0:
               "index",
               "row_id"
             ]
-          },
-          "id": {
-            "type": "integer"
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/id"
+        "/_meta/row_id"
       ],
       "projections": null
     },
-    "state_key": "test_capturewithupdatedatcursor_792371"
+    "state_key": "test_featureflagkeylessrowid_enabled_905157"
   }
 

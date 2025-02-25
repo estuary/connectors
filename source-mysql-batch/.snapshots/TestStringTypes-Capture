@@ -1,12 +1,12 @@
 # ================================
 # Collection "acmeCo/test/test_stringtypes_339419": 4 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"char_col":"char_val","id":0,"longtext_col":"longtext_val","mediumtext_col":"mediumtext_val","text_col":"text_val","tinytext_col":"tinytext_val","varchar_col":"varchar_val"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"char_col":"short","id":1,"longtext_col":"short","mediumtext_col":"short","text_col":"short","tinytext_col":"short","varchar_col":"short"}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"char_col":"","id":2,"longtext_col":"","mediumtext_col":"","text_col":"","tinytext_col":"","varchar_col":""}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"char_col":null,"id":3,"longtext_col":null,"mediumtext_col":null,"text_col":null,"tinytext_col":null,"varchar_col":null}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"char_col":"char_val","id":0,"longtext_col":"longtext_val","mediumtext_col":"mediumtext_val","text_col":"text_val","tinytext_col":"tinytext_val","varchar_col":"varchar_val"}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"char_col":"short","id":1,"longtext_col":"short","mediumtext_col":"short","text_col":"short","tinytext_col":"short","varchar_col":"short"}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"char_col":"","id":2,"longtext_col":"","mediumtext_col":"","text_col":"","tinytext_col":"","varchar_col":""}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"char_col":null,"id":3,"longtext_col":null,"mediumtext_col":null,"text_col":null,"tinytext_col":null,"varchar_col":null}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_stringtypes_339419":{"CursorNames":["id"],"CursorValues":[3],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_stringtypes_339419":{"CursorNames":["id"],"CursorValues":[3],"LastPolled":"<TIMESTAMP>","DocumentCount":4}}}
 
