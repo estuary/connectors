@@ -1,9 +1,9 @@
 # ================================
-# Collection "acmeCo/test/flow_test_logminer/t83287013": 1 Documents
+# Collection "acmeCo/test/c__flow_test_logminer/t83287013": 1 Documents
 # ================================
-{"FULLNAME":"New No Such State","STATE":"BB","YEAR":"1930","_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T83287013","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"FULLNAME":"New No Such State","STATE":"BB","YEAR":"1930","_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T83287013","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT83287013":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT83287013":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"}},"cursor":"11111111"}
 

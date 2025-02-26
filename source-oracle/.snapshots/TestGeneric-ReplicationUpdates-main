@@ -1,13 +1,13 @@
 # ================================
-# Collection "acmeCo/test/flow_test_logminer/t79710599": 5 Documents
+# Collection "acmeCo/test/c__flow_test_logminer/t79710599": 5 Documents
 # ================================
-{"DATA":"more","ID":"1000","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"rows","ID":"1001","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"some","ID":"1002","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"updated","ID":"1","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"},"before":{"DATA":"bbb","ID":"1"}}}
-{"DATA":"updated","ID":"1002","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"},"before":{"DATA":"some","ID":"1002"}}}
+{"DATA":"more","ID":"1000","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"rows","ID":"1001","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"some","ID":"1002","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"updated","ID":"1","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111},"before":{"DATA":"bbb","ID":"1"}}}
+{"DATA":"updated","ID":"1002","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T79710599","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111},"before":{"DATA":"some","ID":"1002"}}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT79710599":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT79710599":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
 

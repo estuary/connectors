@@ -87,6 +87,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	var fields = make(map[string]any, len(cols)-1)
 	var rowid string
 
+	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		if rowid, err = scanToMap(rows, cols, fields); err != nil {
 			return false, err
@@ -117,6 +118,10 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 					Table:    table,
 				},
 				RowID: rowid,
+
+				// Artificial RSID and SSN during backfill
+				RSID: "0x000000.00000000.0000",
+				SSN:  rowOffset,
 			},
 			Before: nil,
 			After:  fields,
@@ -125,6 +130,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			return false, fmt.Errorf("error processing change event: %w", err)
 		}
 		resultRows++
+		rowOffset++
 	}
 
 	if err := rows.Err(); err != nil {
@@ -230,7 +236,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 }
 
 // Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
-// since ROWIDs do not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
+// since ROWIDs are not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
 // but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
 func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)

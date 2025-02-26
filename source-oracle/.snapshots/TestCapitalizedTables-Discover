@@ -1,25 +1,22 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer_users",
+    "recommended_name": "c__flow_test_logminer/users",
     "resource_config_json": {
-      "namespace": "FLOW_TEST_LOGMINER",
+      "namespace": "C##FLOW_TEST_LOGMINER",
       "stream": "USERS"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERUSERS": {
+        "C##FLOW_TEST_LOGMINERUSERS": {
           "type": "object",
           "required": [
             "ID"
           ],
-          "$anchor": "FLOW_TEST_LOGMINERUSERS",
+          "$anchor": "C##FLOW_TEST_LOGMINERUSERS",
           "properties": {
             "DATA": {
-              "description": "(source type: VARCHAR2)",
-              "type": [
-                "string",
-                "null"
-              ]
+              "type": "string",
+              "description": "(source type: non-nullable VARCHAR2)"
             },
             "ID": {
               "type": "string",
@@ -65,7 +62,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERUSERS",
+                  "$ref": "#C##FLOW_TEST_LOGMINERUSERS",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -105,13 +102,23 @@ Binding 0:
                     "row_id": {
                       "type": "string",
                       "description": "ROWID of the document"
+                    },
+                    "rs_id": {
+                      "type": "string",
+                      "description": "Record Set ID of the logical change"
+                    },
+                    "ssn": {
+                      "type": "integer",
+                      "description": "SQL sequence number of the logical change"
                     }
                   },
                   "type": "object",
                   "required": [
                     "schema",
                     "table",
-                    "row_id"
+                    "row_id",
+                    "rs_id",
+                    "ssn"
                   ]
                 }
               },
@@ -122,7 +129,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERUSERS"
+          "$ref": "#C##FLOW_TEST_LOGMINERUSERS"
         }
       ]
     },

@@ -1,18 +1,18 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer/t39256824",
+    "recommended_name": "c__flow_test_logminer/t39256824",
     "resource_config_json": {
-      "namespace": "FLOW_TEST_LOGMINER",
+      "namespace": "C##FLOW_TEST_LOGMINER",
       "stream": "T39256824"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT39256824": {
+        "C##FLOW_TEST_LOGMINERT39256824": {
           "type": "object",
           "required": [
             "`Meta/'wtf'~ID`"
           ],
-          "$anchor": "FLOW_TEST_LOGMINERT39256824",
+          "$anchor": "C##FLOW_TEST_LOGMINERT39256824",
           "properties": {
             "DATA": {
               "description": "(source type: VARCHAR2)",
@@ -22,12 +22,9 @@ Binding 0:
               ]
             },
             "`Meta/'wtf'~ID`": {
+              "type": "string",
               "format": "integer",
-              "description": "(source type: NUMBER)",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "(source type: non-nullable NUMBER)"
             }
           }
         }
@@ -68,7 +65,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT39256824",
+                  "$ref": "#C##FLOW_TEST_LOGMINERT39256824",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -108,13 +105,23 @@ Binding 0:
                     "row_id": {
                       "type": "string",
                       "description": "ROWID of the document"
+                    },
+                    "rs_id": {
+                      "type": "string",
+                      "description": "Record Set ID of the logical change"
+                    },
+                    "ssn": {
+                      "type": "integer",
+                      "description": "SQL sequence number of the logical change"
                     }
                   },
                   "type": "object",
                   "required": [
                     "schema",
                     "table",
-                    "row_id"
+                    "row_id",
+                    "rs_id",
+                    "ssn"
                   ]
                 }
               },
@@ -125,7 +132,7 @@ Binding 0:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT39256824"
+          "$ref": "#C##FLOW_TEST_LOGMINERT39256824"
         }
       ]
     },
@@ -135,19 +142,19 @@ Binding 0:
   }
 Binding 1:
 {
-    "recommended_name": "flow_test_logminer/t42531495",
+    "recommended_name": "c__flow_test_logminer/t42531495",
     "resource_config_json": {
-      "namespace": "FLOW_TEST_LOGMINER",
+      "namespace": "C##FLOW_TEST_LOGMINER",
       "stream": "T42531495"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT42531495": {
+        "C##FLOW_TEST_LOGMINERT42531495": {
           "type": "object",
           "required": [
             "table"
           ],
-          "$anchor": "FLOW_TEST_LOGMINERT42531495",
+          "$anchor": "C##FLOW_TEST_LOGMINERT42531495",
           "properties": {
             "DATA": {
               "description": "(source type: VARCHAR2)",
@@ -157,12 +164,9 @@ Binding 1:
               ]
             },
             "table": {
+              "type": "string",
               "format": "integer",
-              "description": "(source type: NUMBER)",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "(source type: non-nullable NUMBER)"
             }
           }
         }
@@ -203,7 +207,7 @@ Binding 1:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT42531495",
+                  "$ref": "#C##FLOW_TEST_LOGMINERT42531495",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -243,13 +247,23 @@ Binding 1:
                     "row_id": {
                       "type": "string",
                       "description": "ROWID of the document"
+                    },
+                    "rs_id": {
+                      "type": "string",
+                      "description": "Record Set ID of the logical change"
+                    },
+                    "ssn": {
+                      "type": "integer",
+                      "description": "SQL sequence number of the logical change"
                     }
                   },
                   "type": "object",
                   "required": [
                     "schema",
                     "table",
-                    "row_id"
+                    "row_id",
+                    "rs_id",
+                    "ssn"
                   ]
                 }
               },
@@ -260,7 +274,7 @@ Binding 1:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT42531495"
+          "$ref": "#C##FLOW_TEST_LOGMINERT42531495"
         }
       ]
     },

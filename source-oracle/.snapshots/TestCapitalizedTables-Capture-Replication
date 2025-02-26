@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/users": 2 Documents
+# Collection "acmeCo/test/c__flow_test_logminer/users": 2 Documents
 # ================================
-{"DATA":"Carol","ID":"3","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"USERS","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"Dave","ID":"4","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"USERS","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"Carol","ID":"3","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"USERS","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"Dave","ID":"4","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"USERS","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FUSERS":{"backfilled":2,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FUSERS":{"backfilled":2,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
 

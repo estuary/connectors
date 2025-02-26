@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/flow_test_logminer_t17789375": 2 Documents
+# Collection "acmeCo/test/c__flow_test_logminer/t17789375": 2 Documents
 # ================================
-{"DATA":"eight","ID":"8","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
-{"DATA":"six","ID":"6","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA"}}}
+{"DATA":"eight","ID":"8","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+{"DATA":"six","ID":"6","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T17789375","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"FLOW_TEST_LOGMINER%2FT17789375":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT17789375":{"backfilled":3,"key_columns":["ID"],"mode":"Active"}},"cursor":"11111111"}
 

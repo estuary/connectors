@@ -1,5 +1,5 @@
-user: c##flow_test_logminer
-password_sops: ENC[AES256_GCM,data:8ZzAMqo8P8BDb+Xexv4K/g==,iv:P3WBCG658USMguqW10CCPBiIo20TsatG3+DU9z7f/Bo=,tag:/01GPk1BLhzj2yrxRNWz6A==,type:str]
+user: C##FLOW_TEST_LOGMINER
+password_sops: ENC[AES256_GCM,data:lYtt7JnqJAeBEm1UrAoKFA==,iv:njFFOcRI2fomajpIl3SFeg1ZpGZwowIObWgQe1Q5A8o=,tag:toByAgxF14xwL9gPIkjgEg==,type:str]
 address: estuarytest.sub06191706070.testvcn.oraclevcn.com:1521
 database: MYPDB.sub06191706070.testvcn.oraclevcn.com
 advanced:
@@ -18,8 +18,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-12-19T09:52:09Z"
-    mac: ENC[AES256_GCM,data:ajqErfrqO2tfiVIlXnwAJN1eWe06VtUrn8OsCEu3Nl6h1PjboJRq2KsLHs1vIq0+LEQoiwHbUBaIZIq0d7yjeQyg0eMMYKWnZSeIRSZq3JRgbFT5zW8VLnluvAbuXRW+o3XYHhCoKmnUhd9HSHa5HjkxoSXruDEdsdUWcUOIv6w=,iv:yPIRnne6Ghh0KX01xayc/r/x1NYrh3w4t/A8iocqiqs=,tag:iVHXGD6Wjhn4KSHWEzQHOA==,type:str]
+    lastmodified: "2025-02-26T10:38:14Z"
+    mac: ENC[AES256_GCM,data:BSHb6r91IT2HrzWz/GU8xJmpAmjfIrGCQ9yC15PqLu2Rpezols6MdTWqM7B3F0w2Jjx1S5saQ6eDasSyna/162OQKUv9LvBsnAXgcBossGaNX+xgpcMeA1t9tzWVErAVt4BUrnjmZTTCb7mAZXFnV89KE+1LQYSPhHAaU5gb0GQ=,iv:v10Tmz5pgOAECHeMWZIJE/9z1IwQs+r6mk0P37QE+qU=,tag:s2TzEt9txKtggrlH6PIFyw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.8.1

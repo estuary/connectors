@@ -1,16 +1,16 @@
 Binding 0:
 {
-    "recommended_name": "flow_test_logminer/t18110541",
+    "recommended_name": "c__flow_test_logminer/t18110541",
     "resource_config_json": {
       "mode": "Without Primary Key",
-      "namespace": "FLOW_TEST_LOGMINER",
+      "namespace": "C##FLOW_TEST_LOGMINER",
       "stream": "T18110541"
     },
     "document_schema_json": {
       "$defs": {
-        "FLOW_TEST_LOGMINERT18110541": {
+        "C##FLOW_TEST_LOGMINERT18110541": {
           "type": "object",
-          "$anchor": "FLOW_TEST_LOGMINERT18110541",
+          "$anchor": "C##FLOW_TEST_LOGMINERT18110541",
           "properties": {
             "ID": {
               "format": "integer",
@@ -59,7 +59,7 @@ Binding 0:
               ],
               "properties": {
                 "before": {
-                  "$ref": "#FLOW_TEST_LOGMINERT18110541",
+                  "$ref": "#C##FLOW_TEST_LOGMINERT18110541",
                   "description": "Record state immediately before this change was applied.",
                   "reduce": {
                     "strategy": "firstWriteWins"
@@ -99,13 +99,23 @@ Binding 0:
                     "row_id": {
                       "type": "string",
                       "description": "ROWID of the document"
+                    },
+                    "rs_id": {
+                      "type": "string",
+                      "description": "Record Set ID of the logical change"
+                    },
+                    "ssn": {
+                      "type": "integer",
+                      "description": "SQL sequence number of the logical change"
                     }
                   },
                   "type": "object",
                   "required": [
                     "schema",
                     "table",
-                    "row_id"
+                    "row_id",
+                    "rs_id",
+                    "ssn"
                   ]
                 }
               },
@@ -116,12 +126,13 @@ Binding 0:
           }
         },
         {
-          "$ref": "#FLOW_TEST_LOGMINERT18110541"
+          "$ref": "#C##FLOW_TEST_LOGMINERT18110541"
         }
       ]
     },
     "key": [
-      "/_meta/source/row_id"
+      "/_meta/source/rs_id",
+      "/_meta/source/ssn"
     ]
   }
 
