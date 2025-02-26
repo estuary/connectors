@@ -1023,3 +1023,204 @@ func TestQueryTemplateOverride(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestKeylessCapture exercises discovery and capture from a table without
+// a defined primary key, but using a user-specified updated_at cursor.
+func TestKeylessCapture(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, "(data STRING, value INTEGER, updated_at TIMESTAMP)") // No PRIMARY KEY
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setCursorColumns(t, cs.Bindings[0], "updated_at")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// Initial batch of data
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (data, value, updated_at) VALUES (@p0, @p1, @p2)", tableName),
+			[][]any{
+				{fmt.Sprintf("Initial row %d", 0), 0, baseTime.Add(0 * time.Minute)},
+				{fmt.Sprintf("Initial row %d", 1), 1, baseTime.Add(1 * time.Minute)},
+				{fmt.Sprintf("Initial row %d", 2), 2, baseTime.Add(2 * time.Minute)},
+				{fmt.Sprintf("Initial row %d", 3), 3, baseTime.Add(3 * time.Minute)},
+				{fmt.Sprintf("Initial row %d", 4), 4, baseTime.Add(4 * time.Minute)},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		// Add more rows with later timestamps
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (data, value, updated_at) VALUES (@p0, @p1, @p2)", tableName),
+			[][]any{
+				{fmt.Sprintf("Additional row %d", 5), 5, baseTime.Add(10 * time.Minute)},
+				{fmt.Sprintf("Additional row %d", 6), 6, baseTime.Add(11 * time.Minute)},
+				{fmt.Sprintf("Additional row %d", 7), 7, baseTime.Add(12 * time.Minute)},
+				{fmt.Sprintf("Additional row %d", 8), 8, baseTime.Add(13 * time.Minute)},
+				{fmt.Sprintf("Additional row %d", 9), 9, baseTime.Add(14 * time.Minute)},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		// Update some rows with new timestamps
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("UPDATE %s SET data = CONCAT(data, ' (updated)'), updated_at = @p0 WHERE value = @p1", tableName),
+			[][]any{
+				{baseTime.Add(15 * time.Minute), 3},
+				{baseTime.Add(15 * time.Minute), 4},
+				{baseTime.Add(15 * time.Minute), 5},
+				{baseTime.Add(15 * time.Minute), 6},
+				{baseTime.Add(15 * time.Minute), 7},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		// Delete and reinsert some rows
+		require.NoError(t, executeSetupQuery(ctx, t, control,
+			fmt.Sprintf("DELETE FROM %s WHERE value IN (4, 6)", tableName)))
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (data, value, updated_at) VALUES (@p0, @p1, @p2)", tableName),
+			[][]any{
+				{"Reinserted row 4", 4, baseTime.Add(20 * time.Minute)},
+				{"Reinserted row 6", 6, baseTime.Add(20 * time.Minute)},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestKeylessFullRefreshCapture exercises discovery and capture from a table
+// without a defined primary key, and with the cursor left empty to test
+// full-refresh behavior.
+func TestKeylessFullRefreshCapture(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, "(data STRING, value INTEGER)") // No PRIMARY KEY
+
+	// Discover the table and verify discovery snapshot
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		// Initial batch of data
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (data, value) VALUES (@p0, @p1)", tableName),
+			[][]any{
+				{fmt.Sprintf("Initial row %d", 0), 0},
+				{fmt.Sprintf("Initial row %d", 1), 1},
+				{fmt.Sprintf("Initial row %d", 2), 2},
+				{fmt.Sprintf("Initial row %d", 3), 3},
+				{fmt.Sprintf("Initial row %d", 4), 4},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		// Add more rows - these should appear in the next full refresh
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (data, value) VALUES (@p0, @p1)", tableName),
+			[][]any{
+				{fmt.Sprintf("Additional row %d", 5), 5},
+				{fmt.Sprintf("Additional row %d", 6), 6},
+				{fmt.Sprintf("Additional row %d", 7), 7},
+				{fmt.Sprintf("Additional row %d", 8), 8},
+				{fmt.Sprintf("Additional row %d", 9), 9},
+			}))
+		cs.Capture(ctx, t, nil)
+
+		// Modify some existing rows - changes should appear in next full refresh
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("UPDATE %s SET data = CONCAT(data, ' (updated)') WHERE value = @p0", tableName),
+			[][]any{{3}, {4}, {5}, {6}, {7}}))
+		cs.Capture(ctx, t, nil)
+
+		// Delete some rows and add new ones - changes should appear in next full refresh
+		require.NoError(t, executeSetupQuery(ctx, t, control,
+			fmt.Sprintf("DELETE FROM %s WHERE value IN (4, 6)", tableName)))
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (data, value) VALUES (@p0, @p1)", tableName),
+			[][]any{{"New row A", 20}, {"New row B", 21}}))
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestFeatureFlagKeylessRowID exercises discovery and capture from a keyless
+// full-refresh table (as in TestKeylessFullRefreshCapture), but with the
+// keyless_row_id feature flag explicitly set to true and false in distinct
+// subtests.
+func TestFeatureFlagKeylessRowID(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		flag string
+	}{
+		{"Enabled", "keyless_row_id"},
+		{"Disabled", "no_keyless_row_id"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var ctx, control = context.Background(), testBigQueryClient(t)
+			var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+			createTestTable(ctx, t, control, tableName, "(data STRING, value INTEGER)") // No PRIMARY KEY
+
+			// Create capture spec with specific feature flag
+			var cs = testCaptureSpec(t)
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flag
+
+			// Discover the table and verify discovery snapshot
+			cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+			// Empty cursor forces full refresh behavior
+			setCursorColumns(t, cs.Bindings[0])
+
+			t.Run("Discovery", func(t *testing.T) {
+				cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+			})
+
+			t.Run("Capture", func(t *testing.T) {
+				setShutdownAfterQuery(t, true)
+
+				// Initial data batch
+				require.NoError(t, parallelSetupQueries(ctx, t, control,
+					fmt.Sprintf("INSERT INTO %s (data, value) VALUES (@p0, @p1)", tableName),
+					[][]any{
+						{fmt.Sprintf("Initial row %d", 0), 0},
+						{fmt.Sprintf("Initial row %d", 1), 1},
+						{fmt.Sprintf("Initial row %d", 2), 2},
+						{fmt.Sprintf("Initial row %d", 3), 3},
+						{fmt.Sprintf("Initial row %d", 4), 4},
+					}))
+				cs.Capture(ctx, t, nil)
+
+				// Add more rows
+				require.NoError(t, parallelSetupQueries(ctx, t, control,
+					fmt.Sprintf("INSERT INTO %s (data, value) VALUES (@p0, @p1)", tableName),
+					[][]any{
+						{fmt.Sprintf("Additional row %d", 5), 5},
+						{fmt.Sprintf("Additional row %d", 6), 6},
+						{fmt.Sprintf("Additional row %d", 7), 7},
+						{fmt.Sprintf("Additional row %d", 8), 8},
+						{fmt.Sprintf("Additional row %d", 9), 9},
+					}))
+				cs.Capture(ctx, t, nil)
+
+				// Modify some existing rows
+				require.NoError(t, parallelSetupQueries(ctx, t, control,
+					fmt.Sprintf("UPDATE %s SET data = CONCAT(data, ' (updated)') WHERE value = @p0", tableName),
+					[][]any{{3}, {4}, {5}, {6}, {7}}))
+				cs.Capture(ctx, t, nil)
+
+				// Delete and add new rows
+				require.NoError(t, executeSetupQuery(ctx, t, control,
+					fmt.Sprintf("DELETE FROM %s WHERE value IN (4, 6)", tableName)))
+				require.NoError(t, parallelSetupQueries(ctx, t, control,
+					fmt.Sprintf("INSERT INTO %s (data, value) VALUES (@p0, @p1)", tableName),
+					[][]any{{"New row A", 20}}))
+				cs.Capture(ctx, t, nil)
+
+				cupaloy.SnapshotT(t, cs.Summary())
+			})
+		})
+	}
+}
