@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/estuary/connectors/go/common"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -18,6 +19,16 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
+
+var featureFlagDefaults = map[string]bool{
+	// When set, discovered collection schemas will request that schema inference be
+	// used _in addition to_ the full column/types discovery we already do.
+	"use_schema_inference": false,
+
+	// When true, the fallback collection key for keyless source tables will be
+	// ["/_meta/row_id"] instead of [].
+	"keyless_row_id": false,
+}
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
@@ -35,6 +46,8 @@ type advancedConfig struct {
 	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	SSLMode         string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
 	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+
+	parsedFeatureFlags map[string]bool // Parsed feature flags setting with defaults applied
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -53,6 +66,12 @@ func (c *Config) Validate() error {
 		if err := schedule.Validate(c.Advanced.PollSchedule); err != nil {
 			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
 		}
+	}
+	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
+	// method that we can be sure always gets called before the config is used.
+	c.Advanced.parsedFeatureFlags = common.ParseFeatureFlags(c.Advanced.FeatureFlags, featureFlagDefaults)
+	if c.Advanced.FeatureFlags != "" {
+		log.WithField("flags", c.Advanced.parsedFeatureFlags).Info("parsed feature flags")
 	}
 	return nil
 }

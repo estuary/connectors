@@ -31,6 +31,8 @@ var (
 	cfgCapture = flag.String("cfg_capture", "configs/cloud-capture.yaml", "The path to an encrypted capture configuration file to use for test captures.")
 	cfgSetup   = flag.String("cfg_setup", "configs/cloud-setup.yaml", "The path to an encrypted configuration file containing the connection settings to use for test control operations.")
 	testSchema = flag.String("test_schema", "public", "The schema in which to create test entities.")
+
+	testFeatureFlags = flag.String("feature_flags", "", "Feature flags to apply to all test captures.")
 )
 
 func TestMain(m *testing.M) {
@@ -98,11 +100,11 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 
 	var endpointSpec = parseConfig(t, *cfgCapture)
 	endpointSpec.Advanced.PollSchedule = "5s" // Always poll frequently in tests
+	endpointSpec.Advanced.FeatureFlags = *testFeatureFlags
 
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
-	sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
 
 	return &st.CaptureSpec{
 		Driver:       redshiftDriver,
@@ -260,8 +262,11 @@ func TestQueryTemplate(t *testing.T) {
 func TestBasicCapture(t *testing.T) {
 	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
 	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
-
 	createTestTable(t, control, tableName, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	// Have to sanitize the index within the polling interval because we're running
+	// the capture in parallel with changes.
+	cs.Sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
 
 	// Discover the table and verify discovery snapshot
 	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
