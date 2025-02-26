@@ -228,7 +228,7 @@ func newPostgresDriver() *sql.Driver {
 
 			return &sql.Endpoint{
 				Config:              cfg,
-				Dialect:             pgDialect,
+				Dialect:             crateDialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
