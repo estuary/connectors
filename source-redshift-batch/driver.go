@@ -12,7 +12,6 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -54,12 +53,6 @@ var (
 	// normal operation.
 	TestShutdownAfterQuery = false
 )
-
-var featureFlagDefaults = map[string]bool{
-	// When set, discovered collection schemas will request that schema inference be
-	// used _in addition to_ the full column/types discovery we already do.
-	"use_schema_inference": false,
-}
 
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
 // by a config schema, connect function, and value translation logic.
@@ -116,7 +109,18 @@ func (r Resource) Validate() error {
 type documentMetadata struct {
 	Polled time.Time `json:"polled" jsonschema:"title=Polled Timestamp,description=The time at which the update query which produced this document as executed."`
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
+	RowID  int64     `json:"row_id" jsonschema:"title=Row ID,description=Row ID of the Document, counting up from zero."`
+	Op     string    `json:"op,omitempty" jsonschema:"title=Change Operation,description=Operation type (c: Create / u: Update / d: Delete),enum=c,enum=u,enum=d,default=u"`
 }
+
+var (
+	// The fallback key of discovered collections when the source table has no primary key.
+	fallbackKey = []string{"/_meta/row_id"}
+
+	// Before the /_meta/row_id property was added, captures left the collection key empty
+	// for tables without a source PK, forcing users to pick one themselves.
+	fallbackKeyOld = []string{}
+)
 
 func generateCollectionSchema(keyColumns []string, columnTypes map[string]columnType, useSchemaInference bool) (json.RawMessage, error) {
 	// Generate schema for the metadata via reflection
@@ -185,9 +189,6 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 	cfg.SetDefaults()
-
-	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-	log.WithField("flags", featureFlags).Info("parsed feature flags")
 
 	var db, err = drv.Connect(ctx, &cfg)
 	if err != nil {
@@ -284,15 +285,24 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			columnTypes[column.Name] = column.DataType
 		}
 
-		generatedSchema, err := generateCollectionSchema(keyColumns, columnTypes, featureFlags["use_schema_inference"])
+		generatedSchema, err := generateCollectionSchema(keyColumns, columnTypes, cfg.Advanced.parsedFeatureFlags["use_schema_inference"])
 		if err != nil {
 			log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
 			continue
 		}
 
+		// If the table has a primary key then convert it to a collection key, otherwise
+		// recommend an appropriate fallback collection key.
 		var collectionKey []string
-		for _, colName := range keyColumns {
-			collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+		if keyColumns != nil {
+			for _, colName := range keyColumns {
+				collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+			}
+		} else {
+			collectionKey = fallbackKey
+			if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
+				collectionKey = fallbackKeyOld
+			}
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
@@ -643,9 +653,6 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 	cfg.SetDefaults()
 
-	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-	log.WithField("flags", featureFlags).Info("parsed feature flags")
-
 	var db, err = drv.Connect(stream.Context(), &cfg)
 	if err != nil {
 		return err
@@ -659,9 +666,10 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 			return fmt.Errorf("parsing resource config: %w", err)
 		}
 		bindings = append(bindings, bindingInfo{
-			resource: &res,
-			index:    idx,
-			stateKey: boilerplate.StateKey(binding.StateKey),
+			resource:      &res,
+			index:         idx,
+			stateKey:      boilerplate.StateKey(binding.StateKey),
+			collectionKey: binding.Collection.Key,
 		})
 	}
 
@@ -689,7 +697,6 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		Bindings:       bindings,
 		Output:         stream,
 		TranslateValue: drv.TranslateValue,
-		featureFlags:   featureFlags,
 	}
 	return capture.Run(stream.Context())
 }
@@ -726,13 +733,13 @@ type capture struct {
 	Bindings       []bindingInfo
 	Output         *boilerplate.PullOutput
 	TranslateValue func(val any, databaseTypeName string) (any, error)
-	featureFlags   map[string]bool
 }
 
 type bindingInfo struct {
-	resource *Resource
-	index    int
-	stateKey boilerplate.StateKey
+	resource      *Resource
+	index         int
+	stateKey      boilerplate.StateKey
+	collectionKey []string // The key of the output collection, as an array of JSON pointers.
 }
 
 type captureState struct {
@@ -740,9 +747,10 @@ type captureState struct {
 }
 
 type streamState struct {
-	CursorNames  []string
-	CursorValues []any
-	LastPolled   time.Time
+	CursorNames   []string
+	CursorValues  []any
+	LastPolled    time.Time
+	DocumentCount int64 // A count of the number of documents emitted since the last full refresh started.
 }
 
 func (s *captureState) Validate() error {
@@ -806,6 +814,17 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	var cursorNames = state.CursorNames
 	var cursorValues = state.CursorValues
 
+	// If the key of the output collection for this binding is the Row ID then we
+	// can automatically provide useful `/_meta/op` values and inferred deletions.
+	var isRowIDKey = len(binding.collectionKey) == 1 && binding.collectionKey[0] == "/_meta/row_id"
+
+	// Two distinct concepts:
+	// - If we have no resume cursor _columns_ then every query is a full refresh.
+	// - If we have no resume cursor _values_ then this is a backfill query, which
+	//   could either be a full refresh or the initial query of an incremental binding.
+	var isFullRefresh = len(cursorNames) == 0
+	var isInitialBackfill = len(cursorValues) == 0
+
 	var quotedCursorNames []string
 	for _, cursorName := range cursorNames {
 		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
@@ -847,9 +866,18 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	}
 	var query = queryBuf.String()
 
+	// For incremental updates of a binding with a cursor, continue counting from where
+	// we left off. For initial backfills (which includes the first query of an incremental
+	// binding as well as every query of a full-refresh binding) restart from zero.
+	var nextRowID = state.DocumentCount
+	if isInitialBackfill {
+		nextRowID = 0
+	}
+
 	log.WithFields(log.Fields{
 		"query": query,
 		"args":  cursorValues,
+		"rowID": nextRowID,
 	}).Info("executing query")
 	var pollTime = time.Now().UTC()
 
@@ -916,10 +944,23 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 			}
 			rowValues[idx] = translatedVal
 		}
-		rowValues[len(rowValues)-1] = &documentMetadata{
+		var metadata = &documentMetadata{
+			RowID:  nextRowID,
 			Polled: pollTime,
 			Index:  count,
 		}
+		if isRowIDKey {
+			// When the output key of a binding is the row ID, we can provide useful
+			// create/update change operation values based on that row ID. This logic
+			// will always set the operation to "c" for a cursor-incremental binding
+			// with row ID key since the row ID is always increasing.
+			if nextRowID < state.DocumentCount {
+				metadata.Op = "u"
+			} else {
+				metadata.Op = "c"
+			}
+		}
+		rowValues[len(rowValues)-1] = metadata
 
 		serializedDocument, err = shape.Encode(serializedDocument, rowValues)
 		if err != nil {
@@ -939,7 +980,19 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		state.CursorValues = cursorValues
 
 		count++
+		nextRowID++
 		if count%documentsPerCheckpoint == 0 {
+			// When a full-refresh binding outputs into a collection with key `/_meta/row_id`
+			// we rely on the persisted DocumentCount not being updated until after the whole
+			// update query completes successfully, so that we can infer deletions of any rows
+			// between the last rowID of the latest query and the persisted DocumentCount.
+			//
+			// But when emitting partial-progress updates on a _non_ full-refresh binding, we
+			// need to update the persisted DocumentCount on each partial progress checkpoint
+			// so that the rowID the next poll resumes from will match the persisted cursor.
+			if !isFullRefresh {
+				state.DocumentCount = nextRowID
+			}
 			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 				return err
 			}
@@ -948,19 +1001,39 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 			log.WithFields(log.Fields{
 				"name":  res.Name,
 				"count": count,
+				"rowID": nextRowID,
 			}).Info("processing query results")
 		}
 	}
-
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error processing results iterator: %w", err)
+	}
 	log.WithFields(log.Fields{
 		"name":  res.Name,
 		"query": query,
 		"count": count,
+		"rowID": nextRowID,
+		"docs":  state.DocumentCount,
 	}).Info("polling complete")
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error processing results iterator: %w", err)
+
+	// A full-refresh binding whose output collection uses the key /_meta/row_id can
+	// infer deletions whenever a refresh yields fewer rows than last time.
+	if isRowIDKey && isFullRefresh {
+		var pollTimestamp = pollTime.Format(time.RFC3339Nano)
+		for i := int64(0); i < state.DocumentCount-nextRowID; i++ {
+			// These inferred-deletion documents are simple enough that we can generate
+			// them with a simple Sprintf rather than going through a whole JSON encoder.
+			var doc = fmt.Sprintf(
+				`{"_meta":{"polled":%q,"index":%d,"row_id":%d,"op":"d"}}`,
+				pollTimestamp, count+int(i), nextRowID+i)
+			if err := c.Output.Documents(binding.index, json.RawMessage(doc)); err != nil {
+				return fmt.Errorf("error emitting document: %w", err)
+			}
+		}
 	}
+
 	state.LastPolled = pollTime
+	state.DocumentCount = nextRowID // Always update persisted count on successful completion
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
 	}
