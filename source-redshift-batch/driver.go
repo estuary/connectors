@@ -122,13 +122,16 @@ var (
 	fallbackKeyOld = []string{}
 )
 
-func generateCollectionSchema(keyColumns []string, columnTypes map[string]columnType, useSchemaInference bool) (json.RawMessage, error) {
+func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[string]columnType, useSchemaInference bool) (json.RawMessage, error) {
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
 		ExpandedStruct: true,
 		DoNotReference: true,
 	}
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
+		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
+	}
 	metadataSchema.Definitions = nil
 	metadataSchema.AdditionalProperties = nil
 
@@ -285,7 +288,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			columnTypes[column.Name] = column.DataType
 		}
 
-		generatedSchema, err := generateCollectionSchema(keyColumns, columnTypes, cfg.Advanced.parsedFeatureFlags["use_schema_inference"])
+		generatedSchema, err := generateCollectionSchema(&cfg, keyColumns, columnTypes, cfg.Advanced.parsedFeatureFlags["use_schema_inference"])
 		if err != nil {
 			log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
 			continue
