@@ -1,0 +1,90 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "capturefromview_194890",
+      "schema": "public",
+      "table": "capturefromview_194890"
+    },
+    "resource_path": [
+      "capturefromview_194890"
+    ],
+    "collection": {
+      "name": "acmeCo/test/capturefromview_194890",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "id"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-redshift-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              },
+              "row_id": {
+                "type": "integer",
+                "title": "Row ID",
+                "description": "Row ID of the Document"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Change Operation",
+                "description": "Operation type (c: Create / u: Update / d: Delete)",
+                "default": "u"
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index",
+              "row_id"
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visible": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          }
+        }
+      },
+      "key": [
+        "/id"
+      ],
+      "projections": null
+    },
+    "state_key": "capturefromview_194890"
+  }
+
