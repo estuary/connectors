@@ -42,6 +42,7 @@ type Config struct {
 }
 
 type advancedConfig struct {
+	DiscoverViews   bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
 	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '24h' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	SSLMode         string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
@@ -176,16 +177,22 @@ var templateFuncs = template.FuncMap{
 	"quoteIdentifier": quoteIdentifier,
 }
 
-func generateRedshiftResource(resourceName, schemaName, tableName, tableType string) (*Resource, error) {
-	if !strings.EqualFold(tableType, "BASE TABLE") {
-		return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
+func generateRedshiftResource(cfg *Config, resourceName, schemaName, tableName, tableType string) (*Resource, error) {
+	if strings.EqualFold(tableType, "BASE TABLE") {
+		return &Resource{
+			Name:       resourceName,
+			SchemaName: schemaName,
+			TableName:  tableName,
+		}, nil
 	}
-
-	return &Resource{
-		Name:       resourceName,
-		SchemaName: schemaName,
-		TableName:  tableName,
-	}, nil
+	if strings.EqualFold(tableType, "VIEW") && cfg.Advanced.DiscoverViews {
+		return &Resource{
+			Name:       resourceName,
+			SchemaName: schemaName,
+			TableName:  tableName,
+		}, nil
+	}
+	return nil, fmt.Errorf("unsupported entity type %q", tableType)
 }
 
 func translateRedshiftValue(val any, databaseTypeName string) (any, error) {
