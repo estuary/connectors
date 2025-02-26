@@ -339,26 +339,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	t.bindings = append(t.bindings, b)
 
-	// Create a binding-scoped temporary table for staged keys to load.
-	input := loadTableColumns{Binding: b.target.Binding}
-	for _, k := range b.target.Keys {
-		existing, err := is.GetField(b.target.Path, k.Field)
-		if err != nil {
-			return fmt.Errorf("getting existing key field %s for binding %s: %w", k.Field, b.target.Path, err)
-		}
-		input.Keys = append(input.Keys, loadTableKey{
-			Identifier: k.Identifier,
-			DDL:        existing.Type + " NOT NULL", // nullable key fields are not allowed
-		})
-	}
-
 	var w strings.Builder
-	if err := tplCreateLoadTable.Execute(&w, &input); err != nil {
+	if err := tplCreateLoadTable.Execute(&w, &b.target); err != nil {
 		return fmt.Errorf("executing createLoadTable template: %w", err)
 	} else if _, err := t.load.conn.Exec(ctx, w.String()); err != nil {
 		return fmt.Errorf("Exec(%s): %w", w.String(), err)
 	}
-
 	return nil
 }
 
