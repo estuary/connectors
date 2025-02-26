@@ -366,6 +366,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		},
 		SCN:   msg.SCN,
 		RowID: rowid,
+		RSID:  msg.RSID,
+		SSN:   msg.SSN,
 	}
 
 	var event = &sqlcapture.ChangeEvent{

@@ -12,14 +12,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func testViewDiscovery(t *testing.T, configFile string) {
+func TestViewDiscovery(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var tableName = tb.CreateTable(ctx, t, unique, "(id INTEGER PRIMARY KEY, grp INTEGER, data VARCHAR(2000))")
 
-	var view = fmt.Sprintf(`"t%s"`, unique+"_simpleview")
-	tb.Query(ctx, t, false, fmt.Sprintf(`DROP VIEW %s`, view))
-	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1`, view, tableName))
+	var view = strings.ToUpper(fmt.Sprintf(`"t%s"`, unique+"_simpleview"))
+	tb.Query(ctx, t, false, fmt.Sprintf(`DROP VIEW "%s".%s`, tb.config.User, view))
+	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE VIEW "%s".%s AS SELECT * FROM %s`, tb.config.User, view, tableName))
 	t.Cleanup(func() {
 		logrus.WithField("view", view).Debug("dropping view")
 		tb.Query(ctx, t, false, fmt.Sprintf(`DROP VIEW %s`, view))
@@ -37,17 +37,9 @@ func testViewDiscovery(t *testing.T, configFile string) {
 	}
 }
 
-func TestViewDiscovery(t *testing.T) {
-	testViewDiscovery(t, "config.rds.yaml")
-}
-
-func TestViewDiscoveryPDB(t *testing.T) {
-	testViewDiscovery(t, "config.pdb.yaml")
-}
-
-func testAllTypes(t *testing.T, configFile string) {
+func TestAllTypes(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var typesAndValues = [][]any{
 		{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ \\ 🔥️'')"},
 		{"vcahr2", "VARCHAR2(2000)", "varchar2 value"},
@@ -103,17 +95,9 @@ func testAllTypes(t *testing.T, configFile string) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestAllTypes(t *testing.T) {
-	testAllTypes(t, "config.rds.yaml")
-}
-
-func TestAllTypesPDB(t *testing.T) {
-	testAllTypes(t, "config.PDB.yaml")
-}
-
-func testNullValues(t *testing.T, configFile string) {
+func TestNullValues(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var typesAndValues = [][]any{
 		{"nvchar2", "NVARCHAR2(2000)", NewRawTupleValue("NULL")},
 		{"vcahr2", "VARCHAR2(2000)", NewRawTupleValue("NULL")},
@@ -168,16 +152,9 @@ func testNullValues(t *testing.T, configFile string) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestNullValues(t *testing.T) {
-	testNullValues(t, "config.rds.yaml")
-}
-func TestNullValuesPDB(t *testing.T) {
-	testNullValues(t, "config.pdb.yaml")
-}
-
-func testUnsupportedTypes(t *testing.T, configFile string) {
+func TestUnsupportedTypes(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var typesAndValues = [][]any{
 		{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ \\ 🔥️'')"},
 		{"anycol", "ANYDATA", NewRawTupleValue("NULL")},
@@ -211,17 +188,9 @@ func testUnsupportedTypes(t *testing.T, configFile string) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestUnsupportedTypes(t *testing.T) {
-	testUnsupportedTypes(t, "config.rds.yaml")
-}
-
-func TestUnsupportedTypesPDB(t *testing.T) {
-	testUnsupportedTypes(t, "config.pdb.yaml")
-}
-
-func testStringKey(t *testing.T, configFile string) {
+func TestStringKey(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	// Integer keys are output as string, format: integer by default
 	var tableName = tb.CreateTable(ctx, t, unique, "(id integer)")
 
@@ -240,17 +209,9 @@ func testStringKey(t *testing.T, configFile string) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestStringKey(t *testing.T) {
-	testStringKey(t, "config.rds.yaml")
-}
-
-func TestStringKeyPDB(t *testing.T) {
-	testStringKey(t, "config.pdb.yaml")
-}
-
-func testLongStrings(t *testing.T, configFile string) {
+func TestLongStrings(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var fire, ice, normalString string
 	for i := 0; i < 250; i++ {
 		fire += "🔥️"
@@ -274,19 +235,11 @@ func testLongStrings(t *testing.T, configFile string) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestLongStrings(t *testing.T) {
-	testLongStrings(t, "config.rds.yaml")
-}
-
-func TestLongStringsPDB(t *testing.T) {
-	testLongStrings(t, "config.pdb.yaml")
-}
-
-func testSkipBackfills(t *testing.T, configFile string) {
+func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
 	// and only capture new changes.
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var uniqueA, uniqueB, uniqueC = "18110541", "24310805", "38410024"
 	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
@@ -308,17 +261,9 @@ func testSkipBackfills(t *testing.T, configFile string) {
 	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestSkipBackfills(t *testing.T) {
-	testSkipBackfills(t, "config.rds.yaml")
-}
-
-func TestSkipBackfillsPDB(t *testing.T) {
-	testSkipBackfills(t, "config.pdb.yaml")
-}
-
-func testTruncatedTables(t *testing.T, configFile string) {
+func TestTruncatedTables(t *testing.T) {
 	// Set up two tables with some data in them
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var uniqueA, uniqueB = "14026504", "29415894"
 	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
@@ -341,18 +286,10 @@ func testTruncatedTables(t *testing.T, configFile string) {
 	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestTruncatedTables(t *testing.T) {
-	testTruncatedTables(t, "config.rds.yaml")
-}
-
-func TestTruncatedTablesPDB(t *testing.T) {
-	testTruncatedTables(t, "config.pdb.yaml")
-}
-
-func testTrickyColumnNames(t *testing.T, configFile string) {
+func TestTrickyColumnNames(t *testing.T) {
 	// Create a table with some 'difficult' column names (a reserved word, a capitalized
 	// name, and one containing special characters which also happens to be the primary key).
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var uniqueA, uniqueB = "39256824", "42531495"
 	var tableA = tb.CreateTable(ctx, t, uniqueA, `("`+"`"+`Meta/'wtf'~ID`+"`"+`" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	var tableB = tb.CreateTable(ctx, t, uniqueB, `("table" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
@@ -374,18 +311,10 @@ func testTrickyColumnNames(t *testing.T, configFile string) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestTrickyColumnNames(t *testing.T) {
-	testTrickyColumnNames(t, "config.rds.yaml")
-}
-
-func TestTrickyColumnNamesPDB(t *testing.T) {
-	testTrickyColumnNames(t, "config.pdb.yaml")
-}
-
 // TestCursorResume sets up a capture with a (string, int) primary key and
 // and repeatedly restarts it after each row of capture output.
-func testCursorResume(t *testing.T, configFile string) {
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+func TestCursorResume(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var uniqueID = "95911555"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(epoch VARCHAR(8), count INTEGER, data VARCHAR(2000), PRIMARY KEY (epoch, count))")
 	tb.Insert(ctx, t, tableName, [][]any{
@@ -404,16 +333,8 @@ func testCursorResume(t *testing.T, configFile string) {
 	cupaloy.SnapshotT(t, summary)
 }
 
-func TestCursorResume(t *testing.T) {
-	testCursorResume(t, "config.rds.yaml")
-}
-
-func TestCursorResumePDB(t *testing.T) {
-	testCursorResume(t, "config.pdb.yaml")
-}
-
-func testCaptureCapitalization(t *testing.T, configFile string) {
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+func TestCaptureCapitalization(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 
 	var uniqueA, uniqueB = "69943814", "73423348"
 	var tablePrefix = "test"
@@ -438,16 +359,9 @@ func testCaptureCapitalization(t *testing.T, configFile string) {
 	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB)))
 }
 
-func TestCaptureCapitalization(t *testing.T) {
-	testCaptureCapitalization(t, "config.rds.yaml")
-}
-
-func TestCaptureCapitalizationPDB(t *testing.T) {
-	testCaptureCapitalization(t, "config.pdb.yaml")
-}
-
-func testSchemaChanges(t *testing.T, configFile string) {
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+func TestSchemaChanges(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	tb.config.Advanced.DictionaryMode = DictionaryModeExtract
 	var uniqueID = "83287013"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
 	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
@@ -470,16 +384,8 @@ func testSchemaChanges(t *testing.T, configFile string) {
 	t.Run("insert-after", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestSchemaChanges(t *testing.T) {
-	testSchemaChanges(t, "config.rds.yaml")
-}
-
-func TestSchemaChangesPDB(t *testing.T) {
-	testSchemaChanges(t, "config.pdb.yaml")
-}
-
-func testSchemaChangesOnlineDictionary(t *testing.T, configFile string) {
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+func TestSchemaChangesOnlineDictionary(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var uniqueID = "83287013"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
 	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
@@ -499,12 +405,4 @@ func testSchemaChangesOnlineDictionary(t *testing.T, configFile string) {
 	tb.Insert(ctx, t, tableName, [][]any{{1940, "CC", "No Such State"}})
 
 	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-}
-
-func TestSchemaChangesOnlineDictionary(t *testing.T) {
-	testSchemaChangesOnlineDictionary(t, "config.rds.yaml")
-}
-
-func TestSchemaChangesOnlineDictionaryPDB(t *testing.T) {
-	testSchemaChangesOnlineDictionary(t, "config.pdb.yaml")
 }

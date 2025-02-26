@@ -32,7 +32,7 @@
         "type": "boolean",
         "description": "Capture change events without reducing them to a final state.",
         "default": false,
-        "order": 4
+        "order": 5
       },
       "advanced": {
         "properties": {
@@ -43,8 +43,7 @@
           },
           "watermarksTable": {
             "type": "string",
-            "description": "The name of the table used for watermark writes during backfills. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
-            "default": "USER.FLOW_WATERMARKS"
+            "description": "The name of the table used for watermark writes during backfills. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form."
           },
           "backfill_chunk_size": {
             "type": "integer",

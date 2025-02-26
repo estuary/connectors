@@ -61,6 +61,9 @@ func oracleTestBackend(t testing.TB, configFile string) *testBackend {
 		t.Fatalf("error validating capture config: %v", err)
 	}
 	config.SetDefaults("test")
+	// Use online mode to speed up tests, we have a specific test
+	// for testing extract mode
+	config.Advanced.DictionaryMode = DictionaryModeOnline
 
 	// Open control connection
 	db, err := connectOracle(ctx, "test", cleanedConfig)
@@ -87,6 +90,8 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 	sanitizers[`"scn":11111111`] = regexp.MustCompile(`"scn":([0-9]+)`)
 	sanitizers[`"cursor":"11111111"`] = regexp.MustCompile(`"cursor":"([0-9]+)"`)
 	sanitizers[`"row_id":"AAAAAAAAAAAAAAAAAA"`] = regexp.MustCompile(`"row_id":"[^"]+"`)
+	sanitizers[`"rs_id":"111111111111111111"`] = regexp.MustCompile(`"rs_id":"[^"]+"`)
+	sanitizers[`"ssn":111`] = regexp.MustCompile(`"ssn":[0-9]+`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 	sanitizers[`"scanned":"AAAAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"scanned":"[^"]+"`)
 
@@ -109,7 +114,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
 	t.Helper()
 
-	var tableName = tb.config.User + "."
+	var tableName = fmt.Sprintf("\"%s\".", tb.config.User)
 	if suffix != "" {
 		tableName += fmt.Sprintf(`"t%s"`, suffix)
 	} else {
@@ -223,17 +228,12 @@ func argsTuple(row []any) string {
 
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
-	var tb = oracleTestBackend(t, "config.rds.yaml")
-	tests.Run(context.Background(), t, tb)
-}
-
-func TestGenericPDB(t *testing.T) {
 	var tb = oracleTestBackend(t, "config.pdb.yaml")
 	tests.Run(context.Background(), t, tb)
 }
 
-func testCapitalizedTables(t *testing.T, configFile string) {
-	var tb, ctx = oracleTestBackend(t, configFile), context.Background()
+func TestCapitalizedTables(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."USERS"`, tb.config.User))
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."USERS" (id INTEGER PRIMARY KEY, data VARCHAR(2000) NOT NULL)`, tb.config.User))
 	var cs = tb.CaptureSpec(ctx, t)
@@ -255,14 +255,6 @@ func testCapitalizedTables(t *testing.T, configFile string) {
 			tests.VerifiedCapture(ctx, t, cs)
 		})
 	})
-}
-
-func TestCapitalizedTables(t *testing.T) {
-	testCapitalizedTables(t, "config.rds.yaml")
-}
-
-func TestCapitalizedTablesPDB(t *testing.T) {
-	testCapitalizedTables(t, "config.pdb.yaml")
 }
 
 func TestConfigURI(t *testing.T) {

@@ -295,7 +295,7 @@ func (db *oracleDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 }
 
 func (db *oracleDatabase) FallbackCollectionKey() []string {
-	return []string{"/_meta/source/row_id"}
+	return []string{"/_meta/source/rs_id", "/_meta/source/ssn"}
 }
 
 func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error) {
