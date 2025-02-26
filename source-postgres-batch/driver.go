@@ -124,13 +124,16 @@ var (
 	fallbackKeyOld = []string{"/_meta/polled", "/_meta/index"}
 )
 
-func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
+func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
 		ExpandedStruct: true,
 		DoNotReference: true,
 	}
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
+		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
+	}
 	metadataSchema.Definitions = nil
 	metadataSchema.AdditionalProperties = nil
 
@@ -165,14 +168,6 @@ func generateCollectionSchema(keyColumns []string, columnTypes map[string]*jsons
 	}
 	return json.RawMessage(bs), nil
 }
-
-var minimalSchema = func() json.RawMessage {
-	var schema, err = generateCollectionSchema(nil, nil)
-	if err != nil {
-		panic(err)
-	}
-	return schema
-}()
 
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
@@ -246,15 +241,19 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		// Try to generate a useful collection schema, but on error fall back to the
-		// minimal schema with a fallback collection key which is always present.
-		var collectionSchema = minimalSchema
+		// Start with a minimal schema and a fallback collection key, which will be
+		// replaced with more useful versions if we have sufficient information.
+		collectionSchema, err := generateCollectionSchema(&cfg, nil, nil)
+		if err != nil {
+			return nil, fmt.Errorf("error generating minimal collection schema: %w", err)
+		}
 		var collectionKey = fallbackKey
 		if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
 			collectionKey = fallbackKeyOld
 		}
+
 		if tableKey, ok := keysByTable[tableID]; ok {
-			if generatedSchema, err := generateCollectionSchema(tableKey.Columns, tableKey.ColumnTypes); err == nil {
+			if generatedSchema, err := generateCollectionSchema(&cfg, tableKey.Columns, tableKey.ColumnTypes); err == nil {
 				collectionSchema = generatedSchema
 				collectionKey = nil
 				for _, colName := range tableKey.Columns {
