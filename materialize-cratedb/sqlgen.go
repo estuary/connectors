@@ -23,7 +23,7 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 		return nil, fmt.Errorf("invalid type %#v for variant", te)
 	}
 }
-var pgDialect = func() sql.Dialect {
+var crateDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER:        sql.MapStatic("NUMERIC(22, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
@@ -121,7 +121,7 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 }
 
 var (
-	tplAll = sql.MustParseTemplate(pgDialect, "root", `
+	tplAll = sql.MustParseTemplate(crateDialect, "root", `
 {{ define "temp_name" -}}
 flow_temp_table_{{ $.Binding }}
 {{- end }}

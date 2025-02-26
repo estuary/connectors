@@ -14,7 +14,7 @@ import (
 func TestSQLGeneration(t *testing.T) {
 	snap, _ := sql.RunSqlGenTests(
 		t,
-		pgDialect,
+		crateDialect,
 		func(table string, delta bool) sql.Resource {
 			return tableConfig{
 				Table: table,
@@ -43,7 +43,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped, err = pgDialect.MapType(&sql.Projection{
+	var mapped, err = crateDialect.MapType(&sql.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
