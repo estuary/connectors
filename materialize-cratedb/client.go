@@ -90,7 +90,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		}
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, pgDialect, catalog, resourcePaths)
+	return sql.StdFetchInfoSchema(ctx, c.db, crateDialect, catalog, resourcePaths)
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -130,7 +130,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", pgDialect.Identifier(path...))
+	stmt := fmt.Sprintf("DROP TABLE %s;", crateDialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, stmt)
@@ -153,7 +153,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.ColumnTypeChanges) > 0 {
 		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, pgDialect, ta.Table, m); err != nil {
+			if steps, err := sql.StdColumnTypeMigration(ctx, crateDialect, ta.Table, m); err != nil {
 				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 			} else {
 				stmts = append(stmts, steps...)
@@ -176,7 +176,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
-	return sql.StdCreateSchema(ctx, c.db, pgDialect, schemaName)
+	return sql.StdCreateSchema(ctx, c.db, crateDialect, schemaName)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
