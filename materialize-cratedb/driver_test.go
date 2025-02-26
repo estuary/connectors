@@ -86,7 +86,7 @@ func TestValidateAndApply(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", crateDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }
@@ -123,15 +123,15 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			var keys = make([]string, len(cols))
 			for i, col := range cols {
-				keys[i] = pgDialect.Identifier(col)
+				keys[i] = crateDialect.Identifier(col)
 			}
-			keys = append(keys, pgDialect.Identifier("_meta/flow_truncated"))
+			keys = append(keys, crateDialect.Identifier("_meta/flow_truncated"))
 			values = append(values, "FALSE")
-			keys = append(keys, pgDialect.Identifier("flow_published_at"))
+			keys = append(keys, crateDialect.Identifier("flow_published_at"))
 			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, pgDialect.Identifier("flow_document"))
+			keys = append(keys, crateDialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", pgDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", crateDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
 			_, err = db.ExecContext(ctx, q)
 
 			require.NoError(t, err)
@@ -139,7 +139,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			rows, err := sql.DumpTestTable(t, db, pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
+			rows, err := sql.DumpTestTable(t, db, crateDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
 
 			require.NoError(t, err)
 
@@ -147,7 +147,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", crateDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }
@@ -162,7 +162,7 @@ func TestFencingCases(t *testing.T) {
 	sql.RunFenceTestCases(t,
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
-		pgDialect,
+		crateDialect,
 		tplCreateTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
