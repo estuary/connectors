@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/floatnans_198258": 3 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"a_double":"NaN","a_real":2,"id":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"a_double":3,"a_real":"NaN","id":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"a_double":"-Infinity","a_real":"Infinity","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"a_double":"NaN","a_real":2,"id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"a_double":3,"a_real":"NaN","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"a_double":"-Infinity","a_real":"Infinity","id":2}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"floatnans_198258":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"floatnans_198258":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":3}}}
 

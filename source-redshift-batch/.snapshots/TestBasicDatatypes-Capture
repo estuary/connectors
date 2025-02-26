@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/basicdatatypes_261881": 1 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":999},"a_bool":true,"a_date":"2024-02-26T00:00:00Z","a_real":-12.34000015258789,"a_ts":"2024-02-26T12:34:56Z","a_tstz":"2024-02-26T07:34:56-05:00","id":100}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"a_bool":true,"a_date":"2024-02-26T00:00:00Z","a_real":-12.34000015258789,"a_ts":"2024-02-26T12:34:56Z","a_tstz":"2024-02-26T07:34:56-05:00","id":100}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"basicdatatypes_261881":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"basicdatatypes_261881":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":1}}}
 
