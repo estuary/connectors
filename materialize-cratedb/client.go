@@ -176,7 +176,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
-	return sql.StdCreateSchema(ctx, c.db, crateDialect, schemaName)
+	return nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
