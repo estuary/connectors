@@ -260,8 +260,7 @@ func TestSpec(t *testing.T) {
 // TestQueryTemplate is a unit test which verifies that the default query template produces
 // the expected output for initial/subsequent polling queries with different cursors.
 func TestQueryTemplate(t *testing.T) {
-	res, err := bigqueryDriver.GenerateResource("foobar", "testdata", "foobar", "BASE TABLE")
-	require.NoError(t, err)
+	var res = &Resource{Name: "foobar", SchemaName: "testdata", TableName: "foobar"}
 
 	tmplString, err := bigqueryDriver.SelectQueryTemplate(res)
 	require.NoError(t, err)
@@ -1223,4 +1222,84 @@ func TestFeatureFlagKeylessRowID(t *testing.T) {
 			})
 		})
 	}
+}
+
+// TestCaptureFromView exercises discovery and capture from a view with an updated_at cursor.
+func TestCaptureFromView(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var baseTableName, tableID = testTableName(t, uniqueTableID(t))
+	var viewName, viewID = testTableName(t, uniqueTableID(t, "view"))
+
+	// Create base table and view
+	createTestTable(ctx, t, control, baseTableName, `(
+		id INTEGER NOT NULL,
+		name STRING,
+		visible BOOL,
+		updated_at TIMESTAMP
+	)`)
+	require.NoError(t, executeSetupQuery(ctx, t, control, fmt.Sprintf(`
+		CREATE VIEW %s AS
+		SELECT id, name, updated_at
+		FROM %s
+		WHERE visible = true`, viewName, baseTableName)))
+	t.Cleanup(func() {
+		_ = executeSetupQuery(ctx, t, control, fmt.Sprintf("DROP VIEW IF EXISTS %s", viewName))
+	})
+
+	// By default views should not be discovered.
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
+	t.Run("DiscoveryWithoutViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	// Enable view discovery and re-discover bindings, then set a cursor for capturing the view.
+	cs.EndpointSpec.(*Config).Advanced.DiscoverViews = true
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(tableID), regexp.MustCompile(viewID))
+	t.Run("DiscoveryWithViews", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	// Update both the base table and the view incrementally using the updated_at column.
+	setCursorColumns(t, cs.Bindings[0], "updated_at")
+	setCursorColumns(t, cs.Bindings[1], "updated_at")
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		baseTime := time.Date(2025, 2, 13, 12, 0, 0, 0, time.UTC)
+
+		// First batch: Insert rows into base table, some visible in view
+		var firstBatch [][]any
+		for i := 0; i < 10; i++ {
+			firstBatch = append(firstBatch, []any{
+				i,
+				fmt.Sprintf("Row %d", i),
+				i%2 == 0, // Even numbered rows are visible
+				baseTime.Add(time.Duration(i) * time.Minute),
+			})
+		}
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (id, name, visible, updated_at) VALUES (@p0, @p1, @p2, @p3)", baseTableName),
+			firstBatch))
+		cs.Capture(ctx, t, nil)
+
+		// Second batch: More rows with later timestamps
+		var secondBatch [][]any
+		for i := 10; i < 20; i++ {
+			secondBatch = append(secondBatch, []any{
+				i,
+				fmt.Sprintf("Row %d", i),
+				i%2 == 0, // Even numbered rows are visible
+				baseTime.Add(time.Duration(i) * time.Minute),
+			})
+		}
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("INSERT INTO %s (id, name, visible, updated_at) VALUES (@p0, @p1, @p2, @p3)", baseTableName),
+			secondBatch))
+		cs.Capture(ctx, t, nil)
+
+		// Update some rows to change their visibility
+		updateTime := baseTime.Add(20 * time.Minute)
+		require.NoError(t, parallelSetupQueries(ctx, t, control,
+			fmt.Sprintf("UPDATE %s SET visible = NOT visible, updated_at = @p0 WHERE id IN (@p1, @p2, @p3)", baseTableName),
+			[][]any{{updateTime, 2, 3, 4}}))
+		cs.Capture(ctx, t, nil)
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
 }
