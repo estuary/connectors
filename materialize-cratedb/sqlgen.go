@@ -61,7 +61,7 @@ var crateDialect = func() sql.Dialect {
 				},
 			}),
 		},
-		sql.WithNotNullText("NOT NULL"),
+		//sql.WithNotNullText("NOT NULL"), CrateDB does not support dropping NOT NULL columns.
 	)
 
 	return sql.Dialect{
@@ -157,11 +157,6 @@ ALTER TABLE {{$.Identifier}}
 	{{- if $ind }},{{ end }}
 	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }}
-{{- if and $.DropNotNulls $.AddColumns}},{{ end }}
-{{- range $ind, $col := $.DropNotNulls }}
-	{{- if $ind }},{{ end }}
-	ALTER COLUMN {{ ColumnIdentifier $col.Name }} DROP NOT NULL
-{{- end }};
 {{ end }}
 
 -- Templated creation of a temporary load table:
