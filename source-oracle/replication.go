@@ -245,6 +245,10 @@ type oracleSource struct {
 	SCN int `json:"scn,omitempty" jsonschema:"description=SCN of this event, only present for incremental changes"`
 
 	RowID string `json:"row_id" jsonschema:"description=ROWID of the document"`
+
+	RSID string `json:"rs_id" jsonschema:"description=Record Set ID of the logical change"`
+
+	SSN int `json:"ssn" jsonschema:"description=SQL sequence number of the logical change"`
 }
 
 func (s *oracleSource) Common() sqlcapture.SourceCommon {
@@ -553,6 +557,9 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 			return err
 		}
 
+		// For some reason RSID comes with a space before and after it
+		msg.RSID = strings.TrimSpace(msg.RSID)
+
 		if undoSql.Valid {
 			msg.UndoSQL = undoSql.String
 		}
@@ -680,6 +687,8 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) erro
 
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
+	s.logminerStmt.Close()
+	s.conn.Close()
 	s.cancel()
 	return <-s.errCh
 }
