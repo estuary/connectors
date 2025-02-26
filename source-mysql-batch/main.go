@@ -201,8 +201,7 @@ func generateMySQLResource(cfg *Config, resourceName, schemaName, tableName, tab
 			TableName:  tableName,
 		}, nil
 	}
-	return nil, fmt.Errorf("discovery will not autogenerate resource configs for entities of type %q, but you may add them manually", tableType)
-
+	return nil, fmt.Errorf("unsupported entity type %q", tableType)
 }
 
 var mysqlDriver = &BatchSQLDriver{
