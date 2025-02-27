@@ -34,8 +34,8 @@ type transactor struct {
 
 	fence sql.Fence
 
-	storeFiles *boilerplate.StagedFiles[azureBlobObject]
-	loadFiles  *boilerplate.StagedFiles[azureBlobObject]
+	storeFiles *boilerplate.StagedFiles
+	loadFiles  *boilerplate.StagedFiles
 	bindings   []*binding
 	be         *boilerplate.BindingEvents
 }
@@ -56,14 +56,14 @@ func newTransactor(
 		return nil, nil, fmt.Errorf("creating storage client: %w", err)
 	}
 
-	storageClient := newFileClient(azClient, cfg.ContainerName, cfg.Directory)
+	storageClient := newFileClient(azClient, cfg.ContainerName)
 
 	t := &transactor{
 		cfg:        cfg,
 		fence:      fence,
 		be:         be,
-		loadFiles:  boilerplate.NewStagedFiles(storageClient, fileSizeLimit, false),
-		storeFiles: boilerplate.NewStagedFiles(storageClient, fileSizeLimit, true),
+		loadFiles:  boilerplate.NewStagedFiles(storageClient, fileSizeLimit, cfg.Directory, false, false),
+		storeFiles: boilerplate.NewStagedFiles(storageClient, fileSizeLimit, cfg.Directory, true, false),
 	}
 
 	for idx, target := range bindings {

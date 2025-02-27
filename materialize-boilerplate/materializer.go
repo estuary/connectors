@@ -10,6 +10,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	pb "go.gazette.dev/core/broker/protocol"
@@ -26,6 +27,10 @@ type MaterializeCfg struct {
 	MaterializeOptions    MaterializeOptions
 }
 
+// ElementConverter maps from a TupleElement into a runtime type instance that's
+// compatible with the materialization.
+type ElementConverter func(tuple.TupleElement) (any, error)
+
 type MappedProjection[MT any] struct {
 	pf.Projection
 	Comment string
@@ -37,6 +42,8 @@ type MappedBinding[MT any, RC Resourcer] struct {
 	Config       RC
 	Keys, Values []MappedProjection[MT]
 	Document     *MappedProjection[MT]
+
+	converters []ElementConverter
 }
 
 func (mb *MappedBinding[MT, RC]) SelectedProjections() []MappedProjection[MT] {
@@ -49,6 +56,42 @@ func (mb *MappedBinding[MT, RC]) SelectedProjections() []MappedProjection[MT] {
 	return out
 }
 
+func (mb *MappedBinding[MT, RC]) ConvertKey(key tuple.Tuple) ([]any, error) {
+	return mb.convertTuple(key, 0, make([]any, 0, len(mb.Keys)))
+}
+
+func (mb *MappedBinding[MT, RC]) ConvertAll(key, values tuple.Tuple, doc json.RawMessage) ([]any, error) {
+	var err error
+	out := make([]any, 0, len(mb.Keys)+len(mb.Values)+1)
+
+	if out, err = mb.convertTuple(key, 0, out); err != nil {
+		return nil, err
+	} else if out, err = mb.convertTuple(values, len(mb.Keys), out); err != nil {
+		return nil, err
+	} else if mb.Document != nil {
+		if out, err = mb.convertTuple(tuple.Tuple{doc}, len(mb.Keys)+len(mb.Values), out); err != nil {
+			return nil, err
+		}
+	}
+
+	return out, nil
+}
+
+func (mb *MappedBinding[MT, RC]) convertTuple(in tuple.Tuple, offset int, out []any) ([]any, error) {
+	for idx, val := range in {
+		converted := val
+		if converter := mb.converters[idx+offset]; converter != nil {
+			var err error
+			if converted, err = converter(val); err != nil {
+				return nil, fmt.Errorf("converting value for field %s of binding %s: %w", mb.Keys[idx].Field, mb.ResourcePath, err)
+			}
+		}
+		out = append(out, converted)
+	}
+
+	return out, nil
+}
+
 type MaterializerBindingUpdate[MT any] struct {
 	NewProjections      []MappedProjection[MT]
 	NewlyNullableFields []ExistingField
@@ -58,7 +101,7 @@ type MaterializerBindingUpdate[MT any] struct {
 type RuntimeCheckpoint []byte
 
 type MaterializerTransactor interface {
-	Open(context.Context, pm.Request_Open) (RuntimeCheckpoint, error)
+	RecoverCheckpoint(context.Context, pf.MaterializationSpec, pf.RangeSpec) (RuntimeCheckpoint, error)
 	m.Transactor
 }
 
@@ -83,14 +126,14 @@ type Materializer[
 	PopulateInfoSchema(context.Context, [][]string, *InfoSchema) error
 	CheckPrerequisites(context.Context) *cerrors.PrereqErr
 	NewConstraint(p pf.Projection, deltaUpdates bool, fieldConfig FC) pm.Response_Validated_Constraint
-	MapType(p Projection, fieldCfg FC) MT
+	MapType(p Projection, fieldCfg FC) (MT, ElementConverter)
 	Compatible(ExistingField, MT) bool
 	DescriptionForType(MT) string
 	CreateNamespace(context.Context, string) error
 	CreateResource(context.Context, MappedBinding[MT, RC]) (string, ActionApplyFn, error)
 	DeleteResource(context.Context, []string) (string, ActionApplyFn, error)
 	UpdateResource(context.Context, []string, ExistingResource, MaterializerBindingUpdate[MT]) (string, ActionApplyFn, error)
-	NewMaterializerTransactor(context.Context, InfoSchema, []MappedBinding[MT, RC], *BindingEvents) (MaterializerTransactor, error)
+	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[MT, RC], *BindingEvents) (MaterializerTransactor, error)
 }
 
 type NewMaterializerFn[EC pb.Validator, FC FieldConfiger, RC Resourcer, MT any] func(context.Context, EC) (Materializer[EC, FC, RC, MT], error)
@@ -347,12 +390,12 @@ func RunNewTransactor[EC pb.Validator, FC FieldConfiger, RC Resourcer, MT any](
 		}
 	}
 
-	mt, err := materializer.NewMaterializerTransactor(ctx, *is, mapped, be)
+	mt, err := materializer.NewMaterializerTransactor(ctx, req, *is, mapped, be)
 	if err != nil {
 		return nil, nil, nil, err
 	}
 
-	checkpoint, err := mt.Open(ctx, req)
+	checkpoint, err := mt.RecoverCheckpoint(ctx, *req.Materialization, *req.Range)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -411,11 +454,13 @@ func buildMappedBinding[EC pb.Validator, FC FieldConfiger, RC Resourcer, MT any]
 				}
 			}
 
+			mt, converter := materializer.MapType(mapProjection(*p, fieldCfg), fieldCfg)
 			*dst = append(*dst, MappedProjection[MT]{
 				Projection: *p,
 				Comment:    commentForProjection(*p),
-				Mapped:     materializer.MapType(mapProjection(*p, fieldCfg), fieldCfg),
+				Mapped:     mt,
 			})
+			mapped.converters = append(mapped.converters, converter)
 		}
 		return nil
 	}
@@ -481,7 +526,8 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 		}
 	}
 
-	return c.m.Compatible(existing, c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)), nil
+	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
+	return c.m.Compatible(existing, mt), nil
 }
 
 func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
@@ -492,7 +538,8 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 		}
 	}
 
-	return c.m.DescriptionForType(c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)), nil
+	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
+	return c.m.DescriptionForType(mt), nil
 }
 
 func unmarshalStrict[T pb.Validator](raw []byte, into *T) error {

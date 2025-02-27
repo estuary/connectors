@@ -1,9 +1,10 @@
-package main
+package catalog
 
 import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,43 +19,152 @@ import (
 	"resty.dev/v3"
 )
 
-// TODO: In general these responses may need to handle pagination.
-
 var (
-	// errTableNotFound may be returned when attempting to get metadata for a
+	// ErrTableNotFound may be returned when attempting to get metadata for a
 	// non-Iceberg table present in a Glue catalog.
-	errTableNotFound = fmt.Errorf("table not found")
+	ErrTableNotFound = fmt.Errorf("table not found")
 )
 
-type catalog struct {
-	rHttp    *resty.Client
-	location string
+type TableMetadata struct {
+	FormatVersion   int              `json:"format-version"`
+	Location        string           `json:"location"`
+	CurrentSchemaID int              `json:"current-schema-id"`
+	Schemas         []iceberg.Schema `json:"schemas"`
 }
 
-func newCatalog(ctx context.Context, cfg catalogConfig) (*catalog, error) {
-	var (
-		rHttp     *resty.Client
-		warehouse string
-		baseURL   *url.URL
-		location  string
-		err       error
-	)
-
-	switch cfg.CatalogType {
-	case catalogTypeRest:
-		rCfg := cfg.restCatalogConfig
-		warehouse = rCfg.Warehouse
-		if baseURL, err = url.Parse(rCfg.URL); err != nil {
-			return nil, fmt.Errorf("failed to parse base url: %w", err)
+func (m *TableMetadata) CurrentSchema() *iceberg.Schema {
+	for idx := range m.Schemas {
+		sc := &m.Schemas[idx] // avoid copying the locks used in iceberg.Schema
+		if sc.ID == m.CurrentSchemaID {
+			return sc
 		}
-		baseURL = baseURL.JoinPath("v1")
+	}
+	panic("not reached")
+}
 
+// TableRequirement is a condition that must hold when submitting a request to a
+// catalog. Right now there's only assertCurrentSchemaID but it is structured to
+// allow for adding more in the future, which may be particularly useful for
+// performing atomic table appends of data files if we ever implement that.
+type TableRequirement interface {
+	isTableRequirement()
+}
+
+type baseRequirement struct {
+	Type string `json:"type"`
+}
+
+type assertCurrentSchemaIdReq struct {
+	baseRequirement
+	CurrentSchemaID int `json:"current-schema-id"`
+}
+
+func (assertCurrentSchemaIdReq) isTableRequirement() {}
+
+func AssertCurrentSchemaID(id int) TableRequirement {
+	return &assertCurrentSchemaIdReq{
+		baseRequirement: baseRequirement{Type: "assert-current-schema-id"},
+		CurrentSchemaID: id,
+	}
+}
+
+// TableUpdate is an update to a table. As above, this is currently fairly
+// limited to adding a new schema to a table and setting the current schema ID -
+// both of which should typically be done to accomplish a DDL change.
+type TableUpdate interface {
+	isTableUpdate()
+}
+
+type baseUpdate struct {
+	Action string `json:"action"`
+}
+
+type addSchemaUpdateReq struct {
+	baseUpdate
+	Schema *iceberg.Schema `json:"schema"`
+}
+
+func (addSchemaUpdateReq) isTableUpdate() {}
+
+func AddSchemaUpdate(schema *iceberg.Schema) TableUpdate {
+	return &addSchemaUpdateReq{
+		baseUpdate: baseUpdate{Action: "add-schema"},
+		Schema:     schema,
+	}
+}
+
+type setCurrentSchemaUpdateReq struct {
+	baseUpdate
+	SchemaID int `json:"schema-id"`
+}
+
+func (setCurrentSchemaUpdateReq) isTableUpdate() {}
+
+func SetCurrentSchemaUpdate(id int) TableUpdate {
+	return &setCurrentSchemaUpdateReq{
+		baseUpdate: baseUpdate{Action: "set-current-schema"},
+		SchemaID:   id,
+	}
+}
+
+// TODO: In general these responses may need to handle pagination.
+
+type catalogOpts struct {
+	useClientCredential bool
+	credential          string
+	scope               string
+
+	useSigV4           bool
+	awsAccessKeyID     string
+	awsSecretAccessKey string
+	awsRegion          string
+}
+
+type CatalogOption = func(*catalogOpts)
+
+func WithClientCredential(credential string, scope *string) CatalogOption {
+	return func(c *catalogOpts) {
+		c.useClientCredential = true
+		c.credential = credential
+		if scope != nil {
+			c.scope = *scope
+		}
+	}
+}
+
+func WithSigV4(awsAccessKeyID string, awsSecretAccessKey string, awsRegion string) CatalogOption {
+	return func(c *catalogOpts) {
+		c.useSigV4 = true
+		c.awsAccessKeyID = awsAccessKeyID
+		c.awsSecretAccessKey = awsSecretAccessKey
+		c.awsRegion = awsRegion
+	}
+}
+
+type Catalog struct {
+	rHttp *resty.Client
+}
+
+func NewCatalog(ctx context.Context, catalogUrl string, warehouse string, opts ...CatalogOption) (*Catalog, error) {
+	cfg := &catalogOpts{}
+	for _, opt := range opts {
+		opt(cfg)
+	}
+
+	baseURL, err := url.Parse(catalogUrl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse catalog url: %w", err)
+	}
+	baseURL = baseURL.JoinPath("v1")
+
+	var rHttp *resty.Client
+	if cfg.useClientCredential {
 		var scopes []string
-		if rCfg.Scope != "" {
-			scopes = []string{rCfg.Scope}
+		if cfg.scope != "" {
+			scopes = []string{cfg.scope}
 		}
 
-		if clientID, clientSecret, ok := strings.Cut(rCfg.Credential, ":"); ok {
+		if clientID, clientSecret, ok := strings.Cut(cfg.credential, ":"); ok {
 			clientCredCfg := &clientcredentials.Config{
 				ClientID:     clientID,
 				ClientSecret: clientSecret,
@@ -63,34 +173,25 @@ func newCatalog(ctx context.Context, cfg catalogConfig) (*catalog, error) {
 			}
 			rHttp = resty.NewWithClient(clientCredCfg.Client(ctx))
 		} else {
-			rHttp = resty.New().SetAuthToken(rCfg.Credential)
+			rHttp = resty.New().SetAuthToken(cfg.credential)
 		}
-	case catalogTypeGlue:
-		gCfg := cfg.glueCatalogConfig
-		warehouse = gCfg.GlueWarehouse
-		location = gCfg.Location
-		if baseURL, err = url.Parse(fmt.Sprintf("https://glue.%s.amazonaws.com/iceberg", gCfg.Region)); err != nil {
-			return nil, fmt.Errorf("failed to parse base url: %w", err)
-		}
-		baseURL = baseURL.JoinPath("v1")
-
+	} else if cfg.useSigV4 {
 		rHttp = resty.New()
-		rHttp.SetTransport(&sigv4Transport{
+		rHttp = rHttp.SetTransport(&sigv4Transport{
 			delegate: rHttp.Transport(),
 			signer:   v4.NewSigner(),
-			region:   cfg.Region,
+			region:   cfg.awsRegion,
 			creds: aws.Credentials{
-				AccessKeyID:     cfg.AWSAccessKeyID,
-				SecretAccessKey: cfg.AWSSecretAccessKey,
+				AccessKeyID:     cfg.awsAccessKeyID,
+				SecretAccessKey: cfg.awsSecretAccessKey,
 			},
 		})
-	default:
-		return nil, fmt.Errorf("unknown catalog type: %s", cfg.CatalogType)
+	} else {
+		return nil, errors.New("must provide an authentication option")
 	}
 
-	rc := &catalog{
-		rHttp:    rHttp.SetBaseURL(baseURL.String()),
-		location: location,
+	rc := &Catalog{
+		rHttp: rHttp.SetBaseURL(baseURL.String()),
 	}
 
 	type configResponse struct {
@@ -111,7 +212,7 @@ func newCatalog(ctx context.Context, cfg catalogConfig) (*catalog, error) {
 	return rc, nil
 }
 
-func (c *catalog) listNamespaces(ctx context.Context) ([]string, error) {
+func (c *Catalog) ListNamespaces(ctx context.Context) ([]string, error) {
 	type resp struct {
 		Namespaces [][]string `json:"namespaces"`
 	}
@@ -129,7 +230,7 @@ func (c *catalog) listNamespaces(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (c *catalog) createNamespace(ctx context.Context, ns string) error {
+func (c *Catalog) CreateNamespace(ctx context.Context, ns string) error {
 	if err := doPost(ctx, c, "/namespaces", map[string][]string{
 		"namespace": {ns},
 	}); err != nil {
@@ -139,7 +240,7 @@ func (c *catalog) createNamespace(ctx context.Context, ns string) error {
 	return nil
 }
 
-func (c *catalog) listTables(ctx context.Context, ns string) ([]string, error) {
+func (c *Catalog) ListTables(ctx context.Context, ns string) ([]string, error) {
 	type resp struct {
 		Identifiers []struct {
 			Name string `json:"name"`
@@ -159,9 +260,9 @@ func (c *catalog) listTables(ctx context.Context, ns string) ([]string, error) {
 	return out, nil
 }
 
-func (c *catalog) tableMetadata(ctx context.Context, ns string, name string) (*tableMetadata, error) {
+func (c *Catalog) TableMetadata(ctx context.Context, ns string, name string) (*TableMetadata, error) {
 	type resp struct {
-		Metadata tableMetadata `json:"metadata"`
+		Metadata TableMetadata `json:"metadata"`
 	}
 
 	res, err := doGet[resp](ctx, c, fmt.Sprintf("/namespaces/%s/tables/%s", ns, name))
@@ -172,7 +273,7 @@ func (c *catalog) tableMetadata(ctx context.Context, ns string, name string) (*t
 	return &res.Metadata, nil
 }
 
-func (c *catalog) createTable(ctx context.Context, ns string, name string, sch *iceberg.Schema) error {
+func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *iceberg.Schema, location string) error {
 	type createTableRequest struct {
 		Name     string          `json:"name"`
 		Schema   *iceberg.Schema `json:"schema"`
@@ -184,7 +285,7 @@ func (c *catalog) createTable(ctx context.Context, ns string, name string, sch *
 	if err := doPost(ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), createTableRequest{
 		Name:     name,
 		Schema:   sch,
-		Location: c.location,
+		Location: location,
 	}); err != nil {
 		return err
 	}
@@ -192,7 +293,7 @@ func (c *catalog) createTable(ctx context.Context, ns string, name string, sch *
 	return nil
 }
 
-func (c *catalog) deleteTable(ctx context.Context, ns string, name string) error {
+func (c *Catalog) DeleteTable(ctx context.Context, ns string, name string) error {
 	if got, err := c.baseReq(ctx).Delete(fmt.Sprintf("/namespaces/%s/tables/%s", ns, name)); err != nil {
 		return fmt.Errorf("failed to delete table %s.%s: %w", ns, name, err)
 	} else if !got.IsSuccess() {
@@ -202,14 +303,14 @@ func (c *catalog) deleteTable(ctx context.Context, ns string, name string) error
 	return nil
 }
 
-func (c *catalog) updateTable(ctx context.Context, ns string, name string, reqs []tableRequirement, upds []tableUpdate) error {
+func (c *Catalog) UpdateTable(ctx context.Context, ns string, name string, reqs []TableRequirement, upds []TableUpdate) error {
 	type tableUpdateRequest struct {
 		Identifier struct {
 			Namespace []string `json:"namespace"`
 			Name      string   `json:"name"`
 		} `json:"identifier"`
-		Requirements []tableRequirement `json:"requirements"`
-		Updates      []tableUpdate      `json:"updates"`
+		Requirements []TableRequirement `json:"requirements"`
+		Updates      []TableUpdate      `json:"updates"`
 	}
 
 	req := tableUpdateRequest{
@@ -238,7 +339,7 @@ func (err *errorResponse) String() string {
 	return fmt.Sprintf("(Code: %d, Message: %s, Type: %s)", err.Error.Code, err.Error.Message, err.Error.Type)
 }
 
-func (c *catalog) baseReq(ctx context.Context) *resty.Request {
+func (c *Catalog) baseReq(ctx context.Context) *resty.Request {
 	return c.
 		rHttp.
 		NewRequest().
@@ -247,7 +348,7 @@ func (c *catalog) baseReq(ctx context.Context) *resty.Request {
 		SetError(&errorResponse{})
 }
 
-func doGet[T any](ctx context.Context, client *catalog, path string, params ...[][]string) (*T, error) {
+func doGet[T any](ctx context.Context, client *Catalog, path string, params ...[][]string) (*T, error) {
 	var res T
 
 	req := client.baseReq(ctx)
@@ -261,7 +362,7 @@ func doGet[T any](ctx context.Context, client *catalog, path string, params ...[
 		return nil, fmt.Errorf("failed to get %s: %w", path, err)
 	} else if !got.IsSuccess() {
 		if e := got.Error().(*errorResponse); e.Error.Type == "IcebergTableNotFoundException" {
-			return nil, errTableNotFound
+			return nil, ErrTableNotFound
 		} else {
 			return nil, fmt.Errorf("failed to GET %s: %s %s", got.Request.URL, got.Status(), e)
 		}
@@ -270,7 +371,7 @@ func doGet[T any](ctx context.Context, client *catalog, path string, params ...[
 	return &res, nil
 }
 
-func doPost(ctx context.Context, client *catalog, path string, body any) error {
+func doPost(ctx context.Context, client *Catalog, path string, body any) error {
 	if got, err := client.baseReq(ctx).SetBody(body).Post(path); err != nil {
 		return fmt.Errorf("failed to post %s: %w", path, err)
 	} else if !got.IsSuccess() {

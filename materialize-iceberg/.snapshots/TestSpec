@@ -3,125 +3,115 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/materialize-iceberg/config",
     "properties": {
+      "url": {
+        "type": "string",
+        "title": "URL",
+        "description": "Base URL for the catalog. If you are using AWS Glue as a catalog this should look like 'https://glue.\u003cregion\u003e.amazonaws.com/iceberg'. Otherwise it may look like 'https://yourserver.com/api/catalog'.",
+        "order": 0
+      },
+      "warehouse": {
+        "type": "string",
+        "title": "Warehouse",
+        "description": "Warehouse to connect to. For AWS Glue this is the account ID.",
+        "order": 1
+      },
       "namespace": {
         "type": "string",
         "title": "Namespace",
         "description": "Namespace for bound collection tables (unless overridden within the binding resource configuration).",
-        "order": 0,
+        "order": 2,
         "pattern": "^[^.]*$"
       },
-      "hardDelete": {
+      "location": {
+        "type": "string",
+        "title": "Location",
+        "description": "Base location for the catalog tables. Required if using AWS Glue as a catalog. Example: 's3://your_bucket/your_prefix/'",
+        "order": 3
+      },
+      "hard_delete": {
         "type": "boolean",
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
-        "default": false,
-        "order": 1
+        "order": 4
       },
-      "catalog": {
+      "catalog_authentication": {
         "oneOf": [
           {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://github.com/estuary/connectors/materialize-iceberg/rest-catalog-config",
+            "$id": "https://github.com/estuary/connectors/materialize-iceberg/catalog-auth-client-credential-config",
             "properties": {
-              "catalog_type": {
+              "catalog_auth_type": {
                 "type": "string",
-                "const": "Iceberg REST Server",
-                "default": "Iceberg REST Server",
+                "const": "OAuth 2.0 Client Credentials",
+                "default": "OAuth 2.0 Client Credentials",
                 "order": 0
-              },
-              "url": {
-                "type": "string",
-                "title": "URL",
-                "description": "Base URL for the REST catalog. Example: 'https://yourserver.com/api/catalog'",
-                "order": 1
               },
               "credential": {
                 "type": "string",
-                "title": "Credential",
-                "description": "Credential for connecting to the catalog usually in the format of '\u003cclient_id\u003e:\u003cclient_secret\u003e'",
-                "order": 2
-              },
-              "warehouse": {
-                "type": "string",
-                "title": "Warehouse",
-                "description": "Warehouse to connect to.",
-                "order": 3
+                "title": "Catalog Credential",
+                "description": "Credential for connecting to the REST catalog. Must be in the format of '\u003cclient_id\u003e:\u003cclient_secret\u003e' for OAuth client credentials. For Bearer authentication use '\u003ctoken\u003e'.",
+                "order": 1,
+                "secret": true
               },
               "scope": {
                 "type": "string",
                 "title": "Scope",
-                "description": "Authorization scope for connecting to the catalog. Example: 'PRINCIPAL_ROLE:your_principal'",
-                "order": 4
+                "description": "Authorization scope for connecting to the catalog when using OAuth client credentials. Example: 'PRINCIPAL_ROLE:your_principal'",
+                "order": 2
               }
             },
             "type": "object",
             "required": [
-              "url",
-              "credential",
-              "warehouse"
+              "credential"
             ],
-            "title": "REST Catalog"
+            "title": "OAuth 2.0 Client Credentials"
           },
           {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://github.com/estuary/connectors/materialize-iceberg/glue-catalog-config",
+            "$id": "https://github.com/estuary/connectors/materialize-iceberg/catalog-auth-sig-v4-config",
             "properties": {
-              "catalog_type": {
+              "catalog_auth_type": {
                 "type": "string",
-                "const": "AWS Glue",
-                "default": "AWS Glue",
+                "const": "AWS SigV4",
+                "default": "AWS SigV4",
                 "order": 0
               },
               "aws_access_key_id": {
                 "type": "string",
                 "title": "AWS Access Key ID",
-                "description": "Access Key ID for authenticating with Glue.",
+                "description": "Access Key ID for authentication.",
                 "order": 1
               },
               "aws_secret_access_key": {
                 "type": "string",
                 "title": "AWS Secret Access key",
-                "description": "Secret Access Key for authenticating with Glue.",
+                "description": "Secret Access Key for authentication.",
                 "order": 2,
                 "secret": true
               },
               "region": {
                 "type": "string",
                 "title": "Region",
-                "description": "Region of the Glue catalog.",
+                "description": "AWS region for authentication.",
                 "order": 3
-              },
-              "glue_warehouse": {
-                "type": "string",
-                "title": "Glue Warehouse (Account ID)",
-                "description": "Glue warehouse to connect to. This is usually your AWS account ID.",
-                "order": 4
-              },
-              "location": {
-                "type": "string",
-                "title": "Location",
-                "description": "Base location for the catalog tables. Example: 's3://your_bucket/your_prefix/'",
-                "order": 5
               }
             },
             "type": "object",
             "required": [
               "aws_access_key_id",
               "aws_secret_access_key",
-              "region",
-              "glue_warehouse",
-              "location"
+              "region"
             ],
-            "title": "AWS Glue Catalog"
+            "title": "AWS SigV4 Authentication"
           }
         ],
         "type": "object",
-        "title": "Catalog",
+        "title": "Catalog Authentication",
         "default": {
-          "catalog_type": "Iceberg REST Server"
+          "catalog_auth_type": "OAuth 2.0 Client Credentials"
         },
         "discriminator": {
-          "propertyName": "catalog_type"
+          "propertyName": "catalog_auth_type"
         }
       },
       "compute": {
@@ -178,6 +168,62 @@
                 "title": "Bucket Path",
                 "description": "Optional prefix that will be used to store staged data files.",
                 "order": 7
+              },
+              "emr_catalog_authentication": {
+                "oneOf": [
+                  {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "$id": "https://github.com/estuary/connectors/materialize-iceberg/emr-auth-client-credential-config",
+                    "properties": {
+                      "emr_auth_type": {
+                        "type": "string",
+                        "const": "OAuth 2.0 Client Credentials",
+                        "default": "OAuth 2.0 Client Credentials",
+                        "order": 0
+                      },
+                      "credential_secret_name": {
+                        "type": "string",
+                        "title": "AWS Secrets Manager Secret Name",
+                        "description": "The secret name in Secrets Manager containing the catalog credential value. The secret must be a single key/value pair with the value containing the credential. The credential format is the same as for the catalog authentication configuration.",
+                        "order": 1,
+                        "secret": true
+                      },
+                      "scope": {
+                        "type": "string",
+                        "title": "Scope",
+                        "description": "Authorization scope for connecting to the catalog when using OAuth client credentials. Example: 'PRINCIPAL_ROLE:your_principal'",
+                        "order": 2
+                      }
+                    },
+                    "type": "object",
+                    "required": [
+                      "credential_secret_name"
+                    ],
+                    "title": "OAuth 2.0 Client Credentials in AWS Secrets Manager"
+                  },
+                  {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "$id": "https://github.com/estuary/connectors/materialize-iceberg/emt-auth-sig-v4-config",
+                    "properties": {
+                      "emr_auth_type": {
+                        "type": "string",
+                        "const": "AWS SigV4",
+                        "default": "AWS SigV4",
+                        "order": 0
+                      }
+                    },
+                    "type": "object",
+                    "title": "AWS SigV4"
+                  }
+                ],
+                "type": "object",
+                "title": "EMR Authentication",
+                "default": {
+                  "emr_auth_type": "OAuth 2.0 Client Credentials"
+                },
+                "discriminator": {
+                  "propertyName": "emr_auth_type"
+                }
               }
             },
             "type": "object",
@@ -187,7 +233,8 @@
               "region",
               "application_id",
               "execution_role_arn",
-              "aws_bucket"
+              "aws_bucket",
+              "emr_catalog_authentication"
             ],
             "title": "AWS EMR Serverless"
           }
@@ -201,7 +248,7 @@
           "propertyName": "compute_type"
         }
       },
-      "syncSchedule": {
+      "sync_schedule": {
         "properties": {
           "syncFrequency": {
             "type": "string",
@@ -311,8 +358,10 @@
     },
     "type": "object",
     "required": [
+      "url",
+      "warehouse",
       "namespace",
-      "catalog",
+      "catalog_authentication",
       "compute"
     ],
     "title": "configSchema"

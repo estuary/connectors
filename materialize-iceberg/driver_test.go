@@ -28,45 +28,41 @@ func testConfig(t *testing.T, ns string) config {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
-	var catCfg catalogConfig
-	switch os.Getenv("ICEBERG_CATALOG_TYPE") {
-	case "rest":
-		catCfg = catalogConfig{
-			CatalogType: catalogTypeRest,
-			restCatalogConfig: restCatalogConfig{
-				URL:        os.Getenv("ICEBERG_CATALOG_URL"),
-				Credential: os.Getenv("ICEBERG_CATALOG_CREDENTIAL"),
-				Warehouse:  os.Getenv("ICEBERG_CATALOG_REST_WAREHOUSE"),
-				Scope:      os.Getenv("ICEBERG_CATALOG_SCOPE"),
-			},
-		}
-	case "glue":
-		catCfg = catalogConfig{
-			CatalogType: catalogTypeGlue,
-			glueCatalogConfig: glueCatalogConfig{
-				AWSAccessKeyID:     os.Getenv("ICEBERG_AWS_ACCESS_KEY_ID"),
-				AWSSecretAccessKey: os.Getenv("ICEBERG_AWS_SECRET_ACCESS_KEY"),
-				Region:             os.Getenv("ICEBERG_REGION_NAME"),
-				GlueWarehouse:      os.Getenv("ICEBERG_CATALOG_GLUE_WAREHOUSE"),
-				Location:           os.Getenv("ICEBERG_CATALOG_GLUE_LOCATION"),
-			},
-		}
-	}
-
 	cfg := config{
+		URL:       os.Getenv("ICEBERG_CATALOG_URL"),
+		Warehouse: os.Getenv("ICEBERG_WAREHOUSE"),
 		Namespace: ns,
-		Catalog:   catCfg,
+		Location:  os.Getenv("ICEBERG_CATALOG_LOCATION"),
 		Compute: computeConfig{
 			ComputeType: computeTypeEmrServerless,
 			emrConfig: emrConfig{
 				AWSAccessKeyID:     os.Getenv("ICEBERG_AWS_ACCESS_KEY_ID"),
 				AWSSecretAccessKey: os.Getenv("ICEBERG_AWS_SECRET_ACCESS_KEY"),
-				Region:             os.Getenv("ICEBERG_REGION_NAME"),
+				Region:             os.Getenv("ICEBERG_AWS_REGION_NAME"),
 				ApplicationId:      "anything",
 				ExecutionRoleArn:   "anything",
 				Bucket:             os.Getenv("ICEBERG_BUCKET"),
 			},
 		},
+	}
+
+	switch os.Getenv("ICEBERG_CATALOG_AUTH_TYPE") {
+	case "OAuth 2.0 Client Credentials":
+		cfg.CatalogAuthentication.CatalogAuthType = catalogAuthTypeClientCredential
+		cfg.CatalogAuthentication.catalogAuthClientCredentialConfig.Credential = os.Getenv("ICEBERG_CATALOG_CREDENTIAL")
+		cfg.CatalogAuthentication.catalogAuthClientCredentialConfig.Scope = os.Getenv("ICEBERG_CATALOG_SCOPE")
+		cfg.Compute.emrConfig.EmrCatalogAuthentication.EmrAuthType = emrAuthTypeClientCredential
+		cfg.Compute.emrConfig.EmrCatalogAuthentication.emrAuthClientCredentialConfig.CredentialSecretName = os.Getenv("ICEBERG_CATALOG_CREDENTIAL_SECRET_NAME")
+	case "AWS SigV4":
+		cfg.CatalogAuthentication.CatalogAuthType = catalogAuthTypeSigV4
+		cfg.CatalogAuthentication.catalogAuthSigV4Config.AWSAccessKeyID = os.Getenv("ICEBERG_AWS_ACCESS_KEY_ID")
+		cfg.CatalogAuthentication.catalogAuthSigV4Config.AWSSecretAccessKey = os.Getenv("ICEBERG_AWS_SECRET_ACCESS_KEY")
+		cfg.CatalogAuthentication.catalogAuthSigV4Config.Region = os.Getenv("ICEBERG_AWS_REGION_NAME")
+		cfg.Compute.emrConfig.EmrCatalogAuthentication.EmrAuthType = emrAuthTypeSigV4
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatal(err)
 	}
 
 	return cfg
@@ -91,14 +87,14 @@ func TestValidateAndApply(t *testing.T) {
 		cfg,
 		resourceConfig,
 		func(t *testing.T) string {
-			meta, err := catalog.tableMetadata(ctx, resourceConfig.Namespace, resourceConfig.Table)
+			meta, err := catalog.TableMetadata(ctx, resourceConfig.Namespace, resourceConfig.Table)
 			require.NoError(t, err)
 
-			return meta.currentSchema().String()
+			return meta.CurrentSchema().String()
 		},
 		func(t *testing.T) {
 			t.Helper()
-			catalog.deleteTable(ctx, resourceConfig.Namespace, resourceConfig.Table)
+			catalog.DeleteTable(ctx, resourceConfig.Namespace, resourceConfig.Table)
 		},
 	)
 }

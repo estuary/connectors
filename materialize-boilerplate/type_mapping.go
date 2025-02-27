@@ -71,7 +71,7 @@ type Projection struct {
 
 func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
 	mustExist := p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
-	typesWithoutNull := slices.DeleteFunc(p.Inference.Types, func(t string) bool { return t == "null" })
+	typesWithoutNull := getTypesWithoutNull(p.Inference.Types)
 
 	out := Projection{
 		Projection: p,
@@ -147,11 +147,23 @@ func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
 		if inf := p.Inference.Array; inf != nil {
 			flat.InferenceArray = *inf
 			flat.NullableItems = p.Inference.Exists == pf.Inference_MUST && !slices.Contains(p.Inference.Types, "null")
-			flat.ItemTypesWithoutNull = slices.DeleteFunc(p.Inference.Types, func(t string) bool { return t == "null" })
+			flat.ItemTypesWithoutNull = getTypesWithoutNull(p.Inference.Types)
 		}
 		out.FlatType = flat
 	default:
 		panic(fmt.Sprintf("unhandled type %q", typesWithoutNull[0]))
+	}
+
+	return out
+}
+
+func getTypesWithoutNull(types []string) []string {
+	var out []string
+
+	for _, t := range types {
+		if t != "null" {
+			out = append(out, t)
+		}
 	}
 
 	return out

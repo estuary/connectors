@@ -1,22 +1,30 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"net/http"
 	"path"
+	"regexp"
 	"slices"
 	"strings"
 	"sync"
 
+	"github.com/apache/iceberg-go"
+	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go/aws"
 	awsHttp "github.com/aws/smithy-go/transport/http"
+	"github.com/cespare/xxhash/v2"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/estuary/connectors/materialize-iceberg/catalog"
+	"github.com/estuary/connectors/materialize-iceberg/python"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
@@ -27,9 +35,10 @@ var _ boilerplate.Connector = &driver{}
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &driver{}
 
 type driver struct {
-	cfg     config
-	catalog *catalog
-	s3      *s3.Client
+	cfg       config
+	catalog   *catalog.Catalog
+	s3Client  *s3.Client
+	emrClient *emr.Client
 }
 
 func newDriver(ctx context.Context, cfg config) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
@@ -43,10 +52,16 @@ func newDriver(ctx context.Context, cfg config) (boilerplate.Materializer[config
 		return nil, fmt.Errorf("creating S3 client: %w", err)
 	}
 
+	emr, err := cfg.toEmrClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating EMR client: %w", err)
+	}
+
 	return &driver{
-		cfg:     cfg,
-		catalog: catalog,
-		s3:      s3,
+		cfg:       cfg,
+		catalog:   catalog,
+		s3Client:  s3,
+		emrClient: emr,
 	}, nil
 }
 
@@ -107,7 +122,7 @@ func (d *driver) PopulateInfoSchema(ctx context.Context, resourcePaths [][]strin
 		relevantPaths[path[0]] = append(relevantPaths[path[0]], path[1])
 	}
 
-	existingNamespaces, err := d.catalog.listNamespaces(ctx)
+	existingNamespaces, err := d.catalog.ListNamespaces(ctx)
 	if err != nil {
 		return fmt.Errorf("listing namespaces: %w", err)
 	}
@@ -122,9 +137,9 @@ func (d *driver) PopulateInfoSchema(ctx context.Context, resourcePaths [][]strin
 	var mu sync.Mutex
 
 	processTableMetadata := func(ctx context.Context, ns string, t string) error {
-		meta, err := d.catalog.tableMetadata(ctx, ns, t)
+		meta, err := d.catalog.TableMetadata(ctx, ns, t)
 		if err != nil {
-			if errors.Is(err, errTableNotFound) {
+			if errors.Is(err, catalog.ErrTableNotFound) {
 				// Most likely cause is this is not an Iceberg table, or it has
 				// been deleted very recently.
 				return nil
@@ -138,7 +153,7 @@ func (d *driver) PopulateInfoSchema(ctx context.Context, resourcePaths [][]strin
 		res := is.PushResource(ns, t)
 		res.Meta = meta
 
-		for _, f := range meta.currentSchema().Fields() {
+		for _, f := range meta.CurrentSchema().Fields() {
 			res.PushField(boilerplate.ExistingField{
 				Name:       f.Name,
 				Nullable:   !f.Required,
@@ -156,7 +171,7 @@ func (d *driver) PopulateInfoSchema(ctx context.Context, resourcePaths [][]strin
 			continue
 		}
 
-		existingTables, err := d.catalog.listTables(ctx, ns)
+		existingTables, err := d.catalog.ListTables(ctx, ns)
 		if err != nil {
 			return fmt.Errorf("listing tables: %w", err)
 		}
@@ -183,7 +198,7 @@ func (d *driver) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 	testKey := path.Join(d.cfg.Compute.BucketPath, uuid.NewString())
 
 	var awsErr *awsHttp.ResponseError
-	if _, err := d.s3.PutObject(ctx, &s3.PutObjectInput{
+	if _, err := d.s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
@@ -196,7 +211,7 @@ func (d *driver) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 			}
 		}
 		errs.Err(err)
-	} else if _, err := d.s3.GetObject(ctx, &s3.GetObjectInput{
+	} else if _, err := d.s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
@@ -204,7 +219,7 @@ func (d *driver) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 			err = fmt.Errorf("not authorized to read from %q", bucketWithPath)
 		}
 		errs.Err(err)
-	} else if _, err := d.s3.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+	} else if _, err := d.s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucket),
 		Prefix: func() *string {
 			if d.cfg.Compute.BucketPath != "" {
@@ -218,7 +233,7 @@ func (d *driver) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 			err = fmt.Errorf("not authorized to list bucket %q", bucket)
 		}
 		errs.Err(err)
-	} else if _, err := d.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
+	} else if _, err := d.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
@@ -272,7 +287,7 @@ func (d *driver) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfi
 	return constraint
 }
 
-func (d *driver) MapType(p boilerplate.Projection, fc fieldConfig) mapped {
+func (d *driver) MapType(p boilerplate.Projection, fc fieldConfig) (mapped, boilerplate.ElementConverter) {
 	return mapProjection(p)
 }
 
@@ -285,7 +300,7 @@ func (d *driver) DescriptionForType(prop mapped) string {
 }
 
 func (d *driver) CreateNamespace(ctx context.Context, ns string) error {
-	return d.catalog.createNamespace(ctx, ns)
+	return d.catalog.CreateNamespace(ctx, ns)
 }
 
 func (d *driver) CreateResource(ctx context.Context, res boilerplate.MappedBinding[mapped, resource]) (string, boilerplate.ActionApplyFn, error) {
@@ -294,7 +309,7 @@ func (d *driver) CreateResource(ctx context.Context, res boilerplate.MappedBindi
 	schema := computeSchemaForNewTable(res)
 
 	return fmt.Sprintf("created table %q.%q as %s", ns, name, schema.String()), func(ctx context.Context) error {
-		return d.catalog.createTable(ctx, ns, name, schema)
+		return d.catalog.CreateTable(ctx, ns, name, schema, d.cfg.Location)
 	}, nil
 }
 
@@ -303,7 +318,7 @@ func (d *driver) DeleteResource(ctx context.Context, resourcePath []string) (str
 	name := resourcePath[1]
 
 	return fmt.Sprintf("deleted table %q.%q", ns, name), func(ctx context.Context) error {
-		return d.catalog.deleteTable(ctx, ns, name)
+		return d.catalog.DeleteTable(ctx, ns, name)
 	}, nil
 }
 
@@ -319,21 +334,122 @@ func (d *driver) UpdateResource(
 
 	ns := resourcePath[0]
 	name := resourcePath[1]
-	current := existing.Meta.(*tableMetadata).currentSchema()
+	current := existing.Meta.(*catalog.TableMetadata).CurrentSchema()
 	next := computeSchemaForUpdatedTable(current, update)
-	reqs := []tableRequirement{assertCurrentSchemaID(current.ID)}
-	upds := []tableUpdate{addSchemaUpdate(next), setCurrentSchemaUpdate(next.ID)}
+	reqs := []catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)}
+	upds := []catalog.TableUpdate{catalog.AddSchemaUpdate(next), catalog.SetCurrentSchemaUpdate(next.ID)}
 
 	return fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), next.String()), func(ctx context.Context) error {
-		return d.catalog.updateTable(ctx, ns, name, reqs, upds)
+		return d.catalog.UpdateTable(ctx, ns, name, reqs, upds)
 	}, nil
 }
 
+//go:embed python
+var pyFilesFS embed.FS
+
 func (d *driver) NewMaterializerTransactor(
 	ctx context.Context,
+	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[mapped, resource],
 	be *boilerplate.BindingEvents,
 ) (boilerplate.MaterializerTransactor, error) {
-	return nil, nil
+	storageClient := newFileClient(d.s3Client, d.cfg.Compute.emrConfig.Bucket)
+
+	t := &transactor{
+		be:         be,
+		cfg:        d.cfg,
+		s3Client:   d.s3Client,
+		emrClient:  d.emrClient,
+		templates:  parseTemplates(),
+		bindings:   make([]binding, 0, len(mappedBindings)),
+		loadFiles:  boilerplate.NewStagedFiles(storageClient, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, false, false),
+		storeFiles: boilerplate.NewStagedFiles(storageClient, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, true, true),
+	}
+
+	// TODO: Make this something based on the materialization name and shard
+	// Maybe do it during apply?
+	// Don't do it on apply, and give it a random thing maybe
+	commonPyFileKey := path.Join(d.cfg.Compute.emrConfig.BucketPath, sanitizedId(req.Materialization.Name.String()), "common.py")
+	loadPyFileKey := path.Join(d.cfg.Compute.emrConfig.BucketPath, sanitizedId(req.Materialization.Name.String()), "load.py")
+	mergePyFileKey := path.Join(d.cfg.Compute.emrConfig.BucketPath, sanitizedId(req.Materialization.Name.String()), "merge.py")
+
+	if common, err := pyFilesFS.ReadFile("python/common.py"); err != nil {
+		return nil, fmt.Errorf("reading common.py: %w", err)
+	} else if _, err := t.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(d.cfg.Compute.emrConfig.Bucket),
+		Key:    aws.String(commonPyFileKey),
+		Body:   bytes.NewReader(common),
+	}); err != nil {
+		return nil, fmt.Errorf("uploading common.py: %w", err)
+	}
+
+	if load, err := pyFilesFS.ReadFile("python/load.py"); err != nil {
+		return nil, fmt.Errorf("reading load.py: %w", err)
+	} else if _, err := t.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(d.cfg.Compute.emrConfig.Bucket),
+		Key:    aws.String(loadPyFileKey),
+		Body:   bytes.NewReader(load),
+	}); err != nil {
+		return nil, fmt.Errorf("uploading load.py: %w", err)
+	}
+
+	if merge, err := pyFilesFS.ReadFile("python/merge.py"); err != nil {
+		return nil, fmt.Errorf("reading merge.py: %w", err)
+	} else if _, err := t.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(d.cfg.Compute.emrConfig.Bucket),
+		Key:    aws.String(mergePyFileKey),
+		Body:   bytes.NewReader(merge),
+	}); err != nil {
+		return nil, fmt.Errorf("uploading merge.py: %w", err)
+	}
+
+	t.pyFiles.commonURI = "s3://" + path.Join(d.cfg.Compute.emrConfig.Bucket, commonPyFileKey)
+	t.pyFiles.loadURI = "s3://" + path.Join(d.cfg.Compute.emrConfig.Bucket, loadPyFileKey)
+	t.pyFiles.mergeURI = "s3://" + path.Join(d.cfg.Compute.emrConfig.Bucket, mergePyFileKey)
+
+	for idx, mapped := range mappedBindings {
+		t.loadFiles.AddBinding(idx, nil)
+		t.storeFiles.AddBinding(idx, nil)
+
+		b := binding{
+			Idx:    idx,
+			Mapped: &mapped,
+		}
+
+		for _, p := range mapped.SelectedProjections() {
+			pyField := python.NestedField{
+				Name: p.Field,
+				Type: p.Mapped.type_.Type(),
+			}
+			if m, ok := p.Mapped.type_.(*iceberg.ListType); ok {
+				pyField.Element = m.Element.Type()
+			}
+
+			if p.IsPrimaryKey {
+				b.load.keys = append(b.load.keys, pyField)
+			}
+			b.store.columns = append(b.store.columns, pyField)
+		}
+
+		b.load.mergeBounds = newMergeBoundsBuilder(mapped.Keys)
+		b.store.mergeBounds = newMergeBoundsBuilder(mapped.Keys)
+
+		t.bindings = append(t.bindings, b)
+	}
+
+	return t, nil
+}
+
+var sanitizerRegexp = regexp.MustCompile(`[^\-_0-9a-zA-Z]`)
+
+// TODO: Might only need a single input string, not a variadic list.
+func sanitizedId(in ...string) string {
+	joined := strings.Join(in, "_")
+	sanitized := sanitizerRegexp.ReplaceAllString(joined, "_")
+	if len(sanitized) > 64 {
+		sanitized = sanitized[:64]
+	}
+
+	return fmt.Sprintf("%s_%016X", sanitized, xxhash.Sum64String(joined))
 }

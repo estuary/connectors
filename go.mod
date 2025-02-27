@@ -25,6 +25,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.11.59
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.21.4
 	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.14.14
+	github.com/aws/aws-sdk-go-v2/service/emrserverless v1.10.4
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.18.4
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.32.0
 	github.com/aws/smithy-go v1.20.2
@@ -54,6 +55,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.8.0
 	github.com/minio/highwayhash v1.0.2
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/pierrec/lz4/v4 v4.1.22
 	github.com/pinecone-io/go-pinecone v1.1.1
 	github.com/pkg/sftp v1.13.6
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
@@ -96,7 +98,7 @@ require (
 	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
 	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
-	github.com/pingcap/log v1.1.1-0.20230317032135-a0d097d16e22
+	github.com/pingcap/log v1.1.1-0.20230317032135-a0d097d16e22 // indirect
 	github.com/pingcap/tidb/pkg/parser v0.0.0-20240626120124-432bb79f9732 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )
@@ -202,7 +204,6 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/outcaste-io/ristretto v0.2.3 // indirect
 	github.com/philhofer/fwd v1.1.2 // indirect
-	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pingcap/errors v0.11.5-0.20240311024730-e056997136bb // indirect
 	github.com/pkg/browser v0.0.0-20240102092130-5ac0b6a4141c // indirect
 	github.com/pkg/errors v0.9.1 // indirect

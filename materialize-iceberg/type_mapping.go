@@ -7,6 +7,7 @@ import (
 
 	"github.com/apache/iceberg-go"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 type fieldConfig struct {
@@ -22,8 +23,9 @@ type mapped struct {
 	required bool
 }
 
-func mapProjection(p boilerplate.Projection) mapped {
+func mapProjection(p boilerplate.Projection) (mapped, boilerplate.ElementConverter) {
 	m := mapped{required: p.MustExist}
+	var converter boilerplate.ElementConverter
 
 	switch ft := p.FlatType.(type) {
 	case boilerplate.FlatTypeArray:
@@ -78,11 +80,19 @@ func mapProjection(p boilerplate.Projection) mapped {
 		}
 	case boilerplate.FlatTypeStringFormatNumber:
 		m.type_ = iceberg.Float64Type{}
+		converter = func(te tuple.TupleElement) (any, error) {
+			if v, ok := te.(string); ok {
+				if v == "Infinity" || v == "-Infinity" {
+					return nil, nil
+				}
+			}
+			return te, nil
+		}
 	default:
 		panic(fmt.Sprintf("unhandled flat type: %T", p.FlatType))
 	}
 
-	return m
+	return m, converter
 }
 
 func computeSchemaForNewTable(res boilerplate.MappedBinding[mapped, resource]) *iceberg.Schema {
