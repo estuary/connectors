@@ -328,6 +328,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     initial_state: _BaseResourceState
     initial_config: _BaseResourceConfig
     schema_inference: bool
+    disable: bool = False
 
 
 def discovered(
@@ -350,6 +351,7 @@ def discovered(
                 key=resource.key,
                 recommendedName=resource.name,
                 resourceConfig=resource.initial_config,
+                disable=resource.disable
             )
         )
 
