@@ -120,6 +120,7 @@ jobs:
           - materialize-webhook
           - materialize-sqlserver
           - materialize-slack
+          - materialize-cratedb
         include:
           - connector: source-criteo
             connector_type: capture
