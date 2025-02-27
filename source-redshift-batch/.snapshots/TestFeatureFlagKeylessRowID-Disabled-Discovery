@@ -51,8 +51,7 @@ Binding 0:
             "type": "object",
             "required": [
               "polled",
-              "index",
-              "row_id"
+              "index"
             ]
           },
           "data": {
