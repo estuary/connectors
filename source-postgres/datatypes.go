@@ -435,16 +435,25 @@ func (db *postgresDatabase) translateArray(column *sqlcapture.ColumnInfo, isPrim
 		scalarColumn.DataType = strings.TrimLeft(str, "_")
 	}
 
-	var dims = make([]int, 0)
-	for _, dim := range x.Dims {
-		dims = append(dims, int(dim.Length))
-	}
+	// Translate the values of x.Elements in place (since we're discarding the original
+	// pgtype.Array value after this).
 	for idx := range x.Elements {
 		var translated, err = db.translateRecordField(&scalarColumn, isPrimaryKey, x.Elements[idx])
 		if err != nil {
 			return nil, err
 		}
 		x.Elements[idx] = translated
+	}
+
+	// If we're supposed to produce flat arrays, just return the elements array now.
+	if db.featureFlags["flatten_arrays"] {
+		return x.Elements, nil
+	}
+
+	// Otherwise translate the array dimensions and return the old object representation.
+	var dims = make([]int, 0)
+	for _, dim := range x.Dims {
+		dims = append(dims, int(dim.Length))
 	}
 	return map[string]any{
 		"dimensions": dims,
