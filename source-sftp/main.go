@@ -138,6 +138,13 @@ func (c config) PathRegex() string {
 	return c.MatchFiles
 }
 
+// additionalKexAlgos specifies any additional key-exchange algorithms which we
+// support which aren't in the defaults from golang.org/x/crypto/ssh/common.go
+var additionalKexAlgos = []string{
+	"diffie-hellman-group16-sha512", // kexAlgoDH16SHA512
+	"diffie-hellman-group1-sha1",    // kexAlgoDH1SHA1
+}
+
 func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 	var user = cfg.Credentials.Username
 	if len(user) == 0 && len(cfg.Username) > 0 {
@@ -149,6 +156,10 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 		Auth:            []ssh.AuthMethod{},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
+
+	// Extend the default list of key-exchange algorithms with a few additional ones we want to support.
+	sshConfig.SetDefaults()
+	sshConfig.KeyExchanges = append(sshConfig.KeyExchanges, additionalKexAlgos...)
 
 	// Legacy authentication method
 	if cfg.Credentials.Type == "" && cfg.Password != "" {
