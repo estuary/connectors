@@ -12,6 +12,9 @@ from pydantic import TypeAdapter
 from .models import (
     IntercomResource,
     TimestampedResource,
+    Contact,
+    NestedTag,
+    ContactTagsResponse,
     ContactsSearchResponse,
     TicketsSearchResponse,
     ConversationsSearchResponse,
@@ -184,6 +187,33 @@ def _is_large_date_window(start: int, end: int) -> bool:
     return delta > timedelta(hours=1)
 
 
+async def _hydrate_contact(
+    http: HTTPSession,
+    contact: Contact,
+    log: Logger,
+) -> Contact:
+    if contact.tags.has_more:
+        url = f"{API}/contacts/{contact.id}/tags"
+        response = ContactTagsResponse.model_validate_json(
+            await http.request(log, url)
+        )
+
+        # Tags and nested tags have different shapes. We have to transform tags into nested tags
+        # to ensure the tags in a Contact are always the same shape.
+        nested_tags = []
+        for tag in response.data:
+            nested_tag = NestedTag.model_validate({
+                "id": tag.id,
+                "type": tag.type,
+                "url": f"/tags/{tag.id}"
+            })
+            nested_tags.append(nested_tag)
+
+        contact.tags.data = nested_tags
+        contact.tags.has_more = False
+    return contact
+
+
 async def fetch_contacts(
     http: HTTPSession,
     window_size: int,
@@ -234,7 +264,9 @@ async def fetch_contacts(
             if updated_at > last_seen_ts:
                 last_seen_ts = updated_at
             if updated_at > start:
-                yield contact
+                # Nested subresources within a contact are capped at 10 elements, even if more exist.
+                # We hydrate the contact with the additional subresources if they aren't all present.
+                yield await _hydrate_contact(http, contact, log)
 
         if pagination_ended_early or response.pages.next is None:
             break
