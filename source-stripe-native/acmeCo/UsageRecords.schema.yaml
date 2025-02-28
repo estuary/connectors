@@ -19,11 +19,10 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
-description: "Child Stream\nParent Stream: SubscriptionItems"
+description: "Parent Stream: SubscriptionItems"
 properties:
   _meta:
-    allOf:
-      - $ref: "#/$defs/Meta"
+    $ref: "#/$defs/Meta"
     default:
       op: u
       row_id: -1
@@ -31,11 +30,21 @@ properties:
   id:
     title: Id
     type: string
+  object:
+    title: Object
+    type: string
+  account_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Id
   subscription_item:
     title: Subscription Item
     type: string
 required:
   - id
+  - object
   - subscription_item
 title: UsageRecords
 type: object
