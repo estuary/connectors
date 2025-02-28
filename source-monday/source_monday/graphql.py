@@ -341,8 +341,8 @@ query {
 """
 
 USERS = """
-query {
-  users {
+query ($limit: Int = 10, $page: Int = 1) {
+  users(limit: $limit, page: $page) {
     birthday
     country_code
     created_at
