@@ -723,3 +723,13 @@ SPLIT_CHILD_STREAM_NAMES = [
     ExternalAccountCards.NAME,
     ExternalBankAccount.NAME,
 ]
+
+# Streams that should not use the Stripe-Account header or have account_id set from the parent account
+# These streams either represent accounts themselves or are directly related to accounts in a way
+# that they should be accessed from the platform account context rather than a connected account
+CONNECTED_ACCOUNT_EXEMPT_STREAMS = [
+    "Accounts",
+    "ExternalAccountCards",
+    "ExternalBankAccount",
+    "Persons",
+]

@@ -18,6 +18,7 @@ from .api import (
     fetch_incremental_no_events,
     fetch_backfill_usage_records,
     fetch_incremental_usage_records,
+    fetch_account_ids,
 )
 
 from .models import (
@@ -28,6 +29,8 @@ from .models import (
 )
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
+CONNECTED_ACCOUNTS = []
+
 
 async def check_accessibility(
     http: HTTPMixin, log: Logger, url: str,
@@ -66,7 +69,14 @@ async def all_resources(
     if is_restricted_api_key:
         events_url = f"{API}/events"
         if not await check_accessibility(http, log, events_url):
-            raise RuntimeError(f"/events endpoint is not accessible, preventing incremental replication.\nPlease update your restricted API key to have read permissions for Events.")
+            raise RuntimeError(
+                f"/events endpoint is not accessible, preventing incremental replication.\nPlease update your restricted API key to have read permissions for Events."
+            )
+
+    # Fetch connected account IDs
+    connected_account_ids = await fetch_account_ids(http, log, f"{API}/accounts")
+    global CONNECTED_ACCOUNTS
+    CONNECTED_ACCOUNTS = [None] + connected_account_ids if connected_account_ids else []
 
     for element in STREAMS:
         is_accessible_stream = True
@@ -79,7 +89,11 @@ async def all_resources(
 
         if is_accessible_stream:
             # If the stream class does not have an EVENT_TYPES attribute, then it does not have any associated events.
-            resource = base_object(base_stream, http, config.start_date) if hasattr(base_stream, "EVENT_TYPES") else no_events_object(base_stream, http, config.start_date)
+            resource = (
+                base_object(base_stream, http, config.start_date)
+                if hasattr(base_stream, "EVENT_TYPES")
+                else no_events_object(base_stream, http, config.start_date)
+            )
             all_streams.append(resource)
 
             children = element.get("children", [])
@@ -125,13 +139,27 @@ def base_object(
         task: Task,
         all_bindings
     ):
+        fetch_chnages_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_incremental, cls, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
+        fetch_page_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_backfill, cls, start_date, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_incremental, cls, http),
-            fetch_page=functools.partial(fetch_backfill, cls, start_date, http),
+            fetch_changes=fetch_chnages_fns,
+            fetch_page=fetch_page_fns,
         )
 
     cutoff = datetime.now(tz=UTC)
@@ -164,13 +192,27 @@ def child_object(
         task: Task,
         all_bindings
     ):
+        fetch_chnages_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_incremental_substreams, cls, child_cls, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
+        fetch_page_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_backfill_substreams, cls, child_cls, start_date, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_incremental_substreams, cls, child_cls, http),
-            fetch_page=functools.partial(fetch_backfill_substreams, cls, child_cls, start_date, http),
+            fetch_changes=fetch_chnages_fns,
+            fetch_page=fetch_page_fns,
         )
 
     cutoff = datetime.now(tz=UTC)
@@ -204,13 +246,27 @@ def split_child_object(
         task: Task,
         all_bindings
     ):
+        fetch_chnages_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_incremental, child_cls, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
+        fetch_page_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_backfill_substreams, cls, child_cls, start_date, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_incremental, child_cls, http),
-            fetch_page=functools.partial(fetch_backfill_substreams, cls, child_cls, start_date, http),
+            fetch_changes=fetch_chnages_fns,
+            fetch_page=fetch_page_fns,
         )
 
     cutoff = datetime.now(tz=UTC)
@@ -243,13 +299,32 @@ def usage_records(
         task: Task,
         all_bindings
     ):
+        fetch_chnages_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_incremental_usage_records, cls, child_cls, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
+        fetch_page_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_backfill_usage_records,
+                cls,
+                child_cls,
+                start_date,
+                account_id,
+                http,
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_incremental_usage_records, cls, child_cls, http),
-            fetch_page=functools.partial(fetch_backfill_usage_records, cls, child_cls, start_date, http),
+            fetch_changes=fetch_chnages_fns,
+            fetch_page=fetch_page_fns,
         )
 
     cutoff = datetime.now(tz=UTC)
@@ -283,13 +358,27 @@ def no_events_object(
         task: Task,
         all_bindings
     ):
+        fetch_chnages_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_incremental_no_events, cls, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
+        fetch_page_fns = {
+            account_id if account_id else "platform": functools.partial(
+                fetch_backfill, cls, start_date, account_id, http
+            )
+            for account_id in CONNECTED_ACCOUNTS
+        }
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_incremental_no_events, cls, http),
-            fetch_page=functools.partial(fetch_backfill, cls, start_date, http),
+            fetch_changes=fetch_chnages_fns,
+            fetch_page=fetch_page_fns,
         )
 
     cutoff = datetime.now(tz=UTC)
