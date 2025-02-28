@@ -686,3 +686,46 @@ func TestGeneratedColumn(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestFeatureFlagFlattenArrays exercises the handling of array columns in both
+// discovery and captures, with the 'flatten_arrays' feature flag explicitly
+// enabled and disabled.
+func TestFeatureFlagFlattenArrays(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "70143951"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, text_array TEXT[], int_array INTEGER[], nested_array INTEGER[][])")
+
+	tb.Insert(ctx, t, tableName, [][]any{
+		{1, []string{"a", "b", "c"}, []int{1, 2, 3}, [][]int{{1, 2}, {3, 4}}},
+		{2, []string{"foo", "bar"}, []int{10, 20}, [][]int{{5, 6}, {7, 8}}},
+		{3, []string{}, []int{}, [][]int{{}}},
+		{4, nil, nil, nil},
+	})
+
+	for _, tc := range []struct {
+		name string
+		flag string
+	}{
+		{"Enabled", "flatten_arrays"},
+		{"Disabled", "no_flatten_arrays"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cs = tb.CaptureSpec(ctx, t)
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flag
+
+			t.Run("Discovery", func(t *testing.T) {
+				cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+			})
+
+			t.Run("Capture", func(t *testing.T) {
+				cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
+				cs.Validator = &st.OrderedCaptureValidator{}
+				sqlcapture.TestShutdownAfterCaughtUp = true
+				t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+				cs.Capture(ctx, t, nil)
+				cupaloy.SnapshotT(t, cs.Summary())
+			})
+		})
+	}
+}
