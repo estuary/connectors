@@ -187,16 +187,87 @@
         "type": "list"
       },
       "tags": {
-        "data": [],
+        "data": [
+          {
+            "id": "10718342",
+            "type": "tag",
+            "url": "/tags/10718342"
+          },
+          {
+            "id": "10718351",
+            "type": "tag",
+            "url": "/tags/10718351"
+          },
+          {
+            "id": "10718352",
+            "type": "tag",
+            "url": "/tags/10718352"
+          },
+          {
+            "id": "10718349",
+            "type": "tag",
+            "url": "/tags/10718349"
+          },
+          {
+            "id": "10718354",
+            "type": "tag",
+            "url": "/tags/10718354"
+          },
+          {
+            "id": "10718353",
+            "type": "tag",
+            "url": "/tags/10718353"
+          },
+          {
+            "id": "10718347",
+            "type": "tag",
+            "url": "/tags/10718347"
+          },
+          {
+            "id": "10718350",
+            "type": "tag",
+            "url": "/tags/10718350"
+          },
+          {
+            "id": "10718345",
+            "type": "tag",
+            "url": "/tags/10718345"
+          },
+          {
+            "id": "10718343",
+            "type": "tag",
+            "url": "/tags/10718343"
+          },
+          {
+            "id": "10718348",
+            "type": "tag",
+            "url": "/tags/10718348"
+          },
+          {
+            "id": "10718344",
+            "type": "tag",
+            "url": "/tags/10718344"
+          },
+          {
+            "id": "10718355",
+            "type": "tag",
+            "url": "/tags/10718355"
+          },
+          {
+            "id": "10718346",
+            "type": "tag",
+            "url": "/tags/10718346"
+          }
+        ],
         "has_more": false,
-        "total_count": 0,
+        "total_count": 14,
         "type": "list",
         "url": "/contacts/67570a878b6e26fe4ce6a894/tags"
       },
       "type": "contact",
       "unsubscribed_from_emails": false,
       "unsubscribed_from_sms": false,
-      "updated_at": 1734097734,
+      "updated_at": 1740758913,
       "utm_campaign": null,
       "utm_content": null,
       "utm_medium": null,
