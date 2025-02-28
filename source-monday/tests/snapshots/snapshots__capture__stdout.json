@@ -54,7 +54,7 @@
       "time_zone_identifier": "America/Chicago",
       "title": null,
       "url": "https://estuarydev.monday.com/users/71985416",
-      "utc_hours_diff": -6.0
+      "utc_hours_diff": -6
     }
   ],
   [
@@ -144,7 +144,7 @@
           "color": "#579bfc",
           "deleted": false,
           "id": "new_group29179",
-          "position": 65472,
+          "position": "65472.0",
           "title": "To-Do"
         },
         {
@@ -152,7 +152,7 @@
           "color": "#00c875",
           "deleted": false,
           "id": "new_group43041",
-          "position": 98208,
+          "position": "98208",
           "title": "Completed"
         }
       ],
@@ -175,7 +175,7 @@
         "id": "new_group29179"
       },
       "type": "board",
-      "updated_at": "2025-02-24T17:14:41Z",
+      "updated_at": "2025-02-28T21:54:49Z",
       "updates": [],
       "views": [],
       "workspace": {
@@ -242,7 +242,7 @@
           "color": "#579bfc",
           "deleted": false,
           "id": "topics",
-          "position": 65536,
+          "position": "65536",
           "title": "Subitems"
         }
       ],
