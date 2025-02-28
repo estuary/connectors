@@ -159,7 +159,8 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
 		for _, stmt := range stmts {
 			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-				return err
+				log.WithField("stmt", stmt).Error("alter table statement failed")
+				return fmt.Errorf("executing alter table for table %s: %w", ta.Identifier, err)
 			}
 		}
 		return nil
