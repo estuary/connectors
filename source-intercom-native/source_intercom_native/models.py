@@ -1,5 +1,13 @@
 from datetime import datetime, UTC, timedelta
-from typing import Annotated, AsyncGenerator, Callable, Literal, TYPE_CHECKING, Optional
+from typing import (
+    Annotated,
+    AsyncGenerator,
+    Callable,
+    Generic,
+    Optional,
+    TYPE_CHECKING,
+    TypeVar,
+)
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -112,8 +120,37 @@ class SearchResponse(BaseModel, extra="allow"):
     pages: Pagination
 
 
+_Subresource = TypeVar("_Subresource", bound=BaseModel)
+
+
+class NestedTag(BaseModel):
+    id: str
+    type: str
+    url: str
+
+
+class Contact(TimestampedResource):
+    class Subresources(BaseModel, Generic[_Subresource]):
+        data: list[_Subresource]
+        has_more: bool
+        total_count: int
+        type: str
+        url: str
+
+    tags: Subresources[NestedTag]
+
+
+class ContactTagsResponse(BaseModel, extra="allow"):
+    class Tag(BaseModel, extra="forbid"):
+        id: str
+        type: str
+        name: str
+
+    data: list[Tag]
+
+
 class ContactsSearchResponse(SearchResponse):
-    data: list[TimestampedResource]
+    data: list[Contact]
 
 
 class TicketsSearchResponse(SearchResponse):
