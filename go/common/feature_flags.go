@@ -12,6 +12,7 @@ func ParseFeatureFlags(flags string, defaults map[string]bool) map[string]bool {
 		settings[k] = v
 	}
 	for _, flagName := range strings.Split(flags, ",") {
+		flagName = strings.TrimSpace(flagName)
 		var flagValue = true
 		if strings.HasPrefix(flagName, "no_") {
 			flagName = strings.TrimPrefix(flagName, "no_")
