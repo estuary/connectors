@@ -1,4 +1,1 @@
-SELECT xmin AS txid, * FROM "test"."foobar"
-    WHERE xmin::text::bigint >= 3
-      AND (((txid_current() - xmin::text::bigint)<<32)>>32) >= 0
-    ORDER BY xmin::text::bigint;
+SELECT xmin AS txid, * FROM "test"."foobar" ORDER BY xmin::text::bigint;
