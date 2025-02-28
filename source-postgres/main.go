@@ -132,6 +132,11 @@ var featureFlagDefaults = map[string]bool{
 	// satisfying `format: time`. Historically these used to be captured as Unix microseconds,
 	// which is usually not what users expect.
 	"time_as_time": true,
+
+	// When true, array columns are captured as a flat array of values in the JSON output.
+	// When false, array columns are captured as a `{dimensions, elements}` object which
+	// preserves dimensionality (at the cost of being awful to use in most cases).
+	"flatten_arrays": false,
 }
 
 // Validate checks that the configuration possesses all required properties.
