@@ -26,7 +26,6 @@ import (
 	"os"
 	"os/exec"
 	"path"
-	"slices"
 	"sort"
 	"strings"
 
@@ -48,7 +47,7 @@ var (
 	taskType     = flag.String("type", "", "The type of catalog spec to list (typically 'capture' or 'materialization'). If unspecified the task listing will not be filtered by type.")
 	imageName    = flag.String("connector", "", "The connector image name to filter on. Can be a full URL like 'ghcr.io/estuary/source-mysql' or a short name like 'source-mysql', and in the latter case the name will be expanded into a full URL including all variants. If unspecified the task list will not be filtered by connector.")
 	namePrefix   = flag.String("prefix", "", "The task name prefix to filter on. If unspecified the task listing will not be filtered by name.")
-	missingFlags = flag.String("missing", "", "A comma-separated list of feature flag settings. If specified only tasks missing one or more flag settings will be listed/pulled.")
+	missingFlags = flag.String("missing", "", "A comma-separated list of feature flags. If specified only tasks with one or more flags unset will be listed/pulled.")
 
 	addToDraft = flag.Bool("draft", false, "When true, all listed tasks will be added to the active flowctl draft.")
 
@@ -96,11 +95,11 @@ func performListing(ctx context.Context) error {
 	for _, task := range tasks {
 		if *missingFlags != "" {
 			// Check whether the task spec already has all of the specified settings, and if so skip this task.
-			var flagSettings = strings.Split(*missingFlags, ",")
-			if hasAllFlags, err := checkForMissingFlags(task.Spec, flagSettings); err != nil {
+			var flagNames = strings.Split(*missingFlags, ",")
+			if hasAllFlags, err := hasSettingsForAllFlags(task.Spec, flagNames); err != nil {
 				return fmt.Errorf("error checking flag settings for task %q: %w", task.CatalogName, err)
 			} else if hasAllFlags {
-				log.WithField("task", task.CatalogName).Debug("task already has all specified flags")
+				log.WithField("task", task.CatalogName).Info("task already has settings for all flags, skipping")
 				continue
 			}
 		}
@@ -216,13 +215,23 @@ func flowctl(ctx context.Context, args ...string) error {
 	return err
 }
 
-func checkForMissingFlags(spec json.RawMessage, flagSettings []string) (hasAllFlags bool, err error) {
+func hasSettingForFlag(flagsSetting string, flagName string) bool {
+	flagName = strings.TrimPrefix(flagName, "no_")
+	for _, flag := range strings.Split(flagsSetting, ",") {
+		flag = strings.TrimSpace(flag)
+		if flag == flagName || flag == "no_"+flagName {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSettingsForAllFlags(spec json.RawMessage, flagNames []string) (hasAllFlags bool, err error) {
 	// Extract the 'endpoint.connector.config.advanced.feature_flags' string property from the task spec,
-	// split into individual flag settings, and check if all of the specified settings are present.
-	var taskFlagsProperty = extractStringProperty(spec, "endpoint", "connector", "config", "advanced", "feature_flags")
-	var taskFlags = strings.Split(taskFlagsProperty, ",")
-	for _, setting := range flagSettings {
-		if !slices.Contains(taskFlags, setting) {
+	// and check if it contains a setting for all specified flag names.
+	var taskFlags = extractStringProperty(spec, "endpoint", "connector", "config", "advanced", "feature_flags")
+	for _, flagName := range flagNames {
+		if !hasSettingForFlag(taskFlags, flagName) {
 			return false, nil
 		}
 	}
