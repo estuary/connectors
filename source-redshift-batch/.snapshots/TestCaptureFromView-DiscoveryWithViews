@@ -52,7 +52,8 @@ Binding 0:
             "type": "object",
             "required": [
               "polled",
-              "index"
+              "index",
+              "row_id"
             ]
           },
           "id": {
@@ -139,7 +140,8 @@ Binding 1:
             "type": "object",
             "required": [
               "polled",
-              "index"
+              "index",
+              "row_id"
             ]
           },
           "id": {
@@ -163,6 +165,9 @@ Binding 1:
           }
         }
       },
+      "key": [
+        "/_meta/row_id"
+      ],
       "projections": null
     },
     "state_key": "capturefromview_227836"
