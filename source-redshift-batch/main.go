@@ -27,7 +27,7 @@ var featureFlagDefaults = map[string]bool{
 
 	// When true, the fallback collection key for keyless source tables will be
 	// ["/_meta/row_id"] instead of [].
-	"keyless_row_id": false,
+	"keyless_row_id": true,
 }
 
 // Config tells the connector how to connect to and interact with the source database.

@@ -51,7 +51,8 @@ Binding 0:
             "type": "object",
             "required": [
               "polled",
-              "index"
+              "index",
+              "row_id"
             ]
           },
           "data": {
@@ -68,6 +69,9 @@ Binding 0:
           }
         }
       },
+      "key": [
+        "/_meta/row_id"
+      ],
       "projections": null
     },
     "state_key": "keylessfullrefreshcapture_941246"
