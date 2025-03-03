@@ -15,30 +15,15 @@ Binding 0:
           "$anchor": "TestCitext_58810479",
           "properties": {
             "arr": {
-              "required": [
-                "dimensions",
-                "elements"
-              ],
-              "description": "(source type: _citext)",
-              "properties": {
-                "dimensions": {
-                  "items": {
-                    "type": "integer"
-                  },
-                  "type": "array"
-                },
-                "elements": {
-                  "items": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "type": "array"
-                }
+              "items": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               },
+              "description": "(source type: _citext)",
               "type": [
-                "object",
+                "array",
                 "null"
               ]
             },
