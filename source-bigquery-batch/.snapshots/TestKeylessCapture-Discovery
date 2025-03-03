@@ -62,8 +62,7 @@ Binding 0:
         "x-infer-schema": true
       },
       "key": [
-        "/_meta/polled",
-        "/_meta/index"
+        "/_meta/row_id"
       ],
       "projections": null
     },

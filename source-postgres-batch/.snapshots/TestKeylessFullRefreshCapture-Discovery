@@ -51,15 +51,15 @@ Binding 0:
             "type": "object",
             "required": [
               "polled",
-              "index"
+              "index",
+              "row_id"
             ]
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/_meta/polled",
-        "/_meta/index"
+        "/_meta/row_id"
       ],
       "projections": null
     },
