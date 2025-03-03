@@ -283,7 +283,7 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, 
 		// New behavior: If the column is an array, turn the element type into a JSON array.
 		jsonType = &jsonschema.Schema{
 			Items:  colSchema.toType(),
-			Extras: map[string]any{"type": []string{"array"}},
+			Extras: map[string]any{"type": "array"},
 		}
 		if column.IsNullable {
 			// The column value itself may be null if the column is nullable.

@@ -136,7 +136,7 @@ var featureFlagDefaults = map[string]bool{
 	// When true, array columns are captured as a flat array of values in the JSON output.
 	// When false, array columns are captured as a `{dimensions, elements}` object which
 	// preserves dimensionality (at the cost of being awful to use in most cases).
-	"flatten_arrays": false,
+	"flatten_arrays": true,
 }
 
 // Validate checks that the configuration possesses all required properties.
