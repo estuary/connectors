@@ -16,6 +16,7 @@ from estuary_cdk.http import HTTPError
 
 
 from .models import (
+    Accounts,
     EventResult,
     BackfillResult,
     ListResult,
@@ -23,6 +24,7 @@ from .models import (
     StripeObjectNoEvents,
     StripeObjectWithEvents,
     SubscriptionItems,
+    CONNECTED_ACCOUNT_EXEMPT_STREAMS,
 )
 
 
@@ -47,8 +49,24 @@ def add_event_types(params: dict[str, str | int], event_types: dict[str, Literal
 
     return params
 
+
+async def fetch_account_ids(
+    http: HTTPSession,
+    log: Logger,
+    url: str,
+) -> list[str]:
+    log.warning(f"Fetching account ids")
+    response = ListResult[Accounts].model_validate_json(
+        await http.request(log, url),
+    )
+    return list(
+        set([item.account_id for item in response.data if item.account_id is not None])
+    )
+
+
 async def fetch_incremental(
     cls: type[StripeObjectWithEvents],
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
@@ -69,11 +87,20 @@ async def fetch_incremental(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls.EVENT_TYPES)
+    headers = {}
+    if (
+        account_id
+        and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
     max_ts = log_cursor
 
     while iterating:
         events = EventResult.model_validate_json(
-            await http.request(log, url, method="GET", params=parameters)
+            await http.request(
+                log, url, method="GET", params=parameters, headers=headers
+            )
         )
 
         for event in events.data:
@@ -87,6 +114,13 @@ async def fetch_incremental(
             if event_ts >= log_cursor:
                 doc = cls.model_validate(event.data.object)
                 doc.meta_ = cls.Meta(op=cls.EVENT_TYPES[event.type])
+
+                if (
+                    account_id
+                    and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+                    and account_id != "platform"
+                ):
+                    doc.account_id = account_id
 
                 # ExternalAccountCards and ExternalBankAccount share the same events even though the
                 # returned documents are different. We skip document if they aren't
@@ -112,6 +146,7 @@ async def fetch_incremental(
 async def fetch_backfill(
     cls: type[StripeObjectWithEvents],
     start_date: datetime,
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
     page: PageCursor | None,
@@ -133,6 +168,13 @@ async def fetch_backfill(
 
     url = f"{API}/{cls.SEARCH_NAME}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    headers = {}
+    if (
+        account_id
+        and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
 
     if page:
         parameters["starting_after"] = page
@@ -141,7 +183,7 @@ async def fetch_backfill(
         parameters["status"] = "all"
 
     result = BackfillResult[cls].model_validate_json(
-        await http.request(log, url, method="GET", params=parameters)
+        await http.request(log, url, method="GET", params=parameters, headers=headers)
     )
 
     for doc in result.data:
@@ -149,6 +191,13 @@ async def fetch_backfill(
         # that didn't add the created field. Since we can't determine when these results were created, treat them
         # like other results within the backfill window and yield them.
         doc_ts = _s_to_dt(doc.created) if doc.created is not None else None
+
+        if (
+            account_id
+            and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+            and account_id != "platform"
+        ):
+            doc.account_id = account_id
 
         if doc_ts == start_date:
             # Yield final document for reference
@@ -167,6 +216,7 @@ async def fetch_backfill(
 async def fetch_incremental_substreams(
     cls: type[StripeObjectWithEvents],
     cls_child: type[StripeChildObject],
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
@@ -186,10 +236,19 @@ async def fetch_incremental_substreams(
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
     max_ts = log_cursor
+    headers = {}
+    if (
+        account_id
+        and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
 
     while iterating:
         events = EventResult.model_validate_json(
-            await http.request(log, url, method="GET", params=parameters)
+            await http.request(
+                log, url, method="GET", params=parameters, headers=headers
+            )
         )
 
         for event in events.data:
@@ -205,20 +264,21 @@ async def fetch_incremental_substreams(
                 search_name = cls.SEARCH_NAME
                 id = parent_data.id
                 child_data = _capture_substreams(
-                                    cls_child,
-                                    search_name,
-                                    id,
-                                    parent_data,
-                                    http,
-                                    log
-                                )
+                    cls_child, search_name, id, parent_data, account_id, http, log
+                )
 
                 if child_data is None:
                     pass # move to next customer
                 async for doc in child_data:
                     doc.meta_ = cls_child.Meta(op=cls.EVENT_TYPES[event.type])
-                    yield doc 
-        
+                    if (
+                        account_id
+                        and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+                        and account_id != "platform"
+                    ):
+                        doc.account_id = account_id
+                    yield doc
+
             elif event_ts < log_cursor:
                 iterating = False
                 break
@@ -233,6 +293,7 @@ async def fetch_backfill_substreams(
     cls: type[StripeObjectWithEvents],
     cls_child: type[StripeChildObject],
     start_date: datetime,
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
     page: PageCursor | None,
@@ -250,6 +311,13 @@ async def fetch_backfill_substreams(
     search_name = cls.SEARCH_NAME
     url = f"{API}/{search_name}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    headers = {}
+    if (
+        account_id
+        and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
 
     if page:
         parameters["starting_after"] = page
@@ -258,7 +326,7 @@ async def fetch_backfill_substreams(
         parameters["status"] = "all"
 
     result = BackfillResult[cls].model_validate_json(
-        await http.request(log, url, method="GET", params=parameters)
+        await http.request(log, url, method="GET", params=parameters, headers=headers)
     )
 
     for doc in result.data:
@@ -272,19 +340,20 @@ async def fetch_backfill_substreams(
             id = parent_data.id
 
             child_data = _capture_substreams(
-                            cls_child,
-                            search_name,
-                            id,
-                            parent_data,
-                            http,
-                            log
-                        )
+                cls_child, search_name, id, parent_data, account_id, http, log
+            )
 
             if child_data is None:
                 return
             async for doc in child_data:
                 doc.meta_ = cls_child.Meta(op="u")
-                yield doc 
+                if (
+                    account_id
+                    and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+                    and account_id != "platform"
+                ):
+                    doc.account_id = account_id
+                yield doc
             return
 
         elif doc_ts is not None and doc_ts < start_date:
@@ -294,19 +363,20 @@ async def fetch_backfill_substreams(
             parent_data = doc
             id = parent_data.id
             child_data = _capture_substreams(
-                            cls_child,
-                            search_name,
-                            id,
-                            parent_data,
-                            http,
-                            log
-                        )
+                cls_child, search_name, id, parent_data, account_id, http, log
+            )
 
             if child_data is None:
                 pass # move to next customer
             async for doc in child_data:
                 doc.meta_ = cls_child.Meta(op="u")
-                yield doc 
+                if (
+                    account_id
+                    and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+                    and account_id != "platform"
+                ):
+                    doc.account_id = account_id
+                yield doc
 
     if result.has_more:
         yield result.data[-1].id
@@ -318,6 +388,7 @@ async def _capture_substreams(
     search_name: str,
     id: str,
     parent_data,
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
 ):
@@ -328,6 +399,13 @@ async def _capture_substreams(
 
     child_url = f"{API}/{search_name}/{id}/{cls_child.SEARCH_NAME}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    headers = {}
+    if (
+        account_id
+        and cls_child.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
 
     # Use stream specific URLs and query parameters.
     match cls_child.NAME:
@@ -348,19 +426,20 @@ async def _capture_substreams(
         # if we encounter further access issues and our understanding of the Stripe API deepens.
         # Docs reference: https://docs.stripe.com/api/persons
         if (
-                cls_child.NAME == "Persons" and
-                parent_data.controller["type"] == "account"
-            ) or (
-                cls_child.NAME == "Persons" and 
-                "requirement_collection" in parent_data.controller and
-                parent_data.controller["requirement_collection"] is not None and 
-                parent_data.controller["requirement_collection"] == "stripe"
-            ):
+            cls_child.NAME == "Persons" and parent_data.controller["type"] == "account"
+        ) or (
+            cls_child.NAME == "Persons"
+            and "requirement_collection" in parent_data.controller
+            and parent_data.controller["requirement_collection"] is not None
+            and parent_data.controller["requirement_collection"] == "stripe"
+        ):
             break
 
         try:
             result_child = ListResult[cls_child].model_validate_json(
-                await http.request(log, child_url, method="GET", params=parameters)
+                await http.request(
+                    log, child_url, method="GET", params=parameters, headers=headers
+                )
             )
         except HTTPError as err:
             # It's possible for us to process events for deleted parent resources, making
@@ -405,6 +484,12 @@ async def _capture_substreams(
                 raise err
 
         for doc in result_child.data:
+            if (
+                account_id
+                and cls_child.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+                and account_id != "platform"
+            ):
+                doc.account_id = account_id
             yield doc
 
         if result_child.has_more:
@@ -414,6 +499,7 @@ async def _capture_substreams(
 
 async def fetch_incremental_no_events(
     cls: type[StripeObjectNoEvents],
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
@@ -432,10 +518,19 @@ async def fetch_incremental_no_events(
     url = f"{API}/{cls.SEARCH_NAME}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     max_ts = log_cursor
+    headers = {}
+    if (
+        account_id
+        and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
 
     while iterating:
         resources = ListResult[cls].model_validate_json(
-            await http.request(log, url, method="GET", params=parameters)
+            await http.request(
+                log, url, method="GET", params=parameters, headers=headers
+            )
         )
 
         for resource in resources.data:
@@ -448,6 +543,12 @@ async def fetch_incremental_no_events(
             # Emit documents if we haven't seen them yet.
             if resource_ts >= log_cursor:
                 doc = cls.model_validate(resource)
+                if (
+                    account_id
+                    and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+                    and account_id != "platform"
+                ):
+                    doc.account_id = account_id
                 yield doc
             elif resource_ts < log_cursor:
                 iterating = False
@@ -464,6 +565,7 @@ async def fetch_incremental_no_events(
 async def fetch_incremental_usage_records(
     cls: SubscriptionItems,
     cls_child: type[StripeChildObject],
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
@@ -482,10 +584,19 @@ async def fetch_incremental_usage_records(
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
     max_ts = log_cursor
+    headers = {}
+    if (
+        account_id
+        and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
 
     while iterating:
         events = EventResult.model_validate_json(
-            await http.request(log, url, method="GET", params=parameters)
+            await http.request(
+                log, url, method="GET", params=parameters, headers=headers
+            )
         )
 
         for event in events.data:
@@ -502,13 +613,8 @@ async def fetch_incremental_usage_records(
                 for item in parent_data.items.data:
                     id = item.id
                     child_data = _capture_substreams(
-                                    cls_child,
-                                    search_name,
-                                    id,
-                                    parent_data,
-                                    http,
-                                    log
-                                )
+                        cls_child, search_name, id, parent_data, account_id, http, log
+                    )
 
                     if child_data is None:
                         pass # move to next item
@@ -532,6 +638,7 @@ async def fetch_backfill_usage_records(
     cls: SubscriptionItems,
     cls_child: type[StripeChildObject],
     start_date: datetime,
+    account_id: str | None,
     http: HTTPSession,
     log: Logger,
     page: PageCursor | None,
@@ -548,6 +655,13 @@ async def fetch_backfill_usage_records(
     search_name = cls.SEARCH_NAME
     url = f"{API}/{search_name}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    headers = {}
+    if (
+        account_id
+        and cls_child.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        and account_id != "platform"
+    ):
+        headers["Stripe-Account"] = account_id
 
     if page:
         parameters["starting_after"] = page
@@ -556,7 +670,7 @@ async def fetch_backfill_usage_records(
         parameters["status"] = "all"
 
     result = BackfillResult[cls].model_validate_json(
-        await http.request(log, url, method="GET", params=parameters)
+        await http.request(log, url, method="GET", params=parameters, headers=headers)
     )
 
     for doc in result.data:
@@ -566,13 +680,8 @@ async def fetch_backfill_usage_records(
             for item in parent_data.items.data:
                 id = item.id
                 child_data = _capture_substreams(
-                                cls_child,
-                                search_name,
-                                id,
-                                parent_data,
-                                http,
-                                log
-                            )
+                    cls_child, search_name, id, parent_data, account_id, http, log
+                )
 
                 if child_data is None:
                     pass
@@ -589,13 +698,8 @@ async def fetch_backfill_usage_records(
             for item in parent_data.items.data:
                 id = item.id
                 child_data = _capture_substreams(
-                                cls_child,
-                                search_name,
-                                id,
-                                parent_data,
-                                http,
-                                log
-                            )
+                    cls_child, search_name, id, parent_data, account_id, http, log
+                )
 
                 if child_data is None:
                     pass # move to next item

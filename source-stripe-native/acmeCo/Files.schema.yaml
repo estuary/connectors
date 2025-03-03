@@ -22,8 +22,7 @@ additionalProperties: true
 description: Incremental stream with no Events
 properties:
   _meta:
-    allOf:
-      - $ref: "#/$defs/Meta"
+    $ref: "#/$defs/Meta"
     default:
       op: u
       row_id: -1
@@ -31,8 +30,22 @@ properties:
   id:
     title: Id
     type: string
+  object:
+    title: Object
+    type: string
+  account_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Id
+  created:
+    title: Created
+    type: integer
 required:
   - id
+  - object
+  - created
 title: Files
 type: object
 x-infer-schema: true

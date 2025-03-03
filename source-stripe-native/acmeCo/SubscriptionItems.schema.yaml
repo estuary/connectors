@@ -3,19 +3,12 @@ $defs:
   Items:
     additionalProperties: true
     properties:
-      object:
-        const: list
-        enum:
-          - list
-        title: Object
-        type: string
       data:
         items:
           $ref: "#/$defs/Values"
         title: Data
         type: array
     required:
-      - object
       - data
     title: Items
     type: object
@@ -43,80 +36,14 @@ $defs:
       id:
         title: Id
         type: string
-      parent_id:
-        anyOf:
-          - type: string
-          - type: "null"
-        default: ~
-        title: Parent Id
-      object:
-        const: subscription_item
-        enum:
-          - subscription_item
-        title: Object
-        type: string
-      billing_thresholds:
-        anyOf:
-          - type: object
-          - type: "null"
-        default: ~
-        title: Billing Thresholds
-      created:
-        title: Created
-        type: integer
-      metadata:
-        anyOf:
-          - type: object
-          - type: "null"
-        default: ~
-        title: Metadata
-      discounts:
-        anyOf:
-          - items:
-              type: object
-            type: array
-          - type: "null"
-        default: ~
-        title: Discounts
-      plan:
-        anyOf:
-          - type: object
-          - type: "null"
-        default: ~
-        title: Plan
-      price:
-        title: Price
-        type: object
-      quantity:
-        anyOf:
-          - type: integer
-          - type: "null"
-        default: ~
-        title: Quantity
-      subscription:
-        title: Subscription
-        type: string
-      tax_rates:
-        anyOf:
-          - items:
-              type: object
-            type: array
-          - type: "null"
-        default: ~
-        title: Tax Rates
     required:
       - id
-      - object
-      - created
-      - price
-      - subscription
     title: Values
     type: object
 additionalProperties: true
 properties:
   _meta:
-    allOf:
-      - $ref: "#/$defs/Meta"
+    $ref: "#/$defs/Meta"
     default:
       op: u
       row_id: -1
@@ -124,10 +51,24 @@ properties:
   id:
     title: Id
     type: string
+  object:
+    title: Object
+    type: string
+  account_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    default: ~
+    title: Account Id
+  created:
+    title: Created
+    type: integer
   items:
     $ref: "#/$defs/Items"
 required:
   - id
+  - object
+  - created
   - items
 title: SubscriptionItems
 type: object

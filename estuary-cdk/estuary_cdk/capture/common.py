@@ -510,9 +510,15 @@ def open_binding(
     binding_index: int,
     state: _ResourceState,
     task: Task,
-    fetch_changes: FetchChangesFn[_BaseDocument] | None = None,
-    fetch_page: FetchPageFn[_BaseDocument] | None = None,
-    fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
+    fetch_changes: FetchChangesFn[_BaseDocument]
+    | dict[str, FetchChangesFn[_BaseDocument]]
+    | None = None,
+    fetch_page: FetchPageFn[_BaseDocument]
+    | dict[str, FetchPageFn[_BaseDocument]]
+    | None = None,
+    fetch_snapshot: FetchSnapshotFn[_BaseDocument]
+    | dict[str, FetchSnapshotFn[_BaseDocument]]
+    | None = None,
     tombstone: _BaseDocument | None = None,
 ):
     """
@@ -520,45 +526,187 @@ def open_binding(
 
     It does 'heavy lifting' to actually capture a binding.
 
-    TODO(johnny): Separate into snapshot vs incremental tasks?
+    When fetch_changes, fetch_page, or fetch_snapshot are provided as dictionaries,
+    each function will be run as a separate subtask with its own independent state.
+    The dictionary keys are used as subtask IDs and are used to store and retrieve
+    the state for each subtask in state.inc, state.backfill, or state.snapshot.
     """
 
     prefix = ".".join(binding.resourceConfig.path())
 
     if fetch_changes:
+        if isinstance(fetch_changes, dict):
+            for subtask_id, subtask_fetch_changes in fetch_changes.items():
+                if not isinstance(state.inc, dict):
+                    state.inc = {subtask_id: state.inc} if state.inc else {}
+                elif subtask_id not in state.inc:
+                    cutoff = datetime.now(tz=UTC)
+                    state.inc[subtask_id] = ResourceState.Incremental(cursor=cutoff)
 
-        async def closure(task: Task):
-            assert state.inc
-            await _binding_incremental_task(
-                binding, binding_index, fetch_changes, state.inc, task,
-            )
+                    connector_state = ConnectorState(
+                        bindingStateV1={binding.stateKey: state}
+                    )
+                    task.checkpoint(connector_state)
 
-        task.spawn_child(f"{prefix}.incremental", closure)
+                async def incremental_subtask(
+                    subtask_task: Task,
+                    fetch_fn=subtask_fetch_changes,
+                    subtask_id=subtask_id,
+                ):
+                    assert state.inc and isinstance(state.inc, dict)
+                    inc_state = state.inc[subtask_id]
+                    assert inc_state
+
+                    await _binding_incremental_task(
+                        binding,
+                        binding_index,
+                        fetch_fn,
+                        inc_state,
+                        subtask_task,
+                    )
+
+                    state.inc[subtask_id] = inc_state
+
+                    connector_state = ConnectorState(
+                        bindingStateV1={binding.stateKey: state}
+                    )
+                    task.checkpoint(connector_state)
+
+                task.spawn_child(
+                    f"{prefix}.incremental.{subtask_id}", incremental_subtask
+                )
+        else:
+
+            async def closure(task: Task):
+                assert state.inc and not isinstance(state.inc, dict)
+                await _binding_incremental_task(
+                    binding,
+                    binding_index,
+                    fetch_changes,
+                    state.inc,
+                    task,
+                )
+
+            task.spawn_child(f"{prefix}.incremental", closure)
 
     if fetch_page and state.backfill:
+        if isinstance(fetch_page, dict):
+            for subtask_id, subtask_fetch_page in fetch_page.items():
+                if not isinstance(state.backfill, dict):
+                    state.backfill = (
+                        {subtask_id: state.backfill} if state.backfill else {}
+                    )
+                elif subtask_id not in state.backfill:
+                    cutoff = datetime.now(tz=UTC)
+                    state.backfill[subtask_id] = ResourceState.Backfill(
+                        next_page=None, cutoff=cutoff
+                    )
 
-        async def closure(task: Task):
-            assert state.backfill
-            await _binding_backfill_task(
-                binding, binding_index, fetch_page, state.backfill, task,
-            )
+                    connector_state = ConnectorState(
+                        bindingStateV1={binding.stateKey: state}
+                    )
+                    task.checkpoint(connector_state)
 
-        task.spawn_child(f"{prefix}.backfill", closure)
+                async def backfill_subtask(
+                    subtask_task: Task,
+                    fetch_fn=subtask_fetch_page,
+                    subtask_id=subtask_id,
+                ):
+                    assert state.backfill and isinstance(state.backfill, dict)
+
+                    backfill_state = state.backfill[subtask_id]
+                    assert backfill_state
+
+                    await _binding_backfill_task(
+                        binding,
+                        binding_index,
+                        fetch_fn,
+                        backfill_state,
+                        subtask_task,
+                    )
+
+                    state.backfill[subtask_id] = backfill_state
+
+                    connector_state = ConnectorState(
+                        bindingStateV1={binding.stateKey: state}
+                    )
+                    task.checkpoint(connector_state)
+
+                task.spawn_child(f"{prefix}.backfill.{subtask_id}", backfill_subtask)
+        else:
+
+            async def closure(task: Task):
+                assert state.backfill and not isinstance(state.backfill, dict)
+                await _binding_backfill_task(
+                    binding,
+                    binding_index,
+                    fetch_page,
+                    state.backfill,
+                    task,
+                )
+
+            task.spawn_child(f"{prefix}.backfill", closure)
 
     if fetch_snapshot:
+        if isinstance(fetch_snapshot, dict):
+            for subtask_id, subtask_fetch_snapshot in fetch_snapshot.items():
+                if not isinstance(state.snapshot, dict):
+                    state.snapshot = (
+                        {subtask_id: state.snapshot} if state.snapshot else {}
+                    )
+                elif subtask_id not in state.snapshot:
+                    state.snapshot[subtask_id] = None
 
-        async def closure(task: Task):
-            assert tombstone
-            await _binding_snapshot_task(
-                binding,
-                binding_index,
-                fetch_snapshot,
-                state.snapshot,
-                task,
-                tombstone,
-            )
+                    connector_state = ConnectorState(
+                        bindingStateV1={binding.stateKey: state}
+                    )
+                    task.checkpoint(connector_state)
 
-        task.spawn_child(f"{prefix}.snapshot", closure)
+                async def snapshot_subtask(
+                    subtask_task: Task,
+                    fetch_fn=subtask_fetch_snapshot,
+                    subtask_id=subtask_id,
+                ):
+                    assert tombstone
+                    snapshot_state = (
+                        state.snapshot[subtask_id]
+                        if state.snapshot and isinstance(state.snapshot, dict)
+                        else None
+                    )
+
+                    await _binding_snapshot_task(
+                        binding,
+                        binding_index,
+                        fetch_fn,
+                        snapshot_state,
+                        subtask_task,
+                        tombstone,
+                    )
+
+                    if state.snapshot and isinstance(state.snapshot, dict):
+                        state.snapshot[subtask_id] = snapshot_state
+
+                    connector_state = ConnectorState(
+                        bindingStateV1={binding.stateKey: state}
+                    )
+                    task.checkpoint(connector_state)
+
+                task.spawn_child(f"{prefix}.snapshot.{subtask_id}", snapshot_subtask)
+        else:
+            # Single fetch_snapshot function - use the original approach
+            async def closure(task: Task):
+                assert tombstone
+                assert state.snapshot and not isinstance(state.snapshot, dict)
+                await _binding_snapshot_task(
+                    binding,
+                    binding_index,
+                    fetch_snapshot,
+                    state.snapshot,
+                    task,
+                    tombstone,
+                )
+
+            task.spawn_child(f"{prefix}.snapshot", closure)
 
 
 async def _binding_snapshot_task(
