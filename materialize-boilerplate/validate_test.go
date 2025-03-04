@@ -23,6 +23,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-fields-incompatible.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullable-key.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/long-fields.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/key-subset.flow.yaml
 
 //go:embed testdata/validate/generated_specs
 var validateFS embed.FS
@@ -193,6 +194,24 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "long-fields.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     20,
+		},
+		{
+			name:               "can materialize a subset of key fields",
+			deltaUpdates:       false,
+			specForInfoSchema:  nil,
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "key-subset.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
+		},
+		{
+			name:               "cannot add or remove selected key fields for standard updates",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "key-subset.flow.proto"),
+			existingSpec:       loadValidateSpec(t, "key-subset.flow.proto"),
+			proposedSpec:       loadValidateSpec(t, "key-subset.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
 		},
 	}
 
@@ -543,8 +562,8 @@ func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {
 	case p.IsPrimaryKey:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "All Locations that are part of the collections key are required"
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "All Locations that are part of the collections key are recommended"
 	case p.IsRootDocumentProjection() && deltaUpdates:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
