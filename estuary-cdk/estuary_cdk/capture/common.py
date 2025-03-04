@@ -54,7 +54,7 @@ and "no pages remain" in a response context.
 
 
 class Triggers(Enum):
-    BACKFILL = 'BACKFILL'
+    BACKFILL = "BACKFILL"
 
 
 class BaseDocument(BaseModel):
@@ -114,13 +114,14 @@ class ResourceConfig(BaseResourceConfig):
 _ResourceConfig = TypeVar("_ResourceConfig", bound=ResourceConfig)
 
 
-CRON_REGEX = (r"^"
+CRON_REGEX = (
+    r"^"
     r"((?:[0-5]?\d(?:-[0-5]?\d)?|\*(?:/[0-5]?\d)?)(?:,(?:[0-5]?\d(?:-[0-5]?\d)?|\*(?:/[0-5]?\d)?))*)\s+"  # minute
     r"((?:[01]?\d|2[0-3]|(?:[01]?\d|2[0-3])-(?:[01]?\d|2[0-3])|\*(?:/[01]?\d|/2[0-3])?)(?:,(?:[01]?\d|2[0-3]|(?:[01]?\d|2[0-3])-(?:[01]?\d|2[0-3])|\*(?:/[01]?\d|/2[0-3])?))*)\s+"  # hour
     r"((?:0?[1-9]|[12]\d|3[01]|(?:0?[1-9]|[12]\d|3[01])-(?:0?[1-9]|[12]\d|3[01])|\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\d|3[01]|(?:0?[1-9]|[12]\d|3[01])-(?:0?[1-9]|[12]\d|3[01])|\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\s+"  # day of month
     r"((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\*(?:/[1-9]|/1[0-2])?))*)\s+"  # month
     r"((?:[0-6]|(?:[0-6])-(?:[0-6])|\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\*(?:/[0-6])?))*)"  # day of week
-    r"$|^$" # Empty string to signify no schedule
+    r"$|^$"  # Empty string to signify no schedule
 )
 
 
@@ -129,7 +130,7 @@ class ResourceConfigWithSchedule(ResourceConfig):
         default="",
         title="Schedule",
         description="Schedule to automatically rebackfill this binding. Accepts a cron expression.",
-        pattern=CRON_REGEX
+        pattern=CRON_REGEX,
     )
 
 
@@ -164,8 +165,7 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
             description="LogCursor at which incremental replication began"
         )
         next_page: PageCursor = Field(
-            description="PageCursor of the next page to fetch",
-            default=None
+            description="PageCursor of the next page to fetch", default=None
         )
 
     class Snapshot(BaseModel, extra="forbid"):
@@ -179,18 +179,22 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
             description="The xxh3_128 hex digest of documents of this resource in the last snapshot"
         )
 
-    inc: Incremental | None = Field(
+    inc: Incremental | dict[str, Incremental | None] | None = Field(
         default=None, description="Incremental capture progress"
     )
 
-    backfill: Backfill | None = Field(
+    backfill: Backfill | dict[str, Backfill | None] | None = Field(
         default=None,
         description="Backfill progress, or None if no backfill is occurring",
     )
 
-    snapshot: Snapshot | None = Field(default=None, description="Snapshot progress")
+    snapshot: Snapshot | dict[str, Snapshot | None] | None = Field(
+        default=None, description="Snapshot progress"
+    )
 
-    last_initialized: datetime | None = Field(default=None, description="The last time this state was initialized.")
+    last_initialized: datetime | None = Field(
+        default=None, description="The last time this state was initialized."
+    )
 
 
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
@@ -213,6 +217,7 @@ class AssociatedDocument(Generic[_BaseDocument]):
     You might use this if your data model requires you to load "child" documents when capturing a "parent" document,
     instead of independently loading the child data stream.
     """
+
     doc: _BaseDocument
     binding: int
 
@@ -317,7 +322,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
                     CaptureBinding[_ResourceConfig],
                     "Resource[_BaseDocument, _ResourceConfig, _ResourceState]",
                 ]
-            ]
+            ],
         ],
         None,
     ]
@@ -363,7 +368,6 @@ def resolve_bindings(
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
     resource_term="Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
-
     resolved: list[
         tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]
     ] = []
@@ -397,7 +401,6 @@ def validated(
         ]
     ],
 ) -> response.Validated:
-
     return response.Validated(
         bindings=[
             response.ValidatedBinding(resourcePath=b[0].resourceConfig.path())
@@ -415,7 +418,6 @@ def open(
         ]
     ],
 ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-
     async def _run(task: Task):
         backfill_requests = []
         if open.state.backfillRequests is not None:
@@ -445,17 +447,20 @@ def open(
                 if state.last_initialized is None:
                     state.last_initialized = datetime.now(tz=UTC)
                     task.checkpoint(
-                        ConnectorState(
-                            bindingStateV1={binding.stateKey: state}
-                        )
+                        ConnectorState(bindingStateV1={binding.stateKey: state})
                     )
 
                 if isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
                     cron_schedule = binding.resourceConfig.schedule
-                    next_scheduled_initialization = next_fire(cron_schedule, state.last_initialized)
+                    next_scheduled_initialization = next_fire(
+                        cron_schedule, state.last_initialized
+                    )
 
-                    if next_scheduled_initialization and next_scheduled_initialization < datetime.now(tz=UTC):
-                    # Re-initialize the binding if we missed a scheduled re-initialization.
+                    if (
+                        next_scheduled_initialization
+                        and next_scheduled_initialization < datetime.now(tz=UTC)
+                    ):
+                        # Re-initialize the binding if we missed a scheduled re-initialization.
                         should_initialize = True
                         if state.backfill:
                             task.log.warning(
@@ -464,12 +469,22 @@ def open(
                                 " complete before the next scheduled backfill starts."
                             )
 
-                        next_scheduled_initialization = next_fire(cron_schedule, datetime.now(tz=UTC))
+                        next_scheduled_initialization = next_fire(
+                            cron_schedule, datetime.now(tz=UTC)
+                        )
 
-                    if next_scheduled_initialization and soonest_future_scheduled_initialization:
-                        soonest_future_scheduled_initialization = min(soonest_future_scheduled_initialization, next_scheduled_initialization)
+                    if (
+                        next_scheduled_initialization
+                        and soonest_future_scheduled_initialization
+                    ):
+                        soonest_future_scheduled_initialization = min(
+                            soonest_future_scheduled_initialization,
+                            next_scheduled_initialization,
+                        )
                     elif next_scheduled_initialization:
-                        soonest_future_scheduled_initialization = next_scheduled_initialization
+                        soonest_future_scheduled_initialization = (
+                            next_scheduled_initialization
+                        )
 
             if should_initialize:
                 # Checkpoint the binding's initialized state prior to any processing.
@@ -478,7 +493,7 @@ def open(
 
                 task.checkpoint(
                     ConnectorState(
-                        bindingStateV1={binding.stateKey: state}
+                        bindingStateV1={binding.stateKey: state},
                     )
                 )
 
@@ -487,7 +502,7 @@ def open(
                 index,
                 state,
                 task,
-                resolved_bindings
+                resolved_bindings,
             )
 
         async def scheduled_stop(future_dt: datetime | None) -> None:
@@ -510,9 +525,15 @@ def open_binding(
     binding_index: int,
     state: _ResourceState,
     task: Task,
-    fetch_changes: FetchChangesFn[_BaseDocument] | None = None,
-    fetch_page: FetchPageFn[_BaseDocument] | None = None,
-    fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
+    fetch_changes: FetchChangesFn[_BaseDocument]
+    | dict[str, FetchChangesFn[_BaseDocument]]
+    | None = None,
+    fetch_page: FetchPageFn[_BaseDocument]
+    | dict[str, FetchPageFn[_BaseDocument]]
+    | None = None,
+    fetch_snapshot: FetchSnapshotFn[_BaseDocument]
+    | dict[str, FetchSnapshotFn[_BaseDocument]]
+    | None = None,
     tombstone: _BaseDocument | None = None,
 ):
     """
@@ -520,45 +541,124 @@ def open_binding(
 
     It does 'heavy lifting' to actually capture a binding.
 
-    TODO(johnny): Separate into snapshot vs incremental tasks?
+    When fetch_changes, fetch_page, or fetch_snapshot are provided as dictionaries,
+    each function will be run as a separate subtask with its own independent state.
+    The dictionary keys are used as subtask IDs and are used to store and retrieve
+    the state for each subtask in state.inc, state.backfill, or state.snapshot.
     """
 
     prefix = ".".join(binding.resourceConfig.path())
 
     if fetch_changes:
+        if isinstance(fetch_changes, dict):
+            for subtask_id, subtask_fetch_changes in fetch_changes.items():
 
-        async def closure(task: Task):
-            assert state.inc
-            await _binding_incremental_task(
-                binding, binding_index, fetch_changes, state.inc, task,
-            )
+                async def incremental_subtask(
+                    subtask_task: Task,
+                    fetch_fn=subtask_fetch_changes,
+                    subtask_id=subtask_id,
+                ):
+                    assert state.inc and isinstance(state.inc, dict)
+                    inc_state = state.inc.get(subtask_id)
+                    assert inc_state
 
-        task.spawn_child(f"{prefix}.incremental", closure)
+                    await _binding_incremental_task(
+                        binding,
+                        binding_index,
+                        fetch_fn,
+                        inc_state,
+                        subtask_task,
+                    )
+
+                task.spawn_child(
+                    f"{prefix}.incremental.{subtask_id}", incremental_subtask
+                )
+        else:
+
+            async def closure(task: Task):
+                assert state.inc and not isinstance(state.inc, dict)
+                await _binding_incremental_task(
+                    binding,
+                    binding_index,
+                    fetch_changes,
+                    state.inc,
+                    task,
+                )
+
+            task.spawn_child(f"{prefix}.incremental", closure)
 
     if fetch_page and state.backfill:
+        if isinstance(fetch_page, dict):
+            for subtask_id, subtask_fetch_page in fetch_page.items():
 
-        async def closure(task: Task):
-            assert state.backfill
-            await _binding_backfill_task(
-                binding, binding_index, fetch_page, state.backfill, task,
-            )
+                async def backfill_subtask(
+                    subtask_task: Task,
+                    fetch_fn=subtask_fetch_page,
+                    subtask_id=subtask_id,
+                ):
+                    assert state.backfill and isinstance(state.backfill, dict)
+                    backfill_state = state.backfill.get(subtask_id)
+                    assert backfill_state
 
-        task.spawn_child(f"{prefix}.backfill", closure)
+                    await _binding_backfill_task(
+                        binding,
+                        binding_index,
+                        fetch_fn,
+                        backfill_state,
+                        subtask_task,
+                    )
+
+                task.spawn_child(f"{prefix}.backfill.{subtask_id}", backfill_subtask)
+        else:
+
+            async def closure(task: Task):
+                assert state.backfill and not isinstance(state.backfill, dict)
+                await _binding_backfill_task(
+                    binding,
+                    binding_index,
+                    fetch_page,
+                    state.backfill,
+                    task,
+                )
+
+            task.spawn_child(f"{prefix}.backfill", closure)
 
     if fetch_snapshot:
+        if isinstance(fetch_snapshot, dict):
+            for subtask_id, subtask_fetch_snapshot in fetch_snapshot.items():
 
-        async def closure(task: Task):
-            assert tombstone
-            await _binding_snapshot_task(
-                binding,
-                binding_index,
-                fetch_snapshot,
-                state.snapshot,
-                task,
-                tombstone,
-            )
+                async def snapshot_subtask(
+                    subtask_task: Task,
+                    fetch_fn=subtask_fetch_snapshot,
+                    subtask_id=subtask_id,
+                ):
+                    assert tombstone
+                    snapshot_state = state.snapshot.get(subtask_id)
 
-        task.spawn_child(f"{prefix}.snapshot", closure)
+                    await _binding_snapshot_task(
+                        binding,
+                        binding_index,
+                        fetch_fn,
+                        snapshot_state,
+                        subtask_task,
+                        tombstone,
+                    )
+
+                task.spawn_child(f"{prefix}.snapshot.{subtask_id}", snapshot_subtask)
+        else:
+
+            async def closure(task: Task):
+                assert tombstone
+                await _binding_snapshot_task(
+                    binding,
+                    binding_index,
+                    fetch_snapshot,
+                    state.snapshot,
+                    task,
+                    tombstone,
+                )
+
+            task.spawn_child(f"{prefix}.snapshot", closure)
 
 
 async def _binding_snapshot_task(
@@ -612,7 +712,7 @@ async def _binding_snapshot_task(
             if isinstance(doc, dict):
                 doc["meta_"] = {
                     "op": "u" if count < state.last_count else "c",
-                    "row_id": count
+                    "row_id": count,
                 }
             else:
                 doc.meta_ = BaseDocument.Meta(
@@ -719,7 +819,10 @@ async def _binding_incremental_task(
 
         if lag < binding.resourceConfig.interval:
             sleep_for = binding.resourceConfig.interval - lag
-            task.log.info("incremental task ran recently, sleeping until `interval` has fully elapsed", {"sleep_for": sleep_for, "interval": binding.resourceConfig.interval})
+            task.log.info(
+                "incremental task ran recently, sleeping until `interval` has fully elapsed",
+                {"sleep_for": sleep_for, "interval": binding.resourceConfig.interval},
+            )
 
     while True:
         try:
@@ -747,9 +850,7 @@ async def _binding_incremental_task(
                 task.log.info("incremental task triggered backfill")
                 task.stopping.event.set()
                 task.checkpoint(
-                    ConnectorState(
-                        backfillRequests={binding.stateKey: True}
-                    )
+                    ConnectorState(backfillRequests={binding.stateKey: True})
                 )
                 return
             else:
@@ -759,7 +860,12 @@ async def _binding_incremental_task(
                     is_larger = item > state.cursor
                 elif isinstance(item, datetime) and isinstance(state.cursor, datetime):
                     is_larger = item > state.cursor
-                elif isinstance(item, tuple) and isinstance(state.cursor, tuple) and isinstance(item[0], str) and isinstance(state.cursor[0], str):
+                elif (
+                    isinstance(item, tuple)
+                    and isinstance(state.cursor, tuple)
+                    and isinstance(item[0], str)
+                    and isinstance(state.cursor[0], str)
+                ):
                     is_larger = item[0] > state.cursor[0]
                 else:
                     raise RuntimeError(
@@ -786,7 +892,7 @@ async def _binding_incremental_task(
             sleep_for = binding.resourceConfig.interval
 
         elif isinstance(state.cursor, datetime):
-            lag = (datetime.now(tz=UTC) - state.cursor)
+            lag = datetime.now(tz=UTC) - state.cursor
 
             if lag > binding.resourceConfig.interval:
                 # We're not idle. Attempt to fetch the next changes.
@@ -800,4 +906,6 @@ async def _binding_incremental_task(
             sleep_for = timedelta()
             continue
 
-        task.log.debug("incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor})
+        task.log.debug(
+            "incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor}
+        )
