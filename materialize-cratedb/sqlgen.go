@@ -170,6 +170,11 @@ CREATE TABLE {{ template "temp_name" . }} (
 );
 {{ end }}
 
+-- Templated deletion of a temporary load table:
+{{ define "dropLoadTable" }}
+DROP TABLE IF EXISTS {{ template "temp_name" . }};
+{{ end }}
+
 -- Templated insertion into the temporary load table:
 
 {{ define "loadInsert" }}
@@ -296,6 +301,7 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
+	tplDropLoadTable     = tplAll.Lookup("dropLoadTable")
 	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
 	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
 	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
