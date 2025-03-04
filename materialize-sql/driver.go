@@ -318,6 +318,8 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *bo
 		}
 	}
 
+	log.WithField("eventType", "connectorStatus").Info("Started")
+
 	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, options, nil
 }
 
