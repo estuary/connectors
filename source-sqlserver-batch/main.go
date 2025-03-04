@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 
 	mssqldb "github.com/microsoft/go-mssqldb"
@@ -38,11 +40,13 @@ type Config struct {
 
 type advancedConfig struct {
 	DiscoverViews   bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
+	Timezone        string   `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank."`
 	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '5m' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 
 	parsedFeatureFlags map[string]bool // Parsed feature flags setting with defaults applied
+	datetimeLocation   *time.Location  // Parsed location in which DATETIME column values will be interpreted.
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -63,6 +67,15 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
 		}
 	}
+
+	if c.Advanced.Timezone == "" {
+		c.Advanced.datetimeLocation = time.UTC
+	} else if loc, err := schedule.ParseTimezone(c.Advanced.Timezone); err != nil {
+		return err
+	} else {
+		c.Advanced.datetimeLocation = loc
+	}
+
 	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
 	// method that we can be sure always gets called before the config is used.
 	c.Advanced.parsedFeatureFlags = common.ParseFeatureFlags(c.Advanced.FeatureFlags, featureFlagDefaults)
@@ -83,6 +96,10 @@ func (c *Config) SetDefaults() {
 
 	if c.Advanced.PollSchedule == "" {
 		c.Advanced.PollSchedule = "5m"
+	}
+
+	if c.Advanced.Timezone == "" {
+		c.Advanced.Timezone = "UTC"
 	}
 }
 
@@ -191,7 +208,53 @@ func generateSQLServerResource(cfg *Config, resourceName, schemaName, tableName,
 	return nil, fmt.Errorf("unsupported entity type %q", tableType)
 }
 
-func translateSQLServerValue(val any, databaseTypeName string) (any, error) {
+func translateSQLServerValue(cfg *Config, val any, databaseTypeName string) (any, error) {
+	switch strings.ToUpper(databaseTypeName) {
+	case "UNIQUEIDENTIFIER":
+		if bs, ok := val.([]byte); ok {
+			// Correct Microsoft's insane fieldwise-little-endian UUID representation.
+			bs[0], bs[1], bs[2], bs[3] = bs[3], bs[2], bs[1], bs[0]
+			bs[4], bs[5] = bs[5], bs[4]
+			bs[6], bs[7] = bs[7], bs[6]
+			var u, err = uuid.FromBytes(bs)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing uniqueidentifier: %w", err)
+			}
+			return u.String(), nil
+		}
+		return val, nil
+	case "DECIMAL", "MONEY", "SMALLMONEY":
+		if bs, ok := val.([]byte); ok {
+			return string(bs), nil
+		}
+		return val, nil
+	case "DATE":
+		if t, ok := val.(time.Time); ok {
+			return t.Format("2006-01-02"), nil
+		}
+		return val, nil
+	case "TIME":
+		if t, ok := val.(time.Time); ok {
+			return t.Format("15:04:05.9999999Z07:00"), nil
+		}
+		return val, nil
+	case "DATETIMEOFFSET":
+		// The DATETIMEOFFSET column type includes an actual UTC timezone offset, so we
+		// should leave that in place and just serialize it appropriately.
+		if t, ok := val.(time.Time); ok {
+			return t.Format(time.RFC3339Nano), nil
+		}
+		return val, nil
+	case "DATETIME", "DATETIME2", "SMALLDATETIME":
+		if t, ok := val.(time.Time); ok {
+			// The SQL Server DATETIME column types don't have any innate time zone information.
+			// We receive these as Go time.Time values in the UTC location, and want to reinterpret
+			// the same YYYY-MM-DD HH:MM:SS.NNN values in the desired location instead.
+			t = time.Date(t.Year(), t.Month(), t.Day(), t.Hour(), t.Minute(), t.Second(), t.Nanosecond(), cfg.Advanced.datetimeLocation)
+			return t.Format(time.RFC3339Nano), nil
+		}
+		return val, nil
+	}
 	return val, nil
 }
 

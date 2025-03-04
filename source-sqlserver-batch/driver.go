@@ -57,7 +57,7 @@ type BatchSQLDriver struct {
 	ConfigSchema     json.RawMessage
 
 	Connect             func(ctx context.Context, cfg *Config) (*sql.DB, error)
-	TranslateValue      func(val any, databaseTypeName string) (any, error)
+	TranslateValue      func(cfg *Config, val any, databaseTypeName string) (any, error)
 	GenerateResource    func(cfg *Config, resourceName, schemaName, tableName, tableType string) (*Resource, error)
 	SelectQueryTemplate func(res *Resource) (string, error)
 }
@@ -281,7 +281,7 @@ type capture struct {
 	DB             *sql.DB
 	Bindings       []bindingInfo
 	Output         *boilerplate.PullOutput
-	TranslateValue func(val any, databaseTypeName string) (any, error)
+	TranslateValue func(cfg *Config, val any, databaseTypeName string) (any, error)
 }
 
 type bindingInfo struct {
@@ -466,7 +466,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		watchdog.Reset(pollingWatchdogTimeout) // Reset the no-data watchdog timeout after each row received
 
 		for idx, val := range columnValues {
-			var translatedVal, err = c.TranslateValue(val, columnTypes[idx].DatabaseTypeName())
+			var translatedVal, err = c.TranslateValue(c.Config, val, columnTypes[idx].DatabaseTypeName())
 			if err != nil {
 				return fmt.Errorf("error translating column %q value: %w", columnNames[idx], err)
 			}
