@@ -14,6 +14,7 @@ from .models import (
     ReportDocument,
     Row,
     RunReportResponse,
+    MetadataResponse,
 )
 from .utils import (
     dt_to_date_str,
@@ -200,3 +201,20 @@ async def backfill_report(
 
     next_start = min(start + timedelta(days=1), cutoff)
     yield dt_to_str(next_start)
+
+
+async def fetch_metadata(
+    http: HTTPSession,
+    property_id: str,
+    log: Logger,
+) -> tuple[list[str], list[str]]:
+    url = f"{API}/{property_id}/metadata"
+
+    response = MetadataResponse.model_validate_json(
+        await http.request(log, url)
+    )
+
+    dimensions = [dimension.apiName for dimension in response.dimensions]
+    metrics = [metric.apiName for metric in response.metrics]
+
+    return (dimensions, metrics)
