@@ -135,6 +135,12 @@ func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUp
 				}
 			}
 			sawRoot = true
+		} else if !deltaUpdates && p.Ptr == boundCollection.Key[0] && isOptional(c.Type) {
+			// The _first_ key location is always required, but others may be optional if the connector allows it
+			c = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+				Reason: "The first collection key component is required to be included for standard updates",
+			}
 		} else if ambiguousFields := v.ambiguousFields(p, boundCollection.Projections); len(ambiguousFields) > 0 && c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED {
 			if p.Explicit {
 				// User-defined projections of ambiguous fields are allowed as-is.
@@ -161,6 +167,11 @@ func (v Validator) validateNewBinding(boundCollection pf.CollectionSpec, deltaUp
 
 	}
 	return constraints
+}
+
+func isOptional(c pm.Response_Validated_Constraint_Type) bool {
+	return c == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED ||
+		c == pm.Response_Validated_Constraint_FIELD_OPTIONAL
 }
 
 func (v Validator) validateMatchesExistingBinding(
@@ -218,6 +229,12 @@ func (v Validator) validateMatchesExistingBinding(
 						}(),
 					),
 				}
+			}
+		} else if !deltaUpdates && p.IsPrimaryKey && existing != nil && !slices.Contains(existing.FieldSelection.Keys, p.Field) {
+			// Locations that are part of the primary key may not be added without backfilling the binding
+			c = &pm.Response_Validated_Constraint{
+				Type:   pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
+				Reason: "Cannot add a new key location to the field selection of an existing non-delta-updates materialization witout backfilling",
 			}
 		} else if ambiguousFields := v.ambiguousFields(p, boundCollection.Projections); len(ambiguousFields) > 0 {
 			// Projections that would result in ambiguous materialized fields are forbidden if a

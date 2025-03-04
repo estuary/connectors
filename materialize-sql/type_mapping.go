@@ -417,8 +417,8 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {
 	case p.IsPrimaryKey:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "All Locations that are part of the collections key are required"
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "All Locations that are part of the collections key are recommended"
 	case p.IsRootDocumentProjection() && deltaUpdates:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"

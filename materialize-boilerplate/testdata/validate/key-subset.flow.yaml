@@ -1,0 +1,34 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        keyA: { type: string }
+        keyB: { type: string }
+        keyC: { type: string }
+        scalarValue: { type: "string" }
+        numericString: { type: [integer, string], format: integer }
+        nonScalarValue: { type: object }
+        multiple: { type: [integer, string, boolean] }
+        nullValue: { type: "null" }
+        optional: { type: object }
+      required: [keyA, keyB, keyC, scalarValue]
+    key: [/keyA, /keyB, /keyC]
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: false
+          include:
+            keyA: {}
+            keyB: {}
+            flow_document: {}
+          exclude:
+            - keyC
