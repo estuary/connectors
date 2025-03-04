@@ -1,0 +1,13 @@
+# ================================
+# Collection "acmeCo/test/integertypes_795898": 5 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"bigint_col":42,"bit_col":true,"id":0,"int_col":42,"smallint_col":42,"tinyint_col":42}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"bigint_col":-9223372036854775808,"bit_col":false,"id":1,"int_col":-2147483648,"smallint_col":-32768,"tinyint_col":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"bigint_col":9223372036854775807,"bit_col":true,"id":2,"int_col":2147483647,"smallint_col":32767,"tinyint_col":255}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"bigint_col":0,"bit_col":false,"id":3,"int_col":0,"smallint_col":0,"tinyint_col":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"bigint_col":null,"bit_col":null,"id":4,"int_col":null,"smallint_col":null,"tinyint_col":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"integertypes_795898":{"CursorNames":["id"],"CursorValues":[4],"LastPolled":"<TIMESTAMP>","DocumentCount":5}}}
+

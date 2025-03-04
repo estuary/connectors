@@ -1,0 +1,18 @@
+# ================================
+# Collection "acmeCo/test/dateandtimetypes_307398": 10 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"date_col":"2025-02-14","datetime2_col":"2025-02-14T14:44:29.1234567Z","datetime_col":"2025-02-14T14:44:29Z","datetimeoffset_col":"2025-02-14T14:44:29.1234567+09:00","id":0,"smalldatetime_col":"2025-02-14T14:44:00Z","time_col":"14:44:29.1234567Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"date_col":"1969-07-20","datetime2_col":"1969-07-20T20:17:00Z","datetime_col":"1969-07-20T20:17:00Z","datetimeoffset_col":"1969-07-20T20:17:00Z","id":1,"smalldatetime_col":"1969-07-20T20:17:00Z","time_col":"20:17:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"date_col":"2077-07-20","datetime2_col":"2077-07-20T15:30:00Z","datetime_col":"2077-07-20T15:30:00Z","datetimeoffset_col":"2077-07-20T15:30:00+09:00","id":2,"smalldatetime_col":"2077-07-20T15:30:00Z","time_col":"15:30:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"date_col":"0001-01-01","datetime2_col":"0001-01-01T00:00:00Z","datetime_col":"1753-01-01T00:00:00Z","datetimeoffset_col":"0001-01-01T00:00:00Z","id":3,"smalldatetime_col":"1900-01-01T00:00:00Z","time_col":"00:00:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"date_col":"9999-12-31","datetime2_col":"9999-12-31T23:59:59.9999999Z","datetime_col":"9999-12-31T23:59:59.997Z","datetimeoffset_col":"9999-12-31T23:59:59.9999999Z","id":4,"smalldatetime_col":"2079-06-06T23:59:00Z","time_col":"23:59:59.9999999Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5},"date_col":"2024-02-14","datetime2_col":"2024-02-14T15:30:45Z","datetime_col":"2024-02-14T15:30:45Z","datetimeoffset_col":"2024-02-14T15:30:45Z","id":5,"smalldatetime_col":"2024-02-14T15:31:00Z","time_col":"15:30:45Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6},"date_col":"2024-02-14","datetime2_col":"2024-02-14T15:30:45Z","datetime_col":"2024-02-14T15:30:45Z","datetimeoffset_col":"2024-02-14T15:30:45Z","id":6,"smalldatetime_col":"2024-02-14T15:31:00Z","time_col":"15:30:45Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7},"date_col":"2024-02-14","datetime2_col":"2024-02-14T15:30:45.1234567Z","datetime_col":"2024-02-14T15:30:45.123Z","datetimeoffset_col":"2024-02-14T15:30:45.1234567Z","id":7,"smalldatetime_col":"2024-02-14T15:31:00Z","time_col":"15:30:45.1234567Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8},"date_col":"2024-02-14","datetime2_col":"2024-02-14T15:30:45.123456Z","datetime_col":"2024-02-14T15:30:45Z","datetimeoffset_col":"2024-02-14T15:30:45.123456Z","id":8,"smalldatetime_col":"2024-02-14T15:31:00Z","time_col":"15:30:45.123456Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9},"date_col":null,"datetime2_col":null,"datetime_col":null,"datetimeoffset_col":null,"id":9,"smalldatetime_col":null,"time_col":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"dateandtimetypes_307398":{"CursorNames":["id"],"CursorValues":[9],"LastPolled":"<TIMESTAMP>","DocumentCount":10}}}
+
