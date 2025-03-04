@@ -1,0 +1,127 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:0"}},"data":"Data 0","k":"AAAAAA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":1,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AQD/AP8A/wD/AA=="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/AP8A/wD/AA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:1"}},"data":"Data 8","k":"AAAARA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":2,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AQD/AP8A/0QA"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/AP8A/0QA"
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:2"}},"data":"Data 7","k":"AABDRA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":3,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AQD/AP9DRAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/AP9DRAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:3"}},"data":"Data 6","k":"AEIARA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":4,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AQD/QgD/RAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/QgD/RAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:4"}},"data":"Data 5","k":"AEJDRA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":5,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AQD/QkNEAA=="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/QkNEAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:5"}},"data":"Data 1","k":"QQAAAA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":6,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AUEA/wD/AP8A"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUEA/wD/AP8A"
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:6"}},"data":"Data 2","k":"QUIAAA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":7,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AUFCAP8A/wA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUFCAP8A/wA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:7"}},"data":"Data 3","k":"QUJDAA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":8,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AUFCQwD/AA=="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUFCQwD/AA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_binary_754161260011": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Binary_754161260011","cursor":"backfill:8"}},"data":"Data 4","k":"QUJDRA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":9,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Backfill","scanned":"AUFCQ0QA"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUFCQ0QA"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_Binary_754161260011":{"backfilled":9,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":{"maxlen":4,"type":"binary"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
+
+

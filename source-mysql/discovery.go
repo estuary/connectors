@@ -724,6 +724,10 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 		// Backfill text keys are serialized as the raw bytes or string we receive, which is generally
 		// fine because we always receive backfill results in UTF-8.
 		return val, nil
+	case "binary", "varbinary":
+		// Binary keys are serialized as the raw bytes, which provides correct
+		// lexicographic ordering in FDB tuples
+		return val, nil
 	}
 	return val, fmt.Errorf("internal error: failed to encode column of type %q as backfill key", t.Type)
 }
