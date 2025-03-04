@@ -39,11 +39,33 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
+	// Obtain the current WAL flush location on the server. We will need this either to
+	// initialize our cursor or to sanity-check it.
+	serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
+	if err != nil {
+		return nil, err
+	}
+
 	var startLSN pglogrepl.LSN
 	if startCursor != "" {
+		// Parse the cursor into an LSN value
 		startLSN, err = pglogrepl.ParseLSN(startCursor)
 		if err != nil {
 			return nil, fmt.Errorf("error parsing start cursor: %w", err)
+		}
+
+		// Check that our start cursor is less than or equal to the server flush LSN.
+		// Since our cursor should always be <= the latest server LSN (since it represents
+		// a WAL commit event that we received, captured, and acknowledged), this should
+		// only ever happen when this is effectively a different server (in a broad sense
+		// which includes situations like "DB version upgrade")
+		//
+		// TODO(wgd): Upgrade this check to an actual failure once it's been verified to work in prod.
+		if startLSN > serverFlushLSN {
+			logrus.WithFields(logrus.Fields{
+				"resumeLSN": startLSN.String(),
+				"flushLSN":  serverFlushLSN.String(),
+			}).Warn("resume cursor mismatch: resume LSN is greater than server flush LSN")
 		}
 	} else {
 		// If no start cursor is specified, we are free to begin replication from the latest tail-end of the WAL.
@@ -62,12 +84,8 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 			logrus.WithField("err", err).Debug("error recreating replication slot")
 		}
 
-		// Obtain the current WAL flush location on the server and initialize the cursor to that point.
-		var flushLSN, err = queryLatestServerLSN(ctx, db.conn)
-		if err != nil {
-			return nil, fmt.Errorf("unable to initialize cursor to current server LSN: %w", err)
-		}
-		startLSN = flushLSN
+		// Initialize our start LSN to the current server flush LSN.
+		startLSN = serverFlushLSN
 	}
 
 	// Check that the slot's `confirmed_flush_lsn` is less than or equal to our resume cursor value.
@@ -90,13 +108,13 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 	} else if slotInfo.WALStatus == "lost" {
 		logrus.WithField("slot", slot).Warn("replication slot was invalidated by the server, it must be deleted and all bindings backfilled")
 	} else if slotInfo.ConfirmedFlushLSN == nil {
-		logrus.WithField("slot", slot).Warn("replication slot has no confirmed_flush_lsn and is likely still being created (but waiting on a long-running transaction)")
+		logrus.WithField("slot", slot).Warn("replication slot has no confirmed_flush_lsn (and is likely still being created but blocked on a long-running transaction)")
 	} else if startLSN < *slotInfo.ConfirmedFlushLSN {
 		logrus.WithFields(logrus.Fields{
 			"slot":         slot,
 			"confirmedLSN": slotInfo.ConfirmedFlushLSN.String(),
 			"startLSN":     startLSN.String(),
-		}).Warn("replication slot confirmed_flush_lsn greater than connector start LSN (this means it was probably deleted+recreated and all bindings need to be backfilled)")
+		}).Warn("resume cursor mismatch: resume LSN is less than replication slot confirmed_flush_lsn (this means the slot was probably deleted+recreated and all bindings need to be backfilled)")
 	}
 
 	logrus.WithFields(logrus.Fields{
