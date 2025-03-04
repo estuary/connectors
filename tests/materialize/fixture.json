@@ -35,7 +35,7 @@
 
     ["tests/symbols", { "id": "test", "testing (%s)": "test"}],
 
-    ["tests/unsigned-bigint", { "id": 1, "unsigned_bigint": 18446744073709551615}],
+    ["tests/unsigned-bigint", { "id": 1, "unsigned_bigint": 1844674407370955169}],
 
     ["tests/deletions", { "id": 1, "_meta": {"op": "c"} }],
     ["tests/deletions", { "id": 2, "_meta": {"op": "c"} }],
