@@ -1,0 +1,98 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "keydiscovery_608585",
+      "schema": "dbo",
+      "table": "keydiscovery_608585"
+    },
+    "resource_path": [
+      "keydiscovery_608585"
+    ],
+    "collection": {
+      "name": "acmeCo/test/keydiscovery_608585",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "k_smallint",
+          "k_int",
+          "k_bigint",
+          "k_bool",
+          "k_str"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              },
+              "row_id": {
+                "type": "integer",
+                "title": "Row ID",
+                "description": "Row ID of the Document"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Change Operation",
+                "description": "Operation type (c: Create / u: Update / d: Delete)",
+                "default": "u"
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index",
+              "row_id"
+            ]
+          },
+          "data": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "k_bigint": {
+            "type": "integer"
+          },
+          "k_bool": {
+            "type": "boolean"
+          },
+          "k_int": {
+            "type": "integer"
+          },
+          "k_smallint": {
+            "type": "integer"
+          },
+          "k_str": {
+            "type": "string"
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/k_smallint",
+        "/k_int",
+        "/k_bigint",
+        "/k_bool",
+        "/k_str"
+      ],
+      "projections": null
+    },
+    "state_key": "keydiscovery_608585"
+  }
+

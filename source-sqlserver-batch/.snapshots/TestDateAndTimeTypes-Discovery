@@ -1,0 +1,117 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "dateandtimetypes_307398",
+      "schema": "dbo",
+      "table": "dateandtimetypes_307398",
+      "cursor": [
+        "id"
+      ]
+    },
+    "resource_path": [
+      "dateandtimetypes_307398"
+    ],
+    "collection": {
+      "name": "acmeCo/test/dateandtimetypes_307398",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "id"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              },
+              "row_id": {
+                "type": "integer",
+                "title": "Row ID",
+                "description": "Row ID of the Document"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Change Operation",
+                "description": "Operation type (c: Create / u: Update / d: Delete)",
+                "default": "u"
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index",
+              "row_id"
+            ]
+          },
+          "date_col": {
+            "format": "date",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datetime2_col": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datetime_col": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datetimeoffset_col": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer"
+          },
+          "smalldatetime_col": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "time_col": {
+            "format": "time",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ],
+      "projections": null
+    },
+    "state_key": "dateandtimetypes_307398"
+  }
+
