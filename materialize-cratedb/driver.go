@@ -277,6 +277,7 @@ func newTransactor(
 	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, nil, fmt.Errorf("load pgx.Connect: %w", err)
 	}
+
 	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
 		return nil, nil, fmt.Errorf("store pgx.Connect: %w", err)
 	}
@@ -290,6 +291,11 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
+		// Make sure that the binding does not exist before creating it.
+		if err = d.removeBinding(ctx, binding); err != nil {
+			return nil, nil, fmt.Errorf("remove binding: %w", err)
+		}
+
 		if err = d.addBinding(ctx, binding, is); err != nil {
 			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
@@ -316,6 +322,18 @@ type binding struct {
 	storeInsertSQL string
 	deleteQuerySQL string
 	loadQuerySQL   string
+}
+
+func (t *transactor) removeBinding(ctx context.Context, target sql.Table) error {
+	var b = &binding{target: target}
+	var w strings.Builder
+
+	if err := tplDropLoadTable.Execute(&w, &b.target); err != nil {
+		return fmt.Errorf("executing dropLoadTable template: %w", err)
+	} else if _, err := t.load.conn.Exec(ctx, w.String()); err != nil {
+		return fmt.Errorf("Exec(%s): %w", w.String(), err)
+	}
+	return nil
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -519,6 +537,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (d *transactor) Destroy() {
+	for _, b := range d.bindings {
+		err := d.removeBinding(context.Background(), b.target)
+		if err != nil {
+			return
+		}
+	}
+
 	d.load.conn.Close(context.Background())
 	d.store.conn.Close(context.Background())
 }
