@@ -15,6 +15,7 @@ from .api import (
     fetch_property_timezone,
     fetch_report,
     backfill_report,
+    fetch_metadata,
 )
 from .models import (
     EndpointConfig,
@@ -32,7 +33,11 @@ from .utils import (
 from .default_reports import DEFAULT_REPORTS
 
 
-async def validate_credentials(
+VALID_DIMENSIONS_DOCS_URL = "https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#dimensions"
+VALID_METRICS_DOCS_URL = "https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#metrics"
+
+
+async def _validate_credentials(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ):
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
@@ -49,16 +54,18 @@ async def validate_credentials(
         raise ValidationError([msg])
 
 
-def validate_custom_reports_json(
-    custom_reports_json: str | None,
+async def validate_custom_reports_json(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
 ):
-    if not custom_reports_json:
+    if not config.custom_reports:
         return
 
     custom_reports: Any
 
     try:
-        custom_reports = json.loads(custom_reports_json)
+        custom_reports = json.loads(config.custom_reports)
         assert isinstance(custom_reports, list)
     except (json.decoder.JSONDecodeError, AssertionError) as err:
         if isinstance(err, json.decoder.JSONDecodeError):
@@ -70,12 +77,33 @@ def validate_custom_reports_json(
 
     default_report_names = [report.get('name') for report in DEFAULT_REPORTS]
 
+    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+
+    try:
+        valid_dimensions, valid_metrics = await fetch_metadata(http, config.property_id, log)
+    except HTTPError as err:
+        if err.code == 401:
+            msg = f"Invalid credentials. Please confirm the provided credentials are correct.\n\n{err.message}"
+        else:
+            msg = f"Encountered error validating credentials.\n\n{err.message}"
+
+        raise ValidationError([msg])
+
     for custom_report_details in custom_reports:
         try:
             assert isinstance(custom_report_details, dict)
             model = Report.model_validate(custom_report_details)
             if model.name in default_report_names:
                 errors.append(f'Custom report name "{model.name}" already exists as a default report. Please rename the custom report.')
+
+            for dimension in model.dimensions:
+                if dimension not in valid_dimensions:
+                    errors.append(f'"{dimension}" in report "{model.name}" is not a valid dimension. Consult {VALID_DIMENSIONS_DOCS_URL} for a list of valid dimensions.')
+
+            for metric in model.metrics:
+                if metric not in valid_metrics:
+                    errors.append(f'"{metric}" in report "{model.name}" is not a valid metric. Consult {VALID_METRICS_DOCS_URL} for a list of valid metrics.')
+
         except (AssertionError, ModelValidationError) as err:
             if isinstance(err, AssertionError):
                 raise ValidationError(["Custom reports JSON input array must only contain objects."])
@@ -86,6 +114,17 @@ def validate_custom_reports_json(
 
     if errors:
         raise ValidationError(errors)
+
+
+async def validate_config(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+):
+    if config.custom_reports:
+        await validate_custom_reports_json(log, http, config)
+    else:
+        await _validate_credentials(log, http, config)
 
 
 def reports(
