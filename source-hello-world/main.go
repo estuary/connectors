@@ -175,6 +175,7 @@ func (c *capture) Run() error {
 		return err
 	}
 
+	log.WithField("eventType", "connectorStatus").Info("Saying hello, over and over...")
 	var interval = time.Duration(float64(time.Second) / float64(c.Config.Rate))
 	for {
 		select {
