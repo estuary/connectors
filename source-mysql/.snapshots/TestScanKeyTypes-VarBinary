@@ -1,0 +1,127 @@
+####################################
+### Capture from Start
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:0"}},"data":"Data 0","k":""}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":1,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AQA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:1"}},"data":"Data 8","k":"AAAARA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":2,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AQD/AP8A/0QA"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/AP8A/0QA"
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:2"}},"data":"Data 7","k":"AABDRA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":3,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AQD/AP9DRAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/AP9DRAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:3"}},"data":"Data 6","k":"AEIARA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":4,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AQD/QgD/RAA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/QgD/RAA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:4"}},"data":"Data 5","k":"AEJDRA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":5,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AQD/QkNEAA=="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AQD/QkNEAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:5"}},"data":"Data 1","k":"QQ=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":6,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AUEA"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUEA"
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:6"}},"data":"Data 2","k":"QUI="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":7,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AUFCAA=="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUFCAA=="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:7"}},"data":"Data 3","k":"QUJD"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":8,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AUFCQwA="}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUFCQwA="
+####################################
+# ================================
+# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:8"}},"data":"Data 4","k":"QUJDRA=="}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":9,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Backfill","scanned":"AUFCQ0QA"}},"cursor":"binlog.000123:56789"}
+
+
+####################################
+### Capture from Key "AUFCQ0QA"
+####################################
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FScanKeyTypes_VarBinary_754161260012":{"backfilled":9,"key_columns":["k"],"metadata":{"charset":"utf8mb4","schema":{"columns":["k","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"k":"varbinary"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+
+
+
