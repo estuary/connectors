@@ -120,7 +120,7 @@ pub async fn run_server(
     let listener = tokio::net::TcpListener::bind(address)
         .await
         .context("listening on port")?;
-    tracing::info!(%address, "listening for connections");
+    tracing::info!(eventType = "connectorStatus", "listening for connections");
     axum::serve(listener, router.into_make_service())
         .await
         .context("running server")?;
