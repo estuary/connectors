@@ -156,3 +156,21 @@ class RunReportResponse(BaseModel, extra="allow"):
         timeZone: str
 
     metadata: Metadata
+
+
+class MetadataResponse(BaseModel, extra="allow"):
+    class BaseMetadata(BaseModel, extra="allow"):
+        apiName: str
+        uiName: str
+        description: str
+
+    class DimensionMetadata(BaseMetadata):
+        category: str
+
+    class MetricMetadata(DimensionMetadata):
+        type: str
+
+    dimensions: list[DimensionMetadata]
+    metrics: list[MetricMetadata]
+    name: str
+    comparisons: list[BaseMetadata]
