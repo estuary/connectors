@@ -128,8 +128,10 @@ async def _paginate_through_report_results(
     while True:
         body = _build_report_body(date, report, offset)
 
+        _, response_body = await http.request_stream(log, url, method="POST", json=body)
+
         processor = IncrementalJsonProcessor(
-            await http.request_stream(log, url, method="POST", json=body),
+            response_body(),
             f"rows.item",
             Row,
             RunReportResponse,
