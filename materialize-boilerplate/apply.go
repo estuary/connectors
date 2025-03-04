@@ -8,6 +8,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -197,10 +198,20 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		group, groupCtx := errgroup.WithContext(ctx)
 		group.SetLimit(maxConcurrentUpdateActions)
 
-		for _, a := range actions {
+		for i, a := range actions {
 			a := a
+			i := i
 			group.Go(func() error {
-				return a(groupCtx)
+				if err := a(groupCtx); err != nil {
+					logrus.WithFields(logrus.Fields{
+						"actionIndex":       i,
+						"totalActions":      len(actions),
+						"actionDescription": actionDescriptions[i],
+						"error":             fmt.Sprintf("%+v", err),
+					}).Error("error executing apply action")
+					return err
+				}
+				return nil
 			})
 		}
 
@@ -208,8 +219,14 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 			return nil, fmt.Errorf("executing concurrent apply actions: %w", err)
 		}
 	} else {
-		for _, a := range actions {
+		for i, a := range actions {
 			if err := a(ctx); err != nil {
+				logrus.WithFields(logrus.Fields{
+					"actionIndex":       i,
+					"totalActions":      len(actions),
+					"actionDescription": actionDescriptions[i],
+					"error":             fmt.Sprintf("%+v", err),
+				}).Error("error executing apply action")
 				return nil, fmt.Errorf("executing apply actions: %w", err)
 			}
 		}
