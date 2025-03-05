@@ -32,7 +32,7 @@ type BindingUpdate struct {
 	// weren't before. They may need to be nullable because a materialized field is now nullable and
 	// wasn't before, or because they exist as non-nullable in the destination and aren't included
 	// in the materialization's field selection.
-	NewlyNullableFields []EndpointField
+	NewlyNullableFields []ExistingField
 
 	// NewlyDeltaUpdates is if the materialized binding was standard updates per the previously
 	// applied materialization spec, and is now delta updates. Some systems may need to do things
@@ -83,75 +83,105 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 	}
 
-	for bindingIdx, binding := range req.Materialization.Bindings {
+	computed, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
+	if err != nil {
+		return nil, fmt.Errorf("computing common updates: %w", err)
+	}
+
+	for _, bindingIdx := range computed.newBindings {
+		desc, action, err := applier.CreateResource(ctx, req.Materialization, bindingIdx)
+		if err != nil {
+			return nil, fmt.Errorf("getting CreateResource action: %w", err)
+		}
+		addAction(desc, action)
+	}
+
+	for _, bindingIdx := range computed.backfillBindings {
+		deleteDesc, deleteAction, err := applier.DeleteResource(ctx, req.Materialization.Bindings[bindingIdx].ResourcePath)
+		if err != nil {
+			return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
+		}
+
+		createDesc, createAction, err := applier.CreateResource(ctx, req.Materialization, bindingIdx)
+		if err != nil {
+			return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
+		}
+
+		if deleteAction == nil && createAction == nil {
+			// Currently only applicable to materialize-sqlite.
+			continue
+		}
+
+		desc := []string{deleteDesc}
+		if createDesc != "" {
+			desc = append(desc, createDesc)
+		}
+
+		action := func(ctx context.Context) error {
+			if err := deleteAction(ctx); err != nil {
+				return err
+			}
+
+			if createAction != nil {
+				if err := createAction(ctx); err != nil {
+					return err
+				}
+			}
+
+			return nil
+		}
+
+		addAction(strings.Join(desc, "\n"), action)
+	}
+
+	for bindingIdx, commonUpdates := range computed.updatedBindings {
+		desc, action, err := applier.UpdateResource(ctx, req.Materialization, bindingIdx, commonUpdates)
+		if err != nil {
+			return nil, fmt.Errorf("getting UpdateResource action: %w", err)
+		}
+		addAction(desc, action)
+	}
+
+	if err := runActions(ctx, actions, actionDescriptions, concurrent); err != nil {
+		return nil, err
+	}
+
+	return &pm.Response_Applied{ActionDescription: strings.Join(actionDescriptions, "\n")}, nil
+}
+
+type computedUpdates struct {
+	newBindings      []int
+	backfillBindings []int
+	updatedBindings  map[int]BindingUpdate
+}
+
+func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*computedUpdates, error) {
+	out := computedUpdates{
+		updatedBindings: make(map[int]BindingUpdate),
+	}
+
+	for bindingIdx, nextBinding := range next.Bindings {
 		// The existing binding spec is used to extract various properties that can't be learned
 		// from introspecting the destination system, such as the backfill counter and if the
 		// materialization was previously delta updates.
-		existingBinding, err := findExistingBinding(binding.ResourcePath, req.LastMaterialization)
-		if err != nil {
-			return nil, fmt.Errorf("finding existing binding: %w", err)
-		}
-
-		if !is.HasResource(binding.ResourcePath) {
+		lastBinding := findExistingBinding(nextBinding.ResourcePath, last)
+		if existingResource := is.GetResource(nextBinding.ResourcePath); existingResource == nil {
 			// Resource does not yet exist, and must be created.
-			desc, action, err := applier.CreateResource(ctx, req.Materialization, bindingIdx)
-			if err != nil {
-				return nil, fmt.Errorf("getting CreateResource action: %w", err)
-			}
-			addAction(desc, action)
-		} else if existingBinding != nil && existingBinding.Backfill != binding.Backfill {
+			out.newBindings = append(out.newBindings, bindingIdx)
+		} else if lastBinding != nil && lastBinding.Backfill != nextBinding.Backfill {
 			// Resource does exist but the backfill counter is being increased, so it must deleted
 			// and re-created anew.
-			deleteDesc, deleteAction, err := applier.DeleteResource(ctx, binding.ResourcePath)
-			if err != nil {
-				return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
-			}
-
-			createDesc, createAction, err := applier.CreateResource(ctx, req.Materialization, bindingIdx)
-			if err != nil {
-				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
-			}
-
-			if deleteAction == nil && createAction == nil {
-				// Currently only applicable to materialize-sqlite.
-				continue
-			}
-
-			desc := []string{deleteDesc}
-			if createDesc != "" {
-				desc = append(desc, createDesc)
-			}
-
-			action := func(ctx context.Context) error {
-				if err := deleteAction(ctx); err != nil {
-					return err
-				}
-
-				if createAction != nil {
-					if err := createAction(ctx); err != nil {
-						return err
-					}
-				}
-
-				return nil
-			}
-
-			addAction(strings.Join(desc, "\n"), action)
+			out.backfillBindings = append(out.backfillBindings, bindingIdx)
 		} else {
 			// Resource does exist and may need updated for changes in the binding specification.
-			params := BindingUpdate{
-				NewlyDeltaUpdates: existingBinding != nil && !existingBinding.DeltaUpdates && binding.DeltaUpdates,
+			update := BindingUpdate{
+				NewlyDeltaUpdates: lastBinding != nil && !lastBinding.DeltaUpdates && nextBinding.DeltaUpdates,
 			}
 
-			for _, field := range binding.FieldSelection.AllFields() {
-				projection := *binding.Collection.GetProjection(field)
+			for _, field := range nextBinding.FieldSelection.AllFields() {
+				projection := *nextBinding.Collection.GetProjection(field)
 
-				if is.HasField(binding.ResourcePath, field) {
-					existingField, err := is.GetField(binding.ResourcePath, field)
-					if err != nil {
-						return nil, fmt.Errorf("getting existing field information for field %q of resource %q: %w", field, binding.ResourcePath, err)
-					}
-
+				if existingField := existingResource.GetField(field); existingField != nil {
 					newRequired := projection.Inference.Exists == pf.Inference_MUST && !slices.Contains(projection.Inference.Types, pf.JsonTypeNull)
 					newlyNullable := !existingField.Nullable && !newRequired
 					projectionHasDefault := projection.Inference.DefaultJson != nil
@@ -159,41 +189,36 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 						// The field has newly been made nullable and neither the existing field nor
 						// the projection has a default value. The existing field will need to be
 						// modified to be made nullable since it may need to hold null values now.
-						params.NewlyNullableFields = append(params.NewlyNullableFields, existingField)
+						update.NewlyNullableFields = append(update.NewlyNullableFields, *existingField)
 					}
 				} else {
 					// Field does not exist in the materialized resource, so this is a new
 					// projection to add to it.
-					params.NewProjections = append(params.NewProjections, projection)
+					update.NewProjections = append(update.NewProjections, projection)
 				}
 			}
 
 			// Fields that exist in the endpoint as non-nullable but aren't in the field selection
 			// need to be made nullable too.
-			existingFields, err := is.FieldsForResource(binding.ResourcePath)
-			if err != nil {
-				return nil, fmt.Errorf("getting list of existing fields for resource %s: %w", binding.ResourcePath, err)
-			}
-
-			for _, existingField := range existingFields {
-				inFieldSelection, err := is.inSelectedFields(existingField.Name, binding.FieldSelection)
+			for _, existingField := range existingResource.AllFields() {
+				inFieldSelection, err := is.inSelectedFields(existingField.Name, nextBinding.FieldSelection)
 				if err != nil {
-					return nil, fmt.Errorf("determining if existing field %q is in field selection for resource %q: %w", existingField.Name, binding.ResourcePath, err)
+					return nil, fmt.Errorf("determining if existing field %q is in field selection for resource %q: %w", existingField.Name, nextBinding.ResourcePath, err)
 				}
 
 				if !inFieldSelection && !existingField.Nullable {
-					params.NewlyNullableFields = append(params.NewlyNullableFields, existingField)
+					update.NewlyNullableFields = append(update.NewlyNullableFields, existingField)
 				}
 			}
 
-			desc, action, err := applier.UpdateResource(ctx, req.Materialization, bindingIdx, params)
-			if err != nil {
-				return nil, fmt.Errorf("getting UpdateResource action: %w", err)
-			}
-			addAction(desc, action)
+			out.updatedBindings[bindingIdx] = update
 		}
 	}
 
+	return &out, nil
+}
+
+func runActions(ctx context.Context, actions []ActionApplyFn, descriptions []string, concurrent bool) error {
 	if concurrent {
 		group, groupCtx := errgroup.WithContext(ctx)
 		group.SetLimit(maxConcurrentUpdateActions)
@@ -206,7 +231,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 					logrus.WithFields(logrus.Fields{
 						"actionIndex":       i,
 						"totalActions":      len(actions),
-						"actionDescription": actionDescriptions[i],
+						"actionDescription": descriptions[i],
 						"error":             fmt.Sprintf("%+v", err),
 					}).Error("error executing apply action")
 					return err
@@ -216,7 +241,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 
 		if err := group.Wait(); err != nil {
-			return nil, fmt.Errorf("executing concurrent apply actions: %w", err)
+			return fmt.Errorf("executing concurrent apply actions: %w", err)
 		}
 	} else {
 		for i, a := range actions {
@@ -224,13 +249,13 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 				logrus.WithFields(logrus.Fields{
 					"actionIndex":       i,
 					"totalActions":      len(actions),
-					"actionDescription": actionDescriptions[i],
+					"actionDescription": descriptions[i],
 					"error":             fmt.Sprintf("%+v", err),
 				}).Error("error executing apply action")
-				return nil, fmt.Errorf("executing apply actions: %w", err)
+				return fmt.Errorf("executing apply actions: %w", err)
 			}
 		}
 	}
 
-	return &pm.Response_Applied{ActionDescription: strings.Join(actionDescriptions, "\n")}, nil
+	return nil
 }
