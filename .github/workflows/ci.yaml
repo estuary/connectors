@@ -106,6 +106,7 @@ jobs:
           - materialize-gcs-parquet
           - materialize-google-pubsub
           - materialize-google-sheets
+          - materialize-iceberg
           - materialize-kafka
           - materialize-mongodb
           - materialize-motherduck
@@ -297,7 +298,8 @@ jobs:
               "materialize-azure-fabric-warehouse",
               "materialize-bigquery",
               "materialize-redshift",
-              "materialize-s3-iceberg"
+              "materialize-s3-iceberg",
+              "materialize-iceberg"
             ]'), matrix.connector)
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;

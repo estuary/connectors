@@ -1,0 +1,978 @@
+[
+  "applied.actionDescription",
+  "created table \"ci_testing\".\"simple\" as table {\n\t1: id: required long (auto-generated projection of JSON at: /id with inferred types: [integer])\n\t2: canary: required string (auto-generated projection of JSON at: /canary with inferred types: [string])\n\t3: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])\n\t4: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])\n}\ncreated table \"ci_testing\".\"duplicate_keys_standard\" as table {\n\t1: id: required long (auto-generated projection of JSON at: /id with inferred types: [integer])\n\t2: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])\n\t3: int: optional long (auto-generated projection of JSON at: /int with inferred types: [integer])\n\t4: str: required string (auto-generated projection of JSON at: /str with inferred types: [string])\n\t5: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])\n}\ncreated table \"ci_testing\".\"multiple_types\" as table {\n\t1: id: required long (auto-generated projection of JSON at: /id with inferred types: [integer])\n\t2: array_int: optional string (auto-generated projection of JSON at: /array_int with inferred types: [array])\n\t3: binary_field: optional binary (auto-generated projection of JSON at: /binary_field with inferred types: [string])\n\t4: bool_field: optional boolean (auto-generated projection of JSON at: /bool_field with inferred types: [boolean])\n\t5: float_field: optional double (auto-generated projection of JSON at: /float_field with inferred types: [number])\n\t6: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])\n\t7: multiple: optional string (auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string])\n\t8: nested: optional string (auto-generated projection of JSON at: /nested with inferred types: [object])\n\t9: nullable_int: optional long (auto-generated projection of JSON at: /nullable_int with inferred types: [integer null])\n\t10: str_field: required string (auto-generated projection of JSON at: /str_field with inferred types: [string])\n\t11: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])\n}\ncreated table \"ci_testing\".\"formatted_strings\" as table {\n\t1: id: required long (auto-generated projection of JSON at: /id with inferred types: [integer])\n\t2: date: optional date (auto-generated projection of JSON at: /date with inferred types: [string])\n\t3: datetime: optional timestamptz (auto-generated projection of JSON at: /datetime with inferred types: [string])\n\t4: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])\n\t5: int_and_str: optional decimal(38, 0) (auto-generated projection of JSON at: /int_and_str with inferred types: [integer string])\n\t6: int_str: optional decimal(38, 0) (auto-generated projection of JSON at: /int_str with inferred types: [string])\n\t7: num_and_str: optional double (auto-generated projection of JSON at: /num_and_str with inferred types: [number string])\n\t8: num_str: optional double (auto-generated projection of JSON at: /num_str with inferred types: [string])\n\t9: time: optional string (auto-generated projection of JSON at: /time with inferred types: [string])\n\t10: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])\n}\ncreated table \"ci_testing\".\"deletions\" as table {\n\t1: id: required long (auto-generated projection of JSON at: /id with inferred types: [integer])\n\t2: _meta/op: optional string (auto-generated projection of JSON at: /_meta/op with inferred types: [string])\n\t3: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])\n\t4: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])\n}\ncreated table \"ci_testing\".\"binary_key\" as table {\n\t1: id: required binary (auto-generated projection of JSON at: /id with inferred types: [string])\n\t2: counter: optional long (auto-generated projection of JSON at: /counter with inferred types: [integer])\n\t3: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])\n\t4: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])\n}"
+]
+[
+  "connectorState",
+  {
+    "updated": {},
+    "mergePatch": true
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "ci_testing%2Fbinary_key": {
+        "binding": 5,
+        "query": "MERGE INTO `ci_testing`.`binary_key` AS l\nUSING merge_view_5 AS r\nON \n\tl.`id` = unbase64(r.`id`)\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = unbase64(r.`id`), l.`counter` = r.`counter`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `counter`, `flow_published_at`, `flow_document`) VALUES (unbase64(r.`id`), r.`counter`, r.`flow_published_at`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "binary"
+          },
+          {
+            "name": "counter",
+            "type": "long"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fdeletions": {
+        "binding": 4,
+        "query": "MERGE INTO `ci_testing`.`deletions` AS l\nUSING merge_view_4 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 2\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`_meta/op` = r.`_meta/op`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `_meta/op`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`_meta/op`, r.`flow_published_at`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "_meta/op",
+            "type": "string"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fduplicate_keys_standard": {
+        "binding": 1,
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 5\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "int",
+            "type": "long"
+          },
+          {
+            "name": "str",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fformatted_strings": {
+        "binding": 3,
+        "query": "MERGE INTO `ci_testing`.`formatted_strings` AS l\nUSING merge_view_3 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 3 AND l.`id` <= 4\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`date` = r.`date`, l.`datetime` = r.`datetime`, l.`flow_published_at` = r.`flow_published_at`, l.`int_and_str` = r.`int_and_str`, l.`int_str` = r.`int_str`, l.`num_and_str` = r.`num_and_str`, l.`num_str` = r.`num_str`, l.`time` = r.`time`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `date`, `datetime`, `flow_published_at`, `int_and_str`, `int_str`, `num_and_str`, `num_str`, `time`, `flow_document`) VALUES (r.`id`, r.`date`, r.`datetime`, r.`flow_published_at`, r.`int_and_str`, r.`int_str`, r.`num_and_str`, r.`num_str`, r.`time`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "date",
+            "type": "date"
+          },
+          {
+            "name": "datetime",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "int_and_str",
+            "type": "decimal(38, 0)"
+          },
+          {
+            "name": "int_str",
+            "type": "decimal(38, 0)"
+          },
+          {
+            "name": "num_and_str",
+            "type": "double"
+          },
+          {
+            "name": "num_str",
+            "type": "double"
+          },
+          {
+            "name": "time",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fmultiple_types": {
+        "binding": 2,
+        "query": "MERGE INTO `ci_testing`.`multiple_types` AS l\nUSING merge_view_2 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`array_int` = r.`array_int`, l.`binary_field` = unbase64(r.`binary_field`), l.`bool_field` = r.`bool_field`, l.`float_field` = r.`float_field`, l.`flow_published_at` = r.`flow_published_at`, l.`multiple` = r.`multiple`, l.`nested` = r.`nested`, l.`nullable_int` = r.`nullable_int`, l.`str_field` = r.`str_field`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `array_int`, `binary_field`, `bool_field`, `float_field`, `flow_published_at`, `multiple`, `nested`, `nullable_int`, `str_field`, `flow_document`) VALUES (r.`id`, r.`array_int`, unbase64(r.`binary_field`), r.`bool_field`, r.`float_field`, r.`flow_published_at`, r.`multiple`, r.`nested`, r.`nullable_int`, r.`str_field`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "array_int",
+            "type": "string"
+          },
+          {
+            "name": "binary_field",
+            "type": "binary"
+          },
+          {
+            "name": "bool_field",
+            "type": "boolean"
+          },
+          {
+            "name": "float_field",
+            "type": "double"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "multiple",
+            "type": "string"
+          },
+          {
+            "name": "nested",
+            "type": "string"
+          },
+          {
+            "name": "nullable_int",
+            "type": "long"
+          },
+          {
+            "name": "str_field",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fsimple": {
+        "binding": 0,
+        "query": "MERGE INTO `ci_testing`.`simple` AS l\nUSING merge_view_0 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 6\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`canary` = r.`canary`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `canary`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`canary`, r.`flow_published_at`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "canary",
+            "type": "string"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      }
+    },
+    "mergePatch": true
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "ci_testing%2Fbinary_key": {
+        "binding": 5,
+        "query": "MERGE INTO `ci_testing`.`binary_key` AS l\nUSING merge_view_5 AS r\nON \n\tl.`id` = unbase64(r.`id`)\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = unbase64(r.`id`), l.`counter` = r.`counter`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `counter`, `flow_published_at`, `flow_document`) VALUES (unbase64(r.`id`), r.`counter`, r.`flow_published_at`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "binary"
+          },
+          {
+            "name": "counter",
+            "type": "long"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fdeletions": {
+        "binding": 4,
+        "query": "MERGE INTO `ci_testing`.`deletions` AS l\nUSING merge_view_4 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 4\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`_meta/op` = r.`_meta/op`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `_meta/op`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`_meta/op`, r.`flow_published_at`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "_meta/op",
+            "type": "string"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fduplicate_keys_standard": {
+        "binding": 1,
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 5\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "int",
+            "type": "long"
+          },
+          {
+            "name": "str",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fformatted_strings": {
+        "binding": 3,
+        "query": "MERGE INTO `ci_testing`.`formatted_strings` AS l\nUSING merge_view_3 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`date` = r.`date`, l.`datetime` = r.`datetime`, l.`flow_published_at` = r.`flow_published_at`, l.`int_and_str` = r.`int_and_str`, l.`int_str` = r.`int_str`, l.`num_and_str` = r.`num_and_str`, l.`num_str` = r.`num_str`, l.`time` = r.`time`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `date`, `datetime`, `flow_published_at`, `int_and_str`, `int_str`, `num_and_str`, `num_str`, `time`, `flow_document`) VALUES (r.`id`, r.`date`, r.`datetime`, r.`flow_published_at`, r.`int_and_str`, r.`int_str`, r.`num_and_str`, r.`num_str`, r.`time`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "date",
+            "type": "date"
+          },
+          {
+            "name": "datetime",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "int_and_str",
+            "type": "decimal(38, 0)"
+          },
+          {
+            "name": "int_str",
+            "type": "decimal(38, 0)"
+          },
+          {
+            "name": "num_and_str",
+            "type": "double"
+          },
+          {
+            "name": "num_str",
+            "type": "double"
+          },
+          {
+            "name": "time",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fmultiple_types": {
+        "binding": 2,
+        "query": "MERGE INTO `ci_testing`.`multiple_types` AS l\nUSING merge_view_2 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`array_int` = r.`array_int`, l.`binary_field` = unbase64(r.`binary_field`), l.`bool_field` = r.`bool_field`, l.`float_field` = r.`float_field`, l.`flow_published_at` = r.`flow_published_at`, l.`multiple` = r.`multiple`, l.`nested` = r.`nested`, l.`nullable_int` = r.`nullable_int`, l.`str_field` = r.`str_field`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `array_int`, `binary_field`, `bool_field`, `float_field`, `flow_published_at`, `multiple`, `nested`, `nullable_int`, `str_field`, `flow_document`) VALUES (r.`id`, r.`array_int`, unbase64(r.`binary_field`), r.`bool_field`, r.`float_field`, r.`flow_published_at`, r.`multiple`, r.`nested`, r.`nullable_int`, r.`str_field`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "array_int",
+            "type": "string"
+          },
+          {
+            "name": "binary_field",
+            "type": "binary"
+          },
+          {
+            "name": "bool_field",
+            "type": "boolean"
+          },
+          {
+            "name": "float_field",
+            "type": "double"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "multiple",
+            "type": "string"
+          },
+          {
+            "name": "nested",
+            "type": "string"
+          },
+          {
+            "name": "nullable_int",
+            "type": "long"
+          },
+          {
+            "name": "str_field",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      },
+      "ci_testing%2Fsimple": {
+        "binding": 0,
+        "query": "MERGE INTO `ci_testing`.`simple` AS l\nUSING merge_view_0 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 7 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`canary` = r.`canary`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `canary`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`canary`, r.`flow_published_at`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "canary",
+            "type": "string"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      }
+    },
+    "mergePatch": true
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "ci_testing%2Fduplicate_keys_standard": {
+        "binding": 1,
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "int",
+            "type": "long"
+          },
+          {
+            "name": "str",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ]
+      }
+    },
+    "mergePatch": true
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "ci_testing%2Fduplicate_keys_standard": {
+        "binding": 1,
+        "columns": [
+          {
+            "name": "id",
+            "type": "long"
+          },
+          {
+            "name": "flow_published_at",
+            "type": "timestamptz"
+          },
+          {
+            "name": "int",
+            "type": "long"
+          },
+          {
+            "name": "str",
+            "type": "string"
+          },
+          {
+            "name": "flow_document",
+            "type": "string"
+          }
+        ],
+        "files": [
+          "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
+        ],
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n"
+      }
+    }
+  }
+]
+{
+  "_table": "simple",
+  "rows": [
+    {
+      "canary": "amputation's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7545a800-1dda-11b2-8000-071353030311\"},\"canary\":\"amputation's\",\"id\":1}",
+      "flow_published_at": "1970-01-01T01:00:00Z",
+      "id": 1
+    },
+    {
+      "canary": "armament's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"75de3e80-1dda-11b2-8000-071353030311\"},\"canary\":\"armament's\",\"id\":2}",
+      "flow_published_at": "1970-01-01T01:00:01Z",
+      "id": 2
+    },
+    {
+      "canary": "splatters",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7676d500-1dda-11b2-8000-071353030311\"},\"canary\":\"splatters\",\"id\":3}",
+      "flow_published_at": "1970-01-01T01:00:02Z",
+      "id": 3
+    },
+    {
+      "canary": "strengthen",
+      "flow_document": "{\"_meta\":{\"uuid\":\"770f6b80-1dda-11b2-8000-071353030311\"},\"canary\":\"strengthen\",\"id\":4}",
+      "flow_published_at": "1970-01-01T01:00:03Z",
+      "id": 4
+    },
+    {
+      "canary": "Kringle's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"77a80200-1dda-11b2-8000-071353030311\"},\"canary\":\"Kringle's\",\"id\":5}",
+      "flow_published_at": "1970-01-01T01:00:04Z",
+      "id": 5
+    },
+    {
+      "canary": "grosbeak's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"78409880-1dda-11b2-8000-071353030311\"},\"canary\":\"grosbeak's\",\"id\":6}",
+      "flow_published_at": "1970-01-01T01:00:05Z",
+      "id": 6
+    },
+    {
+      "canary": "pieced",
+      "flow_document": "{\"_meta\":{\"uuid\":\"d70a1000-1de2-11b2-8000-071353030311\"},\"canary\":\"pieced\",\"id\":7}",
+      "flow_published_at": "1970-01-01T02:00:00Z",
+      "id": 7
+    },
+    {
+      "canary": "roaches",
+      "flow_document": "{\"_meta\":{\"uuid\":\"d7a2a680-1de2-11b2-8000-071353030311\"},\"canary\":\"roaches\",\"id\":8}",
+      "flow_published_at": "1970-01-01T02:00:01Z",
+      "id": 8
+    },
+    {
+      "canary": "devilish",
+      "flow_document": "{\"_meta\":{\"uuid\":\"d83b3d00-1de2-11b2-8000-071353030311\"},\"canary\":\"devilish\",\"id\":9}",
+      "flow_published_at": "1970-01-01T02:00:02Z",
+      "id": 9
+    },
+    {
+      "canary": "glucose's",
+      "flow_document": "{\"_meta\":{\"uuid\":\"d8d3d380-1de2-11b2-8000-071353030311\"},\"canary\":\"glucose's\",\"id\":10}",
+      "flow_published_at": "1970-01-01T02:00:03Z",
+      "id": 10
+    }
+  ]
+}
+{
+  "_table": "duplicate_keys_standard",
+  "rows": [
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"d96c6a00-1de2-11b2-8000-071353030311\"},\"id\":1,\"int\":7,\"str\":\"str 6\"}",
+      "flow_published_at": "1970-01-01T02:00:04Z",
+      "id": 1,
+      "int": 7,
+      "str": "str 6"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"da050080-1de2-11b2-8000-071353030311\"},\"id\":2,\"int\":9,\"str\":\"str 7\"}",
+      "flow_published_at": "1970-01-01T02:00:05Z",
+      "id": 2,
+      "int": 9,
+      "str": "str 7"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"da9d9700-1de2-11b2-8000-071353030311\"},\"id\":3,\"int\":11,\"str\":\"str 8\"}",
+      "flow_published_at": "1970-01-01T02:00:06Z",
+      "id": 3,
+      "int": 11,
+      "str": "str 8"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"db362d80-1de2-11b2-8000-071353030311\"},\"id\":4,\"int\":13,\"str\":\"str 9\"}",
+      "flow_published_at": "1970-01-01T02:00:07Z",
+      "id": 4,
+      "int": 13,
+      "str": "str 9"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"dbcec400-1de2-11b2-8000-071353030311\"},\"id\":5,\"int\":15,\"str\":\"str 10\"}",
+      "flow_published_at": "1970-01-01T02:00:08Z",
+      "id": 5,
+      "int": 15,
+      "str": "str 10"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"38ce7800-1deb-11b2-8000-071353030311\"},\"id\":6,\"int\":11,\"str\":\"str 11\"}",
+      "flow_published_at": "1970-01-01T03:00:00Z",
+      "id": 6,
+      "int": 11,
+      "str": "str 11"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"39670e80-1deb-11b2-8000-071353030311\"},\"id\":7,\"int\":12,\"str\":\"str 12\"}",
+      "flow_published_at": "1970-01-01T03:00:01Z",
+      "id": 7,
+      "int": 12,
+      "str": "str 12"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"39ffa500-1deb-11b2-8000-071353030311\"},\"id\":8,\"int\":13,\"str\":\"str 13\"}",
+      "flow_published_at": "1970-01-01T03:00:02Z",
+      "id": 8,
+      "int": 13,
+      "str": "str 13"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"3a983b80-1deb-11b2-8000-071353030311\"},\"id\":9,\"int\":14,\"str\":\"str 14\"}",
+      "flow_published_at": "1970-01-01T03:00:03Z",
+      "id": 9,
+      "int": 14,
+      "str": "str 14"
+    },
+    {
+      "flow_document": "{\"_meta\":{\"uuid\":\"3b30d200-1deb-11b2-8000-071353030311\"},\"id\":10,\"int\":15,\"str\":\"str 15\"}",
+      "flow_published_at": "1970-01-01T03:00:04Z",
+      "id": 10,
+      "int": 15,
+      "str": "str 15"
+    }
+  ]
+}
+{
+  "_table": "multiple_types",
+  "rows": [
+    {
+      "array_int": "[11,12]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 1.1,
+      "flow_document": "{\"_meta\":{\"uuid\":\"7d054c80-1dda-11b2-8000-071353030311\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
+      "flow_published_at": "1970-01-01T01:00:13Z",
+      "id": 1,
+      "multiple": "1",
+      "nested": "{\"id\":\"i1\"}",
+      "nullable_int": null,
+      "str_field": "str1"
+    },
+    {
+      "array_int": "[21,22]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 2.2,
+      "flow_document": "{\"_meta\":{\"uuid\":\"7d9de300-1dda-11b2-8000-071353030311\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
+      "flow_published_at": "1970-01-01T01:00:14Z",
+      "id": 2,
+      "multiple": "2.2",
+      "nested": "{\"id\":\"i2\"}",
+      "nullable_int": 2,
+      "str_field": "str2"
+    },
+    {
+      "array_int": "[31,32]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 3.3,
+      "flow_document": "{\"_meta\":{\"uuid\":\"7e367980-1dda-11b2-8000-071353030311\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
+      "flow_published_at": "1970-01-01T01:00:15Z",
+      "id": 3,
+      "multiple": "true",
+      "nested": "{\"id\":\"i3\"}",
+      "nullable_int": null,
+      "str_field": "str3"
+    },
+    {
+      "array_int": "[41,42]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 4.4,
+      "flow_document": "{\"_meta\":{\"uuid\":\"7ecf1000-1dda-11b2-8000-071353030311\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
+      "flow_published_at": "1970-01-01T01:00:16Z",
+      "id": 4,
+      "multiple": "false",
+      "nested": "{\"id\":\"i4\"}",
+      "nullable_int": 4,
+      "str_field": "str4"
+    },
+    {
+      "array_int": "[51,52]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 5.5,
+      "flow_document": "{\"_meta\":{\"uuid\":\"7f67a680-1dda-11b2-8000-071353030311\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
+      "flow_published_at": "1970-01-01T01:00:17Z",
+      "id": 5,
+      "multiple": "string five",
+      "nested": "{\"id\":\"i5\"}",
+      "nullable_int": null,
+      "str_field": "str5"
+    },
+    {
+      "array_int": "[61,62]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 66.66,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e25d3b80-1de2-11b2-8000-071353030311\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
+      "flow_published_at": "1970-01-01T02:00:19Z",
+      "id": 6,
+      "multiple": "[\"one\",2,true]",
+      "nested": "{\"id\":\"i6\"}",
+      "nullable_int": 6,
+      "str_field": "str6 v2"
+    },
+    {
+      "array_int": "[71,72]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 77.77,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e2f5d200-1de2-11b2-8000-071353030311\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
+      "flow_published_at": "1970-01-01T02:00:20Z",
+      "id": 7,
+      "multiple": "{\"object\":\"seven\"}",
+      "nested": "{\"id\":\"i7\"}",
+      "nullable_int": null,
+      "str_field": "str7 v2"
+    },
+    {
+      "array_int": "[81,82]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 88.88,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e38e6880-1de2-11b2-8000-071353030311\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
+      "flow_published_at": "1970-01-01T02:00:21Z",
+      "id": 8,
+      "multiple": null,
+      "nested": "{\"id\":\"i8\"}",
+      "nullable_int": 8,
+      "str_field": "str8 v2"
+    },
+    {
+      "array_int": "[91,92]",
+      "binary_field": "YWxvaGEK",
+      "bool_field": false,
+      "float_field": 99.99,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e426ff00-1de2-11b2-8000-071353030311\"},\"array_int\":[91,92],\"binary_field\":\"YWxvaGEK\",\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
+      "flow_published_at": "1970-01-01T02:00:22Z",
+      "id": 9,
+      "multiple": null,
+      "nested": "{\"id\":\"i9\"}",
+      "nullable_int": null,
+      "str_field": "str9 v2"
+    },
+    {
+      "array_int": "[1,2]",
+      "binary_field": "c2F5xY1uYXJhCg==",
+      "bool_field": true,
+      "float_field": 1010.101,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e4bf9580-1de2-11b2-8000-071353030311\"},\"array_int\":[1,2],\"binary_field\":\"c2F5xY1uYXJhCg==\",\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
+      "flow_published_at": "1970-01-01T02:00:23Z",
+      "id": 10,
+      "multiple": null,
+      "nested": "{\"id\":\"i10\"}",
+      "nullable_int": 10,
+      "str_field": "str10 v2"
+    }
+  ]
+}
+{
+  "_table": "formatted_strings",
+  "rows": [
+    {
+      "date": "0000-01-01T00:00:00Z",
+      "datetime": "0000-01-01T00:00:00Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"dec9b480-1de2-11b2-8000-071353030311\"},\"date\":\"0000-01-01\",\"datetime\":\"0000-01-01T00:00:00Z\",\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\",\"time\":\"00:00:00Z\"}",
+      "flow_published_at": "1970-01-01T02:00:13Z",
+      "id": 1,
+      "int_and_str": {
+        "Scale": 0,
+        "Value": 1,
+        "Width": 38
+      },
+      "int_str": {
+        "Scale": 0,
+        "Value": 10,
+        "Width": 38
+      },
+      "num_and_str": 1.1,
+      "num_str": 10.1,
+      "time": "00:00:00Z"
+    },
+    {
+      "date": "1999-02-02T00:00:00Z",
+      "datetime": "1999-02-02T14:20:12.33Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"df624b00-1de2-11b2-8000-071353030311\"},\"date\":\"1999-02-02\",\"datetime\":\"1999-02-02T14:20:12.33Z\",\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\",\"time\":\"14:20:12.33Z\"}",
+      "flow_published_at": "1970-01-01T02:00:14Z",
+      "id": 2,
+      "int_and_str": {
+        "Scale": 0,
+        "Value": 2,
+        "Width": 38
+      },
+      "int_str": {
+        "Scale": 0,
+        "Value": 20,
+        "Width": 38
+      },
+      "num_and_str": 2.1,
+      "num_str": 20.1,
+      "time": "14:20:12.33Z"
+    },
+    {
+      "date": "1000-03-03T00:00:00Z",
+      "datetime": "1000-03-03T23:59:38.1Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7bd41f80-1dda-11b2-8000-071353030311\"},\"date\":\"1000-03-03\",\"datetime\":\"1000-03-03T23:59:38.10Z\",\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\",\"time\":\"23:59:38.10Z\"}",
+      "flow_published_at": "1970-01-01T01:00:11Z",
+      "id": 3,
+      "int_and_str": {
+        "Scale": 0,
+        "Value": 3,
+        "Width": 38
+      },
+      "int_str": {
+        "Scale": 0,
+        "Value": 30,
+        "Width": 38
+      },
+      "num_and_str": 3.1,
+      "num_str": 30.1,
+      "time": "23:59:38.10Z"
+    },
+    {
+      "date": "2023-08-29T00:00:00Z",
+      "datetime": "2023-08-29T23:59:38Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"7c6cb600-1dda-11b2-8000-071353030311\"},\"date\":\"2023-08-29\",\"datetime\":\"2023-08-29T23:59:38Z\",\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\",\"time\":\"23:59:38Z\"}",
+      "flow_published_at": "1970-01-01T01:00:12Z",
+      "id": 4,
+      "int_and_str": {
+        "Scale": 0,
+        "Value": 4,
+        "Width": 38
+      },
+      "int_str": {
+        "Scale": 0,
+        "Value": 40,
+        "Width": 38
+      },
+      "num_and_str": 4.1,
+      "num_str": 40.1,
+      "time": "23:59:38Z"
+    },
+    {
+      "date": "9999-12-31T00:00:00Z",
+      "datetime": "9999-12-31T23:59:59Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"dffae180-1de2-11b2-8000-071353030311\"},\"date\":\"9999-12-31\",\"datetime\":\"9999-12-31T23:59:59Z\",\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\",\"time\":\"23:59:59Z\"}",
+      "flow_published_at": "1970-01-01T02:00:15Z",
+      "id": 5,
+      "int_and_str": {
+        "Scale": 0,
+        "Value": 5,
+        "Width": 38
+      },
+      "int_str": {
+        "Scale": 0,
+        "Value": 50,
+        "Width": 38
+      },
+      "num_and_str": 5.1,
+      "num_str": 50.1,
+      "time": "23:59:59Z"
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e0937800-1de2-11b2-8000-071353030311\"},\"id\":8,\"num_str\":\"NaN\"}",
+      "flow_published_at": "1970-01-01T02:00:16Z",
+      "id": 8,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": "NaN",
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e12c0e80-1de2-11b2-8000-071353030311\"},\"id\":9,\"num_str\":\"Infinity\"}",
+      "flow_published_at": "1970-01-01T02:00:17Z",
+      "id": 9,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e1c4a500-1de2-11b2-8000-071353030311\"},\"id\":10,\"num_str\":\"-Infinity\"}",
+      "flow_published_at": "1970-01-01T02:00:18Z",
+      "id": 10,
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    }
+  ]
+}
+{
+  "_table": "deletions",
+  "rows": [
+    {
+      "_meta/op": "d",
+      "flow_document": "{\"_meta\":{\"op\":\"d\",\"uuid\":\"e5f0c280-1de2-11b2-8000-071353030311\"},\"id\":1}",
+      "flow_published_at": "1970-01-01T02:00:25Z",
+      "id": 1
+    },
+    {
+      "_meta/op": "u",
+      "flow_document": "{\"_meta\":{\"op\":\"u\",\"uuid\":\"e6895900-1de2-11b2-8000-071353030311\"},\"id\":2}",
+      "flow_published_at": "1970-01-01T02:00:26Z",
+      "id": 2
+    },
+    {
+      "_meta/op": "c",
+      "flow_document": "{\"_meta\":{\"op\":\"c\",\"uuid\":\"e721ef80-1de2-11b2-8000-071353030311\"},\"id\":3}",
+      "flow_published_at": "1970-01-01T02:00:27Z",
+      "id": 3
+    },
+    {
+      "_meta/op": "d",
+      "flow_document": "{\"_meta\":{\"op\":\"d\",\"uuid\":\"e8531c80-1de2-11b2-8000-071353030311\"},\"id\":4}",
+      "flow_published_at": "1970-01-01T02:00:29Z",
+      "id": 4
+    }
+  ]
+}
+{
+  "_table": "binary_key",
+  "rows": [
+    {
+      "counter": 1,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e8ebb300-1de2-11b2-8000-071353030311\"},\"counter\":1,\"id\":\"c2F5xY1uYXJhCg==\"}",
+      "flow_published_at": "1970-01-01T02:00:30Z",
+      "id": "c2F5xY1uYXJhCg=="
+    }
+  ]
+}
+[
+  "applied.actionDescription",
+  ""
+]
+[
+  "connectorState",
+  {
+    "updated": {}
+  }
+]
