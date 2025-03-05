@@ -19,7 +19,6 @@ import (
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
@@ -192,7 +191,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	}
 
 	// Test creating, reading, and deleting an object from the configured bucket and prefix.
-	errs := &sql.PrereqErr{}
+	errs := &cerrors.PrereqErr{}
 
 	s3store, err := filesink.NewS3Store(ctx, filesink.S3StoreConfig{
 		Bucket:             cfg.Bucket,
