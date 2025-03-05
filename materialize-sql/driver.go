@@ -35,7 +35,7 @@ type Driver struct {
 	// connector, to as much of an extent as possible. The returned PrereqErr
 	// can include multiple separate errors if it possible to determine that
 	// there is more than one issue that needs corrected.
-	PreReqs func(ctx context.Context, conf any, tenant string) *PrereqErr
+	PreReqs func(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver{}

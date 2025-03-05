@@ -9,14 +9,16 @@ import (
 	"strings"
 	"sync"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	_ "github.com/mattn/go-sqlite3" // Import for register side-effects.
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 const databasePath = "/tmp/sqlite.db"
@@ -87,7 +89,7 @@ func NewSQLiteDriver() *sql.Driver {
 				ConcurrentApply:     false,
 			}, nil
 		},
-		PreReqs: func(context.Context, any, string) *sql.PrereqErr { return &sql.PrereqErr{} },
+		PreReqs: func(context.Context, any, string) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
 	}
 }
 
