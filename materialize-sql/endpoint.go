@@ -2,8 +2,6 @@ package sql
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"text/template"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -109,33 +107,4 @@ type Endpoint struct {
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
 	// for changing many tables in a single apply.
 	ConcurrentApply bool
-}
-
-// PrereqErr is a wrapper for recording accumulated errors during prerequisite checking and
-// formatting them for user presentation.
-type PrereqErr struct {
-	errs []error
-}
-
-// Err adds an error to the accumulated list of errors.
-func (e *PrereqErr) Err(err error) {
-	e.errs = append(e.errs, err)
-}
-
-func (e *PrereqErr) Len() int {
-	return len(e.errs)
-}
-
-func (e *PrereqErr) Unwrap() []error {
-	return e.errs
-}
-
-func (e *PrereqErr) Error() string {
-	var b = new(strings.Builder)
-	fmt.Fprintf(b, "the materialization cannot run due to the following error(s):")
-	for _, err := range e.errs {
-		b.WriteString("\n - ")
-		b.WriteString(err.Error())
-	}
-	return b.String()
 }

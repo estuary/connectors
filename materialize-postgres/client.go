@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -38,8 +39,8 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
+func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)
 

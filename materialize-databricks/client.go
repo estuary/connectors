@@ -16,6 +16,7 @@ import (
 	"github.com/databricks/databricks-sdk-go/service/catalog"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
@@ -201,8 +202,8 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return err
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
+func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{

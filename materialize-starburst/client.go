@@ -7,6 +7,7 @@ import (
 	"slices"
 	"strings"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
@@ -165,8 +166,8 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
+func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)
 	if db, err := openDB(cfg.ToURI()); err != nil {
