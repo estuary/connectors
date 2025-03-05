@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "materialize-iceberg"
+version = "0.1.0"
+description = ""
+authors = ["Will Baker <wbaker@gmail.com>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+pyspark = "^3.5.4"
+botocore = "^1.37.0"
+boto3 = "^1.37.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
