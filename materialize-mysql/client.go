@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/go-sql-driver/mysql"
@@ -39,8 +40,8 @@ func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, ep *s
 	}
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
+func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)
 

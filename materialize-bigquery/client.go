@@ -13,6 +13,7 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
@@ -231,8 +232,8 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	})
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
+func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)
 	c, err := cfg.client(ctx, nil)
