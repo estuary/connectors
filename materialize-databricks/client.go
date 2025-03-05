@@ -16,6 +16,7 @@ import (
 	"github.com/databricks/databricks-sdk-go/service/catalog"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
@@ -100,21 +101,20 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 				return nil, fmt.Errorf("iterating tables: %w", err)
 			}
 
-			is.PushResource(t.SchemaName, t.Name)
-
+			res := is.PushResource(t.SchemaName, t.Name)
 			for _, c := range t.Columns {
 				var colMeta columnMeta
 				if err := json.Unmarshal([]byte(c.TypeJson), &colMeta); err != nil {
 					return nil, fmt.Errorf("unmarshalling column metadata: %w", err)
 				}
 
-				is.PushField(boilerplate.EndpointField{
+				res.PushField(boilerplate.ExistingField{
 					Name:               c.Name,
 					Nullable:           c.Nullable,
 					Type:               string(c.TypeName),
 					CharacterMaxLength: 0, // TODO(whb): Currently not supported by us, although we could parse the metadata for VARCHAR columns.
 					HasDefault:         colMeta.Metadata.Default != nil,
-				}, t.SchemaName, t.Name)
+				})
 			}
 		}
 	}
@@ -202,8 +202,8 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return err
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
+func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{

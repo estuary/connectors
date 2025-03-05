@@ -53,14 +53,13 @@ func (c *catalog) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, erro
 		parts := strings.Split(res, ".")
 		namespace := parts[0]
 		table := parts[1]
-		is.PushResource(namespace, table)
-
+		res := is.PushResource(namespace, table)
 		for _, f := range fields {
-			is.PushField(boilerplate.EndpointField{
+			res.PushField(boilerplate.ExistingField{
 				Name:     f.Name,
 				Nullable: f.Nullable,
 				Type:     string(f.Type),
-			}, namespace, table)
+			})
 		}
 	}
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
@@ -125,13 +126,13 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 			return nil, err
 		}
 
-		is.PushField(boilerplate.EndpointField{
+		is.PushResource(c.TableSchema, c.TableName).PushField(boilerplate.ExistingField{
 			Name:               c.ColumnName,
 			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
 			Type:               c.DataType,
 			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
 			HasDefault:         c.ColumnDefault.Valid,
-		}, c.TableSchema, c.TableName)
+		})
 	}
 	if err := columns.Err(); err != nil {
 		return nil, err
@@ -273,8 +274,8 @@ type badRequestResponseBody struct {
 	ErrorCodes       []int  `json:"error_codes"`
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *sql.PrereqErr {
-	errs := &sql.PrereqErr{}
+func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)
 

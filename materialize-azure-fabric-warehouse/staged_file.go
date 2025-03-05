@@ -18,15 +18,6 @@ import (
 // enough for larger transactions.
 const fileSizeLimit = 250 * 1024 * 1024
 
-type azureBlobObject struct {
-	directory string
-	name      string
-}
-
-func (o azureBlobObject) blobName() string {
-	return path.Join(o.directory, o.name)
-}
-
 func newFileClient(azClient *azblob.Client, container string, directory string) *stagedFileClient {
 	return &stagedFileClient{
 		container: container,
@@ -45,16 +36,16 @@ func (s *stagedFileClient) NewEncoder(w io.WriteCloser, fields []string) boilerp
 	return enc.NewCsvEncoder(w, fields, enc.WithCsvSkipHeaders(), enc.WithCsvQuoteChar('`'))
 }
 
-func (s *stagedFileClient) NewObject(uuid string) azureBlobObject {
-	return azureBlobObject{directory: s.directory, name: uuid}
+func (s *stagedFileClient) NewKey(keyParts []string) string {
+	return path.Join(keyParts...)
 }
 
-func (s *stagedFileClient) URI(o azureBlobObject) string {
-	return s.azClient.URL() + path.Join(s.container, o.blobName())
+func (s *stagedFileClient) URI(key string) string {
+	return s.azClient.URL() + path.Join(s.container, key)
 }
 
-func (s *stagedFileClient) UploadStream(ctx context.Context, o azureBlobObject, r io.Reader) error {
-	if _, err := s.azClient.UploadStream(ctx, s.container, o.blobName(), r, nil); err != nil {
+func (s *stagedFileClient) UploadStream(ctx context.Context, key string, r io.Reader) error {
+	if _, err := s.azClient.UploadStream(ctx, s.container, key, r, nil); err != nil {
 		return err
 	}
 

@@ -102,7 +102,7 @@ func parquetTypeToIcebergType(pqt enc.ParquetDataType) icebergType {
 
 type icebergConstrainter struct{}
 
-func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, fc json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	_, isNumeric := boilerplate.AsFormattedNumeric(p)
 
 	var constraint = pm.Response_Validated_Constraint{}
@@ -140,10 +140,10 @@ func (icebergConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *
 		constraint.Reason = "This field is able to be materialized"
 	}
 
-	return &constraint
+	return &constraint, nil
 }
 
-func (icebergConstrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
+func (icebergConstrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
 	s, err := projectionToParquetSchemaElement(*proposed, fc)
 	if err != nil {
 		return false, err
