@@ -8,15 +8,15 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "amount": "7.00",
-      "created_at": "2024-12-02T16:02:33Z",
+      "created_at": "redacted",
       "description": "",
-      "id": "2c7b",
+      "id": "redacted",
       "kind": "discount",
       "merchant_id": "7bsbj4jzqs733j2f",
       "name": "test_discount",
       "never_expires": true,
       "number_of_billing_cycles": null,
-      "updated_at": "2024-12-02T16:02:33Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -28,15 +28,15 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "amount": "8.00",
-      "created_at": "2024-12-02T20:59:46Z",
+      "created_at": "redacted",
       "description": "",
-      "id": "g9km",
+      "id": "redacted",
       "kind": "add_on",
       "merchant_id": "7bsbj4jzqs733j2f",
       "name": "test_add_on",
       "never_expires": true,
       "number_of_billing_cycles": null,
-      "updated_at": "2024-12-02T20:59:46Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -50,11 +50,11 @@
       "add_ons": [],
       "billing_day_of_month": null,
       "billing_frequency": 1,
-      "created_at": "2024-11-26T15:43:33Z",
+      "created_at": "redacted",
       "currency_iso_code": "USD",
       "description": "Some test subscription",
       "discounts": [],
-      "id": "38py",
+      "id": "redacted",
       "merchant_id": "7bsbj4jzqs733j2f",
       "name": "Test Subscriptoin",
       "number_of_billing_cycles": null,
@@ -62,7 +62,7 @@
       "trial_duration": null,
       "trial_duration_unit": null,
       "trial_period": false,
-      "updated_at": "2024-11-26T15:43:33Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -89,7 +89,7 @@
       "currency_iso_code": "USD",
       "default": true,
       "funding_details": {},
-      "id": "estuary",
+      "id": "redacted",
       "individual_details": {
         "address_details": {}
       },
@@ -129,7 +129,7 @@
       "amount": "11.00",
       "amount_requested": null,
       "authorization_adjustments": [],
-      "authorization_expires_at": "2024-12-03T16:29:00Z",
+      "authorization_expires_at": "redacted",
       "authorized_transaction_global_id": null,
       "authorized_transaction_id": null,
       "avs_error_response_code": null,
@@ -176,7 +176,7 @@
         "street_address": null
       },
       "channel": null,
-      "created_at": "2024-11-26T16:29:00Z",
+      "created_at": "redacted",
       "credit_card": {
         "account_balance": null,
         "account_type": null,
@@ -276,22 +276,22 @@
         "url": null
       },
       "disbursement_details": {
-        "disbursement_date": "2024-11-28",
-        "funds_held": false,
-        "settlement_amount": "11.00",
-        "settlement_base_currency_exchange_rate": "1",
-        "settlement_currency_exchange_rate": "1",
-        "settlement_currency_iso_code": "USD",
-        "success": true
+        "disbursement_date": "redacted",
+        "funds_held": "redacted",
+        "settlement_amount": "redacted",
+        "settlement_base_currency_exchange_rate": "redacted",
+        "settlement_currency_exchange_rate": "redacted",
+        "settlement_currency_iso_code": "redacted",
+        "success": "redacted"
       },
       "discount_amount": null,
       "discounts": [],
       "disputes": [],
       "escrow_status": null,
       "gateway_rejection_reason": null,
-      "global_id": "dHJhbnNhY3Rpb25fMmdid2ZxNXQ",
-      "graphql_id": "dHJhbnNhY3Rpb25fMmdid2ZxNXQ",
-      "id": "2gbwfq5t",
+      "global_id": "redacted",
+      "graphql_id": "redacted",
+      "id": "redacted",
       "installment_count": null,
       "installments": [],
       "master_merchant_account_id": null,
@@ -309,42 +309,42 @@
       "merchant_name": "DESCRIPTORNAME",
       "network_response_code": "XX",
       "network_response_text": "sample network response text",
-      "network_transaction_id": "020241126162900",
+      "network_transaction_id": "redacted",
       "order_id": null,
       "partial_settlement_transaction_global_ids": [],
       "partial_settlement_transaction_ids": [],
       "payment_instrument_type": "credit_card",
       "payment_receipt": {
-        "account_balance": null,
-        "amount": "11.00",
-        "card_last_4": "1881",
-        "card_type": "Visa",
-        "currency_iso_code": "USD",
-        "global_id": "dHJhbnNhY3Rpb25fMmdid2ZxNXQ",
-        "id": "2gbwfq5t",
+        "account_balance": "redacted",
+        "amount": "redacted",
+        "card_last_4": "redacted",
+        "card_type": "redacted",
+        "currency_iso_code": "redacted",
+        "global_id": "redacted",
+        "id": "redacted",
         "merchant_address": {
-          "locality": "Braintree",
-          "phone": "5555555555",
-          "postal_code": "02184",
-          "region": "MA",
-          "street_address": ""
+          "locality": "redacted",
+          "phone": "redacted",
+          "postal_code": "redacted",
+          "region": "redacted",
+          "street_address": "redacted"
         },
-        "merchant_identification_number": "123456789012",
-        "merchant_name": "DESCRIPTORNAME",
-        "network_identification_code": null,
-        "pin_verified": false,
-        "processing_mode": null,
-        "processor_authorization_code": "HNS5PM",
-        "processor_response_code": "1000",
-        "processor_response_text": "Approved",
-        "terminal_identification_number": "00000001",
-        "type": "sale"
+        "merchant_identification_number": "redacted",
+        "merchant_name": "redacted",
+        "network_identification_code": "redacted",
+        "pin_verified": "redacted",
+        "processing_mode": "redacted",
+        "processor_authorization_code": "redacted",
+        "processor_response_code": "redacted",
+        "processor_response_text": "redacted",
+        "terminal_identification_number": "redacted",
+        "type": "redacted"
       },
       "pin_verified": false,
       "plan_id": "38py",
       "processed_with_network_token": false,
       "processing_mode": null,
-      "processor_authorization_code": "HNS5PM",
+      "processor_authorization_code": "redacted",
       "processor_response_code": "1000",
       "processor_response_text": "Approved",
       "processor_response_type": "approved",
@@ -368,7 +368,7 @@
       "risk_data": null,
       "sca_exemption_requested": null,
       "service_fee_amount": null,
-      "settlement_batch_id": "2024-11-26_estuary_1cbf4has",
+      "settlement_batch_id": "redacted",
       "shipping": {
         "company": null,
         "country_code_alpha2": null,
@@ -417,34 +417,32 @@
       "status": "settled",
       "status_history": [
         {
-          "amount": "11.00",
-          "status": "authorized",
-          "timestamp": "2024-11-26T16:29:00Z",
-          "transaction_source": "recurring",
-          "user": "alexb@estuary.dev"
+          "amount": "redacted",
+          "status": "redacted",
+          "timestamp": "redacted",
+          "transaction_source": "redacted"
         },
         {
-          "amount": "11.00",
-          "status": "submitted_for_settlement",
-          "timestamp": "2024-11-26T16:29:00Z",
-          "transaction_source": "recurring",
-          "user": "alexb@estuary.dev"
+          "amount": "redacted",
+          "status": "redacted",
+          "timestamp": "redacted",
+          "transaction_source": "redacted"
         },
         {
-          "amount": "11.00",
-          "status": "settled",
-          "timestamp": "2024-11-28T03:07:16Z",
-          "transaction_source": ""
+          "amount": "redacted",
+          "status": "redacted",
+          "timestamp": "redacted",
+          "transaction_source": "redacted"
         }
       ],
       "sub_merchant_account_id": null,
       "subscription": {
-        "billing_period_end_date": "2024-12-25",
-        "billing_period_start_date": "2024-11-26"
+        "billing_period_end_date": "redacted",
+        "billing_period_start_date": "redacted"
       },
       "subscription_details": {
-        "billing_period_end_date": "2024-12-25",
-        "billing_period_start_date": "2024-11-26"
+        "billing_period_end_date": "redacted",
+        "billing_period_start_date": "redacted"
       },
       "subscription_id": "95jzxv",
       "surcharge_amount": null,
@@ -453,7 +451,7 @@
       "terminal_identification_number": "00000001",
       "three_d_secure_info": null,
       "type": "sale",
-      "updated_at": "2024-11-28T03:07:16Z",
+      "updated_at": "redacted",
       "voice_referral_number": null
     }
   ],
@@ -468,7 +466,7 @@
       "amount_won": "0.00",
       "case_number": "CB262657160630",
       "chargeback_protection_level": null,
-      "created_at": "2024-11-26T14:24:31Z",
+      "created_at": "redacted",
       "currency_iso_code": "USD",
       "date_opened": "2024-11-26",
       "date_won": null,
@@ -499,9 +497,9 @@
         }
       ],
       "evidence_submittable": false,
-      "global_id": "ZGlzcHV0ZV9jM3BmdzVxeGJ0NXJnMzhw",
-      "graphql_id": "ZGlzcHV0ZV9jM3BmdzVxeGJ0NXJnMzhw",
-      "id": "c3pfw5qxbt5rg38p",
+      "global_id": "redacted",
+      "graphql_id": "redacted",
+      "id": "redacted",
       "kind": "chargeback",
       "merchant_account_id": "estuary",
       "original_dispute_id": null,
@@ -560,7 +558,7 @@
         "payment_instrument_subtype": "Visa",
         "purchase_order_number": "123654"
       },
-      "updated_at": "2025-01-31T06:18:52Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -574,7 +572,7 @@
       "billing_day_of_month": 26,
       "billing_period_end_date": "redacted",
       "billing_period_start_date": "redacted",
-      "created_at": "2024-11-26T16:29:00Z",
+      "created_at": "redacted",
       "current_billing_cycle": 0,
       "days_past_due": null,
       "description": null,
@@ -586,7 +584,7 @@
       "discounts": [],
       "failure_count": 0,
       "first_billing_date": "2024-11-26",
-      "id": "95jzxv",
+      "id": "redacted",
       "merchant_account_id": "estuary",
       "never_expires": true,
       "next_bill_amount": "11.00",
@@ -962,7 +960,7 @@
       },
       "addresses": [],
       "company": "MyCompany",
-      "created_at": "2024-11-26T14:24:31Z",
+      "created_at": "redacted",
       "credit_cards": [
         {
           "billing_address": null,
@@ -1005,9 +1003,9 @@
       "email": "janesmith@mycompany.com",
       "fax": "",
       "first_name": "Jane",
-      "global_id": "Y3VzdG9tZXJfMTEzODM4MDcwNjQ",
-      "graphql_id": "Y3VzdG9tZXJfMTEzODM4MDcwNjQ",
-      "id": "11383807064",
+      "global_id": "redacted",
+      "graphql_id": "redacted",
+      "id": "redacted",
       "international_phone": {
         "country_code": null,
         "national_number": null
@@ -1053,7 +1051,7 @@
         }
       ],
       "phone": "98765432310",
-      "updated_at": "2024-11-26T14:24:31Z",
+      "updated_at": "redacted",
       "website": ""
     }
   ]
