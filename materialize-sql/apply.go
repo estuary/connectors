@@ -29,7 +29,7 @@ type TableAlter struct {
 	// because the projection is not required anymore, or because the column exists in the
 	// materialized table and is required but is not included in the field selection for the
 	// materialization.
-	DropNotNulls []boilerplate.EndpointField
+	DropNotNulls []boilerplate.ExistingField
 
 	// ColumnTypeChanges is a list of columns that need their type changed. For connectors that use column renaming to migrate columns from one type to another
 	// it is possible that the migration is interrupted by a crash / restart. In these instances
@@ -118,13 +118,14 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 		DropNotNulls: bindingUpdate.NewlyNullableFields,
 	}
 
+	existingResource := a.is.GetResource(table.Path)
 	for _, newProjection := range bindingUpdate.NewProjections {
 		col, err := getColumn(newProjection.Field)
 		if err != nil {
 			return "", nil, err
 		}
 
-		if a.is.HasField(table.Path, col.Field+ColumnMigrationTemporarySuffix) {
+		if existingResource.GetField(col.Field+ColumnMigrationTemporarySuffix) != nil {
 			// At this stage we don't have the target MappedType anymore, but it's okay because if we don't have the original column anymore
 			// (hence the new projection), it means we have already created the new column and set its value.
 			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, ColumnTypeMigration{
@@ -148,18 +149,14 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 			continue
 		}
 
-		existing, err := a.is.GetField(table.Path, proposed.Field)
-		if err != nil {
-			return "", nil, fmt.Errorf("getting existing field information for migration %q: %w", proposed.Field, err)
-		}
-
+		existing := existingResource.GetField(proposed.Field)
 		var rawFieldConfig = binding.FieldSelection.FieldConfigJsonMap[proposed.Field]
-		compatible, err := a.constrainter.compatibleType(existing, &proposed, rawFieldConfig)
+		compatible, err := a.constrainter.compatibleType(*existing, &proposed, rawFieldConfig)
 		if err != nil {
 			return "", nil, fmt.Errorf("checking compatibility of %q: %w", proposed.Field, err)
 		}
 
-		migratable, migrationSpec, err := a.constrainter.migratable(existing, &proposed, rawFieldConfig)
+		migratable, migrationSpec, err := a.constrainter.migratable(*existing, &proposed, rawFieldConfig)
 		if err != nil {
 			return "", nil, fmt.Errorf("checking migratability of %q: %w", proposed.Field, err)
 		}
@@ -174,7 +171,7 @@ func (a *sqlApplier) UpdateResource(ctx context.Context, spec *pf.Materializatio
 				Column:               col,
 				MigrationSpec:        *migrationSpec,
 				OriginalColumnExists: true,
-				ProgressColumnExists: a.is.HasField(table.Path, col.Field+ColumnMigrationTemporarySuffix),
+				ProgressColumnExists: existingResource.GetField(col.Field+ColumnMigrationTemporarySuffix) != nil,
 			}
 			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, m)
 		}
