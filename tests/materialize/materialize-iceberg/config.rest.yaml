@@ -1,0 +1,34 @@
+url: https://na81867.us-east-2.aws.snowflakecomputing.com/polaris/api/catalog
+warehouse: estuary_test
+namespace: ci_testing
+catalog_authentication:
+    catalog_auth_type: OAuth 2.0 Client Credentials
+    oauth2_server_uri: v1/oauth/tokens
+    credential_sops: ENC[AES256_GCM,data:Oac4hXeguBE6BZzNG9gCPcAuMrTCLqjkjJWskX3DDBVHyjOEC1F0gUDkrkubUnFy7IUpl683TLzQ8NQSTDMli48IUr4T2Wn3qQ==,iv:Gxwtz7oSz+wTUNaBWVjB5jha5L5MOw0WJMXIrnEkatk=,tag:8nQLL329Vx2Qgs0W7nvxlw==,type:str]
+    scope: PRINCIPAL_ROLE:estuary_test_principal
+compute:
+    compute_type: AWS EMR Serverless
+    aws_access_key_id_sops: ENC[AES256_GCM,data:kzYYqI3MMGwi0Xcxg5Pgcm3B4qE=,iv:iBOmilXG9TWhQKAPw4R8QVvfqLY09gK4dRZi1xNg9CQ=,tag:8e0HbfoQP8AR172X5/e9CA==,type:str]
+    aws_secret_access_key_sops: ENC[AES256_GCM,data:rSA0ZsLqGhmAsyxmCcEWgrSMQ+DNAwN9pXrKkP2M8Ea1w/9oSi6SSA==,iv:zFx5QiXs2Zf1NnuVbwWunSm4u7QYNrwFabpeDsBgUUc=,tag:mLbE4qpc+eiIitpDQmBT9A==,type:str]
+    region: us-east-2
+    application_id_sops: ENC[AES256_GCM,data:5YR5bOWXFiZLsr93iesAOw==,iv:IWFmkC9+7E+bhK+wP32i1UTW9eUAuzpGlPqhwt18oos=,tag:+4t3h9sKIMWc/+tlRLP8yg==,type:str]
+    execution_role_arn_sops: ENC[AES256_GCM,data:GqpQw/et43W2On51d+v/7WCNKldzcsOsdgRr85bvmR0SB7HcEjebC0SMsy5E81m+sQ==,iv:ad+ZXJ3rKqe0zzZr2RVbo4fXO0dCsxdt8OGJCiq+EaY=,tag:1n4OdiwK+VdoLzw704lR2w==,type:str]
+    bucket: estuary-emr-staging
+    bucket_path: connector-test
+    systems_manager_prefix: /estuary/
+syncSchedule:
+    syncFrequency: 0s
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2025-02-28T17:40:03Z"
+          enc: CiQAdmEdwuDzO+JgxRvKOCcWqizfuOMoTV7GPa8MEp6/6kcN9FsSSQCtUdBGPXvOXXD39buCdUnlpUXk1ijEHVl2POcLjW6Qib6n9EP5LAC5f7cqB98JT54Vk9V4/TYWpQ/M0IYljxzCvPfPcG44/us=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-03-04T16:28:50Z"
+    mac: ENC[AES256_GCM,data:mEksvxgXVz+RWzVnkIK5aeWcekn59PgIO3W7rDwjDCculo7nlNhPiEMjlbucI/PHY+lCwqX6bhBRBOvcCUYiazrmq2JsY9F9ELxYasR7s0o85yJ3epO/x9qyClGmd6MOWaqdWEwUkTzKq8NNSGwmVGjGizucQ6TSkBX3QPgLwxw=,iv:cvOsPtovRL+3f7suT50FKDecQOOA/3WnaSKpD9DI56Y=,tag:/adII9sa8bKFPXee3Z4D1g==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.4
