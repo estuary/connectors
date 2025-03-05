@@ -548,7 +548,7 @@ func TestAsFormattedNumeric(t *testing.T) {
 
 type testConstrainter struct{}
 
-func (testConstrainter) Compatible(existing EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (testConstrainter) Compatible(existing ExistingField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	return existing.Type == strings.Join(proposed.Inference.Types, ","), nil
 }
 
@@ -556,7 +556,7 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 	return strings.Join(p.Inference.Types, ", "), nil
 }
 
-func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	_, numericString := AsFormattedNumeric(p)
 
 	var constraint = new(pm.Response_Validated_Constraint)
@@ -584,5 +584,5 @@ func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "This field is able to be materialized"
 	}
-	return constraint
+	return constraint, nil
 }

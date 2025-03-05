@@ -80,7 +80,7 @@ func TestValidateMigrations(t *testing.T) {
 
 type testConstrainter struct{}
 
-func (testConstrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
+func (testConstrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	var migratable = existing.Type == "integer,string" && strings.Join(proposed.Inference.Types, ",") == "string"
 	return existing.Type == strings.Join(proposed.Inference.Types, ",") || migratable, nil
 }
@@ -89,7 +89,7 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 	return strings.Join(p.Inference.Types, ", "), nil
 }
 
-func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	_, numericString := boilerplate.AsFormattedNumeric(p)
 
 	var constraint = new(pm.Response_Validated_Constraint)
@@ -117,7 +117,7 @@ func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "This field is able to be materialized"
 	}
-	return constraint
+	return constraint, nil
 }
 
 func simpleTestTransform(in string) string {
