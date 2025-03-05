@@ -1,11 +1,11 @@
+# Ignore compiled binaries named "connector", but allow directories named "connector"  
+# when they are part of the expected "cmd/connector" structure for multi-package connectors.  
 connector
+!*/cmd/connector
+
 .docker-cache/*
 !.docker-cache/.keep
 /.build/
-/source-gcs/source-gcs
-/source-hello-world/source-hello-world
-/source-kinesis/source-kinesis
-/source-s3/source-s3
 */target
 **/.DS_Store
 

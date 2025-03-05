@@ -1,0 +1,362 @@
+Big Schema Initial Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"objField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIntegerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringNumberField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUint32Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUint64Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+
+Big Schema Re-validated Constraints:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
+{"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"objField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIntegerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringNumberField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUint32Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUint64Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+
+Big Schema Changed Types Constraints:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"boolField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BOOLEAN' but endpoint type 'LONG' is required by its schema '{ type: [integer] }'"}
+{"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"intField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'intField' is already being materialized as endpoint type 'LONG' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
+{"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"numField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'numField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
+{"Field":"objField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringDateField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateField' is already being materialized as endpoint type 'DATE' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateTimeField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'TIMESTAMPTZ' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'STRING' but endpoint type 'LONG' is required by its schema '{ type: [integer] }'"}
+{"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIntegerField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringIntegerField' is already being materialized as endpoint type 'DECIMAL(38, 0)' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringNumberField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUint32Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'DECIMAL(38, 0)' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUint64Field","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'DECIMAL(38, 0)' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+
+Big Schema Materialized Resource Schema With All Fields Required:
+table {
+	1: key: required string (auto-generated projection of JSON at: /key with inferred types: [string])
+	2: _meta/flow_truncated: required boolean (Flow truncation indicator - Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system. - auto-generated projection of JSON at: /_meta/flow_truncated with inferred types: [boolean])
+	3: arrayField: required string (auto-generated projection of JSON at: /arrayField with inferred types: [array])
+	4: boolField: required boolean (auto-generated projection of JSON at: /boolField with inferred types: [boolean])
+	5: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	6: intField: required long (auto-generated projection of JSON at: /intField with inferred types: [integer])
+	7: multipleField: required string (auto-generated projection of JSON at: /multipleField with inferred types: [integer object string])
+	8: numField: required double (auto-generated projection of JSON at: /numField with inferred types: [number])
+	9: objField: required string (auto-generated projection of JSON at: /objField with inferred types: [object])
+	10: stringDateField: required date (auto-generated projection of JSON at: /stringDateField with inferred types: [string])
+	11: stringDateTimeField: required timestamptz (auto-generated projection of JSON at: /stringDateTimeField with inferred types: [string])
+	12: stringDurationField: required string (auto-generated projection of JSON at: /stringDurationField with inferred types: [string])
+	13: stringEmailField: required string (auto-generated projection of JSON at: /stringEmailField with inferred types: [string])
+	14: stringField: required string (auto-generated projection of JSON at: /stringField with inferred types: [string])
+	15: stringHostnameField: required string (auto-generated projection of JSON at: /stringHostnameField with inferred types: [string])
+	16: stringIdnEmailField: required string (auto-generated projection of JSON at: /stringIdnEmailField with inferred types: [string])
+	17: stringIdnHostnameField: required string (auto-generated projection of JSON at: /stringIdnHostnameField with inferred types: [string])
+	18: stringIntegerField: required decimal(38, 0) (auto-generated projection of JSON at: /stringIntegerField with inferred types: [string])
+	19: stringIpv4Field: required string (auto-generated projection of JSON at: /stringIpv4Field with inferred types: [string])
+	20: stringIpv6Field: required string (auto-generated projection of JSON at: /stringIpv6Field with inferred types: [string])
+	21: stringIriField: required string (auto-generated projection of JSON at: /stringIriField with inferred types: [string])
+	22: stringIriReferenceField: required string (auto-generated projection of JSON at: /stringIriReferenceField with inferred types: [string])
+	23: stringJsonPointerField: required string (auto-generated projection of JSON at: /stringJsonPointerField with inferred types: [string])
+	24: stringMacAddr8Field: required string (auto-generated projection of JSON at: /stringMacAddr8Field with inferred types: [string])
+	25: stringMacAddrField: required string (auto-generated projection of JSON at: /stringMacAddrField with inferred types: [string])
+	26: stringNumberField: required double (auto-generated projection of JSON at: /stringNumberField with inferred types: [string])
+	27: stringRegexField: required string (auto-generated projection of JSON at: /stringRegexField with inferred types: [string])
+	28: stringRelativeJsonPointerField: required string (auto-generated projection of JSON at: /stringRelativeJsonPointerField with inferred types: [string])
+	29: stringTimeField: required string (auto-generated projection of JSON at: /stringTimeField with inferred types: [string])
+	30: stringUint32Field: required decimal(38, 0) (auto-generated projection of JSON at: /stringUint32Field with inferred types: [string])
+	31: stringUint64Field: required decimal(38, 0) (auto-generated projection of JSON at: /stringUint64Field with inferred types: [string])
+	32: stringUriField: required string (auto-generated projection of JSON at: /stringUriField with inferred types: [string])
+	33: stringUriReferenceField: required string (auto-generated projection of JSON at: /stringUriReferenceField with inferred types: [string])
+	34: stringUriTemplateField: required string (auto-generated projection of JSON at: /stringUriTemplateField with inferred types: [string])
+	35: stringUuidField: required string (auto-generated projection of JSON at: /stringUuidField with inferred types: [string])
+	36: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])
+}
+
+Big Schema Materialized Resource Schema With No Fields Required:
+table {
+	1: key: required string (auto-generated projection of JSON at: /key with inferred types: [string])
+	2: _meta/flow_truncated: required boolean (Flow truncation indicator - Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system. - auto-generated projection of JSON at: /_meta/flow_truncated with inferred types: [boolean])
+	3: arrayField: optional string (auto-generated projection of JSON at: /arrayField with inferred types: [array])
+	4: boolField: optional boolean (auto-generated projection of JSON at: /boolField with inferred types: [boolean])
+	5: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	6: intField: optional long (auto-generated projection of JSON at: /intField with inferred types: [integer])
+	7: multipleField: optional string (auto-generated projection of JSON at: /multipleField with inferred types: [integer object string])
+	8: numField: optional double (auto-generated projection of JSON at: /numField with inferred types: [number])
+	9: objField: optional string (auto-generated projection of JSON at: /objField with inferred types: [object])
+	10: stringDateField: optional date (auto-generated projection of JSON at: /stringDateField with inferred types: [string])
+	11: stringDateTimeField: optional timestamptz (auto-generated projection of JSON at: /stringDateTimeField with inferred types: [string])
+	12: stringDurationField: optional string (auto-generated projection of JSON at: /stringDurationField with inferred types: [string])
+	13: stringEmailField: optional string (auto-generated projection of JSON at: /stringEmailField with inferred types: [string])
+	14: stringField: optional string (auto-generated projection of JSON at: /stringField with inferred types: [string])
+	15: stringHostnameField: optional string (auto-generated projection of JSON at: /stringHostnameField with inferred types: [string])
+	16: stringIdnEmailField: optional string (auto-generated projection of JSON at: /stringIdnEmailField with inferred types: [string])
+	17: stringIdnHostnameField: optional string (auto-generated projection of JSON at: /stringIdnHostnameField with inferred types: [string])
+	18: stringIntegerField: optional decimal(38, 0) (auto-generated projection of JSON at: /stringIntegerField with inferred types: [string])
+	19: stringIpv4Field: optional string (auto-generated projection of JSON at: /stringIpv4Field with inferred types: [string])
+	20: stringIpv6Field: optional string (auto-generated projection of JSON at: /stringIpv6Field with inferred types: [string])
+	21: stringIriField: optional string (auto-generated projection of JSON at: /stringIriField with inferred types: [string])
+	22: stringIriReferenceField: optional string (auto-generated projection of JSON at: /stringIriReferenceField with inferred types: [string])
+	23: stringJsonPointerField: optional string (auto-generated projection of JSON at: /stringJsonPointerField with inferred types: [string])
+	24: stringMacAddr8Field: optional string (auto-generated projection of JSON at: /stringMacAddr8Field with inferred types: [string])
+	25: stringMacAddrField: optional string (auto-generated projection of JSON at: /stringMacAddrField with inferred types: [string])
+	26: stringNumberField: optional double (auto-generated projection of JSON at: /stringNumberField with inferred types: [string])
+	27: stringRegexField: optional string (auto-generated projection of JSON at: /stringRegexField with inferred types: [string])
+	28: stringRelativeJsonPointerField: optional string (auto-generated projection of JSON at: /stringRelativeJsonPointerField with inferred types: [string])
+	29: stringTimeField: optional string (auto-generated projection of JSON at: /stringTimeField with inferred types: [string])
+	30: stringUint32Field: optional decimal(38, 0) (auto-generated projection of JSON at: /stringUint32Field with inferred types: [string])
+	31: stringUint64Field: optional decimal(38, 0) (auto-generated projection of JSON at: /stringUint64Field with inferred types: [string])
+	32: stringUriField: optional string (auto-generated projection of JSON at: /stringUriField with inferred types: [string])
+	33: stringUriReferenceField: optional string (auto-generated projection of JSON at: /stringUriReferenceField with inferred types: [string])
+	34: stringUriTemplateField: optional string (auto-generated projection of JSON at: /stringUriTemplateField with inferred types: [string])
+	35: stringUuidField: optional string (auto-generated projection of JSON at: /stringUuidField with inferred types: [string])
+	36: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])
+}
+
+Big Schema Changed Types With Table Replacement Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"numField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"objField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIntegerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringNumberField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUint32Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUint64Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+
+Big Schema Materialized Resource Schema Changed Types With Table Replacement:
+table {
+	1: key: required string (auto-generated projection of JSON at: /key with inferred types: [string])
+	2: _meta/flow_truncated: required boolean (Flow truncation indicator - Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system. - auto-generated projection of JSON at: /_meta/flow_truncated with inferred types: [boolean])
+	3: arrayField: required string (auto-generated projection of JSON at: /arrayField with inferred types: [object])
+	4: boolField: required long (auto-generated projection of JSON at: /boolField with inferred types: [integer])
+	5: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	6: intField: required string (auto-generated projection of JSON at: /intField with inferred types: [string])
+	7: multipleField: required string (auto-generated projection of JSON at: /multipleField with inferred types: [boolean integer object string])
+	8: nullField: optional string (auto-generated projection of JSON at: /nullField with inferred types: [null object])
+	9: numField: required boolean (auto-generated projection of JSON at: /numField with inferred types: [boolean])
+	10: objField: required string (auto-generated projection of JSON at: /objField with inferred types: [string])
+	11: stringDateField: required string (auto-generated projection of JSON at: /stringDateField with inferred types: [string])
+	12: stringDateTimeField: required string (auto-generated projection of JSON at: /stringDateTimeField with inferred types: [string])
+	13: stringDurationField: required string (auto-generated projection of JSON at: /stringDurationField with inferred types: [string])
+	14: stringEmailField: required string (auto-generated projection of JSON at: /stringEmailField with inferred types: [string])
+	15: stringField: required long (auto-generated projection of JSON at: /stringField with inferred types: [integer])
+	16: stringHostnameField: required string (auto-generated projection of JSON at: /stringHostnameField with inferred types: [string])
+	17: stringIdnEmailField: required string (auto-generated projection of JSON at: /stringIdnEmailField with inferred types: [string])
+	18: stringIdnHostnameField: required string (auto-generated projection of JSON at: /stringIdnHostnameField with inferred types: [string])
+	19: stringIntegerField: required string (auto-generated projection of JSON at: /stringIntegerField with inferred types: [string])
+	20: stringIpv4Field: required string (auto-generated projection of JSON at: /stringIpv4Field with inferred types: [string])
+	21: stringIpv6Field: required string (auto-generated projection of JSON at: /stringIpv6Field with inferred types: [string])
+	22: stringIriField: required string (auto-generated projection of JSON at: /stringIriField with inferred types: [string])
+	23: stringIriReferenceField: required string (auto-generated projection of JSON at: /stringIriReferenceField with inferred types: [string])
+	24: stringJsonPointerField: required string (auto-generated projection of JSON at: /stringJsonPointerField with inferred types: [string])
+	25: stringMacAddr8Field: required string (auto-generated projection of JSON at: /stringMacAddr8Field with inferred types: [string])
+	26: stringMacAddrField: required string (auto-generated projection of JSON at: /stringMacAddrField with inferred types: [string])
+	27: stringNumberField: required string (auto-generated projection of JSON at: /stringNumberField with inferred types: [string])
+	28: stringRegexField: required string (auto-generated projection of JSON at: /stringRegexField with inferred types: [string])
+	29: stringRelativeJsonPointerField: required string (auto-generated projection of JSON at: /stringRelativeJsonPointerField with inferred types: [string])
+	30: stringTimeField: required string (auto-generated projection of JSON at: /stringTimeField with inferred types: [string])
+	31: stringUint32Field: required string (auto-generated projection of JSON at: /stringUint32Field with inferred types: [string])
+	32: stringUint64Field: required string (auto-generated projection of JSON at: /stringUint64Field with inferred types: [string])
+	33: stringUriField: required string (auto-generated projection of JSON at: /stringUriField with inferred types: [string])
+	34: stringUriReferenceField: required string (auto-generated projection of JSON at: /stringUriReferenceField with inferred types: [string])
+	35: stringUriTemplateField: required string (auto-generated projection of JSON at: /stringUriTemplateField with inferred types: [string])
+	36: stringUuidField: required string (auto-generated projection of JSON at: /stringUuidField with inferred types: [string])
+	37: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])
+}
+
+add a single field:
+table {
+	1: key: required string (auto-generated projection of JSON at: /key with inferred types: [string])
+	2: _meta/flow_truncated: required boolean (Flow truncation indicator - Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system. - auto-generated projection of JSON at: /_meta/flow_truncated with inferred types: [boolean])
+	3: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	4: optionalBoolean: optional boolean (auto-generated projection of JSON at: /optionalBoolean with inferred types: [boolean])
+	5: optionalInteger: optional long (auto-generated projection of JSON at: /optionalInteger with inferred types: [integer])
+	6: optionalObject: optional string (auto-generated projection of JSON at: /optionalObject with inferred types: [object])
+	7: optionalString: optional string (auto-generated projection of JSON at: /optionalString with inferred types: [string])
+	8: requiredBoolean: required boolean (auto-generated projection of JSON at: /requiredBoolean with inferred types: [boolean])
+	9: requiredInteger: required long (auto-generated projection of JSON at: /requiredInteger with inferred types: [integer])
+	10: requiredObject: required string (auto-generated projection of JSON at: /requiredObject with inferred types: [object])
+	11: requiredString: required string (auto-generated projection of JSON at: /requiredString with inferred types: [string])
+	12: flow_document: required string (user-provided projection of JSON at:  with inferred types: [object])
+	13: addedOptionalString: optional string (auto-generated projection of JSON at: /addedOptionalString with inferred types: [string])
+}
+
+remove a single optional field:
+table {
+	1: key: required string (auto-generated projection of JSON at: /key with inferred types: [string])
+	2: _meta/flow_truncated: required boolean (Flow truncation indicator - Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system. - auto-generated projection of JSON at: /_meta/flow_truncated with inferred types: [boolean])
+	3: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	4: optionalBoolean: optional boolean (auto-generated projection of JSON at: /optionalBoolean with inferred types: [boolean])
+	5: optionalInteger: optional long (auto-generated projection of JSON at: /optionalInteger with inferred types: [integer])
+	6: optionalObject: optional string (auto-generated projection of JSON at: /optionalObject with inferred types: [object])
+	7: optionalString: optional string (auto-generated projection of JSON at: /optionalString with inferred types: [string])
+	8: requiredBoolean: required boolean (auto-generated projection of JSON at: /requiredBoolean with inferred types: [boolean])
+	9: requiredInteger: required long (auto-generated projection of JSON at: /requiredInteger with inferred types: [integer])
+	10: requiredObject: required string (auto-generated projection of JSON at: /requiredObject with inferred types: [object])
+	11: requiredString: required string (auto-generated projection of JSON at: /requiredString with inferred types: [string])
+	12: flow_document: required string (user-provided projection of JSON at:  with inferred types: [object])
+}
+
+remove a single required field:
+table {
+	1: key: required string (auto-generated projection of JSON at: /key with inferred types: [string])
+	2: _meta/flow_truncated: required boolean (Flow truncation indicator - Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system. - auto-generated projection of JSON at: /_meta/flow_truncated with inferred types: [boolean])
+	3: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	4: optionalBoolean: optional boolean (auto-generated projection of JSON at: /optionalBoolean with inferred types: [boolean])
+	5: optionalInteger: optional long (auto-generated projection of JSON at: /optionalInteger with inferred types: [integer])
+	6: optionalObject: optional string (auto-generated projection of JSON at: /optionalObject with inferred types: [object])
+	7: optionalString: optional string (auto-generated projection of JSON at: /optionalString with inferred types: [string])
+	8: requiredBoolean: required boolean (auto-generated projection of JSON at: /requiredBoolean with inferred types: [boolean])
+	9: requiredInteger: required long (auto-generated projection of JSON at: /requiredInteger with inferred types: [integer])
+	10: requiredObject: required string (auto-generated projection of JSON at: /requiredObject with inferred types: [object])
+	11: requiredString: optional string (auto-generated projection of JSON at: /requiredString with inferred types: [string])
+	12: flow_document: required string (user-provided projection of JSON at:  with inferred types: [object])
+}
+
+add and remove many fields:
+table {
+	1: key: required string (auto-generated projection of JSON at: /key with inferred types: [string])
+	2: _meta/flow_truncated: required boolean (Flow truncation indicator - Indicates whether any of the materialized values for this row have been truncated to make them fit inside the limitations of the destination system. - auto-generated projection of JSON at: /_meta/flow_truncated with inferred types: [boolean])
+	3: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	4: optionalBoolean: optional boolean (auto-generated projection of JSON at: /optionalBoolean with inferred types: [boolean])
+	5: optionalInteger: optional long (auto-generated projection of JSON at: /optionalInteger with inferred types: [integer])
+	6: optionalObject: optional string (auto-generated projection of JSON at: /optionalObject with inferred types: [object])
+	7: optionalString: optional string (auto-generated projection of JSON at: /optionalString with inferred types: [string])
+	8: requiredBoolean: required boolean (auto-generated projection of JSON at: /requiredBoolean with inferred types: [boolean])
+	9: requiredInteger: required long (auto-generated projection of JSON at: /requiredInteger with inferred types: [integer])
+	10: requiredObject: optional string (auto-generated projection of JSON at: /requiredObject with inferred types: [object])
+	11: requiredString: optional string (auto-generated projection of JSON at: /requiredString with inferred types: [string])
+	12: flow_document: required string (user-provided projection of JSON at:  with inferred types: [object])
+	13: addedOptionalString: optional string (auto-generated projection of JSON at: /addedOptionalString with inferred types: [string])
+	14: addedRequiredString: required string (auto-generated projection of JSON at: /addedRequiredString with inferred types: [string])
+}
+
+Challenging Field Names Materialized Columns:
+table {
+	1:  ,;{}().- problematicKey � 𐀀 嶲 : required string (auto-generated projection of JSON at: / ,;{}().- problematicKey � 𐀀 嶲  with inferred types: [string])
+	2: _id: required string (auto-generated projection of JSON at: /_id with inferred types: [string])
+	3:  ,;{}().- problematicValue � 𐀀 嶲 : optional string (auto-generated projection of JSON at: / ,;{}().- problematicValue � 𐀀 嶲  with inferred types: [string])
+	4: $dollar$signs: optional string (auto-generated projection of JSON at: /$dollar$signs with inferred types: [string])
+	5: 123: optional string (auto-generated projection of JSON at: /123 with inferred types: [string])
+	6: 123startsWithDigits: optional string (auto-generated projection of JSON at: /123startsWithDigits with inferred types: [string])
+	7: a"string`with`quote'characters: optional string (auto-generated projection of JSON at: /a"string`with`quote'characters with inferred types: [string])
+	8: flow_published_at: required timestamptz (Flow Publication Time - Flow publication date-time of this document - auto-generated projection of JSON at: /_meta/uuid with inferred types: [string])
+	9: value with separated words: optional string (auto-generated projection of JSON at: /value with separated words with inferred types: [string])
+	10: value-with-separated-words: optional string (auto-generated projection of JSON at: /value-with-separated-words with inferred types: [string])
+	11: value.with-separated_words: optional string (auto-generated projection of JSON at: /value.with-separated_words with inferred types: [string])
+	12: value.with.separated.words: optional string (auto-generated projection of JSON at: /value.with.separated.words with inferred types: [string])
+	13: value_with_separated_words: optional string (auto-generated projection of JSON at: /value_with_separated_words with inferred types: [string])
+	14: flow_document: required string (auto-generated projection of JSON at:  with inferred types: [object])
+}
+
