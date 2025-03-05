@@ -77,10 +77,8 @@ func TestValidateAndApply(t *testing.T) {
 			is, err := catalog.infoSchema(ctx)
 			require.NoError(t, err)
 
-			fields, err := is.FieldsForResource(resourceConfig.path())
-			require.NoError(t, err)
-
-			slices.SortFunc(fields, func(a, b boilerplate.EndpointField) int {
+			fields := is.GetResource(resourceConfig.path()).AllFields()
+			slices.SortFunc(fields, func(a, b boilerplate.ExistingField) int {
 				return strings.Compare(a.Name, b.Name)
 			})
 

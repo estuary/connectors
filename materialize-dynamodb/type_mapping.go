@@ -266,13 +266,14 @@ func infoSchema(ctx context.Context, db *dynamodb.Client, tableNames []string) (
 			return nil, fmt.Errorf("describing table %q: %w", t, err)
 		}
 
+		res := is.PushResource(t)
 		for _, def := range d.Table.AttributeDefinitions {
-			is.PushField(boilerplate.EndpointField{
+			res.PushField(boilerplate.ExistingField{
 				Name:               *def.AttributeName,
 				Nullable:           false,                     // Table keys can never be nullable.
 				Type:               string(def.AttributeType), // "B", "S", or "N".
 				CharacterMaxLength: 0,
-			}, t)
+			})
 		}
 	}
 

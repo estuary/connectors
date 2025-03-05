@@ -143,15 +143,14 @@ func (c *client) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error
 	}
 
 	for index, meta := range indexMeta {
-		is.PushResource(index)
-
+		res := is.PushResource(index)
 		for field, prop := range meta.Mappings.Properties {
-			is.PushField(boilerplate.EndpointField{
+			res.PushField(boilerplate.ExistingField{
 				Name:               field,
 				Nullable:           true,
 				Type:               string(prop.Type),
 				CharacterMaxLength: 0,
-			}, index)
+			})
 		}
 	}
 
