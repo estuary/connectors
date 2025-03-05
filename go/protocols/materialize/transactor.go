@@ -8,6 +8,7 @@ import (
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
@@ -131,6 +132,7 @@ func RunTransactions(
 	if err != nil {
 		return err
 	}
+	logrus.WithField("eventType", "connectorStatus").Info("Running")
 
 	var (
 		// awaitErr is the last await() result,
