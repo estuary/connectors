@@ -77,10 +77,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 				return nil, fmt.Errorf("table iterator next: %w", err)
 			}
 
-			mu.Lock()
-			is.PushResource(table.DatasetID, table.TableID)
-			mu.Unlock()
-
 			group.Go(func() error {
 				md, err := table.Metadata(groupCtx, bigquery.WithMetadataView(bigquery.BasicMetadataView))
 				if err != nil {
@@ -90,14 +86,16 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 				mu.Lock()
 				defer mu.Unlock()
 
+				res := is.PushResource(table.DatasetID, table.TableID)
+				res.Meta = md.Schema
 				for _, f := range md.Schema {
-					is.PushField(boilerplate.EndpointField{
+					res.PushField(boilerplate.ExistingField{
 						Name:               f.Name,
 						Nullable:           !f.Required,
 						Type:               string(f.Type),
 						CharacterMaxLength: int(f.MaxLength),
 						HasDefault:         len(f.DefaultValueExpression) > 0,
-					}, table.DatasetID, table.TableID)
+					})
 				}
 
 				return nil

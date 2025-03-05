@@ -244,7 +244,7 @@ func infoSchema(ctx context.Context, db *mongo.Database) (*boilerplate.InfoSchem
 	}
 
 	for _, c := range collections {
-		is.PushField(boilerplate.EndpointField{}, db.Name(), c.Name) // NB: ResourcePath includes the database name.
+		is.PushResource(db.Name(), c.Name) // NB: ResourcePath includes the database name.
 	}
 
 	return is, nil
