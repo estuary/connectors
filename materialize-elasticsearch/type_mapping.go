@@ -140,7 +140,7 @@ func boolPtr(b bool) *bool {
 
 type constrainter struct{}
 
-func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint {
+func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, fc json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	_, isNumeric := boilerplate.AsFormattedNumeric(p)
 
 	var constraint = pm.Response_Validated_Constraint{}
@@ -178,10 +178,10 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Resp
 		constraint.Reason = "This field is able to be materialized"
 	}
 
-	return &constraint
+	return &constraint, nil
 }
 
-func (constrainter) Compatible(existing boilerplate.EndpointField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
+func (constrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, fc json.RawMessage) (bool, error) {
 	prop, err := propForProjection(proposed, proposed.Inference.Types, fc)
 	if err != nil {
 		return false, err

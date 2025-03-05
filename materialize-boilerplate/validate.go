@@ -15,11 +15,11 @@ import (
 type Constrainter interface {
 	// NewConstraints produces constraints for a projection that is not part of the current
 	// materialization.
-	NewConstraints(p *pf.Projection, deltaUpdates bool) *pm.Response_Validated_Constraint
+	NewConstraints(p *pf.Projection, deltaUpdates bool, rawFieldConfig json.RawMessage) (*pm.Response_Validated_Constraint, error)
 
 	// Compatible reports whether an existing materialized field in a destination system (such as a
 	// column in a table) is compatible with a proposed projection.
-	Compatible(existing EndpointField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error)
+	Compatible(existing ExistingField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error)
 
 	// DescriptionForType produces a human-readable description for a type, which is used in
 	// constraint descriptions when there is an incompatible type change.
