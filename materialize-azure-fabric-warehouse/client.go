@@ -125,13 +125,13 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 			return nil, err
 		}
 
-		is.PushField(boilerplate.EndpointField{
+		is.PushResource(c.TableSchema, c.TableName).PushField(boilerplate.ExistingField{
 			Name:               c.ColumnName,
 			Nullable:           strings.EqualFold(c.IsNullable, "yes"),
 			Type:               c.DataType,
 			CharacterMaxLength: int(c.CharacterMaximumLength.Int64),
 			HasDefault:         c.ColumnDefault.Valid,
-		}, c.TableSchema, c.TableName)
+		})
 	}
 	if err := columns.Err(); err != nil {
 		return nil, err
