@@ -1753,7 +1753,22 @@
             "type": "array"
         },
         "company": {
+            "properties": {
+                "id": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                },
+                "location_id": {
+                    "type": [
+                        "integer",
+                        "null"
+                    ]
+                }
+            },
             "type": [
+                "object",
                 "string",
                 "null"
             ]
