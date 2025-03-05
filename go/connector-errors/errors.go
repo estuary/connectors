@@ -2,7 +2,9 @@ package errors
 
 import (
 	"errors"
+	"fmt"
 	"os"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 )
@@ -77,4 +79,33 @@ func HandleFinalError(err error) {
 	_, _ = os.Stderr.WriteString(err.Error())
 	_, _ = os.Stderr.Write([]byte("\n"))
 	os.Exit(1)
+}
+
+// PrereqErr is a wrapper for recording accumulated errors during prerequisite checking and
+// formatting them for user presentation.
+type PrereqErr struct {
+	errs []error
+}
+
+// Err adds an error to the accumulated list of errors.
+func (e *PrereqErr) Err(err error) {
+	e.errs = append(e.errs, err)
+}
+
+func (e *PrereqErr) Len() int {
+	return len(e.errs)
+}
+
+func (e *PrereqErr) Unwrap() []error {
+	return e.errs
+}
+
+func (e *PrereqErr) Error() string {
+	var b = new(strings.Builder)
+	fmt.Fprintf(b, "the connector cannot run due to the following error(s):")
+	for _, err := range e.errs {
+		b.WriteString("\n - ")
+		b.WriteString(err.Error())
+	}
+	return b.String()
 }
