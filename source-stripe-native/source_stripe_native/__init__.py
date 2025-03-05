@@ -10,13 +10,13 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.capture.common import ResourceConfig
 from estuary_cdk.http import HTTPMixin
 
 from .resources import all_resources
 from .models import (
     ConnectorState,
     EndpointConfig,
-    ResourceConfig,
 )
 
 

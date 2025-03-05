@@ -34,11 +34,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -52,6 +48,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -106,11 +114,7 @@
       "description": "Parent Stream: Accounts",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -124,6 +128,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -174,11 +190,7 @@
       "description": "Parent Stream: Accounts",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -192,6 +204,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -242,11 +266,7 @@
       "description": "Parent Stream: Accounts",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -260,6 +280,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -309,11 +341,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -327,6 +355,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -382,11 +422,7 @@
       "description": "Parent Stream: ApplicationFees",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -400,6 +436,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -449,11 +497,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -467,6 +511,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -522,11 +578,7 @@
       "description": "Parent Stream: Customers",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -540,6 +592,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -590,11 +654,7 @@
       "description": "Parent Stream: Customers\n\nWhen backfilling, Cards behaves as a child stream. But during incremental replication,\nCards listens to distinct events that contain Card documents, meaning it isn't a child stream.",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -608,6 +668,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -658,11 +730,7 @@
       "description": "Parent Stream: Customers",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -676,6 +744,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -726,11 +806,7 @@
       "description": "Parent Stream: Customers\n\nWhen backfilling, PaymentMethods behaves as a child stream. But during incremental replication,\nPaymentMethods listens to distinct events that contain PaymentMethods documents, meaning it\nisn't a child stream.",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -744,6 +820,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -793,11 +881,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -811,6 +895,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -865,11 +961,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -883,6 +975,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -938,11 +1042,7 @@
       "description": "Parent Stream: CheckoutSessions",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -956,6 +1056,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -1005,11 +1117,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1023,6 +1131,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1077,11 +1197,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1095,6 +1211,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1150,11 +1278,7 @@
       "description": "Parent Stream: CreditNotes",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1168,6 +1292,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -1217,11 +1353,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1235,6 +1367,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1289,11 +1433,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1307,6 +1447,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1361,11 +1513,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1379,6 +1527,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1433,11 +1593,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1451,6 +1607,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1506,11 +1674,7 @@
       "description": "Parent Stream: Invoices",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1524,6 +1688,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -1573,11 +1749,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1591,6 +1763,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1645,11 +1829,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1663,6 +1843,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1717,11 +1909,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1735,6 +1923,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1789,11 +1989,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1807,6 +2003,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1861,11 +2069,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1879,6 +2083,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -1933,11 +2149,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1951,6 +2163,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2005,11 +2229,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2023,6 +2243,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2077,11 +2309,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2095,6 +2323,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2150,11 +2390,7 @@
       "description": "Parent Stream: SetupIntents",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2168,6 +2404,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -2217,11 +2465,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2235,6 +2479,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2289,11 +2545,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2307,6 +2559,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2392,11 +2656,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2410,6 +2670,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2469,11 +2741,7 @@
       "description": "Parent Stream: SubscriptionItems",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2487,6 +2755,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "subscription_item": {
           "title": "Subscription Item",
@@ -2541,11 +2821,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2559,6 +2835,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2613,11 +2901,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2631,6 +2915,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2686,11 +2982,7 @@
       "description": "Parent Stream: Transfers",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2704,6 +2996,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         }
       },
       "required": [
@@ -2754,11 +3058,7 @@
       "description": "Incremental stream with no Events",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2772,6 +3072,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2827,11 +3139,7 @@
       "description": "Incremental stream with no Events",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2845,6 +3153,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",
@@ -2900,11 +3220,7 @@
       "description": "Incremental stream with no Events",
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -2918,6 +3234,18 @@
         "object": {
           "title": "Object",
           "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
         },
         "created": {
           "title": "Created",

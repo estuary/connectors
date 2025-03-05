@@ -21,8 +21,7 @@ $defs:
 additionalProperties: true
 properties:
   _meta:
-    allOf:
-      - $ref: "#/$defs/Meta"
+    $ref: "#/$defs/Meta"
     default:
       op: u
       row_id: -1
@@ -30,8 +29,22 @@ properties:
   id:
     title: Id
     type: string
+  object:
+    title: Object
+    type: string
+  account_id:
+    anyOf:
+      - type: string
+      - type: "null"
+    description: The account ID associated with the resource.
+    title: Account Id
+  created:
+    title: Created
+    type: integer
 required:
   - id
+  - object
+  - created
 title: Refunds
 type: object
 x-infer-schema: true
