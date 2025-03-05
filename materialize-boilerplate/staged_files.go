@@ -18,33 +18,35 @@ type Encoder interface {
 
 // StagedFileStorageClient is a specific implementation of a client that
 // interacts with a staging file system, usually an object store of some kind.
-type StagedFileStorageClient[T any] interface {
+type StagedFileStorageClient interface {
 	// NewEncoder creates a new Encoder that writes rows to a writer.
 	NewEncoder(w io.WriteCloser, fields []string) Encoder
 
-	// NewObject creates a new file object handle from a random UUID. The UUID
-	// should be part of the file name, and the specifics of the object
-	// construction are generic to the implementation.
-	NewObject(uuid string) T
+	// NewObject creates a new file key from keyParts, which include the
+	// bucketPath (if set), a random UUID prefix if prefixFiles is true, and a
+	// random UUID for the specific object.
+	NewKey(keyParts []string) string
 
-	// URI creates an identifier from T.
-	URI(T) string
+	// URI creates an identifier from a file key, usually be prepending the URI
+	// scheme, for example "s3://".
+	URI(key string) string
 
-	// UploadStream streams data from a reader to the destination represented by
-	// the object T. For example, this may read bytes from r and write the bytes
-	// to a blob at a specific location represented by T.
-	UploadStream(ctx context.Context, object T, r io.Reader) error
+	// UploadStream streams data from a reader to the destination file specified
+	// by `key`.
+	UploadStream(ctx context.Context, key string, r io.Reader) error
 
 	// Delete deletes the objects per the list of URIs. This is used for
 	// removing the temporary staged files after transactions are applied.
 	Delete(ctx context.Context, uris []string) error
 }
 
-type StagedFiles[T any] struct {
-	client             StagedFileStorageClient[T]
+type StagedFiles struct {
+	client             StagedFileStorageClient
 	fileSizeLimit      int
+	bucketPath         string
 	flushOnNextBinding bool
-	stagedFiles        []stagedFile[T]
+	prefixFiles        bool
+	stagedFiles        []stagedFile
 	lastBinding        int
 }
 
@@ -62,31 +64,48 @@ type StagedFiles[T any] struct {
 // start a new file, so this should usually only be enabled for encoding rows
 // received from Store requests, where the documents are always in monotonic
 // order with respect to their binding index.
-func NewStagedFiles[T any](client StagedFileStorageClient[T], fileSizeLimit int, flushOnNextBinding bool) *StagedFiles[T] {
-	return &StagedFiles[T]{
+//
+// prefixFiles generates an additional random UUID to prefix each file name,
+// which is unique for each binding and each transaction cycle. This can be used
+// to provide additional grouping of files for a binding within a transaction so
+// that all of its files are in the same "folder".
+func NewStagedFiles(
+	client StagedFileStorageClient,
+	fileSizeLimit int,
+	bucketPath string,
+	flushOnNextBinding bool,
+	prefixFiles bool,
+) *StagedFiles {
+	return &StagedFiles{
 		client:             client,
 		fileSizeLimit:      fileSizeLimit,
+		bucketPath:         bucketPath,
 		flushOnNextBinding: flushOnNextBinding,
 		lastBinding:        -1,
+		prefixFiles:        prefixFiles,
 	}
 }
 
 // AddBinding adds a binding. Bindings must be added in order of their binding
-// index, starting from 0.
-func (sf *StagedFiles[T]) AddBinding(binding int, fields []string) {
+// index, starting from 0. Fields may be `nil` if they are not needed, ex:
+// encoding CSV files without headers, or encoding JSONL as arrays of values
+// instead of objects.
+func (sf *StagedFiles) AddBinding(binding int, fields []string) {
 	if binding != len(sf.stagedFiles) {
 		panic("bindings must be added monotonically increasing order starting with binding 0")
 	}
 
-	sf.stagedFiles = append(sf.stagedFiles, stagedFile[T]{
+	sf.stagedFiles = append(sf.stagedFiles, stagedFile{
 		client:        sf.client,
 		fileSizeLimit: sf.fileSizeLimit,
+		bucketPath:    sf.bucketPath,
+		prefixFiles:   sf.prefixFiles,
 		fields:        fields,
 	})
 }
 
 // EncodeRow encodes a row of data for the binding.
-func (sf *StagedFiles[T]) EncodeRow(ctx context.Context, binding int, row []any) error {
+func (sf *StagedFiles) EncodeRow(ctx context.Context, binding int, row []any) error {
 	if sf.flushOnNextBinding && sf.lastBinding != -1 && binding != sf.lastBinding {
 		if err := sf.stagedFiles[sf.lastBinding].flushFile(); err != nil {
 			return fmt.Errorf("flushing prior binding [%d]: %w", sf.lastBinding, err)
@@ -98,7 +117,7 @@ func (sf *StagedFiles[T]) EncodeRow(ctx context.Context, binding int, row []any)
 }
 
 // Flush flushes the current encoder and closes the file.
-func (sf *StagedFiles[T]) Flush(binding int) ([]string, error) {
+func (sf *StagedFiles) Flush(binding int) ([]string, error) {
 	return sf.stagedFiles[binding].flush()
 }
 
@@ -107,7 +126,7 @@ func (sf *StagedFiles[T]) Flush(binding int) ([]string, error) {
 // again will not re-attempt to delete the same files. This makes it convenient
 // to use both as part of a deferred call, and an inline call to check for
 // deletion errors.
-func (sf *StagedFiles[T]) CleanupCurrentTransaction(ctx context.Context) error {
+func (sf *StagedFiles) CleanupCurrentTransaction(ctx context.Context) error {
 	var uris []string
 	for i := range sf.stagedFiles {
 		f := &sf.stagedFiles[i]
@@ -120,7 +139,6 @@ func (sf *StagedFiles[T]) CleanupCurrentTransaction(ctx context.Context) error {
 		}
 		f.uploaded = nil
 	}
-
 	if len(uris) == 0 {
 		return nil
 	}
@@ -132,28 +150,32 @@ func (sf *StagedFiles[T]) CleanupCurrentTransaction(ctx context.Context) error {
 // used to cleanup files that have been staged for a materialization using the
 // post-commit apply pattern, where staged files must remain across connector
 // restarts.
-func (sf *StagedFiles[T]) CleanupCheckpoint(ctx context.Context, uris []string) error {
+func (sf *StagedFiles) CleanupCheckpoint(ctx context.Context, uris []string) error {
 	return sf.client.Delete(ctx, uris)
 }
 
 // Started indicates if any rows were encoded for the binding during this
 // transaction.
-func (sf *StagedFiles[T]) Started(binding int) bool {
+func (sf *StagedFiles) Started(binding int) bool {
 	return sf.stagedFiles[binding].started
 }
 
-type stagedFile[T any] struct {
-	client        StagedFileStorageClient[T]
+type stagedFile struct {
+	client        StagedFileStorageClient
 	fileSizeLimit int
+	bucketPath    string
+	prefixFiles   bool
+	uuidPrefix    string
 	fields        []string
 	encoder       Encoder
 	group         *errgroup.Group
 	started       bool
-	uploaded      []T
+	uploaded      []string
 }
 
-func (f *stagedFile[T]) encodeRow(ctx context.Context, row []any) error {
+func (f *stagedFile) encodeRow(ctx context.Context, row []any) error {
 	if !f.started {
+		f.uuidPrefix = uuid.NewString()
 		f.uploaded = nil
 		f.started = true
 	}
@@ -175,7 +197,7 @@ func (f *stagedFile[T]) encodeRow(ctx context.Context, row []any) error {
 	return nil
 }
 
-func (f *stagedFile[T]) flush() ([]string, error) {
+func (f *stagedFile) flush() ([]string, error) {
 	if err := f.flushFile(); err != nil {
 		return nil, err
 	}
@@ -189,17 +211,27 @@ func (f *stagedFile[T]) flush() ([]string, error) {
 	return uploaded, nil
 }
 
-func (f *stagedFile[T]) newFile(ctx context.Context) {
+func (f *stagedFile) newFile(ctx context.Context) {
 	r, w := io.Pipe()
 	f.encoder = f.client.NewEncoder(w, f.fields)
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	f.group = group
-	obj := f.client.NewObject(uuid.NewString())
-	f.uploaded = append(f.uploaded, obj)
+
+	var nameParts []string
+	if f.bucketPath != "" {
+		nameParts = append(nameParts, f.bucketPath)
+	}
+	if f.prefixFiles {
+		nameParts = append(nameParts, f.uuidPrefix)
+	}
+	nameParts = append(nameParts, uuid.NewString())
+
+	key := f.client.NewKey(nameParts)
+	f.uploaded = append(f.uploaded, key)
 
 	f.group.Go(func() error {
-		if err := f.client.UploadStream(groupCtx, obj, r); err != nil {
+		if err := f.client.UploadStream(groupCtx, key, r); err != nil {
 			r.CloseWithError(err)
 			return fmt.Errorf("uploading file: %w", err)
 		}
@@ -208,7 +240,7 @@ func (f *stagedFile[T]) newFile(ctx context.Context) {
 	})
 }
 
-func (f *stagedFile[T]) flushFile() error {
+func (f *stagedFile) flushFile() error {
 	if f.encoder == nil {
 		return nil
 	}
