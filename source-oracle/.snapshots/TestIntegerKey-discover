@@ -1,0 +1,135 @@
+Binding 0:
+{
+    "recommended_name": "c__flow_test_logminer/t12319541",
+    "resource_config_json": {
+      "namespace": "C##FLOW_TEST_LOGMINER",
+      "stream": "T12319541"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "C##FLOW_TEST_LOGMINERT12319541": {
+          "type": "object",
+          "required": [
+            "NUM18"
+          ],
+          "$anchor": "C##FLOW_TEST_LOGMINERT12319541",
+          "properties": {
+            "NUM18": {
+              "type": "integer",
+              "description": "(source type: non-nullable NUMBER)"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#C##FLOW_TEST_LOGMINERT12319541",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-oracle/oracle-source",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "scn": {
+                      "type": "integer",
+                      "description": "SCN of this event"
+                    },
+                    "row_id": {
+                      "type": "string",
+                      "description": "ROWID of the document"
+                    },
+                    "rs_id": {
+                      "type": "string",
+                      "description": "Record Set ID of the logical change"
+                    },
+                    "ssn": {
+                      "type": "integer",
+                      "description": "SQL sequence number of the logical change"
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table",
+                    "row_id",
+                    "rs_id",
+                    "ssn"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#C##FLOW_TEST_LOGMINERT12319541"
+        }
+      ]
+    },
+    "key": [
+      "/NUM18"
+    ]
+  }
+
