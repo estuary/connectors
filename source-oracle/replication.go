@@ -551,14 +551,19 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 
 		var msg logminerMessage
 		var ts time.Time
+		var redoSql sql.NullString
 		var undoSql sql.NullString
 		var info sql.NullString
-		if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &msg.SQL, &undoSql, &msg.TableName, &msg.Owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID); err != nil {
+		if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &redoSql, &undoSql, &msg.TableName, &msg.Owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID); err != nil {
 			return err
 		}
 
 		// For some reason RSID comes with a space before and after it
 		msg.RSID = strings.TrimSpace(msg.RSID)
+
+		if redoSql.Valid {
+			msg.SQL = redoSql.String
+		}
 
 		if undoSql.Valid {
 			msg.UndoSQL = undoSql.String

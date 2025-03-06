@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/url"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -299,13 +300,6 @@ func (db *oracleDatabase) FallbackCollectionKey() []string {
 }
 
 func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error) {
-	if colType.jsonType == "integer" {
-		return key.(int64), nil
-	} else if colType.jsonType == "number" {
-		// Sanity check, should not happen
-		return nil, fmt.Errorf("unsupported %q primary key with scale %d", colType.original, colType.scale)
-	}
-
 	switch key := key.(type) {
 	case [16]uint8:
 		var id, err = uuid.FromBytes(key[:])
@@ -316,9 +310,15 @@ func encodeKeyFDB(key any, colType oracleColumnType) (tuple.TupleElement, error)
 	case time.Time:
 		return key.Format(sortableRFC3339Nano), nil
 	case string:
-		if colType.format == "integer" {
+		if colType.JsonType == "integer" {
+			return strconv.Atoi(key)
+		} else if colType.JsonType == "number" {
+			return strconv.ParseFloat(key, 64)
+		}
+
+		if colType.Format == "integer" {
 			// prepend zeros so that string represented numbers are lexicographically consistent
-			var leadingZeros = strings.Repeat("0", int(colType.precision)-len(key))
+			var leadingZeros = strings.Repeat("0", int(colType.Precision)-len(key))
 			if key[0] == '-' {
 				key = "-" + leadingZeros + key[1:]
 			} else {

@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -109,12 +109,10 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 	case nil:
 		return nil, nil
 	case string:
-		if dataType.jsonType != "string" {
-			var out = reflect.New(dataType.t).Interface()
-			if err := json.Unmarshal([]byte(v), out); err != nil {
-				return nil, err
-			}
-			return out, nil
+		if dataType.JsonType == "integer" {
+			return strconv.Atoi(v)
+		} else if dataType.JsonType == "number" {
+			return strconv.ParseFloat(v, 64)
 		} else {
 			return val, nil
 		}
@@ -122,24 +120,25 @@ func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (inter
 	}
 
 	var rv = reflect.ValueOf(val)
-	if rv.CanConvert(dataType.t) {
-		return rv.Convert(dataType.t).Interface(), nil
+	if rv.CanConvert(dataType.T) {
+		return rv.Convert(dataType.T).Interface(), nil
 	}
+
 	return val, nil
 }
 
 func (ct *oracleColumnType) toJSONSchemaType() *jsonschema.Schema {
 	var out = &jsonschema.Schema{
-		Format: ct.format,
+		Format: ct.Format,
 		Extras: make(map[string]interface{}),
 	}
 
-	if ct.jsonType == "" {
+	if ct.JsonType == "" {
 		// No type constraint.
-	} else if ct.nullable {
-		out.Extras["type"] = []string{ct.jsonType, "null"} // Use variadic form.
+	} else if ct.Nullable {
+		out.Extras["type"] = []string{ct.JsonType, "null"} // Use variadic form.
 	} else {
-		out.Type = ct.jsonType
+		out.Type = ct.JsonType
 	}
 	return out
 }
@@ -268,18 +267,18 @@ SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_typ
     ON (t.owner = c.owner AND t.table_name = c.table_name AND t.column_name = c.column_name)`
 
 type oracleColumnType struct {
-	original  string
-	length    int
-	scale     int16
-	precision int16
-	t         reflect.Type
-	format    string
-	jsonType  string
-	nullable  bool
+	Original  string
+	Length    int
+	Scale     int16
+	Precision int16
+	T         reflect.Type
+	Format    string
+	JsonType  string
+	Nullable  bool
 }
 
 func (ct oracleColumnType) String() string {
-	return ct.original
+	return ct.Original
 }
 
 // SMALLINT, INT and INTEGER have a default precision 38 which is not included in the column information
@@ -383,14 +382,14 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		}
 
 		sc.DataType = oracleColumnType{
-			original:  dataType,
-			scale:     dataScale.Int16,
-			precision: precision,
-			length:    dataLength,
-			t:         t,
-			format:    format,
-			jsonType:  jsonType,
-			nullable:  sc.IsNullable,
+			Original:  dataType,
+			Scale:     dataScale.Int16,
+			Precision: precision,
+			Length:    dataLength,
+			T:         t,
+			Format:    format,
+			JsonType:  jsonType,
+			Nullable:  sc.IsNullable,
 		}
 
 		if isPrimaryKey {

@@ -40,7 +40,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterRowID}
 
-	case sqlcapture.TableStatePreciseBackfill:
+	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
@@ -195,7 +195,7 @@ var columnBinaryKeyComparison = map[string]bool{
 // render a "cast" expression for a column so that we can cast it to the
 // type and format we expect for that column (e.g. for timestamps we expect a certain format with UTC timezone, etc.)
 func castColumn(col sqlcapture.ColumnInfo) string {
-	var dataType = col.DataType.(oracleColumnType).original
+	var dataType = col.DataType.(oracleColumnType).Original
 	var isDateTime = dataType == "DATE" || strings.HasPrefix(dataType, "TIMESTAMP")
 	var isInterval = dataType == "INTERVAL"
 
@@ -259,7 +259,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 		var quotedName = quoteColumnName(colName)
 		// If a precise backfill is requested *and* the column type requires binary ordering for precise
 		// backfill comparisons to work, add the 'COLLATE BINARY' qualifier to the column name.
-		if columnTypes[colName].jsonType == "string" && columnBinaryKeyComparison[colName] {
+		if columnTypes[colName].JsonType == "string" && columnBinaryKeyComparison[colName] {
 			pkey = append(pkey, quotedName+" COLLATE BINARY")
 		} else {
 			pkey = append(pkey, quotedName)
