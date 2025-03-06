@@ -301,7 +301,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		if err := encoder.Encode(row); err != nil {
-			return nil, fmt.Errorf("encoding row: %w", err)
+			return nil, fmt.Errorf("encoding row for resource %q: %w", b.path, err)
 		}
 
 		if t.common.FileSizeLimit != 0 && encoder.Written() >= t.common.FileSizeLimit {
