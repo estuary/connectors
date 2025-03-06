@@ -95,6 +95,41 @@ func TestAllTypes(t *testing.T) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestIntegerKey(t *testing.T) {
+	var unique = "12319541"
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var typesAndValues = [][]any{
+		{"num18", "NUMBER(18, 0) PRIMARY KEY", 999999999999999999},
+	}
+
+	var columnDefs = "("
+	var vals []any
+	for idx, tv := range typesAndValues {
+		if idx > 0 {
+			columnDefs += ", "
+		}
+		columnDefs += fmt.Sprintf("%s %s", tv[0].(string), tv[1].(string))
+		vals = append(vals, tv[2])
+	}
+	columnDefs += ")"
+	var tableName = tb.CreateTable(ctx, t, unique, columnDefs)
+
+	tb.Insert(ctx, t, tableName, [][]any{vals})
+
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(unique))
+	})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{{vals[0].(int) - 1}})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestNullValues(t *testing.T) {
 	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
