@@ -9,6 +9,7 @@ from source_shopify_native.models import (
     BulkSpecificJobResponse,
     BulkJobSubmitResponse,
     BulkOperationDetails,
+    BulkOperationErrorCodes,
     BulkOperationStatuses,
     BulkOperationTypes,
     UserErrors,
@@ -194,7 +195,14 @@ class BulkJobManager:
                         await asyncio.sleep(delay)
                         delay = min(delay * 2, MAX_SLEEP)
                     case BulkOperationStatuses.CANCELED | BulkOperationStatuses.CANCELING | BulkOperationStatuses.EXPIRED | BulkOperationStatuses.FAILED:
-                        raise BulkJobError(f"Unanticipated status {details.status} for job {job_id}. Error code: {details.errorCode}.")
+                        msg = f"Unanticipated status {details.status} for job {job_id}. Error code: {details.errorCode}."
+                        if details.errorCode and details.errorCode == BulkOperationErrorCodes.ACCESS_DENIED:
+                            msg = (
+                                f'Bulk job {job_id} has failed because the provided credentials do not have sufficient permissions.'
+                                f' If authenticating with an access token, ensure it is granted the permissions listed at'
+                                f' https://docs.estuary.dev/reference/Connectors/capture-connectors/shopify-native/#access-token-permissions.'
+                            )
+                        raise BulkJobError(msg)
                     case _:
                         raise BulkJobError(f"Unknown status {details.status} for job {job_id}.")
 
