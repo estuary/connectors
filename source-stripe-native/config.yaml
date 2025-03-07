@@ -1,18 +1,18 @@
 credentials:
-    access_token_sops: ENC[AES256_GCM,data:7iG2cZ/7379LcC/C+hKbpmfPtIZpINAvI+Kl2EmrJQS4GHygNTQmvh9k3xqgZcnPihVJmfXUcAAN9xpzKLhhtx6WX335pzgI2lIveKLxa+qaAcBauFoqnZhhiAV7MsnrxDqp69SqtdA5QbU=,iv:2ESJfwINDwLkqnAsQ1n/3ZZI9YUSO3zVO9xAE3X+Wuw=,tag:p1NZ4ejRfxAb1+3RXQmYkg==,type:str]
+    access_token_sops: ENC[AES256_GCM,data:JLPRanyakzcBb8AMFIs0I+g5D1w7obPxQXoCi6wSV5Ot66sX2phfn1pCE34LcmTxlokAS7CSDUdAyAsw36Eltb6iZGfkHBDtJ2S3BGGz2HEen8SgnkapNkfjOJfjkvOSEFzcH/af7w1OIJQ=,iv:Qt59fJGiz9JoHltxkA7EPqWHChjB+ppXMa3izz7UqBk=,tag:mYZWNrsOQJWH7Rc+rR+u2Q==,type:str]
 start_date: "2010-01-01T00:00:00+00:00"
-capture_connected_accounts: false
+capture_connected_accounts: true
 sops:
     kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2025-03-04T15:38:33Z"
-          enc: CiQAdmEdwpifyiYXJmh1JpbtmbNtZcif3KHKcxPPsWtvwCNEp5sSSQCtUdBGHOd6Ai+9YMjMeIq9TzWF7v8RqkljcGFqHvOluAIUU4MqSa57wuUbTYTREgKxUynYRlpbOdBYpIFF+BZf4peGKj/NlsQ=
+          created_at: "2025-03-07T21:20:45Z"
+          enc: CiQAdmEdwqj7wNLmtF7bRmbZp/HTg7GH0fyXZ/0sd+HAJylZ5Q8SSQCtUdBGNtHMe91hNh4GvgqEh8NOsOj3n8uAPVtnLmgyuetL9N7hBnXzXae6bkOaZj/OehhQjTPRJrfAjJBe/FBoTPLHxMO9gbw=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-03-04T15:38:34Z"
-    mac: ENC[AES256_GCM,data:hFGI3Y4t8bvBqoTWx2Qa8/UQ4AH46JZ/dwUXsRRS1D3Bh7uS7javuXLf3bSRIynXV6Y+u79ZJsbH26L8Ifr5fwUBWXhn7eI94s0N0rn1F1TUklQKpHQAN3p7x9b8hn8XvFjEDBBQPXQQQFT0Hltn+g2kKhE1e+nFUvI98DV/9Bk=,iv:KA6kD6QP71Giz/uxZ1ceHuPOwImBWY3KHyGDqGrmV1U=,tag:licITgXgJHodNH+MVLuY/Q==,type:str]
+    lastmodified: "2025-03-07T21:20:45Z"
+    mac: ENC[AES256_GCM,data:I3mhDLPF07sAGViAGYXSZMx//Pp3pJOoFARqrEagfoR+96evSb845q818SxqEJeUVkPF0Weue6f9FwSyuAUHpu9+LPYAZrVixHr/HeFEFLfvCe/yFf0fTXO7GhsKdGiucqzrd6nRc6/byVyka75H86MzCsdrOW5zVyfwXPr0jUM=,iv:HguMQ+BM+H2AIpdUMlWW9oDWRL4zzB+JZYTLC7xQblU=,tag:B1AV7zVrP5hQ7kMrUe6m7w==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4
