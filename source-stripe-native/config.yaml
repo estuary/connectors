@@ -1,17 +1,18 @@
 credentials:
-    access_token_sops: ENC[AES256_GCM,data:dLvs/aZ6E/HvgdgPfLVPRlZAiHnCPs/RpuVrtyL0ytaDWRTZdGTB/5UMiFctVfpLlWQaG3hPq4hsHLdYMlZ8B2P6XMEqrwtOtmx6yAXvtPrY1H3rRathTdbEDb+kFizUc0SayWFJAPeyhgQ=,iv:rtL4yTQMDJjiwnBbLrA1LtrlJAixUdu/vzWwUdk7weU=,tag:PCDBilsBpOBvdEyB95AGGg==,type:str]
+    access_token_sops: ENC[AES256_GCM,data:7iG2cZ/7379LcC/C+hKbpmfPtIZpINAvI+Kl2EmrJQS4GHygNTQmvh9k3xqgZcnPihVJmfXUcAAN9xpzKLhhtx6WX335pzgI2lIveKLxa+qaAcBauFoqnZhhiAV7MsnrxDqp69SqtdA5QbU=,iv:2ESJfwINDwLkqnAsQ1n/3ZZI9YUSO3zVO9xAE3X+Wuw=,tag:p1NZ4ejRfxAb1+3RXQmYkg==,type:str]
 start_date: "2010-01-01T00:00:00+00:00"
+capture_connected_accounts: false
 sops:
     kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2024-05-02T13:47:48Z"
-          enc: CiQAdmEdwk45taZWjTxdh/PygSgNRJ7RCJKmErQaA+H7uqLEaOMSSQCSobQjk+VIs+SouneIqSdhuBJqr1macZM43Rx4jkgmtHWcBzf811OM2zTVDOdCR0a+1oZwJSx4F6Qj04CDFhrxlrhZLjJeVVU=
+          created_at: "2025-03-04T15:38:33Z"
+          enc: CiQAdmEdwpifyiYXJmh1JpbtmbNtZcif3KHKcxPPsWtvwCNEp5sSSQCtUdBGHOd6Ai+9YMjMeIq9TzWF7v8RqkljcGFqHvOluAIUU4MqSa57wuUbTYTREgKxUynYRlpbOdBYpIFF+BZf4peGKj/NlsQ=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-09-19T19:05:15Z"
-    mac: ENC[AES256_GCM,data:eQg0lkQQMIELna+yoZUtO0lu+T2y8dWfgFr1J+8T6/N+9NpuNRzltvCRNUIySAm3fBTJ8UdXnuXLtylyp9znpPWRBxEqlcO/Z/uIlhqZTux1uOMGlK+DXb6qF2HECgx4JMzTKIj+/XrGLrFKcNwZr2L8GNTAMJ6P5bMHO12+YZY=,iv:8vw+KoZBfPrAwHemvX9CorGSz/rZyqwQjNaht5xEeQE=,tag:DHbKd8D4yvZEh6MIE8TIzg==,type:str]
+    lastmodified: "2025-03-04T15:38:34Z"
+    mac: ENC[AES256_GCM,data:hFGI3Y4t8bvBqoTWx2Qa8/UQ4AH46JZ/dwUXsRRS1D3Bh7uS7javuXLf3bSRIynXV6Y+u79ZJsbH26L8Ifr5fwUBWXhn7eI94s0N0rn1F1TUklQKpHQAN3p7x9b8hn8XvFjEDBBQPXQQQFT0Hltn+g2kKhE1e+nFUvI98DV/9Bk=,iv:KA6kD6QP71Giz/uxZ1ceHuPOwImBWY3KHyGDqGrmV1U=,tag:licITgXgJHodNH+MVLuY/Q==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.8.1
+    version: 3.9.4
