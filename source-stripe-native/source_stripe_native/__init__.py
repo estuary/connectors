@@ -10,13 +10,14 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.capture.common import ResourceConfig
 from estuary_cdk.http import HTTPMixin
+from estuary_cdk.flow import ValidationError
 
 from .resources import all_resources
 from .models import (
     ConnectorState,
     EndpointConfig,
-    ResourceConfig,
 )
 
 
@@ -47,6 +48,35 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
+        if (
+            not validate.lastCapture
+            or (
+                validate.lastCapture.config.config.get("capture_connected_accounts")
+                == validate.config.capture_connected_accounts
+            )
+            or not validate.lastCapture.bindings
+        ):
+            resources = await all_resources(log, self, validate.config)
+            resolved = common.resolve_bindings(validate.bindings, resources)
+            return common.validated(resolved)
+
+        prev_bindings_by_name = {
+            binding.resourceConfig.name: binding.backfill
+            for binding in validate.lastCapture.bindings
+        }
+
+        for current_binding in validate.bindings:
+            resource_name = current_binding.resourceConfig.name
+            if (
+                resource_name in prev_bindings_by_name
+                and current_binding.backfill <= prev_bindings_by_name[resource_name]
+            ):
+                raise ValidationError(
+                    [
+                        "Cannot change the `capture_connected_accounts` property without backfilling all collections again."
+                    ]
+                )
+
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
