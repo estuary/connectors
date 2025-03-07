@@ -26,8 +26,7 @@ type MergeBinding struct {
 }
 
 type MergeInput struct {
-	Bindings       []MergeBinding `json:"bindings"`
-	OutputLocation string         `json:"output_location"`
+	Bindings []MergeBinding `json:"bindings"`
 }
 
 type StatusOutput struct {

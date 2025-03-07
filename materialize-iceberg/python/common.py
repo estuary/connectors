@@ -10,7 +10,6 @@ import botocore.session
 from pyspark.sql import SparkSession
 from pyspark.sql.types import (
     ArrayType,
-    BinaryType,
     BooleanType,
     DataType,
     DateType,
@@ -68,7 +67,9 @@ def fields_to_struct(fields: list[NestedField]) -> StructType:
 def common_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
-        "--input", required=True, help="Input for the program, as serialized JSON."
+        "--input-uri",
+        required=True,
+        help="Location of the program input, as serialized JSON.",
     )
     parser.add_argument(
         "--status-output",
@@ -140,23 +141,33 @@ def get_spark_session(args: argparse.Namespace) -> SparkSession:
 def run_with_status(
     parsed_args: argparse.Namespace,
     fn,
-    *args,
-    **kwargs,
 ):
-    parsed_url = urlparse(parsed_args.status_output)
-    bucket_name = parsed_url.netloc
-    file_path = parsed_url.path.lstrip("/")
+    input_uri = urlparse(parsed_args.input_uri)
+    input_bucket_name = input_uri.netloc
+    input_file_path = input_uri.path.lstrip("/")
+
+    output_uri = urlparse(parsed_args.status_output)
+    output_bucket_name = output_uri.netloc
+    output_file_path = output_uri.path.lstrip("/")
+
     s3 = boto3.client("s3")
 
     try:
-        fn(*args, **kwargs)
+        input = s3.get_object(Bucket=input_bucket_name, Key=input_file_path)
+        with input["Body"] as body:
+            input = json.loads(body.read().decode("utf-8"))
+        s3.delete_object(Bucket=input_bucket_name, Key=input_file_path)
+
+        fn(input)
         s3.put_object(
-            Bucket=bucket_name, Key=file_path, Body=json.dumps({"success": True})
+            Bucket=output_bucket_name,
+            Key=output_file_path,
+            Body=json.dumps({"success": True}),
         )
     except Exception as e:
         s3.put_object(
-            Bucket=bucket_name,
-            Key=file_path,
+            Bucket=output_bucket_name,
+            Key=output_file_path,
             Body=json.dumps({"success": False, "error": str(e)}),
         )
         raise

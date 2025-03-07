@@ -84,10 +84,10 @@ func ensureEmrSecret(ctx context.Context, client *ssm.Client, parameterName, wan
 	return nil
 }
 
-func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, statusOutputPrefix, entryPointUri string) error {
+func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, workingPrefix, entryPointUri string) error {
 	/***
 	Available arguments to the pyspark script:
-	| --input                  | Input for the program, as serialized JSON                              | Required |
+	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script        | Required |
 	| --status-output          | Location where the final status object will be written.                | Required |
 	| --catalog-url            | The catalog URL                                                        | Required |
 	| --warehouse              | REST Warehouse                                                         | Required |
@@ -97,7 +97,7 @@ func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, s
 	***/
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
-		statusKey := path.Join(statusOutputPrefix, statusFile)
+		statusKey := path.Join(workingPrefix, statusFile)
 		if statusObj, err := t.s3Client.GetObject(ctx, &s3.GetObjectInput{
 			Bucket: aws.String(t.cfg.Compute.Bucket),
 			Key:    aws.String(statusKey),
@@ -109,14 +109,20 @@ func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, s
 		return &status, nil
 	}
 
-	encodedInput, err := encodeInput(input)
-	if err != nil {
+	inputKey := path.Join(workingPrefix, "input.json")
+	if inputBytes, err := encodeInput(input); err != nil {
 		return fmt.Errorf("encoding input: %w", err)
+	} else if _, err := t.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(t.cfg.Compute.Bucket),
+		Key:    aws.String(inputKey),
+		Body:   bytes.NewReader(inputBytes),
+	}); err != nil {
+		return fmt.Errorf("putting input file object: %w", err)
 	}
 
 	args := []string{
-		"--input", encodedInput,
-		"--status-output", "s3://" + path.Join(t.cfg.Compute.Bucket, statusOutputPrefix, statusFile),
+		"--input-uri", "s3://" + path.Join(t.cfg.Compute.Bucket, inputKey),
+		"--status-output", "s3://" + path.Join(t.cfg.Compute.Bucket, workingPrefix, statusFile),
 		"--catalog-url", t.cfg.URL,
 		"--warehouse", t.cfg.Warehouse,
 		"--region", t.cfg.Compute.Region,
@@ -184,14 +190,14 @@ func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, s
 	}
 }
 
-func encodeInput(in any) (string, error) {
+func encodeInput(in any) ([]byte, error) {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)
 	enc.SetAppendNewline(false)
 	enc.SetEscapeHTML(false)
 	if err := enc.Encode(in); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return buf.String(), nil
+	return buf.Bytes(), nil
 }
