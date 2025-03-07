@@ -338,8 +338,20 @@ func (c *capture) readEvent(
 		}
 	}
 
+	var logFields log.Fields
+	if log.GetLevel() == log.DebugLevel {
+		logFields = log.Fields{
+			"_id":                   idToString(ev.fields.DocumentKey.Id),
+			"changeStreamDatabase":  s.db,
+			"operationType":         ev.fields.OperationType,
+			"fragments":             ev.fragments,
+			"requestedAnotherBatch": requestedAnotherBatch,
+		}
+	}
+
 	if !slices.Contains([]string{"insert", "update", "replace", "delete"}, ev.fields.OperationType) {
 		// Event is not for a tracked operation type.
+		log.WithFields(logFields).Debug("discarding event with un-tracked operation")
 		return
 	} else if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil {
 		// FullDocument can be "null" for non-deletion events if another
@@ -350,6 +362,7 @@ func (c *capture) readEvent(
 		// or different from the deltas in the update event. We ignore
 		// events where FullDocument is null. Another change event of type
 		// delete will eventually come and delete the document.
+		log.WithFields(logFields).Debug("discarding event with no FullDocument")
 		return
 	}
 
@@ -393,6 +406,12 @@ func readFragments(
 		if !s.ms.Next(ctx) {
 			return 0, false, fmt.Errorf("advancing change stream: %w", s.ms.Err())
 		}
+	}
+
+	if ev.fields.Ns.Collection == "" {
+		// This should never happen, since split events should always be
+		// collection documents.
+		return 0, false, fmt.Errorf("reading fragments produced an event with no collection")
 	}
 
 	return lastFragment, requestedAnotherBatch, nil
