@@ -8,9 +8,6 @@
             "credentials_title": {
               "const": "Private App Credentials",
               "default": "Private App Credentials",
-              "enum": [
-                "Private App Credentials"
-              ],
               "title": "Credentials Title",
               "type": "string"
             },
@@ -29,11 +26,7 @@
       },
       "properties": {
         "credentials": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/AccessToken"
-            }
-          ],
+          "$ref": "#/$defs/AccessToken",
           "title": "API Key"
         },
         "start_date": {
@@ -41,6 +34,12 @@
           "format": "date-time",
           "title": "Start Date",
           "type": "string"
+        },
+        "capture_connected_accounts": {
+          "default": false,
+          "description": "Whether to capture data from connected accounts.",
+          "title": "Capture Connected Accounts",
+          "type": "boolean"
         }
       },
       "required": [
