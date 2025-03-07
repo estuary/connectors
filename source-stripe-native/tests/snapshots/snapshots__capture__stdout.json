@@ -5,6 +5,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -171,6 +172,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -570,6 +572,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "business_profile": {
         "annual_revenue": null,
         "estimated_worker_count": null,
@@ -707,6 +710,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "address": {
         "city": "",
         "country": "BR",
@@ -751,6 +755,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "address": null,
       "balance": 0,
       "created": 1715026232,
@@ -788,6 +793,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "address": {
         "city": "Maringa",
         "country": "BR",
@@ -843,6 +849,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -961,6 +968,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 1000,
@@ -1079,6 +1087,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 23000,
       "amount_captured": 23000,
       "amount_refunded": 0,
@@ -1197,6 +1206,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 4500,
       "amount_captured": 4500,
       "amount_refunded": 0,
@@ -1315,6 +1325,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1433,6 +1444,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1551,6 +1563,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 104000,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1669,6 +1682,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1689,7 +1703,7 @@
         "name": null,
         "phone": null
       },
-      "calculated_statement_descriptor": null,
+      "calculated_statement_descriptor": "DESCRIPTOR",
       "captured": false,
       "created": 1715174544,
       "currency": "brl",
@@ -1788,6 +1802,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 0,
@@ -1808,7 +1823,7 @@
         "name": null,
         "phone": null
       },
-      "calculated_statement_descriptor": null,
+      "calculated_statement_descriptor": "DESCRIPTOR",
       "captured": false,
       "created": 1715174581,
       "currency": "brl",
@@ -1907,6 +1922,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 300,
       "amount_captured": 0,
       "amount_refunded": 300,
@@ -2026,6 +2042,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1200,
       "amount_captured": 1200,
       "amount_refunded": 0,
@@ -2144,6 +2161,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1200,
       "amount_captured": 1200,
       "amount_refunded": 0,
@@ -2262,6 +2280,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 3400,
       "amount_captured": 3400,
       "amount_refunded": 3400,
@@ -2380,6 +2399,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2498,6 +2518,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2616,6 +2637,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2734,6 +2756,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2852,6 +2875,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -2970,6 +2994,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3088,6 +3113,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3206,6 +3232,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3324,6 +3351,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3442,6 +3470,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3560,6 +3589,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3678,6 +3708,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3796,6 +3827,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -3914,6 +3946,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4032,6 +4065,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4150,6 +4184,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4268,6 +4303,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4386,6 +4422,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4504,6 +4541,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4622,6 +4660,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4740,6 +4779,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4858,6 +4898,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -4976,6 +5017,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5094,6 +5136,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5212,6 +5255,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5330,6 +5374,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5448,6 +5493,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5566,6 +5612,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5684,6 +5731,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5802,6 +5850,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
@@ -5920,6 +5969,7 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
       "amount": 1000,
       "amount_captured": 1000,
       "amount_refunded": 0,
