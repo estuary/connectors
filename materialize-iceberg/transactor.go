@@ -237,7 +237,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	outputPrefix := path.Join(t.cfg.Compute.BucketPath, uuid.NewString())
 	checkpointClear := make(map[string]*python.MergeBinding)
-	mergeInput := python.MergeInput{OutputLocation: "s3://" + path.Join(t.cfg.Compute.Bucket, outputPrefix)}
+	var mergeInput python.MergeInput
 	var allFileUris []string
 
 	for _, b := range t.bindings {
@@ -281,7 +281,6 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		cleanupStatus := t.cleanPrefixOnceFn(ctx, t.cfg.Compute.Bucket, outputPrefix)
 		defer cleanupStatus()
 
-		stateUpdate = &pf.ConnectorState{MergePatch: true}
 		if err := t.runEmrJob(ctx, fmt.Sprintf("store for: %s", t.materializationName), mergeInput, outputPrefix, t.pyFiles.mergeURI); err != nil {
 			return nil, fmt.Errorf("store merge job failed: %w", err)
 		} else if err := cleanupStatus(); err != nil {
@@ -291,7 +290,10 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		} else if cpUpdate, err := json.Marshal(checkpointClear); err != nil {
 			return nil, fmt.Errorf("encoding checkpoint update: %w", err)
 		} else {
-			stateUpdate.UpdatedJson = cpUpdate
+			stateUpdate = &pf.ConnectorState{
+				UpdatedJson: cpUpdate,
+				MergePatch:  true,
+			}
 		}
 	}
 

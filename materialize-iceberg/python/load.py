@@ -1,5 +1,3 @@
-import json
-
 from common import (
     NestedField,
     common_args,
@@ -11,14 +9,12 @@ from common import (
 args = common_args()
 spark = get_spark_session(args)
 
-input = json.loads(args.input)
-query = input["query"]
-bindings = input["bindings"]
-output_location = input["output_location"]
-status_output = args.status_output
 
+def run(input):
+    query = input["query"]
+    bindings = input["bindings"]
+    output_location = input["output_location"]
 
-def run():
     for binding in bindings:
         bindingIdx: int = binding["binding"]
         keys: list[NestedField] = [NestedField(**key) for key in binding["keys"]]
