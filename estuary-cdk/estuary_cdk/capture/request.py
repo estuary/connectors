@@ -1,5 +1,5 @@
 from pydantic import BaseModel, NonNegativeInt
-from typing import Generic
+from typing import Generic, Any
 
 from ..flow import (
     CaptureSpec,
@@ -28,13 +28,26 @@ class Discover(GenericModel, Generic[EndpointConfig]):
 class ValidateBinding(GenericModel, Generic[ResourceConfig]):
     collection: CollectionSpec
     resourceConfig: ResourceConfig
+    backfill: NonNegativeInt = 0
 
 
-class Validate(GenericModel, Generic[EndpointConfig, ResourceConfig]):
+class ValidateBase(GenericModel, Generic[ResourceConfig]):
     name: str
     connectorType: ConnectorType
-    config: EndpointConfig
     bindings: list[ValidateBinding[ResourceConfig]] = []
+
+
+class ValidateLastCaptureEndpointConfig(BaseModel):
+    config: dict[str, Any]
+
+
+class ValidateLastCapture(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
+    config: ValidateLastCaptureEndpointConfig
+
+
+class Validate(ValidateBase, Generic[EndpointConfig, ResourceConfig]):
+    config: EndpointConfig
+    lastCapture: ValidateLastCapture[EndpointConfig, ResourceConfig] | None = None
 
 
 class Apply(GenericModel, Generic[EndpointConfig, ResourceConfig]):
