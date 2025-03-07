@@ -531,9 +531,12 @@ func (d *transactor) Destroy() {
 }
 
 func main() {
-	logger.DefaultLogger = &NoOpLogger{}
-	if err := dbsqllog.SetLogLevel("disabled"); err != nil {
-		panic(err)
+	// Disable databricks driver logging on INFO level, it can be quite noisy and confusing
+	if log.GetLevel() != log.DebugLevel {
+		logger.DefaultLogger = &NoOpLogger{}
+		if err := dbsqllog.SetLogLevel("disabled"); err != nil {
+			panic(err)
+		}
 	}
 
 	boilerplate.RunMain(newDatabricksDriver())
