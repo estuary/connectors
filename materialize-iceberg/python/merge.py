@@ -11,12 +11,9 @@ from common import (
 args = common_args()
 spark = get_spark_session(args)
 
-input = json.loads(args.input)
-bindings = input["bindings"]
 
-
-def run():
-    for binding in bindings:
+def run(input):
+    for binding in input["bindings"]:
         bindingIdx: int = binding["binding"]
         query: str = binding["query"]
         columns: list[NestedField] = [NestedField(**col) for col in binding["columns"]]
