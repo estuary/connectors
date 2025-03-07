@@ -235,19 +235,47 @@ def base_object(
         task: Task,
         all_bindings,
     ):
-        fetch_changes_fns = {
-            account_id: functools.partial(
-                fetch_incremental, cls, platform_account_id, account_id, http
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_changes_fns = functools.partial(
+                fetch_incremental,
+                cls,
+                platform_account_id,
+                None,
+                http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_changes_fns = {
+                account_id: functools.partial(
+                    fetch_incremental,
+                    cls,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
-        fetch_page_fns = {
-            account_id: functools.partial(
-                fetch_backfill, cls, start_date, platform_account_id, account_id, http
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_page_fns = functools.partial(
+                fetch_backfill,
+                cls,
+                start_date,
+                platform_account_id,
+                None,
+                http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_page_fns = {
+                account_id: functools.partial(
+                    fetch_backfill,
+                    cls,
+                    start_date,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
         open_binding(
             binding,
@@ -293,30 +321,51 @@ def child_object(
         task: Task,
         all_bindings,
     ):
-        fetch_changes_fns = {
-            account_id: functools.partial(
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_changes_fns = functools.partial(
                 fetch_incremental_substreams,
                 cls,
                 child_cls,
                 platform_account_id,
-                account_id,
+                None,
                 http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_changes_fns = {
+                account_id: functools.partial(
+                    fetch_incremental_substreams,
+                    cls,
+                    child_cls,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
-        fetch_page_fns = {
-            account_id: functools.partial(
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_page_fns = functools.partial(
                 fetch_backfill_substreams,
                 cls,
                 child_cls,
                 start_date,
                 platform_account_id,
-                account_id,
+                None,
                 http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_page_fns = {
+                account_id: functools.partial(
+                    fetch_backfill_substreams,
+                    cls,
+                    child_cls,
+                    start_date,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
         open_binding(
             binding,
@@ -365,25 +414,49 @@ def split_child_object(
         task: Task,
         all_bindings,
     ):
-        fetch_changes_fns = {
-            account_id: functools.partial(
-                fetch_incremental, child_cls, platform_account_id, account_id, http
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_changes_fns = functools.partial(
+                fetch_incremental,
+                child_cls,
+                platform_account_id,
+                None,
+                http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_changes_fns = {
+                account_id: functools.partial(
+                    fetch_incremental,
+                    child_cls,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
-        fetch_page_fns = {
-            account_id: functools.partial(
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_page_fns = functools.partial(
                 fetch_backfill_substreams,
                 cls,
                 child_cls,
                 start_date,
                 platform_account_id,
-                account_id,
+                None,
                 http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_page_fns = {
+                account_id: functools.partial(
+                    fetch_backfill_substreams,
+                    cls,
+                    child_cls,
+                    start_date,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
         open_binding(
             binding,
@@ -431,30 +504,51 @@ def usage_records(
         task: Task,
         all_bindings,
     ):
-        fetch_changes_fns = {
-            account_id: functools.partial(
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_changes_fns = functools.partial(
                 fetch_incremental_usage_records,
                 cls,
                 child_cls,
                 platform_account_id,
-                account_id,
+                None,
                 http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_changes_fns = {
+                account_id: functools.partial(
+                    fetch_incremental_usage_records,
+                    cls,
+                    child_cls,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
-        fetch_page_fns = {
-            account_id: functools.partial(
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_page_fns = functools.partial(
                 fetch_backfill_usage_records,
                 cls,
                 child_cls,
                 start_date,
                 platform_account_id,
-                account_id,
+                None,
                 http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_page_fns = {
+                account_id: functools.partial(
+                    fetch_backfill_usage_records,
+                    cls,
+                    child_cls,
+                    start_date,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
         open_binding(
             binding,
@@ -502,19 +596,47 @@ def no_events_object(
         task: Task,
         all_bindings,
     ):
-        fetch_changes_fns = {
-            account_id: functools.partial(
-                fetch_incremental_no_events, cls, platform_account_id, account_id, http
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_changes_fns = functools.partial(
+                fetch_incremental_no_events,
+                cls,
+                platform_account_id,
+                None,
+                http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_changes_fns = {
+                account_id: functools.partial(
+                    fetch_incremental_no_events,
+                    cls,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
-        fetch_page_fns = {
-            account_id: functools.partial(
-                fetch_backfill, cls, start_date, platform_account_id, account_id, http
+        if not connected_account_ids or len(connected_account_ids) == 0:
+            fetch_page_fns = functools.partial(
+                fetch_backfill,
+                cls,
+                start_date,
+                platform_account_id,
+                None,
+                http,
             )
-            for account_id in all_account_ids
-        }
+        else:
+            fetch_page_fns = {
+                account_id: functools.partial(
+                    fetch_backfill,
+                    cls,
+                    start_date,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+                for account_id in all_account_ids
+            }
 
         open_binding(
             binding,
