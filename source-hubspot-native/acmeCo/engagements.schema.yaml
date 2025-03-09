@@ -100,11 +100,89 @@ properties:
     default: {}
     title: Associations
     type: object
+  contacts:
+    default: []
+    items:
+      type: integer
+    title: Contacts
+    type: array
+  companies:
+    default: []
+    items:
+      type: integer
+    title: Companies
+    type: array
   deals:
     default: []
     items:
       type: integer
     title: Deals
+    type: array
+  tickets:
+    default: []
+    items:
+      type: integer
+    title: Tickets
+    type: array
+  content:
+    default: []
+    items:
+      type: integer
+    title: Content
+    type: array
+  quotes:
+    default: []
+    items:
+      type: integer
+    title: Quotes
+    type: array
+  orders:
+    default: []
+    items:
+      type: integer
+    title: Orders
+    type: array
+  emails:
+    default: []
+    items:
+      type: integer
+    title: Emails
+    type: array
+  meetings:
+    default: []
+    items:
+      type: integer
+    title: Meetings
+    type: array
+  notes:
+    default: []
+    items:
+      type: integer
+    title: Notes
+    type: array
+  tasks:
+    default: []
+    items:
+      type: integer
+    title: Tasks
+    type: array
+  carts:
+    default: []
+    items:
+      type: integer
+    title: Carts
+    type: array
+  partner_clients:
+    default: []
+    items:
+      type: integer
+    title: Partner Clients
+    type: array
+  marketing_event:
+    default: []
+    items:
+      type: integer
+    title: Marketing Event
     type: array
 required:
   - id
