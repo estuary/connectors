@@ -106,7 +106,7 @@ var migrationSteps = []sql.ColumnMigrationStep{
 	sql.StdMigrationSteps[0],
 	sql.StdMigrationSteps[1],
 	sql.StdMigrationSteps[2],
-	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var queries []string
 		for _, ins := range instructions {
 			queries = append(
@@ -123,7 +123,7 @@ var migrationSteps = []sql.ColumnMigrationStep{
 
 		return queries, nil
 	},
-	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var queries []string
 
 		for _, ins := range instructions {

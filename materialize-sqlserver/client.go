@@ -89,7 +89,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 }
 
 var columnMigrationSteps = []sql.ColumnMigrationStep{
-	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var queries []string
 
 		for _, ins := range instructions {
@@ -105,7 +105,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 
 		return queries, nil
 	},
-	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var query strings.Builder
 		query.WriteString(fmt.Sprintf("UPDATE %s SET ", table.Identifier))
 
@@ -119,7 +119,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 		return []string{query.String()}, nil
 	},
 	sql.StdMigrationSteps[2],
-	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var queries []string
 
 		for _, ins := range instructions {
@@ -137,7 +137,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 
 		return queries, nil
 	},
-	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var queries []string
 
 		for _, ins := range instructions {
