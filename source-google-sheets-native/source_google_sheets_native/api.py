@@ -58,8 +58,10 @@ async def fetch_rows(
 
     params["fields"] = "sheets.data(rowData.values(effectiveFormat(numberFormat(type)),effectiveValue))"
 
+    _, body = await http.request_stream(log, url, params=params)
+
     async for row in IncrementalJsonProcessor(
-        await http.request_stream(log, url, params=params),
+        body(),
         "sheets.item.data.item.rowData.item",
         RowData,
     ):

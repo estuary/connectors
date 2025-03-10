@@ -34,8 +34,8 @@ async def fetch_products(
 
     last_seen_dt = log_cursor
 
-    lines = http.request_lines(log, url)
-    async for record in products.process_result(log, lines):
+    _, lines = await http.request_lines(log, url)
+    async for record in products.process_result(log, lines()):
         product = TimestampedResource.model_validate(record)
 
         if product.updatedAt > last_seen_dt:

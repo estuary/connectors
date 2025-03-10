@@ -646,6 +646,7 @@
         "row_id": 0
       },
       "active": true,
+      "agent_can_edit": true,
       "agent_description": null,
       "collapsed_for_agents": false,
       "created_at": "2024-07-26T15:40:58Z",
