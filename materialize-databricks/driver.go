@@ -389,12 +389,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-
-		// FIXME: due to a bug in databricks go sql driver we are temporarily always running MERGE INTO for
-		// all non-delta-updates bindings. This should be reverted once https://github.com/databricks/databricks-sql-go/issues/254
-		// is fixed and we have updated to the latest driver
-		// if b.target.DeltaUpdates || !b.needsMerge {
-		if b.target.DeltaUpdates {
+		if b.target.DeltaUpdates || !b.needsMerge {
 			// TODO: switch to slices.Chunk once we switch to go1.23
 			for i := 0; i < len(toCopy); i += queryBatchSize {
 				end := i + queryBatchSize
