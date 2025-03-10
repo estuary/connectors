@@ -157,13 +157,25 @@ async def fetch_report(
     timezone: ZoneInfo,
     report_doc_model: type[ReportDocument],
     report: Report,
+    start_date: datetime,
+    lookback_window_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ReportDocument | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
+    lookback_start = max(log_cursor - timedelta(days=lookback_window_size), start_date)
     start = log_cursor
     end = datetime.now(tz=timezone)
+
+    # Recapture reports from the past lookback_window_size days. The underlying data for reports in this window could have changed
+    # for various reasons, so we recapture reports within the lookback window.
+    # https://support.google.com/analytics/answer/11198161
+    while not _are_same_day(lookback_start, start):
+        async for record in _paginate_through_report_results(http, property_id, report_doc_model, lookback_start, report, log):
+            yield record
+
+        lookback_start = min(lookback_start + timedelta(days=1), start)
 
     # Catch up to the present day.
     while not _are_same_day(start, end):

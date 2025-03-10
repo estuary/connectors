@@ -152,6 +152,8 @@ def reports(
                 timezone,
                 model,
                 report,
+                config.start_date,
+                config.advanced.lookback_window_size,
             ),
             fetch_page=functools.partial(
                 backfill_report,
