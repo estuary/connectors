@@ -1,0 +1,30 @@
+version: "3.7"
+
+services:
+  db:
+    image: 'mcr.microsoft.com/mssql/server:2022-latest'
+    entrypoint: "/startup.sh"
+    ports:
+      - "1433:1433"
+    volumes:
+      - type: bind
+        source: ./docker-initdb.sh
+        target: /startup.sh
+      - sqlserver_data:/var/opt/mssql
+    environment:
+      SA_PASSWORD: "gf6w6dkD"
+      ACCEPT_EULA: "Y"
+      MSSQL_AGENT_ENABLED: "true"
+    healthcheck:
+      test: "true"
+      interval: 30s
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  sqlserver_data: {}

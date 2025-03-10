@@ -94,6 +94,7 @@ jobs:
           - source-sftp
           - source-snowflake
           - source-sqlserver
+          - source-sqlserver-batch
           - source-test
           - source-azure-blob-storage
           - materialize-azure-fabric-warehouse
@@ -188,6 +189,7 @@ jobs:
             "source-postgres-batch",
             "source-sftp",
             "source-sqlserver",
+            "source-sqlserver-batch",
             "source-mongodb"
             ]'), matrix.connector)
         run: |

@@ -1,0 +1,2 @@
+SELECT * FROM [test].[foobar] WHERE ([major] > @p1) OR ([major] = @p1 AND [minor] > @p2) ORDER BY [major], [minor];
+

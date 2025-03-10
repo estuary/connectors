@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/numerictypes_559424": 6 Documents
+# ================================
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"decimal_col":"123.45","float_col":123.456,"id":0,"money_col":"123.4500","numeric_col":"123.45","real_col":123.45600128173828,"smallmoney_col":"123.4500"}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"decimal_col":"-99999999.99","float_col":-1.7e+308,"id":1,"money_col":"-922337203685477.5808","numeric_col":"-99999999.99","real_col":-3.3999999521443642e+38,"smallmoney_col":"-214748.3648"}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"decimal_col":"99999999.99","float_col":1.7e+308,"id":2,"money_col":"922337203685477.5807","numeric_col":"99999999.99","real_col":3.3999999521443642e+38,"smallmoney_col":"214748.3647"}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"decimal_col":"0.00","float_col":0,"id":3,"money_col":"0.0000","numeric_col":"0.00","real_col":0,"smallmoney_col":"0.0000"}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"decimal_col":null,"float_col":null,"id":4,"money_col":null,"numeric_col":null,"real_col":null,"smallmoney_col":null}
+{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5},"decimal_col":"12345678.91","float_col":0,"id":5,"money_col":"123456789123456.7891","numeric_col":"12345678.91","real_col":0,"smallmoney_col":"123456.7891"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"numerictypes_559424":{"CursorNames":["id"],"CursorValues":[5],"LastPolled":"<TIMESTAMP>","DocumentCount":6}}}
+
