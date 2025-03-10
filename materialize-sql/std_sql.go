@@ -451,72 +451,94 @@ func StdCreateSchema(ctx context.Context, db *sql.DB, dialect Dialect, schemaNam
 	return err
 }
 
-type ColumnMigrationStep func(dialect Dialect, table Table, migration ColumnTypeMigration, tempColumnIdentifier string) (string, error)
+type MigrationInstruction struct {
+	TypeMigration        ColumnTypeMigration
+	TempColumnIdentifier string
+}
+
+type ColumnMigrationStep func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error)
 
 var StdMigrationSteps = []ColumnMigrationStep{
-	func(dialect Dialect, table Table, migration ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			// Always create these new columns as nullable
-			migration.NullableDDL,
-		), nil
-	},
-	func(dialect Dialect, table Table, migration ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf(
-			// The WHERE filter is required by some warehouses (bigquery)
-			"UPDATE %s SET %s = %s WHERE true;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.CastSQL(migration),
-		), nil
-	},
-	func(dialect Dialect, table Table, migration ColumnTypeMigration, _ string) (string, error) {
-		return fmt.Sprintf(
-			"ALTER TABLE %s DROP COLUMN %s;",
-			table.Identifier,
-			migration.Identifier,
-		), nil
-	},
-	func(dialect Dialect, table Table, migration ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf(
-			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.Identifier,
-		), nil
-	},
-	func(dialect Dialect, table Table, migration ColumnTypeMigration, _ string) (string, error) {
-		// If column was originally not nullable, we fix its DDL
-		if migration.NullableDDL == migration.DDL {
-			return "", nil
+	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+		var queries []string
+		for _, ins := range instructions {
+			queries = append(
+				queries,
+				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s ",
+					table.Identifier,
+					ins.TempColumnIdentifier,
+					ins.TypeMigration.NullableDDL,
+				),
+			)
 		}
 
-		return fmt.Sprintf(
-			"ALTER TABLE %s ALTER COLUMN %s SET NOT NULL;",
-			table.Identifier,
-			migration.Identifier,
-		), nil
+		return queries, nil
+	},
+	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+		var query strings.Builder
+		query.WriteString(fmt.Sprintf("UPDATE %s SET ", table.Identifier))
+
+		for i, ins := range instructions {
+			if i > 0 {
+				query.WriteString(", ")
+			}
+			query.WriteString(fmt.Sprintf("%s = %s", ins.TempColumnIdentifier, ins.TypeMigration.CastSQL(ins.TypeMigration)))
+		}
+
+		// The WHERE filter is required by some warehouses (bigquery)
+		query.WriteString(" WHERE true;")
+
+		return []string{query.String()}, nil
+	},
+	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+		var queries []string
+		for _, ins := range instructions {
+			queries = append(
+				queries,
+				fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s",
+					table.Identifier,
+					ins.TypeMigration.Identifier,
+				),
+			)
+		}
+
+		return queries, nil
+	},
+	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+		var queries []string
+		for _, ins := range instructions {
+			queries = append(queries,
+				fmt.Sprintf("ALTER TABLE %s RENAME COLUMN %s TO %s",
+					table.Identifier,
+					ins.TempColumnIdentifier,
+					ins.TypeMigration.Identifier,
+				),
+			)
+		}
+
+		return queries, nil
+	},
+	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+		var queries []string
+
+		for _, ins := range instructions {
+			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+				queries = append(
+					queries,
+					fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
+						table.Identifier,
+						ins.TypeMigration.Identifier,
+					),
+				)
+			}
+		}
+
+		return queries, nil
 	},
 }
 
-func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, migration ColumnTypeMigration, steps ...ColumnMigrationStep) ([]string, error) {
-	var step = 0
-	if migration.ProgressColumnExists && migration.OriginalColumnExists {
-		step = 1
-	} else if migration.ProgressColumnExists && !migration.OriginalColumnExists {
-		step = 3
-	}
-
-	log.WithFields(log.Fields{
-		"table":                table.Identifier,
-		"ddl":                  migration.DDL,
-		"field":                migration.Field,
-		"originalColumnExists": migration.OriginalColumnExists,
-		"progressColumnExists": migration.ProgressColumnExists,
-		"step":                 step,
-	}).Info("rendered queries for column migration using renaming")
-
+func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, migrations []ColumnTypeMigration, steps ...ColumnMigrationStep) ([]string, error) {
+	// Connectors can provide custom steps, if they don't, we default to std steps
 	if len(steps) == 0 {
 		steps = StdMigrationSteps
 	}
@@ -525,19 +547,45 @@ func StdColumnTypeMigration(ctx context.Context, dialect Dialect, table Table, m
 		return nil, fmt.Errorf("must have at least %d steps", len(StdMigrationSteps))
 	}
 
-	var tempColumnIdentifier = dialect.Identifier(migration.Field + ColumnMigrationTemporarySuffix)
+	var stepInstructions = make(map[int][]MigrationInstruction)
+
+	for _, migration := range migrations {
+		var step = 0
+		if migration.ProgressColumnExists && migration.OriginalColumnExists {
+			step = 1
+		} else if migration.ProgressColumnExists && !migration.OriginalColumnExists {
+			step = 3
+		}
+
+		log.WithFields(log.Fields{
+			"table":                table.Identifier,
+			"ddl":                  migration.DDL,
+			"field":                migration.Field,
+			"originalColumnExists": migration.OriginalColumnExists,
+			"progressColumnExists": migration.ProgressColumnExists,
+			"step":                 step,
+		}).Info("rendering queries for column migration using renaming")
+
+		var tempColumnIdentifier = dialect.Identifier(migration.Field + ColumnMigrationTemporarySuffix)
+
+		var instruction = MigrationInstruction{
+			TypeMigration:        migration,
+			TempColumnIdentifier: tempColumnIdentifier,
+		}
+
+		stepInstructions[step] = append(stepInstructions[step], instruction)
+	}
 
 	var renderedSteps []string
-	for i, s := range steps[step:] {
-		newStep, err := s(dialect, table, migration, tempColumnIdentifier)
-		if err != nil {
-			return nil, fmt.Errorf("rendering step %d: %w", i, err)
-		}
-		if newStep == "" {
-			continue
-		}
+	for step, instructions := range stepInstructions {
+		for i, s := range steps[step:] {
+			newStep, err := s(dialect, table, instructions...)
+			if err != nil {
+				return nil, fmt.Errorf("rendering step %d: %w", i, err)
+			}
 
-		renderedSteps = append(renderedSteps, newStep)
+			renderedSteps = append(renderedSteps, newStep...)
+		}
 	}
 
 	return renderedSteps, nil
