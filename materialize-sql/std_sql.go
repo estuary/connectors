@@ -456,10 +456,10 @@ type MigrationInstruction struct {
 	TempColumnIdentifier string
 }
 
-type ColumnMigrationStep func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error)
+type ColumnMigrationStep func(dialect Dialect, table Table, instructions []MigrationInstruction) ([]string, error)
 
 var StdMigrationSteps = []ColumnMigrationStep{
-	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+	func(dialect Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
 		var queries []string
 		for _, ins := range instructions {
 			queries = append(
@@ -474,7 +474,7 @@ var StdMigrationSteps = []ColumnMigrationStep{
 
 		return queries, nil
 	},
-	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+	func(dialect Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
 		var query strings.Builder
 		query.WriteString(fmt.Sprintf("UPDATE %s SET ", table.Identifier))
 
@@ -490,7 +490,7 @@ var StdMigrationSteps = []ColumnMigrationStep{
 
 		return []string{query.String()}, nil
 	},
-	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+	func(dialect Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
 		var queries []string
 		for _, ins := range instructions {
 			queries = append(
@@ -504,7 +504,7 @@ var StdMigrationSteps = []ColumnMigrationStep{
 
 		return queries, nil
 	},
-	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+	func(dialect Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
 		var queries []string
 		for _, ins := range instructions {
 			queries = append(queries,
@@ -518,7 +518,7 @@ var StdMigrationSteps = []ColumnMigrationStep{
 
 		return queries, nil
 	},
-	func(dialect Dialect, table Table, instructions ...MigrationInstruction) ([]string, error) {
+	func(dialect Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
 		var queries []string
 
 		for _, ins := range instructions {
@@ -579,7 +579,7 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 	var renderedSteps []string
 	for step, instructions := range stepInstructions {
 		for i, s := range steps[step:] {
-			newStep, err := s(dialect, table, instructions...)
+			newStep, err := s(dialect, table, instructions)
 			if err != nil {
 				return nil, fmt.Errorf("rendering step %d: %w", i, err)
 			}
