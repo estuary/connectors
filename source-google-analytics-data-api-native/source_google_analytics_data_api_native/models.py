@@ -85,7 +85,20 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
         title="Authentication",
     )
+    class Advanced(BaseModel):
+        lookback_window_size: Annotated[int, Field(
+            description="Number of days to lookback from the present for updates.",
+            title="Lookback Window Size",
+            default=30,
+            ge=0,
+        )]
 
+    advanced: Advanced = Field(
+        default_factory=Advanced, #type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
+    )
 
 ConnectorState = GenericConnectorState[ResourceState]
 

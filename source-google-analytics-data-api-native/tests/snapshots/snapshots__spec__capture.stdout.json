@@ -3,6 +3,19 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
+        "Advanced": {
+          "properties": {
+            "lookback_window_size": {
+              "default": 30,
+              "description": "Number of days to lookback from the present for updates.",
+              "minimum": 0,
+              "title": "Lookback Window Size",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
         "_OAuth2Credentials": {
           "properties": {
             "credentials_title": {
@@ -68,6 +81,12 @@
             }
           ],
           "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [
