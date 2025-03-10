@@ -60,7 +60,9 @@ SELECT 0, `a-schema`.key_value.flow_document
 			FROM json.`file2`
 		)
 	) AS r
-	ON `a-schema`.key_value.key1 = r.key1 AND `a-schema`.key_value.key2 = r.key2 AND `a-schema`.key_value.`key!binary` = r.`key!binary`
+	ON `a-schema`.key_value.key1 = r.key1 AND `a-schema`.key_value.key1 >= 10 AND `a-schema`.key_value.key1 <= 100
+	AND `a-schema`.key_value.key2 = r.key2
+	AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.`key!binary` >= 'aGVsbG8K' AND `a-schema`.key_value.`key!binary` <= 'Z29vZGJ5ZQo='
 --- End `a-schema`.key_value loadQuery ---
 
 --- Begin `a-schema`.key_value mergeInto ---
@@ -77,7 +79,10 @@ SELECT 0, `a-schema`.key_value.flow_document
 			FROM json.`file2`
 		)
 	) AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2 AND l.`key!binary` = r.`key!binary`
+  ON 
+    l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+    AND l.key2 = r.key2
+    AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
 	WHEN MATCHED AND r.flow_document='"delete"' THEN
 		DELETE
 	WHEN MATCHED THEN
