@@ -89,54 +89,77 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 }
 
 var columnMigrationSteps = []sql.ColumnMigrationStep{
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf("ALTER TABLE %s ADD %s %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.NullableDDL,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf(
-			"UPDATE %s SET %s = %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.CastSQL(migration),
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
-		return fmt.Sprintf(
-			"ALTER TABLE %s DROP COLUMN %s;",
-			table.Identifier,
-			migration.Identifier,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
-		var tempColumn = migration.Field + sql.ColumnMigrationTemporarySuffix
-		return fmt.Sprintf(
-			"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
-			table.Path[0],
-			tempColumn,
-			migration.Field,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
-		// If column was originally not nullable, we fix its DDL
-		if migration.NullableDDL == migration.DDL {
-			return "", nil
+	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+
+		for _, ins := range instructions {
+			queries = append(
+				queries,
+				fmt.Sprintf("ALTER TABLE %s ADD %s %s;",
+					table.Identifier,
+					ins.TempColumnIdentifier,
+					ins.TypeMigration.NullableDDL,
+				),
+			)
 		}
 
-		return fmt.Sprintf(
-			"ALTER TABLE %s ALTER COLUMN %s %s;",
-			table.Identifier,
-			migration.Identifier,
-			migration.DDL,
-		), nil
+		return queries, nil
+	},
+	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+		var query strings.Builder
+		query.WriteString(fmt.Sprintf("UPDATE %s SET ", table.Identifier))
+
+		for i, ins := range instructions {
+			if i > 0 {
+				query.WriteString(", ")
+			}
+			query.WriteString(fmt.Sprintf("%s = %s", ins.TempColumnIdentifier, ins.TypeMigration.CastSQL(ins.TypeMigration)))
+		}
+
+		return []string{query.String()}, nil
+	},
+	sql.StdMigrationSteps[2],
+	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+
+		for _, ins := range instructions {
+			var tempColumn = ins.TypeMigration.Field + sql.ColumnMigrationTemporarySuffix
+			queries = append(
+				queries,
+				fmt.Sprintf(
+					"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
+					table.Path[0],
+					tempColumn,
+					ins.TypeMigration.Field,
+				),
+			)
+		}
+
+		return queries, nil
+	},
+	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+
+		for _, ins := range instructions {
+			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+				queries = append(
+					queries,
+					fmt.Sprintf(
+						"ALTER TABLE %s ALTER COLUMN %s %s;",
+						table.Identifier,
+						ins.TypeMigration.Identifier,
+						ins.TypeMigration.DDL,
+					),
+				)
+			}
+		}
+
+		return queries, nil
 	},
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
-	var statements []string
+	var stmts []string
 
 	// SQL Server supports adding multiple columns in a single statement, but only a single
 	// modification per statement.
@@ -145,7 +168,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		statements = append(statements, addColumnsStmt.String())
+		stmts = append(stmts, addColumnsStmt.String())
 	}
 
 	if len(ta.DropNotNulls) > 0 {
@@ -171,7 +194,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 				return "", nil, err
 			}
 
-			statements = append(statements, fmt.Sprintf(
+			stmts = append(stmts, fmt.Sprintf(
 				"ALTER TABLE %s ALTER COLUMN %s %s;",
 				ta.Identifier,
 				c.ep.Dialect.Identifier(dn.Name),
@@ -181,17 +204,15 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, columnMigrationSteps...); err != nil {
-				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
-			} else {
-				statements = append(statements, steps...)
-			}
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, columnMigrationSteps...); err != nil {
+			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+		} else {
+			stmts = append(stmts, steps...)
 		}
 	}
 
-	return strings.Join(statements, "\n"), func(ctx context.Context) error {
-		for _, stmt := range statements {
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		for _, stmt := range stmts {
 			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 				return err
 			}

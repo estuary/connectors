@@ -148,12 +148,10 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, pgDialect, ta.Table, m); err != nil {
-				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
-			} else {
-				stmts = append(stmts, steps...)
-			}
+		if steps, err := sql.StdColumnTypeMigrations(ctx, pgDialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+		} else {
+			stmts = append(stmts, steps...)
 		}
 	}
 
