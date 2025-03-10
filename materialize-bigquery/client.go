@@ -126,44 +126,16 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 }
 
 var columnMigrationSteps = []sql.ColumnMigrationStep{
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			// Always create these new columns as nullable
-			migration.NullableDDL,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf(
-			// The WHERE filter is required by some warehouses (bigquery)
-			"UPDATE %s SET %s = %s WHERE true;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.CastSQL(migration),
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
-		return fmt.Sprintf(
-			"ALTER TABLE %s DROP COLUMN %s;",
-			table.Identifier,
-			migration.Identifier,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf(
-			"ALTER TABLE %s RENAME COLUMN %s TO %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.Identifier,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
+	sql.StdMigrationSteps[0],
+	sql.StdMigrationSteps[1],
+	sql.StdMigrationSteps[2],
+	sql.StdMigrationSteps[3],
+	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
 		// BigQuery does not support making a column REQUIRED when it is NULLABLE
 		// TODO: do we prefer to backfill in these instances for BigQuery, or just continue
 		// with this no-op as-is?
 
-		return "", nil
+		return []string{}, nil
 	},
 }
 
@@ -186,12 +158,10 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, columnMigrationSteps...); err != nil {
-				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
-			} else {
-				stmts = append(stmts, steps...)
-			}
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, columnMigrationSteps...); err != nil {
+			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+		} else {
+			stmts = append(stmts, steps...)
 		}
 	}
 
