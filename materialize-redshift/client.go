@@ -85,9 +85,9 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		return "", nil, fmt.Errorf("redshift cannot drop nullability constraints but got %d DropNotNulls for table %s", len(ta.DropNotNulls), ta.Identifier)
 	}
 
-	statements := []string{}
+	stmts := []string{}
 	for _, c := range ta.AddColumns {
-		statements = append(statements, fmt.Sprintf(
+		stmts = append(stmts, fmt.Sprintf(
 			"ALTER TABLE %s ADD COLUMN %s %s;",
 			ta.Identifier,
 			c.Identifier,
@@ -96,17 +96,15 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m); err != nil {
-				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
-			} else {
-				statements = append(statements, steps...)
-			}
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+		} else {
+			stmts = append(stmts, steps...)
 		}
 	}
 
-	return strings.Join(statements, "\n"), func(ctx context.Context) error {
-		for _, stmt := range statements {
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		for _, stmt := range stmts {
 			_, err := c.db.ExecContext(ctx, stmt)
 			if err != nil {
 				return err

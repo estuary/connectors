@@ -7,7 +7,7 @@ Base Initial Constraints:
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"intWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The first collection key component is required to be included for standard updates"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
 {"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
@@ -71,7 +71,7 @@ Migratable Changes Applied Schema:
 {"Name":"datetimeValue","Nullable":"YES","Type":"varchar"}
 {"Name":"flow_document","Nullable":"NO","Type":"varchar"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"datetime2"}
-{"Name":"int64","Nullable":"YES","Type":"bigint"}
+{"Name":"int64","Nullable":"YES","Type":"varchar"}
 {"Name":"intWidenedToJson","Nullable":"YES","Type":"varchar"}
 {"Name":"key","Nullable":"NO","Type":"varchar"}
 {"Name":"multiple","Nullable":"YES","Type":"varchar"}
@@ -85,6 +85,6 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (NVARCHAR), _meta/flow_truncated (BIT), boolWidenedToJson (BIT), flow_published_at (DATETIME2), int64 (BIGINT), multiple (NVARCHAR), nonScalarValue (NVARCHAR), optional (NVARCHAR), scalarValue (NVARCHAR), stringWidenedToJson (NVARCHAR), flow_document (NVARCHAR), dateValue (NVARCHAR), datetimeValue (NVARCHAR), intWidenedToJson (NVARCHAR), numericString (NVARCHAR), requiredNumeric (NVARCHAR), timeValue (NVARCHAR)
-1, false, true, 2024-09-13T01:01:01Z, 1, <nil>, <nil>, <nil>, test, hello, {}, 2024-01-01, 2024-01-01T01:01:01.1111111Z, 999, 123, 456, 01:01:01.0000000
+key (NVARCHAR), _meta/flow_truncated (BIT), boolWidenedToJson (BIT), flow_published_at (DATETIME2), multiple (NVARCHAR), nonScalarValue (NVARCHAR), optional (NVARCHAR), scalarValue (NVARCHAR), stringWidenedToJson (NVARCHAR), flow_document (NVARCHAR), dateValue (NVARCHAR), datetimeValue (NVARCHAR), int64 (NVARCHAR), intWidenedToJson (NVARCHAR), numericString (NVARCHAR), requiredNumeric (NVARCHAR), timeValue (NVARCHAR)
+1, false, true, 2024-09-13T01:01:01Z, <nil>, <nil>, <nil>, test, hello, {}, 2024-01-01, 2024-01-01T01:01:01.1111111Z, 1, 999, 123, 456, 01:01:01.0000000
 
