@@ -123,8 +123,8 @@ require (
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 // indirect
+	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/apache/arrow/go/v16 v16.0.0 // indirect
 	github.com/apache/thrift v0.20.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/astaxie/beego v1.12.3 // indirect
@@ -266,3 +266,8 @@ require (
 	k8s.io/apimachinery v0.23.17 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+// FIXME: due to a bug in databricks go sql driver we have this hack below
+// This should be reverted once https://github.com/databricks/databricks-sql-go/issues/254
+// is fixed and we have updated to the latest driver
+replace github.com/databricks/databricks-sql-go v1.5.5 => github.com/mdibaiee/databricks-sql-go v0.0.0-20250307113106-c54f93acc0f1
