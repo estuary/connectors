@@ -103,49 +103,43 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *
 }
 
 var migrationSteps = []sql.ColumnMigrationStep{
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.NullableDDL,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf(
-			"UPDATE %s SET %s = %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.CastSQL(migration),
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
-		return fmt.Sprintf(
-			"ALTER TABLE %s DROP COLUMN %s;",
-			table.Identifier,
-			migration.Identifier,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, tempColumnIdentifier string) (string, error) {
-		return fmt.Sprintf(
-			"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
-			table.Identifier,
-			tempColumnIdentifier,
-			migration.Identifier,
-			migration.DDL,
-		), nil
-	},
-	func(dialect sql.Dialect, table sql.Table, migration sql.ColumnTypeMigration, _ string) (string, error) {
-		// If column was originally not nullable, we fix its DDL
-		if migration.NullableDDL == migration.DDL {
-			return "", nil
+	sql.StdMigrationSteps[0],
+	sql.StdMigrationSteps[1],
+	sql.StdMigrationSteps[2],
+	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+		for _, ins := range instructions {
+			queries = append(
+				queries,
+				fmt.Sprintf(
+					"ALTER TABLE %s CHANGE COLUMN %s %s %s;",
+					table.Identifier,
+					ins.TempColumnIdentifier,
+					ins.TypeMigration.Identifier,
+					ins.TypeMigration.DDL,
+				),
+			)
 		}
 
-		return fmt.Sprintf(
-			"ALTER TABLE %s MODIFY %s %s;",
-			table.Identifier,
-			migration.Identifier,
-			migration.DDL,
-		), nil
+		return queries, nil
+	},
+	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+
+		for _, ins := range instructions {
+			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+				queries = append(
+					queries,
+					fmt.Sprintf("ALTER TABLE %s MODIFY %s %s;",
+						table.Identifier,
+						ins.TypeMigration.Identifier,
+						ins.TypeMigration.DDL,
+					),
+				)
+			}
+		}
+
+		return queries, nil
 	},
 }
 
@@ -205,12 +199,10 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		for _, m := range ta.ColumnTypeChanges {
-			if steps, err := sql.StdColumnTypeMigration(ctx, c.ep.Dialect, ta.Table, m, migrationSteps...); err != nil {
-				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
-			} else {
-				stmts = append(stmts, steps...)
-			}
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, migrationSteps...); err != nil {
+			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+		} else {
+			stmts = append(stmts, steps...)
 		}
 	}
 
