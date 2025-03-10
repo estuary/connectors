@@ -110,12 +110,20 @@ class Names(StrEnum):
     quotes = auto()
     subscriptions = auto()
     tickets = auto()
+    emails = auto()
+    meetings = auto()
+    notes = auto()
+    tasks = auto()
+    content = auto()
+    orders = auto()
+    carts = auto()
+    partner_clients = auto()
+    marketing_event = auto()
 
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
 # attached to a HubSpot CRM object.
 class Property(BaseDocument, extra="allow"):
-
     name: str = ""
     calculated: bool = False
     hubspotObject: str = "unknown"  # Added by us.
@@ -126,7 +134,6 @@ class Properties(BaseDocument, extra="forbid"):
 
 
 class DealPipeline(BaseDocument, extra="allow"):
-
     createdAt: AwareDatetime | None
     updatedAt: AwareDatetime | None
 
@@ -136,7 +143,6 @@ class DealPipelines(BaseDocument, extra="forbid"):
 
 
 class Owner(BaseDocument, extra="allow"):
-
     createdAt: AwareDatetime | None
     updatedAt: AwareDatetime | None
 
@@ -185,7 +191,6 @@ class BaseCRMObject(BaseDocument, extra="forbid"):
                 k: v for k, v in self.propertiesWithHistory.items() if len(v)
             }
 
-
         # If the model has attached inline associations,
         # hoist them to corresponding arrays. Then clear associations.
         for ae in self.ASSOCIATED_ENTITIES:
@@ -222,9 +227,40 @@ class Deal(BaseCRMObject):
 
 
 class Engagement(BaseCRMObject):
-    ASSOCIATED_ENTITIES = [Names.deals]
+    ASSOCIATED_ENTITIES = [
+        Names.contacts,
+        Names.companies,
+        Names.deals,
+        Names.tickets,
+        Names.quotes,
+        Names.orders,
+        Names.emails,
+        Names.meetings,
+        Names.notes,
+        Names.tasks,
+        Names.content,
+        Names.orders,
+        Names.carts,
+        Names.partner_clients,
+        Names.marketing_event,
+    ]
 
+    contacts: list[int] = []
+    companies: list[int] = []
     deals: list[int] = []
+    tickets: list[int] = []
+    content: list[int] = []
+    quotes: list[int] = []
+    orders: list[int] = []
+    emails: list[int] = []
+    meetings: list[int] = []
+    notes: list[int] = []
+    tasks: list[int] = []
+    content: list[int] = []
+    orders: list[int] = []
+    carts: list[int] = []
+    partner_clients: list[int] = []
+    marketing_event: list[int] = []
 
 
 class Ticket(BaseCRMObject):
@@ -241,7 +277,14 @@ class Product(BaseCRMObject):
 
 
 class LineItem(BaseCRMObject):
-    ASSOCIATED_ENTITIES = [Names.commerce_payments, Names.products, Names.deals, Names.invoices, Names.quotes, Names.subscriptions]
+    ASSOCIATED_ENTITIES = [
+        Names.commerce_payments,
+        Names.products,
+        Names.deals,
+        Names.invoices,
+        Names.quotes,
+        Names.subscriptions,
+    ]
 
     commerce_payments: list[int] = []
     products: list[int] = []
@@ -253,7 +296,6 @@ class LineItem(BaseCRMObject):
 
 # An Association, as returned by the v4 associations API.
 class Association(BaseModel, extra="forbid"):
-
     class Type(BaseModel, extra="forbid"):
         category: Literal["HUBSPOT_DEFINED", "USER_DEFINED"]
         # Type IDs are defined here: https://developers.hubspot.com/docs/api/crm/associations
@@ -296,7 +338,6 @@ Item = TypeVar("Item")
 # Common shape of a v3 API paged listing for a GET request to the objects endpoint for a particular
 # object.
 class PageResult(BaseModel, Generic[Item], extra="forbid"):
-
     class Cursor(BaseModel, extra="forbid"):
         after: str
         link: str
@@ -311,7 +352,6 @@ class PageResult(BaseModel, Generic[Item], extra="forbid"):
 # Common shape of a v3 search API listing, which is the same as PageResult but includes a field for
 # the total number of records returned, and doesn't have a "link" in the paging.next object.
 class SearchPageResult(BaseModel, Generic[Item], extra="forbid"):
-
     class Cursor(BaseModel, extra="forbid"):
         after: str
 
@@ -325,7 +365,6 @@ class SearchPageResult(BaseModel, Generic[Item], extra="forbid"):
 
 # Common shape of a v3 API batch read.
 class BatchResult(BaseModel, Generic[Item], extra="forbid"):
-
     class Error(BaseModel, extra="forbid"):
         status: Literal["error"]
         category: Literal["OBJECT_NOT_FOUND"]
@@ -349,7 +388,6 @@ class BatchResult(BaseModel, Generic[Item], extra="forbid"):
 
 
 class OldRecentCompanies(BaseModel):
-
     class Item(BaseModel):
         class Properties(BaseModel):
             class Timestamp(BaseModel):
@@ -367,7 +405,6 @@ class OldRecentCompanies(BaseModel):
 
 
 class OldRecentContacts(BaseModel):
-
     class Item(BaseModel):
         class Properties(BaseModel):
             class Timestamp(BaseModel):
@@ -379,13 +416,12 @@ class OldRecentContacts(BaseModel):
         properties: Properties
 
     contacts: list[Item]
-    has_more: bool = Field(alias="has-more") # type: ignore
-    time_offset: int = Field(alias="time-offset") # type: ignore
-    vid_offset: int = Field(alias="vid-offset") # type: ignore
+    has_more: bool = Field(alias="has-more")  # type: ignore
+    time_offset: int = Field(alias="time-offset")  # type: ignore
+    vid_offset: int = Field(alias="vid-offset")  # type: ignore
 
 
 class OldRecentDeals(BaseModel):
-
     class Item(BaseModel):
         class Properties(BaseModel):
             class Timestamp(BaseModel):
@@ -403,7 +439,6 @@ class OldRecentDeals(BaseModel):
 
 
 class OldRecentEngagements(BaseModel):
-
     class Item(BaseModel):
         class Engagement(BaseModel):
             id: int
@@ -425,6 +460,7 @@ class OldRecentTicket(BaseModel):
 # EmailEvent and EmailEventsResponse represent an email event and the shape of the email events API
 # response, respectively.
 
+
 class EmailEvent(BaseDocument, extra="allow"):
     id: str
     created: AwareDatetime
@@ -442,12 +478,12 @@ class EmailEvent(BaseDocument, extra="allow"):
         "STATUSCHANGE",
         "SPAMREPORT",
         "SUPPRESSED",
-        "SUPPRESSION", # "SUPPRESSION" is documented in HubSpot's docs, but "SUPPRESSED" isn't. We've seen "SUPPRESSED" events, so "SUPPRESSION" events might not actually occur.
-        "UNBOUNCE", # This is not actually a type reported by HubSpot, but the absence of the "type" field means its an UNBOUNCE type.
+        "SUPPRESSION",  # "SUPPRESSION" is documented in HubSpot's docs, but "SUPPRESSED" isn't. We've seen "SUPPRESSED" events, so "SUPPRESSION" events might not actually occur.
+        "UNBOUNCE",  # This is not actually a type reported by HubSpot, but the absence of the "type" field means its an UNBOUNCE type.
     ] = Field(
         default="UNBOUNCE",
-        # Don't schematize the default value. 
-        json_schema_extra=lambda x: x.pop('default'), # type: ignore
+        # Don't schematize the default value.
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
     )
 
 
@@ -478,7 +514,6 @@ class CustomObjectSchema(BaseDocument, extra="allow"):
 # This is the shape of a response from the V3 search API for custom objects. As above, we are
 # modeling only the minimum needed to get the IDs and modification time.
 class CustomObjectSearchResult(BaseModel):
-
     class Properties(BaseModel):
         hs_lastmodifieddate: AwareDatetime
 
@@ -488,10 +523,14 @@ class CustomObjectSearchResult(BaseModel):
 
             # The "Contacts" object uses `lastmodifieddate`, while everything
             # else uses `hs_lastmodifieddate`.
-            if 'lastmodifieddate' in values:
-                values['hs_lastmodifieddate'] = datetime.fromisoformat(values.pop('lastmodifieddate'))
-            elif 'hs_lastmodifieddate' in values:
-                values['hs_lastmodifieddate'] = datetime.fromisoformat(values.pop('hs_lastmodifieddate'))
+            if "lastmodifieddate" in values:
+                values["hs_lastmodifieddate"] = datetime.fromisoformat(
+                    values.pop("lastmodifieddate")
+                )
+            elif "hs_lastmodifieddate" in values:
+                values["hs_lastmodifieddate"] = datetime.fromisoformat(
+                    values.pop("hs_lastmodifieddate")
+                )
             return values
 
     id: int
