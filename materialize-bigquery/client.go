@@ -130,7 +130,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 	sql.StdMigrationSteps[1],
 	sql.StdMigrationSteps[2],
 	sql.StdMigrationSteps[3],
-	func(dialect sql.Dialect, table sql.Table, instructions ...sql.MigrationInstruction) ([]string, error) {
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		// BigQuery does not support making a column REQUIRED when it is NULLABLE
 		// TODO: do we prefer to backfill in these instances for BigQuery, or just continue
 		// with this no-op as-is?
