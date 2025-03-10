@@ -163,9 +163,10 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 		)
 		{{- end }}
 	) AS r
-	ON {{ range $ind, $key := $.Table.Keys }}
-	{{- if $ind }} AND {{ end -}}
-	{{ $.Table.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }}AND {{ else }}ON {{ end -}}
+	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 	{{- end }}
 {{ else -}}
 SELECT -1, ""
@@ -216,10 +217,11 @@ SELECT -1, ""
 		)
 		{{- end }}
 	) AS r
-	ON {{ range $ind, $key := $.Table.Keys }}
-		{{- if $ind }} AND {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
-	{{- end }}
+  ON {{ range $ind, $bound := $.Bounds }}
+    {{ if $ind -}} AND {{ end -}}
+    l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+    {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+  {{- end }}
 	{{- if $.Table.Document }}
 	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='"delete"' THEN
 		DELETE
@@ -258,11 +260,12 @@ type tableWithFiles struct {
 	Files       []string
 	StagingPath string
 	Table       *sql.Table
+	Bounds      []sql.MergeBound
 }
 
-func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template) (string, error) {
+func RenderTableWithFiles(table sql.Table, files []string, stagingPath string, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath}); err != nil {
+	if err := tpl.Execute(&w, &tableWithFiles{Table: &table, Files: files, StagingPath: stagingPath, Bounds: bounds}); err != nil {
 		return "", err
 	}
 	return w.String(), nil
