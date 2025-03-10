@@ -95,7 +95,7 @@ func (c *Config) SetDefaults() {
 	}
 
 	if c.Advanced.PollSchedule == "" {
-		c.Advanced.PollSchedule = "5m"
+		c.Advanced.PollSchedule = "1h"
 	}
 
 	if c.Advanced.Timezone == "" {
