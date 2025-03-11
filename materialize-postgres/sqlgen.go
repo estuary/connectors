@@ -55,8 +55,8 @@ var pgDialect = func() sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"numeric":                  {sql.NewMigrationSpec([]string{"text"})},
-			"bigint":                   {sql.NewMigrationSpec([]string{"numeric", "text"})},
+			"numeric":                  {sql.NewMigrationSpec([]string{"double precision", "text"})},
+			"bigint":                   {sql.NewMigrationSpec([]string{"double precision", "numeric", "text"})},
 			"double precision":         {sql.NewMigrationSpec([]string{"text"})},
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},

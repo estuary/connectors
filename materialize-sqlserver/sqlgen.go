@@ -89,7 +89,7 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
 			"float":     {sql.NewMigrationSpec([]string{textType}, nocast)},
-			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast), sql.NewMigrationSpec([]string{"double precision"})},
 			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},

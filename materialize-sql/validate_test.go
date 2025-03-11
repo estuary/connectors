@@ -81,7 +81,8 @@ func TestValidateMigrations(t *testing.T) {
 type testConstrainter struct{}
 
 func (testConstrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
-	var migratable = existing.Type == "integer,string" && strings.Join(proposed.Inference.Types, ",") == "string"
+	var migratable = (existing.Type == "integer,string" && strings.Join(proposed.Inference.Types, ",") == "string") ||
+		(existing.Type == "integer" && proposed.Inference.Types[0] == "number")
 	return existing.Type == strings.Join(proposed.Inference.Types, ",") || migratable, nil
 }
 

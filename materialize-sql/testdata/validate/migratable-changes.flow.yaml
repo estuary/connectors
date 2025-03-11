@@ -18,6 +18,8 @@ collections:
         stringWidenedToJson: { type: [string, integer, boolean] }
         intWidenedToJson: { type: [string, integer, boolean] }
         boolWidenedToJson: { type: [boolean, string] }
+        intToNumber: { type: number }
+        int64ToNumber: { type: number, maximum: 10000000000000000000}
       required: [key, scalarValue, requiredNumeric]
     key: [/key]
     projections:

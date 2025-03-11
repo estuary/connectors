@@ -88,7 +88,7 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"number":        {sql.NewMigrationSpec([]string{"text"})},
+			"number":        {sql.NewMigrationSpec([]string{"float", "text"})},
 			"float":         {sql.NewMigrationSpec([]string{"text"})},
 			"date":          {sql.NewMigrationSpec([]string{"text"})},
 			"timestamp_ntz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeNoTzToStringCast))},
