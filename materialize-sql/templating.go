@@ -152,6 +152,13 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 			// the complexity and overhead of comparing their binary values is
 			// probably not worth it.
 			continue
+		} else if ft == STRING && col.Inference.String_ != nil && col.Inference.String_.Format == "date-time" {
+			// At least one destination (BigQuery) has known issues with keys
+			// that are date-times with sub-microsecond precision when used as a
+			// merge bound. For simplicity such formatted strings will never
+			// appear in merge bounds, although we should figure out how to do
+			// this more selectively in the future.
+			continue
 		}
 
 		conditions[idx].LiteralLower = b.literaler(b.lower[idx])
