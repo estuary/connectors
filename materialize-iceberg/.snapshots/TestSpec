@@ -334,7 +334,7 @@
         "description": "Name of the database table.",
         "x-collection-name": true
       },
-      "schema": {
+      "namespace": {
         "type": "string",
         "title": "Alternative Namespace",
         "description": "Alternative Namespace for this table (optional).",

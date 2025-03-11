@@ -279,7 +279,7 @@ func (c config) toSsmClient(ctx context.Context) (*ssm.Client, error) {
 
 type resource struct {
 	Table     string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
-	Namespace string `json:"schema,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative Namespace for this table (optional)." jsonschema_extras:"x-schema-name=true"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative Namespace for this table (optional)." jsonschema_extras:"x-schema-name=true"`
 }
 
 func (r resource) Validate() error {
