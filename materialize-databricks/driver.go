@@ -205,6 +205,9 @@ type binding struct {
 	// into the target table. Note that in case of delta updates, "needsMerge"
 	// will always be false
 	needsMerge bool
+
+	loadMergeBounds  *sql.MergeBoundsBuilder
+	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
 func (t *transactor) addBinding(target sql.Table) error {
@@ -222,6 +225,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 
 	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
 	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
+	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, databricksDialect.Literal)
+	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, databricksDialect.Literal)
 
 	t.bindings = append(t.bindings, b)
 
@@ -242,6 +247,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err := b.loadFile.encodeRow(converted); err != nil {
 			return fmt.Errorf("encoding row for load: %w", err)
+		} else {
+			b.loadMergeBounds.NextKey(converted)
 		}
 	}
 
@@ -259,7 +266,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toLoad)
 
-		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplLoadQuery); err != nil {
+		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplLoadQuery, b.loadMergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			queries = append(queries, loadQuery)
@@ -358,6 +365,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := b.storeFile.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
+		} else {
+			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
 
 		if it.Exists {
@@ -383,18 +392,15 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toCopy)
 
+		var bounds = b.storeMergeBounds.Build()
+
 		var queries []string
 		// In case of delta updates or if there are no existing keys being stored
 		// we directly copy from staged files into the target table. Note that this is retriable
 		// given that COPY INTO is idempotent by default: files that have already been loaded into a table will
 		// not be loaded again
 		// see https://docs.databricks.com/en/sql/language-manual/delta-copy-into.html
-
-		// FIXME: due to a bug in databricks go sql driver we are temporarily always running MERGE INTO for
-		// all non-delta-updates bindings. This should be reverted once https://github.com/databricks/databricks-sql-go/issues/254
-		// is fixed and we have updated to the latest driver
-		// if b.target.DeltaUpdates || !b.needsMerge {
-		if b.target.DeltaUpdates {
+		if b.target.DeltaUpdates || !b.needsMerge {
 			// TODO: switch to slices.Chunk once we switch to go1.23
 			for i := 0; i < len(toCopy); i += queryBatchSize {
 				end := i + queryBatchSize
@@ -402,7 +408,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 					end = len(toCopy)
 				}
 
-				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, tplCopyIntoDirect); err != nil {
+				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, tplCopyIntoDirect, bounds); err != nil {
 					return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 				} else {
 					queries = append(queries, query)
@@ -414,7 +420,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				if end > len(toCopy) {
 					end = len(toCopy)
 				}
-				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, tplMergeInto); err != nil {
+				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, tplMergeInto, bounds); err != nil {
 					return nil, fmt.Errorf("mergeInto template: %w", err)
 				} else {
 					queries = append(queries, query)
