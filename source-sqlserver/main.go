@@ -46,6 +46,10 @@ var featureFlagDefaults = map[string]bool{
 	// When true, the capture will use a fence mechanism based on observing CDC worker runs
 	// and LSN positions rather than the old watermark write mechanism.
 	"read_only": true,
+
+	// Force use of the 'replica fence' mechanism, which is normally used automatically
+	// when the target database is detected as a replica.
+	"replica_fencing": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
