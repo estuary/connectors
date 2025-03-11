@@ -94,8 +94,8 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 	var nocast = sql.WithCastSQL(migrationIdentifier)
 
 	var migrationSpecs = sql.MigrationSpecs{
-		"decimal":  {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
-		"bigint":   {sql.NewMigrationSpec([]string{"numeric(65,0)", "varchar", "longtext"}, nocast)},
+		"decimal":  {sql.NewMigrationSpec([]string{"double precision", "varchar", "longtext"}, nocast)},
+		"bigint":   {sql.NewMigrationSpec([]string{"double precision", "numeric(65,0)", "varchar", "longtext"}, nocast)},
 		"double":   {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 		"date":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 		"time":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},

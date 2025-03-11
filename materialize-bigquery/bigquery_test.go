@@ -120,11 +120,14 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			keys = append(keys, testDialect.Identifier("flow_document"))
 			values = append(values, "JSON '{}'")
 
-			// bigquery does not support more than 6 fractional second precision, and will fail if we try
-			// to insert a value with 9
 			for i := range values {
+				// bigquery does not support more than 6 fractional second precision, and will fail if we try
+				// to insert a value with 9
 				if keys[i] == "datetimeValue" {
 					values[i] = "'2024-01-01 01:01:01.111111'"
+				}
+				if keys[i] == "int64ToNumber" {
+					values[i] = "BIGNUMERIC '" + values[i] + "'"
 				}
 			}
 
