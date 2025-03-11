@@ -202,9 +202,20 @@ func (f *stagedFile) putWorker(ctx context.Context, filePaths <-chan string) err
 
 		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
 
-		if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, f.remoteFilePath(fName))); err != nil {
-			return fmt.Errorf("put file: %w", err)
+		// This query fails sometimes even in low load, we retry this query to avoid a full restart
+		var maxAttempts = 3
+		var attempt = 0
+		for {
+			if _, err := db.ExecContext(ctx, fmt.Sprintf(`PUT '%s' INTO '%s' OVERWRITE`, file, f.remoteFilePath(fName))); err != nil {
+				if attempt < maxAttempts {
+					attempt++
+					continue
+				}
+				return fmt.Errorf("put file: %w", err)
+			}
+			break
 		}
+
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: upload done")
 
 		// Once the file has been staged to Databricks we don't need it locally anymore and can
