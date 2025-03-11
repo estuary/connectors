@@ -109,9 +109,9 @@ func bqDialect(objAndArrayAsJson bool) sql.Dialect {
 		MigratableTypes: sql.MigrationSpecs{
 			"integer": {
 				sql.NewMigrationSpec([]string{"bignumeric(38,0)"}, sql.WithCastSQL(toBigNumericCast)),
-				sql.NewMigrationSpec([]string{"string"}),
+				sql.NewMigrationSpec([]string{"float64", "string"}),
 			},
-			"bignumeric": {sql.NewMigrationSpec([]string{"string"})},
+			"bignumeric": {sql.NewMigrationSpec([]string{"float64", "string"})},
 			"float":      {sql.NewMigrationSpec([]string{"string"})},
 			"date":       {sql.NewMigrationSpec([]string{"string"})},
 			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
