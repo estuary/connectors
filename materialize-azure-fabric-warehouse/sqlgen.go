@@ -48,8 +48,8 @@ var dialect = func() sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"bigint":    {sql.NewMigrationSpec([]string{"DECIMAL(38,0)", "VARCHAR(MAX)"})},
-			"decimal":   {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
+			"bigint":    {sql.NewMigrationSpec([]string{"FLOAT", "DECIMAL(38,0)", "VARCHAR(MAX)"})},
+			"decimal":   {sql.NewMigrationSpec([]string{"FLOAT", "VARCHAR(MAX)"})},
 			"float":     {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
 			"bit":       {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"}, sql.WithCastSQL(bitToStringCast))},
 			"date":      {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
