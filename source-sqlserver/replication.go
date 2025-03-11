@@ -109,6 +109,8 @@ type sqlserverReplicationStream struct {
 	conn *sql.DB
 	cfg  *Config
 
+	isReplica bool // True if the connected database is a read-only replica
+
 	cancel context.CancelFunc            // Cancel function for the replication goroutine's context
 	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
 	events chan sqlcapture.DatabaseEvent // Change event channel from the replication goroutine to the main thread
@@ -148,6 +150,13 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 	if !cdcEnabled {
 		return fmt.Errorf("CDC is not enabled on database %q", dbName)
 	}
+
+	// Check replica status. Some operations work differently on replicas.
+	isReplica, err := isReplicaDatabase(ctx, rs.conn)
+	if err != nil {
+		return fmt.Errorf("error determining if database is a replica: %w", err)
+	}
+	rs.isReplica = isReplica
 
 	rs.errCh = make(chan error)
 	rs.events = make(chan sqlcapture.DatabaseEvent)
@@ -216,12 +225,173 @@ func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context, disc
 }
 
 func (rs *sqlserverReplicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
-	if rs.db.featureFlags["read_only"] {
-		return rs.streamToPositionalFence(ctx, fenceAfter, callback)
+	// We support three different fence mechanisms for SQL Server, which are appropriate
+	// in different conditions:
+	//  - streamToWatermarkFence: Legacy mechanism. Only works on the master DB. Requires a
+	//    writable watermarks table.
+	//  - streamToPositionalFence: Works on the master DB. Uses the CDC log scan sessions view
+	//    to establish a fence LSN. Requires VIEW DATABASE STATE permission.
+	//  - streamToReplicaFence: Works on any DB, including read replicas. Provides slightly
+	//    weaker causality guarantees (but the fully-reduced capture output is still always
+	//    correct once fully caught up).
+	//
+	// We only ever use streamToWatermarkFence for legacy captures with 'no_read_only' set,
+	// and we only use streamToReplicaFence if we're connected to a replica or the user
+	// explicitly requested it by setting the 'replica_fencing' flag. But we could decide
+	// in the future to simplify things and just always use streamToReplicaFence, if the
+	// looser correctness guarantee is acceptable.
+	if !rs.db.featureFlags["read_only"] {
+		return rs.streamToWatermarkFence(ctx, fenceAfter, callback)
 	}
-	return rs.streamToWatermarkFence(ctx, fenceAfter, callback)
+	if rs.isReplica || rs.db.featureFlags["replica_fencing"] {
+		return rs.streamToReplicaFence(ctx, fenceAfter, callback)
+	}
+	return rs.streamToPositionalFence(ctx, fenceAfter, callback)
 }
 
+// streamToReplicaFence implements the stream-to-fence operation without watermark writes,
+// using a mechanism that works even against a read replica (unlike streamToPositionalFence)
+// but which doesn't provide quite as strict of causality guarantees as streamToPositionalFence.
+//
+// Put simply: this implementation can only guarantee that you're caught up to the latest CDC
+// events available, but it can't guarantee that you've reached a point in the WAL after the
+// start of the operation. It could lag behind in various cases, including:
+// - You may be a few seconds out of date just because of the CDC polling interval.
+// - The CDC worker itself could have just run but could be lagging due to the maxtrans*maxscans limit.
+// - The CDC worker might not be running at all (which is basically just an infinite lag).
+//
+// I keep going back and forth on whether these caveats actually _matter_ in any real sense.
+// On the one hand it's nice to provide as strong of correctness guarantees as we can. But on
+// the other hand there is only one actual downside and it's pretty tiny. Consider a row which
+// goes through states A -> B -> C just as our backfill reaches it. If we backfill the row at B,
+// then the captured sequence of changes might go '[Insert(B)], [Insert(A), Update(B), Update(C)]'
+// when using this fence policy, whereas streamToPositionalFence can guarantee that the whole
+// sequence of changes '[Insert(B), Insert(A), Update(B), Update(C)]' is emitted within a single
+// Flow transaction and thus (when not using history mode) is reduced together into 'Insert(C)'
+// from the perspective of any data consumers.
+//
+// For now I've opted to just implement this mechanism side-by-side with streamToPositionalFence
+// and automatically select between them depending on whether we're connected to a replica. But
+// in the future  we might consider removing the extra complexity and just always using this one.
+func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
+	// Time-based event streaming until the fenceAfter duration is reached.
+	var latestFlushLSN = rs.fenceLSN
+	var timedEventsSinceFlush int
+	if fenceAfter > 0 {
+		log.WithField("cursor", fmt.Sprintf("%X", latestFlushLSN)).Debug("beginning timed streaming phase")
+		var deadline = time.NewTimer(fenceAfter)
+		defer deadline.Stop()
+	timedLoop:
+		for {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-deadline.C:
+				break timedLoop
+			case event, ok := <-rs.events:
+				if !ok {
+					return sqlcapture.ErrFenceNotReached
+				} else if err := callback(event); err != nil {
+					return err
+				}
+				timedEventsSinceFlush++
+				if event, ok := event.(*sqlcapture.FlushEvent); ok {
+					var eventLSN, err = base64.StdEncoding.DecodeString(event.Cursor)
+					if err != nil {
+						return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
+					}
+					latestFlushLSN = eventLSN
+					timedEventsSinceFlush = 0
+				}
+			}
+		}
+	}
+	log.WithField("cursor", fmt.Sprintf("%X", latestFlushLSN)).Debug("finished timed streaming phase")
+
+	// Establish the fence position by querying the latest CDC time mapping LSN.
+	var nextFenceLSN LSN
+	if currentLSN, err := cdcGetMaxLSN(ctx, rs.conn); err != nil {
+		return fmt.Errorf("error getting current LSN for replica fence: %w", err)
+	} else {
+		nextFenceLSN = currentLSN
+	}
+
+	// Early-exit fast path for when the database has been idle since the last commit event.
+	if bytes.Compare(nextFenceLSN, latestFlushLSN) <= 0 {
+		log.WithField("cursor", fmt.Sprintf("%X", latestFlushLSN)).WithField("target", fmt.Sprintf("%X", nextFenceLSN)).Debug("fenced streaming phased exited via idle fast-path")
+
+		// As an internal sanity check, we assert that it should never be possible
+		// to hit this early exit unless the database has been idle since the last
+		// flush event we observed.
+		if timedEventsSinceFlush > 0 {
+			return fmt.Errorf("internal error: sanity check failed: already at fence after processing %d changes during timed phase", timedEventsSinceFlush)
+		}
+
+		// Mark the position of the flush event as the latest fence before returning.
+		rs.fenceLSN = latestFlushLSN
+
+		// Since we're still at a valid flush position and those are always between
+		// transactions, we can safely emit a synthetic FlushEvent here. This means
+		// that every StreamToFence operation ends in a flush, and is helpful since
+		// there's a lot of implicit assumptions of regular events / flushes.
+		return callback(&sqlcapture.FlushEvent{
+			Cursor: base64.StdEncoding.EncodeToString(latestFlushLSN),
+		})
+	}
+
+	// Given that the early-exit fast path was not taken, there must be further data for
+	// us to read. Thus if we sit idle for a nontrivial length of time without reaching
+	// our fence position, something is wrong and we should error out instead of blocking
+	// forever.
+	var fenceWatchdog = time.NewTimer(streamToFenceWatchdogTimeout)
+
+	// Stream replication events until the fence is reached.
+	log.WithField("cursor", fmt.Sprintf("%X", latestFlushLSN)).WithField("target", fmt.Sprintf("%X", nextFenceLSN)).Debug("beginning fenced streaming phase")
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-fenceWatchdog.C:
+			return fmt.Errorf("replication became idle while streaming from %X to an established fence at %X", latestFlushLSN, nextFenceLSN)
+		case event, ok := <-rs.events:
+			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
+			if !ok {
+				return sqlcapture.ErrFenceNotReached
+			} else if err := callback(event); err != nil {
+				return err
+			}
+
+			// Mark the fence as reached when we observe a commit event whose cursor value
+			// is greater than or equal to the fence LSN.
+			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+				// It might be a bit inefficient to re-parse every flush cursor here, but
+				// realistically it's probably not a significant slowdown and it would be
+				// a bit more work to preserve the position as a typed struct.
+				var eventLSN, err = base64.StdEncoding.DecodeString(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
+				}
+				if bytes.Compare(eventLSN, nextFenceLSN) >= 0 {
+					log.WithField("eventLSN", fmt.Sprintf("%X", eventLSN)).Debug("finished fenced streaming phase")
+					rs.fenceLSN = bytes.Clone(eventLSN)
+					return nil
+				}
+			}
+		}
+	}
+}
+
+// streamToPositionalFence implements the stream-to-fence operation without watermark writes,
+// using a mechanism that only works on the master DB but is exactly correct. This mechanism is
+// based on observing the dm_cdc_log_scan_sessions view to determine when the CDC worker has
+// finished processing all changes up to a certain point, and then querying the latest CDC LSN
+// after that occurs.
+//
+// Since we know that the worker has just finished catching up to the current end of the WAL,
+// and the CDC LSN reflects the latest CDC-eligible change it processed, we can use that LSN
+// as our fence position and know that it is definitely not-before the start of the operation.
+//
+// This mechanism requires the VIEW DATABASE STATE permission on the database.
 func (rs *sqlserverReplicationStream) streamToPositionalFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
 	// Keep track of the most recent scan session when we started this stream-to-fence cycle.
 	// This will be used to ensure that the fence position we establish occurs after anything
@@ -444,6 +614,15 @@ func latestCDCLogScanSession(ctx context.Context, conn *sql.DB) (*logScanSession
 	return &s, nil
 }
 
+// streamToWatermarkFence implements the stream-to-fence operation using a watermark table
+// write and the later observation of that write to establish when we're caught up. This is
+// the legacy behavior which we retain for backwards compatibility, only because the other
+// two implementations both have at least one downside:
+//   - streamToPositionalFence requires the VIEW DATABASE STATE permission, which legacy captures
+//     often haven't granted to the capture user.
+//   - streamToReplicaFence doesn't provide as strong of causality guarantees as the watermark mechanism.
+//
+// If we decided that streamToReplicaFence was adequate we'd probably remove this outright.
 func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
 	// Time-based event streaming until the fenceAfter duration is reached.
 	if fenceAfter > 0 {
@@ -1291,6 +1470,26 @@ func cdcQueryCaptureJobConfig(ctx context.Context, conn *sql.DB) (*cdcCaptureJob
 		return nil, fmt.Errorf("error querying CDC job config: %w", err)
 	}
 	return &x, nil
+}
+
+// isReplicaDatabase determines whether the current database connection is to a read-only replica.
+// This function specifically checks for Always On Availability Groups, which is the modern
+// and recommended high availability solution in SQL Server.
+func isReplicaDatabase(ctx context.Context, conn *sql.DB) (bool, error) {
+	const query = `
+    SELECT CASE
+        WHEN EXISTS (
+            SELECT 1 FROM sys.dm_hadr_database_replica_states 
+            WHERE is_local = 1 AND is_primary_replica = 0
+        ) THEN 1
+        ELSE 0
+    END AS is_replica;`
+
+	var isReplica bool
+	if err := conn.QueryRowContext(ctx, query).Scan(&isReplica); err != nil {
+		return false, fmt.Errorf("error determining replica status: %w", err)
+	}
+	return isReplica, nil
 }
 
 func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {

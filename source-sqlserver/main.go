@@ -52,6 +52,10 @@ var featureFlagDefaults = map[string]bool{
 	// event data starts to expire before it can be captured, but should generally only be
 	// needed in exceptional circumstances when recovering from some sort of major breakage.
 	"tolerate_missed_changes": false,
+
+	// Force use of the 'replica fence' mechanism, which is normally used automatically
+	// when the target database is detected as a replica.
+	"replica_fencing": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
