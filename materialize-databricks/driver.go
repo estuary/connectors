@@ -393,6 +393,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toCopy)
 
+		var bounds = b.storeMergeBounds.Build()
+
 		var queries []string
 		// In case of delta updates or if there are no existing keys being stored
 		// we directly copy from staged files into the target table. Note that this is retriable
@@ -412,14 +414,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 					end = len(toCopy)
 				}
 
-				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, tplCopyIntoDirect, nil); err != nil {
+				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, tplCopyIntoDirect, bounds); err != nil {
 					return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 				} else {
 					queries = append(queries, query)
 				}
 			}
 		} else {
-			var bounds = b.storeMergeBounds.Build()
 			for i := 0; i < len(toCopy); i += queryBatchSize {
 				end := i + queryBatchSize
 				if end > len(toCopy) {
