@@ -135,6 +135,15 @@ class ResourceConfigWithSchedule(ResourceConfig):
     )
 
 
+async def scheduled_stop(task: Task, future_dt: datetime | None) -> None:
+    if not future_dt:
+        return None
+
+    sleep_duration = future_dt - datetime.now(tz=UTC)
+    await asyncio.sleep(sleep_duration.total_seconds())
+    task.stopping.event.set()
+
+
 class BaseResourceState(abc.ABC, BaseModel, extra="forbid"):
     """
     AbstractResourceState is a base class for ResourceState classes.
@@ -472,35 +481,27 @@ def open(
                         cron_schedule, state.last_initialized
                     )
 
-                    if (
-                        next_scheduled_initialization
-                        and next_scheduled_initialization < datetime.now(tz=UTC)
-                    ):
-                        # Re-initialize the binding if we missed a scheduled re-initialization.
-                        should_initialize = True
-                        if state.backfill:
-                            task.log.warning(
-                                f"Scheduled backfill for binding {resource.name} is taking precedence over its ongoing backfill."
-                                " Please extend the binding's configured cron schedule if you'd like the previous backfill to"
-                                " complete before the next scheduled backfill starts."
-                            )
-
-                        next_scheduled_initialization = next_fire(
-                            cron_schedule, datetime.now(tz=UTC)
-                        )
-
-                    if (
-                        next_scheduled_initialization
-                        and soonest_future_scheduled_initialization
-                    ):
-                        soonest_future_scheduled_initialization = min(
-                            soonest_future_scheduled_initialization,
-                            next_scheduled_initialization,
-                        )
-                    elif next_scheduled_initialization:
-                        soonest_future_scheduled_initialization = (
+                    if not state.backfill:
+                        if (
                             next_scheduled_initialization
-                        )
+                            and next_scheduled_initialization < datetime.now(tz=UTC)
+                        ):
+                            should_initialize = True
+                            next_scheduled_initialization = next_fire(cron_schedule, datetime.now(tz=UTC))
+
+                        else:
+                            if (
+                                next_scheduled_initialization
+                                and soonest_future_scheduled_initialization
+                            ):
+                                soonest_future_scheduled_initialization = min(
+                                    soonest_future_scheduled_initialization,
+                                    next_scheduled_initialization,
+                                )
+                            elif next_scheduled_initialization:
+                                soonest_future_scheduled_initialization = (
+                                    next_scheduled_initialization
+                                )
 
             if should_initialize:
                 # Checkpoint the binding's initialized state prior to any processing.
@@ -521,17 +522,10 @@ def open(
                 resolved_bindings,
             )
 
-        async def scheduled_stop(future_dt: datetime | None) -> None:
-            if not future_dt:
-                return None
-
-            sleep_duration = future_dt - datetime.now(tz=UTC)
-            await asyncio.sleep(sleep_duration.total_seconds())
-            task.stopping.event.set()
 
         # Gracefully exit to ensure relatively close adherence to any bindings'
         # re-initialization schedules.
-        asyncio.create_task(scheduled_stop(soonest_future_scheduled_initialization))
+        asyncio.create_task(scheduled_stop(task, soonest_future_scheduled_initialization))
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 
@@ -539,7 +533,7 @@ def open(
 def open_binding(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
-    state: _ResourceState,
+    resource_state: _ResourceState,
     task: Task,
     fetch_changes: FetchChangesFn[_BaseDocument]
     | dict[str, FetchChangesFn[_BaseDocument]]
@@ -582,9 +576,9 @@ def open_binding(
             )
 
         if isinstance(fetch_changes, dict):
-            assert state.inc and isinstance(state.inc, dict)
+            assert resource_state.inc and isinstance(resource_state.inc, dict)
             for subtask_id, subtask_fetch_changes in fetch_changes.items():
-                inc_state = state.inc.get(subtask_id)
+                inc_state = resource_state.inc.get(subtask_id)
                 assert inc_state
 
                 task.spawn_child(
@@ -597,17 +591,17 @@ def open_binding(
                     ),
                 )
         else:
-            assert state.inc and not isinstance(state.inc, dict)
+            assert resource_state.inc and not isinstance(resource_state.inc, dict)
             task.spawn_child(
                 f"{prefix}.incremental",
                 functools.partial(
                     incremental_closure,
                     fetch_changes=fetch_changes,
-                    state=state.inc,
+                    state=resource_state.inc,
                 ),
             )
 
-    if fetch_page and state.backfill:
+    if fetch_page and resource_state.backfill:
 
         async def backfill_closure(
             task: Task,
@@ -621,14 +615,15 @@ def open_binding(
                 binding_index,
                 fetch_page,
                 state,
+                resource_state.last_initialized,
                 task,
                 subtask_id,
             )
 
         if isinstance(fetch_page, dict):
-            assert state.backfill and isinstance(state.backfill, dict)
+            assert resource_state.backfill and isinstance(resource_state.backfill, dict)
             for subtask_id, subtask_fetch_page in fetch_page.items():
-                backfill_state = state.backfill.get(subtask_id)
+                backfill_state = resource_state.backfill.get(subtask_id)
 
                 if not backfill_state:
                     continue
@@ -644,13 +639,13 @@ def open_binding(
                 )
 
         else:
-            assert state.backfill and not isinstance(state.backfill, dict)
+            assert resource_state.backfill and not isinstance(resource_state.backfill, dict)
             task.spawn_child(
                 f"{prefix}.backfill",
                 functools.partial(
                     backfill_closure,
                     fetch_page=fetch_page,
-                    state=state.backfill,
+                    state=resource_state.backfill,
                 ),
             )
 
@@ -662,7 +657,7 @@ def open_binding(
                 binding,
                 binding_index,
                 fetch_snapshot,
-                state.snapshot,
+                resource_state.snapshot,
                 task,
                 tombstone,
             )
@@ -760,6 +755,7 @@ async def _binding_backfill_task(
     binding_index: int,
     fetch_page: FetchPageFn[_BaseDocument],
     state: ResourceState.Backfill,
+    last_initialized: datetime | None,
     task: Task,
     subtask_id: str | None = None,
 ):
@@ -824,6 +820,19 @@ async def _binding_backfill_task(
             )
         )
     task.log.info("completed backfill", {"subtask_id": subtask_id})
+
+    # If this binding has an initialization schedule to adhere to, either stop
+    # if we missed a scheduled initialization or schedule a future stop.
+    if isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
+        assert isinstance(last_initialized, datetime)
+        cron_schedule = binding.resourceConfig.schedule
+        next_scheduled_initialization = next_fire(cron_schedule, last_initialized)
+        if next_scheduled_initialization:
+            if next_scheduled_initialization < datetime.now(tz=UTC):
+                task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
+                task.stopping.event.set()
+            else:
+                asyncio.create_task(scheduled_stop(task, next_scheduled_initialization))
 
 
 async def _binding_incremental_task(
