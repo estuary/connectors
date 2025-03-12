@@ -351,7 +351,7 @@ def discovered(
                 key=resource.key,
                 recommendedName=resource.name,
                 resourceConfig=resource.initial_config,
-                disable=resource.disable
+                disable=resource.disable,
             )
         )
 
@@ -554,6 +554,7 @@ def open_binding(
             task: Task,
             fetch_changes: FetchChangesFn[_BaseDocument],
             state: ResourceState.Incremental,
+            subtask_id: str | None = None,
         ):
             assert state and not isinstance(state, dict)
             await _binding_incremental_task(
@@ -562,6 +563,7 @@ def open_binding(
                 fetch_changes,
                 state,
                 task,
+                subtask_id,
             )
 
         if isinstance(fetch_changes, dict):
@@ -576,6 +578,7 @@ def open_binding(
                         incremental_closure,
                         fetch_changes=subtask_fetch_changes,
                         state=inc_state,
+                        subtask_id=subtask_id,
                     ),
                 )
         else:
@@ -595,6 +598,7 @@ def open_binding(
             task: Task,
             fetch_page: FetchPageFn[_BaseDocument],
             state: ResourceState.Backfill,
+            subtask_id: str | None = None,
         ):
             assert state and not isinstance(state, dict)
             await _binding_backfill_task(
@@ -603,13 +607,16 @@ def open_binding(
                 fetch_page,
                 state,
                 task,
+                subtask_id,
             )
 
         if isinstance(fetch_page, dict):
             assert state.backfill and isinstance(state.backfill, dict)
             for subtask_id, subtask_fetch_page in fetch_page.items():
                 backfill_state = state.backfill.get(subtask_id)
-                assert backfill_state
+
+                if not backfill_state:
+                    continue
 
                 task.spawn_child(
                     f"{prefix}.backfill.{subtask_id}",
@@ -617,6 +624,7 @@ def open_binding(
                         backfill_closure,
                         fetch_page=subtask_fetch_page,
                         state=backfill_state,
+                        subtask_id=subtask_id,
                     ),
                 )
 
@@ -738,22 +746,30 @@ async def _binding_backfill_task(
     fetch_page: FetchPageFn[_BaseDocument],
     state: ResourceState.Backfill,
     task: Task,
+    subtask_id: str | None = None,
 ):
-    connector_state = ConnectorState(
-        bindingStateV1={binding.stateKey: ResourceState(backfill=state)}
-    )
+    if subtask_id is not None:
+        connector_state = ConnectorState(
+            bindingStateV1={
+                binding.stateKey: ResourceState(backfill={subtask_id: state})
+            }
+        )
+    else:
+        connector_state = ConnectorState(
+            bindingStateV1={binding.stateKey: ResourceState(backfill=state)}
+        )
 
     if state.next_page is not None:
-        task.log.info(f"resuming backfill", state)
+        task.log.info("resuming backfill", {"state": state, "subtask_id": subtask_id})
     else:
-        task.log.info(f"beginning backfill", state)
+        task.log.info("beginning backfill", {"state": state, "subtask_id": subtask_id})
 
     while True:
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
         if task.stopping.event.is_set():
-            task.log.debug(f"backfill is yielding to stop")
+            task.log.debug("backfill is yielding to stop", {"subtask_id": subtask_id})
             return
 
         # Track if fetch_page returns without having yielded a PageCursor.
@@ -768,7 +784,7 @@ async def _binding_backfill_task(
                 done = True
             elif item is None:
                 raise RuntimeError(
-                    f"Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
+                    "Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
                 )
             else:
                 state.next_page = item
@@ -778,11 +794,21 @@ async def _binding_backfill_task(
         if done:
             break
 
-    connector_state = ConnectorState(
-        bindingStateV1={binding.stateKey: ResourceState(backfill=None)}
-    )
-    task.checkpoint(connector_state)
-    task.log.info(f"completed backfill")
+    if subtask_id is not None:
+        task.checkpoint(
+            ConnectorState(
+                bindingStateV1={
+                    binding.stateKey: ResourceState(backfill={subtask_id: None})
+                }
+            )
+        )
+    else:
+        task.checkpoint(
+            ConnectorState(
+                bindingStateV1={binding.stateKey: ResourceState(backfill=None)}
+            )
+        )
+    task.log.info("completed backfill", {"subtask_id": subtask_id})
 
 
 async def _binding_incremental_task(
@@ -791,14 +817,22 @@ async def _binding_incremental_task(
     fetch_changes: FetchChangesFn[_BaseDocument],
     state: ResourceState.Incremental,
     task: Task,
+    subtask_id: str | None = None,
 ):
-    connector_state = ConnectorState(
-        bindingStateV1={binding.stateKey: ResourceState(inc=state)}
-    )
+    if subtask_id is not None:
+        connector_state = ConnectorState(
+            bindingStateV1={binding.stateKey: ResourceState(inc={subtask_id: state})}
+        )
+    else:
+        connector_state = ConnectorState(
+            bindingStateV1={binding.stateKey: ResourceState(inc=state)}
+        )
 
     sleep_for = timedelta()
 
-    task.log.info(f"resuming incremental replication", state)
+    task.log.info(
+        "resuming incremental replication", {"state": state, "subtask_id": subtask_id}
+    )
 
     if isinstance(state.cursor, datetime):
         lag = datetime.now(tz=UTC) - state.cursor
@@ -807,7 +841,11 @@ async def _binding_incremental_task(
             sleep_for = binding.resourceConfig.interval - lag
             task.log.info(
                 "incremental task ran recently, sleeping until `interval` has fully elapsed",
-                {"sleep_for": sleep_for, "interval": binding.resourceConfig.interval},
+                {
+                    "sleep_for": sleep_for,
+                    "interval": binding.resourceConfig.interval,
+                    "subtask_id": subtask_id,
+                },
             )
 
     while True:
@@ -817,7 +855,10 @@ async def _binding_incremental_task(
                     task.stopping.event.wait(), timeout=sleep_for.total_seconds()
                 )
 
-            task.log.debug(f"incremental replication is idle and is yielding to stop")
+            task.log.debug(
+                "incremental replication is idle and is yielding to stop",
+                {"subtask_id": subtask_id},
+            )
             return
         except asyncio.TimeoutError:
             pass  # `sleep_for` elapsed.
@@ -833,7 +874,9 @@ async def _binding_incremental_task(
                 task.captured(item.binding, item.doc)
                 pending = True
             elif item == Triggers.BACKFILL:
-                task.log.info("incremental task triggered backfill")
+                task.log.info(
+                    "incremental task triggered backfill", {"subtask_id": subtask_id}
+                )
                 task.stopping.event.set()
                 task.checkpoint(
                     ConnectorState(backfillRequests={binding.stateKey: True})
@@ -893,5 +936,6 @@ async def _binding_incremental_task(
             continue
 
         task.log.debug(
-            "incremental task is idle", {"sleep_for": sleep_for, "cursor": state.cursor}
+            "incremental task is idle",
+            {"sleep_for": sleep_for, "cursor": state.cursor, "subtask_id": subtask_id},
         )
