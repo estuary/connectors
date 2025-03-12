@@ -27,9 +27,12 @@ def run(input):
             inferSchema=False,
         ).createTempView(f"merge_view_{bindingIdx}")
 
-        spark.sql(query)
-
-        spark.catalog.dropTempView(f"merge_view_{bindingIdx}")
+        try:
+            spark.sql(query)
+        except Exception as e:
+            raise RuntimeError(f"Running merge query failed:\n{query}\nOriginal Error:\n{str(e)}") from e
+        finally:
+            spark.catalog.dropTempView(f"merge_view_{bindingIdx}")
 
 
 run_with_status(args, run)
