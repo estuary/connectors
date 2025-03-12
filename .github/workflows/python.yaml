@@ -37,6 +37,7 @@ on:
       - "source-iterate/**"
       - "source-google-analytics-data-api-native/**"
       - "source-monday/**"
+      - "source-salesforce-native/**"
 
   pull_request:
     branches: [main]
@@ -76,6 +77,7 @@ on:
       - "source-iterate/**"
       - "source-google-analytics-data-api-native/**"
       - "source-monday/**"
+      - "source-salesforce-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -216,6 +218,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-monday
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-salesforce-native
             type: capture
             version: v1
             usage_rate: "1.0"
