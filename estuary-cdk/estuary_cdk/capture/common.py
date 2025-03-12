@@ -467,6 +467,7 @@ def open(
             )
 
             should_initialize = state is None or binding.stateKey in backfill_requests
+            is_connector_initiated = False
 
             if state:
                 if state.last_initialized is None:
@@ -487,6 +488,7 @@ def open(
                             and next_scheduled_initialization < datetime.now(tz=UTC)
                         ):
                             should_initialize = True
+                            is_connector_initiated = True
                             next_scheduled_initialization = next_fire(cron_schedule, datetime.now(tz=UTC))
 
                         else:
@@ -504,10 +506,29 @@ def open(
                                 )
 
             if should_initialize:
-                # Checkpoint the binding's initialized state prior to any processing.
-                state = resource.initial_state
+                if is_connector_initiated:
+                # In the most commmon case of a single fetch_changes and a single fetch_pages,
+                # coordinate the initialized backfill's cutoff with the current incremental state's cursor.
+                    if (
+                        isinstance(resource.initial_state.backfill, ResourceState.Backfill) and
+                        isinstance(resource.initial_state.backfill.cutoff, datetime) and
+                        state and
+                        isinstance(state.inc, ResourceState.Incremental) and
+                        isinstance(state.inc.cursor, datetime)
+                    ):
+                        initialized_backfill_state = resource.initial_state.backfill
+                        initialized_backfill_state.cutoff = state.inc.cursor
+                        state.backfill = initialized_backfill_state
+                    # In all other cases, wipe the state back to the initial state.
+                    else:
+                        state = resource.initial_state
+
+                else:
+                    state = resource.initial_state
+
                 state.last_initialized = datetime.now(tz=UTC)
 
+                # Checkpoint the binding's initialized state prior to any processing.
                 task.checkpoint(
                     ConnectorState(
                         bindingStateV1={binding.stateKey: state},
