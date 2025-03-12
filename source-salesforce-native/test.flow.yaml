@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-salesforce-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_salesforce_native
+        config: config.yaml
+    bindings: []
