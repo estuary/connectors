@@ -182,7 +182,7 @@ def reports(
                 backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
             ),
             initial_config=ResourceConfig(
-                name=report.name, interval=timedelta(minutes=5)
+                name=report.name, interval=timedelta(minutes=30)
             ),
             schema_inference=True,
         )
