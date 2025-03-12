@@ -1,7 +1,7 @@
 import abc
 import asyncio
 import functools
-from enum import Enum
+from enum import Enum, StrEnum
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from logging import Logger
@@ -292,6 +292,17 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 """
 
 
+class ReductionStrategy(StrEnum):
+    APPEND = "append"
+    FIRST_WRITE_WINS = "firstWriteWins"
+    LAST_WRITE_WINS = "lastWriteWins"
+    MERGE = "merge"
+    MINIMIZE = "minimize"
+    MAXIMIZE = "maximize"
+    SET = "set"
+    SUM = "sum"
+
+
 @dataclass
 class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     """Resource is a high-level description of an available capture resource,
@@ -328,6 +339,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     initial_state: _BaseResourceState
     initial_config: _BaseResourceConfig
     schema_inference: bool
+    reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
 
 
@@ -344,6 +356,9 @@ def discovered(
 
         if resource.schema_inference:
             schema["x-infer-schema"] = True
+
+        if resource.reduction_strategy:
+            schema["reduce"] = {"strategy": resource.reduction_strategy}
 
         bindings.append(
             response.DiscoveredBinding(
