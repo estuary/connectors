@@ -1,0 +1,228 @@
+
+import abc
+from datetime import datetime, timedelta, UTC
+from enum import StrEnum
+from typing import Any, TYPE_CHECKING, Iterator, Annotated
+
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from estuary_cdk.capture.common import (
+    BaseDocument,
+    BaseOAuth2Credentials,
+    OAuth2Spec,
+    ResourceConfig,
+    ResourceState,
+)
+from estuary_cdk.capture.common import (
+    ConnectorState as GenericConnectorState,
+)
+
+
+EARLIEST_VALID_DATE_IN_SALESFORCE = datetime(1700, 1, 1, tzinfo=UTC)
+
+
+OAUTH2_SPEC = OAuth2Spec(
+    provider="salesforce",
+    authUrlTemplate=(
+        "https://"
+        r"{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}"
+        ".salesforce.com/services/oauth2/authorize?"
+        r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
+        r"&response_type=code"
+        r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
+    ),
+    accessTokenUrlTemplate=(
+        "https://"
+        r"{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}"
+        ".salesforce.com/services/oauth2/token"
+    ),
+    accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
+    accessTokenBody=(
+        "grant_type=authorization_code"
+        r"&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        r"&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}"
+        r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
+        r"&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
+    ),
+    accessTokenResponseMap={
+        "refresh_token": "/refresh_token",
+    },
+)
+
+# Mustache templates in accessTokenUrlTemplate are not interpolated within the connector, so update_oauth_spec reassigns it for use within the connector.
+def update_oauth_spec(is_sandbox: bool):
+    OAUTH2_SPEC.accessTokenUrlTemplate = f"https://{'test' if is_sandbox else 'login'}.salesforce.com/services/oauth2/token"
+
+
+if TYPE_CHECKING:
+    OAuth2Credentials = BaseOAuth2Credentials
+else:
+    OAuth2Credentials = BaseOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+
+
+def default_start_date():
+    dt = datetime.now(UTC) - timedelta(days=30)
+    return dt
+
+class EndpointConfig(BaseModel):
+    is_sandbox: bool = Field(
+        title="Sandbox",
+        description="Toggle if you're using a Salesforce Sandbox.",
+        default=False,
+    )
+    start_date: AwareDatetime = Field(
+        description="UTC data and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present date.",
+        default_factory=default_start_date,
+        ge=EARLIEST_VALID_DATE_IN_SALESFORCE,
+    )
+    credentials: OAuth2Credentials = Field(
+        discriminator="credentials_title",
+        title="Authentication",
+    )
+    class Advanced(BaseModel):
+        window_size: Annotated[int, Field(
+            description="Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
+            title="Window size",
+            default=180,
+            gt=0,
+        )]
+
+    advanced: Advanced = Field(
+        default_factory=Advanced, #type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
+    )
+
+ConnectorState = GenericConnectorState[ResourceState]
+
+
+class AccessTokenResponse(BaseModel, extra="allow"):
+    instance_url: str
+
+
+class PartialSObject(BaseModel, extra="allow"):
+    name: str
+    queryable: bool
+
+
+class GlobalDescribeObjectsResponse(BaseModel, extra="allow"):
+    sobjects: list[PartialSObject]
+
+
+class SoapTypes(StrEnum):
+    ID = "tns:ID"
+    ANY_TYPE = "xsd:anyType"
+    BASE64 = "xsd:base64Binary"
+    BOOLEAN = "xsd:boolean"
+    DATE = "xsd:date"
+    DATETIME = "xsd:dateTime"
+    DOUBLE = "xsd:double"
+    INTEGER = "xsd:int"
+    STRING = "xsd:string"
+    # The following are not mentioned in Salesforce's documentation but do exist when decribing an object's fields.
+    LONG = "xsd:long"
+    TIME = "xsd:time"
+    JSON = "tns:json"
+    ADDRESS = "urn:address"
+    JUNCTION_ID_LIST_NAMES = "urn:JunctionIdListNames"
+    LOCATION = "urn:location"
+    RELATIONSHIP_REFERENCE_TO = "urn:RelationshipReferenceTo"
+    RECORD_TYPES_SUPPORTED = "urn:RecordTypesSupported"
+    SEARCH_LAYOUT_BUTTONS_DISPLAYED = "urn:SearchLayoutButtonsDisplayed"
+    SEARCH_LAYOUT_FIELDS_DISPLAYED = "urn:SearchLayoutFieldsDisplayed"
+    SEARCH_LAYOUT_BUTTON = "urn:SearchLayoutButton"
+    SEARCH_LAYOUT_FIELD = "urn:SearchLayoutField"
+
+# FieldDetails is used by the connector to convert field types in Bulk API responses.
+class FieldDetails(BaseModel, extra="allow"):
+    soapType: SoapTypes # Type of field
+    calculated: bool # Indicates whether or not this is a formula field.
+
+
+class SObject(PartialSObject):
+    class ObjectField(FieldDetails):
+        name: str
+
+    fields: list[ObjectField]
+
+
+# FieldDetailsDict is a connector-internal structure used to convert field
+# types in records fetched via the Bulk API.
+class FieldDetailsDict(BaseModel):
+    fields: dict[str, FieldDetails]
+
+    @classmethod
+    def model_validate(cls, obj: Any, *args, **kwargs):
+        if isinstance(obj, dict) and "fields" not in obj:
+            obj = {"fields": obj}
+        return super().model_validate(obj, *args, **kwargs)
+
+    def __getitem__(self, key: str) -> FieldDetails:
+        return self.fields[key]
+
+    def __setitem__(self, key: str, value: FieldDetails) -> None:
+        self.fields[key] = value
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.fields)
+
+    def __len__(self) -> int:
+        return len(self.fields)
+
+    def keys(self):
+        return self.fields.keys()
+
+    def values(self):
+        return self.fields.values()
+
+    def items(self):
+        return self.fields.items()
+
+
+class FullRefreshResource(BaseDocument, extra="allow"):
+    pass
+
+
+class SalesforceResource(FullRefreshResource):
+    Id: str
+
+
+class CursorFields(StrEnum):
+    SYSTEM_MODSTAMP = "SystemModstamp"
+    LAST_MODIFIED_DATE = "LastModifiedDate"
+    CREATED_DATE = "CreatedDate"
+    LOGIN_TIME = "LoginTime"
+
+# REST API Related Models
+
+class QueryResponse(BaseModel, extra="forbid"):
+    totalSize: int
+    done: bool
+    records: list[dict[str, Any]]
+    nextRecordsUrl: str | None = None
+
+# Bulk Job Related Models
+
+class BulkJobStates(StrEnum):
+    UPLOAD_COMPLETE = "UploadComplete"
+    IN_PROGRESS = "InProgress"
+    ABORTED = "Aborted"
+    JOB_COMPLETE = "JobComplete"
+    FAILED = "Failed"
+
+
+class BulkJobSubmitResponse(BaseModel, extra="allow"):
+    id: str
+    state: BulkJobStates
+    object: str
+    operation: str
+    createdDate: str
+    systemModstamp: str
+
+
+class BulkJobCheckStatusResponse(BulkJobSubmitResponse):
+    retries: int
+    numberRecordsProcessed: int | None = None
+    totalProcessingTime: int
+    errorMessage: str | None = None
