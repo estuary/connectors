@@ -199,19 +199,25 @@ async def all_resources(
     return all_streams
 
 
-def _create_initial_state(all_account_ids: list[str]) -> ResourceState:
+def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
     cutoff = datetime.now(tz=UTC)
 
-    initial_state = ResourceState(
-        inc={
-            account_id: ResourceState.Incremental(cursor=cutoff)
-            for account_id in all_account_ids
-        },
-        backfill={
-            account_id: ResourceState.Backfill(next_page=None, cutoff=cutoff)
-            for account_id in all_account_ids
-        },
-    )
+    if isinstance(account_ids, str):
+        initial_state = ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+        )
+    else:
+        initial_state = ResourceState(
+            inc={
+                account_id: ResourceState.Incremental(cursor=cutoff)
+                for account_id in account_ids
+            },
+            backfill={
+                account_id: ResourceState.Backfill(next_page=None, cutoff=cutoff)
+                for account_id in account_ids
+            },
+        )
 
     return initial_state
 
@@ -235,10 +241,18 @@ def base_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids or len(connected_account_ids) == 0:
+        if not connected_account_ids:
             fetch_changes_fns = functools.partial(
                 fetch_incremental,
                 cls,
+                platform_account_id,
+                None,
+                http,
+            )
+            fetch_page_fns = functools.partial(
+                fetch_backfill,
+                cls,
+                start_date,
                 platform_account_id,
                 None,
                 http,
@@ -254,17 +268,6 @@ def base_object(
                 )
                 for account_id in all_account_ids
             }
-
-        if not connected_account_ids or len(connected_account_ids) == 0:
-            fetch_page_fns = functools.partial(
-                fetch_backfill,
-                cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-        else:
             fetch_page_fns = {
                 account_id: functools.partial(
                     fetch_backfill,
@@ -286,7 +289,9 @@ def base_object(
             fetch_page=fetch_page_fns,
         )
 
-    initial_state = _create_initial_state(all_account_ids)
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     return Resource(
         name=cls.NAME,
@@ -321,11 +326,20 @@ def child_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids or len(connected_account_ids) == 0:
+        if not connected_account_ids:
             fetch_changes_fns = functools.partial(
                 fetch_incremental_substreams,
                 cls,
                 child_cls,
+                platform_account_id,
+                None,
+                http,
+            )
+            fetch_page_fns = functools.partial(
+                fetch_backfill_substreams,
+                cls,
+                child_cls,
+                start_date,
                 platform_account_id,
                 None,
                 http,
@@ -342,18 +356,6 @@ def child_object(
                 )
                 for account_id in all_account_ids
             }
-
-        if not connected_account_ids or len(connected_account_ids) == 0:
-            fetch_page_fns = functools.partial(
-                fetch_backfill_substreams,
-                cls,
-                child_cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-        else:
             fetch_page_fns = {
                 account_id: functools.partial(
                     fetch_backfill_substreams,
@@ -376,7 +378,9 @@ def child_object(
             fetch_page=fetch_page_fns,
         )
 
-    initial_state = _create_initial_state(all_account_ids)
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     return Resource(
         name=child_cls.NAME,
@@ -414,10 +418,19 @@ def split_child_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids or len(connected_account_ids) == 0:
+        if not connected_account_ids:
             fetch_changes_fns = functools.partial(
                 fetch_incremental,
                 child_cls,
+                platform_account_id,
+                None,
+                http,
+            )
+            fetch_page_fns = functools.partial(
+                fetch_backfill_substreams,
+                cls,
+                child_cls,
+                start_date,
                 platform_account_id,
                 None,
                 http,
@@ -433,18 +446,6 @@ def split_child_object(
                 )
                 for account_id in all_account_ids
             }
-
-        if not connected_account_ids or len(connected_account_ids) == 0:
-            fetch_page_fns = functools.partial(
-                fetch_backfill_substreams,
-                cls,
-                child_cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-        else:
             fetch_page_fns = {
                 account_id: functools.partial(
                     fetch_backfill_substreams,
@@ -467,7 +468,9 @@ def split_child_object(
             fetch_page=fetch_page_fns,
         )
 
-    initial_state = _create_initial_state(all_account_ids)
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     return Resource(
         name=child_cls.NAME,
@@ -504,11 +507,20 @@ def usage_records(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids or len(connected_account_ids) == 0:
+        if not connected_account_ids:
             fetch_changes_fns = functools.partial(
                 fetch_incremental_usage_records,
                 cls,
                 child_cls,
+                platform_account_id,
+                None,
+                http,
+            )
+            fetch_page_fns = functools.partial(
+                fetch_backfill_usage_records,
+                cls,
+                child_cls,
+                start_date,
                 platform_account_id,
                 None,
                 http,
@@ -525,18 +537,6 @@ def usage_records(
                 )
                 for account_id in all_account_ids
             }
-
-        if not connected_account_ids or len(connected_account_ids) == 0:
-            fetch_page_fns = functools.partial(
-                fetch_backfill_usage_records,
-                cls,
-                child_cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-        else:
             fetch_page_fns = {
                 account_id: functools.partial(
                     fetch_backfill_usage_records,
@@ -559,7 +559,9 @@ def usage_records(
             fetch_page=fetch_page_fns,
         )
 
-    initial_state = _create_initial_state(all_account_ids)
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     return Resource(
         name=child_cls.NAME,
@@ -596,10 +598,18 @@ def no_events_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids or len(connected_account_ids) == 0:
+        if not connected_account_ids:
             fetch_changes_fns = functools.partial(
                 fetch_incremental_no_events,
                 cls,
+                platform_account_id,
+                None,
+                http,
+            )
+            fetch_page_fns = functools.partial(
+                fetch_backfill,
+                cls,
+                start_date,
                 platform_account_id,
                 None,
                 http,
@@ -615,17 +625,6 @@ def no_events_object(
                 )
                 for account_id in all_account_ids
             }
-
-        if not connected_account_ids or len(connected_account_ids) == 0:
-            fetch_page_fns = functools.partial(
-                fetch_backfill,
-                cls,
-                start_date,
-                platform_account_id,
-                None,
-                http,
-            )
-        else:
             fetch_page_fns = {
                 account_id: functools.partial(
                     fetch_backfill,
@@ -647,7 +646,9 @@ def no_events_object(
             fetch_page=fetch_page_fns,
         )
 
-    initial_state = _create_initial_state(all_account_ids)
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     return Resource(
         name=cls.NAME,
