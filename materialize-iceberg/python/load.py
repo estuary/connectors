@@ -35,6 +35,7 @@ def run(input):
         quote="|",
         compression="gzip",
         escapeQuotes=False,
+        escape="\u0000",
     )
 
     for binding in bindings:
