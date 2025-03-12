@@ -499,7 +499,7 @@ async def fetch_disputes(
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     window_end = log_cursor + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
-    end = min(window_end, datetime.now(tz=UTC))
+    end = min(window_end, datetime.now(tz=UTC)).replace(microsecond=0)
 
     # Braintree does not let us search disputes based on the created_at field, and the received_date field is
     # the best alternative that Braintree exposes for searching. Since received_date can be earlier than
