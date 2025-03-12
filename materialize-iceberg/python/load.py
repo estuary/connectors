@@ -26,6 +26,7 @@ def run(input):
             quote="`",
             header=False,
             inferSchema=False,
+            multiLine=True,
         ).createTempView(f"load_view_{bindingIdx}")
 
     spark.sql(query).write.csv(

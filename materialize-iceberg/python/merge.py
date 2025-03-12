@@ -25,6 +25,7 @@ def run(input):
             quote="`",
             header=False,
             inferSchema=False,
+            multiLine=True,
         ).createTempView(f"merge_view_{bindingIdx}")
 
         try:
