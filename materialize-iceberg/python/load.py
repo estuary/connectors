@@ -29,6 +29,7 @@ def run(input):
         mode="error",
         header=False,
         quote="|",
+        quoteAll=True,
         compression="gzip",
         escapeQuotes=False,
         escape="\u0000",
