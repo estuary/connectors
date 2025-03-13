@@ -55,9 +55,7 @@ class ConnectorState(GenericConnectorState[ResourceState]):
             for _, state in list(binding_state.items()):
                 for key in ["inc", "backfill"]:
                     if key in state:
-                        if not isinstance(state[key], dict):
-                            del state[key]
-                            continue
+                        del state[key]
 
         return handler(data)
 
