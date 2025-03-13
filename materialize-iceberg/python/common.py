@@ -64,6 +64,21 @@ def fields_to_struct(fields: list[NestedField]) -> StructType:
     return StructType([StructField(f.name, data_type_for_field(f)) for f in fields])
 
 
+def read_csv_opts(files: list[str], cols: list[NestedField]):
+    return {
+        "path": files,
+        "schema": fields_to_struct(cols),
+        "quote": "`",
+        "escape": "`",
+        "emptyValue": '""',
+        "header": False,
+        "inferSchema": False,
+        "enforceSchema": False,
+        "multiLine": True,
+        "unescapedQuoteHandling": "RAISE_ERROR",
+    }
+
+
 def common_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument(
