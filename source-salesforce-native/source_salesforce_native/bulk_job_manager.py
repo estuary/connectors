@@ -19,6 +19,7 @@ from .models import (
 
 INITIAL_SLEEP = 5
 MAX_SLEEP = 300
+ATTEMPT_LOG_THRESHOLD = 10
 
 CANNOT_FETCH_COMPOUND_DATA = r"Selecting compound data not supported in Bulk Query"
 NOT_SUPPORTED_BY_BULK_API = r"is not supported by the Bulk API"
@@ -232,6 +233,7 @@ class BulkJobManager:
         job_id = await self._submit(object_name, list(fields.keys()), cursor_field, start, end)
 
         delay = INITIAL_SLEEP
+        attempt = 1
 
         while True:
             job_details = await self._check_job(job_id)
@@ -241,8 +243,13 @@ class BulkJobManager:
                         return
                     break
                 case BulkJobStates.UPLOAD_COMPLETE | BulkJobStates.IN_PROGRESS:
-                    await asyncio.sleep(delay)
+                    if delay >= MAX_SLEEP or attempt > ATTEMPT_LOG_THRESHOLD:
+                        self.log.info(f"Sleeping for {delay} seconds after attempt #{attempt} of waiting for job completion.", {
+                            "job_details": job_details,
+                        })
+                    await asyncio.sleep(delay)  
                     delay = min(delay * 2, MAX_SLEEP)
+                    attempt += 1
                 case BulkJobStates.ABORTED | BulkJobStates.FAILED:
                     msg = f"Unanticipated status {job_details.state} for job {job_id}."
                     msg += (
