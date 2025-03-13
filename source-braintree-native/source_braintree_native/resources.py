@@ -52,14 +52,6 @@ INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn, Increm
     ("subscriptions", fetch_subscriptions, backfill_subscriptions),
 ]
 
-# When a scheduled backfill occurs, it's possible for an incremental task to be sleeping until its interval has elapsed.
-# This can create a gap from where the old incremental task left off & where the new incremental task picks up. While
-# the backfill task will eventually pick up any records within that gap, it could take days for the backfill to complete
-# and actually fetch those records. Instead, we can push the cutoff between backfill/incremental so the incremental task
-# is responsible for capturing data in these gaps instead of the backfill, and the incremental task will capture this data
-# sooner than the backfill will.
-CUTOFF_OFFSET = timedelta(hours=1)
-
 
 def _create_gateway(config: EndpointConfig) -> BraintreeGateway:
     environment = braintree.Environment.Sandbox if config.advanced.is_sandbox else braintree.Environment.Production
@@ -161,7 +153,7 @@ def incremental_resources(
             )
         )
 
-    cutoff = datetime.now(tz=UTC).replace(microsecond=0) - CUTOFF_OFFSET
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
 
     return [
         common.Resource(
