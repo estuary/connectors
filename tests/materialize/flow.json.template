@@ -150,6 +150,18 @@
           "type": "object"
        },
        "key": ["/id"]
+    },
+    "tests/string-escaped-key": {
+       "schema": {
+       "properties": {
+           "id": {"type": "string"},
+           "counter": { "type": "integer", "reduce": { "strategy": "sum" } }
+          },
+          "required": ["id"],
+          "type": "object",
+          "reduce": { "strategy": "merge" }
+       },
+       "key": ["/id"]
     }
   },
 

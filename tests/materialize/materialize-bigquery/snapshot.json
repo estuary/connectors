@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0),\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n"
+  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0),\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.string_escaped_key (\n\t\tid STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n"
 ]
 [
   "connectorState",
@@ -391,6 +391,17 @@
     }
   ],
   "table": "deletions"
+}
+{
+  "rows": [
+    {
+      "counter": 3,
+      "flow_document": "{\"_meta\":{\"uuid\":\"e9844980-1de2-11b2-8000-071353030311\"},\"counter\":3,\"id\":\"\\\\he \\\\ ' \\\" `llo`\"}",
+      "flow_published_at": "1970-01-01T02:00:31Z",
+      "id": "\\he \\ ' \" `llo`"
+    }
+  ],
+  "table": "string_escaped_key"
 }
 [
   "applied.actionDescription",
