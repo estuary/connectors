@@ -2,6 +2,7 @@ url: https://glue.us-east-2.amazonaws.com/iceberg
 warehouse: "076183946664"
 namespace: ci_testing
 base_location: s3://estuary-connector-test-bucket/glue/
+hard_delete: true
 catalog_authentication:
     catalog_auth_type: AWS SigV4
     aws_access_key_id_sops: ENC[AES256_GCM,data:rjlhgHI4lBC4tn2c26sXhBHYssA=,iv:u0/KXArIZ0xSXBheNVmfJ38L/6Cofqhp6ah2z+E9HHw=,tag:BZXuQRKntqj1UIjRG0sYnQ==,type:str]
@@ -27,8 +28,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-03-04T16:28:41Z"
-    mac: ENC[AES256_GCM,data:HE7Gnynuc0cfgzRlHzOthuLYIgxrNocxP/kd8YsiRzN8OutydGBJv9TnkIwF3fs70y1ZJc53nBklZZBXCiA6L69NDYI2r41+VUjh0H/oMVDHzmHygnn1/vmYGMS/SvhBsffH2UM1ZuwvNMBVU6npzqQZxNJH376DlrdeFmygEZw=,iv:tb7kfMIOMBk7cgvHf2AD3x7LKkrLqwR7HbidSH/eU30=,tag:EpSdhL4xFeIgB7bAf2YKlw==,type:str]
+    lastmodified: "2025-03-13T14:19:20Z"
+    mac: ENC[AES256_GCM,data:L1mrxX8q+tFSSjvDes8dXCjvrg0q9UBWAe6lyGllm5OdlNLhpDSvsHrwRUNSJ0huKaSak9hOySN8GL4JU9sfx82k3Nz3Q440m34DI/w5hQsDzT2PP5NdLKdhOBJLhxX48r/bVZSacLVEJO4vlqyGgV+z0c1x/huDQ5DmkpLQ18M=,iv:x8pKS3fYKOv8zWQzPcmPpI+h4iPx+RHoqQ3qL8kO/y8=,tag:A2ynqCefqxNdHR7NAb9wmA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4

@@ -1,6 +1,7 @@
 url: https://na81867.us-east-2.aws.snowflakecomputing.com/polaris/api/catalog
 warehouse: estuary_test
 namespace: ci_testing
+hard_delete: true
 catalog_authentication:
     catalog_auth_type: OAuth 2.0 Client Credentials
     oauth2_server_uri: v1/oauth/tokens
@@ -27,8 +28,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-03-04T16:28:50Z"
-    mac: ENC[AES256_GCM,data:mEksvxgXVz+RWzVnkIK5aeWcekn59PgIO3W7rDwjDCculo7nlNhPiEMjlbucI/PHY+lCwqX6bhBRBOvcCUYiazrmq2JsY9F9ELxYasR7s0o85yJ3epO/x9qyClGmd6MOWaqdWEwUkTzKq8NNSGwmVGjGizucQ6TSkBX3QPgLwxw=,iv:cvOsPtovRL+3f7suT50FKDecQOOA/3WnaSKpD9DI56Y=,tag:/adII9sa8bKFPXee3Z4D1g==,type:str]
+    lastmodified: "2025-03-13T14:19:11Z"
+    mac: ENC[AES256_GCM,data:enUWPVEh81IDFN0s1el9ALzmv1evBk8f3NMvdgrUbzVQrVK7G0h10Yd4fce5swjAJ8I0Vp9GWxnGHcJRSpYRZj8Kv1HyKZ1DvwqHomLs9Ziy6+l31tSDDV58nJINtQmiIM5UOX0bF+Njt1otWMDpHG641lW9vC4l512jVX6ilF0=,iv:WQFCkU17aRwFNA/A0eeYsRRqavY1kQZYoGkN9gxFcJg=,tag:315z8c9iluOgVUoJ3vN6wg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4
