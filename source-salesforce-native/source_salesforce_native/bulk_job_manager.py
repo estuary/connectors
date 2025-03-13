@@ -102,18 +102,18 @@ class BulkJobManager:
 
     async def _process_csv_lines(
         self,
-        line_generator: AsyncGenerator[bytes, None],
+        byte_generator: AsyncGenerator[bytes, None],
     ) -> AsyncGenerator[dict[str, str], None]:
-        class AsyncLineReader(aiocsv.protocols.WithAsyncRead):
-            def __init__(self, line_gen: AsyncGenerator[bytes, None]):
-                self.line_gen = line_gen
+        class AsyncByteReader(aiocsv.protocols.WithAsyncRead):
+            def __init__(self, byte_gen: AsyncGenerator[bytes, None]):
+                self.byte_gen = byte_gen
 
             async def read(self, size: int = -1) -> str:
-                line = (await self.line_gen.__anext__()).decode('utf-8')
-                return line
+                decoded = (await self.byte_gen.__anext__()).decode('utf-8')
+                return decoded
 
-        line_reader = AsyncLineReader(line_generator)
-        async for row in aiocsv.AsyncDictReader(line_reader):
+        byte_reader = AsyncByteReader(byte_generator)
+        async for row in aiocsv.AsyncDictReader(byte_reader):
             yield row
 
 
