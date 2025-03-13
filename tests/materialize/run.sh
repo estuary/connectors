@@ -49,7 +49,7 @@ export TEST_COLLECTION_SYMBOLS="tests/symbols"
 export TEST_COLLECTION_UNSIGNED_BIGINT="tests/unsigned-bigint"
 export TEST_COLLECTION_DELETIONS="tests/deletions"
 export TEST_COLLECTION_BINARY_KEY="tests/binary-key"
-
+export TEST_COLLECTION_STRING_ESCAPED_KEY="tests/string-escaped-key"
 
 function decrypt_config {
   sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 

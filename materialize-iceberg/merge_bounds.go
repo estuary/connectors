@@ -28,10 +28,8 @@ type mergeBoundsBuilder struct {
 
 func newMergeBoundsBuilder(keys []boilerplate.MappedProjection[mapped]) *mergeBoundsBuilder {
 	return &mergeBoundsBuilder{
-		keys: keys,
-		literaler: sql.ToLiteralFn(func(in string) string {
-			return "'" + in + "'"
-		}),
+		keys:      keys,
+		literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'")),
 	}
 }
 

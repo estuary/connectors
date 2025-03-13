@@ -166,6 +166,16 @@ func QuoteTransform(quote string, escape string) func(string) string {
 	}
 }
 
+// QuoteTransformEscapedBackslash first escapes any backslashes in the input
+// with a second backslash, then applies the transform per QuoteTransform. This
+// is common for systems that use a backslash as an escape character and require
+// it to be escaped as well.
+func QuoteTransformEscapedBackslash(quote string, escape string) func(string) string {
+	return func(s string) string {
+		return QuoteTransform(quote, escape)(strings.ReplaceAll(s, `\`, `\\`))
+	}
+}
+
 // JoinTransform returns a function that takes component `parts` and processes
 // each through the `delegate` transform.
 // Then, it joins their results around `joiner`.
