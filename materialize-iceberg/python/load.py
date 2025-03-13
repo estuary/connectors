@@ -1,8 +1,8 @@
 from common import (
     NestedField,
     common_args,
-    fields_to_struct,
     get_spark_session,
+    read_csv_opts,
     run_with_status,
 )
 
@@ -20,14 +20,9 @@ def run(input):
         keys: list[NestedField] = [NestedField(**key) for key in binding["keys"]]
         files: list[str] = binding["files"]
 
-        spark.read.csv(
-            path=files,
-            schema=fields_to_struct(keys),
-            quote="`",
-            header=False,
-            inferSchema=False,
-            multiLine=True,
-        ).createTempView(f"load_view_{bindingIdx}")
+        spark.read.csv(**read_csv_opts(files, keys)).createTempView(
+            f"load_view_{bindingIdx}"
+        )
 
     spark.sql(query).write.csv(
         output_location,
