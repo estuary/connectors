@@ -4,12 +4,14 @@ import functools
 from enum import Enum, StrEnum
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+import inspect
 from logging import Logger
 from typing import (
     Any,
     AsyncGenerator,
     Awaitable,
     Callable,
+    cast,
     ClassVar,
     Generic,
     Iterable,
@@ -204,6 +206,10 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
         default=None, description="The last time this state was initialized."
     )
 
+    is_connector_initiated: bool = Field(
+        default=False, description="Indicates if this backfill was initiated by the connector.",
+    )
+
 
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
 
@@ -265,6 +271,37 @@ Instead, mark the end of the sequence by yielding documents and then
 returning without yielding a final PageCursor.
 """
 
+RecurringFetchPageFn = Callable[
+    [Logger, PageCursor, LogCursor, bool],
+    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
+]
+"""
+RecurringFetchPagesFn fetches available checkpoints since the provided last PageCursor.
+It will typically fetch just one page, though it may fetch multiple pages.
+
+RecurringFetchPagesFn is intended to start new iterations on some cadence,
+often based on a schedule set in ResourceConfigWithSchedule.
+
+The argument PageCursor is None if a new iteration is being started.
+Otherwise it is the last PageCursor yielded by RecurringFetchPagesFn.
+
+The argument LogCursor is the "cutoff" log position at which incremental
+replication started, and should be used to suppress documents which were
+modified at-or-after the cutoff, as such documents are
+already observed through incremental replication.
+
+The boolean argument signals if this iteration/backfill was connector-initiated.
+It is True if this iteration was connector-initiated, and False otherwise.
+
+Checkpoints consist of a yielded sequence of documents followed by a
+non-None PageCursor, which checkpoints those preceding documents,
+or by simply returning if the iteration is complete.
+
+It's an error if RecurringFetchPagesFn yields a PageCursor of None.
+Instead, mark the end of the sequence by yielding documents and then
+returning without yielding a final PageCursor.
+"""
+
 FetchChangesFn = Callable[
     [Logger, LogCursor],
     AsyncGenerator[_BaseDocument | dict | AssociatedDocument | LogCursor, None],
@@ -299,6 +336,15 @@ Otherwise if it returns without yielding a checkpoint, then
 Implementations SHOULD NOT sleep or implement their own coarse rate limit
 (use `ResourceConfig.interval`).
 """
+
+
+def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
+    """Check if the function signature accepts the arguments of a RecurringFetchPageFn."""
+    try:
+        inspect.signature(fn).bind(log, page, cutoff, is_connector_initiated)
+        return True
+    except TypeError:
+        return False
 
 
 class ReductionStrategy(StrEnum):
@@ -523,6 +569,7 @@ def open(
                     else:
                         state = resource.initial_state
 
+                    state.is_connector_initiated = True
                 else:
                     state = resource.initial_state
 
@@ -560,6 +607,7 @@ def open_binding(
     | dict[str, FetchChangesFn[_BaseDocument]]
     | None = None,
     fetch_page: FetchPageFn[_BaseDocument]
+    | RecurringFetchPageFn[_BaseDocument]
     | dict[str, FetchPageFn[_BaseDocument]]
     | None = None,
     fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
@@ -626,7 +674,7 @@ def open_binding(
 
         async def backfill_closure(
             task: Task,
-            fetch_page: FetchPageFn[_BaseDocument],
+            fetch_page: FetchPageFn[_BaseDocument] | RecurringFetchPageFn,
             state: ResourceState.Backfill,
             subtask_id: str | None = None,
         ):
@@ -637,6 +685,7 @@ def open_binding(
                 fetch_page,
                 state,
                 resource_state.last_initialized,
+                resource_state.is_connector_initiated,
                 task,
                 subtask_id,
             )
@@ -774,9 +823,10 @@ async def _binding_snapshot_task(
 async def _binding_backfill_task(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
-    fetch_page: FetchPageFn[_BaseDocument],
+    fetch_page: FetchPageFn[_BaseDocument] | RecurringFetchPageFn[_BaseDocument],
     state: ResourceState.Backfill,
     last_initialized: datetime | None,
+    is_connector_initiated: bool,
     task: Task,
     subtask_id: str | None = None,
 ):
@@ -807,7 +857,15 @@ async def _binding_backfill_task(
         # Track if fetch_page returns without having yielded a PageCursor.
         done = True
 
-        async for item in fetch_page(task.log, state.next_page, state.cutoff):
+        # Distinguish between FetchPageFn and RecurringFetchPageFn to provide the correct arguments.
+        if is_recurring_fetch_page_fn(fetch_page, task.log, state.next_page, state.cutoff, is_connector_initiated):
+            fn = cast(RecurringFetchPageFn, fetch_page)
+            pages = fn(task.log, state.next_page, state.cutoff, is_connector_initiated)
+        else:
+            fn = cast(FetchPageFn, fetch_page)
+            pages = fn(task.log, state.next_page, state.cutoff)
+
+        async for item in pages:
             if isinstance(item, BaseDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
                 done = True
