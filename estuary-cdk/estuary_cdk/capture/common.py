@@ -137,10 +137,7 @@ class ResourceConfigWithSchedule(ResourceConfig):
     )
 
 
-async def scheduled_stop(task: Task, future_dt: datetime | None) -> None:
-    if not future_dt:
-        return None
-
+async def scheduled_stop(task: Task, future_dt: datetime) -> None:
     sleep_duration = future_dt - datetime.now(tz=UTC)
     await asyncio.sleep(sleep_duration.total_seconds())
     task.stopping.event.set()
@@ -506,6 +503,7 @@ def open(
                 )
 
         soonest_future_scheduled_initialization: datetime | None = None
+        NOW = datetime.now(tz=UTC)
 
         for index, (binding, resource) in enumerate(resolved_bindings):
             state: _ResourceState | None = open.state.bindingStateV1.get(
@@ -517,39 +515,29 @@ def open(
 
             if state:
                 if state.last_initialized is None:
-                    state.last_initialized = datetime.now(tz=UTC)
+                    state.last_initialized = NOW
                     task.checkpoint(
                         ConnectorState(bindingStateV1={binding.stateKey: state})
                     )
 
-                if isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
+                if not state.backfill and isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
                     cron_schedule = binding.resourceConfig.schedule
-                    next_scheduled_initialization = next_fire(
-                        cron_schedule, state.last_initialized
+                    missed_scheduled_initialization = next_fire(
+                        cron_schedule, state.last_initialized, NOW
+                    )
+                    future_scheduled_initialization = next_fire(
+                        cron_schedule, NOW,
                     )
 
-                    if not state.backfill:
-                        if (
-                            next_scheduled_initialization
-                            and next_scheduled_initialization < datetime.now(tz=UTC)
-                        ):
-                            should_initialize = True
-                            is_connector_initiated = True
-                            next_scheduled_initialization = next_fire(cron_schedule, datetime.now(tz=UTC))
+                    if missed_scheduled_initialization:
+                        should_initialize = True
+                        is_connector_initiated = True
 
+                    if future_scheduled_initialization:
+                        if not soonest_future_scheduled_initialization:
+                            soonest_future_scheduled_initialization = future_scheduled_initialization
                         else:
-                            if (
-                                next_scheduled_initialization
-                                and soonest_future_scheduled_initialization
-                            ):
-                                soonest_future_scheduled_initialization = min(
-                                    soonest_future_scheduled_initialization,
-                                    next_scheduled_initialization,
-                                )
-                            elif next_scheduled_initialization:
-                                soonest_future_scheduled_initialization = (
-                                    next_scheduled_initialization
-                                )
+                            soonest_future_scheduled_initialization = min(soonest_future_scheduled_initialization, future_scheduled_initialization)
 
             if should_initialize:
                 if is_connector_initiated:
@@ -573,7 +561,7 @@ def open(
                 else:
                     state = resource.initial_state
 
-                state.last_initialized = datetime.now(tz=UTC)
+                state.last_initialized = NOW
 
                 # Checkpoint the binding's initialized state prior to any processing.
                 task.checkpoint(
@@ -591,9 +579,10 @@ def open(
             )
 
 
-        # Gracefully exit to ensure relatively close adherence to any bindings'
-        # re-initialization schedules.
-        asyncio.create_task(scheduled_stop(task, soonest_future_scheduled_initialization))
+        if soonest_future_scheduled_initialization:
+            # Gracefully exit to ensure relatively close adherence to any bindings'
+            # re-initialization schedules.
+            asyncio.create_task(scheduled_stop(task, soonest_future_scheduled_initialization))
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 
@@ -904,14 +893,15 @@ async def _binding_backfill_task(
     # if we missed a scheduled initialization or schedule a future stop.
     if isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
         assert isinstance(last_initialized, datetime)
+        NOW = datetime.now(tz=UTC)
         cron_schedule = binding.resourceConfig.schedule
-        next_scheduled_initialization = next_fire(cron_schedule, last_initialized)
-        if next_scheduled_initialization:
-            if next_scheduled_initialization < datetime.now(tz=UTC):
-                task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
-                task.stopping.event.set()
-            else:
-                asyncio.create_task(scheduled_stop(task, next_scheduled_initialization))
+        missed_scheduled_initialization = next_fire(cron_schedule, last_initialized, NOW)
+        future_scheduled_initialization = next_fire(cron_schedule, NOW)
+        if missed_scheduled_initialization:
+            task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
+            task.stopping.event.set()
+        elif future_scheduled_initialization:
+            asyncio.create_task(scheduled_stop(task, future_scheduled_initialization))
 
 
 async def _binding_incremental_task(
