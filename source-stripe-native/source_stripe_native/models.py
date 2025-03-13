@@ -1,5 +1,12 @@
 from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel, Field, AwareDatetime, AliasChoices
+from pydantic import (
+    BaseModel,
+    Field,
+    AwareDatetime,
+    AliasChoices,
+    model_validator,
+    ModelWrapValidatorHandler,
+)
 from typing import (
     Literal,
     Generic,
@@ -7,6 +14,8 @@ from typing import (
     ClassVar,
     Dict,
     List,
+    Any,
+    Self,
 )
 
 from estuary_cdk.flow import AccessToken
@@ -35,8 +44,23 @@ class EndpointConfig(BaseModel):
     )
 
 
-# We use ResourceState directly, without extending it.
-ConnectorState = GenericConnectorState[ResourceState]
+class ConnectorState(GenericConnectorState[ResourceState]):
+    @model_validator(mode="wrap")
+    @classmethod
+    def _state_cleanup_wrap(
+        cls, data: Any, handler: ModelWrapValidatorHandler[Self]
+    ) -> Self:
+        if "bindingStateV1" in data:
+            binding_state = data["bindingStateV1"]
+            for _, state in list(binding_state.items()):
+                for key in ["inc", "backfill"]:
+                    if key in state:
+                        if not isinstance(state[key], dict):
+                            del state[key]
+                            continue
+
+        return handler(data)
+
 
 Item = TypeVar("Item")
 
