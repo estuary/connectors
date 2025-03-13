@@ -45,12 +45,12 @@ ON {{ range $ind, $bound := $.Bounds }}
 	l.{{ QuoteIdentifier $bound.Field }} = {{ template "maybe_unbase64_rhs" $bound }}
 	{{- if $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Field }} >= {{ $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Field }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
-WHEN MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Field }} = 'delete' THEN DELETE
+WHEN MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Field }} = '"delete"' THEN DELETE
 WHEN MATCHED THEN UPDATE SET {{ range $ind, $proj := $.Mapped.SelectedProjections }}
 	{{- if $ind }}, {{ end -}}
 	l.{{ QuoteIdentifier $proj.Field }} = {{ template "maybe_unbase64_rhs" $proj }}
 {{- end }}
-WHEN NOT MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Field }} != 'delete' THEN INSERT (
+WHEN NOT MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Field }} != '"delete"' THEN INSERT (
 {{- range $ind, $proj := $.Mapped.SelectedProjections }}
 	{{- if $ind }}, {{ end -}}
 	{{ QuoteIdentifier $proj.Field -}}

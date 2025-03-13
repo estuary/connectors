@@ -15,7 +15,7 @@
     "updated": {
       "ci_testing%2Fbinary_key": {
         "binding": 5,
-        "query": "MERGE INTO `ci_testing`.`binary_key` AS l\nUSING merge_view_5 AS r\nON \n\tl.`id` = unbase64(r.`id`)\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = unbase64(r.`id`), l.`counter` = r.`counter`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `counter`, `flow_published_at`, `flow_document`) VALUES (unbase64(r.`id`), r.`counter`, r.`flow_published_at`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`binary_key` AS l\nUSING merge_view_5 AS r\nON \n\tl.`id` = unbase64(r.`id`)\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = unbase64(r.`id`), l.`counter` = r.`counter`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `counter`, `flow_published_at`, `flow_document`) VALUES (unbase64(r.`id`), r.`counter`, r.`flow_published_at`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -40,7 +40,7 @@
       },
       "ci_testing%2Fdeletions": {
         "binding": 4,
-        "query": "MERGE INTO `ci_testing`.`deletions` AS l\nUSING merge_view_4 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 2\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`_meta/op` = r.`_meta/op`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `_meta/op`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`_meta/op`, r.`flow_published_at`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`deletions` AS l\nUSING merge_view_4 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 2\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`_meta/op` = r.`_meta/op`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `_meta/op`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`_meta/op`, r.`flow_published_at`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -65,7 +65,7 @@
       },
       "ci_testing%2Fduplicate_keys_standard": {
         "binding": 1,
-        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 5\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 5\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -94,7 +94,7 @@
       },
       "ci_testing%2Fformatted_strings": {
         "binding": 3,
-        "query": "MERGE INTO `ci_testing`.`formatted_strings` AS l\nUSING merge_view_3 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 3 AND l.`id` <= 4\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`date` = r.`date`, l.`datetime` = r.`datetime`, l.`flow_published_at` = r.`flow_published_at`, l.`int_and_str` = r.`int_and_str`, l.`int_str` = r.`int_str`, l.`num_and_str` = r.`num_and_str`, l.`num_str` = r.`num_str`, l.`time` = r.`time`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `date`, `datetime`, `flow_published_at`, `int_and_str`, `int_str`, `num_and_str`, `num_str`, `time`, `flow_document`) VALUES (r.`id`, r.`date`, r.`datetime`, r.`flow_published_at`, r.`int_and_str`, r.`int_str`, r.`num_and_str`, r.`num_str`, r.`time`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`formatted_strings` AS l\nUSING merge_view_3 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 3 AND l.`id` <= 4\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`date` = r.`date`, l.`datetime` = r.`datetime`, l.`flow_published_at` = r.`flow_published_at`, l.`int_and_str` = r.`int_and_str`, l.`int_str` = r.`int_str`, l.`num_and_str` = r.`num_and_str`, l.`num_str` = r.`num_str`, l.`time` = r.`time`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `date`, `datetime`, `flow_published_at`, `int_and_str`, `int_str`, `num_and_str`, `num_str`, `time`, `flow_document`) VALUES (r.`id`, r.`date`, r.`datetime`, r.`flow_published_at`, r.`int_and_str`, r.`int_str`, r.`num_and_str`, r.`num_str`, r.`time`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -143,7 +143,7 @@
       },
       "ci_testing%2Fmultiple_types": {
         "binding": 2,
-        "query": "MERGE INTO `ci_testing`.`multiple_types` AS l\nUSING merge_view_2 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`array_int` = r.`array_int`, l.`binary_field` = unbase64(r.`binary_field`), l.`bool_field` = r.`bool_field`, l.`float_field` = r.`float_field`, l.`flow_published_at` = r.`flow_published_at`, l.`multiple` = r.`multiple`, l.`nested` = r.`nested`, l.`nullable_int` = r.`nullable_int`, l.`str_field` = r.`str_field`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `array_int`, `binary_field`, `bool_field`, `float_field`, `flow_published_at`, `multiple`, `nested`, `nullable_int`, `str_field`, `flow_document`) VALUES (r.`id`, r.`array_int`, unbase64(r.`binary_field`), r.`bool_field`, r.`float_field`, r.`flow_published_at`, r.`multiple`, r.`nested`, r.`nullable_int`, r.`str_field`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`multiple_types` AS l\nUSING merge_view_2 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`array_int` = r.`array_int`, l.`binary_field` = unbase64(r.`binary_field`), l.`bool_field` = r.`bool_field`, l.`float_field` = r.`float_field`, l.`flow_published_at` = r.`flow_published_at`, l.`multiple` = r.`multiple`, l.`nested` = r.`nested`, l.`nullable_int` = r.`nullable_int`, l.`str_field` = r.`str_field`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `array_int`, `binary_field`, `bool_field`, `float_field`, `flow_published_at`, `multiple`, `nested`, `nullable_int`, `str_field`, `flow_document`) VALUES (r.`id`, r.`array_int`, unbase64(r.`binary_field`), r.`bool_field`, r.`float_field`, r.`flow_published_at`, r.`multiple`, r.`nested`, r.`nullable_int`, r.`str_field`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -196,7 +196,7 @@
       },
       "ci_testing%2Fsimple": {
         "binding": 0,
-        "query": "MERGE INTO `ci_testing`.`simple` AS l\nUSING merge_view_0 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 6\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`canary` = r.`canary`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `canary`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`canary`, r.`flow_published_at`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`simple` AS l\nUSING merge_view_0 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 6\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`canary` = r.`canary`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `canary`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`canary`, r.`flow_published_at`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -229,7 +229,7 @@
     "updated": {
       "ci_testing%2Fbinary_key": {
         "binding": 5,
-        "query": "MERGE INTO `ci_testing`.`binary_key` AS l\nUSING merge_view_5 AS r\nON \n\tl.`id` = unbase64(r.`id`)\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = unbase64(r.`id`), l.`counter` = r.`counter`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `counter`, `flow_published_at`, `flow_document`) VALUES (unbase64(r.`id`), r.`counter`, r.`flow_published_at`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`binary_key` AS l\nUSING merge_view_5 AS r\nON \n\tl.`id` = unbase64(r.`id`)\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = unbase64(r.`id`), l.`counter` = r.`counter`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `counter`, `flow_published_at`, `flow_document`) VALUES (unbase64(r.`id`), r.`counter`, r.`flow_published_at`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -254,7 +254,7 @@
       },
       "ci_testing%2Fdeletions": {
         "binding": 4,
-        "query": "MERGE INTO `ci_testing`.`deletions` AS l\nUSING merge_view_4 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 4\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`_meta/op` = r.`_meta/op`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `_meta/op`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`_meta/op`, r.`flow_published_at`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`deletions` AS l\nUSING merge_view_4 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 3\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`_meta/op` = r.`_meta/op`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `_meta/op`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`_meta/op`, r.`flow_published_at`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -279,7 +279,7 @@
       },
       "ci_testing%2Fduplicate_keys_standard": {
         "binding": 1,
-        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 5\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 5\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -308,7 +308,7 @@
       },
       "ci_testing%2Fformatted_strings": {
         "binding": 3,
-        "query": "MERGE INTO `ci_testing`.`formatted_strings` AS l\nUSING merge_view_3 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`date` = r.`date`, l.`datetime` = r.`datetime`, l.`flow_published_at` = r.`flow_published_at`, l.`int_and_str` = r.`int_and_str`, l.`int_str` = r.`int_str`, l.`num_and_str` = r.`num_and_str`, l.`num_str` = r.`num_str`, l.`time` = r.`time`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `date`, `datetime`, `flow_published_at`, `int_and_str`, `int_str`, `num_and_str`, `num_str`, `time`, `flow_document`) VALUES (r.`id`, r.`date`, r.`datetime`, r.`flow_published_at`, r.`int_and_str`, r.`int_str`, r.`num_and_str`, r.`num_str`, r.`time`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`formatted_strings` AS l\nUSING merge_view_3 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 1 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`date` = r.`date`, l.`datetime` = r.`datetime`, l.`flow_published_at` = r.`flow_published_at`, l.`int_and_str` = r.`int_and_str`, l.`int_str` = r.`int_str`, l.`num_and_str` = r.`num_and_str`, l.`num_str` = r.`num_str`, l.`time` = r.`time`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `date`, `datetime`, `flow_published_at`, `int_and_str`, `int_str`, `num_and_str`, `num_str`, `time`, `flow_document`) VALUES (r.`id`, r.`date`, r.`datetime`, r.`flow_published_at`, r.`int_and_str`, r.`int_str`, r.`num_and_str`, r.`num_str`, r.`time`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -357,7 +357,7 @@
       },
       "ci_testing%2Fmultiple_types": {
         "binding": 2,
-        "query": "MERGE INTO `ci_testing`.`multiple_types` AS l\nUSING merge_view_2 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`array_int` = r.`array_int`, l.`binary_field` = unbase64(r.`binary_field`), l.`bool_field` = r.`bool_field`, l.`float_field` = r.`float_field`, l.`flow_published_at` = r.`flow_published_at`, l.`multiple` = r.`multiple`, l.`nested` = r.`nested`, l.`nullable_int` = r.`nullable_int`, l.`str_field` = r.`str_field`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `array_int`, `binary_field`, `bool_field`, `float_field`, `flow_published_at`, `multiple`, `nested`, `nullable_int`, `str_field`, `flow_document`) VALUES (r.`id`, r.`array_int`, unbase64(r.`binary_field`), r.`bool_field`, r.`float_field`, r.`flow_published_at`, r.`multiple`, r.`nested`, r.`nullable_int`, r.`str_field`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`multiple_types` AS l\nUSING merge_view_2 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`array_int` = r.`array_int`, l.`binary_field` = unbase64(r.`binary_field`), l.`bool_field` = r.`bool_field`, l.`float_field` = r.`float_field`, l.`flow_published_at` = r.`flow_published_at`, l.`multiple` = r.`multiple`, l.`nested` = r.`nested`, l.`nullable_int` = r.`nullable_int`, l.`str_field` = r.`str_field`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `array_int`, `binary_field`, `bool_field`, `float_field`, `flow_published_at`, `multiple`, `nested`, `nullable_int`, `str_field`, `flow_document`) VALUES (r.`id`, r.`array_int`, unbase64(r.`binary_field`), r.`bool_field`, r.`float_field`, r.`flow_published_at`, r.`multiple`, r.`nested`, r.`nullable_int`, r.`str_field`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -410,7 +410,7 @@
       },
       "ci_testing%2Fsimple": {
         "binding": 0,
-        "query": "MERGE INTO `ci_testing`.`simple` AS l\nUSING merge_view_0 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 7 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`canary` = r.`canary`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `canary`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`canary`, r.`flow_published_at`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`simple` AS l\nUSING merge_view_0 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 7 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`canary` = r.`canary`, l.`flow_published_at` = r.`flow_published_at`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `canary`, `flow_published_at`, `flow_document`) VALUES (r.`id`, r.`canary`, r.`flow_published_at`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -443,7 +443,7 @@
     "updated": {
       "ci_testing%2Fduplicate_keys_standard": {
         "binding": 1,
-        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n",
         "columns": [
           {
             "name": "id",
@@ -505,7 +505,7 @@
         "files": [
           "s3://estuary-emr-staging/connector-test/<uuid>/<uuid>.csv.gz"
         ],
-        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = 'delete' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != 'delete' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n"
+        "query": "MERGE INTO `ci_testing`.`duplicate_keys_standard` AS l\nUSING merge_view_1 AS r\nON \n\tl.`id` = r.`id` AND l.`id` >= 6 AND l.`id` <= 10\nWHEN MATCHED AND r.`flow_document` = '\"delete\"' THEN DELETE\nWHEN MATCHED THEN UPDATE SET l.`id` = r.`id`, l.`flow_published_at` = r.`flow_published_at`, l.`int` = r.`int`, l.`str` = r.`str`, l.`flow_document` = r.`flow_document`\nWHEN NOT MATCHED AND r.`flow_document` != '\"delete\"' THEN INSERT (`id`, `flow_published_at`, `int`, `str`, `flow_document`) VALUES (r.`id`, r.`flow_published_at`, r.`int`, r.`str`, r.`flow_document`)\n"
       }
     }
   }
@@ -930,12 +930,6 @@
   "_table": "deletions",
   "rows": [
     {
-      "_meta/op": "d",
-      "flow_document": "{\"_meta\":{\"op\":\"d\",\"uuid\":\"e5f0c280-1de2-11b2-8000-071353030311\"},\"id\":1}",
-      "flow_published_at": "1970-01-01T02:00:25Z",
-      "id": 1
-    },
-    {
       "_meta/op": "u",
       "flow_document": "{\"_meta\":{\"op\":\"u\",\"uuid\":\"e6895900-1de2-11b2-8000-071353030311\"},\"id\":2}",
       "flow_published_at": "1970-01-01T02:00:26Z",
@@ -946,12 +940,6 @@
       "flow_document": "{\"_meta\":{\"op\":\"c\",\"uuid\":\"e721ef80-1de2-11b2-8000-071353030311\"},\"id\":3}",
       "flow_published_at": "1970-01-01T02:00:27Z",
       "id": 3
-    },
-    {
-      "_meta/op": "d",
-      "flow_document": "{\"_meta\":{\"op\":\"d\",\"uuid\":\"e8531c80-1de2-11b2-8000-071353030311\"},\"id\":4}",
-      "flow_published_at": "1970-01-01T02:00:29Z",
-      "id": 4
     }
   ]
 }
