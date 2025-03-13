@@ -143,9 +143,14 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		return fmt.Errorf("querying archive log files destination: %w", err)
 	}
 
-	// In order to make sure we don't hit dictionary mismatches, we need to find the most recent archive log before
+	var findEarliestLogSCNQuery = "SELECT MAX(NEXT_CHANGE#) FROM V$ARCHIVED_LOG WHERE NEXT_CHANGE# <= :scn"
+
+	// In order to make sure we don't hit dictionary mismatches in extract mode, we need to find the most recent archive log before
 	// or at our SCN range that begins a dictionary, so that early rows of this range are not missing their dictionary
-	row = s.conn.QueryRowContext(ctx, "SELECT MAX(NEXT_CHANGE#) FROM V$ARCHIVED_LOG WHERE DICTIONARY_BEGIN='YES' AND NEXT_CHANGE# <= :scn", startSCN)
+	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
+		findEarliestLogSCNQuery += " AND DICTIONARY_BEGIN='YES'"
+	}
+	row = s.conn.QueryRowContext(ctx, findEarliestLogSCNQuery, startSCN)
 	var minArchiveSCNScan sql.NullInt64
 	if err := row.Scan(&minArchiveSCNScan); err != nil {
 		return fmt.Errorf("querying latest archive log to contain the dictionary for the SCN range: %w", err)
