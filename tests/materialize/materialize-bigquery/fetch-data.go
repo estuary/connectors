@@ -116,7 +116,11 @@ func main() {
 
 	// Sort by ID
 	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][it.Schema[0].Name].(int64) < rows[j][it.Schema[0].Name].(int64)
+		if _, ok := rows[i][it.Schema[0].Name].(int64); ok {
+			return rows[i][it.Schema[0].Name].(int64) < rows[j][it.Schema[0].Name].(int64)
+		} else {
+			return rows[i][it.Schema[0].Name].(string) < rows[j][it.Schema[0].Name].(string)
+		}
 	})
 
 	var enc = json.NewEncoder(os.Stdout)

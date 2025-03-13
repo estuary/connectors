@@ -40,7 +40,9 @@
     ["tests/deletions", { "id": 1, "_meta": {"op": "c"} }],
     ["tests/deletions", { "id": 2, "_meta": {"op": "c"} }],
 
-    ["tests/binary-key", { "id": "c2F5xY1uYXJhCg==", "counter": 0 }]
+    ["tests/binary-key", { "id": "c2F5xY1uYXJhCg==", "counter": 0 }],
+
+    ["tests/string-escaped-key", { "id": "\\he \\ ' \" `llo`", "counter": 1 }]
   ],
   [
     ["tests/simple", { "id": 7, "canary": "pieced"}],
@@ -81,7 +83,9 @@
     ["tests/deletions", { "id": 4, "_meta": {"op": "c"} }],
     ["tests/deletions", { "id": 4, "_meta": {"op": "d"} }],
 
-    ["tests/binary-key", { "id": "c2F5xY1uYXJhCg==", "counter": 1 }]
+    ["tests/binary-key", { "id": "c2F5xY1uYXJhCg==", "counter": 1 }],
+
+    ["tests/string-escaped-key", { "id": "\\he \\ ' \" `llo`", "counter": 2 }]
   ],
   [
     ["tests/duplicated-keys", { "id": 6, "int": 11, "str": "str 11"}],

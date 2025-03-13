@@ -59,6 +59,12 @@ resources_json_template='[
       "table": "binary_key"
     },
     "source": "${TEST_COLLECTION_BINARY_KEY}"
+  },
+  {
+    "resource": {
+      "table": "string_escaped_key"
+    },
+    "source": "${TEST_COLLECTION_STRING_ESCAPED_KEY}"
   }
 ]'
 

@@ -81,6 +81,12 @@ resources_json_template='[
       "table": "deletions"
     },
     "source": "${TEST_COLLECTION_DELETIONS}"
+  },
+  {
+    "resource": {
+      "table": "string_escaped_key"
+    },
+    "source": "${TEST_COLLECTION_STRING_ESCAPED_KEY}"
   }
 ]'
 

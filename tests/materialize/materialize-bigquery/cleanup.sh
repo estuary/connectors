@@ -13,6 +13,7 @@ dropTable "multiple_types"
 dropTable "formatted_strings"
 dropTable "unsigned_bigint"
 dropTable "deletions"
+dropTable "string_escaped_key"
 
 # Remove the persisted materialization spec & checkpoint for this test materialization so subsequent
 # runs start from scratch.
