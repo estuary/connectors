@@ -71,7 +71,9 @@ pub async fn run_server(
         let openapi_path = binding.url_path();
         let axum_path = openapi_to_axum_path(&openapi_path);
         tracing::info!(path = %openapi_path, %axum_path, "configuring handler for route");
-        router = router.route(&axum_path, routing::post(handle_webhook));
+        router = router
+            .route(&axum_path, routing::post(handle_webhook))
+            .route(&axum_path, routing::get(handle_get));
     }
 
     // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
@@ -125,6 +127,18 @@ pub async fn run_server(
         .await
         .context("running server")?;
     Ok(())
+}
+
+/// Handles GET requests, in order to satisfy Okta's requirements for webhooks.
+/// See issue: https://github.com/estuary/connectors/issues/2433
+/// The TLDR is that we need to take the value of the `x-okta-verification`
+/// header and return it in a JSON response. I have no idea why they do this.
+async fn handle_get(
+    OktaVerificationHeader(okta_header): OktaVerificationHeader,
+    path: axum::extract::MatchedPath,
+) -> axum::Json<Value> {
+    tracing::info!(path = %path.as_str(), %okta_header, "handling Okta verification challenge");
+    axum::Json(serde_json::json!({"verification": okta_header}))
 }
 
 async fn handle_webhook(
@@ -872,4 +886,33 @@ type JsonObj = BTreeMap<String, RawValue>;
 enum JsonBody {
     Object(JsonObj),
     Array(Vec<JsonObj>),
+}
+
+pub struct OktaVerificationHeader(String);
+#[async_trait::async_trait]
+impl<S: Send + Sync> axum::extract::FromRequestParts<S> for OktaVerificationHeader {
+    type Rejection = (axum::http::StatusCode, &'static str);
+
+    async fn from_request_parts(
+        parts: &mut axum::http::request::Parts,
+        _state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let header = parts
+            .headers
+            .get("x-okta-verification-challenge")
+            .ok_or_else(|| (StatusCode::NOT_FOUND, "nothing to see here"))?;
+
+        let header = std::str::from_utf8(header.as_bytes()).map_err(|error| {
+            tracing::error!(
+                ?error,
+                "invalid UTF-8 in x-okta-verification-challenge header value"
+            );
+            (
+                StatusCode::BAD_REQUEST,
+                "invalid UTF-8 in x-okta-verification-challenge header value",
+            )
+        })?;
+
+        Ok(OktaVerificationHeader(header.to_string()))
+    }
 }
