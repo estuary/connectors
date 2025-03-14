@@ -6,17 +6,18 @@ from typing import Any
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import common, Task
+from estuary_cdk.capture.common import ReductionStrategy
 from estuary_cdk.http import HTTPMixin
 
 from .supported_standard_objects import SUPPORTED_STANDARD_OBJECTS, COMMON_CUSTOM_OBJECT_DETAILS
 
 from .bulk_job_manager import BulkJobManager
 from .rest_query_manager import RestQueryManager
-from .shared import dt_to_str, VERSION
+from .shared import dt_to_str, now, VERSION
 
 from .models import (
     EndpointConfig,
-    ResourceConfig,
+    SalesforceResourceConfigWithSchedule,
     ResourceState,
     SalesforceTokenSource,
     GlobalDescribeObjectsResponse,
@@ -79,7 +80,7 @@ def full_refresh_resource(
 ) -> common.Resource:
 
     def open(
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[SalesforceResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
@@ -112,7 +113,7 @@ def full_refresh_resource(
         model=FullRefreshResource,
         open=open,
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(
+        initial_config=SalesforceResourceConfigWithSchedule(
             name=name, interval=timedelta(minutes=5)
         ),
         schema_inference=True,
@@ -136,7 +137,7 @@ def incremental_resource(
 ) -> common.Resource:
 
     def open(
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[SalesforceResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
@@ -176,7 +177,7 @@ def incremental_resource(
             ),
         )
 
-    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
+    cutoff = now()
 
     resource = common.Resource(
         name=name,
@@ -187,11 +188,15 @@ def incremental_resource(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
         ),
-        initial_config=ResourceConfig(
-            name=name, interval=timedelta(minutes=5)
+        initial_config=SalesforceResourceConfigWithSchedule(
+            name=name,
+            interval=timedelta(minutes=5),
+            # Default to performing a formula field refresh at 23:55 UTC every day for every enabled binding.
+            schedule="55 23 * * *"
         ),
         schema_inference=True,
         disable=not enable,
+        reduction_strategy=ReductionStrategy.MERGE,
     )
 
     return resource
