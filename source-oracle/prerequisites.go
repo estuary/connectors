@@ -30,7 +30,22 @@ func (db *oracleDatabase) prerequisiteArchiveLogRetention(ctx context.Context) e
 	if err := db.switchToCDB(ctx); err != nil {
 		return err
 	}
-	var row = db.conn.QueryRowContext(ctx, "SELECT MIN(FIRST_TIME) FROM V$ARCHIVED_LOG A WHERE A.NAME IS NOT NULL")
+	var row = db.conn.QueryRowContext(ctx, "select created from v$database")
+	var databaseAge time.Time
+	if err := row.Scan(&databaseAge); err != nil {
+		return fmt.Errorf("querying database age from DBA_OBJECTS: %w", err)
+	}
+
+	log.WithFields(log.Fields{
+		"created": databaseAge,
+	}).Debug("database age")
+
+	if time.Since(databaseAge) < (time.Hour * 24) {
+		log.Warn("database age is less than 24 hours, skipping retention checks")
+		return nil
+	}
+
+	row = db.conn.QueryRowContext(ctx, "SELECT MIN(FIRST_TIME) FROM V$ARCHIVED_LOG A WHERE A.NAME IS NOT NULL")
 	var minTimestamp time.Time
 	if err := row.Scan(&minTimestamp); err != nil {
 		return fmt.Errorf("querying minimum archived log timestamp from V$ARCHIVED_LOG: %w", err)
