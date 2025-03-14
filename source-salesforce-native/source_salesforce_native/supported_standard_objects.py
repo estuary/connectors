@@ -54,6 +54,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
         "enabled_by_default": True,
     },
+    "AccountBrand": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "AccountCleanInfo": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -74,6 +77,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "AccountShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
+    },
+    "AccountTeamMember": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "ActionLinkGroupTemplate": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -172,6 +178,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "AppointmentTopicTimeSlotHistory": {
         "cursor_field": CursorFields.CREATED_DATE
+    },
+    "Approval": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "Asset": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -355,6 +364,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "CampaignHistory": {
         "cursor_field": CursorFields.CREATED_DATE
     },
+    "CampaignInfluence": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+    },
     "CampaignInfluenceModel": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
     },
@@ -423,6 +435,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
         "is_supported_by_bulk_api": False,
     },
+    "CaseSubjectParticle": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "CaseTeamMember": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -443,6 +458,33 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "CategoryNode": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ChannelProgram": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ChannelProgramFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ChannelProgramHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "ChannelProgramLevel": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ChannelProgramLevelFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ChannelProgramLevelHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "ChannelProgramMember": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ChannelProgramMemberFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ChannelProgramMemberHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
     },
     "ChatRetirementRdyMetrics": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -636,6 +678,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "ContentFolderLink": {},
+    "ContentNote": {
+        "cursor_field": CursorFields.LAST_MODIFIED_DATE
+    },
     "ContentNotification": {
         "cursor_field": CursorFields.CREATED_DATE
     },
@@ -755,6 +800,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "CspTrustedSite": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "CurrencyType": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "CustomBrand": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
@@ -804,6 +852,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "DataAssessmentValueMetric": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "DataIntegrationRecordPurchasePermission": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "DataKitDeploymentLog": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -836,9 +887,21 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "DatacloudPurchaseUsage": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "DatedConversionRate": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "DeclinedEventRelation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
         "is_supported_by_bulk_api": False,
+    },
+    "DelegatedAccount": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "DelegatedAccountFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "DelegatedAccountHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
     },
     "DeleteEvent": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -859,6 +922,12 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "DuplicateRecordItem": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "DuplicateJob": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "DuplicateJobMatchingRule": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "DuplicateRecordSet": {
@@ -896,6 +965,12 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "EmbeddedServiceDetail": {},
     "EmbeddedServiceLabel": {},
+    "EmpUserProvisionProcessErr": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "EmpUserProvisioningProcess": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "EngagementChannelType": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -955,7 +1030,13 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "EventLogFile": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "EventRecurrenceException": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "EventRelation": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "EventWhoRelation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "ExpressionFilter": {
@@ -978,6 +1059,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "ExternalEventMappingShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
+    },
+    "ExternalSocialAccount": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "FeedAttachment": {},
     "FeedComment": {
@@ -1047,6 +1131,18 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "Folder": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "ForecastingAdjustment": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ForecastingItem": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ForecastingOwnerAdjustment": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "ForecastingQuota": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "FormulaFunction": {},
     "FormulaFunctionAllowedType": {},
     "FormulaFunctionCategory": {},
@@ -1096,6 +1192,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "Idea": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "IdeaTheme": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "IframeWhiteListUrl": {
@@ -1260,6 +1359,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "LocationHistory": {
         "cursor_field": CursorFields.CREATED_DATE
     },
+    "LocationTrustMeasure": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "LocationShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
@@ -1366,6 +1468,21 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "NamedCredential": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "NetworkActivityAudit": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "NetworkDiscoverableLogin": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "NetworkFeedResponseMetric": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "NetworkMember": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "NetworkSelfRegistration": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "Note": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -1421,14 +1538,32 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "OpportunityLineItem": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "OpportunityLineItemSchedule": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "OpportunityPartner": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "OpportunityShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
+    "OpportunitySplit": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "OpportunitySplitHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "OpportunitySplitType": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "OpportunityStage": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "OpportunityTeamMember": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "OpportunityTeamMemberHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
     },
     "Order": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -1476,11 +1611,50 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "Organization": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "OutOfOffice": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "PackageLicense": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "Partner": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerFundAllocation": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerFundAllocationFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerFundAllocationHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "PartnerFundClaim": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerFundClaimFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerFundClaimHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "PartnerFundRequest": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerFundRequestFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerFundRequestHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "PartnerMarketingBudget": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerMarketingBudgetFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "PartnerMarketingBudgetHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
     },
     "PartnerRole": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
@@ -1950,6 +2124,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "SetupEntityAccess": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "SharingRecordCollection": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "Shift": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -2017,6 +2194,21 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "SlaProcess": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "SocialPersona": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "SocialPersonaHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "SocialPost": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "SocialPostFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "SocialPostHistory": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "Solution": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -2045,12 +2237,30 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "StreamingChannelShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
+    "Survey": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "SurveyEngagementContext": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "SurveyEngagementContextShare": {
+        "cursor_field": CursorFields.LAST_MODIFIED_DATE
+    },
     "TabDefinition": {},
     "Task": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
         "enabled_by_default": True,
     },
     "TaskFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "TaskRecurrenceException": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "TaskRelation": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "TaskWhoRelation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "TaskPriority": {
@@ -2114,6 +2324,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "User": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
         "enabled_by_default": True,
+    },
+    "UserAccountTeamMember": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "UserAppInfo": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -2183,7 +2396,25 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "UserShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
+    "UserTeamMember": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "VerificationHistory": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "VideoCall": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "VideoCallFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "VideoCallParticipant": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "VideoCallRecording": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "VideoCallShare": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "VisualforceAccessMetrics": {
@@ -2238,6 +2469,27 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.CREATED_DATE
     },
     "WebStoreShare": {
+        "cursor_field": CursorFields.LAST_MODIFIED_DATE
+    },
+    "WorkAccess": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "WorkAccessShare": {
+        "cursor_field": CursorFields.LAST_MODIFIED_DATE
+    },
+    "WorkBadge": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "WorkBadgeDefinition": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "WorkBadgeDefinitionFeed": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "WorkBadgeDefinitionHistory": {
+        "cursor_field": CursorFields.CREATED_DATE
+    },
+    "WorkBadgeDefinitionShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
     "WorkOrder": {
@@ -2324,6 +2576,12 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.CREATED_DATE
     },
     "WorkStepTemplateShare": {
+        "cursor_field": CursorFields.LAST_MODIFIED_DATE
+    },
+    "WorkThanks": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "WorkThanksShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
     "WorkType": {
