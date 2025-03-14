@@ -14,6 +14,12 @@ def str_to_dt(string: str) -> datetime:
     return datetime.fromisoformat(string)
 
 
+# Salesforce's datetimes have millisecond precision. now helps ensure
+# we are always working with millisecond precision datetimes.
+def now() -> datetime:
+    return str_to_dt(dt_to_str(datetime.now(tz=UTC)))
+
+
 def build_query(
         object_name: str, 
         fields: list[str],
