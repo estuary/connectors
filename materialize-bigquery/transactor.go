@@ -76,6 +76,10 @@ func prepareNewTransactor(
 			// as the JSON encoding of the values is the same they may be used for columns that would
 			// have been created differently due to evolution of the dialect's column types.
 			res := is.GetResource(binding.Path)
+			if res == nil {
+				return nil, nil, fmt.Errorf("could not get metadata for table %s: verify that the table exists and that the connector service account user is authorized for it", binding.Identifier)
+			}
+
 			schema := res.Meta.(bigquery.Schema)
 
 			log.WithFields(log.Fields{
