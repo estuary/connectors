@@ -51,17 +51,18 @@
         }
       },
       "properties": {
+        "start_date": {
+          "default": "1700-01-01T00:00:00Z",
+          "description": "UTC data and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, all data will be replicated.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
         "is_sandbox": {
           "default": false,
           "description": "Toggle if you're using a Salesforce Sandbox.",
           "title": "Sandbox",
           "type": "boolean"
-        },
-        "start_date": {
-          "description": "UTC data and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present date.",
-          "format": "date-time",
-          "title": "Start Date",
-          "type": "string"
         },
         "credentials": {
           "discriminator": {

@@ -98,20 +98,16 @@ else:
     OAuth2Credentials = SalesforceOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
 
 
-def default_start_date():
-    dt = datetime.now(UTC) - timedelta(days=30)
-    return dt
-
 class EndpointConfig(BaseModel):
+    start_date: AwareDatetime = Field(
+        description="UTC data and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, all data will be replicated.",
+        default=EARLIEST_VALID_DATE_IN_SALESFORCE,
+        ge=EARLIEST_VALID_DATE_IN_SALESFORCE,
+    )
     is_sandbox: bool = Field(
         title="Sandbox",
         description="Toggle if you're using a Salesforce Sandbox.",
         default=False,
-    )
-    start_date: AwareDatetime = Field(
-        description="UTC data and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present date.",
-        default_factory=default_start_date,
-        ge=EARLIEST_VALID_DATE_IN_SALESFORCE,
     )
     credentials: OAuth2Credentials = Field(
         discriminator="credentials_title",
