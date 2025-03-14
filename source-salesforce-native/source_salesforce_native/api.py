@@ -83,6 +83,7 @@ async def _execution_wrapper(
 
 async def backfill_incremental_resources(
     http: HTTPSession,
+    is_supported_by_bulk_api: bool,
     bulk_job_manager: BulkJobManager,
     rest_query_manager: RestQueryManager,
     instance_url: str,
@@ -105,8 +106,11 @@ async def backfill_incremental_resources(
 
     cursor_field = _determine_cursor_field(fields)
 
-    try:
-        gen = bulk_job_manager.execute(
+    async def _execute(
+        manager: BulkJobManager | RestQueryManager, 
+        checkpoint_interval: int
+    ) -> AsyncGenerator[SalesforceResource | str, None]:
+        gen = manager.execute(
             name,
             fields,
             cursor_field,
@@ -114,35 +118,30 @@ async def backfill_incremental_resources(
             end,
         )
 
-        async for record_or_dt in _execution_wrapper(gen, cursor_field, start, end, BULK_CHECKPOINT_INTERVAL):
+        async for record_or_dt in _execution_wrapper(gen, cursor_field, start, end, checkpoint_interval):
             if isinstance(record_or_dt, datetime):
                 yield dt_to_str(record_or_dt)
             else:
                 yield SalesforceResource.model_validate(record_or_dt)
 
+    try:
+        gen = _execute(bulk_job_manager, BULK_CHECKPOINT_INTERVAL) if is_supported_by_bulk_api else _execute(rest_query_manager, REST_CHECKPOINT_INTERVAL)
+        async for doc_or_str in gen:
+            yield doc_or_str
     except BulkJobError as err:
-        # If this object can't be queried via the Bulk API, we use the REST API.
+        # If this object can't be queried via the Bulk API, fallback to using the REST API.
         if err.errors and (CANNOT_FETCH_COMPOUND_DATA in err.errors or NOT_SUPPORTED_BY_BULK_API in err.errors):
-            rest_gen = rest_query_manager.execute(
-                name,
-                fields,
-                cursor_field,
-                start,
-                end,
-            )
-
-            async for record_or_dt in _execution_wrapper(rest_gen, cursor_field, start, end, REST_CHECKPOINT_INTERVAL):
-                if isinstance(record_or_dt, datetime):
-                    yield dt_to_str(record_or_dt)
-                else:
-                    yield SalesforceResource.model_validate(record_or_dt)
-
+            log.info(f"{name} cannot be queried via the Bulk API. Attempting to use the REST API instead.", {"errors": err.errors})
+            async for doc_or_str in _execute(rest_query_manager, REST_CHECKPOINT_INTERVAL):
+                yield doc_or_str
+        
         else:
             raise
 
 
 async def fetch_incremental_resources(
     http: HTTPSession,
+    is_supported_by_bulk_api: bool,
     bulk_job_manager: BulkJobManager,
     rest_query_manager: RestQueryManager,
     instance_url: str,

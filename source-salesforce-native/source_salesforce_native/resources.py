@@ -19,6 +19,7 @@ from .models import (
     ResourceState,
     AccessTokenResponse,
     GlobalDescribeObjectsResponse,
+    SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API,
     FieldDetailsDict,
     SObject,
     OAUTH2_SPEC,
@@ -139,6 +140,7 @@ def incremental_resource(
     log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
+    is_supported_by_bulk_api: bool,
     bulk_job_manager: BulkJobManager,
     rest_query_manager: RestQueryManager,
     instance_url: str,
@@ -167,6 +169,7 @@ def incremental_resource(
             fetch_page=functools.partial(
                 backfill_incremental_resources,
                 http,
+                is_supported_by_bulk_api,
                 bulk_job_manager,
                 rest_query_manager,
                 instance_url,
@@ -177,6 +180,7 @@ def incremental_resource(
             fetch_changes=functools.partial(
                 fetch_incremental_resources,
                 http,
+                is_supported_by_bulk_api,
                 bulk_job_manager,
                 rest_query_manager,
                 instance_url,
@@ -225,14 +229,24 @@ async def _object_to_resource(
 
     cursor_field = details.get('cursor_field', None)
     enable = details.get('enabled_by_default', False)
+    is_supported_by_bulk_api = details.get('is_supported_by_bulk_api', True)
     assert isinstance(enable, bool)
+    assert isinstance(is_supported_by_bulk_api, bool)
     fields = await _fetch_object_fields(log, http, instance_url, name) if should_fetch_fields else None
+
+    if fields:
+        field_soap_types = {fields[field].soapType for field in fields}
+        for soap_type in field_soap_types:
+            if soap_type in SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API:
+                is_supported_by_bulk_api = False
+
 
     if is_custom_object or cursor_field is not None:
         return incremental_resource(
             log,
             http,
             config,
+            is_supported_by_bulk_api,
             bulk_job_manager,
             rest_query_manager,
             instance_url,

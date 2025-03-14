@@ -134,6 +134,19 @@ class SoapTypes(StrEnum):
     SEARCH_LAYOUT_BUTTON = "urn:SearchLayoutButton"
     SEARCH_LAYOUT_FIELD = "urn:SearchLayoutField"
 
+
+SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API = [
+    SoapTypes.BASE64,
+    SoapTypes.JSON,
+    SoapTypes.ADDRESS,
+    SoapTypes.LOCATION,
+    SoapTypes.SEARCH_LAYOUT_BUTTON,
+    SoapTypes.SEARCH_LAYOUT_BUTTONS_DISPLAYED,
+    SoapTypes.SEARCH_LAYOUT_FIELD,
+    SoapTypes.SEARCH_LAYOUT_FIELDS_DISPLAYED,
+]
+
+
 # FieldDetails is used by the connector to convert field types in Bulk API responses.
 class FieldDetails(BaseModel, extra="allow"):
     soapType: SoapTypes # Type of field

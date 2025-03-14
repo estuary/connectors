@@ -15,7 +15,8 @@ from source_salesforce_native.models import CursorFields
 
 class ObjectDetails(TypedDict, total=False):
     cursor_field: Optional[CursorFields] # If absent, the object is full refresh. If present, the object is incremental.
-    enabled_by_default: Optional[bool]
+    enabled_by_default: Optional[bool] # If absent, the object is not enabled by default. If present and True, the object is enabled by default.
+    is_supported_by_bulk_api: Optional[bool] # If absent, the object is supported by the Bulk API. If present and False, the object is not supported by the Bulk API.
 
 
 COMMON_CUSTOM_OBJECT_DETAILS: ObjectDetails = {
@@ -47,6 +48,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "AcceptedEventRelation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "Account": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
@@ -419,6 +421,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "CaseStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "CaseTeamMember": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -683,6 +686,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "ContractStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "Conversation": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
@@ -834,6 +838,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "DeclinedEventRelation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "DeleteEvent": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -995,6 +1000,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "FieldSecurityClassification": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "FileSearchActivity": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -1447,6 +1453,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "OrderStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "OrgDeleteRequest": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -1477,6 +1484,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "PartnerRole": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "PartyConsent": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -1855,6 +1863,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "ServiceAppointmentStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "ServiceContract": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
@@ -1955,6 +1964,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "ShiftStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "Shipment": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -2018,6 +2028,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "SolutionStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "Stamp": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -2044,9 +2055,11 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "TaskPriority": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "TaskStatus": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "TenantUsageEntitlement": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -2096,6 +2109,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "UndecidedEventRelation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "is_supported_by_bulk_api": False,
     },
     "User": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
