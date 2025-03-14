@@ -28,11 +28,9 @@ def run(input):
         output_location,
         mode="error",
         header=False,
-        quote="|",
-        quoteAll=True,
         compression="gzip",
-        escapeQuotes=False,
-        escape="\u0000",
+        sep="\u0000",
+        quote="\u0000",
     )
 
     for binding in bindings:
