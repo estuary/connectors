@@ -136,7 +136,7 @@ func computeSchemaForUpdatedTable(current *iceberg.Schema, update boilerplate.Ma
 		nextFields = append(nextFields, f)
 	}
 
-	appendProjectionsAsFields(&nextFields, update.NewProjections, current.HighestFieldID())
+	appendProjectionsAsFields(&nextFields, update.NewProjections, getHighestFieldID(current))
 
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }
@@ -163,4 +163,26 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 	}
 
 	return ids, id
+}
+
+// TODO(whb): The version of go-iceberg we are using has a broken
+// (*Schema).HighestFieldID method which does not work with most logical types.
+// It looks like that is probably fixed in a more recent version, but we need to
+// be on Go 1.23 to use that.
+func getHighestFieldID(sch *iceberg.Schema) int {
+	var out int
+
+	for _, f := range sch.Fields() {
+		out = max(out, f.ID)
+		if l, ok := f.Type.(*iceberg.ListType); ok {
+			out = max(out, l.ElementID)
+		}
+		// Ignoring the possibility of Map and Struct types, which also have
+		// elements with their own field IDs since we don't create columns with
+		// those types. We _also_ don't create columns with list types, but it
+		// is more conceivable that we could add that in the short term. This
+		// should all be removed when we upgrade Go & iceberg-go anyway.
+	}
+
+	return out
 }
