@@ -7,8 +7,9 @@ from estuary_cdk.http import HTTPSession
 
 from .bulk_job_manager import BulkJobError, BulkJobManager, NOT_SUPPORTED_BY_BULK_API, CANNOT_FETCH_COMPOUND_DATA
 from .rest_query_manager import RestQueryManager
-from .shared import dt_to_str, str_to_dt
+from .shared import dt_to_str, str_to_dt, now
 from .models import (
+    FieldDetails,
     FieldDetailsDict,
     FullRefreshResource,
     SalesforceResource,
@@ -32,6 +33,21 @@ def _determine_cursor_field(
         return CursorFields.LOGIN_TIME
     else:
         raise RuntimeError("Attempted to find cursor field but no valid cursor field exists.")
+
+
+def _filter_to_only_formula_fields(all_fields: FieldDetailsDict, cursor_field: str) -> tuple[bool, FieldDetailsDict]:
+    mandatory_fields: list[str] = ['Id', cursor_field]
+
+    mandatory_and_formula_fields: dict[str, FieldDetails] = {}
+    has_formula_fields = False
+    for field, details in all_fields.items():
+        if field in mandatory_fields or details.calculated:
+            mandatory_and_formula_fields[field] = details
+        
+        if details.calculated:
+            has_formula_fields = True
+
+    return (has_formula_fields, FieldDetailsDict.model_validate(mandatory_and_formula_fields))
 
 
 async def snapshot_resources(
@@ -93,6 +109,7 @@ async def backfill_incremental_resources(
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
+    is_connector_initiated: bool,
 ) -> AsyncGenerator[SalesforceResource | PageCursor, None]:
     assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
@@ -105,6 +122,14 @@ async def backfill_incremental_resources(
     end = min(cutoff, start + timedelta(days=window_size))
 
     cursor_field = _determine_cursor_field(fields)
+
+    # On connector-initiated backfills, only fetch formula fields and rely on the top level
+    # merge reduction strategy to merge in partial documents containing updated formula fields.
+    if is_connector_initiated:
+        has_formula_fields, fields = _filter_to_only_formula_fields(fields, cursor_field)
+        # If there are no formula fields in this object, return early.
+        if not has_formula_fields:
+            return
 
     async def _execute(
         manager: BulkJobManager | RestQueryManager, 
@@ -153,7 +178,7 @@ async def fetch_incremental_resources(
 ) -> AsyncGenerator[SalesforceResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    end = min(datetime.now(tz=UTC), log_cursor + timedelta(days=window_size))
+    end = min(now(), log_cursor + timedelta(days=window_size))
 
     cursor_field = _determine_cursor_field(fields)
 

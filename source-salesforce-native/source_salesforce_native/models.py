@@ -9,7 +9,8 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     BaseOAuth2Credentials,
     OAuth2Spec,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
+    CRON_REGEX,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
@@ -96,6 +97,15 @@ if TYPE_CHECKING:
     OAuth2Credentials = SalesforceOAuth2Credentials
 else:
     OAuth2Credentials = SalesforceOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+
+
+class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
+    schedule: str = Field(
+        default="",
+        title="Formula Field Refresh Schedule",
+        description="Schedule to automatically refresh formula fields. Accepts a cron expression.",
+        pattern=CRON_REGEX
+    )
 
 
 def default_start_date():
