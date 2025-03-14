@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime, timedelta, UTC
 import functools
 from logging import Logger
@@ -5,7 +6,7 @@ from typing import Any
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPMixin, TokenSource
+from estuary_cdk.http import HTTPMixin
 
 from .supported_standard_objects import SUPPORTED_STANDARD_OBJECTS, COMMON_CUSTOM_OBJECT_DETAILS
 
@@ -17,7 +18,7 @@ from .models import (
     EndpointConfig,
     ResourceConfig,
     ResourceState,
-    AccessTokenResponse,
+    SalesforceTokenSource,
     GlobalDescribeObjectsResponse,
     SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API,
     FieldDetailsDict,
@@ -35,22 +36,7 @@ from .api import (
 
 
 CUSTOM_OBJECT_SUFFIX = '__c'
-
-
-async def _fetch_instance_url(log: Logger, http: HTTPMixin, config: EndpointConfig) -> str:
-    url = OAUTH2_SPEC.accessTokenUrlTemplate
-    body = {
-        "grant_type": "refresh_token",
-        "client_id": config.credentials.client_id,
-        "client_secret": config.credentials.client_secret,
-        "refresh_token": config.credentials.refresh_token,
-    }
-
-    response = AccessTokenResponse.model_validate_json(
-        await http.request(log, url, method="POST", form=body, _with_token=False)
-    )
-
-    return response.instance_url
+BUILD_RESOURCE_SEMAPHORE_LIMIT = 15
 
 
 async def _fetch_queryable_objects(log: Logger, http: HTTPMixin, instance_url: str) -> list[str]:
@@ -272,9 +258,7 @@ async def enabled_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig, bindings: list[common._ResolvableBinding]
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox)
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
-
-    instance_url = await _fetch_instance_url(log, http, config)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
 
     enabled_binding_names: list[str] = []
 
@@ -282,16 +266,31 @@ async def enabled_resources(
         path: list[str] = binding.resourceConfig.path()
         enabled_binding_names.append(path[0])
 
-    bulk_job_manager = BulkJobManager(http, log, instance_url)
-    rest_query_manager = RestQueryManager(http, log, instance_url)
-    resources: list[common.Resource] = []
+    bulk_job_manager = BulkJobManager(http, log, config.credentials.instance_url)
+    rest_query_manager = RestQueryManager(http, log, config.credentials.instance_url)
 
-    for name in enabled_binding_names:
-        r = await _object_to_resource(log, http, config, bulk_job_manager, rest_query_manager, instance_url, name, True)
-        if r:
-            resources.append(r)
+    # If we concurrently send multiple requests that exchange the same refresh token for an access token,
+    # some of those requests intermittently fail. 
+    # https://help.salesforce.com/s/articleView?id=xcloud.remoteaccess_oauth_refresh_token_flow.htm&type=5#:~:text=Avoid%20sending%20simultaneous%20requests%20that%20contain%20the%20same%20refresh%20token.%20If%20your%20client%20sends%20identical%20requests%20at%20the%20same%20time%2C%20some%20of%20the%20requests%20fail%20intermittently%20and%20the%20Status%20column%20in%20the%20Login%20History%20displays%20Failed%3A%20Token%20request%20is%20already%20being%20processed.
+    # To avoid this, we make a noop request to set the token_source's access token before using the scatter-gather
+    # technique to make multiple requests concurrently. This prevents the first BUILD_RESOURCE_SEMAPHORE_LIMIT
+    # requests from all exchanging the same access token and encountering that intermittent error.
+    await _fetch_queryable_objects(log, http, config.credentials.instance_url)
 
-    return resources
+    semaphore = asyncio.Semaphore(BUILD_RESOURCE_SEMAPHORE_LIMIT)
+    async def build_resource(name: str) -> common.Resource | None:
+        async with semaphore:
+            return await _object_to_resource(
+                log, http, config, bulk_job_manager, rest_query_manager, config.credentials.instance_url, name, True
+            )
+
+    task_results = await asyncio.gather(
+        *(
+            build_resource(name) for name in enabled_binding_names
+        )
+    )
+
+    return [resource for resource in task_results if resource is not None]
 
 
 # all_resources returns resources for all possible supported bindings.
@@ -299,18 +298,16 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox)
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
 
-    instance_url = await _fetch_instance_url(log, http, config)
+    queryable_object_names = await _fetch_queryable_objects(log, http, config.credentials.instance_url)
 
-    queryable_object_names = await _fetch_queryable_objects(log, http, instance_url)
-
-    bulk_job_manager = BulkJobManager(http, log, instance_url)
-    rest_query_manager = RestQueryManager(http, log, instance_url)
+    bulk_job_manager = BulkJobManager(http, log, config.credentials.instance_url)
+    rest_query_manager = RestQueryManager(http, log, config.credentials.instance_url)
     resources: list[common.Resource] = []
 
     for name in queryable_object_names:
-        r = await _object_to_resource(log, http, config, bulk_job_manager, rest_query_manager, instance_url, name)
+        r = await _object_to_resource(log, http, config, bulk_job_manager, rest_query_manager, config.credentials.instance_url, name)
         if r:
             resources.append(r)
 
