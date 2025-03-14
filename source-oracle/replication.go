@@ -193,17 +193,42 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 
 		logrus.WithField("file", fmt.Sprintf("%+v", f)).Debug("adding log file")
 
+		// The current log file has the same sequence as the last archived log file
+		// in this case we prefer reading from the current log file
+		if f.Sequence == redoSequence {
+			var last = redoFiles[len(redoFiles)-1]
+			logrus.WithFields(logrus.Fields{
+				"this": fmt.Sprintf("%+v", f),
+				"last": fmt.Sprintf("%+v", last),
+			}).Debug("found two log files with the same sequence number, keeping CURRENT")
+
+			if f.Status == "CURRENT" {
+				// Remove the last archived log file from the list
+				redoFiles = redoFiles[:len(redoFiles)-1]
+			} else if last.Status == "CURRENT" {
+				// Skip this file
+				continue
+			} else {
+				return fmt.Errorf("found two log files with the same sequence number, but neither is CURRENT: %+v, %+v", f, last)
+			}
+		}
+
 		if f.Sequence > redoSequence {
 			redoSequence = f.Sequence
 		}
 
 		redoFiles = append(redoFiles, f)
 
-		// once we hit a log file that has passed endSCN and it signifies a dictEnd, we know we don't
-		// need any more log files. If we don't include a dictionary end file, we risk having an incomplete
-		// dictionary
-		if f.FirstChange >= endSCN && f.DictEnd == "YES" {
-			break
+		if f.FirstChange >= endSCN {
+			if s.db.config.Advanced.DictionaryMode == DictionaryModeOnline {
+				break
+			}
+
+			// If we don't include a dictionary end file, we risk having an incomplete
+			// dictionary in extract mode
+			if f.DictEnd == "YES" {
+				break
+			}
 		}
 	}
 
