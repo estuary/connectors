@@ -19,36 +19,36 @@ from .models import (
     ConnectorState,
     EndpointConfig,
     OAUTH2_SPEC,
-    ResourceConfig,
+    SalesforceResourceConfigWithSchedule,
 )
 
 
 class Connector(
-    BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
+    BaseCaptureConnector[EndpointConfig, SalesforceResourceConfigWithSchedule, ConnectorState],
     HTTPMixin,
 ):
     def request_class(self):
-        return Request[EndpointConfig, ResourceConfig, ConnectorState]
+        return Request[EndpointConfig, SalesforceResourceConfigWithSchedule, ConnectorState]
 
     async def spec(self, _: request.Spec, logger: Logger) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
             oauth2=OAUTH2_SPEC,
             documentationUrl="https://go.estuary.dev/source-salesforce-native",
-            resourceConfigSchema=ResourceConfig.model_json_schema(),
-            resourcePathPointers=ResourceConfig.PATH_POINTERS,
+            resourceConfigSchema=SalesforceResourceConfigWithSchedule.model_json_schema(),
+            resourcePathPointers=SalesforceResourceConfigWithSchedule.PATH_POINTERS,
         )
 
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
-    ) -> response.Discovered[ResourceConfig]:
+    ) -> response.Discovered[SalesforceResourceConfigWithSchedule]:
         resources = await all_resources(log, self, discover.config)
         return common.discovered(resources)
 
     async def validate(
         self,
         log: Logger,
-        validate: request.Validate[EndpointConfig, ResourceConfig],
+        validate: request.Validate[EndpointConfig, SalesforceResourceConfigWithSchedule],
     ) -> response.Validated:
         resources = await enabled_resources(log, self, validate.config, validate.bindings)
         resolved = common.resolve_bindings(validate.bindings, resources)
@@ -57,7 +57,7 @@ class Connector(
     async def open(
         self,
         log: Logger,
-        open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
+        open: request.Open[EndpointConfig, SalesforceResourceConfigWithSchedule, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         resources = await enabled_resources(log, self, open.capture.config, open.capture.bindings)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
