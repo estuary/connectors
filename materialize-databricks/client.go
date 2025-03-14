@@ -19,6 +19,7 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/databricks/databricks-sql-go"
@@ -124,7 +125,28 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
-	return err
+	if err != nil {
+		return err
+	}
+
+	var res = newTableConfig(c.ep).(*tableConfig)
+	if tc.ResourceConfigJson != nil {
+		if err := pf.UnmarshalStrict(tc.ResourceConfigJson, res); err != nil {
+			return fmt.Errorf("unmarshalling resource binding for bound collection %q: %w", tc.Source.String(), err)
+		}
+	}
+	if res.AdditionalSql != "" {
+		if _, err := c.db.ExecContext(ctx, res.AdditionalSql); err != nil {
+			return fmt.Errorf("executing additional SQL statement '%s': %w", res.AdditionalSql, err)
+		}
+
+		log.WithFields(log.Fields{
+			"table": tc.Identifier,
+			"query": res.AdditionalSql,
+		}).Info("executed AdditionalSql")
+	}
+
+	return nil
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
