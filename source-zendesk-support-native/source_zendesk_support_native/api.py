@@ -440,9 +440,8 @@ async def _fetch_incremental_time_export_resources(
 
     while True:
         async with incremental_time_export_api_lock:
-            _, body = await http.request_stream(log, url, params=params)
             processor = IncrementalJsonProcessor(
-                body(),
+                await http.request_stream(log, url, params=params),
                 f"{name}.item",
                 TimestampedResource,
                 response_model,
@@ -569,9 +568,8 @@ async def _fetch_incremental_cursor_export_resources(
         params["cursor"] = _base64_encode(cursor)
 
     while True:
-        _, body = await http.request_stream(log, url, params=params)
         processor = IncrementalJsonProcessor(
-            body(),
+            await http.request_stream(log, url, params=params),
             f"{name}.item",
             TimestampedResource,
             response_model,
