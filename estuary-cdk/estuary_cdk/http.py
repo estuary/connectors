@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from logging import Logger
 from estuary_cdk.incremental_json_processor import Remainder
 from pydantic import BaseModel
-from typing import AsyncGenerator, Any, TypeVar, Union, Callable
+from typing import AsyncGenerator, Any, TypeVar
 import abc
 import aiohttp
 import asyncio
@@ -24,13 +24,6 @@ from .flow import (
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 
 StreamedObject = TypeVar("StreamedObject", bound=BaseModel)
-
-class Headers(dict[str, Any]):
-    pass
-
-
-BodyGeneratorFunction = Callable[[], AsyncGenerator[bytes, None]]
-HeadersAndBodyGenerator = tuple[Headers, BodyGeneratorFunction]
 
 
 class HTTPError(RuntimeError):
@@ -76,11 +69,9 @@ class HTTPSession(abc.ABC):
         """Request a url and return its body as bytes"""
 
         chunks: list[bytes] = []
-        _, body_generator = await self._request_stream(
+        async for chunk in self._request_stream(
             log, url, method, params, json, form, _with_token, headers
-        )
-
-        async for chunk in body_generator():
+        ):
             chunks.append(chunk)
 
         if len(chunks) == 0:
@@ -99,26 +90,22 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         delim: bytes = b"\n",
-        headers: dict[str, Any] = {}
-    ) -> tuple[Headers, BodyGeneratorFunction]:
+    ) -> AsyncGenerator[bytes, None]:
         """Request a url and return its response as streaming lines, as they arrive"""
 
-        headers, body = await self._request_stream(
-            log, url, method, params, json, form, True, headers
-        )
+        buffer = b""
+        async for chunk in self._request_stream(
+            log, url, method, params, json, form, True
+        ):
+            buffer += chunk
+            while delim in buffer:
+                line, buffer = buffer.split(delim, 1)
+                yield line
 
-        async def gen() -> AsyncGenerator[bytes, None]:
-            buffer = b""
-            async for chunk in body():
-                buffer += chunk
-                while delim in buffer:
-                    line, buffer = buffer.split(delim, 1)
-                    yield line
+        if buffer:
+            yield buffer
 
-            if buffer:
-                yield buffer
-
-        return (headers, gen)
+        return
 
     async def request_stream(
         self,
@@ -128,15 +115,13 @@ class HTTPSession(abc.ABC):
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
-        headers: dict[str, Any] = {},
-    ) -> tuple[Headers, BodyGeneratorFunction]:
+    ) -> AsyncGenerator[bytes, None]:
         """Request a url and and return the raw response as a stream of bytes"""
 
-        headers, body = await self._request_stream(log, url, method, params, json, form, True, headers)
-        return (headers, body)
+        return self._request_stream(log, url, method, params, json, form, True)
 
     @abc.abstractmethod
-    async def _request_stream(
+    def _request_stream(
         self,
         log: Logger,
         url: str,
@@ -146,7 +131,7 @@ class HTTPSession(abc.ABC):
         form: dict[str, Any] | None,
         _with_token: bool,
         headers: dict[str, Any] = {},
-    ) -> HeadersAndBodyGenerator: ...
+    ) -> AsyncGenerator[bytes, None]: ...
 
     # TODO(johnny): This is an unstable API.
     # It may need to accept request headers, or surface response headers,
@@ -330,7 +315,7 @@ class HTTPMixin(Mixin, HTTPSession):
         form: dict[str, Any] | None,
         _with_token: bool,
         headers: dict[str, Any] = {},
-    ) -> HeadersAndBodyGenerator:
+    ) -> AsyncGenerator[bytes, None]:
         while True:
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
@@ -345,17 +330,14 @@ class HTTPMixin(Mixin, HTTPSession):
                 )
                 headers[self.token_source.authorization_header] = header_value
 
-            resp = await self.inner.request(
+            async with self.inner.request(
                 headers=headers,
                 json=json,
                 data=form,
                 method=method,
                 params=params,
                 url=url,
-            )
-
-            should_release_response = True
-            try:
+            ) as resp:
                 self.rate_limiter.update(cur_delay, resp.status == 429)
 
                 if resp.status == 429:
@@ -384,17 +366,7 @@ class HTTPMixin(Mixin, HTTPSession):
                 else:
                     resp.raise_for_status()
 
-                    async def body_generator() -> AsyncGenerator[bytes, None]:
-                        try:
-                            async for chunk in resp.content.iter_any():
-                                yield chunk
-                        finally:
-                            await resp.release()
+                    async for chunk in resp.content.iter_any():
+                        yield chunk
 
-                    headers = Headers({k: v for k, v in resp.headers.items()})
-                    should_release_response = False
-                    return (headers, body_generator)
-
-            finally:
-                if should_release_response:
-                    await resp.release()
+                    return

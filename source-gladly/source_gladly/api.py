@@ -33,8 +33,7 @@ async def fetch_events(
 
     last_ts = log_cursor
     doc_count = 0
-    _, lines = await http.request_lines(log, url, params=params)
-    async for line in lines():
+    async for line in http.request_lines(log, url, params=params):
         event = Event.model_validate_json(line)
         if event.timestamp < last_ts:
             # Events must be in ascending order with respect to time, so this is an application
