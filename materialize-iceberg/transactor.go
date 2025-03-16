@@ -11,7 +11,6 @@ import (
 	"strings"
 	"sync"
 
-	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/aws-sdk-go/aws"
@@ -50,23 +49,14 @@ type transactor struct {
 	be        *boilerplate.BindingEvents
 	cfg       config
 	s3Client  *s3.Client
-	emrClient *emr.Client
+	emrClient *emrClient
 
 	templates  templates
 	bindings   []binding
 	loadFiles  *boilerplate.StagedFiles
 	storeFiles *boilerplate.StagedFiles
 
-	emrAuth struct {
-		credentialSecretName string
-		scope                string
-	}
-
-	pyFiles struct {
-		commonURI string
-		loadURI   string
-		mergeURI  string
-	}
+	pyFiles pyFileURIs
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
@@ -146,11 +136,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 
 	// In addition to removing the staged load keys, the loaded document result
 	// files that are written to the staging location must also be removed.
-	cleanupResults := t.cleanPrefixOnceFn(ctx, t.cfg.Compute.Bucket, outputPrefix)
+	cleanupResults := cleanPrefixOnceFn(ctx, t.s3Client, t.cfg.Compute.Bucket, outputPrefix)
 	defer cleanupResults()
 
 	t.be.StartedEvaluatingLoads()
-	if err := t.runEmrJob(ctx, fmt.Sprintf("load for: %s", t.materializationName), loadInput, outputPrefix, t.pyFiles.loadURI); err != nil {
+	if err := t.emrClient.runJob(ctx, loadInput, t.pyFiles.load, t.pyFiles.common, fmt.Sprintf("load for: %s", t.materializationName), outputPrefix); err != nil {
 		return fmt.Errorf("load job failed: %w", err)
 	} else if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
 		return fmt.Errorf("cleaning up load files: %w", err)
@@ -278,10 +268,10 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var stateUpdate *pf.ConnectorState
 	if len(mergeInput.Bindings) > 0 {
 		// Make sure the job status output file gets cleaned up.
-		cleanupStatus := t.cleanPrefixOnceFn(ctx, t.cfg.Compute.Bucket, outputPrefix)
+		cleanupStatus := cleanPrefixOnceFn(ctx, t.s3Client, t.cfg.Compute.Bucket, outputPrefix)
 		defer cleanupStatus()
 
-		if err := t.runEmrJob(ctx, fmt.Sprintf("store for: %s", t.materializationName), mergeInput, outputPrefix, t.pyFiles.mergeURI); err != nil {
+		if err := t.emrClient.runJob(ctx, mergeInput, t.pyFiles.merge, t.pyFiles.common, fmt.Sprintf("store for: %s", t.materializationName), outputPrefix); err != nil {
 			return nil, fmt.Errorf("store merge job failed: %w", err)
 		} else if err := cleanupStatus(); err != nil {
 			return nil, fmt.Errorf("cleaning up generated job status file: %w", err)
@@ -415,48 +405,6 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, do
 	return nil
 }
 
-func (t *transactor) cleanPrefixOnceFn(ctx context.Context, bucket string, prefix string) func() error {
-	didClean := false
-	return func() error {
-		if didClean {
-			return nil
-		}
-
-		paginator := s3.NewListObjectsV2Paginator(t.s3Client, &s3.ListObjectsV2Input{
-			Bucket: aws.String(bucket),
-			Prefix: aws.String(prefix),
-		})
-		if !paginator.HasMorePages() {
-			log.WithFields(log.Fields{
-				"bucket": bucket,
-				"prefix": prefix,
-			}).Warn("called cleanPrefixOnceFn on an empty prefix")
-		}
-
-		for paginator.HasMorePages() {
-			page, err := paginator.NextPage(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get next page: %w", err)
-			}
-
-			thisPage := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
-			for _, obj := range page.Contents {
-				thisPage = append(thisPage, s3types.ObjectIdentifier{Key: obj.Key})
-			}
-
-			if _, err := t.s3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-				Bucket: aws.String(bucket),
-				Delete: &s3types.Delete{Objects: thisPage},
-			}); err != nil {
-				return err
-			}
-
-		}
-		didClean = true
-		return nil
-	}
-}
-
 func (t *transactor) extantFiles(ctx context.Context, originalFileUris []string) (map[string]struct{}, error) {
 	var prefix string
 	for _, uri := range originalFileUris {
@@ -488,5 +436,46 @@ func (t *transactor) extantFiles(ctx context.Context, originalFileUris []string)
 	}
 
 	return out, nil
+}
 
+func cleanPrefixOnceFn(ctx context.Context, s3Client *s3.Client, bucket string, prefix string) func() error {
+	didClean := false
+	return func() error {
+		if didClean {
+			return nil
+		}
+
+		paginator := s3.NewListObjectsV2Paginator(s3Client, &s3.ListObjectsV2Input{
+			Bucket: aws.String(bucket),
+			Prefix: aws.String(prefix),
+		})
+		if !paginator.HasMorePages() {
+			log.WithFields(log.Fields{
+				"bucket": bucket,
+				"prefix": prefix,
+			}).Warn("called cleanPrefixOnceFn on an empty prefix")
+		}
+
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return fmt.Errorf("failed to get next page: %w", err)
+			}
+
+			thisPage := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
+			for _, obj := range page.Contents {
+				thisPage = append(thisPage, s3types.ObjectIdentifier{Key: obj.Key})
+			}
+
+			if _, err := s3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+				Bucket: aws.String(bucket),
+				Delete: &s3types.Delete{Objects: thisPage},
+			}); err != nil {
+				return err
+			}
+
+		}
+		didClean = true
+		return nil
+	}
 }
