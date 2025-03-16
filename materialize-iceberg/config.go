@@ -95,6 +95,10 @@ func (c config) Validate() error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string {
+	return sanitizePath(c.Namespace)[0]
+}
+
 type catalogAuthType string
 
 const (
