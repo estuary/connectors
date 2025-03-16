@@ -70,12 +70,44 @@ func (FlatTypeString) isFlatType()              {}
 func (FlatTypeStringFormatInteger) isFlatType() {}
 func (FlatTypeStringFormatNumber) isFlatType()  {}
 
+type MappedTyper interface {
+	// String produces a human readable description of the mapped type, which
+	// will be included in validation constraint descriptions.
+	String() string
+
+	// Compatible determines if an existing materialized field as reported in
+	// the InfoSchema is compatible with a proposed mapped type.
+	Compatible(ExistingField) bool
+
+	// CanMigrate determines if an existing materialized field can be migrated
+	// to be compatible with the updated mapped type.
+	CanMigrate(ExistingField) bool
+}
+
 // Projection lifts a pf.Projection into a form that's more easily worked with
 // for materialization-specific type mapping.
 type Projection struct {
 	pf.Projection
 	FlatType  FlatType
 	MustExist bool
+}
+
+const AnyExistingType string = "*"
+
+// TypeMigrations is a utility struct for defining which existing fields can be
+// migrated to be compatible with updated projections.
+type TypeMigrations[T comparable] map[string][]T
+
+func (m TypeMigrations[T]) CanMigrate(from string, to T) bool {
+	for f, ts := range m {
+		if f == from || f == AnyExistingType {
+			if slices.Contains(ts, to) {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
