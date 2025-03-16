@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function purge() {
-    ${ICEBERG_HELPER_CMD} --force purge ${NAMESPACE}."$1"
+    ${ICEBERG_HELPER_CMD} --force purge ${NAMESPACE}."$1"_${TABLE_SUFFIX}
 }
 
 purge "simple"
