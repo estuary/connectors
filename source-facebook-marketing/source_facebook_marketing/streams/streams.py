@@ -20,10 +20,10 @@ from .base_streams import FBMarketingIncrementalStream, FBMarketingReversedIncre
 logger = logging.getLogger("airbyte")
 
 
-def fetch_thumbnail_data_url(url: str) -> Optional[str]:
+def fetch_thumbnail_data_url(session: requests.Session, url: str) -> Optional[str]:
     """Request thumbnail image and return it embedded into the data-link"""
     try:
-        response = requests.get(url)
+        response = session.request("GET", url)
         if response.status_code == requests.status_codes.codes.OK:
             _type = response.headers["content-type"]
             data = base64.b64encode(response.content)
@@ -67,7 +67,7 @@ class AdCreatives(FBMarketingStream):
             if self._fetch_thumbnail_images:
                 thumbnail_url = record.get("thumbnail_url")
                 if thumbnail_url:
-                    record["thumbnail_data_url"] = fetch_thumbnail_data_url(thumbnail_url)
+                    record["thumbnail_data_url"] = fetch_thumbnail_data_url(self._api.api._session.requests, thumbnail_url)
             yield record
 
     def list_objects(self, params: Mapping[str, Any], account_id: str) -> Iterable:
