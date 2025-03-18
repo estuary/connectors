@@ -7,9 +7,13 @@ from typing import Any, Iterable, List, Mapping, Optional, MutableMapping
 import requests
 from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
+from airbyte_cdk.sources.streams.core import StreamData
 
 from .base import MixpanelStream
 from .cohorts import Cohorts
+
+
+MISSING_DATAGROUP_ERROR = "Missing Datagroup"
 
 
 class CohortMembers(MixpanelStream):
@@ -114,3 +118,18 @@ class CohortMembers(MixpanelStream):
             item["cohort_id"] = stream_slice["id"]
 
             yield item
+
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: Optional[List[str]] = None,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Optional[Mapping[str, Any]] = None,
+    ) -> Iterable[StreamData]:
+        try:
+            yield from super().read_records(sync_mode, cursor_field, stream_slice, stream_state)
+        except requests.HTTPError as err:
+            if err.response.status_code == 404 and MISSING_DATAGROUP_ERROR in err.response.text:
+                self.logger.warning(f"Cohort {stream_slice["id"]} is associated with a missing datagroup and cannot be queried via the Mixpanel API. Skipping to the next cohort.")
+            else:
+                raise
