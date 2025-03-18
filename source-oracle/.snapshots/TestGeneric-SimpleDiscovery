@@ -27,12 +27,9 @@ Binding 0:
               ]
             },
             "C": {
+              "type": "string",
               "format": "number",
-              "description": "(source type: FLOAT)",
-              "type": [
-                "string",
-                "null"
-              ]
+              "description": "(source type: non-nullable FLOAT)"
             },
             "D": {
               "description": "(source type: VARCHAR2)",
