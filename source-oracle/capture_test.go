@@ -65,6 +65,7 @@ func TestAllTypes(t *testing.T) {
 		{"interval_year", "INTERVAL YEAR(4) TO MONTH", NewRawTupleValue("INTERVAL '1234-5' YEAR(4) TO MONTH")},
 		{"interval_day", "INTERVAL DAY TO SECOND", NewRawTupleValue("INTERVAL '1 2:3:4.567' DAY TO SECOND(3)")},
 		{"r", "RAW(1000)", NewRawTupleValue("UTL_RAW.CAST_To_RAW('testing raw value')")},
+		{"nonnull", "INTEGER NOT NULL", 123456789},
 	}
 
 	var columnDefs = "("
