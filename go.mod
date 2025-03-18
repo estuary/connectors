@@ -33,7 +33,7 @@ require (
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/databricks/databricks-sdk-go v0.41.0
-	github.com/databricks/databricks-sql-go v1.5.5
+	github.com/databricks/databricks-sql-go v1.6.2-0.20250318155202-2a39cfaf0c27
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
 	github.com/estuary/flow v0.5.9
@@ -123,8 +123,8 @@ require (
 	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 // indirect
+	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
-	github.com/apache/arrow/go/v16 v16.0.0 // indirect
 	github.com/apache/thrift v0.20.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/astaxie/beego v1.12.3 // indirect
