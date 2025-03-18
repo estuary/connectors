@@ -72,6 +72,11 @@ Binding 0:
                 "null"
               ]
             },
+            "NONNULL": {
+              "type": "string",
+              "format": "integer",
+              "description": "(source type: non-nullable NUMBER)"
+            },
             "NUM": {
               "format": "number",
               "description": "(source type: NUMBER)",

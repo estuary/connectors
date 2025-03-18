@@ -287,7 +287,6 @@ const defaultNumericPrecision = 38
 func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[string][]string, error) {
 	var pks = make(map[string][]string)
 	var columns []sqlcapture.ColumnInfo
-	var sc sqlcapture.ColumnInfo
 
 	var ownersMap = make(map[string]bool)
 	for _, t := range tables {
@@ -306,6 +305,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	defer rows.Close()
 
 	for rows.Next() {
+		var sc sqlcapture.ColumnInfo
+
 		var isPrimaryKey bool
 		var isNullableStr string
 		var dataScale sql.NullInt16
@@ -316,9 +317,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 			return nil, nil, fmt.Errorf("scanning column: %w", err)
 		}
 
-		if isNullableStr == "Y" {
-			sc.IsNullable = true
-		}
+		sc.IsNullable = isNullableStr == "Y"
+
 		var precision int16
 		if dataPrecision.Valid {
 			precision = dataPrecision.Int16
