@@ -46,6 +46,11 @@ type CaptureSpec struct {
 	Validator  CaptureValidator
 	Sanitizers map[string]*regexp.Regexp
 	Errors     []error
+
+	// CaptureDelay is an optional delay to introduce before each Capture() call. It is mostly
+	// useful in replicated setups, where we may need to wait a brief period after making changes
+	// before expecting to reliably capture them from the replica.
+	CaptureDelay time.Duration
 }
 
 // Validate performs validation against the target database.
@@ -180,6 +185,11 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 
 	stream := &boilerplate.PullOutput{
 		Connector_CaptureServer: adapter,
+	}
+
+	if cs.CaptureDelay > 0 {
+		log.WithField("delay", cs.CaptureDelay.String()).Debug("waiting for capture delay")
+		time.Sleep(cs.CaptureDelay)
 	}
 
 	if err := cs.Driver.Pull(open.Open, stream); err != nil {
