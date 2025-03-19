@@ -32,6 +32,7 @@ COMPANIES_LIST_LIMIT = 10_000
 
 COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API"
 COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX = r"scroll already exists for this workspace"
+COMPANY_NOT_FOUND_REGEX = r'Company Not Found'
 
 companies_scroll_lock = asyncio.Lock()
 
@@ -654,9 +655,15 @@ async def fetch_company_segments(
     for id in company_ids:
         segments_url = f"{API}/companies/{id}/segments"
 
-        company_segments = CompanySegmentsResponse.model_validate_json(
-            await http.request(log, segments_url)
-        )
+        try:
+            company_segments = CompanySegmentsResponse.model_validate_json(
+                await http.request(log, segments_url)
+            )
+        except HTTPError as err:
+            if err.code == 404 and bool(re.search(COMPANY_NOT_FOUND_REGEX, err.message, re.DOTALL)):
+                continue
+            else:
+                raise
 
         for segment in company_segments.data:
             if segment.updated_at > last_seen_ts:
