@@ -23,6 +23,10 @@ COMMON_CUSTOM_OBJECT_DETAILS: ObjectDetails = {
     "cursor_field": CursorFields.SYSTEM_MODSTAMP,
 }
 
+COMMON_CUSTOM_OBJECT_HISTORY_DETAILS: ObjectDetails = {
+    "cursor_field": CursorFields.CREATED_DATE,
+}
+
 
 SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "AIApplication": {
