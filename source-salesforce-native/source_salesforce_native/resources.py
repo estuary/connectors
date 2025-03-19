@@ -9,7 +9,12 @@ from estuary_cdk.capture import common, Task
 from estuary_cdk.capture.common import ReductionStrategy
 from estuary_cdk.http import HTTPMixin
 
-from .supported_standard_objects import SUPPORTED_STANDARD_OBJECTS, COMMON_CUSTOM_OBJECT_DETAILS
+from .supported_standard_objects import (
+    COMMON_CUSTOM_OBJECT_DETAILS,
+    COMMON_CUSTOM_OBJECT_HISTORY_DETAILS,
+    SUPPORTED_STANDARD_OBJECTS,
+
+)
 
 from .bulk_job_manager import BulkJobManager
 from .rest_query_manager import RestQueryManager
@@ -37,6 +42,7 @@ from .api import (
 
 
 CUSTOM_OBJECT_SUFFIX = '__c'
+CUSTOM_OBJECT_HISTORY_SUFFIX = '__History'
 BUILD_RESOURCE_SEMAPHORE_LIMIT = 15
 
 
@@ -213,7 +219,14 @@ async def _object_to_resource(
         should_fetch_fields: bool = False,
     ) -> common.Resource | None:
     is_custom_object = name.endswith(CUSTOM_OBJECT_SUFFIX)
-    details = COMMON_CUSTOM_OBJECT_DETAILS if is_custom_object else SUPPORTED_STANDARD_OBJECTS.get(name, None)
+    is_custom_object_history = name.endswith(CUSTOM_OBJECT_HISTORY_SUFFIX)
+
+    if is_custom_object:
+        details = COMMON_CUSTOM_OBJECT_DETAILS
+    elif is_custom_object_history:
+        details = COMMON_CUSTOM_OBJECT_HISTORY_DETAILS
+    else:
+        details = SUPPORTED_STANDARD_OBJECTS.get(name, None)
 
     if details is None:
         return
@@ -232,7 +245,7 @@ async def _object_to_resource(
                 is_supported_by_bulk_api = False
 
 
-    if is_custom_object or cursor_field is not None:
+    if cursor_field is not None:
         return incremental_resource(
             log,
             http,
