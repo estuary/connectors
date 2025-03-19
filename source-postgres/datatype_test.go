@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
@@ -243,4 +245,37 @@ func TestEnumScanKey(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
 	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
 	cupaloy.SnapshotT(t, summary)
+}
+
+// TestSpecialTemporalValues exercises various 'special values' of the date/time
+// column types to ensure that they all get captured as something reasonable.
+func TestSpecialTemporalValues(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "33220241"
+	// In theory we ought to test interval values 'infinity' and '-infinity' too, but the PGX client library fails to parse those at all right now.
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a_date DATE, a_time TIME, a_timestamp TIMESTAMP)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Backfill
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{0, "epoch", nil, "epoch"},
+		{1, "infinity", nil, "infinity"},
+		{2, "-infinity", nil, "-infinity"},
+		{3, nil, "allballs", nil},
+	})
+	cs.Capture(ctx, t, nil)
+
+	// Replication
+	tb.Insert(ctx, t, tableName, [][]interface{}{
+		{10, "epoch", nil, "epoch"},
+		{11, "infinity", nil, "infinity"},
+		{12, "-infinity", nil, "-infinity"},
+		{13, nil, "allballs", nil},
+	})
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
 }
