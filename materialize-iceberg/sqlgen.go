@@ -1,13 +1,17 @@
 package connector
 
 import (
+	"fmt"
 	"strings"
 	"text/template"
+
+	"github.com/apache/iceberg-go"
 )
 
 type templates struct {
-	loadQuery  *template.Template
-	mergeQuery *template.Template
+	loadQuery    *template.Template
+	mergeQuery   *template.Template
+	migrateQuery *template.Template
 }
 
 type templateInput struct {
@@ -15,15 +19,51 @@ type templateInput struct {
 	Bounds []mergeBound
 }
 
+type migrateColumn struct {
+	Field      string
+	FromType   string
+	TargetType iceberg.Type
+}
+
+type migrateInput struct {
+	ResourcePath []string
+	Migrations   []migrateColumn
+}
+
+func quoteIdentifier(in string) string { return "`" + in + "`" }
+
 func parseTemplates() templates {
 	tpl := template.New("root").Funcs(template.FuncMap{
 		"QuoteIdentifier": quoteIdentifier,
-		"TableFQN":        tableFQN,
+		"TableFQN": func(in []string) string {
+			quotedParts := make([]string, len(in))
+			for i, part := range in {
+				quotedParts[i] = quoteIdentifier(part)
+			}
+			return strings.Join(quotedParts, ".")
+		},
+		"IsBinary":          func(m mapped) bool { return m.type_.Equals(iceberg.BinaryType{}) },
+		"MigrateColumnName": func(f string) string { return f + migrateFieldSuffix },
+		"CastSQL": func(m migrateColumn) string {
+			ident := quoteIdentifier(m.Field)
+			switch m.FromType {
+			case "binary":
+				return fmt.Sprintf("BASE64(%s)", ident)
+			case "timestamptz":
+				// timestamptz columns have an internal storage representation
+				// in UTC so this will always result in a Z timestamp string,
+				// which is consistent with what you get if you read a
+				// timestamptz column.
+				return fmt.Sprintf(`DATE_FORMAT(%s, 'yyyy-MM-dd\'T\'HH:mm:ss.SSSSSS\'Z\'')`, ident)
+			default:
+				return fmt.Sprintf("CAST(%s AS %s)", ident, m.TargetType.Type())
+			}
+		},
 	})
 
 	parsed := template.Must(tpl.Parse(`
 {{ define "maybe_unbase64_rhs" -}}
-{{- if $.Mapped.IsBinary -}}unbase64(r.{{ QuoteIdentifier $.Field }}){{ else }}r.{{ QuoteIdentifier $.Field }}{{ end }}
+{{- if IsBinary $.Mapped -}}UNBASE64(r.{{ QuoteIdentifier $.Field }}){{ else }}r.{{ QuoteIdentifier $.Field }}{{ end }}
 {{- end }}
 
 {{ define "loadQuery" -}}
@@ -62,20 +102,20 @@ WHEN NOT MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Field }} != '"delete
 {{- end -}}
 )
 {{ end }}
+
+{{ define "migrateQuery" -}}
+UPDATE {{ TableFQN $.ResourcePath }}
+SET
+{{- range $ind, $col := $.Migrations }}
+	{{- if $ind }}, {{ end }}
+	{{ QuoteIdentifier (MigrateColumnName $col.Field) }} = {{ CastSQL $col }}
+{{- end }}
+{{ end }}
 `))
 
 	return templates{
-		loadQuery:  parsed.Lookup("loadQuery"),
-		mergeQuery: parsed.Lookup("mergeQuery"),
+		loadQuery:    parsed.Lookup("loadQuery"),
+		mergeQuery:   parsed.Lookup("mergeQuery"),
+		migrateQuery: parsed.Lookup("migrateQuery"),
 	}
-}
-
-func quoteIdentifier(in string) string { return "`" + in + "`" }
-
-func tableFQN(in []string) string {
-	quotedParts := make([]string, len(in))
-	for i, part := range in {
-		quotedParts[i] = quoteIdentifier(part)
-	}
-	return strings.Join(quotedParts, ".")
 }

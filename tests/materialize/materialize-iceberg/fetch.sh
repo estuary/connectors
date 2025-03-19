@@ -5,7 +5,7 @@ set -o pipefail
 set -o nounset
 
 function exportToJsonl() {
-  ${ICEBERG_HELPER_CMD} read ${NAMESPACE}."$1" | jq -s "sort_by([.id, .flow_published_at]) | { _table: \"$1\", rows: . }"
+  ${ICEBERG_HELPER_CMD} read ${NAMESPACE}."$1"_${TABLE_SUFFIX} | jq -s "sort_by([.id, .flow_published_at]) | { _table: \"$1\", rows: . }"
 }
 
 exportToJsonl "simple"

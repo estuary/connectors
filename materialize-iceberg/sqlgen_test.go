@@ -16,20 +16,26 @@ func TestTemplates(t *testing.T) {
 
 	var snap strings.Builder
 
+	makeProjection := func(field string) boilerplate.Projection {
+		return boilerplate.Projection{
+			Projection: pf.Projection{Field: field},
+		}
+	}
+
 	keys := []boilerplate.MappedProjection[mapped]{
-		{Projection: pf.Projection{Field: "first-key"}},
-		{Projection: pf.Projection{Field: "second-key"}, Mapped: mapped{type_: iceberg.BinaryType{}}},
-		{Projection: pf.Projection{Field: "third-key"}},
+		{Projection: makeProjection("first-key"), Mapped: mapped{iceberg.StringType{}}},
+		{Projection: makeProjection("second-key"), Mapped: mapped{iceberg.BinaryType{}}},
+		{Projection: makeProjection("third-key"), Mapped: mapped{iceberg.Int64Type{}}},
 	}
 
 	values := []boilerplate.MappedProjection[mapped]{
-		{Projection: pf.Projection{Field: "first-val"}},
-		{Projection: pf.Projection{Field: "second-val"}},
-		{Projection: pf.Projection{Field: "third-val"}},
-		{Projection: pf.Projection{Field: "fourth-val"}},
+		{Projection: makeProjection("first-val"), Mapped: mapped{iceberg.StringType{}}},
+		{Projection: makeProjection("second-val"), Mapped: mapped{iceberg.StringType{}}},
+		{Projection: makeProjection("third-val"), Mapped: mapped{iceberg.BinaryType{}}},
+		{Projection: makeProjection("fourth-val"), Mapped: mapped{iceberg.StringType{}}},
 	}
 
-	doc := &boilerplate.MappedProjection[mapped]{Projection: pf.Projection{Field: "flow_document"}}
+	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{iceberg.StringType{}}}
 
 	input := templateInput{
 		binding: binding{
@@ -60,6 +66,27 @@ func TestTemplates(t *testing.T) {
 		},
 	}
 
+	mInput := migrateInput{
+		ResourcePath: []string{"some", "table"},
+		Migrations: []migrateColumn{
+			{
+				Field:      "long_to_decimal",
+				FromType:   "long",
+				TargetType: iceberg.DecimalTypeOf(38, 0),
+			},
+			{
+				Field:      "datetime_to_string",
+				FromType:   "timestamptz",
+				TargetType: iceberg.StringType{},
+			},
+			{
+				Field:      "binary_to_string",
+				FromType:   "binary",
+				TargetType: iceberg.StringType{},
+			},
+		},
+	}
+
 	snap.WriteString("--- Begin load query ---\n")
 	require.NoError(t, templates.loadQuery.Execute(&snap, input))
 	snap.WriteString("--- End load query ---")
@@ -69,6 +96,12 @@ func TestTemplates(t *testing.T) {
 	snap.WriteString("--- Begin merge query ---\n")
 	require.NoError(t, templates.mergeQuery.Execute(&snap, input))
 	snap.WriteString("--- End merge query ---")
+
+	snap.WriteString("\n\n")
+
+	snap.WriteString("--- Begin migrate query ---\n")
+	require.NoError(t, templates.migrateQuery.Execute(&snap, mInput))
+	snap.WriteString("--- End migrate query ---")
 
 	cupaloy.SnapshotT(t, snap.String())
 

@@ -4,22 +4,24 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
+export TABLE_SUFFIX=$(head -c 12 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 8 | tr '[:upper:]' '[:lower:]')
+
 resources_json_template='[
   {
     "resource": {
-      "table": "simple"
+      "table": "simple_${TABLE_SUFFIX}"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
   },
   {
     "resource": {
-      "table": "duplicate_keys_standard"
+      "table": "duplicate_keys_standard_${TABLE_SUFFIX}"
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
   },
   {
     "resource": {
-      "table": "multiple_types"
+      "table": "multiple_types_${TABLE_SUFFIX}"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
     "fields": {
@@ -34,7 +36,7 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "formatted_strings"
+      "table": "formatted_strings_${TABLE_SUFFIX}"
     },
     "source": "${TEST_COLLECTION_FORMATTED_STRINGS}",
     "fields": {
@@ -43,19 +45,19 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "deletions"
+      "table": "deletions_${TABLE_SUFFIX}"
     },
     "source": "${TEST_COLLECTION_DELETIONS}"
   },
   {
     "resource": {
-      "table": "binary_key"
+      "table": "binary_key_${TABLE_SUFFIX}"
     },
     "source": "${TEST_COLLECTION_BINARY_KEY}"
   },
   {
     "resource": {
-      "table": "string_escaped_key"
+      "table": "string_escaped_key_${TABLE_SUFFIX}"
     },
     "source": "${TEST_COLLECTION_STRING_ESCAPED_KEY}"
   }

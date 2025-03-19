@@ -1,0 +1,42 @@
+--- Original Schema ---
+table {
+	1: firstKey: required long
+	2: secondKey: required string
+	3: val1: required string
+	4: val2: optional boolean
+	5: dateToStr: required date
+	6: intToDecimal: optional long
+	7: decimalToFloat: required decimal(38, 0)
+	8: timestampToStr: required timestamptz
+	10: dateToStr_flow_tmp: required double
+}
+
+--- Next Schema ---
+table {
+	1: firstKey: required long
+	2: secondKey: required string
+	3: val1: required string
+	4: val2: optional boolean
+	5: dateToStr: optional date
+	6: intToDecimal: optional long
+	7: decimalToFloat: required decimal(38, 0)
+	8: timestampToStr: required timestamptz
+	13: new: optional string
+	14: dateToStr_flow_tmp: optional string
+	15: intToDecimal_flow_tmp: optional decimal(38, 0)
+	16: decimalToFloat_flow_tmp: required double
+	17: timestampToStr_flow_tmp: optional string
+}
+
+--- After Migrate Schema ---
+table {
+	1: firstKey: required long
+	2: secondKey: required string
+	3: val1: required string
+	4: val2: optional boolean
+	13: new: optional string
+	14: dateToStr: optional string
+	15: intToDecimal: optional decimal(38, 0)
+	16: decimalToFloat: required double
+	17: timestampToStr: optional string
+}

@@ -12,10 +12,10 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/apache/iceberg-go"
 	"github.com/apache/iceberg-go/table"
-	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go/aws"
@@ -74,19 +74,7 @@ func (Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 }
 
 func (Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	mtz, _, res, err := boilerplate.RunApply[*materialization](ctx, req, newMaterialization)
-	if err != nil {
-		return nil, err
-	}
-
-	if mtz.cfg.CatalogAuthentication.CatalogAuthType == catalogAuthTypeClientCredential {
-		secretName := clientCredSecretName(mtz.cfg.Compute.SystemsManagerPrefix, req.Materialization.Name.String())
-		if err := ensureEmrSecret(ctx, mtz.ssmClient, secretName, mtz.cfg.CatalogAuthentication.Credential); err != nil {
-			return nil, fmt.Errorf("resolving client credential secret for EMR in Systems Manager: %w", err)
-		}
-	}
-
-	return res, nil
+	return boilerplate.RunApply(ctx, req, newMaterialization)
 }
 
 func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
@@ -97,13 +85,15 @@ type materialization struct {
 	cfg       config
 	catalog   *catalog.Catalog
 	s3Client  *s3.Client
-	emrClient *emr.Client
 	ssmClient *ssm.Client
+	emrClient *emrClient
+	templates templates
+	pyFiles   *pyFileURIs // populated in Setup and NewMaterializerTransactor
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
 
-func newMaterialization(ctx context.Context, cfg config) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
+func newMaterialization(ctx context.Context, materializationName string, cfg config) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
 	catalog, err := cfg.toCatalog(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating catalog: %w", err)
@@ -114,22 +104,32 @@ func newMaterialization(ctx context.Context, cfg config) (boilerplate.Materializ
 		return nil, fmt.Errorf("creating S3 client: %w", err)
 	}
 
-	emr, err := cfg.toEmrClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating EMR client: %w", err)
-	}
-
 	ssmClient, err := cfg.toSsmClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating EMR client: %w", err)
 	}
 
+	emr, err := cfg.toEmrClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("creating EMR client: %w", err)
+	}
+
 	return &materialization{
-		cfg:       cfg,
-		catalog:   catalog,
-		s3Client:  s3,
-		emrClient: emr,
+		cfg:      cfg,
+		catalog:  catalog,
+		s3Client: s3,
+		emrClient: &emrClient{
+			cfg:                 cfg.Compute.emrConfig,
+			catalogAuth:         cfg.CatalogAuthentication,
+			catalogURL:          cfg.URL,
+			warehouse:           cfg.Warehouse,
+			materializationName: materializationName,
+			c:                   emr,
+			s3Client:            s3,
+			ssmClient:           ssmClient,
+		},
 		ssmClient: ssmClient,
+		templates: parseTemplates(),
 	}, nil
 }
 
@@ -147,14 +147,6 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 			DBTJobTrigger: &d.cfg.DBTJobTrigger,
 		},
 	}
-}
-
-func (d *materialization) SetResourceDefaults(c config, res resource) resource {
-	if res.Namespace == "" {
-		res.Namespace = c.Namespace
-	}
-
-	return res
 }
 
 func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
@@ -198,7 +190,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths 
 			res.PushField(boilerplate.ExistingField{
 				Name:       f.Name,
 				Nullable:   !f.Required,
-				Type:       f.Type.Type(),
+				Type:       f.Type.String(),
 				HasDefault: f.WriteDefault != nil,
 			})
 		}
@@ -234,7 +226,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	checkEmrPrereqs(ctx, d, errs)
+	d.emrClient.checkPrereqs(ctx, errs)
 
 	bucket := d.cfg.Compute.Bucket
 	bucketWithPath := path.Join(bucket, d.cfg.Compute.BucketPath)
@@ -334,12 +326,20 @@ func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (map
 	return mapProjection(p)
 }
 
-func (d *materialization) Compatible(existing boilerplate.ExistingField, proposed mapped) bool {
-	return strings.EqualFold(existing.Type, string(proposed.type_.String()))
-}
+func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	if d.cfg.CatalogAuthentication.CatalogAuthType == catalogAuthTypeClientCredential {
+		if err := d.emrClient.ensureSecret(ctx, d.cfg.CatalogAuthentication.Credential); err != nil {
+			return "", err
+		}
+	}
 
-func (d *materialization) DescriptionForType(prop mapped) string {
-	return string(prop.type_.String())
+	pyFiles, err := d.putPyFiles(ctx)
+	if err != nil {
+		return "", fmt.Errorf("putting PySpark scripts: %w", err)
+	}
+	d.pyFiles = pyFiles
+
+	return "", nil
 }
 
 func (d *materialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
@@ -385,24 +385,97 @@ func (d *materialization) UpdateResource(
 	existing boilerplate.ExistingResource,
 	update boilerplate.MaterializerBindingUpdate[mapped],
 ) (string, boilerplate.ActionApplyFn, error) {
-	if len(update.NewProjections) == 0 && len(update.NewlyNullableFields) == 0 {
+	if len(update.NewProjections) == 0 && len(update.NewlyNullableFields) == 0 && len(update.FieldsToMigrate) == 0 {
 		return "", nil, nil
 	}
 
 	ns := resourcePath[0]
 	name := resourcePath[1]
-	current := existing.Meta.(table.Metadata).CurrentSchema()
-	next := computeSchemaForUpdatedTable(current, update)
+	table := existing.Meta.(table.Metadata)
+	current := table.CurrentSchema()
+	next := computeSchemaForUpdatedTable(table.LastColumnID(), current, update)
 	reqs := []catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)}
 	upds := []catalog.TableUpdate{catalog.AddSchemaUpdate(next), catalog.SetCurrentSchemaUpdate(next.ID)}
+	action := fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), next.String())
 
-	return fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), next.String()), func(ctx context.Context) error {
-		return d.catalog.UpdateTable(ctx, ns, name, reqs, upds)
+	var afterMigrateReqs []catalog.TableRequirement
+	var afterMigrateUpds []catalog.TableUpdate
+	if len(update.FieldsToMigrate) > 0 {
+		// If there are migrations, the table is initially updated to |next|,
+		// which will add temporary columns that existing data will be cast
+		// into. After the compute job is run to cast the existing column data
+		// into the temporary column, the table is updated to |afterMigrate|,
+		// which will delete the original columns and rename the temporary
+		// columns to be the name of the original columns in an atomic schema
+		// update.
+		//
+		// The AssertSchemaID requirements throughout these two table updates
+		// ensure that no other process comes in and modifies the table schema
+		// while this is happening. If the schema IDs aren't as expected, the
+		// connector will crash and start over, which should work fine.
+		afterMigrate := computeSchemaForCompletedMigrations(next, update.FieldsToMigrate)
+		afterMigrateReqs = []catalog.TableRequirement{catalog.AssertCurrentSchemaID(next.ID)}
+		afterMigrateUpds = []catalog.TableUpdate{catalog.AddSchemaUpdate(afterMigrate), catalog.SetCurrentSchemaUpdate(afterMigrate.ID)}
+		action = fmt.Sprintf("updated table %q.%q schema from %s to %s", ns, name, current.String(), afterMigrate.String())
+	}
+
+	return action, func(ctx context.Context) error {
+		if err := d.catalog.UpdateTable(ctx, ns, name, reqs, upds); err != nil {
+			return err
+		}
+
+		if len(update.FieldsToMigrate) > 0 {
+			input := migrateInput{
+				ResourcePath: resourcePath,
+				Migrations:   make([]migrateColumn, 0, len(update.FieldsToMigrate)),
+			}
+			for _, migration := range update.FieldsToMigrate {
+				input.Migrations = append(input.Migrations, migrateColumn{
+					Field:      migration.From.Name,
+					FromType:   migration.From.Type,
+					TargetType: migration.To.Mapped.type_,
+				})
+			}
+
+			var q strings.Builder
+			if err := d.templates.migrateQuery.Execute(&q, input); err != nil {
+				return err
+			}
+
+			outputPrefix := path.Join(d.emrClient.cfg.BucketPath, uuid.NewString())
+			defer func() {
+				if err := cleanPrefixOnceFn(ctx, d.s3Client, d.emrClient.cfg.Bucket, outputPrefix)(); err != nil {
+					log.WithError(err).Warn("failed to clean up status file after running a column migration job")
+				}
+			}()
+
+			ll := log.WithFields(log.Fields{
+				"table":      fmt.Sprintf("%s.%s", ns, name),
+				"numColumns": len(update.FieldsToMigrate),
+			})
+			ll.Info("running column migration job")
+			ts := time.Now()
+			if err := d.emrClient.runJob(
+				ctx,
+				python.ExecInput{Query: q.String()},
+				d.pyFiles.exec,
+				d.pyFiles.common,
+				fmt.Sprintf("column migration for: %s", d.emrClient.materializationName),
+				outputPrefix,
+			); err != nil {
+				return fmt.Errorf("failed to run column migration job: %w", err)
+			}
+			ll.WithField("took", time.Since(ts).String()).Info("column migration job complete")
+
+			if err := d.catalog.UpdateTable(ctx, ns, name, afterMigrateReqs, afterMigrateUpds); err != nil {
+				return fmt.Errorf("failed to update table %s.%s after migration job: %w", ns, name, err)
+			}
+
+		}
+
+		return nil
 	}, nil
 }
-
-//go:embed python
-var pyFilesFS embed.FS
 
 func (d *materialization) NewMaterializerTransactor(
 	ctx context.Context,
@@ -411,65 +484,24 @@ func (d *materialization) NewMaterializerTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, mapped],
 	be *boilerplate.BindingEvents,
 ) (boilerplate.MaterializerTransactor, error) {
+	pyFiles, err := d.putPyFiles(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("putting PySpark scripts: %w", err)
+	}
+
 	storageClient := newFileClient(d.s3Client, d.cfg.Compute.emrConfig.Bucket)
 
 	t := &transactor{
-		materializationName: req.Materialization.Name.String(),
+		materializationName: d.emrClient.materializationName,
 		be:                  be,
 		cfg:                 d.cfg,
 		s3Client:            d.s3Client,
 		emrClient:           d.emrClient,
-		templates:           parseTemplates(),
+		templates:           d.templates,
 		bindings:            make([]binding, 0, len(mappedBindings)),
 		loadFiles:           boilerplate.NewStagedFiles(storageClient, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, false, false),
 		storeFiles:          boilerplate.NewStagedFiles(storageClient, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, true, true),
-	}
-
-	if d.cfg.CatalogAuthentication.CatalogAuthType == catalogAuthTypeClientCredential {
-		t.emrAuth.credentialSecretName = clientCredSecretName(d.cfg.Compute.SystemsManagerPrefix, req.Materialization.Name.String())
-		t.emrAuth.scope = d.cfg.CatalogAuthentication.Scope
-	}
-
-	// PySpark scripts are uploaded to the staging bucket metadata location
-	// under a prefix that include a hash of their contents. If the scripts are
-	// changed because of connector updates a new set of files will be written,
-	// but this is not expected to happen very often so the number of excessive
-	// files should be minimal.
-	pyFiles := []struct {
-		name  string
-		tProp *string
-	}{
-		{name: "common", tProp: &t.pyFiles.commonURI},
-		{name: "load", tProp: &t.pyFiles.loadURI},
-		{name: "merge", tProp: &t.pyFiles.mergeURI},
-	}
-	pyBytes := make([][]byte, 0, len(pyFiles))
-	hasher := sha256.New()
-
-	for _, pf := range pyFiles {
-		bs, err := pyFilesFS.ReadFile(fmt.Sprintf("python/%s.py", pf.name))
-		if err != nil {
-			return nil, fmt.Errorf("reading embedded python script %s: %w", pf.name, err)
-		}
-		if _, err := hasher.Write(bs); err != nil {
-			return nil, fmt.Errorf("computing hash of embedded python script %s: %w", pf.name, err)
-		}
-		pyBytes = append(pyBytes, bs)
-	}
-
-	fullMetaPrefix := path.Join(d.cfg.Compute.BucketPath, metadataPrefix, "pySparkFiles", fmt.Sprintf("%x", hasher.Sum(nil)))
-	for idx, pf := range pyFiles {
-		key := path.Join(fullMetaPrefix, fmt.Sprintf("%s.py", pf.name))
-		if _, err := t.s3Client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(d.cfg.Compute.emrConfig.Bucket),
-			Key:    aws.String(key),
-			Body:   bytes.NewReader(pyBytes[idx]),
-		}); err != nil {
-			return nil, fmt.Errorf("uploading %s: %w", pf.name, err)
-		}
-
-		*pf.tProp = "s3://" + path.Join(d.cfg.Compute.emrConfig.Bucket, key)
-		log.WithField("uri", *pf.tProp).Debug("uploaded PySpark script")
+		pyFiles:             *pyFiles,
 	}
 
 	for idx, mapped := range mappedBindings {
@@ -503,4 +535,64 @@ func (d *materialization) NewMaterializerTransactor(
 	}
 
 	return t, nil
+}
+
+//go:embed python
+var pyFilesFS embed.FS
+
+type pyFileURIs struct {
+	common string
+	exec   string
+	load   string
+	merge  string
+}
+
+// putPyFiles uploads PySpark scripts to the staging bucket metadata location
+// under a prefix that includes a hash of their contents. If the scripts are
+// changed because of connector updates a new set of files will be written, but
+// this is not expected to happen very often so the number of excessive files
+// should be minimal.
+func (d *materialization) putPyFiles(ctx context.Context) (*pyFileURIs, error) {
+	var out pyFileURIs
+
+	pyFiles := []struct {
+		name string
+		prop *string
+	}{
+		{name: "common", prop: &out.common},
+		{name: "exec", prop: &out.exec},
+		{name: "load", prop: &out.load},
+		{name: "merge", prop: &out.merge},
+	}
+	pyBytes := make([][]byte, 0, len(pyFiles))
+	hasher := sha256.New()
+
+	for _, pf := range pyFiles {
+		bs, err := pyFilesFS.ReadFile(fmt.Sprintf("python/%s.py", pf.name))
+		if err != nil {
+			return nil, fmt.Errorf("reading embedded python script %s: %w", pf.name, err)
+		}
+		if _, err := hasher.Write(bs); err != nil {
+			return nil, fmt.Errorf("computing hash of embedded python script %s: %w", pf.name, err)
+		}
+		pyBytes = append(pyBytes, bs)
+	}
+
+	fullMetaPrefix := path.Join(d.cfg.Compute.emrConfig.BucketPath, metadataPrefix, "pySparkFiles", fmt.Sprintf("%x", hasher.Sum(nil)))
+	for idx, pf := range pyFiles {
+		key := path.Join(fullMetaPrefix, fmt.Sprintf("%s.py", pf.name))
+		if _, err := d.s3Client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(d.cfg.Compute.emrConfig.Bucket),
+			Key:    aws.String(key),
+			Body:   bytes.NewReader(pyBytes[idx]),
+		}); err != nil {
+			return nil, fmt.Errorf("uploading %s: %w", pf.name, err)
+		}
+
+		*pf.prop = "s3://" + path.Join(d.cfg.Compute.emrConfig.Bucket, key)
+		log.WithField("uri", *pf.prop).Debug("uploaded PySpark script")
+	}
+
+	d.pyFiles = &out
+	return d.pyFiles, nil
 }
