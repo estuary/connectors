@@ -654,9 +654,15 @@ async def fetch_company_segments(
     for id in company_ids:
         segments_url = f"{API}/companies/{id}/segments"
 
-        company_segments = CompanySegmentsResponse.model_validate_json(
-            await http.request(log, segments_url)
-        )
+        try:
+            company_segments = CompanySegmentsResponse.model_validate_json(
+                await http.request(log, segments_url)
+            )
+        except HTTPError as err:
+            if err.code == 404 and 'Company Not Found' in err.message:
+                continue
+            else:
+                raise
 
         for segment in company_segments.data:
             if segment.updated_at > last_seen_ts:
