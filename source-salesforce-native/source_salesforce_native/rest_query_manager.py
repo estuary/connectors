@@ -1,9 +1,9 @@
 from datetime import datetime
 from logging import Logger
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, TypedDict
 
 from estuary_cdk.http import HTTPSession
-from .shared import async_enumerate, build_query, dt_to_str, str_to_dt, VERSION
+from .shared import build_query, dt_to_str, str_to_dt, VERSION
 from .models import (
     CursorFields,
     SoapTypes,
@@ -27,6 +27,7 @@ class Query:
         self.query_locator = None
         self.done = False
         self.total_size = 0
+        self.records_yielded = 0
 
     def _set_query_locator(self, next_records_url: str | None) -> None:
         if next_records_url is None:
@@ -54,12 +55,26 @@ class Query:
             await self.http.request(self.log, url, params=params)
         )
 
+        count = 0
+
         for record in response.records:
             yield record
+            count += 1
 
+        self.records_yielded += count
         self.done = response.done
         self.total_size = response.totalSize
         self._set_query_locator(response.nextRecordsUrl)
+
+
+# RecordAndChunksCompleted contains an in-progress record that's being built-up from multiple Queries
+# that are fetching separate chunks of available fields. Fields are merged into the record
+# when they are received. chunks_completed_count is used to determine when a record has
+# been completed & all of its fields have been merged into it; once chunks_completed_count
+# is the same as the number of total field chunks, the record is completely built and can be yielded.
+class RecordAndChunksCompleted(TypedDict):
+    record: dict[str, Any]
+    chunks_completed_count: int
 
 
 class RestQueryManager:
@@ -95,6 +110,28 @@ class RestQueryManager:
         return chunks
 
 
+    def _transform_fields(
+        self,
+        record: dict[str, Any],
+        fields: FieldDetailsDict,
+    ) -> dict[str, Any]:
+        for field, details in fields.items():
+            # The datetime field formats between REST and Bulk API are different, so we try
+            # to convert any cursor fields to the same format to keep values consistent between them.
+            if details.soapType == SoapTypes.DATETIME and isinstance(record[field], str):
+                try:
+                    record[field] = dt_to_str(str_to_dt(record[field]))
+                except ValueError:
+                    pass
+        # REST API query results have an extraneous "attributes" field with a small amount of metadata.
+        # This metadata isn't present in the Bulk API response, so we remove it from records fetched
+        # via the REST API.
+        if 'attributes' in record:
+            del record['attributes']
+
+        return record
+
+
     async def execute(
         self,
         object_name: str,
@@ -112,40 +149,60 @@ class RestQueryManager:
             q = Query(self.http, self.log, self.base_url, build_query(object_name, chunk, cursor_field, start, end))
             queries.append(q)
 
+        records: dict[str, RecordAndChunksCompleted] = {}
         while True:
-            records: list[dict[str, Any]] = []
+            # next_query is the query that's yielded the fewest records so far. Since Salesforce dynamically reduces the page size of queries
+            # depending on how much data is returned for each query, the page size for each query can be different.
+            # We cache a record in memory until all of its fields are fetched. Each query's records_yielded attribute is used to gauge the
+            # overall progress of each query. Executing the query that's made the least progress ensures the number of incomplete records we
+            # hold in memory is bounded.
+            next_query: Query | None = None
             for query in queries:
-                async for index, partial_record in async_enumerate(query._fetch_single_page()):
-                    if index == len(records):
-                        records.append(partial_record)
-                    else:
-                        # We require chunked records be returned in the same order across queries.
-                        assert records[index]['Id'] == partial_record['Id']
-                        records[index] = records[index] | partial_record
+                if query.done:
+                    continue
+                elif next_query is None:
+                    next_query = query
+                elif query.records_yielded < next_query.records_yielded:
+                    next_query = query
 
-            for record in records:
+            assert isinstance(next_query, Query)
+
+            async for partial_record in next_query._fetch_single_page():
+                id = partial_record["Id"]
+
+                # Create a new entry if we haven't seen this record's id yet. Since records are queried in ascending order 
+                # of their cursor field, records are always added to the records dictionary in the same ascending order.
+                if id not in records:
+                    records[id] = {
+                            "record": partial_record,
+                            "chunks_completed_count": 1,
+                        }
+                else:
+                    records[id]["record"] = records[id]["record"] | partial_record
+                    records[id]["chunks_completed_count"] += 1
+
+            # Dictionaries maintain the order items were added, and since items were added in ascending order of their cursor field,
+            # we can iterate over their ids with list(records.keys()) and know the ids are in the same ascending order of record's cursor field.
+            # This ensures records are yielded in ascending order.
+            for id in list(records.keys()):
+                chunk_completed_count = records[id]["chunks_completed_count"]
+                record = records[id]["record"]
+
+                # Do not emit a record if we haven't fetched all of its fields yet.
+                if chunk_completed_count < len(field_chunks):
+                    continue
+
                 # If the record was updated after our end date, we ignore it since we should capture it on a future sweep.
                 # This means the connector ignores records that are updated between chunked queries since they may not reflect the
                 # current state of the record in Saleforce.
                 if str_to_dt(record[cursor_field]) <= end:
-                    # The datetime field formats between REST and Bulk API are different, so we try
-                    # to convert any cursor fields to the same format to keep values consistent between them.
-                    for field, details in fields.items():
-                        if details.soapType == SoapTypes.DATETIME and isinstance(record[field], str):
-                            try:
-                                record[field] = dt_to_str(str_to_dt(record[field]))
-                            except ValueError:
-                                pass
+                    yield self._transform_fields(record, fields)
 
-                    # REST API query results have an extraneous "attributes" field with a small amount of metadata.
-                    # This metadata isn't present in the Bulk API response, so we remove it from records fetched
-                    # via the REST API.
-                    if 'attributes' in record:
-                        del record['attributes']
-
-                    yield record
-
+                # Delete completed records to avoid keeping them in memory.
+                del records[id]
             if all([q.done for q in queries]):
+                # Any records that were updated between kicking off individual queries will not have all fields & won't have been yielded after all queries are done.
+                # These are ignored since they should be captured on a future incremental sweep.
+                if len(records) > 0:
+                    self.log.debug(f"There were {len(records)} records that were not yielded when all queries completed. These updated records will be picked up on the next incremental sweep.")
                 return
-            elif not all([not q.done for q in queries]):
-                raise RuntimeError("Not all queries completed at the same time!")
