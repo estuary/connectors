@@ -288,8 +288,6 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 // Pull is a very long lived RPC through which the Flow runtime and a
 // Driver cooperatively execute an unbounded number of transactions.
 func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
-	log.Debug("connector started")
-
 	var state PersistentState
 	if len(open.StateJson) > 0 {
 		if err := pf.UnmarshalStrict(open.StateJson, &state); err != nil {
