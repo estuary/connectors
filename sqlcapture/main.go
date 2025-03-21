@@ -333,12 +333,14 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var ctx = stream.Context()
+	log.WithField("eventType", "connectorStatus").Info("Connecting to database")
 	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close(ctx)
 
+	log.WithField("eventType", "connectorStatus").Info("Verifying capture requirements")
 	var errs = db.SetupPrerequisites(ctx)
 
 	// Build a mapping from stream IDs to capture binding information
