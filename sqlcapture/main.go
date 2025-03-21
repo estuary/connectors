@@ -288,8 +288,6 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 // Pull is a very long lived RPC through which the Flow runtime and a
 // Driver cooperatively execute an unbounded number of transactions.
 func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
-	log.Debug("connector started")
-
 	var state PersistentState
 	if len(open.StateJson) > 0 {
 		if err := pf.UnmarshalStrict(open.StateJson, &state); err != nil {
@@ -333,12 +331,14 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var ctx = stream.Context()
+	log.WithField("eventType", "connectorStatus").Info("Connecting to database")
 	db, err := d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
 	if err != nil {
 		return fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close(ctx)
 
+	log.WithField("eventType", "connectorStatus").Info("Verifying capture requirements")
 	var errs = db.SetupPrerequisites(ctx)
 
 	// Build a mapping from stream IDs to capture binding information
