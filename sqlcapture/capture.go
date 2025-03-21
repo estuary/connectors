@@ -158,7 +158,7 @@ var (
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Perform discovery and log the full results for convenience. This info
 	// will be needed when activating all currently-active bindings below.
-	log.Info("discovering tables")
+	log.WithField("eventType", "connectorStatus").Info("Discovering database tables")
 	discovery, err := c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
@@ -174,6 +174,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
+	log.WithField("eventType", "connectorStatus").Info("Initializing replication")
 	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
@@ -203,6 +204,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}()
 
 	// Perform an initial "catch-up" stream-to-fence before entering the main capture loop.
+	log.WithField("eventType", "connectorStatus").Info("Catching up on CDC history")
 	if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
@@ -210,6 +212,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	var rediscoverAfter time.Time
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
+			log.WithField("eventType", "connectorStatus").Info("Rediscovering database tables")
 			discovery, err = c.Database.DiscoverTables(ctx)
 			if err != nil {
 				return fmt.Errorf("error discovering database tables: %w", err)
@@ -223,6 +226,10 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 		// If any tables are currently backfilling, go perform another backfill iteration.
 		if c.BindingsCurrentlyBackfilling() != nil {
+			log.WithField("eventType", "connectorStatus").Infof("Backfilling %d out of %d tables",
+				len(c.BindingsCurrentlyBackfilling()),
+				len(c.BindingsCurrentlyActive()),
+			)
 			if err := c.backfillStreams(ctx, discovery); err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
 			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
@@ -245,6 +252,9 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 
 		// Finally, since there's no other work to do right now, we just stream changes for a period of time.
+		log.WithField("eventType", "connectorStatus").Infof("Streaming CDC events (all %d tables are backfilled)",
+			len(c.BindingsCurrentlyActive()),
+		)
 		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
 			return err
 		}
