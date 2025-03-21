@@ -40,12 +40,3 @@ def build_query(
         query += f" ORDER BY {cursor_field} ASC"
 
     return query
-
-
-T = TypeVar('T')
-
-async def async_enumerate(iter: AsyncIterable[T], start: int = 0) -> AsyncIterator[tuple[int, T]]:
-    index = 0
-    async for item in iter:
-        yield index, item
-        index += 1
