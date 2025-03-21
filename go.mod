@@ -43,7 +43,7 @@ require (
 	github.com/go-mysql-org/go-mysql v1.9.2-0.20241024113125-ff1dab44f445
 	github.com/go-sql-driver/mysql v1.8.1
 	github.com/gogo/protobuf v1.3.2
-	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/google/uuid v1.6.0
 	github.com/invopop/jsonschema v0.13.0
 	github.com/jackc/pgconn v1.14.3
