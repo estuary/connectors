@@ -11,7 +11,7 @@ import (
 
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/invopop/jsonschema"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 // DiscoverCatalog queries the database and generates discovered bindings
@@ -41,7 +41,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 	var catalog []*pc.Response_Discovered_Binding
 	for _, table := range tables {
-		var logEntry = logrus.WithFields(logrus.Fields{
+		var logEntry = log.WithFields(log.Fields{
 			"table":      table.Name,
 			"namespace":  table.Schema,
 			"primaryKey": table.PrimaryKey,
@@ -107,7 +107,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			if err != nil {
 				// Unhandled types are translated to the catch-all schema {} but with
 				// a description clarifying that we don't have a better translation.
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(log.Fields{
 					"error": err,
 					"type":  column.DataType,
 				}).Debug("error translating column type to JSON schema")
@@ -217,7 +217,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			return nil, fmt.Errorf("error marshalling schema JSON: %w", err)
 		}
 
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"table":     table.Name,
 			"namespace": table.Schema,
 			"columns":   table.Columns,
@@ -254,7 +254,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 	}
 
 	if len(catalog) == 0 {
-		logrus.Warn("no tables discovered; note that tables in system schemas will not be discovered and must be added manually if desired")
+		log.Warn("no tables discovered; note that tables in system schemas will not be discovered and must be added manually if desired")
 	}
 
 	return catalog, err
