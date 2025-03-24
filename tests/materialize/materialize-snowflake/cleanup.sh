@@ -11,6 +11,7 @@ dropTable "simple"
 dropTable "duplicate_keys_standard"
 dropTable "duplicate_keys_delta"
 dropTable "duplicate_keys_delta_exclude_flow_doc"
+dropTable '"duplicate keys @ with spaces"'
 dropTable "multiple_types"
 dropTable "formatted_strings"
 dropTable "symbols"

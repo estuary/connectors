@@ -235,12 +235,8 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end -}}
 {{ end }}
 
-{{ define "pipe_name" -}}
-flow_pipe_{{ $.Table.Binding }}_{{ Last $.Table.Path }}_{{ $.ShardKeyBegin }}_{{ $.Version }}
-{{- end }}
-
 {{ define "createPipe" }}
-CREATE PIPE {{ template "pipe_name" . }}
+CREATE PIPE {{ $.PipeName }}
   COMMENT = 'Pipe for table {{ $.Table.Path }}'
   AS COPY INTO {{ $.Table.Identifier }} (
 	{{ range $ind, $key := $.Table.Columns }}
@@ -344,24 +340,21 @@ FILE_FORMAT = (
 COMMENT = 'Internal stage used by Estuary Flow to stage loaded & stored documents'
 ;`
 
-type tableShardVersion struct {
-	Table         sql.Table
-	ShardKeyBegin string
-	Version       string
+type tablePipe struct {
+	Table    sql.Table
+	PipeName string
 }
 
-func renderTableShardVersionTemplate(table sql.Table, shardKeyBegin uint32, version string, tpl *template.Template) (string, error) {
+func renderTablePipeTemplate(table sql.Table, pipeName string, tpl *template.Template) (string, error) {
 	var w strings.Builder
-	var keyBegin = fmt.Sprintf("%08x", shardKeyBegin)
-	if err := tpl.Execute(&w, &tableShardVersion{Table: table, ShardKeyBegin: keyBegin, Version: version}); err != nil {
+	if err := tpl.Execute(&w, &tablePipe{Table: table, PipeName: pipeName}); err != nil {
 		return "", err
 	}
 	var s = w.String()
 	log.WithFields(log.Fields{
-		"rendered":      s,
-		"table":         table,
-		"shardKeyBegin": shardKeyBegin,
-		"version":       version,
+		"rendered": s,
+		"table":    table,
+		"pipeName": pipeName,
 	}).Debug("rendered template")
 	return s, nil
 }
