@@ -21,6 +21,9 @@ from estuary_cdk.http import (
 )
 
 EARLIEST_VALID_DATE_IN_SALESFORCE = datetime(1700, 1, 1, tzinfo=UTC)
+# Salesforce was founded on 03FEB1999. As long as cursor values aren't backdated before this date (which only seems possible
+# for a select few of them), Salesforce's founding date should be a good start date for most users.
+SALESFORCE_FOUNDING_DATE = datetime(1999, 2, 3, tzinfo=UTC)
 
 
 OAUTH2_SPEC = OAuth2Spec(
@@ -109,12 +112,12 @@ class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
 
 
 def default_start_date():
-    return EARLIEST_VALID_DATE_IN_SALESFORCE
+    return SALESFORCE_FOUNDING_DATE
 
 
 class EndpointConfig(BaseModel):
     start_date: AwareDatetime = Field(
-        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, all data will be replicated.",
+        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to Salesforce's founding date (1999-02-03T00:00:00Z).",
         default_factory=default_start_date,
         ge=EARLIEST_VALID_DATE_IN_SALESFORCE,
     )
@@ -131,7 +134,7 @@ class EndpointConfig(BaseModel):
         window_size: Annotated[int, Field(
             description="Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
             title="Window size",
-            default=180,
+            default=18250,
             gt=0,
         )]
 
