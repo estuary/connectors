@@ -6,7 +6,7 @@
         "Advanced": {
           "properties": {
             "window_size": {
-              "default": 180,
+              "default": 36500,
               "description": "Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
               "exclusiveMinimum": 0,
               "title": "Window size",
@@ -57,7 +57,7 @@
       },
       "properties": {
         "start_date": {
-          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, all data will be replicated.",
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to the epoch (1970-01-01T00:00:00Z).",
           "format": "date-time",
           "title": "Start Date",
           "type": "string"

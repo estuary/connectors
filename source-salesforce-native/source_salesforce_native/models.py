@@ -21,6 +21,7 @@ from estuary_cdk.http import (
 )
 
 EARLIEST_VALID_DATE_IN_SALESFORCE = datetime(1700, 1, 1, tzinfo=UTC)
+EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
 OAUTH2_SPEC = OAuth2Spec(
@@ -109,12 +110,12 @@ class SalesforceResourceConfigWithSchedule(ResourceConfigWithSchedule):
 
 
 def default_start_date():
-    return EARLIEST_VALID_DATE_IN_SALESFORCE
+    return EPOCH
 
 
 class EndpointConfig(BaseModel):
     start_date: AwareDatetime = Field(
-        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, all data will be replicated.",
+        description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to the epoch (1970-01-01T00:00:00Z).",
         default_factory=default_start_date,
         ge=EARLIEST_VALID_DATE_IN_SALESFORCE,
     )
@@ -131,7 +132,7 @@ class EndpointConfig(BaseModel):
         window_size: Annotated[int, Field(
             description="Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
             title="Window size",
-            default=180,
+            default=36500,
             gt=0,
         )]
 
