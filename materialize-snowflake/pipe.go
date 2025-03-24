@@ -11,14 +11,38 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"text/template"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 )
+
+var pipeSanitizeRegex = regexp.MustCompile("(?i)[^a-z0-9_]")
+
+// sanitizeAndAppendHash adapts an input into a reasonably human-readable
+// representation, sanitizing problematic characters and including a hash of the
+// "original" value to guarantee a unique (with respect to the input) and
+// deterministic output.
+func sanitizeAndAppendHash(prefix string, binding int, keyBegin string, version string, tableName string) string {
+	pre := strings.Join([]string{prefix, fmt.Sprintf("%d", binding), keyBegin, version}, "_")
+	sanitizedPre := pipeSanitizeRegex.ReplaceAllString(pre, "_")
+	sanitizedTable := pipeSanitizeRegex.ReplaceAllString(tableName, "_")
+	full := sanitizedPre + "_" + sanitizedTable
+	limitedFull := full
+
+	if len(limitedFull) > 64 {
+		// Limit the length of the "human readable" part of the table name to
+		// something reasonable, but make sure only the tableName portion is cut
+		limitedFull = sanitizedPre + "_" + sanitizedTable[:64-len(sanitizedPre)]
+	}
+
+	return fmt.Sprintf("%s_%016X", limitedFull, xxhash.Sum64String(full))
+}
 
 type PipeClient struct {
 	cfg             *config

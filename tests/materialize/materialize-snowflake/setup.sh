@@ -39,6 +39,13 @@ resources_json_template='[
   },
   {
     "resource": {
+      "table": "duplicate keys @ with spaces",
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
+  },
+  {
+    "resource": {
       "table": "multiple_types"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
