@@ -134,7 +134,7 @@ func (s *ConnectorServer) Capture(stream pc.Connector_CaptureServer) error {
 				return err
 			}
 		case request.Discover != nil:
-			log.WithField("eventType", "connectorStatus").Info("Discovering tables")
+			// No connectorStatus logging here, Discover RPC logging doesn't go into the ops log collection.
 			if response, err := s.Connector.Discover(ctx, request.Discover); err != nil {
 				return err
 			} else if err := stream.Send(&pc.Response{Discovered: response}); err != nil {
