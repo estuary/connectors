@@ -138,6 +138,8 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 			return fmt.Errorf("unpacking resume key for segment %d of table %s: %w", segment, t.tableName, err)
 		}
 
+		// NB: doScan will acquire a semaphore which must be released after
+		// processing the scanned documents.
 		scanned, err := c.doScan(ctx, t, scanLimit, limiter, rcusPerRequest, segment, startKey)
 		if err != nil {
 			return err
@@ -160,6 +162,9 @@ func (c *capture) backfillWorker(ctx context.Context, t *table, scanLimit *int32
 		if err := c.emitBackfill(t.bindingIdx, t.stateKey, segment, newState, scanned.Items, t.keyFields); err != nil {
 			return fmt.Errorf("emitting backfill documents for segment %d of table %s: %w", segment, t.tableName, err)
 		}
+
+		// Release the semaphore acquired in doScan.
+		c.sem.Release(1)
 
 		if len(scanned.Items) > 0 {
 			// Adjust RCU usage prediction if we got anything from this request.
@@ -209,6 +214,15 @@ func (c *capture) doScan(
 			return nil, fmt.Errorf("backfill limiter wait: %w", err)
 		}
 
+		// Acquire one of the capture semaphores before initiating the scan
+		// request. This is released by the calling backfill worker process
+		// after emitting the resulting documents, unless the request needs to
+		// be retried in which case it is released before retrying. Any
+		// non-retryable error that occurs between here and there will cause the
+		// connector to exit.
+		if err := c.sem.Acquire(ctx, 1); err != nil {
+			return nil, err
+		}
 		scanned, err := c.client.db.Scan(ctx, &dynamodb.ScanInput{
 			TableName:              aws.String(t.tableName),
 			ConsistentRead:         aws.Bool(true),
@@ -227,6 +241,7 @@ func (c *capture) doScan(
 					"attempt": attempt,
 					"err":     err.Error(),
 				}).Info("retrying a throughput exceeded exception")
+				c.sem.Release(1)
 				continue
 			}
 
@@ -238,6 +253,7 @@ func (c *capture) doScan(
 					"attempt": attempt,
 					"err":     err.Error(),
 				}).Info("retrying a closed network connection error")
+				c.sem.Release(1)
 				continue
 			}
 
