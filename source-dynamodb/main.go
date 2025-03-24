@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	awsHTTP "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
@@ -112,5 +113,7 @@ type client struct {
 }
 
 func main() {
+	awsHTTP.DefaultHTTPTransportMaxIdleConns = 100        // From 100.
+	awsHTTP.DefaultHTTPTransportMaxIdleConnsPerHost = 100 // From 10.
 	boilerplate.RunMain(new(driver))
 }
