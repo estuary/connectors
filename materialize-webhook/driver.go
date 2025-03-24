@@ -61,7 +61,7 @@ func (c config) Validate() error {
 }
 
 type resource struct {
-	RelativePath string `json:"relativePath,omitempty" jsonschema:"title=Relative Path,description=Path which is joined with the base Address to build a complete URL" jsonschema_extras:"x-collection-name=true"`
+	RelativePath string `json:"relativePath" jsonschema:"title=Relative Path,description=Path which is joined with the base Address to build a complete URL" jsonschema_extras:"x-collection-name=true"`
 }
 
 func (r resource) Validate() error {
