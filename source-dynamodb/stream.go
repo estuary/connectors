@@ -12,7 +12,6 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
 
@@ -68,12 +67,10 @@ func (c *capture) streamTable(ctx context.Context, t *table) error {
 			// is no way to read shards for completely accurate ordering of events across _all_ keys
 			// - we can only get correct ordering relative to individual keys by reading shards in
 			// this way.
-
-			streamSemaphore := semaphore.NewWeighted(streamConcurrency)
 			for _, shardTree := range buildShardTrees(currentShards) {
 				shardTree := shardTree
 				workers.Go(func() error {
-					return c.readShardTree(workersCtx, streamSemaphore, t, shardTree, workers, workersStop, false, 0)
+					return c.readShardTree(workersCtx, t, shardTree, workers, workersStop, false, 0)
 				})
 			}
 
@@ -108,12 +105,10 @@ func (c *capture) catchupStreams(ctx context.Context, t *table, horizon time.Dur
 	}
 
 	workers, workersCtx := errgroup.WithContext(ctx)
-
-	streamSemaphore := semaphore.NewWeighted(streamConcurrency)
 	for _, shardTree := range buildShardTrees(currentShards) {
 		shardTree := shardTree
 		workers.Go(func() error {
-			return c.readShardTree(workersCtx, streamSemaphore, t, shardTree, workers, make(chan struct{}), true, horizon)
+			return c.readShardTree(workersCtx, t, shardTree, workers, make(chan struct{}), true, horizon)
 		})
 	}
 
@@ -169,7 +164,6 @@ func (c *capture) pruneShards(table *table, activeShards map[string]streamTypes.
 
 func (c *capture) readShardTree(
 	ctx context.Context,
-	sema *semaphore.Weighted,
 	t *table,
 	l *shardTree,
 	workers *errgroup.Group,
@@ -190,7 +184,7 @@ func (c *capture) readShardTree(
 
 	// Read the root shard to the end. If the shard is currently open, this will block until the
 	// shard is closed.
-	if err := c.readShard(ctx, sema, t, l.shard, workersStop, horizon); err != nil {
+	if err := c.readShard(ctx, t, l.shard, workersStop, horizon); err != nil {
 		return fmt.Errorf("reading shard tree: %w", err)
 	}
 
@@ -205,7 +199,7 @@ func (c *capture) readShardTree(
 		for _, child := range l.children {
 			child := child
 			workers.Go(func() error {
-				return c.readShardTree(ctx, sema, t, child, workers, workersStop, catchup, horizon)
+				return c.readShardTree(ctx, t, child, workers, workersStop, catchup, horizon)
 			})
 		}
 
@@ -215,7 +209,6 @@ func (c *capture) readShardTree(
 
 func (c *capture) readShard(
 	ctx context.Context,
-	sema *semaphore.Weighted,
 	t *table,
 	shard streamTypes.Shard,
 	workersStop <-chan struct{},
@@ -264,11 +257,11 @@ func (c *capture) readShard(
 			return fmt.Errorf("stream limiter wait: %w", err)
 		}
 
-		// Acquire one of the stream semaphores before initiating the GetRecords request, which may
+		// Acquire one of the capture semaphores before initiating the GetRecords request, which may
 		// return up to 10MB of data that will be buffered in-memory. The semaphore is released
 		// after the records have been emitted to Flow. Any error that occurs between here and then
 		// will cause the connector to exit.
-		if err := sema.Acquire(ctx, 1); err != nil {
+		if err := c.sem.Acquire(ctx, 1); err != nil {
 			return err
 		}
 
@@ -312,7 +305,7 @@ func (c *capture) readShard(
 			}
 		}
 
-		sema.Release(1)
+		c.sem.Release(1)
 
 		if reachedHorizon {
 			return nil

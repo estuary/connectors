@@ -10,6 +10,7 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
 
@@ -34,8 +35,9 @@ const (
 	// Number of concurrent workers to use when backfilling a table.
 	backfillConcurrency = 5
 
-	// Number of stream workers which may concurrently send requests for stream data.
-	streamConcurrency = 5
+	// Global limit on the number of concurrent in-flight network requests and
+	// subsequent processing of results.
+	globalConcurrencyLimit = 10
 
 	// Describe stream calls that are needed to get a shard listing are limited to 10 per second, so
 	// we need to do requests less often than that to avoid errors. See
@@ -88,6 +90,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		config:            cfg,
 		state:             checkpoint,
 		listShardsLimiter: rate.NewLimiter(rate.Limit(listShardsPerSecond), 1),
+		sem:               semaphore.NewWeighted(globalConcurrencyLimit),
 	}
 
 	if err := stream.Ready(false); err != nil {
