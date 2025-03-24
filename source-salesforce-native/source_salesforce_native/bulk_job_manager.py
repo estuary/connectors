@@ -1,6 +1,7 @@
 import asyncio
 import aiocsv
 import aiocsv.protocols
+import codecs
 from datetime import datetime
 from logging import Logger
 import re
@@ -109,10 +110,17 @@ class BulkJobManager:
         class AsyncByteReader(aiocsv.protocols.WithAsyncRead):
             def __init__(self, byte_gen: AsyncGenerator[bytes, None]):
                 self.byte_gen = byte_gen
+                self.decoder = codecs.getincrementaldecoder("utf-8")()
 
             async def read(self, size: int = -1) -> str:
-                decoded = (await self.byte_gen.__anext__()).decode('utf-8')
-                return decoded
+                try:
+                    chunk = await self.byte_gen.__anext__()
+                    return self.decoder.decode(chunk)
+                except StopAsyncIteration:
+                    # There should be no bytes left in the buffer after completely reading the CSV.
+                    if self.decoder.buffer != b"":
+                        raise BulkJobError("There were leftover bytes in the incremental decoder after reading the entire CSV.")
+                    raise
 
         byte_reader = AsyncByteReader(byte_generator)
         async for row in aiocsv.AsyncDictReader(byte_reader):
