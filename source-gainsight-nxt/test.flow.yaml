@@ -1,0 +1,46 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-gainsight-nxt:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_gainsight_nxt
+        config:
+          credentials:
+            credentials_title: Private App Credentials
+            access_token: access_token_from_gainsight
+          domain: https://subdomain.gainsightcloud.com
+          start_date: 2025-01-01T00:00:00Z
+    bindings:
+      - resource:
+          name: da_picklist
+          interval: PT5M
+        target: acmeCo/da_picklist
+      - resource:
+          name: companies
+          interval: PT5M
+        target: acmeCo/companies
+      - resource:
+          name: users
+          interval: PT5M
+        target: acmeCo/users
+      - resource:
+          name: success_plans
+          interval: PT5M
+        target: acmeCo/success_plans
+      - resource:
+          name: cs_tasks
+          interval: PT5M
+        target: acmeCo/cs_tasks
+      - resource:
+          name: activity_timelines
+          interval: PT5M
+        target: acmeCo/activity_timelines
+      - resource:
+          name: call_to_actions
+          interval: PT5M
+        target: acmeCo/call_to_actions
