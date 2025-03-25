@@ -93,13 +93,14 @@ func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
 func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFilesCommonURI, jobName, workingPrefix string) error {
 	/***
 	Available arguments to the pyspark script:
-	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script        | Required |
-	| --status-output          | Location where the final status object will be written.                | Required |
-	| --catalog-url            | The catalog URL                                                        | Required |
-	| --warehouse              | REST Warehouse                                                         | Required |
-	| --region                 | EMR & SigV4 Region                                                     | Required |
-	| --credential-secret-name | Name of the secret in Systems Manager if using client credentials auth | Optional |
-	| --scope                  | Scope if using client credentials auth                                 | Optional |
+	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script                      | Required |
+	| --status-output.         | Location where the final status object will be written.                              | Required |
+	| --catalog-url            | The catalog URL                                                                      | Required |
+	| --warehouse              | REST Warehouse                                                                       | Required |
+	| --region                 | EMR & SigV4 Region                                                                   | Required |
+	| --credential-secret-name | Name of the secret in Systems Manager if using client credentials auth               | Optional |
+	| --scope                  | Scope if using client credentials auth                                               | Optional |
+	| --signing-name           | Signing name to use when authenticating with AWS SigV4. Either 'glue' or 's3tables'. | Optional |
 	***/
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
@@ -139,6 +140,8 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		if s := e.catalogAuth.Scope; s != "" {
 			args = append(args, "--scope", s)
 		}
+	} else if e.catalogAuth.CatalogAuthType == catalogAuthTypeSigV4 {
+		args = append(args, "--signing-name", e.catalogAuth.catalogAuthSigV4Config.SigningName)
 	}
 
 	start, err := e.c.StartJobRun(ctx, &emr.StartJobRunInput{
