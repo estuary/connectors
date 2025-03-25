@@ -123,7 +123,7 @@ type advancedConfig struct {
 	IncrementalSCNRange  int      `json:"incremental_scn_range,omitempty" jsonschema:"title=Incremental SCN Range,default=50000,description=The SCN range captured at every iteration."`
 	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
-	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to online.,enum=extract,enum=online"`
+	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two modes based on requirements.,enum=extract,enum=online,enum=smart"`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -143,8 +143,8 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
 	}
 
-	if !slices.Contains([]string{"", DictionaryModeExtract, DictionaryModeOnline}, c.Advanced.DictionaryMode) {
-		return fmt.Errorf("dictionary mode must be one of %s or %s", DictionaryModeExtract, DictionaryModeOnline)
+	if !slices.Contains([]string{"", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart}, c.Advanced.DictionaryMode) {
+		return fmt.Errorf("dictionary mode must be one of %s or %s or %s", DictionaryModeExtract, DictionaryModeOnline, DictionaryModeSmart)
 	}
 
 	return nil
@@ -153,6 +153,7 @@ func (c *Config) Validate() error {
 const (
 	DictionaryModeExtract = "extract"
 	DictionaryModeOnline  = "online"
+	DictionaryModeSmart   = "smart"
 )
 
 // SetDefaults fills in the default values for unset optional parameters.
@@ -188,7 +189,7 @@ func (c *Config) SetDefaults(name string) {
 	}
 
 	if c.Advanced.DictionaryMode == "" {
-		c.Advanced.DictionaryMode = DictionaryModeOnline
+		c.Advanced.DictionaryMode = DictionaryModeSmart
 	}
 }
 
