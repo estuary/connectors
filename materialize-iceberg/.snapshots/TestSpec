@@ -102,13 +102,25 @@
                 "title": "Region",
                 "description": "AWS region for authentication.",
                 "order": 3
+              },
+              "signing_name": {
+                "type": "string",
+                "enum": [
+                  "glue",
+                  "s3tables"
+                ],
+                "title": "Signing Name",
+                "description": "Signing Name for SigV4 authentication.",
+                "default": "glue",
+                "order": 4
               }
             },
             "type": "object",
             "required": [
               "aws_access_key_id",
               "aws_secret_access_key",
-              "region"
+              "region",
+              "signing_name"
             ],
             "title": "AWS SigV4 Authentication"
           }

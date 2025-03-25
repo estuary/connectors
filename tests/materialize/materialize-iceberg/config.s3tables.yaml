@@ -1,14 +1,13 @@
-url: https://glue.us-east-2.amazonaws.com/iceberg
-warehouse: "076183946664"
+url: https://s3tables.us-east-2.amazonaws.com/iceberg
+warehouse: arn:aws:s3tables:us-east-2:076183946664:bucket/estuary-test-table-bucket
 namespace: ci_testing
-base_location: s3://estuary-connector-test-bucket/glue/
 hard_delete: true
 catalog_authentication:
     catalog_auth_type: AWS SigV4
     aws_access_key_id_sops: ENC[AES256_GCM,data:rjlhgHI4lBC4tn2c26sXhBHYssA=,iv:u0/KXArIZ0xSXBheNVmfJ38L/6Cofqhp6ah2z+E9HHw=,tag:BZXuQRKntqj1UIjRG0sYnQ==,type:str]
     aws_secret_access_key_sops: ENC[AES256_GCM,data:omek+Y+1o4to+AKbLuFbC0Sh3aKSAdWg11JrRPrtSIJGQYG5cWag0w==,iv:Viq2mm+WdsKlcwk7ixBLb49GdZKOnCn2oPmtOp8jc94=,tag:6+zSF7xzFyHUk6Nmavm+IA==,type:str]
     region: us-east-2
-    signing_name: glue
+    signing_name: s3tables
 compute:
     compute_type: AWS EMR Serverless
     aws_access_key_id_sops: ENC[AES256_GCM,data:cF3FsiBxupKJqIXrNirqMNmc+gI=,iv:rFYnteMlz4HIQFMnHsK58HWqRktgVUEXAPvfqe0ji4E=,tag:zIK1AURXB6Cy89n/WWtnKQ==,type:str]
@@ -29,8 +28,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-03-25T21:13:38Z"
-    mac: ENC[AES256_GCM,data:mAdyHEcokA6U+yd4lPz1vJ6EnDp/tAkdfVPBfYqfyv0FDWHDPycG+0ilYG8PN8R4MQoYvmNZKv3UmFyAS0lPOnNV9HCuFraK6Ae07Kq5TR1flftV6pn8JUqS8/9L6XYQYkPaFCpCsgDKtcPlvsv1jiRYxu8PfhP7N+7HFaFR/YM=,iv:TtNIKMhDYV3C1r/CS5U9atcX+Zf5aiiQjlPenbQ1PeM=,tag:m49kko/8PFYF3vKq15WF9A==,type:str]
+    lastmodified: "2025-03-25T21:15:02Z"
+    mac: ENC[AES256_GCM,data:2QWRKsxBgSo4V16+oV0gQUo5U41cWhDlRqN3LQmtzZ83ntmUHlTUfzidswsF2DDoCQmhpFqyJZUIqzEooMlX+N89De+McOfelubrF/aTQni/siV7Gt9/apF3apszSWGwj5HA512mDX0ZovGTetZH+qWnHgY5n7vmSN0UG0l+O7Y=,iv:fN64af+uGgJnSwU+9ksV2TLxBwSVuKliG7p0ApGsBGY=,tag:HEbCAbxCxgNDS9roPqpzVg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4

@@ -144,6 +144,7 @@ type catalogAuthSigV4Config struct {
 	AWSAccessKeyID     string `json:"aws_access_key_id" jsonschema:"title=AWS Access Key ID,description=Access Key ID for authentication." jsonschema_extras:"order=1"`
 	AWSSecretAccessKey string `json:"aws_secret_access_key" jsonschema:"title=AWS Secret Access key,description=Secret Access Key for authentication." jsonschema_extras:"secret=true,order=2"`
 	Region             string `json:"region" jsonschema:"title=Region,description=AWS region for authentication." jsonschema_extras:"order=3"`
+	SigningName        string `json:"signing_name" jsonschema:"title=Signing Name,description=Signing Name for SigV4 authentication.,enum=glue,enum=s3tables,default=glue" jsonschema_extras:"order=4"`
 }
 
 func (c catalogAuthSigV4Config) Validate() error {
@@ -151,11 +152,16 @@ func (c catalogAuthSigV4Config) Validate() error {
 		{"aws_access_key_id", c.AWSAccessKeyID},
 		{"aws_secret_access_key", c.AWSSecretAccessKey},
 		{"region", c.Region},
+		{"signing_name", c.SigningName},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if c.SigningName != "glue" && c.SigningName != "s3tables" {
+		return fmt.Errorf("signing_name must be 'glue' or 's3tables'")
 	}
 
 	return nil
@@ -233,8 +239,7 @@ func (c config) toCatalog(ctx context.Context) (*catalog.Catalog, error) {
 		opts = append(opts, catalog.WithClientCredential(cfg.Credential, cfg.Oauth2ServerURI, scope))
 	} else if c.CatalogAuthentication.CatalogAuthType == catalogAuthTypeSigV4 {
 		cfg := c.CatalogAuthentication.catalogAuthSigV4Config
-
-		opts = append(opts, catalog.WithSigV4(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.Region))
+		opts = append(opts, catalog.WithSigV4(cfg.SigningName, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.Region))
 	}
 
 	return catalog.New(ctx, c.URL, c.Warehouse, opts...)
