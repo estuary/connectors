@@ -87,12 +87,20 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		return nil, fmt.Errorf("preparing logminer query: %w", err)
 	}
 
+	var smartMode = db.config.Advanced.DictionaryMode == DictionaryModeSmart
+	var dictionaryMode = db.config.Advanced.DictionaryMode
+	if smartMode {
+		dictionaryMode = DictionaryModeOnline
+	}
 	var stream = &replicationStream{
 		db:   db,
 		conn: conn,
 
 		lastTxnEndSCN: startSCN,
 		logminerStmt:  stmt,
+
+		smartMode:      smartMode,
+		dictionaryMode: dictionaryMode,
 	}
 
 	stream.tables.active = make(map[string]struct{})
@@ -122,7 +130,7 @@ type redoFile struct {
 	DictEnd     string
 }
 
-func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN int64) error {
+func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN int64) (int, error) {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
 		"endSCN":   endSCN,
@@ -131,29 +139,29 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 
 	// See DBMS_LOGMNR_D.BUILD reference:
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_LOGMNR_D.html#GUID-20E210F3-A566-46F1-B817-486723069AF4
-	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
+	if s.dictionaryMode == DictionaryModeExtract {
 		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR_D.BUILD (options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;"); err != nil {
-			return fmt.Errorf("extracting dictionary from logfile: %w", err)
+			return 0, fmt.Errorf("extracting dictionary from logfile: %w", err)
 		}
 	}
 	// We only add the local version of archived log files to avoid duplicates
 	var row = s.conn.QueryRowContext(ctx, "SELECT DEST_ID FROM V$ARCHIVE_DEST_STATUS WHERE TYPE='LOCAL' AND STATUS='VALID' AND ROWNUM=1")
 	var localDestID int
 	if err := row.Scan(&localDestID); err != nil {
-		return fmt.Errorf("querying archive log files destination: %w", err)
+		return 0, fmt.Errorf("querying archive log files destination: %w", err)
 	}
 
 	var findEarliestLogSCNQuery = "SELECT MAX(NEXT_CHANGE#) FROM V$ARCHIVED_LOG WHERE NEXT_CHANGE# <= :scn"
 
 	// In order to make sure we don't hit dictionary mismatches in extract mode, we need to find the most recent archive log before
 	// or at our SCN range that begins a dictionary, so that early rows of this range are not missing their dictionary
-	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
+	if s.dictionaryMode == DictionaryModeExtract {
 		findEarliestLogSCNQuery += " AND DICTIONARY_BEGIN='YES'"
 	}
 	row = s.conn.QueryRowContext(ctx, findEarliestLogSCNQuery, startSCN)
 	var minArchiveSCNScan sql.NullInt64
 	if err := row.Scan(&minArchiveSCNScan); err != nil {
-		return fmt.Errorf("querying latest archive log to contain the dictionary for the SCN range: %w", err)
+		return 0, fmt.Errorf("querying latest archive log to contain the dictionary for the SCN range: %w", err)
 	}
 
 	var minArchiveSCN = minArchiveSCNScan.Int64
@@ -178,7 +186,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + " ORDER BY SEQUENCE#"
 	rows, err := s.conn.QueryContext(ctx, fullQuery, minArchiveSCN)
 	if err != nil {
-		return fmt.Errorf("fetching log file list: %w", err)
+		return 0, fmt.Errorf("fetching log file list: %w", err)
 	}
 	defer rows.Close()
 
@@ -188,7 +196,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		var f redoFile
 
 		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.DictStart, &f.DictEnd); err != nil {
-			return fmt.Errorf("scanning log file record: %w", err)
+			return 0, fmt.Errorf("scanning log file record: %w", err)
 		}
 
 		logrus.WithField("file", fmt.Sprintf("%+v", f)).Debug("adding log file")
@@ -209,7 +217,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 				// Skip this file
 				continue
 			} else {
-				return fmt.Errorf("found two log files with the same sequence number, but neither is CURRENT: %+v, %+v", f, last)
+				return 0, fmt.Errorf("found two log files with the same sequence number, but neither is CURRENT: %+v, %+v", f, last)
 			}
 		}
 
@@ -220,7 +228,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		redoFiles = append(redoFiles, f)
 
 		if f.FirstChange >= endSCN {
-			if s.db.config.Advanced.DictionaryMode == DictionaryModeOnline {
+			if s.dictionaryMode == DictionaryModeOnline {
 				break
 			}
 
@@ -233,25 +241,23 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 	}
 
 	if err := rows.Err(); err != nil {
-		return err
+		return 0, err
 	}
 
 	for _, f := range redoFiles {
 		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.Name); err != nil {
-			return fmt.Errorf("adding logfile %q (%s, %d, %s, %s) to logminer: %w", f.Name, f.Status, f.FirstChange, f.DictStart, f.DictEnd, err)
+			return 0, fmt.Errorf("adding logfile %q (%s, %d, %s, %s) to logminer: %w", f.Name, f.Status, f.FirstChange, f.DictStart, f.DictEnd, err)
 		}
 	}
 
-	s.redoSequence = redoSequence
-
-	return nil
+	return redoSequence, nil
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int64) error {
 	var dictionaryOption = ""
-	if s.db.config.Advanced.DictionaryMode == DictionaryModeExtract {
+	if s.dictionaryMode == DictionaryModeExtract {
 		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
-	} else if s.db.config.Advanced.DictionaryMode == DictionaryModeOnline {
+	} else if s.dictionaryMode == DictionaryModeOnline {
 		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG"
 	}
 
@@ -294,6 +300,12 @@ type replicationStream struct {
 	cancel context.CancelFunc            // Cancel function for the replication goroutine's context
 	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
 	events chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
+
+	// Is connector configured to be smart about dictionary mode
+	smartMode bool
+
+	// One of online or extract, the smart mode will switch between these two values on the replication stream
+	dictionaryMode string
 
 	// sequence# of the last redo log file read, used to check if new log files have appeared
 	redoSequence int
@@ -473,12 +485,13 @@ func (s *replicationStream) poll(ctx context.Context) error {
 
 		// If redo files have switched, we need to restart and add log files
 		// over again, otherwise we just start a new session with a different SCN range
+		var redoSequence int
 		if switched, err := s.redoFileSwitched(ctx); err != nil {
 			return err
 		} else if switched {
 			if err := s.endLogminer(ctx); err != nil {
 				return err
-			} else if err := s.addLogFiles(ctx, startSCN, endSCN); err != nil {
+			} else if redoSequence, err = s.addLogFiles(ctx, startSCN, endSCN); err != nil {
 				return err
 			} else if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
 				return err
@@ -490,6 +503,14 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		}
 
 		if err := s.receiveMessages(ctx, startSCN, endSCN); err != nil {
+			// If configured to use smart mode, switch to extract mode and re-try
+			// We will switch back to Online mode afterwards
+			var dictionaryMismatch = strings.Contains(strings.ToLower(err.Error()), "dictionary mismatch")
+			if dictionaryMismatch && s.dictionaryMode == DictionaryModeOnline && s.smartMode {
+				s.dictionaryMode = DictionaryModeExtract
+				logrus.Info("smart mode: encountered dictionary mismatch, switching to extract mode")
+				continue
+			}
 			return fmt.Errorf("receive messages: %w", err)
 		}
 
@@ -500,6 +521,13 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		s.lastTxnEndSCN = endSCN
 
 		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.FormatInt(s.lastTxnEndSCN, 10)}
+
+		if s.smartMode && s.dictionaryMode == DictionaryModeExtract {
+			s.dictionaryMode = DictionaryModeOnline
+			logrus.Info("smart mode: switching back to online mode")
+		}
+
+		s.redoSequence = redoSequence
 	}
 }
 

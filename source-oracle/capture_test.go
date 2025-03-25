@@ -395,7 +395,7 @@ func TestCaptureCapitalization(t *testing.T) {
 	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB)))
 }
 
-func TestSchemaChanges(t *testing.T) {
+func TestSchemaChangesExtract(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	tb.config.Advanced.DictionaryMode = DictionaryModeExtract
 	var uniqueID = "83287013"
@@ -420,7 +420,32 @@ func TestSchemaChanges(t *testing.T) {
 	t.Run("insert-after", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestSchemaChangesOnlineDictionary(t *testing.T) {
+func TestSchemaChangesSmart(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	tb.config.Advanced.DictionaryMode = DictionaryModeSmart
+	var uniqueID = "83287013"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
+	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Insert(ctx, t, tableName, [][]any{{1930, "BB", "No Such State", 10000}})
+
+	tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName))
+	t.Run("insert-before", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE year=1930", tableName))
+	t.Run("update", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE year = 1930", tableName))
+	t.Run("delete", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	tb.Insert(ctx, t, tableName, [][]any{{1940, "CC", "No Such State"}})
+	t.Run("insert-after", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
+func TestSchemaChangesOnline(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	var uniqueID = "83287013"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
