@@ -1,0 +1,92 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Private App Credentials": "#/$defs/AccessToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "domain": {
+          "description": "The domain of your Gainsight NXT account. For example, https://my-company.gainsight.com or https://my-custom-domain.com.",
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Domain",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated. If left blank, defaults to 30 days before current time.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentials",
+        "domain"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-gainsight-nxt",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
