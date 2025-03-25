@@ -309,7 +309,7 @@ func (d *transactor) addBinding(target sql.Table) error {
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
-		var tableName = strings.ReplaceAll(b.target.Path[len(b.target.Path)-1], " ", "_")
+		var tableName = b.target.Path[len(b.target.Path)-1]
 		var pipeName = strings.ToUpper(sanitizeAndAppendHash("flow_pipe", b.target.Binding, keyBegin, d.version, tableName))
 		b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, pipeName)
 	}
