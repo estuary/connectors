@@ -38,6 +38,7 @@ var oauth2ServerUri = flag.String("oauth2-server-uri", "v1/oauth/tokens", "OAuth
 var awsAccessKeyID = flag.String("aws-access-key-id", "", "AWS access key ID for using SigV4 authentication")
 var awsSecretAccessKey = flag.String("aws-secret-access-key", "", "AWS secret access key for using SigV4 authentication")
 var region = flag.String("region", "", "AWS region for using SigV4 authentication")
+var signingName = flag.String("signing-name", "", "Signing name for using SigV4 authentication")
 
 func getCatalog(ctx context.Context) (*catalog.Catalog, error) {
 	usingClientCredentialAuth := *clientCredential != ""
@@ -52,7 +53,7 @@ func getCatalog(ctx context.Context) (*catalog.Catalog, error) {
 	} else if !usingClientCredentialAuth && !usingSigV4Auth {
 		return nil, errors.New("must use either client credential or SigV4 authentication")
 	} else if usingSigV4Auth {
-		if *awsAccessKeyID == "" || *awsSecretAccessKey == "" || *region == "" {
+		if *signingName == "" || *awsAccessKeyID == "" || *awsSecretAccessKey == "" || *region == "" {
 			return nil, errors.New("missing required flags for SigV4 authentication")
 		}
 	}
@@ -61,7 +62,7 @@ func getCatalog(ctx context.Context) (*catalog.Catalog, error) {
 	if usingClientCredentialAuth {
 		opts = append(opts, catalog.WithClientCredential(*clientCredential, *oauth2ServerUri, scope))
 	} else if usingSigV4Auth {
-		opts = append(opts, catalog.WithSigV4(*awsAccessKeyID, *awsSecretAccessKey, *region))
+		opts = append(opts, catalog.WithSigV4(*signingName, *awsAccessKeyID, *awsSecretAccessKey, *region))
 	}
 
 	cat, err := catalog.New(ctx, *catalogUrl, *warehouse, opts...)

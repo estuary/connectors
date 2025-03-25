@@ -104,6 +104,11 @@ def common_args() -> argparse.Namespace:
         required=False,
         help="Scope when authenticating with client credentials.",
     )
+    parser.add_argument(
+        "--signing-name",
+        required=False,
+        help="Signing name to use when authenticating with AWS SigV4. Either 'glue' or 's3tables'.",
+    )
     return parser.parse_args()
 
 
@@ -143,7 +148,7 @@ def get_spark_session(args: argparse.Namespace) -> SparkSession:
     else:
         builder = (
             builder.config("spark.sql.catalog.estuary.rest.sigv4-enabled", "true")
-            .config("spark.sql.catalog.estuary.rest.signing-name", "glue")
+            .config("spark.sql.catalog.estuary.rest.signing-name", args.signing_name)
             .config("spark.sql.catalog.estuary.rest.signing-region", args.region)
         )
 

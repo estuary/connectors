@@ -73,10 +73,11 @@ export CATALOG_SCOPE="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.s
 export CATALOG_AWS_ACCESS_KEY_ID="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.aws_access_key_id)"
 export CATALOG_AWS_SECRET_ACCESS_KEY="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.aws_secret_access_key)"
 export CATALOG_REGION="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.region)"
+export CATALOG_AWS_SIGNING_NAME="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.signing_name)"
 
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 
-for var in CATALOG_CREDENTIAL CATALOG_SCOPE CATALOG_AWS_ACCESS_KEY_ID CATALOG_AWS_SECRET_ACCESS_KEY CATALOG_REGION; do
+for var in CATALOG_CREDENTIAL CATALOG_SCOPE CATALOG_AWS_ACCESS_KEY_ID CATALOG_AWS_SECRET_ACCESS_KEY CATALOG_REGION CATALOG_AWS_SIGNING_NAME; do
     [ "${!var}" = "null" ] && eval "$var=''"
 done
 
@@ -86,7 +87,7 @@ ICEBERG_HELPER_CMD="go run $(git rev-parse --show-toplevel)/materialize-iceberg/
 [ -n "$CATALOG_SCOPE" ] && ICEBERG_HELPER_CMD+=" --scope ${CATALOG_SCOPE}"
 
 if [ -n "$CATALOG_AWS_ACCESS_KEY_ID" ]; then
-    ICEBERG_HELPER_CMD+=" --aws-access-key-id ${CATALOG_AWS_ACCESS_KEY_ID} --aws-secret-access-key ${CATALOG_AWS_SECRET_ACCESS_KEY} --region ${CATALOG_REGION}"
+    ICEBERG_HELPER_CMD+=" --signing-name ${CATALOG_AWS_SIGNING_NAME} --aws-access-key-id ${CATALOG_AWS_ACCESS_KEY_ID} --aws-secret-access-key ${CATALOG_AWS_SECRET_ACCESS_KEY} --region ${CATALOG_REGION}"
 fi
 
 export ICEBERG_HELPER_CMD

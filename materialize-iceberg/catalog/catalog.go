@@ -148,6 +148,7 @@ type catalogOpts struct {
 	awsAccessKeyID     string
 	awsSecretAccessKey string
 	awsRegion          string
+	signingName        string
 }
 
 type CatalogOption = func(*catalogOpts)
@@ -163,17 +164,19 @@ func WithClientCredential(credential string, oath2ServerUri string, scope *strin
 	}
 }
 
-func WithSigV4(awsAccessKeyID string, awsSecretAccessKey string, awsRegion string) CatalogOption {
+func WithSigV4(signingName, awsAccessKeyID, awsSecretAccessKey, awsRegion string) CatalogOption {
 	return func(c *catalogOpts) {
 		c.useSigV4 = true
 		c.awsAccessKeyID = awsAccessKeyID
 		c.awsSecretAccessKey = awsSecretAccessKey
 		c.awsRegion = awsRegion
+		c.signingName = signingName
 	}
 }
 
 type Catalog struct {
-	rHttp *resty.Client
+	rHttp      *resty.Client
+	isS3tables bool
 }
 
 func New(ctx context.Context, catalogUrl string, warehouse string, opts ...CatalogOption) (*Catalog, error) {
@@ -215,6 +218,7 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 				AccessKeyID:     cfg.awsAccessKeyID,
 				SecretAccessKey: cfg.awsSecretAccessKey,
 			},
+			signingName: cfg.signingName,
 		})
 	} else {
 		return nil, errors.New("must provide an authentication option")
@@ -222,10 +226,12 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 
 	baseURL := parsedCatalogUrl.JoinPath("v1")
 	rc := &Catalog{
-		rHttp: rHttp.SetBaseURL(baseURL.String()),
+		rHttp:      rHttp.SetBaseURL(baseURL.String()),
+		isS3tables: cfg.signingName == "s3tables",
 	}
 
 	type configResponse struct {
+		Defaults  map[string]string `json:"defaults"`
 		Overrides map[string]string `json:"overrides"`
 	}
 
@@ -234,10 +240,22 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 		return nil, err
 	}
 
-	if catalogCfg.Overrides != nil {
-		if prefix, ok := catalogCfg.Overrides["prefix"]; ok {
-			rc.rHttp = rc.rHttp.SetBaseURL(baseURL.JoinPath(prefix).String())
+	// Get the extra URL prefix from the configuration defaults if it is there
+	// or overrides, preferring the value from overrides if both are present.
+	var prefix string
+	if catalogCfg.Defaults != nil {
+		if p, ok := catalogCfg.Defaults["prefix"]; ok {
+			prefix = p
 		}
+	}
+	if catalogCfg.Overrides != nil {
+		if p, ok := catalogCfg.Overrides["prefix"]; ok {
+			prefix = p
+
+		}
+	}
+	if prefix != "" {
+		rc.rHttp = rc.rHttp.SetBaseURL(baseURL.JoinPath(prefix).String())
 	}
 
 	return rc, nil
@@ -329,16 +347,18 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 	}
 
 	type createTableRequest struct {
-		Name       string          `json:"name"`
-		Schema     *iceberg.Schema `json:"schema"`
-		Location   *string         `json:"location,omitempty"`
-		WriteOrder *sortOrder      `json:"write-order,omitempty"`
+		Name        string          `json:"name"`
+		Schema      *iceberg.Schema `json:"schema"`
+		Location    *string         `json:"location,omitempty"`
+		WriteOrder  *sortOrder      `json:"write-order,omitempty"`
+		StageCreate bool            `json:"stage-create"` // always false, required to exist & be false for s3tables catalogs
 	}
 
 	req := createTableRequest{
-		Name:     name,
-		Schema:   sch,
-		Location: location,
+		Name:        name,
+		Schema:      sch,
+		Location:    location,
+		StageCreate: false,
 	}
 
 	if len(sortFieldIDs) > 0 {
@@ -366,7 +386,14 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 }
 
 func (c *Catalog) DeleteTable(ctx context.Context, ns string, name string) error {
-	if got, err := c.baseReq(ctx).Delete(fmt.Sprintf("/namespaces/%s/tables/%s", ns, name)); err != nil {
+	req := c.baseReq(ctx)
+	if c.isS3tables {
+		// This must be set if using s3tables. For glue, it must _not_ be set.
+		// For other REST catalogs (Snowflake open catalog, for example) it
+		// seems to generally cause permissions errors.
+		req = req.SetQueryParam("purgeRequested", "true")
+	}
+	if got, err := req.Delete(fmt.Sprintf("/namespaces/%s/tables/%s", ns, name)); err != nil {
 		return fmt.Errorf("failed to delete table %s.%s: %w", ns, name, err)
 	} else if !got.IsSuccess() {
 		return fmt.Errorf("failed to delete table %s.%s: %s: %s", ns, name, got.Status(), got.String())
@@ -458,10 +485,11 @@ func doPost(ctx context.Context, client *Catalog, path string, body any) error {
 const emptyStringHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
 type sigv4Transport struct {
-	delegate http.RoundTripper
-	signer   *v4.Signer
-	region   string
-	creds    aws.Credentials
+	delegate    http.RoundTripper
+	signer      *v4.Signer
+	region      string
+	creds       aws.Credentials
+	signingName string
 }
 
 func (t *sigv4Transport) RoundTrip(req *http.Request) (*http.Response, error) {
@@ -480,7 +508,7 @@ func (t *sigv4Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		hsh = emptyStringHash
 	}
 
-	if err := t.signer.SignHTTP(req.Context(), t.creds, req, hsh, "glue", t.region, time.Now()); err != nil {
+	if err := t.signer.SignHTTP(req.Context(), t.creds, req, hsh, t.signingName, t.region, time.Now()); err != nil {
 		return nil, err
 	}
 

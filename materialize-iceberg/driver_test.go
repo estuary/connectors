@@ -58,6 +58,7 @@ func testConfig(t *testing.T, ns string) config {
 		cfg.CatalogAuthentication.catalogAuthSigV4Config.AWSAccessKeyID = os.Getenv("ICEBERG_AWS_ACCESS_KEY_ID")
 		cfg.CatalogAuthentication.catalogAuthSigV4Config.AWSSecretAccessKey = os.Getenv("ICEBERG_AWS_SECRET_ACCESS_KEY")
 		cfg.CatalogAuthentication.catalogAuthSigV4Config.Region = os.Getenv("ICEBERG_AWS_REGION_NAME")
+		cfg.CatalogAuthentication.catalogAuthSigV4Config.SigningName = os.Getenv("ICEBERG_AWS_SIGNING_NAME")
 	}
 
 	if err := cfg.Validate(); err != nil {
