@@ -1,0 +1,30 @@
+---
+collections:
+  acmeCo/activity_timelines:
+    schema: activity_timelines.schema.yaml
+    key:
+      - /Gsid
+  acmeCo/call_to_actions:
+    schema: call_to_actions.schema.yaml
+    key:
+      - /Gsid
+  acmeCo/companies:
+    schema: companies.schema.yaml
+    key:
+      - /Gsid
+  acmeCo/cs_tasks:
+    schema: cs_tasks.schema.yaml
+    key:
+      - /Gsid
+  acmeCo/da_picklist:
+    schema: da_picklist.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/success_plans:
+    schema: success_plans.schema.yaml
+    key:
+      - /Gsid
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /Gsid
