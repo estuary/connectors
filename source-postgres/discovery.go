@@ -17,6 +17,15 @@ import (
 
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+	// This is an incredibly hacky place to put this logic and it isn't going to live here
+	// in the long term, but right this moment it satisfies an important production need:
+	// we need to know what the latest server XID was at the moment that the connector
+	// started up, and we need a rough estimate of the transaction rate over time. Since
+	// this discovery code gets run at startup and also runs automatically every 5 minutes,
+	// we accomplish both of those by querying and logging out the current server XID each
+	// time discovery runs.
+	queryAndLogCurrentXID(ctx, db.conn)
+
 	// Get lists of all tables, columns and primary keys in the database
 	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
@@ -722,4 +731,21 @@ func getColumnDescriptions(ctx context.Context, conn *pgx.Conn) ([]columnDescrip
 		descriptions = append(descriptions, desc)
 	}
 	return descriptions, rows.Err()
+}
+
+func queryAndLogCurrentXID(ctx context.Context, conn *pgx.Conn) {
+	var xid uint64
+	if err := conn.QueryRow(ctx, "SELECT txid_current()").Scan(&xid); err == nil {
+		logrus.WithField("xid", xid).Info("current transaction ID (from txid_current)")
+		return
+	} else {
+		logrus.WithError(err).Info("failed to query txid_current(), trying txid_snapshot_xmax()")
+	}
+
+	if err := conn.QueryRow(ctx, "SELECT txid_snapshot_xmax(txid_current_snapshot())").Scan(&xid); err == nil {
+		logrus.WithField("xid", xid).Info("current transaction ID (from txid_snapshot_xmax)")
+		return
+	} else {
+		logrus.WithError(err).Info("failed to query txid_snapshot_xmax()")
+	}
 }
