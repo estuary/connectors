@@ -13,6 +13,11 @@ import (
 // ShouldBackfill returns true if a given table's contents should be backfilled, given
 // that we intend to capture that table.
 func (db *sqlserverDatabase) ShouldBackfill(streamID string) bool {
+	// Allow the setting "*.*" to skip backfilling any tables.
+	if db.config.Advanced.SkipBackfills == "*.*" {
+		return false
+	}
+
 	if db.config.Advanced.SkipBackfills != "" {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.

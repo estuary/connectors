@@ -82,9 +82,20 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 		logrus.WithField("flags", featureFlags).Info("parsed feature flags")
 	}
 
+	// This is a bit of an ugly hack to allow us to specify a single _value_ as part of a feature flag.
+	// The alternative would be that we'd have to add a visible advanced option for what is really just
+	// an internal mechanism for us to use.
+	var initialBackfillCursor string
+	for flag, value := range featureFlags {
+		if strings.HasPrefix(flag, "initial_backfill_cursor=") && value {
+			initialBackfillCursor = strings.TrimPrefix(flag, "initial_backfill_cursor=")
+		}
+	}
+
 	var db = &postgresDatabase{
-		config:       &config,
-		featureFlags: featureFlags,
+		config:                &config,
+		featureFlags:          featureFlags,
+		initialBackfillCursor: initialBackfillCursor,
 	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
@@ -258,7 +269,8 @@ type postgresDatabase struct {
 	includeTxIDs    map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
 
-	featureFlags map[string]bool // Parsed feature flag settings with defaults applied
+	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
+	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 }
 
 func (db *postgresDatabase) HistoryMode() bool {
@@ -334,6 +346,11 @@ func (db *postgresDatabase) FallbackCollectionKey() []string {
 }
 
 func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
+	// Allow the setting "*.*" to skip backfilling any tables.
+	if db.config.Advanced.SkipBackfills == "*.*" {
+		return false
+	}
+
 	if db.config.Advanced.SkipBackfills != "" {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
