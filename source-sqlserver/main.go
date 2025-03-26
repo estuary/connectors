@@ -46,6 +46,12 @@ var featureFlagDefaults = map[string]bool{
 	// When true, the capture will use a fence mechanism based on observing CDC worker runs
 	// and LSN positions rather than the old watermark write mechanism.
 	"read_only": true,
+
+	// When true, the connector will tolerate missed changes in the CDC stream and will not
+	// trigger an automatic re-backfill if changes go missing. This may be useful if the CDC
+	// event data starts to expire before it can be captured, but should generally only be
+	// needed in exceptional circumstances when recovering from some sort of major breakage.
+	"tolerate_missed_changes": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
