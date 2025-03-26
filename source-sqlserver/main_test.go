@@ -113,6 +113,9 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   sanitizers,
 	}
+	if strings.Contains(*testFeatureFlags, "replica_fencing") {
+		cs.CaptureDelay = 1 * time.Second
+	}
 	if len(streamMatchers) > 0 {
 		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamMatchers...)
 	}
