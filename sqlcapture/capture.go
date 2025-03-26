@@ -174,7 +174,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
-	log.WithField("eventType", "connectorStatus").Info("Initializing replication")
+	log.WithField("cursor", c.State.Cursor).WithField("eventType", "connectorStatus").Info("Initializing replication")
 	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)

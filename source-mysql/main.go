@@ -91,9 +91,20 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 		logrus.WithField("flags", featureFlags).Info("parsed feature flags")
 	}
 
+	// This is a bit of an ugly hack to allow us to specify a single _value_ as part of a feature flag.
+	// The alternative would be that we'd have to add a visible advanced option for what is really just
+	// an internal mechanism for us to use.
+	var initialBackfillCursor string
+	for flag, value := range featureFlags {
+		if strings.HasPrefix(flag, "initial_backfill_cursor=") && value {
+			initialBackfillCursor = strings.TrimPrefix(flag, "initial_backfill_cursor=")
+		}
+	}
+
 	var db = &mysqlDatabase{
-		config:       &config,
-		featureFlags: featureFlags,
+		config:                &config,
+		featureFlags:          featureFlags,
+		initialBackfillCursor: initialBackfillCursor,
 	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
@@ -208,7 +219,8 @@ type mysqlDatabase struct {
 	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
 	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
 
-	featureFlags map[string]bool // Parsed feature flag settings with defaults applied
+	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
+	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 }
 
 func (db *mysqlDatabase) HistoryMode() bool {

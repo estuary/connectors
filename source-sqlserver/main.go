@@ -187,6 +187,16 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 		log.WithField("flags", featureFlags).Info("parsed feature flags")
 	}
 
+	// This is a bit of an ugly hack to allow us to specify a single _value_ as part of a feature flag.
+	// The alternative would be that we'd have to add a visible advanced option for what is really just
+	// an internal mechanism for us to use.
+	var initialBackfillCursor string
+	for flag, value := range featureFlags {
+		if strings.HasPrefix(flag, "initial_backfill_cursor=") && value {
+			initialBackfillCursor = strings.TrimPrefix(flag, "initial_backfill_cursor=")
+		}
+	}
+
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		host, port, err := net.SplitHostPort(config.Address)
@@ -211,8 +221,9 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 	}
 
 	var db = &sqlserverDatabase{
-		config:       &config,
-		featureFlags: featureFlags,
+		config:                &config,
+		featureFlags:          featureFlags,
+		initialBackfillCursor: initialBackfillCursor,
 	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
@@ -224,8 +235,9 @@ type sqlserverDatabase struct {
 	config *Config
 	conn   *sql.DB
 
-	featureFlags     map[string]bool // Parsed feature flag settings with defaults applied
-	datetimeLocation *time.Location  // The location in which to interpret DATETIME column values as timestamps.
+	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
+	datetimeLocation      *time.Location  // The location in which to interpret DATETIME column values as timestamps.
+	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {

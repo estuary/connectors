@@ -37,6 +37,12 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		return nil, fmt.Errorf("unable to connect to database for replication: %w", err)
 	}
 
+	// If we have no resume cursor but we do have an initial backfill cursor, use that as the start position.
+	if startCursor == "" && db.initialBackfillCursor != "" {
+		logrus.WithField("cursor", db.initialBackfillCursor).Info("using initial backfill cursor as start position")
+		startCursor = db.initialBackfillCursor
+	}
+
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
 	// Obtain the current WAL flush location on the server. We will need this either to
