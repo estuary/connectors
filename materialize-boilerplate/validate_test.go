@@ -357,7 +357,7 @@ func TestValidate(t *testing.T) {
 			nil,
 		)
 
-		require.ErrorContains(t, err, "cannot materialize collection with nullable key field 'key' unless it has a default value annotation")
+		require.ErrorContains(t, err, "cannot materialize collection 'key/value 'with nullable key field 'key' unless it has a default value annotation")
 	})
 
 	t.Run("can materialize a nullable collection key with a default value", func(t *testing.T) {
