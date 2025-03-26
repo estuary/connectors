@@ -74,6 +74,12 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor 
 		return nil, fmt.Errorf("error opening replication stream: %w", err)
 	}
 
+	// If we have no resume cursor but we do have an initial backfill cursor, use that as the start position.
+	if startCursor == "" && db.initialBackfillCursor != "" {
+		log.WithField("cursor", db.initialBackfillCursor).Info("using initial backfill cursor as start position")
+		startCursor = db.initialBackfillCursor
+	}
+
 	if startCursor == "" {
 		var maxLSN, err = cdcGetMaxLSN(ctx, db.conn)
 		if err != nil {
