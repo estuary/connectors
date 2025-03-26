@@ -599,7 +599,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	rs.tables.RLock()
 	for streamID, info := range rs.tables.info {
 		// Figure out which capture instance to use for the current polling cycle.
-		var instance = newestValidInstance(captureInstances[streamID], rs.fromLSN)
+		var instance = newestValidInstance(captureInstances[streamID], rs.fromLSN, rs.db.featureFlags["tolerate_missed_changes"])
 		if instance == nil {
 			failed = append(failed, streamID)
 			continue
@@ -683,7 +683,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 // for polling, but if the newest instance was created more recently than our last
 // polling cycle we can't quite use it yet, so we have to wait until our `fromLSN`
 // for polling advances past the point where the capture instance was created.
-func newestValidInstance(instances []*captureInstanceInfo, fromLSN LSN) *captureInstanceInfo {
+func newestValidInstance(instances []*captureInstanceInfo, fromLSN LSN, tolerateMissedChanges bool) *captureInstanceInfo {
 	var selected *captureInstanceInfo
 	for _, candidate := range instances {
 		if bytes.Compare(candidate.StartLSN, fromLSN) > 0 {
@@ -693,6 +693,17 @@ func newestValidInstance(instances []*captureInstanceInfo, fromLSN LSN) *capture
 			selected = candidate // Retain the newest valid instance
 		}
 	}
+
+	// If we're tolerating missed changes and nothing passed the StartLSN>fromLSN check,
+	// use the instance with the earliest StartLSN instead.
+	if selected == nil && tolerateMissedChanges {
+		for _, candidate := range instances {
+			if selected == nil || bytes.Compare(candidate.StartLSN, selected.StartLSN) < 0 {
+				selected = candidate
+			}
+		}
+	}
+
 	return selected
 }
 
@@ -758,7 +769,7 @@ func (rs *sqlserverReplicationStream) manageCaptureInstances(ctx context.Context
 			// explicit about that.
 			continue
 		}
-		var activeInstance = newestValidInstance(captureInstances[streamID], rs.fromLSN)
+		var activeInstance = newestValidInstance(captureInstances[streamID], rs.fromLSN, rs.db.featureFlags["tolerate_missed_changes"])
 		for _, candidate := range captureInstances[streamID] {
 			// Any instance which is valid (startLSN <= fromLSN) but not the newest one is eligible for deletion.
 			if bytes.Compare(candidate.StartLSN, rs.fromLSN) <= 0 && candidate != activeInstance {
