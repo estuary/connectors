@@ -1,0 +1,62 @@
+---
+collections:
+  acmeCo/addons:
+    schema: addons.schema.yaml
+    key:
+      - /addon/id
+  acmeCo/coupons:
+    schema: coupons.schema.yaml
+    key:
+      - /coupon/id
+  acmeCo/credit_notes:
+    schema: credit_notes.schema.yaml
+    key:
+      - /credit_note/id
+  acmeCo/customers:
+    schema: customers.schema.yaml
+    key:
+      - /customer/id
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+      - /event/id
+  acmeCo/hosted_pages:
+    schema: hosted_pages.schema.yaml
+    key:
+      - /hosted_page/id
+  acmeCo/invoices:
+    schema: invoices.schema.yaml
+    key:
+      - /invoice/id
+  acmeCo/orders:
+    schema: orders.schema.yaml
+    key:
+      - /order/id
+  acmeCo/payment_sources:
+    schema: payment_sources.schema.yaml
+    key:
+      - /payment_source/id
+  acmeCo/plans:
+    schema: plans.schema.yaml
+    key:
+      - /plan/id
+  acmeCo/quotes:
+    schema: quotes.schema.yaml
+    key:
+      - /quote/id
+  acmeCo/site_migration_details:
+    schema: site_migration_details.schema.yaml
+    key:
+      - /_meta/row_id
+  acmeCo/subscriptions:
+    schema: subscriptions.schema.yaml
+    key:
+      - /subscription/id
+  acmeCo/transactions:
+    schema: transactions.schema.yaml
+    key:
+      - /transaction/id
+  acmeCo/virtual_bank_accounts:
+    schema: virtual_bank_accounts.schema.yaml
+    key:
+      - /virtual_bank_account/id

@@ -1,0 +1,103 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ApiKey": {
+          "properties": {
+            "credentials_title": {
+              "const": "API Key",
+              "default": "API Key",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "api_key": {
+              "secret": true,
+              "title": "API Key",
+              "type": "string"
+            },
+            "password": {
+              "default": "",
+              "description": "This field is always blank for Chargebee authentication.",
+              "secret": true,
+              "title": "Password (Not Required)",
+              "type": "string"
+            }
+          },
+          "required": [
+            "api_key"
+          ],
+          "title": "ApiKey",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "API Key": "#/$defs/ApiKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiKey"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "site": {
+          "description": "The site prefix of your Chargebee account.",
+          "title": "Site",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated. If left blank, defaults to 30 days before current time.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "product_catalog": {
+          "const": "1.0",
+          "default": "1.0",
+          "description": "The product catalog version to use.",
+          "title": "Product Catalog",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentials",
+        "site"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-chargebee-native",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
