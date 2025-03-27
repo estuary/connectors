@@ -139,6 +139,9 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
             return True
         return super().should_retry(response)
 
+    def is_valid_record(self, potential_record: Any) -> bool:
+        return isinstance(potential_record, dict) and potential_record.get('event', None) and potential_record.get('properties', None)
+
     def iter_dicts(self, lines):
         """
         The incoming stream has to be JSON lines format.
@@ -151,7 +154,11 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
                 self.logger.warning(f"Couldn't fetch data from Export API. Response: {record_line}")
                 return
             try:
-                yield json.loads(record_line)
+                record = json.loads(record_line)
+                if self.is_valid_record(record):
+                    yield record
+                else:
+                    raise ValueError()
             except ValueError:
                 parts.append(record_line)
             else:
@@ -159,7 +166,11 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
 
             if len(parts) > 1:
                 try:
-                    yield json.loads("".join(parts))
+                    record = json.loads("".join(parts))
+                    if self.is_valid_record(record):
+                        yield record
+                    else:
+                        raise ValueError()
                 except ValueError:
                     pass
                 else:
