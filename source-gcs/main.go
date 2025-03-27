@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -14,6 +15,7 @@ import (
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -108,7 +110,9 @@ func validateBucket(ctx context.Context, cfg config, client *storage.Client) err
 	// (bucket exists & correct access) via the list operation, so we can interpret a "not found" as
 	// a successful outcome.
 	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
-	if _, err := client.Bucket(cfg.Bucket).Object(objectKey).Attrs(ctx); err != nil && err != storage.ErrObjectNotExist {
+	var apiErr *googleapi.Error
+	_, err := client.Bucket(cfg.Bucket).Object(objectKey).Attrs(ctx)
+	if !errors.As(err, &apiErr) || apiErr.Code != 404 {
 		return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
 	}
 
