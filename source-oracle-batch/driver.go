@@ -324,11 +324,11 @@ const defaultNumericPrecision = 38
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
 	var query = new(strings.Builder)
 
-	fmt.Fprintf(query, "SELECT t.owner, t.table_name, t.column_id, t.column_name,")
+	fmt.Fprintf(query, "SELECT t.owner, t.table_name, c.position, t.column_name,")
 	fmt.Fprintf(query, "t.data_type, t.data_precision, t.data_scale, t.data_length")
 	fmt.Fprintf(query, " FROM all_tab_columns t")
 	fmt.Fprintf(query, " INNER JOIN (")
-	fmt.Fprintf(query, "   SELECT c.owner, c.table_name, c.constraint_type, ac.column_name FROM all_constraints c")
+	fmt.Fprintf(query, "   SELECT c.owner, c.table_name, c.constraint_type, ac.column_name, ac.position FROM all_constraints c")
 	fmt.Fprintf(query, "     INNER JOIN all_cons_columns ac ON (")
 	fmt.Fprintf(query, "         c.constraint_name = ac.constraint_name")
 	fmt.Fprintf(query, "         AND c.table_name = ac.table_name")
@@ -339,7 +339,7 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	fmt.Fprintf(query, " ON (t.owner = c.owner AND t.table_name = c.table_name AND t.column_name = c.column_name)")
 	fmt.Fprintf(query, " WHERE t.owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'RDSADMIN', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS', 'GGS_ADMIN', 'GSMADMIN_INTERNAL')")
 	fmt.Fprintf(query, " AND t.table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')")
-	fmt.Fprintf(query, " ORDER BY t.table_name, t.column_id")
+	fmt.Fprintf(query, " ORDER BY t.table_name, c.position")
 
 	rows, err := db.QueryContext(ctx, query.String())
 	if err != nil {
