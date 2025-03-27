@@ -95,9 +95,13 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 	// The alternative would be that we'd have to add a visible advanced option for what is really just
 	// an internal mechanism for us to use.
 	var initialBackfillCursor string
+	var forceResetCursor string
 	for flag, value := range featureFlags {
 		if strings.HasPrefix(flag, "initial_backfill_cursor=") && value {
 			initialBackfillCursor = strings.TrimPrefix(flag, "initial_backfill_cursor=")
+		}
+		if strings.HasPrefix(flag, "force_reset_cursor=") && value {
+			forceResetCursor = strings.TrimPrefix(flag, "force_reset_cursor=")
 		}
 	}
 
@@ -105,6 +109,7 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 		config:                &config,
 		featureFlags:          featureFlags,
 		initialBackfillCursor: initialBackfillCursor,
+		forceResetCursor:      forceResetCursor,
 	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
@@ -221,6 +226,7 @@ type mysqlDatabase struct {
 
 	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
+	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
 }
 
 func (db *mysqlDatabase) HistoryMode() bool {
