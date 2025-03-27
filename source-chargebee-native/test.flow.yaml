@@ -1,0 +1,79 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-chargebee-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_chargebee_native
+        config:
+          credentials:
+            credentials_title: API Key
+            api_key: notanapikey
+          site: notasite
+          start_date: "2024-01-01T00:00:00Z"
+          product_catalog: "1.0"
+    bindings:
+      - resource:
+          name: site_migration_details
+          interval: PT2M
+        target: acmeCo/site_migration_details
+      - resource:
+          name: addons
+          interval: PT2M
+        target: acmeCo/addons
+      - resource:
+          name: coupons
+          interval: PT2M
+        target: acmeCo/coupons
+      - resource:
+          name: credit_notes
+          interval: PT2M
+        target: acmeCo/credit_notes
+      - resource:
+          name: customers
+          interval: PT2M
+        target: acmeCo/customers
+      - resource:
+          name: events
+          interval: PT2M
+        target: acmeCo/events
+      - resource:
+          name: hosted_pages
+          interval: PT2M
+        target: acmeCo/hosted_pages
+      - resource:
+          name: invoices
+          interval: PT2M
+        target: acmeCo/invoices
+      - resource:
+          name: orders
+          interval: PT2M
+        target: acmeCo/orders
+      - resource:
+          name: payment_sources
+          interval: PT2M
+        target: acmeCo/payment_sources
+      - resource:
+          name: plans
+          interval: PT2M
+        target: acmeCo/plans
+      - resource:
+          name: quotes
+          interval: PT2M
+        target: acmeCo/quotes
+      - resource:
+          name: subscriptions
+          interval: PT2M
+        target: acmeCo/subscriptions
+      - resource:
+          name: transactions
+          interval: PT2M
+        target: acmeCo/transactions
+      - resource:
+          name: virtual_bank_accounts
+          interval: PT2M
+        target: acmeCo/virtual_bank_accounts
