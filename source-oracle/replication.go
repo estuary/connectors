@@ -307,6 +307,9 @@ type replicationStream struct {
 	// One of online or extract, the smart mode will switch between these two values on the replication stream
 	dictionaryMode string
 
+	// maximum last DDL SCN of all active tables, we need to stay on extract mode until this SCN has passed
+	lastDDLSCN int64
+
 	// sequence# of the last redo log file read, used to check if new log files have appeared
 	redoSequence int
 
@@ -508,7 +511,13 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			var dictionaryMismatch = strings.Contains(strings.ToLower(err.Error()), "dictionary mismatch")
 			if dictionaryMismatch && s.dictionaryMode == DictionaryModeOnline && s.smartMode {
 				s.dictionaryMode = DictionaryModeExtract
-				logrus.Info("smart mode: encountered dictionary mismatch, switching to extract mode")
+				if lastDDLSCN, err := s.maximumLastDDLSCN(ctx); err != nil {
+					return err
+				} else {
+					s.lastDDLSCN = lastDDLSCN
+				}
+
+				logrus.WithField("lastDDLSCN", s.lastDDLSCN).Info("smart mode: encountered dictionary mismatch, switching to extract mode")
 				continue
 			}
 			return fmt.Errorf("receive messages: %w", err)
@@ -522,9 +531,12 @@ func (s *replicationStream) poll(ctx context.Context) error {
 
 		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.FormatInt(s.lastTxnEndSCN, 10)}
 
-		if s.smartMode && s.dictionaryMode == DictionaryModeExtract {
+		if s.smartMode && s.dictionaryMode == DictionaryModeExtract && int64(s.lastDDLSCN) < endSCN {
 			s.dictionaryMode = DictionaryModeOnline
-			logrus.Info("smart mode: switching back to online mode")
+			logrus.WithFields(logrus.Fields{
+				"lastDDLSCN": s.lastDDLSCN,
+				"endSCN":     endSCN,
+			}).Info("smart mode: switching back to online mode")
 		}
 
 		s.redoSequence = redoSequence
@@ -740,6 +752,67 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 	s.tables.keyColumns[streamID] = keyColumns
 	s.tables.discovery[streamID] = discovery
 	return nil
+}
+
+// This function is a no-op if there is no PDB name configured
+func (s *replicationStream) switchToCDB(ctx context.Context) error {
+	if s.db.pdbName == "" {
+		return nil
+	}
+
+	if _, err := s.conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
+		return fmt.Errorf("switching to CDB: %w", err)
+	}
+
+	return nil
+}
+
+// This function is a no-op if there is no PDB name configured
+func (s *replicationStream) switchToPDB(ctx context.Context) error {
+	if s.db.pdbName == "" {
+		return nil
+	}
+
+	if _, err := s.conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET CONTAINER=%s", s.db.pdbName)); err != nil {
+		return fmt.Errorf("switching to PDB %s: %w", s.db.pdbName, err)
+	}
+
+	return nil
+}
+
+// Each table has a LAST_DDL_TIME which specifies the last time it was modified
+// by a DDL statement. This function returns the maximum of all of those times
+// across all tables. When we hit a dictionary mismatch, we stay on Extract mode until
+// we have covered all the latest DDLs on all tables before switching back to online mode
+func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (int64, error) {
+	var tablesCondition = ""
+	var i = 0
+	for _, mapping := range s.db.tableObjectMapping {
+		if i > 0 {
+			tablesCondition += " OR "
+		}
+		tablesCondition += fmt.Sprintf("(OBJECT_ID = %d AND DATA_OBJECT_ID = %d)", mapping.objectID, mapping.dataObjectID)
+		i++
+	}
+	var query = fmt.Sprintf(`SELECT TIMESTAMP_TO_SCN(MAX(LAST_DDL_TIME)) last_ddl FROM ALL_OBJECTS WHERE %s`, tablesCondition)
+
+	if err := s.switchToPDB(ctx); err != nil {
+		return 0, err
+	}
+
+	logrus.WithField("t", fmt.Sprintf("%v", s.db.tableObjectMapping)).WithField("q", query).Info("maximum last ddl")
+	row := s.conn.QueryRowContext(ctx, query)
+
+	var maximumDDLSCN int64
+	if err := row.Scan(&maximumDDLSCN); err != nil {
+		return 0, fmt.Errorf("fetching maximum last DDL SCN: %w", err)
+	}
+
+	if err := s.switchToCDB(ctx); err != nil {
+		return 0, err
+	}
+
+	return maximumDDLSCN, nil
 }
 
 // Acknowledge informs the ReplicationStream that all messages up to the specified
