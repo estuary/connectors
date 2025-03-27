@@ -16,9 +16,9 @@ import (
 
 	"github.com/apache/iceberg-go"
 	"github.com/apache/iceberg-go/table"
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/aws/aws-sdk-go/aws"
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -262,7 +262,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 			}
 			return nil
 		}(),
-		MaxKeys: 1,
+		MaxKeys: aws.Int32(1),
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
 			err = fmt.Errorf("not authorized to list bucket %q", bucket)
