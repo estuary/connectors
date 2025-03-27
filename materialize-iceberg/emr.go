@@ -8,12 +8,12 @@ import (
 	"path"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	emrTypes "github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
-	"github.com/aws/aws-sdk-go/aws"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/materialize-iceberg/python"
 	"github.com/google/uuid"

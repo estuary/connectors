@@ -6,10 +6,10 @@ import (
 	"path"
 	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	"github.com/aws/aws-sdk-go/aws"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 )

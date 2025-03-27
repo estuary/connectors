@@ -257,6 +257,19 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 	var binlogOffsetOverflow bool
 	var binlogEstimatedOffset = uint64(cursor.Pos)
 
+	// The vitess SQL parser can be initialized with a few options that aren't relevant to
+	// us. Somewhat notably, the MySQLServerVersion is used when parsing version-specific
+	// MySQL comments in the form of /*!50708 sql here */. If the MySqlServerVersion is
+	// less than the version in that comment, the special comment is not parsed. If
+	// nothing is set for MySQLServerVersion, the default is 8.0.40. Also Note that in a
+	// previous version of the vitess SQL parser that we used the default was 5.07.09, but
+	// I don't think this should have any practical implications on our usage of the
+	// parser.
+	parser, err := sqlparser.New(sqlparser.Options{})
+	if err != nil {
+		return fmt.Errorf("creating SQL parser: %w", err)
+	}
+
 	for {
 		// Process the next binlog event from the database.
 		var event, err = rs.streamer.GetEvent(ctx)
@@ -560,7 +573,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				}
 			} else {
 				implicitFlush = true // Implicit FlushEvent conversion permitted
-				if err := rs.handleQuery(ctx, string(data.Schema), string(data.Query)); err != nil {
+				if err := rs.handleQuery(ctx, parser, string(data.Schema), string(data.Query)); err != nil {
 					return fmt.Errorf("error processing query event: %w", err)
 				}
 			}
@@ -651,7 +664,7 @@ var silentIgnoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|ROLLBACK|SAVE
 var createDefinerRegex = `CREATE\s*(OR REPLACE){0,1}\s*(ALGORITHM\s*=\s*[^ ]+)*\s*DEFINER`
 var ignoreQueriesRe = regexp.MustCompile(`(?i)^(BEGIN|COMMIT|GRANT|REVOKE|CREATE USER|` + createDefinerRegex + `|DROP USER|ALTER USER|DROP PROCEDURE|DROP FUNCTION|DROP TRIGGER|SET STATEMENT|CREATE EVENT|ALTER EVENT|DROP EVENT)`)
 
-func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query string) error {
+func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlparser.Parser, schema, query string) error {
 	// There are basically three types of query events we might receive:
 	//   * An INSERT/UPDATE/DELETE query is an error, we should never receive
 	//     these if the server's `binlog_format` is set to ROW as it should be
@@ -674,7 +687,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 	}
 	logrus.WithField("query", query).Info("handling query event")
 
-	var stmt, err = sqlparser.Parse(query)
+	var stmt, err = parser.Parse(query)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"query": query,
@@ -748,7 +761,11 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 			}
 		}
 	case *sqlparser.Insert:
-		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
+		table, err := stmt.Table.TableName()
+		if err != nil {
+			return fmt.Errorf("internal error: could no determine table name for Insert query %s: %w", query, err)
+		}
+		if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
 			return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 		}
 	case *sqlparser.Update:
@@ -762,7 +779,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, schema, query
 				return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 			}
 		}
-	case *sqlparser.OtherAdmin, *sqlparser.OtherRead:
+	case *sqlparser.OtherAdmin, *sqlparser.Analyze:
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	default:
 		return fmt.Errorf("unhandled query (go.estuary.dev/ceqr74): unhandled type %q: %q", reflect.TypeOf(stmt).String(), query)
@@ -916,7 +933,7 @@ func findColumnIndex(columns []string, name string) int {
 	return -1
 }
 
-func translateDataType(meta *mysqlTableMetadata, t sqlparser.ColumnType) any {
+func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType) any {
 	switch typeName := strings.ToLower(t.Type); typeName {
 	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
@@ -940,8 +957,8 @@ func translateDataType(meta *mysqlTableMetadata, t sqlparser.ColumnType) any {
 		var columnLength int
 		if t.Length == nil {
 			columnLength = 1 // A type of just 'BINARY' is allowed and is a synonym for 'BINARY(1)'
-		} else if n, err := strconv.Atoi(t.Length.Val); err == nil {
-			columnLength = n // Otherwise if a length is specified we should be able to parse that as an integer and use that
+		} else {
+			columnLength = *t.Length
 		}
 		return &mysqlColumnType{Type: typeName, MaxLength: columnLength}
 	default:
