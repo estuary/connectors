@@ -298,7 +298,10 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	}
 	var ownersCondition = " WHERE t.owner IN ('" + strings.Join(owners, "','") + "')"
 
-	var rows, err = conn.QueryContext(ctx, queryDiscoverColumns+ownersCondition)
+	var ordering = " ORDER BY t.table_name, c.position"
+
+	var fullQuery = queryDiscoverColumns + ownersCondition + ordering
+	var rows, err = conn.QueryContext(ctx, fullQuery)
 	if err != nil {
 		return nil, nil, fmt.Errorf("fetching columns: %w", err)
 	}

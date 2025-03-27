@@ -1,9 +1,9 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT83287013":{"backfilled":1,"key_columns":["STATE","YEAR"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT23135019":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"}},"cursor":"11111111"}
 # ================================
 # Captures Terminated With Errors
 # ================================
-failed to poll messages: receive messages: dictionary mismatch (Dictionary Mismatch) for table "T83287013": "insert into \"C##FLOW_TEST_LOGMINER\".\"T83287013\"(\"COL 1\",\"COL 2\",\"COL 3\",\"COL 4\") values (HEXTORAW('c2141f'),HEXTORAW('4242'),HEXTORAW('4e6f2053756368205374617465'),HEXTORAW('c302'));"
+failed to poll messages: receive messages: dictionary mismatch (Dictionary Mismatch) for table "T23135019": "insert into \"C##FLOW_TEST_LOGMINER\".\"T23135019\"(\"COL 1\",\"COL 2\",\"COL 3\",\"COL 4\") values (HEXTORAW('c2141f'),HEXTORAW('4242'),HEXTORAW('4e6f2053756368205374617465'),HEXTORAW('c302'));"
 
