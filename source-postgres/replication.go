@@ -43,6 +43,12 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 		startCursor = db.initialBackfillCursor
 	}
 
+	// If the `force_reset_cursor=XYZ` hackery flag is set, use that as the start position regardless of anything else.
+	if db.forceResetCursor != "" {
+		logrus.WithField("cursor", db.forceResetCursor).Info("forcibly modified resume cursor")
+		startCursor = db.forceResetCursor
+	}
+
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
 	// Obtain the current WAL flush location on the server. We will need this either to

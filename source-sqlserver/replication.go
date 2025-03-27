@@ -80,6 +80,12 @@ func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor 
 		startCursor = db.initialBackfillCursor
 	}
 
+	// If the `force_reset_cursor=XYZ` hackery flag is set, use that as the start position regardless of anything else.
+	if db.forceResetCursor != "" {
+		log.WithField("cursor", db.forceResetCursor).Info("forcibly modified resume cursor")
+		startCursor = db.forceResetCursor
+	}
+
 	if startCursor == "" {
 		var maxLSN, err = cdcGetMaxLSN(ctx, db.conn)
 		if err != nil {
