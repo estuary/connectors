@@ -2,14 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
 )
 
 func TestViewDiscovery(t *testing.T) {
@@ -377,7 +380,7 @@ func TestCaptureCapitalization(t *testing.T) {
 	var tableA = tablePrefix + "_AaAaA_" + uniqueA                  // Name containing capital letters
 	var tableB = strings.ToUpper(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all uppercase (like all our other test table names)
 
-	var cleanup = func() {
+	cleanup := func() {
 		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableA))
 		tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."%s"`, tb.config.User, tableB))
 	}
@@ -420,34 +423,78 @@ func TestSchemaChangesExtract(t *testing.T) {
 	t.Run("insert-after", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
-func TestSchemaChangesSmart(t *testing.T) {
+type doc struct {
+	Year       string `json:"YEAR"`
+	State      string `json:"STATE"`
+	Fullname   string `json:"FULLNAME"`
+	Population string `json:"POPULATION,omitempty"`
+}
+
+func TestSchemaChangesSmartMultiple(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
 	tb.config.Advanced.DictionaryMode = DictionaryModeSmart
-	var uniqueID = "83287013"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
-	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	var uniqueID1 = "47287013"
+	var uniqueID2 = "94367083"
+	var tableName1 = tb.CreateTable(ctx, t, uniqueID1, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
+	var tableName2 = tb.CreateTable(ctx, t, uniqueID2, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID1), regexp.MustCompile(uniqueID2))
 
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
 
-	tb.Insert(ctx, t, tableName, [][]any{{1930, "BB", "No Such State", 10000}})
+	tb.Insert(ctx, t, tableName1, [][]any{{1900, "AA", "No Such State", 20000}})
+	tb.Insert(ctx, t, tableName2, [][]any{{1910, "AA", "No Such State", 20000}})
 
-	tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName))
-	t.Run("insert-before", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	var step = 0
+	cs.Capture(captureCtx, t, func(data json.RawMessage) {
+		if !strings.Contains(string(data), "bindingStateV1") {
+			var d doc
+			err := json.Unmarshal(data, &d)
+			require.NoError(t, err)
 
-	tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET fullname = 'New ' || fullname WHERE year=1930", tableName))
-	t.Run("update", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+			if d.Year == "1910" && step == 0 {
+				time.Sleep(1 * time.Second)
 
-	tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s WHERE year = 1930", tableName))
-	t.Run("delete", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+				tb.Insert(ctx, t, tableName1, [][]any{{1920, "BB", "No Such State", 10000}})
 
-	tb.Insert(ctx, t, tableName, [][]any{{1940, "CC", "No Such State"}})
-	t.Run("insert-after", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+				tb.Insert(ctx, t, tableName2, [][]any{{1930, "BB", "No Such State", 10000}})
+
+				tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName2))
+
+				step = 1
+			} else if d.Year == "1930" && step == 1 {
+
+				tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET year=1940 WHERE year=1920", tableName1))
+				tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET year=1950 WHERE year=1930", tableName2))
+
+				tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName1))
+
+				tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET year=1960 WHERE year=1940", tableName1))
+				tb.Query(ctx, t, true, fmt.Sprintf("UPDATE %s SET year=1970 WHERE year=1950", tableName2))
+
+				tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s ADD population INTEGER", tableName2))
+				tb.Query(ctx, t, true, fmt.Sprintf("ALTER TABLE %s DROP COLUMN population", tableName2))
+
+				step = 3
+			} else if d.Year == "1970" && step == 3 {
+				tb.Insert(ctx, t, tableName1, [][]any{{1980, "CC", "No Such State"}})
+				tb.Insert(ctx, t, tableName2, [][]any{{1990, "CC", "No Such State"}})
+				step = 4
+			} else if d.Year == "1990" && step == 4 {
+				tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s", tableName1))
+				tb.Query(ctx, t, true, fmt.Sprintf("DELETE FROM %s", tableName2))
+				step = 5
+			} else if d.Year == "1990" && step == 5 {
+				cancelCapture()
+			}
+		}
+	})
+
+	cupaloy.SnapshotT(t, cs.Summary())
 }
 
 func TestSchemaChangesOnline(t *testing.T) {
 	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
-	var uniqueID = "83287013"
+	var uniqueID = "23135019"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
 	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
