@@ -60,6 +60,12 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		startCursor = db.initialBackfillCursor
 	}
 
+	// If the `force_reset_cursor=XYZ` hackery flag is set, use that as the start position regardless of anything else.
+	if db.forceResetCursor != "" {
+		logrus.WithField("cursor", db.forceResetCursor).Info("forcibly modified resume cursor")
+		startCursor = db.forceResetCursor
+	}
+
 	var pos mysql.Position
 	if startCursor != "" {
 		pos, err = parseCursor(startCursor)
