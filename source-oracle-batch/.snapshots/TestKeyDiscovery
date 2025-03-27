@@ -18,8 +18,8 @@ Binding 0:
         "required": [
           "_meta",
           "K_SMALLINT",
-          "K_INT",
           "K_BOOL",
+          "K_INT",
           "K_STR"
         ],
         "properties": {
@@ -64,8 +64,8 @@ Binding 0:
       },
       "key": [
         "/K_SMALLINT",
-        "/K_INT",
         "/K_BOOL",
+        "/K_INT",
         "/K_STR"
       ],
       "projections": null
