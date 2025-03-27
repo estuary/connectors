@@ -2,6 +2,7 @@ package boilerplate
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -228,12 +229,14 @@ func runActions(ctx context.Context, actions []ActionApplyFn, descriptions []str
 			i := i
 			group.Go(func() error {
 				if err := a(groupCtx); err != nil {
-					logrus.WithFields(logrus.Fields{
-						"actionIndex":       i,
-						"totalActions":      len(actions),
-						"actionDescription": descriptions[i],
-						"error":             fmt.Sprintf("%+v", err),
-					}).Error("error executing apply action")
+					if !errors.Is(err, context.Canceled) {
+						logrus.WithFields(logrus.Fields{
+							"actionIndex":       i,
+							"totalActions":      len(actions),
+							"actionDescription": descriptions[i],
+							"error":             fmt.Sprintf("%+v", err),
+						}).Error("error executing apply action")
+					}
 					return err
 				}
 				return nil
