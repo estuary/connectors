@@ -191,92 +191,88 @@ func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 	return nil
 }
 
-type body struct {
-	content bytes.Buffer
-	done    bool
+func (d *transactor) sendWebhook(ctx context.Context, address string, body bytes.Buffer) error {
+	for attempt := 0; true; attempt++ {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff(attempt)):
+			// Fallthrough
+		}
+
+		request, err := http.NewRequest("POST", address, bytes.NewReader((body.Bytes())))
+		if err != nil {
+			return fmt.Errorf("http.NewRequest(%s): %w", address, err)
+		}
+
+		request.Header.Add("Content-Type", "application/json")
+
+		for i := range d.customHeaders {
+			header := d.customHeaders[i]
+			request.Header.Add(header.Name, header.Value)
+		}
+
+		response, err := http.DefaultClient.Do(request)
+		if err == nil {
+			err = response.Body.Close()
+		}
+		if err == nil && (response.StatusCode < 200 || response.StatusCode >= 300) {
+			err = fmt.Errorf("unexpected webhook response code %d from %s", response.StatusCode, address)
+		}
+
+		if err == nil {
+			break
+		} else if attempt == 10 {
+			return fmt.Errorf("webhook failed after many attempts: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Store streams StoreIterator documents directly into the webhook body.
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	const requestSizeCutoff = 1024 * 1024 * 1 // 1 MiB
-	var bodies = make([]body, len(d.addresses))
-	hasMore := true
+	var body bytes.Buffer
 	ctx := it.Context()
 
-	for hasMore {
-		for hasMore = it.Next(); hasMore; hasMore = it.Next() {
-			var b = &bodies[it.Binding]
+	previousBinding := -1
+	for it.Next() {
+		if previousBinding == -1 {
+			previousBinding = it.Binding
+		}
 
-			if b.content.Len() != 0 {
-				b.content.WriteString(",\n")
-			} else {
-				b.content.WriteString("[\n")
+		// Send a webhook if the binding switches or the body is over the cutoff
+		if it.Binding != previousBinding || body.Len() >= requestSizeCutoff {
+			body.WriteString("]")
+			if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
+				return nil, fmt.Errorf("draining previous binding: %w", err)
 			}
 
-			if _, err := b.content.Write(it.RawJSON); err != nil {
-				return nil, err
-			}
+			body.Reset()
 
-			if b.content.Len() >= requestSizeCutoff {
-				b.done = true
-				break
+			if it.Binding != previousBinding {
+				previousBinding = it.Binding
 			}
 		}
 
-		for i := range bodies {
-			body := &bodies[i]
-			if (!hasMore || body.done) && body.content.Len() > 0 {
-				body.content.WriteString("\n]")
-				body.done = true
-			}
+		if body.Len() == 0 {
+			body.WriteString("[")
+		} else {
+			body.WriteString(",")
 		}
 
-		for i, address := range d.addresses {
-			var address = address.String()
-			var body = &bodies[i]
-
-			if !body.done {
-				continue
-			}
-
-			for attempt := 0; true; attempt++ {
-				select {
-				case <-ctx.Done():
-					return nil, ctx.Err()
-				case <-time.After(backoff(attempt)):
-					// Fallthrough
-				}
-
-				request, err := http.NewRequest("POST", address, bytes.NewReader(body.content.Bytes()))
-				if err != nil {
-					return nil, fmt.Errorf("http.NewRequest(%s): %w", address, err)
-				}
-
-				request.Header.Add("Content-Type", "application/json")
-
-				for i := range d.customHeaders {
-					header := d.customHeaders[i]
-					request.Header.Add(header.Name, header.Value)
-				}
-
-				response, err := http.DefaultClient.Do(request)
-				if err == nil {
-					err = response.Body.Close()
-				}
-				if err == nil && (response.StatusCode < 200 || response.StatusCode >= 300) {
-					err = fmt.Errorf("unexpected webhook response code %d from %s",
-						response.StatusCode, address)
-				}
-
-				if err == nil {
-					body.content.Reset()
-					body.done = false
-					break
-				} else if attempt == 10 {
-					return nil, fmt.Errorf("webhook failed after many attempts: %w", err)
-				}
-			}
+		if _, err := body.Write(it.RawJSON); err != nil {
+			return nil, err
 		}
+	}
+
+	if body.Len() > 0 {
+		body.WriteString("]")
+		if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
+			return nil, fmt.Errorf("draining previous binding: %w", err)
+		}
+		body.Reset()
 	}
 
 	return nil, nil
