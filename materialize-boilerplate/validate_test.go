@@ -3,6 +3,7 @@ package boilerplate
 import (
 	"embed"
 	"encoding/json"
+	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -294,7 +295,7 @@ func TestValidate(t *testing.T) {
 			existing,
 		)
 
-		require.ErrorContains(t, err, "backfill count 0 is less than previously applied count of 1")
+		require.ErrorContains(t, err, fmt.Sprintf("backfill count 0 is less than previously applied count of 1 (%s)", proposed.Bindings[0].Collection.Name))
 	})
 
 	t.Run("can't switch from delta to standard updates", func(t *testing.T) {
