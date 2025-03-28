@@ -140,7 +140,7 @@ type Database interface {
 
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
-	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, err error)
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, nextRowKey []byte, err error)
 	// DiscoverTables queries the database for the latest information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.

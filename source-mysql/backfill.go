@@ -10,7 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
+func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -38,10 +38,10 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return false, nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return false, nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 
 			logrus.WithFields(logrus.Fields{
@@ -66,7 +66,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
@@ -79,14 +79,15 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	// so we have to drop down a level and prepare the statement ourselves here.
 	var stmt, err = db.conn.Prepare(query)
 	if err != nil {
-		return false, fmt.Errorf("error preparing query %q: %w", query, err)
+		return false, nil, fmt.Errorf("error preparing query %q: %w", query, err)
 	}
 	defer stmt.Close()
 
 	var result mysql.Result
 	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
 
-	var resultRows int // Count of rows received within the current backfill chunk
+	var resultRows int    // Count of rows received within the current backfill chunk
+	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
 	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
 		var fields = make(map[string]any)
@@ -103,6 +104,8 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
+		nextRowKey = rowKey
+
 		if err := db.translateRecordFields(true, columnTypes, fields); err != nil {
 			return fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
@@ -130,11 +133,11 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		rowOffset++
 		return nil
 	}, nil, args...); err != nil {
-		return false, fmt.Errorf("error executing backfill: %w", err)
+		return false, nil, fmt.Errorf("error executing backfill: %w", err)
 	}
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, nil
+	return backfillComplete, nextRowKey, nil
 }
 
 // The set of MySQL column types for which we need to specify `BINARY` ordering
