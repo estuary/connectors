@@ -80,9 +80,46 @@ class IncrementalChargebeeResource(ChargebeeResource):
     CURSOR_FIELD: ClassVar[str] = "updated_at"
     ID_FIELD: ClassVar[str] = "id"
     DELETED_FIELD: ClassVar[str] = "deleted"
+    TIMESTAMP_FIELDS: ClassVar[List[str]] = [
+        "created_at",
+        "updated_at",
+        "archived_at",
+        "vat_number_validated_time",
+        "start_date",
+        "trial_start",
+        "trial_end",
+        "current_term_start",
+        "current_term_end",
+        "next_billing_at",
+        "started_at",
+        "archived_at",
+        "pause_date",
+        "resume_date",
+        "cancelled_at",
+        "cancel_schedule_created_at",
+        "due_since",
+        "changes_scheduled_at",
+        "invoice_date",
+        "date",
+        "activated_date",
+        "contract_start",
+        "contract_end",
+        "scheduled_at",
+        "actual_delivered_at",
+        "claim_expiry_date",
+        "gifted_at",
+        "cancelled_at",
+        "paused_at",
+        "resumed_at",
+        "scheduled_pause_at",
+        "scheduled_resume_at",
+        "event_time",
+        "due_date",
+        # TODO(jsmith): more fields to list
+    ]
 
     id: str = Field(exclude=True)
-    updated_at: int = Field(exclude=True)
+    updated_at: AwareDatetime = Field(exclude=True)
     deleted: bool = Field(exclude=True)
 
     @staticmethod
@@ -93,6 +130,23 @@ class IncrementalChargebeeResource(ChargebeeResource):
                 raise TypeError(
                     f"Class {class_obj.__name__} must define class attribute '{attr}'"
                 )
+
+    @classmethod
+    def convert_timestamp_fields(cls, data: dict, field_names: List[str]) -> None:
+        if not isinstance(data, dict):
+            return
+
+        for field in field_names:
+            if field in data and isinstance(data[field], int):
+                data[field] = datetime.fromtimestamp(data[field], tz=UTC)
+
+        for key, value in data.items():
+            if isinstance(value, dict):
+                cls.convert_timestamp_fields(value, field_names)
+            elif isinstance(value, list):
+                for item in value:
+                    if isinstance(item, dict):
+                        cls.convert_timestamp_fields(item, field_names)
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -118,6 +172,10 @@ class IncrementalChargebeeResource(ChargebeeResource):
             data["id"] = data[cls.RESOURCE_KEY][cls.ID_FIELD]
             data["updated_at"] = data[cls.RESOURCE_KEY][cls.CURSOR_FIELD]
             data["deleted"] = data[cls.RESOURCE_KEY].get(cls.DELETED_FIELD, False)
+
+            if cls.TIMESTAMP_FIELDS:
+                cls.convert_timestamp_fields(data, cls.TIMESTAMP_FIELDS)
+
         return data
 
 

@@ -23,10 +23,6 @@ def _dt_to_ts(dt: datetime) -> int:
     return int(dt.timestamp())
 
 
-def _ts_to_dt(ts: int) -> datetime:
-    return datetime.fromtimestamp(ts, tz=UTC)
-
-
 async def _fetch_resource_data(
     http: HTTPSession,
     log: Logger,
@@ -141,9 +137,9 @@ async def fetch_resource_changes(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ChargebeeResource | LogCursor, None]:
-    assert isinstance(log_cursor, int)
+    assert isinstance(log_cursor, datetime)
 
-    max_updated_at = _ts_to_dt(log_cursor)
+    max_updated_at = log_cursor
     has_results = False
     end_date = min(max_updated_at + timedelta(days=30), datetime.now(tz=UTC))
     offset = None
@@ -167,7 +163,7 @@ async def fetch_resource_changes(
         has_results = True
 
         for doc in resource_data:
-            max_updated_at = max(max_updated_at, _ts_to_dt(doc.updated_at))
+            max_updated_at = max(max_updated_at, doc.updated_at)
 
             if doc.deleted:
                 doc.meta_ = doc.Meta(op="d")

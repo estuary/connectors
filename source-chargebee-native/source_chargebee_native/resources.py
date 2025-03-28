@@ -222,7 +222,7 @@ async def incremental_resources(
             model=resource_type,
             open=functools.partial(open, name, resource_type),
             initial_state=common.ResourceState(
-                inc=common.ResourceState.Incremental(cursor=int(cutoff.timestamp())),
+                inc=common.ResourceState.Incremental(cursor=cutoff),
                 backfill=common.ResourceState.Backfill(cutoff=cutoff, next_page=None),
             ),
             initial_config=common.ResourceConfig(
