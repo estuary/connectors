@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb/v2"
 	iso8601 "github.com/senseyeio/duration"
 	"github.com/stretchr/testify/require"
 )

@@ -24,7 +24,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 type config struct {

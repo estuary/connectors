@@ -23,7 +23,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 var catalogUrl = flag.String("catalog-url", "", "catalog url to connect to")

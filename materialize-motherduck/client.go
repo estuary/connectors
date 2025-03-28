@@ -18,7 +18,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 
-	_ "github.com/marcboeker/go-duckdb"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
