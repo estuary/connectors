@@ -25,6 +25,7 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 		db.prerequisiteChangeTableCleanup,
 		db.prerequisiteCaptureInstanceManagement,
 		db.prerequisiteMaximumLSN,
+		db.prerequisiteConnectionEncryption,
 	}
 
 	// In non-read-only mode we still need to verify watermarks table usability.
@@ -175,6 +176,28 @@ func (db *sqlserverDatabase) prerequisiteCaptureInstanceManagement(ctx context.C
 	} else if !hasPermission {
 		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
 	}
+	return nil
+}
+
+func (db *sqlserverDatabase) prerequisiteConnectionEncryption(ctx context.Context) error {
+	var sessionId int
+	if err := db.conn.QueryRowContext(ctx, `SELECT @@SPID;`).Scan(&sessionId); err != nil {
+		log.Warn(fmt.Errorf("unable to query @@SPID: %w", err))
+	}
+
+	var encryptOption bool
+	if err := db.conn.QueryRowContext(ctx, `SELECT encrypt_option FROM sys.dm_exec_connections WHERE session_id = @@SPID;`).Scan(&encryptOption); err != nil {
+		log.WithFields(log.Fields{
+			"err":       err,
+			"sessionId": sessionId,
+		}).Debug("unable to query connection encryption option")
+	} else {
+		log.WithFields(log.Fields{
+			"encrypted": encryptOption,
+			"sessionId": sessionId,
+		}).Info("connection encryption option")
+	}
+
 	return nil
 }
 
