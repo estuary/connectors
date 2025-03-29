@@ -13,7 +13,7 @@ import (
 )
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
+func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	logrus.WithField("state", state).Debug("ScanChunk")
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
@@ -44,10 +44,10 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return false, nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return false, nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 			logEntry.WithFields(logrus.Fields{
 				"keyColumns": keyColumns,
@@ -62,7 +62,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			query = db.buildScanQuery(true, info, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
@@ -72,16 +72,17 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
-		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return false, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 
 	// Process the results into `changeEvent` structs and return them
 	cols, err := rows.Columns()
 	if err != nil {
-		return false, fmt.Errorf("rows.Columns: %w", err)
+		return false, nil, fmt.Errorf("rows.Columns: %w", err)
 	}
-	var resultRows int // Count of rows received within the current backfill chunk
+	var resultRows int    // Count of rows received within the current backfill chunk
+	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
 	logEntry.Debug("translating query rows to change events")
 
 	var fields = make(map[string]any, len(cols)-1)
@@ -90,7 +91,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		if rowid, err = scanToMap(rows, cols, fields); err != nil {
-			return false, err
+			return false, nil, err
 		}
 
 		var rowKey []byte
@@ -99,12 +100,13 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
-				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+				return false, nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
+		nextRowKey = rowKey
 
 		if err := translateRecordFields(info, fields); err != nil {
-			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
+			return false, nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		var event = &sqlcapture.ChangeEvent{
@@ -127,18 +129,18 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			After:  fields,
 		}
 		if err := callback(event); err != nil {
-			return false, fmt.Errorf("error processing change event: %w", err)
+			return false, nil, fmt.Errorf("error processing change event: %w", err)
 		}
 		resultRows++
 		rowOffset++
 	}
 
 	if err := rows.Err(); err != nil {
-		return false, err
+		return false, nil, err
 	}
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, nil
+	return backfillComplete, nextRowKey, nil
 }
 
 func scanToMap(rows *sql.Rows, cols []string, fields map[string]any) (string, error) {

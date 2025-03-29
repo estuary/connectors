@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -15,7 +16,7 @@ import (
 var statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to statement timeout`)
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
+func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -51,10 +52,10 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return false, nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return false, nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 			logEntry.WithFields(logrus.Fields{
 				"keyColumns": keyColumns,
@@ -67,7 +68,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			query = db.buildScanQuery(true, isPrecise, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// Keyless backfill queries need to return results in CTID order, but we can't ask
@@ -94,26 +95,88 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	logEntry.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.Query(ctx, query, args...)
 	if err != nil {
-		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return false, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 
 	// Process the results into `changeEvent` structs and return them
 	var cols = rows.FieldDescriptions()
-	var resultRows int // Count of rows received within the current backfill chunk
+	var totalRows, resultRows int // totalRows counts DB returned rows, resultRows counts rows after XID filtering
+	var nextRowKey []byte         // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
 	var prevTID pgtype.TID // Used when processing keyless backfill results to sanity-check ordering
+	var xidFiltered = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
+		totalRows++
+
 		// Scan the row values and copy into the equivalent map
 		var vals, err = rows.Values()
 		if err != nil {
-			return false, fmt.Errorf("unable to get row values: %w", err)
+			return false, nil, fmt.Errorf("unable to get row values: %w", err)
 		}
 		var fields = make(map[string]interface{})
 		for idx := range cols {
 			fields[string(cols[idx].Name)] = vals[idx]
 		}
+
+		// Compute row key and update 'nextRowKey' before XID filtering, so that we can resume
+		// correctly when doing an XMIN-filtered backfill even if no result rows satisfy the filter.
+		var rowKey []byte
+		if state.Mode == sqlcapture.TableStateKeylessBackfill {
+			var ctid = fields["ctid"].(pgtype.TID)
+			delete(fields, "ctid")
+
+			if !ctid.Valid {
+				return false, nil, fmt.Errorf("internal error: invalid ctid value %#v", ctid)
+			}
+			rowKey = []byte(fmt.Sprintf("(%d,%d)", ctid.BlockNumber, ctid.OffsetNumber))
+
+			// Sanity check that rows are returned in ascending CTID order within a given backfill chunk
+			if (ctid.BlockNumber < prevTID.BlockNumber) || ((ctid.BlockNumber == prevTID.BlockNumber) && (ctid.OffsetNumber <= prevTID.OffsetNumber)) {
+				return false, nil, fmt.Errorf("internal error: ctid ordering sanity check failed: %v <= %v", ctid, prevTID)
+			}
+			prevTID = ctid
+		} else {
+			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
+			if err != nil {
+				return false, nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
+		}
+		nextRowKey = rowKey
+
+		if xidFiltered {
+			// XMIN filtering
+			xminStr, ok := fields["xmin"].(string)
+			if !ok {
+				// This should not happen if xidFiltered is true, as the query should include it.
+				return false, nil, fmt.Errorf("internal error: xmin column missing or not a string despite filtering being enabled")
+			}
+			xmin, err := strconv.ParseUint(xminStr, 10, 64)
+			if err != nil {
+				return false, nil, fmt.Errorf("invalid xmin value %q: %w", xminStr, err)
+			}
+
+			// Apply MinimumBackfillXID filter
+			if db.config.Advanced.MinimumBackfillXID != "" {
+				minXID, _ := strconv.ParseUint(db.config.Advanced.MinimumBackfillXID, 10, 64) // Error ignored as it's validated at config load
+				if xmin < minXID {
+					continue // Skip this row
+				}
+			}
+
+			// Apply MaximumBackfillXID filter
+			if db.config.Advanced.MaximumBackfillXID != "" {
+				maxXID, _ := strconv.ParseUint(db.config.Advanced.MaximumBackfillXID, 10, 64) // Error ignored as it's validated at config load
+				if xmin > maxXID {
+					continue // Skip this row
+				}
+			}
+
+			// Remove xmin from fields before processing further
+			delete(fields, "xmin")
+		}
+
 		for _, name := range generatedColumns {
 			// Generated column values cannot be captured via CDC, so we have to exclude them from
 			// backfills as well or we could end up with incorrect/stale values. Better not to have
@@ -121,29 +184,8 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			delete(fields, name)
 		}
 
-		var rowKey []byte
-		if state.Mode == sqlcapture.TableStateKeylessBackfill {
-			var ctid = fields["ctid"].(pgtype.TID)
-			delete(fields, "ctid")
-
-			if !ctid.Valid {
-				return false, fmt.Errorf("internal error: invalid ctid value %#v", ctid)
-			}
-			rowKey = []byte(fmt.Sprintf("(%d,%d)", ctid.BlockNumber, ctid.OffsetNumber))
-
-			// Sanity check that rows are returned in ascending CTID order within a given backfill chunk
-			if (ctid.BlockNumber < prevTID.BlockNumber) || ((ctid.BlockNumber == prevTID.BlockNumber) && (ctid.OffsetNumber <= prevTID.OffsetNumber)) {
-				return false, fmt.Errorf("internal error: ctid ordering sanity check failed: %v <= %v", ctid, prevTID)
-			}
-			prevTID = ctid
-		} else {
-			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
-			if err != nil {
-				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-			}
-		}
 		if err := db.translateRecordFields(info, fields); err != nil {
-			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
+			return false, nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		var event = &sqlcapture.ChangeEvent{
@@ -162,25 +204,40 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			After:  fields,
 		}
 		if err := callback(event); err != nil {
-			return false, fmt.Errorf("error processing change event: %w", err)
+			return false, nil, fmt.Errorf("error processing change event: %w", err)
 		}
-		resultRows++
+		resultRows++ // Only increment for rows that passed the filter and were sent
 		rowOffset++
 	}
 
 	if err := rows.Err(); err != nil {
 		// As a special case, consider statement timeouts to be not an error so long as we got
-		// at least one row back. This allows us to make partial progress on slow databases with
+		// at least one row back (totalRows > 0). This allows us to make partial progress on slow databases with
 		// statement timeouts set, without having to fine-tune the backfill chunk size.
-		if err, ok := err.(*pgconn.PgError); ok && statementTimeoutRegexp.MatchString(err.Message) && resultRows > 0 {
-			logrus.WithField("rows", resultRows).Warn("backfill query interrupted by statement timeout")
-			return false, nil
+		if pgErr, ok := err.(*pgconn.PgError); ok && statementTimeoutRegexp.MatchString(pgErr.Message) && totalRows > 0 {
+			logrus.WithFields(logrus.Fields{
+				"stream":     streamID,
+				"totalRows":  totalRows,
+				"resultRows": resultRows,
+			}).Warn("backfill query interrupted by statement timeout; partial progress saved")
+
+			// Even if resultRows is 0, if totalRows > 0, we made progress scanning, so we don't return an error.
+			// The next chunk will resume correctly based on the last row's key/ctid regardless of XID filtering.
+			return false, nextRowKey, nil
 		}
-		return false, err
+		return false, nil, err
 	}
 
-	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, nil
+	// Backfill is complete if the *total* number of rows returned by the DB was less than the requested chunk size.
+	// This correctly handles cases where the last chunk might be filtered down to zero rows by XMIN.
+	var backfillComplete = totalRows < db.config.Advanced.BackfillChunkSize
+	logEntry.WithFields(logrus.Fields{
+		"totalRows":  totalRows,
+		"resultRows": resultRows,
+		"chunkSize":  db.config.Advanced.BackfillChunkSize,
+		"complete":   backfillComplete,
+	}).Debug("finished processing table chunk")
+	return backfillComplete, nextRowKey, nil
 }
 
 // WriteWatermark writes the provided string into the 'watermarks' table.
@@ -210,14 +267,16 @@ var columnBinaryKeyComparison = map[string]bool{
 
 func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
+	var needsXmin = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
+
+	// Conditionally select xmin
+	if needsXmin {
+		fmt.Fprintf(query, `SELECT ctid, xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
+	} else {
+		fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
+	}
+
 	fmt.Fprintf(query, ` WHERE ctid > $1`)
-	if db.config.Advanced.MinimumBackfillXID != "" {
-		fmt.Fprintf(query, ` AND (((xmin::text::bigint - %s::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3`, db.config.Advanced.MinimumBackfillXID)
-	}
-	if db.config.Advanced.MaximumBackfillXID != "" {
-		fmt.Fprintf(query, ` AND (((%s::bigint - xmin::text::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3`, db.config.Advanced.MaximumBackfillXID)
-	}
 	fmt.Fprintf(query, ` LIMIT %d;`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
@@ -243,16 +302,16 @@ func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []s
 	if !start {
 		whereClauses = append(whereClauses, fmt.Sprintf(`(%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", ")))
 	}
-	if db.config.Advanced.MinimumBackfillXID != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf(`(((xmin::text::bigint - %s::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3`, db.config.Advanced.MinimumBackfillXID))
-	}
-	if db.config.Advanced.MaximumBackfillXID != "" {
-		whereClauses = append(whereClauses, fmt.Sprintf(`(((%s::bigint - xmin::text::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3`, db.config.Advanced.MaximumBackfillXID))
-	}
 
 	// Construct the query itself
 	var query = new(strings.Builder)
-	fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
+	var needsXmin = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
+	if needsXmin {
+		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
+	} else {
+		fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
+	}
+
 	if len(whereClauses) > 0 {
 		fmt.Fprintf(query, " WHERE %s", strings.Join(whereClauses, " AND "))
 	}

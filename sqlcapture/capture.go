@@ -633,10 +633,10 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string, discovery
 	var streamState = c.State.Streams[stateKey]
 
 	// Process backfill query results as a callback-driven stream.
-	var lastRowKey = streamState.Scanned
+	var prevRowKey = streamState.Scanned
 	var eventCount int
-	backfillComplete, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
-		if streamState.Mode == TableStatePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
+	backfillComplete, nextRowKey, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
+		if streamState.Mode == TableStatePreciseBackfill && compareTuples(prevRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
 			// row keys.
@@ -651,9 +651,9 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string, discovery
 			// should have set `UnpredictableKeyOrdering` to true, which should have resulted in a
 			// backfill using the "UnfilteredBackfill" mode instead, which would not perform that
 			// filtering or this sanity check.
-			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", lastRowKey, event.RowKey)
+			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", prevRowKey, event.RowKey)
 		}
-		lastRowKey = event.RowKey
+		prevRowKey = event.RowKey
 
 		if err := c.emitChange(event); err != nil {
 			return fmt.Errorf("error emitting %q backfill row: %w", streamID, err)
@@ -677,7 +677,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string, discovery
 		state.Mode = TableStateActive
 		state.Scanned = nil
 	} else {
-		state.Scanned = lastRowKey
+		state.Scanned = nextRowKey
 	}
 	state.dirty = true
 	c.State.Streams[stateKey] = state
