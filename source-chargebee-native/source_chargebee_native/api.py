@@ -47,14 +47,17 @@ async def _fetch_resource_data(
     if offset is not None:
         params["offset"] = offset
 
-    if start_date and end_date:
-        params["updated_at[between]"] = (
-            f"[{int(start_date.timestamp())},{int(end_date.timestamp())}]"
-        )
-    elif start_date:
-        params["updated_at[after]"] = int(start_date.timestamp())
-    elif end_date:
-        params["updated_at[before]"] = int(end_date.timestamp())
+    if issubclass(resource_type, IncrementalChargebeeResource):
+        cursor_field = resource_type.CURSOR_FIELD
+
+        if start_date and end_date:
+            params[f"{cursor_field}[between]"] = (
+                f"[{int(start_date.timestamp())},{int(end_date.timestamp())}]"
+            )
+        elif start_date:
+            params[f"{cursor_field}[after]"] = int(start_date.timestamp())
+        elif end_date:
+            params[f"{cursor_field}[before]"] = int(end_date.timestamp())
 
     if include_deleted:
         params["include_deleted"] = "true"
@@ -102,7 +105,7 @@ async def fetch_resource_page(
     http: HTTPSession,
     site: str,
     resource_name: str,
-    resource_type: type[ChargebeeResourceType],
+    resource_type: type[IncrementalChargebeeResource],
     start_date: datetime,
     log: Logger,
     offset: PageCursor | None,
