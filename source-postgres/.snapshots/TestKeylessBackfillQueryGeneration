@@ -1,0 +1,7 @@
+--- no_xid_filtering ---
+SELECT ctid, * FROM "public"."users" WHERE ctid > $1 LIMIT 100;
+
+--- with_xid_filtering ---
+SELECT ctid, xmin::text AS xmin, * FROM "public"."users" WHERE ctid > $1 AND ((((((xmin::text::bigint - 12345::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3) AND ((((67890::bigint - xmin::text::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)) OR (RANDOM() < 0.001)) LIMIT 100;
+
+
