@@ -149,10 +149,8 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 	for _, info := range tableMap {
 		for _, colName := range info.PrimaryKey {
 			var dataType = info.Columns[colName].DataType
-			if textType, ok := dataType.(*sqlserverTextColumnType); ok {
-				if !predictableCollation(textType) {
-					info.UnpredictableKeyOrdering = true
-				}
+			if _, ok := dataType.(*sqlserverTextColumnType); ok {
+				info.UnpredictableKeyOrdering = true
 			} else if dataType == "numeric" || dataType == "decimal" {
 				info.UnpredictableKeyOrdering = true
 			}
