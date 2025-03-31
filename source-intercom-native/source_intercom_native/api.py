@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, UTC, timedelta
+import itertools
 import json
 from logging import Logger
 import re
@@ -389,20 +390,36 @@ async def fetch_conversations_parts(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
+    CONCURRENCY_LIMIT = 15
+    conversation_ids: list[str] = []
+
     async for conversation_or_dt in fetch_conversations(http, log, log_cursor):
         if isinstance(conversation_or_dt, TimestampedResource):
-            async for part in _fetch_part(http, log, conversation_or_dt):
-                yield part
+            conversation_ids.append(conversation_or_dt.id)
         else:
+            for chunk in itertools.batched(conversation_ids, CONCURRENCY_LIMIT):
+                results = await asyncio.gather(
+                    *(
+                        _fetch_part(http, log, conversation_id)
+                        for conversation_id in chunk
+                    )
+                )
+
+                for parts in results:
+                    for part in parts:
+                        yield part
+
+            conversation_ids = []
+
             yield conversation_or_dt
 
 
 async def _fetch_part(
         http: HTTPSession,
         log: Logger,
-        conversation: TimestampedResource
-) -> AsyncGenerator[TimestampedResource, None]:
-    url = f"{API}/conversations/{conversation.id}"
+        conversation_id: str
+) -> list[TimestampedResource]:
+    url = f"{API}/conversations/{conversation_id}"
 
     response = ConversationResponse.model_validate_json(
         await http.request(log, url)
@@ -410,8 +427,9 @@ async def _fetch_part(
 
     for part in response.conversation_parts.conversation_parts:
         # Add conversation_id to the conversation part to align with the Airbyte connector.
-        part.conversation_id = conversation.id #type: ignore
-        yield part
+        part.conversation_id = conversation_id #type: ignore
+
+    return response.conversation_parts.conversation_parts
 
 
 async def fetch_segments(
