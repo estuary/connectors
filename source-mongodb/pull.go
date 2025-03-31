@@ -63,6 +63,11 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return fmt.Errorf("invalid default poll schedule: %w", err)
 	}
 
+	excludeCollections, err := parseExcludeCollections(cfg.Advanced.ExcludeCollections)
+	if err != nil {
+		return err
+	}
+
 	var changeStreamBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
 	var batchBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
 	var trackedChangeStreamBindings = make(map[string]bindingInfo)
@@ -166,7 +171,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
 		// backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter); err != nil {
+		if streams, err := c.initializeStreams(ctx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections); err != nil {
 			return err
 		} else if err := coordinator.startCatchingUp(ctx); err != nil {
 			return err
@@ -184,7 +189,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if len(changeStreamBindings) > 0 {
 		log.Info("streaming change events indefinitely")
-		streams, err := c.initializeStreams(groupCtx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter)
+		streams, err := c.initializeStreams(groupCtx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections)
 		if err != nil {
 			return err
 		}

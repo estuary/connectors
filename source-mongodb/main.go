@@ -125,7 +125,22 @@ type config struct {
 }
 
 type advancedConfig struct {
-	ExclusiveCollectionFilter bool `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."`
+	ExclusiveCollectionFilter bool   `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."`
+	ExcludeCollections        string `json:"excludeCollections,omitempty" jsonschema:"title=Exclude Collections,description=Comma-separated list of collections to exclude from database change streams. Each one is formatted as 'database_name:collection'. Cannot be set if exclusiveCollectionFilter is enabled."`
+}
+
+func parseExcludeCollections(excludeCollections string) (map[string][]string, error) {
+	out := make(map[string][]string)
+
+	for _, collection := range strings.Split(excludeCollections, ",") {
+		parts := strings.Split(collection, ":")
+		if len(parts) != 2 {
+			return nil, fmt.Errorf("invalid exclude collection: %s", collection)
+		}
+		out[parts[0]] = append(out[parts[0]], parts[1])
+	}
+
+	return out, nil
 }
 
 func (c *config) Validate() error {
@@ -150,6 +165,14 @@ func (c *config) Validate() error {
 		if err := schedule.Validate(c.PollSchedule); err != nil {
 			return fmt.Errorf("invalid default polling schedule %q: %w", c.PollSchedule, err)
 		}
+	}
+
+	if c.Advanced.ExcludeCollections != "" && c.Advanced.ExclusiveCollectionFilter {
+		return fmt.Errorf("cannot set both excludeCollections and exclusiveCollectionFilter")
+	}
+
+	if _, err := parseExcludeCollections(c.Advanced.ExcludeCollections); err != nil {
+		return err
 	}
 
 	return nil
@@ -437,6 +460,24 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		bindings = append(bindings, &pc.Response_Validated_Binding{
 			ResourcePath: resourcePath,
 		})
+	}
+
+	excludeCollections, err := parseExcludeCollections(cfg.Advanced.ExcludeCollections)
+	if err != nil {
+		return nil, fmt.Errorf("invalid excludeCollections: %w", err)
+	}
+
+	for db, excludeColls := range excludeCollections {
+		captureColls, ok := dbCollectionSpecs[db]
+		if !ok {
+			return nil, fmt.Errorf("database %s is not being captured from for excludeCollections %s", db, excludeColls)
+		}
+
+		for _, coll := range excludeColls {
+			if slices.ContainsFunc(captureColls, func(c *mongo.CollectionSpecification) bool { return c.Name == coll }) {
+				return nil, fmt.Errorf("excludeCollections collection %s of database %s is an enabled binding", coll, db)
+			}
+		}
 	}
 
 	return &pc.Response_Validated{Bindings: bindings}, nil
