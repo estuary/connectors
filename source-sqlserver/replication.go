@@ -1487,7 +1487,8 @@ func isReplicaDatabase(ctx context.Context, conn *sql.DB) (bool, error) {
 
 	var isReplica bool
 	if err := conn.QueryRowContext(ctx, query).Scan(&isReplica); err != nil {
-		return false, fmt.Errorf("error determining replica status: %w", err)
+		log.WithError(err).Warn("error determining replica status, assuming primary")
+		return false, nil
 	}
 	return isReplica, nil
 }
