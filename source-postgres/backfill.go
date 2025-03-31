@@ -265,18 +265,39 @@ var columnBinaryKeyComparison = map[string]bool{
 	"text":    true,
 }
 
+// Construct a filter expression for the backfill query which excludes rows based on their xmin.
+// Includes a random aspect so that we receive a trickle of data even while processing parts of
+// the table which are fully excluded. When XID filtering is not in use the resulting expression
+// is empty since we don't need any of that.
+func (db *postgresDatabase) backfillQueryFilterXMIN() string {
+	var clauses []string
+	if db.config.Advanced.MinimumBackfillXID != "" {
+		clauses = append(clauses, fmt.Sprintf(`((((xmin::text::bigint - %s::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)`, db.config.Advanced.MinimumBackfillXID))
+	}
+	if db.config.Advanced.MaximumBackfillXID != "" {
+		clauses = append(clauses, fmt.Sprintf(`((((%s::bigint - xmin::text::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)`, db.config.Advanced.MaximumBackfillXID))
+	}
+	if len(clauses) > 0 {
+		return fmt.Sprintf("((%s) OR (RANDOM() < 0.001))", strings.Join(clauses, " AND "))
+	}
+	return ""
+}
+
 func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
 	var query = new(strings.Builder)
-	var needsXmin = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
 
-	// Conditionally select xmin
-	if needsXmin {
+	// Include xmin when using XID filtering
+	var xidFiltered = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
+	if xidFiltered {
 		fmt.Fprintf(query, `SELECT ctid, xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
 	} else {
 		fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
 	}
 
 	fmt.Fprintf(query, ` WHERE ctid > $1`)
+	if xidFiltered {
+		fmt.Fprintf(query, ` AND %s`, db.backfillQueryFilterXMIN())
+	}
 	fmt.Fprintf(query, ` LIMIT %d;`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
@@ -303,10 +324,14 @@ func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []s
 		whereClauses = append(whereClauses, fmt.Sprintf(`(%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", ")))
 	}
 
+	var xidFiltered = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
+	if xidFiltered {
+		whereClauses = append(whereClauses, db.backfillQueryFilterXMIN())
+	}
+
 	// Construct the query itself
 	var query = new(strings.Builder)
-	var needsXmin = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
-	if needsXmin {
+	if xidFiltered {
 		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
 	} else {
 		fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
