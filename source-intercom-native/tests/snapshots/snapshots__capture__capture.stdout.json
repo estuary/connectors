@@ -598,7 +598,7 @@
       "state": "open",
       "statistics": {
         "count_assignments": 0,
-        "count_conversation_parts": 7,
+        "count_conversation_parts": 11,
         "count_reopens": 0,
         "first_admin_reply_at": null,
         "first_assignment_at": null,
@@ -639,7 +639,7 @@
         "type": "topic.list"
       },
       "type": "conversation",
-      "updated_at": 1734097743,
+      "updated_at": 1743439247,
       "waiting_since": null
     }
   ],
