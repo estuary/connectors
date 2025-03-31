@@ -384,106 +384,17 @@ async def fetch_conversations(
         body = _generate_conversations_or_tickets_search_body(start, end, response.pages.next.starting_after)
 
 
-async def _determine_window_end(
-        http: HTTPSession,
-        start: datetime,
-        initial_end: datetime,
-        log: Logger,
-) -> datetime:
-    MAX_PAGE_QUANTITY = 25
-    MIN_WINDOW_SIZE = timedelta(seconds=1)
-    url = f"{API}/conversations/search"
-    end = min(initial_end, datetime.now(tz=UTC))
-
-    while True:
-        body = _generate_conversations_or_tickets_search_body(_dt_to_s(start), _dt_to_s(end))
-        response = ConversationsSearchResponse.model_validate_json(
-                await http.request(log, url, "POST", json=body)
-        )
-
-        total_pages = response.pages.total_pages
-
-        if total_pages <= MAX_PAGE_QUANTITY:
-            return end
-
-        delta = (end - start) / 2
-        # Conversation searches do not have subsecond precision, so we cut off any microseconds from the window size.
-        reduced_window_size = delta - timedelta(microseconds=delta.microseconds)
-
-        if reduced_window_size <= MIN_WINDOW_SIZE:
-            return start + MIN_WINDOW_SIZE
-
-        end = start + reduced_window_size
-
-
 async def fetch_conversations_parts(
     http: HTTPSession,
-    window_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
-    url = f"{API}/conversations/search"
-
-    start = _dt_to_s(log_cursor)
-    max_end_dt = log_cursor + timedelta(days=window_size)
-    max_end = _dt_to_s(max_end_dt)
-
-    # Since conversation_parts cannot checkpoint until a complete date window is checked,
-    # _determine_window_end constricts windows to a size that should complete in a reasonable
-    # amount of time.
-    end = _dt_to_s(
-        await _determine_window_end(
-            http=http,
-            start=log_cursor,
-            initial_end=max_end_dt,
-            log=log
-        )
-    )
-
-    last_seen_ts = start
-
-    body = _generate_conversations_or_tickets_search_body(start, end)
-
-    while True:
-        response = ConversationsSearchResponse.model_validate_json(
-                await http.request(log, url, "POST", json=body)
-        )
-
-        page_num = response.pages.page
-        total_pages = response.pages.total_pages
-
-        if total_pages == 0:
-            break
-
-        should_log_progress = _is_large_date_window(start, end) or total_pages > 5
-
-        if should_log_progress and _is_page_number_to_log(page_num, total_pages):
-            log.info(f"Processing page {page_num} of {total_pages}.", {
-                'window_start': _s_to_dt(start),
-                'window_end': _s_to_dt(end)
-            })
-
-        for conversation in response.conversations:
-            if conversation.updated_at > last_seen_ts:
-                last_seen_ts = conversation.updated_at
-
-            if conversation.updated_at > start:
-                async for part in _fetch_part(http, log, conversation):
-                    if part.updated_at > start:
-                        yield part
-
-        if response.pages.next is None:
-            break
-
-        body = _generate_conversations_or_tickets_search_body(start, end, response.pages.next.starting_after)
-
-    # Since a conversation part's updated_at could be after the window_start but before the parent
-    # conversation's updated_at, we can't yield a new cursor until after checking the entire date window.
-    if end == max_end:
-        yield _s_to_dt(max_end)
-    elif last_seen_ts > start:
-        yield _s_to_dt(last_seen_ts)
+    async for conversation_or_dt in fetch_conversations(http, log, log_cursor):
+        if isinstance(conversation_or_dt, TimestampedResource):
+            async for part in _fetch_part(http, log, conversation_or_dt):
+                yield part
+        else:
+            yield conversation_or_dt
 
 
 async def _fetch_part(
