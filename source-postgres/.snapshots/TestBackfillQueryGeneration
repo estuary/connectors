@@ -1,0 +1,31 @@
+--- integer_key_precise ---
+SELECT * FROM "public"."users" ORDER BY "id" LIMIT 100;
+
+SELECT * FROM "public"."users" WHERE ("id") > ($1) ORDER BY "id" LIMIT 100;
+
+--- string_key_imprecise ---
+SELECT * FROM "public"."users" ORDER BY "name" LIMIT 100;
+
+SELECT * FROM "public"."users" WHERE ("name") > ($1) ORDER BY "name" LIMIT 100;
+
+--- composite_key ---
+SELECT * FROM "public"."users" ORDER BY "first_name", "last_name" LIMIT 100;
+
+SELECT * FROM "public"."users" WHERE ("first_name", "last_name") > ($1, $2) ORDER BY "first_name", "last_name" LIMIT 100;
+
+--- string_key_with_min_xid ---
+SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ((((((xmin::text::bigint - 12345::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)) OR (RANDOM() < 0.001)) ORDER BY "name" LIMIT 100;
+
+SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ("name") > ($1) AND ((((((xmin::text::bigint - 12345::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)) OR (RANDOM() < 0.001)) ORDER BY "name" LIMIT 100;
+
+--- string_key_with_min_max_xid ---
+SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ((((((xmin::text::bigint - 12345::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3) AND ((((67890::bigint - xmin::text::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)) OR (RANDOM() < 0.001)) ORDER BY "name" LIMIT 100;
+
+SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ("name") > ($1) AND ((((((xmin::text::bigint - 12345::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3) AND ((((67890::bigint - xmin::text::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)) OR (RANDOM() < 0.001)) ORDER BY "name" LIMIT 100;
+
+--- quoted_column_name ---
+SELECT * FROM "public"."special_users" ORDER BY "user-id", "group.name" COLLATE "C" LIMIT 100;
+
+SELECT * FROM "public"."special_users" WHERE ("user-id", "group.name" COLLATE "C") > ($1, $2) ORDER BY "user-id", "group.name" COLLATE "C" LIMIT 100;
+
+
