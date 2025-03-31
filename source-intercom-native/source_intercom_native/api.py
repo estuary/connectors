@@ -34,6 +34,8 @@ COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API
 COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX = r"scroll already exists for this workspace"
 
 companies_scroll_lock = asyncio.Lock()
+parts_semaphore = asyncio.Semaphore(15)
+
 
 def _dt_to_s(dt: datetime) -> int:
     return int(dt.timestamp())
@@ -389,29 +391,44 @@ async def fetch_conversations_parts(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
+    conversation_ids: list[str] = []
+
     async for conversation_or_dt in fetch_conversations(http, log, log_cursor):
         if isinstance(conversation_or_dt, TimestampedResource):
-            async for part in _fetch_part(http, log, conversation_or_dt):
-                yield part
+            conversation_ids.append(conversation_or_dt.id)
         else:
+            for coro in asyncio.as_completed(
+                [
+                    _fetch_parts(http, log, conversation_id)
+                    for conversation_id in conversation_ids
+                ]
+            ):
+                parts = await coro
+                for part in parts:
+                    yield part
+
+            conversation_ids = []
+
             yield conversation_or_dt
 
 
-async def _fetch_part(
+async def _fetch_parts(
         http: HTTPSession,
         log: Logger,
-        conversation: TimestampedResource
-) -> AsyncGenerator[TimestampedResource, None]:
-    url = f"{API}/conversations/{conversation.id}"
+        conversation_id: str
+) -> list[TimestampedResource]:
+    async with parts_semaphore:
+        url = f"{API}/conversations/{conversation_id}"
 
-    response = ConversationResponse.model_validate_json(
-        await http.request(log, url)
-    )
+        response = ConversationResponse.model_validate_json(
+            await http.request(log, url)
+        )
 
-    for part in response.conversation_parts.conversation_parts:
-        # Add conversation_id to the conversation part to align with the Airbyte connector.
-        part.conversation_id = conversation.id #type: ignore
-        yield part
+        for part in response.conversation_parts.conversation_parts:
+            # Add conversation_id to the conversation part to align with the Airbyte connector.
+            part.conversation_id = conversation_id #type: ignore
+
+        return response.conversation_parts.conversation_parts
 
 
 async def fetch_segments(
