@@ -174,12 +174,20 @@ func (c *capture) streamChanges(
 				return fmt.Errorf("getting cluster op time: %w", err)
 			}
 
+			// "lag" is an estimate of how far behind we are on reading change
+			// streams event for each database change stream.
+			lag := make(map[string]string)
+			for db, latestEventTs := range clusterTimes {
+				lag[db] = (time.Duration(currentOpTime.T-latestEventTs.T) * time.Second).String()
+			}
+
 			if nextProcessed != initialProcessed {
 				log.WithFields(log.Fields{
 					"events":                nextProcessed - initialProcessed,
 					"docs":                  nextEmitted - initialEmitted,
 					"latestClusterOpTime":   currentOpTime,
 					"lastEventClusterTimes": clusterTimes,
+					"lag":                   lag,
 				}).Info("processed change stream events")
 			} else {
 				log.Info("change stream idle")
