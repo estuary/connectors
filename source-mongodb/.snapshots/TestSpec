@@ -80,6 +80,11 @@
             "type": "boolean",
             "title": "Change Stream Exclusive Collection Filter",
             "description": "Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."
+          },
+          "excludeCollections": {
+            "type": "string",
+            "title": "Exclude Collections",
+            "description": "Comma-separated list of collections to exclude from database change streams. Each one should be formatted as 'database_name:collection'. Cannot be set if exclusiveCollectionFilter is enabled."
           }
         },
         "additionalProperties": false,

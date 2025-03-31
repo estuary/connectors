@@ -55,6 +55,7 @@ func (c *capture) initializeStreams(
 	changeStreamBindings []bindingInfo,
 	requestPreImages bool,
 	exclusiveCollectionFilter bool,
+	excludeCollections map[string][]string,
 ) ([]changeStream, error) {
 	var out []changeStream
 
@@ -100,6 +101,12 @@ func (c *capture) initializeStreams(
 			}
 
 			pl = append(pl, bson.D{{Key: "$match", Value: bson.D{{Key: "$or", Value: collectionFilters}}}})
+		} else if exclude := excludeCollections[db]; len(exclude) > 0 {
+			// Specifically exclude listed collections for this database.
+			pl = append(pl, bson.D{{Key: "$match", Value: bson.D{{
+				Key:   "ns.coll",
+				Value: bson.D{{Key: "$nin", Value: exclude}},
+			}}}})
 		}
 
 		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
