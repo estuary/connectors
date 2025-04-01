@@ -2,6 +2,7 @@ import asyncio
 import aiocsv
 import aiocsv.protocols
 import codecs
+import csv
 from datetime import datetime
 from logging import Logger
 import re
@@ -25,6 +26,12 @@ ATTEMPT_LOG_THRESHOLD = 10
 COUNT_HEADER = "Sforce-NumberOfRecords"
 CANNOT_FETCH_COMPOUND_DATA = r"Selecting compound data not supported in Bulk Query"
 NOT_SUPPORTED_BY_BULK_API = r"is not supported by the Bulk API"
+
+
+# Python's csv module has a default field size limit of 131,072 bytes, and it wil raise an _csv.Error exception if a field value
+# is larger than that limit. Some users have fields larger than 131,072 bytes, so we increase the limit to 10 MiB, which should be
+# sufficiently large.
+csv.field_size_limit(10_000_000)
 
 
 class BulkJobError(RuntimeError):
