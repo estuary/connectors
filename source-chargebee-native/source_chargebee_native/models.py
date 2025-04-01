@@ -5,7 +5,9 @@ from pydantic import (
     BaseModel,
     Field,
     model_validator,
+    field_validator,
 )
+import re
 
 from estuary_cdk.flow import BasicAuth
 from estuary_cdk.capture.common import (
@@ -52,7 +54,7 @@ class EndpointConfig(BaseModel):
         title="Start Date",
         default_factory=default_start_date,
     )
-    product_catalog: Literal["1.0"] = Field(
+    product_catalog: Literal["1.0", "2.0"] = Field(
         description="The product catalog version to use.",
         title="Product Catalog",
         default="1.0",
@@ -65,9 +67,30 @@ ConnectorState = GenericConnectorState[ResourceState]
 ListItem = TypeVar("ListItem", bound=BaseModel)
 
 
+class ChargebeeConfiguration(BaseModel, extra="allow"):
+    domain: str
+    product_catalog_version: Literal["v1", "v2"]
+
+    @property
+    def product_catalog(self) -> Literal["1.0", "2.0"]:
+        version_map: dict[Literal["v1", "v2"], Literal["1.0", "2.0"]] = {"v1": "1.0", "v2": "2.0"}
+        return version_map[self.product_catalog_version]
+
+
 class APIResponse(BaseModel, Generic[ListItem], extra="allow"):
     next_offset: str | None = None
     list: List[ListItem] | None = None
+    configurations: List[ChargebeeConfiguration] | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_single_object(cls, data: dict) -> dict:
+        if isinstance(data, dict):
+            if "configurations" in data:
+                return data
+            elif "list" not in data:
+                data = {"list": [data], "next_offset": None}
+        return data
 
 
 class ChargebeeResource(BaseDocument, extra="allow"):
@@ -76,23 +99,23 @@ class ChargebeeResource(BaseDocument, extra="allow"):
 
 class IncrementalChargebeeResource(ChargebeeResource):
     RESOURCE_KEY: ClassVar[str]
-    RESOURCE_KEY_JSON_PATH: ClassVar[str]
     CURSOR_FIELD: ClassVar[str] = "updated_at"
     ID_FIELD: ClassVar[str] = "id"
     DELETED_FIELD: ClassVar[str] = "deleted"
 
     id: str = Field(exclude=True)
-    updated_at: int = Field(exclude=True)
+    cursor_value: int = Field(exclude=True)
     deleted: bool = Field(exclude=True)
+
+    @classmethod
+    def get_resource_key_json_path(cls) -> str:
+        return f"/{cls.RESOURCE_KEY}/id"
 
     @staticmethod
     def validate_required_class_attrs(class_obj, attrs: List[str]) -> None:
-        """Validate that the class has the required class attributes defined and non-empty."""
         for attr in attrs:
             if not hasattr(class_obj, attr) or getattr(class_obj, attr) == "":
-                raise TypeError(
-                    f"Class {class_obj.__name__} must define class attribute '{attr}'"
-                )
+                raise TypeError(f"Class {class_obj.__name__} must define class attribute '{attr}'")
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -100,7 +123,6 @@ class IncrementalChargebeeResource(ChargebeeResource):
             cls,
             [
                 "RESOURCE_KEY",
-                "RESOURCE_KEY_JSON_PATH",
                 "CURSOR_FIELD",
                 "ID_FIELD",
                 "DELETED_FIELD",
@@ -116,14 +138,35 @@ class IncrementalChargebeeResource(ChargebeeResource):
             and isinstance(data[cls.RESOURCE_KEY], dict)
         ):
             data["id"] = data[cls.RESOURCE_KEY][cls.ID_FIELD]
-            data["updated_at"] = data[cls.RESOURCE_KEY][cls.CURSOR_FIELD]
+            data["cursor_value"] = data[cls.RESOURCE_KEY][cls.CURSOR_FIELD]
             data["deleted"] = data[cls.RESOURCE_KEY].get(cls.DELETED_FIELD, False)
         return data
 
 
+class AssociationConfig(BaseModel):
+    parent_resource: str
+    parent_response_key: str
+    parent_key_field: str
+    endpoint_pattern: str  # e.g. "{parent}/{id}/retrieve_with_scheduled_changes"
+    parent_filter_params: dict[str, str] | None = None
+    returns_list: bool
+
+    @field_validator("endpoint_pattern")
+    @classmethod
+    def validate_endpoint_pattern(cls, v: str) -> str:
+        required_placeholders = {"parent", "id"}
+        found_placeholders = set(re.findall(r"\{([^}]+)\}", v))
+
+        if found_placeholders != required_placeholders:
+            raise ValueError(
+                f"Endpoint pattern must contain exactly {{parent}} and {{id}} placeholders. "
+                f"Found: {found_placeholders}"
+            )
+        return v
+
+
 class Customer(IncrementalChargebeeResource):
     RESOURCE_KEY = "customer"
-    RESOURCE_KEY_JSON_PATH = "/customer/id"
 
     class CustomerData(BaseModel, extra="allow"):
         id: str
@@ -131,9 +174,18 @@ class Customer(IncrementalChargebeeResource):
     customer: CustomerData
 
 
+class Comment(IncrementalChargebeeResource):
+    RESOURCE_KEY = "comment"
+    CURSOR_FIELD = "created_at"
+
+    class CommentData(BaseModel, extra="allow"):
+        id: str
+
+    comment: CommentData
+
+
 class Subscription(IncrementalChargebeeResource):
     RESOURCE_KEY = "subscription"
-    RESOURCE_KEY_JSON_PATH = "/subscription/id"
 
     class SubscriptionData(BaseModel, extra="allow"):
         id: str
@@ -143,7 +195,6 @@ class Subscription(IncrementalChargebeeResource):
 
 class Addon(IncrementalChargebeeResource):
     RESOURCE_KEY = "addon"
-    RESOURCE_KEY_JSON_PATH = "/addon/id"
 
     class AddonData(BaseModel, extra="allow"):
         id: str
@@ -153,7 +204,6 @@ class Addon(IncrementalChargebeeResource):
 
 class AttachedItem(IncrementalChargebeeResource):
     RESOURCE_KEY = "attached_item"
-    RESOURCE_KEY_JSON_PATH = "/attached_item/id"
 
     class AttachedItemData(BaseModel, extra="allow"):
         id: str
@@ -163,7 +213,6 @@ class AttachedItem(IncrementalChargebeeResource):
 
 class Coupon(IncrementalChargebeeResource):
     RESOURCE_KEY = "coupon"
-    RESOURCE_KEY_JSON_PATH = "/coupon/id"
 
     class CouponData(BaseModel, extra="allow"):
         id: str
@@ -173,7 +222,6 @@ class Coupon(IncrementalChargebeeResource):
 
 class CreditNote(IncrementalChargebeeResource):
     RESOURCE_KEY = "credit_note"
-    RESOURCE_KEY_JSON_PATH = "/credit_note/id"
 
     class CreditNoteData(BaseModel, extra="allow"):
         id: str
@@ -183,7 +231,6 @@ class CreditNote(IncrementalChargebeeResource):
 
 class Event(IncrementalChargebeeResource):
     RESOURCE_KEY = "event"
-    RESOURCE_KEY_JSON_PATH = "/event/id"
     CURSOR_FIELD = "occurred_at"
 
     class EventData(BaseModel, extra="allow"):
@@ -194,7 +241,6 @@ class Event(IncrementalChargebeeResource):
 
 class HostedPage(IncrementalChargebeeResource):
     RESOURCE_KEY = "hosted_page"
-    RESOURCE_KEY_JSON_PATH = "/hosted_page/id"
 
     class HostedPageData(BaseModel, extra="allow"):
         id: str
@@ -204,7 +250,6 @@ class HostedPage(IncrementalChargebeeResource):
 
 class Invoice(IncrementalChargebeeResource):
     RESOURCE_KEY = "invoice"
-    RESOURCE_KEY_JSON_PATH = "/invoice/id"
 
     class InvoiceData(BaseModel, extra="allow"):
         id: str
@@ -214,7 +259,6 @@ class Invoice(IncrementalChargebeeResource):
 
 class Item(IncrementalChargebeeResource):
     RESOURCE_KEY = "item"
-    RESOURCE_KEY_JSON_PATH = "/item/id"
 
     class ItemData(BaseModel, extra="allow"):
         id: str
@@ -224,7 +268,6 @@ class Item(IncrementalChargebeeResource):
 
 class ItemPrice(IncrementalChargebeeResource):
     RESOURCE_KEY = "item_price"
-    RESOURCE_KEY_JSON_PATH = "/item_price/id"
 
     class ItemPriceData(BaseModel, extra="allow"):
         id: str
@@ -234,7 +277,6 @@ class ItemPrice(IncrementalChargebeeResource):
 
 class ItemFamily(IncrementalChargebeeResource):
     RESOURCE_KEY = "item_family"
-    RESOURCE_KEY_JSON_PATH = "/item_family/id"
 
     class ItemFamilyData(BaseModel, extra="allow"):
         id: str
@@ -244,7 +286,6 @@ class ItemFamily(IncrementalChargebeeResource):
 
 class Order(IncrementalChargebeeResource):
     RESOURCE_KEY = "order"
-    RESOURCE_KEY_JSON_PATH = "/order/id"
 
     class OrderData(BaseModel, extra="allow"):
         id: str
@@ -254,7 +295,6 @@ class Order(IncrementalChargebeeResource):
 
 class PaymentSource(IncrementalChargebeeResource):
     RESOURCE_KEY = "payment_source"
-    RESOURCE_KEY_JSON_PATH = "/payment_source/id"
 
     class PaymentSourceData(BaseModel, extra="allow"):
         id: str
@@ -264,7 +304,6 @@ class PaymentSource(IncrementalChargebeeResource):
 
 class Plan(IncrementalChargebeeResource):
     RESOURCE_KEY = "plan"
-    RESOURCE_KEY_JSON_PATH = "/plan/id"
 
     class PlanData(BaseModel, extra="allow"):
         id: str
@@ -272,9 +311,18 @@ class Plan(IncrementalChargebeeResource):
     plan: PlanData
 
 
+class PromotionalCredits(IncrementalChargebeeResource):
+    RESOURCE_KEY = "promotional_credit"
+    CURSOR_FIELD = "created_at"
+
+    class PromotionalCreditData(BaseModel, extra="allow"):
+        id: str
+
+    promotional_credit: PromotionalCreditData
+
+
 class Quote(IncrementalChargebeeResource):
     RESOURCE_KEY = "quote"
-    RESOURCE_KEY_JSON_PATH = "/quote/id"
 
     class QuoteData(BaseModel, extra="allow"):
         id: str
@@ -284,7 +332,6 @@ class Quote(IncrementalChargebeeResource):
 
 class Transaction(IncrementalChargebeeResource):
     RESOURCE_KEY = "transaction"
-    RESOURCE_KEY_JSON_PATH = "/transaction/id"
 
     class TransactionData(BaseModel, extra="allow"):
         id: str
@@ -294,7 +341,6 @@ class Transaction(IncrementalChargebeeResource):
 
 class VirtualBankAccount(IncrementalChargebeeResource):
     RESOURCE_KEY = "virtual_bank_account"
-    RESOURCE_KEY_JSON_PATH = "/virtual_bank_account/id"
 
     class VirtualBankAccountData(BaseModel, extra="allow"):
         id: str

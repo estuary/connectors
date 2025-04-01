@@ -11,7 +11,11 @@ from source_chargebee_native.models import (
     EndpointConfig,
     ChargebeeResource,
     IncrementalChargebeeResource,
+    AssociationConfig,
+    ChargebeeConfiguration,
+    APIResponse,
     Customer,
+    Comment,
     Subscription,
     Addon,
     AttachedItem,
@@ -26,6 +30,7 @@ from source_chargebee_native.models import (
     Order,
     PaymentSource,
     Plan,
+    PromotionalCredits,
     Quote,
     Transaction,
     VirtualBankAccount,
@@ -34,92 +39,136 @@ from source_chargebee_native.api import (
     snapshot_resource,
     fetch_resource_page,
     fetch_resource_changes,
+    snapshot_associated_resource,
+    fetch_associated_resource_page,
+    fetch_associated_resource_changes,
 )
 
 
-# TODO(jsmith): revisit
-# PARENT_CHILD_RESOURCES: dict[str, tuple[str, str]] = {
-#     "contacts": ("customers", "id"),  # (parent_resource, parent_key_field)
-#     "subscriptions_with_scheduled_changes": ("subscriptions", "id"),
-# }
+COMMON_STANDALONE_FULL_REFRESH_RESOURCES = [
+    "site_migration_details",
+    "quote_line_groups",  # Requires Performance or Enterprise Chargebee subscription plan - will throw HTTP 404 if not enabled
+]
 
-STANDALONE_FULL_REFRESH_RESOURCES: dict[Literal["1.0", "2.0"], list[str]] = {
+FULL_REFRESH_RESOURCES: dict[Literal["1.0", "2.0"], list[str]] = {
     "1.0": [
-        # "comments", # TODO(jsmith): revisit - potentially incremental
-        # "gifts", # TODO(jsmith): revisit - potential client-side filtering
-        # "promotional_credits", # TODO(jsmith): revisit - potentially incremental
-        "site_migration_details",
-        # "unbilled_charges", # TODO(jsmith): revisit - potential client-side filtering
-        # "quote_line_groups", # TODO(jsmith): add this back in after figuring out the best way to handle 404 (quotes feature not enabled)
+        *COMMON_STANDALONE_FULL_REFRESH_RESOURCES,
+        "gifts",
+        "unbilled_charges",
     ],
     "2.0": [
-        # "comments", # TODO(jsmith): revisit - potentially incremental
-        # "differential_prices", # TODO(jsmith): revisit
-        # "gifts", # TODO(jsmith): revisit - potential client-side filtering
-        # "promotional_credits", # TODO(jsmith): revisit - potentially incremental
-        "site_migration_details",
-        # "unbilled_charges", # TODO(jsmith): revisit - potential client-side filtering
-        # "quote_line_groups", # TODO(jsmith): add this back in after figuring out the best way to handle 404 (quotes feature not enabled)
+        *COMMON_STANDALONE_FULL_REFRESH_RESOURCES,
+        "differential_prices",
+        "gifts",
+        "unbilled_charges",
     ],
 }
 
-# TODO(jsmith): revisit
-# CHILD_FULL_REFRESH_RESOURCES: list[str] = [
-#     "contacts",
-#     "subscriptions_with_scheduled_changes",
-# ]
+COMMON_INCREMENTAL_RESOURCES: list[tuple[str, type[IncrementalChargebeeResource]]] = [
+    ("comments", Comment),
+    ("coupons", Coupon),
+    ("credit_notes", CreditNote),
+    ("customers", Customer),
+    ("events", Event),
+    ("hosted_pages", HostedPage),
+    ("invoices", Invoice),
+    ("orders", Order),
+    ("payment_sources", PaymentSource),
+    ("promotional_credits", PromotionalCredits),
+    (
+        "quotes",
+        Quote,
+    ),  # Requires Performance or Enterprise Chargebee subscription plan - will throw HTTP 404 if not enabled
+    ("subscriptions", Subscription),
+    ("transactions", Transaction),
+    ("virtual_bank_accounts", VirtualBankAccount),
+]
 
 INCREMENTAL_RESOURCES: dict[
     Literal["1.0", "2.0"], list[tuple[str, type[IncrementalChargebeeResource]]]
 ] = {
     "1.0": [
+        *COMMON_INCREMENTAL_RESOURCES,
         ("addons", Addon),
-        ("coupons", Coupon),
-        ("credit_notes", CreditNote),
-        ("customers", Customer),
-        ("events", Event),
-        ("hosted_pages", HostedPage),
-        ("invoices", Invoice),
-        ("orders", Order),
-        ("payment_sources", PaymentSource),
         ("plans", Plan),
-        ("quotes", Quote),
-        ("subscriptions", Subscription),
-        ("transactions", Transaction),
-        ("virtual_bank_accounts", VirtualBankAccount),
     ],
     "2.0": [
-        ("addons", Addon),
-        ("attached_items", AttachedItem),
-        ("coupons", Coupon),
-        ("credit_notes", CreditNote),
-        ("customers", Customer),
-        ("events", Event),
-        ("hosted_pages", HostedPage),
-        ("invoices", Invoice),
+        *COMMON_INCREMENTAL_RESOURCES,
         ("items", Item),
         ("item_prices", ItemPrice),
         ("item_families", ItemFamily),
-        ("orders", Order),
-        ("payment_sources", PaymentSource),
-        ("plans", Plan),
-        ("quotes", Quote),
-        ("subscriptions", Subscription),
-        ("transactions", Transaction),
-        ("virtual_bank_accounts", VirtualBankAccount),
     ],
 }
 
+COMMON_ASSOCIATED_FULL_REFRESH_RESOURCES: dict[str, AssociationConfig] = {
+    "contacts": AssociationConfig(
+        parent_resource="customers",
+        parent_response_key="customer",
+        parent_key_field="id",
+        endpoint_pattern="{parent}/{id}/contacts",
+        returns_list=True,
+    ),
+    "subscriptions_with_scheduled_changes": AssociationConfig(
+        parent_resource="subscriptions",
+        parent_response_key="subscription",
+        parent_key_field="id",
+        endpoint_pattern="{parent}/{id}/retrieve_with_scheduled_changes",
+        parent_filter_params={
+            "has_scheduled_changes[is]": "true"
+        },  # Filter to prevent 400 error when no scheduled changes
+        returns_list=False,
+    ),
+}
 
-async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
+ASSOCIATED_FULL_REFRESH_RESOURCES: dict[Literal["1.0", "2.0"], dict[str, AssociationConfig]] = {
+    "1.0": {
+        **COMMON_ASSOCIATED_FULL_REFRESH_RESOURCES,
+    },
+    "2.0": {
+        **COMMON_ASSOCIATED_FULL_REFRESH_RESOURCES,
+    },
+}
+
+COMMON_ASSOCIATED_INCREMENTAL_RESOURCES: dict[
+    str, tuple[AssociationConfig, type[IncrementalChargebeeResource]]
+] = {}
+
+ASSOCIATED_INCREMENTAL_RESOURCES: dict[
+    Literal["1.0", "2.0"],
+    dict[str, tuple[AssociationConfig, type[IncrementalChargebeeResource]]],
+] = {
+    "1.0": {
+        **COMMON_ASSOCIATED_INCREMENTAL_RESOURCES,
+    },
+    "2.0": {
+        **COMMON_ASSOCIATED_INCREMENTAL_RESOURCES,
+        "attached_items": (
+            AssociationConfig(
+                parent_resource="items",
+                parent_response_key="item",
+                parent_key_field="id",
+                endpoint_pattern="{parent}/{id}/attached_items",
+                returns_list=True,
+            ),
+            AttachedItem,
+        ),
+    },
+}
+
+
+async def validate_credentials_and_configuration(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+):
     http.token_source = TokenSource(
         oauth_spec=None,
         credentials=config.credentials,
     )
-    url = f"https://{config.site}.chargebee.com/api/v2/customers"
+    url = f"https://{config.site}.chargebee.com/api/v2/configurations"
 
     try:
-        await http.request(log, url)
+        configuration = APIResponse[ChargebeeConfiguration].model_validate_json(
+            await http.request(log, url)
+        )
     except HTTPError as err:
         msg = "Unknown error occurred."
         if err.code == 401:
@@ -129,14 +178,29 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
 
         raise ValidationError([msg])
 
+    if not configuration.configurations or len(configuration.configurations) != 1:
+        raise ValidationError(
+            [
+                "Encountered error validating configuration.\n\n"
+                "Please ensure that the provided configuration is correct."
+            ]
+        )
+
+    if configuration.configurations[0].product_catalog != config.product_catalog:
+        raise ValidationError(
+            [
+                "Encountered error validating configuration.\n\n"
+                "Please ensure that the provided product catalog version is correct.\n\n"
+                f"Provided: {config.product_catalog}, Actual: {configuration.configurations[0].product_catalog}."
+            ]
+        )
+
 
 async def full_refresh_resources(
     log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
 ) -> list[common.Resource]:
-    resources = []
-
     def open_standalone(
         resource_name: str,
         binding: CaptureBinding[common.ResourceConfig],
@@ -159,22 +223,18 @@ async def full_refresh_resources(
             tombstone=ChargebeeResource(_meta=ChargebeeResource.Meta(op="d")),
         )
 
-    for name in STANDALONE_FULL_REFRESH_RESOURCES[config.product_catalog]:
-        resources.append(
-            common.Resource(
-                name=name,
-                key=["/_meta/row_id"],
-                model=ChargebeeResource,
-                open=functools.partial(open_standalone, name),
-                initial_state=common.ResourceState(),
-                initial_config=common.ResourceConfig(
-                    name=name, interval=timedelta(minutes=2)
-                ),
-                schema_inference=True,
-            )
+    return [
+        common.Resource(
+            name=name,
+            key=["/_meta/row_id"],
+            model=ChargebeeResource,
+            open=functools.partial(open_standalone, name),
+            initial_state=common.ResourceState(),
+            initial_config=common.ResourceConfig(name=name, interval=timedelta(minutes=2)),
+            schema_inference=True,
         )
-
-    return resources
+        for name in FULL_REFRESH_RESOURCES[config.product_catalog]
+    ]
 
 
 async def incremental_resources(
@@ -218,24 +278,129 @@ async def incremental_resources(
     return [
         common.Resource(
             name=name,
-            key=[resource_type.RESOURCE_KEY_JSON_PATH],
+            key=[resource_type.get_resource_key_json_path()],
             model=resource_type,
             open=functools.partial(open, name, resource_type),
             initial_state=common.ResourceState(
                 inc=common.ResourceState.Incremental(cursor=int(cutoff.timestamp())),
                 backfill=common.ResourceState.Backfill(cutoff=cutoff, next_page=None),
             ),
-            initial_config=common.ResourceConfig(
-                name=name, interval=timedelta(minutes=2)
-            ),
+            initial_config=common.ResourceConfig(name=name, interval=timedelta(minutes=2)),
             schema_inference=True,
         )
         for name, resource_type in INCREMENTAL_RESOURCES[config.product_catalog]
     ]
 
 
+async def associated_full_refresh_resources(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+) -> list[common.Resource]:
+    def open_child(
+        association_config: AssociationConfig,
+        binding: CaptureBinding[common.ResourceConfig],
+        binding_index: int,
+        state: common.ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_associated_resource,
+                http,
+                config.site,
+                association_config,
+            ),
+            tombstone=ChargebeeResource(_meta=ChargebeeResource.Meta(op="d")),
+        )
+
+    return [
+        common.Resource(
+            name=name,
+            key=["/_meta/row_id"],
+            model=ChargebeeResource,
+            open=functools.partial(open_child, association_config),
+            initial_state=common.ResourceState(),
+            initial_config=common.ResourceConfig(name=name, interval=timedelta(minutes=2)),
+            schema_inference=True,
+        )
+        for name, association_config in ASSOCIATED_FULL_REFRESH_RESOURCES[
+            config.product_catalog
+        ].items()
+    ]
+
+
+async def associated_incremental_resources(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+) -> list[common.Resource]:
+    def open_incremental_child(
+        association_config: AssociationConfig,
+        resource_type: type[IncrementalChargebeeResource],
+        binding: CaptureBinding[common.ResourceConfig],
+        binding_index: int,
+        state: common.ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_page=functools.partial(
+                fetch_associated_resource_page,
+                http,
+                config.site,
+                association_config,
+                resource_type,
+                config.start_date,
+            ),
+            fetch_changes=functools.partial(
+                fetch_associated_resource_changes,
+                http,
+                config.site,
+                association_config,
+                resource_type,
+            ),
+        )
+
+    cutoff = datetime.now(tz=UTC)
+
+    return [
+        common.Resource(
+            name=name,
+            key=[resource_type.get_resource_key_json_path()],
+            model=resource_type,
+            open=functools.partial(
+                open_incremental_child,
+                association_config,
+                resource_type,
+            ),
+            initial_state=common.ResourceState(
+                inc=common.ResourceState.Incremental(cursor=int(cutoff.timestamp())),
+                backfill=common.ResourceState.Backfill(cutoff=cutoff, next_page=None),
+            ),
+            initial_config=common.ResourceConfig(name=name, interval=timedelta(minutes=2)),
+            schema_inference=True,
+        )
+        for name, (
+            association_config,
+            resource_type,
+        ) in ASSOCIATED_INCREMENTAL_RESOURCES[config.product_catalog].items()
+    ]
+
+
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
 ) -> list[common.Resource]:
     http.token_source = TokenSource(
         oauth_spec=None,
@@ -245,4 +410,6 @@ async def all_resources(
     return [
         *await full_refresh_resources(log, http, config),
         *await incremental_resources(log, http, config),
+        *await associated_full_refresh_resources(log, http, config),
+        *await associated_incremental_resources(log, http, config),
     ]

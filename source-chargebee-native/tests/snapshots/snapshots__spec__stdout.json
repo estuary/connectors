@@ -58,9 +58,12 @@
           "type": "string"
         },
         "product_catalog": {
-          "const": "1.0",
           "default": "1.0",
           "description": "The product catalog version to use.",
+          "enum": [
+            "1.0",
+            "2.0"
+          ],
           "title": "Product Catalog",
           "type": "string"
         }
