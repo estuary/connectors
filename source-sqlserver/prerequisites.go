@@ -26,16 +26,24 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 		db.prerequisiteCaptureInstanceManagement,
 		db.prerequisiteMaximumLSN,
 	}
-	if db.featureFlags["read_only"] {
-		checks = append(checks,
-			db.prerequisiteViewCDCScanHistory,
-		)
-	} else {
+
+	// In non-read-only mode we still need to verify watermarks table usability.
+	// In read-only non-replica mode we need to verify that sys.dm_cdc_log_scan_sessions is accessible.
+	// In read-only replica mode we have no additional requirements.
+	var isReplica, _ = isReplicaDatabase(ctx, db.conn)
+	if !db.featureFlags["read_only"] {
 		checks = append(checks,
 			db.prerequisiteWatermarksTable,
 			db.prerequisiteWatermarksCaptureInstance,
 		)
+	} else if isReplica || db.featureFlags["replica_fencing"] {
+		// No additional requirements for read-only replica mode.
+	} else {
+		checks = append(checks,
+			db.prerequisiteViewCDCScanHistory,
+		)
 	}
+
 	for _, prereq := range checks {
 		if err := prereq(ctx); err != nil {
 			errs = append(errs, err)
