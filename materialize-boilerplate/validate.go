@@ -71,9 +71,10 @@ func (v Validator) ValidateBinding(
 	if existingBinding != nil && existingBinding.Backfill > backfill {
 		// Sanity check: Don't allow backfill counters to decrease.
 		return nil, fmt.Errorf(
-			"backfill count %d is less than previously applied count of %d",
+			"backfill count %d is less than previously applied count of %d (%s)",
 			backfill,
 			existingBinding.Backfill,
+			existingBinding.Collection.Name,
 		)
 	}
 

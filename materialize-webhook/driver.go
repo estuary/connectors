@@ -1,20 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"golang.org/x/sync/errgroup"
 )
 
 // driver implements the pm.DriverServer interface.
@@ -61,7 +61,7 @@ func (c config) Validate() error {
 }
 
 type resource struct {
-	RelativePath string `json:"relativePath,omitempty" jsonschema:"title=Relative Path,description=Path which is joined with the base Address to build a complete URL" jsonschema_extras:"x-collection-name=true"`
+	RelativePath string `json:"relativePath" jsonschema:"title=Relative Path,description=Path which is joined with the base Address to build a complete URL" jsonschema_extras:"x-collection-name=true"`
 }
 
 func (r resource) Validate() error {
@@ -191,118 +191,85 @@ func (d *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 	return nil
 }
 
+func (d *transactor) sendWebhook(ctx context.Context, address string, body bytes.Buffer) error {
+	for attempt := 0; true; attempt++ {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(backoff(attempt)):
+			// Fallthrough
+		}
+
+		request, err := http.NewRequest("POST", address, bytes.NewReader((body.Bytes())))
+		if err != nil {
+			return fmt.Errorf("http.NewRequest(%s): %w", address, err)
+		}
+
+		request.Header.Add("Content-Type", "application/json")
+
+		for i := range d.customHeaders {
+			header := d.customHeaders[i]
+			request.Header.Add(header.Name, header.Value)
+		}
+
+		response, err := http.DefaultClient.Do(request)
+		if err == nil {
+			err = response.Body.Close()
+		}
+		if err == nil && (response.StatusCode < 200 || response.StatusCode >= 300) {
+			err = fmt.Errorf("unexpected webhook response code %d from %s", response.StatusCode, address)
+		}
+
+		if err == nil {
+			break
+		} else if attempt == 10 {
+			return fmt.Errorf("webhook failed after many attempts: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Store streams StoreIterator documents directly into the webhook body.
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
-	var pipeWriter *io.PipeWriter
-	group := errgroup.Group{}
+	const requestSizeCutoff = 1024 * 1024 * 1 // 1 MiB
+	var body bytes.Buffer
+	ctx := it.Context()
 
-	startWebhook := func(address string) {
-		var pipeReader *io.PipeReader
-		pipeReader, pipeWriter = io.Pipe()
-
-		group.Go(func() error {
-			request, err := http.NewRequest("POST", address, pipeReader)
-
-			if err != nil {
-				pipeReader.CloseWithError(err)
-				return fmt.Errorf("http.NewRequest(%s): %w", address, err)
-			}
-
-			request.Header.Add("Content-Type", "application/json")
-
-			for i := range d.customHeaders {
-				header := d.customHeaders[i]
-				request.Header.Add(header.Name, header.Value)
-			}
-
-			response, err := http.DefaultClient.Do(request)
-
-			if err != nil {
-				pipeReader.CloseWithError(err)
-				return fmt.Errorf("sending webhook: %w", err)
-			}
-
-			if err := response.Body.Close(); err != nil {
-				pipeReader.CloseWithError(err)
-				return fmt.Errorf("response.Body.Close(): %w", err)
-			}
-
-			if response.StatusCode < 200 || response.StatusCode >= 300 {
-				err := fmt.Errorf("unexpected webhook response code %d from %s", response.StatusCode, address)
-				pipeReader.CloseWithError(err)
-				return err
-			}
-
-			return nil
-		})
-	}
-
-	finishWebhook := func() error {
-		if pipeWriter == nil {
-			return nil
-		}
-
-		if _, err := pipeWriter.Write([]byte("]")); err != nil {
-			return fmt.Errorf("pipeWriter.Write(): %w", err)
-		}
-
-		if err := pipeWriter.Close(); err != nil {
-			return fmt.Errorf("pipeWriter.Close(): %w", err)
-		}
-
-		if err := group.Wait(); err != nil {
-			return fmt.Errorf("group.Wait(): %w", err)
-		}
-
-		pipeWriter = nil
-		return nil
-	}
-
-	const requestSizeCutoff = 1024 * 1024 // 1 MiB
-	byteCount := 0
-	var previousAddress string
-
+	previousBinding := -1
 	for it.Next() {
-		address := d.addresses[it.Binding].String()
-
-		// The webhook for the previous binding must finish before the next binding's webhook starts.
-		if previousAddress != "" && address != previousAddress {
-			if err := finishWebhook(); err != nil {
-				return nil, fmt.Errorf("finishWebhooks: %w", err)
-			}
+		if previousBinding == -1 {
+			previousBinding = it.Binding
 		}
 
-		previousAddress = address
-
-		if pipeWriter == nil {
-			startWebhook(address)
-			if _, err := pipeWriter.Write([]byte("[")); err != nil {
-				return nil, fmt.Errorf("pipeWriter.Write: %w", err)
-			}
-		} else if _, err := pipeWriter.Write([]byte(",")); err != nil {
-			return nil, fmt.Errorf("pipeWriter.Write: %w", err)
-		}
-
-		if _, err := pipeWriter.Write(it.RawJSON); err != nil {
-			return nil, fmt.Errorf("pipeWriter.Write: %w", err)
-		}
-		byteCount += len(it.RawJSON)
-
-		if byteCount >= requestSizeCutoff {
-			if err := finishWebhook(); err != nil {
-				return nil, fmt.Errorf("finishWebhook: %w", err)
+		// Send a webhook if the binding switches or the body is over the cutoff
+		if it.Binding != previousBinding || body.Len() >= requestSizeCutoff {
+			body.WriteString("]")
+			if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
+				return nil, fmt.Errorf("draining previous binding: %w", err)
 			}
 
-			byteCount = 0
+			body.Reset()
+			previousBinding = it.Binding
+		}
+
+		if body.Len() == 0 {
+			body.WriteString("[")
+		} else {
+			body.WriteString(",")
+		}
+
+		if _, err := body.Write(it.RawJSON); err != nil {
+			return nil, err
 		}
 	}
 
-	if err := it.Err(); err != nil {
-		return nil, fmt.Errorf("store iterator error: %w", err)
-	}
-
-	if err := finishWebhook(); err != nil {
-		return nil, fmt.Errorf("finishWebhook: %w", err)
+	if body.Len() > 0 {
+		body.WriteString("]")
+		if err := d.sendWebhook(ctx, d.addresses[previousBinding].String(), body); err != nil {
+			return nil, fmt.Errorf("draining previous binding: %w", err)
+		}
+		body.Reset()
 	}
 
 	return nil, nil
@@ -310,5 +277,18 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 // Destroy is a no-op.
 func (d *transactor) Destroy() {}
+
+func backoff(attempt int) time.Duration {
+	switch attempt {
+	case 0:
+		return 0
+	case 1:
+		return time.Millisecond * 100
+	case 2, 3, 4, 5, 6, 7, 8, 9, 10:
+		return time.Second * time.Duration(attempt-1)
+	default:
+		return 10 * time.Second
+	}
+}
 
 func main() { boilerplate.RunMain(new(driver)) }

@@ -3,7 +3,7 @@ SELECT 0, l.`flow_document`
 FROM `foo`.`bar` AS l
 JOIN load_view_0 AS r
 	 ON  l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10
-	 AND l.`second-key` = unbase64(r.`second-key`)
+	 AND l.`second-key` = UNBASE64(r.`second-key`)
 	 AND l.`third-key` = r.`third-key` AND l.`third-key` >= 'aaaSomeString' AND l.`third-key` <= 'zzzSomeString'
 --- End load query ---
 
@@ -12,9 +12,17 @@ MERGE INTO `foo`.`bar` AS l
 USING merge_view_0 AS r
 ON 
 	l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10
-	AND l.`second-key` = unbase64(r.`second-key`)
+	AND l.`second-key` = UNBASE64(r.`second-key`)
 	AND l.`third-key` = r.`third-key` AND l.`third-key` >= 'aaaSomeString' AND l.`third-key` <= 'zzzSomeString'
 WHEN MATCHED AND r.`flow_document` = '"delete"' THEN DELETE
-WHEN MATCHED THEN UPDATE SET l.`first-key` = r.`first-key`, l.`second-key` = unbase64(r.`second-key`), l.`third-key` = r.`third-key`, l.`first-val` = r.`first-val`, l.`second-val` = r.`second-val`, l.`third-val` = r.`third-val`, l.`fourth-val` = r.`fourth-val`, l.`flow_document` = r.`flow_document`
-WHEN NOT MATCHED AND r.`flow_document` != '"delete"' THEN INSERT (`first-key`, `second-key`, `third-key`, `first-val`, `second-val`, `third-val`, `fourth-val`, `flow_document`) VALUES (r.`first-key`, unbase64(r.`second-key`), r.`third-key`, r.`first-val`, r.`second-val`, r.`third-val`, r.`fourth-val`, r.`flow_document`)
+WHEN MATCHED THEN UPDATE SET l.`first-key` = r.`first-key`, l.`second-key` = UNBASE64(r.`second-key`), l.`third-key` = r.`third-key`, l.`first-val` = r.`first-val`, l.`second-val` = r.`second-val`, l.`third-val` = UNBASE64(r.`third-val`), l.`fourth-val` = r.`fourth-val`, l.`flow_document` = r.`flow_document`
+WHEN NOT MATCHED AND r.`flow_document` != '"delete"' THEN INSERT (`first-key`, `second-key`, `third-key`, `first-val`, `second-val`, `third-val`, `fourth-val`, `flow_document`) VALUES (r.`first-key`, UNBASE64(r.`second-key`), r.`third-key`, r.`first-val`, r.`second-val`, UNBASE64(r.`third-val`), r.`fourth-val`, r.`flow_document`)
 --- End merge query ---
+
+--- Begin migrate query ---
+UPDATE `some`.`table`
+SET
+	`long_to_decimal_flow_tmp` = CAST(`long_to_decimal` AS decimal(38, 0)), 
+	`datetime_to_string_flow_tmp` = DATE_FORMAT(`datetime_to_string`, 'yyyy-MM-dd\'T\'HH:mm:ss.SSSSSS\'Z\''), 
+	`binary_to_string_flow_tmp` = BASE64(`binary_to_string`)
+--- End migrate query ---

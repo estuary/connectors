@@ -254,9 +254,9 @@ func joinObjectID(objectID, dataObjectID int) string {
 }
 
 const queryDiscoverColumns = `
-SELECT t.owner, t.table_name, t.column_id, t.column_name, t.nullable, t.data_type, t.data_precision, t.data_scale, t.data_length, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
+SELECT t.owner, t.table_name, c.position, t.column_name, t.nullable, t.data_type, t.data_precision, t.data_scale, t.data_length, NVL2(c.constraint_type, 1, 0) as COL_IS_PK FROM all_tab_columns t
     LEFT JOIN (
-            SELECT c.owner, c.table_name, c.constraint_type, ac.column_name FROM all_constraints c
+            SELECT c.owner, c.table_name, c.constraint_type, ac.column_name, ac.position FROM all_constraints c
                 INNER JOIN all_cons_columns ac ON (
                     c.constraint_name = ac.constraint_name
                     AND c.table_name = ac.table_name
@@ -287,7 +287,6 @@ const defaultNumericPrecision = 38
 func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[string][]string, error) {
 	var pks = make(map[string][]string)
 	var columns []sqlcapture.ColumnInfo
-	var sc sqlcapture.ColumnInfo
 
 	var ownersMap = make(map[string]bool)
 	for _, t := range tables {
@@ -306,24 +305,30 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 	defer rows.Close()
 
 	for rows.Next() {
+		var sc sqlcapture.ColumnInfo
+
 		var isPrimaryKey bool
 		var isNullableStr string
 		var dataScale sql.NullInt16
 		var dataLength int
 		var dataPrecision sql.NullInt16
 		var dataType string
-		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &sc.Index, &sc.Name, &isNullableStr, &dataType, &dataPrecision, &dataScale, &dataLength, &isPrimaryKey); err != nil {
+		var keyOrdinalPosition sql.NullInt16
+		if err := rows.Scan(&sc.TableSchema, &sc.TableName, &keyOrdinalPosition, &sc.Name, &isNullableStr, &dataType, &dataPrecision, &dataScale, &dataLength, &isPrimaryKey); err != nil {
 			return nil, nil, fmt.Errorf("scanning column: %w", err)
 		}
 
-		if isNullableStr == "Y" {
-			sc.IsNullable = true
-		}
+		sc.IsNullable = isNullableStr == "Y"
+
 		var precision int16
 		if dataPrecision.Valid {
 			precision = dataPrecision.Int16
 		} else {
 			precision = defaultNumericPrecision
+		}
+
+		if keyOrdinalPosition.Valid {
+			sc.Index = int(keyOrdinalPosition.Int16)
 		}
 
 		var t reflect.Type

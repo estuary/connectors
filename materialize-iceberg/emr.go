@@ -21,21 +21,28 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func clientCredSecretName(prefix string, materializationName string) string {
-	return prefix + sanitizeAndAppendHash(materializationName)
+type emrClient struct {
+	cfg                 emrConfig
+	catalogAuth         catalogAuthConfig
+	catalogURL          string
+	warehouse           string
+	materializationName string
+	c                   *emr.Client
+	s3Client            *s3.Client
+	ssmClient           *ssm.Client
 }
 
-func checkEmrPrereqs(ctx context.Context, d *materialization, errs *cerrors.PrereqErr) {
-	if _, err := d.emrClient.ListJobRuns(ctx, &emr.ListJobRunsInput{
-		ApplicationId: aws.String(d.cfg.Compute.ApplicationId),
+func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
+	if _, err := e.c.ListJobRuns(ctx, &emr.ListJobRunsInput{
+		ApplicationId: aws.String(e.cfg.ApplicationId),
 		MaxResults:    aws.Int32(1),
 	}); err != nil {
-		errs.Err(fmt.Errorf("failed to list job runs for application %q: %w", d.cfg.Compute.ApplicationId, err))
+		errs.Err(fmt.Errorf("failed to list job runs for application %q: %w", e.cfg.ApplicationId, err))
 	}
 
-	if d.cfg.CatalogAuthentication.CatalogAuthType == catalogAuthTypeClientCredential {
-		testParameter := clientCredSecretName(d.cfg.Compute.SystemsManagerPrefix, "test")
-		if _, err := d.ssmClient.PutParameter(ctx, &ssm.PutParameterInput{
+	if e.catalogAuth.CatalogAuthType == catalogAuthTypeClientCredential {
+		testParameter := e.cfg.SystemsManagerPrefix + "test"
+		if _, err := e.ssmClient.PutParameter(ctx, &ssm.PutParameterInput{
 			Name:      aws.String(testParameter),
 			Value:     aws.String("test"),
 			Type:      ssmTypes.ParameterTypeSecureString,
@@ -43,7 +50,7 @@ func checkEmrPrereqs(ctx context.Context, d *materialization, errs *cerrors.Prer
 		}); err != nil {
 			errs.Err(fmt.Errorf("failed to put secure string parameter to %s: %w", testParameter, err))
 			return
-		} else if _, err := d.ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
+		} else if _, err := e.ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
 			Name:           aws.String(testParameter),
 			WithDecryption: aws.Bool(true),
 		}); err != nil {
@@ -52,12 +59,11 @@ func checkEmrPrereqs(ctx context.Context, d *materialization, errs *cerrors.Prer
 	}
 }
 
-func ensureEmrSecret(ctx context.Context, client *ssm.Client, parameterName, wantCred string) error {
-	res, err := client.GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String(parameterName),
+func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
+	res, err := e.ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String(e.clientCredSecretName()),
 		WithDecryption: aws.Bool(true),
 	})
-
 	if err != nil {
 		var errNotFound *ssmTypes.ParameterNotFound
 		if !errors.As(err, &errNotFound) {
@@ -69,8 +75,8 @@ func ensureEmrSecret(ctx context.Context, client *ssm.Client, parameterName, wan
 		return nil
 	}
 
-	_, err = client.PutParameter(ctx, &ssm.PutParameterInput{
-		Name:      aws.String(parameterName),
+	_, err = e.ssmClient.PutParameter(ctx, &ssm.PutParameterInput{
+		Name:      aws.String(e.clientCredSecretName()),
 		Value:     aws.String(wantCred),
 		Type:      ssmTypes.ParameterTypeSecureString,
 		Overwrite: aws.Bool(true),
@@ -84,22 +90,23 @@ func ensureEmrSecret(ctx context.Context, client *ssm.Client, parameterName, wan
 	return nil
 }
 
-func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, workingPrefix, entryPointUri string) error {
+func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFilesCommonURI, jobName, workingPrefix string) error {
 	/***
 	Available arguments to the pyspark script:
-	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script        | Required |
-	| --status-output          | Location where the final status object will be written.                | Required |
-	| --catalog-url            | The catalog URL                                                        | Required |
-	| --warehouse              | REST Warehouse                                                         | Required |
-	| --region                 | EMR & SigV4 Region                                                     | Required |
-	| --credential-secret-name | Name of the secret in Systems Manager if using client credentials auth | Optional |
-	| --scope                  | Scope if using client credentials auth                                 | Optional |
+	| --input-uri              | Input for the program, as an s3 URI, to be parsed by the script                      | Required |
+	| --status-output.         | Location where the final status object will be written.                              | Required |
+	| --catalog-url            | The catalog URL                                                                      | Required |
+	| --warehouse              | REST Warehouse                                                                       | Required |
+	| --region                 | EMR & SigV4 Region                                                                   | Required |
+	| --credential-secret-name | Name of the secret in Systems Manager if using client credentials auth               | Optional |
+	| --scope                  | Scope if using client credentials auth                                               | Optional |
+	| --signing-name           | Signing name to use when authenticating with AWS SigV4. Either 'glue' or 's3tables'. | Optional |
 	***/
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
 		statusKey := path.Join(workingPrefix, statusFile)
-		if statusObj, err := t.s3Client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket: aws.String(t.cfg.Compute.Bucket),
+		if statusObj, err := e.s3Client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String(e.cfg.Bucket),
 			Key:    aws.String(statusKey),
 		}); err != nil {
 			return nil, fmt.Errorf("reading status object %q: %w", statusKey, err)
@@ -112,8 +119,8 @@ func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, w
 	inputKey := path.Join(workingPrefix, "input.json")
 	if inputBytes, err := encodeInput(input); err != nil {
 		return fmt.Errorf("encoding input: %w", err)
-	} else if _, err := t.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(t.cfg.Compute.Bucket),
+	} else if _, err := e.s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(e.cfg.Bucket),
 		Key:    aws.String(inputKey),
 		Body:   bytes.NewReader(inputBytes),
 	}); err != nil {
@@ -121,27 +128,29 @@ func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, w
 	}
 
 	args := []string{
-		"--input-uri", "s3://" + path.Join(t.cfg.Compute.Bucket, inputKey),
-		"--status-output", "s3://" + path.Join(t.cfg.Compute.Bucket, workingPrefix, statusFile),
-		"--catalog-url", t.cfg.URL,
-		"--warehouse", t.cfg.Warehouse,
-		"--region", t.cfg.Compute.Region,
+		"--input-uri", "s3://" + path.Join(e.cfg.Bucket, inputKey),
+		"--status-output", "s3://" + path.Join(e.cfg.Bucket, workingPrefix, statusFile),
+		"--catalog-url", e.catalogURL,
+		"--warehouse", e.warehouse,
+		"--region", e.cfg.Region,
 	}
 
-	if n := t.emrAuth.credentialSecretName; n != "" {
-		args = append(args, "--credential-secret-name", n)
-	}
-	if s := t.emrAuth.scope; s != "" {
-		args = append(args, "--scope", s)
+	if e.catalogAuth.CatalogAuthType == catalogAuthTypeClientCredential {
+		args = append(args, "--credential-secret-name", e.clientCredSecretName())
+		if s := e.catalogAuth.Scope; s != "" {
+			args = append(args, "--scope", s)
+		}
+	} else if e.catalogAuth.CatalogAuthType == catalogAuthTypeSigV4 {
+		args = append(args, "--signing-name", e.catalogAuth.catalogAuthSigV4Config.SigningName)
 	}
 
-	start, err := t.emrClient.StartJobRun(ctx, &emr.StartJobRunInput{
-		ApplicationId:    aws.String(t.cfg.Compute.ApplicationId),
+	start, err := e.c.StartJobRun(ctx, &emr.StartJobRunInput{
+		ApplicationId:    aws.String(e.cfg.ApplicationId),
 		ClientToken:      aws.String(uuid.NewString()),
-		ExecutionRoleArn: aws.String(t.cfg.Compute.ExecutionRoleArn),
+		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
 		JobDriver: &emrTypes.JobDriverMemberSparkSubmit{
 			Value: emrTypes.SparkSubmit{
-				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s", t.pyFiles.commonURI)),
+				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s", pyFilesCommonURI)),
 				EntryPoint:            aws.String(entryPointUri),
 				EntryPointArguments:   args,
 			},
@@ -154,8 +163,8 @@ func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, w
 
 	var runDetails string
 	for {
-		gotRun, err := t.emrClient.GetJobRun(ctx, &emr.GetJobRunInput{
-			ApplicationId: aws.String(t.cfg.Compute.ApplicationId),
+		gotRun, err := e.c.GetJobRun(ctx, &emr.GetJobRunInput{
+			ApplicationId: aws.String(e.cfg.ApplicationId),
 			JobRunId:      start.JobRunId,
 		})
 		if err != nil {
@@ -188,6 +197,10 @@ func (t *transactor) runEmrJob(ctx context.Context, jobName string, input any, w
 			}
 		}
 	}
+}
+
+func (e *emrClient) clientCredSecretName() string {
+	return e.cfg.SystemsManagerPrefix + sanitizeAndAppendHash(e.materializationName)
 }
 
 func encodeInput(in any) ([]byte, error) {

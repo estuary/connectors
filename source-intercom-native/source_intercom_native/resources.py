@@ -46,12 +46,12 @@ FULL_REFRESH_RESOURCES: list[tuple[str, str, str, str | None]] = [
 # Each tuple contains the resource's name and its fetch function.
 INCREMENTAL_DATE_WINDOW_RESOURCES: list[tuple[str, IncrementalDateWindowResourceFetchChangesFn]] = [
     ('contacts', fetch_contacts),
-    ('conversation_parts', fetch_conversations_parts),
 ]
 
 # Incremental resources that don't use date windows.
 # Each tuple contains the resource's name and its fetch function.
 INCREMENTAL_RESOURCES: list[tuple[str, IncrementalResourceFetchChangesFn]] = [
+    ('conversation_parts', fetch_conversations_parts),
     ('tickets', fetch_tickets),
     ('conversations', fetch_conversations),
 ]

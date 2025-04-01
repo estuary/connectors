@@ -1,0 +1,24 @@
+credentials:
+    credentials_title: OAuth Credentials
+    client_id_sops: ENC[AES256_GCM,data:fMXpKq4TrDG9vbkRFa7EYhOsdk6FtTLLT+jU5hokrHEB2FF8h39CquHiOp0+El0Mg/4zQMTdJ5wDp90WKSPa9yxzaMAi97ExkqfNWPM2FNAK2KmAYg==,iv:8lNVaJITypPnTuUZM4kMXUMdJglGFdkDYGNGhyPsxVU=,tag:yT1ENGiQzGZKM8DCT8gS0g==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:jJgwo0E280bY9JApzBDCXuFaEbnnMMhtT0zYrwybJcOtZc+6RXNkxtQSbXvw9DpAAC6jbGEXMMc6yONx4y21ww==,iv:KqFuPgJzjVgDdOdKGRrnvEda/ZUUBvvlBjUcEdiALeg=,tag:M2RoEtnWixP86GOv/uwMIw==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:vqvATUauWsPBTFv1wTO7DljL4zOADONNj7+euRIQkXlB6nQgFIX11uH6tFrhhThAT99x5ipqRSxzzRgbGb/bd++AybniGSIy/Cw6AvPUDvDYAJ8yRX94,iv:4gQ10k3Z3oZ2/pKrP530yWpaha16KznbwXJilLmJGO0=,tag:VvwHjDwFNRkPeBGauLtajw==,type:str]
+    instance_url: https://estuary2-dev-ed.develop.my.salesforce.com
+is_sandbox: false
+start_date: "2024-07-26T00:00:00Z"
+advanced:
+    window_size: 1000
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-07-26T15:53:37Z"
+          enc: CiQAdmEdwpmP0/Kcv6L1SnM3nPbsYLywIaUeOL1mz7cZjFUwWt0SSQD5lVw43Of1YI96anxUVo7d7ALi0DYnCNvxTHCgHX5ZeDBPlfXwLNpmYb6y3hJSsHG7NupwDQT/qIpUvlqQnq5IVkgJEFHPU1s=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-03-14T18:11:44Z"
+    mac: ENC[AES256_GCM,data:2q6JA+SFc4w+MsfeuapyfuVZq9n/ATOdIJxEurebzR2TDToOsfqhSR+c2rEM9aIErD9UDL2xc6hYtfu8hCg5YCdsyqAQXYxFAfASa5xWiHodAZ5H4k2jaY9Yf8Yi0UM1IVW2tt04o8qc2yrLut7mnVoQtjPfzT/782LjgfZZt6s=,iv:qoMbdN3i4rO1S/EoqEZ4gTggf89FPKkOh3qNZgjmbfs=,tag:HUKjKKjBojrETyyk5oNiLg==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.7.3

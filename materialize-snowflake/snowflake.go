@@ -308,14 +308,10 @@ func (d *transactor) addBinding(target sql.Table) error {
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
-		var pipeName string
-		var err error
-		if pipeName, err = renderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.pipeName); err != nil {
-			return fmt.Errorf("pipeName template: %w", err)
-		} else {
-			pipeName = strings.ToUpper(strings.Trim(pipeName, "`"))
-			b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, pipeName)
-		}
+		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
+		var tableName = b.target.Path[len(b.target.Path)-1]
+		var pipeName = strings.ToUpper(sanitizeAndAppendHash("flow_pipe", b.target.Binding, keyBegin, d.version, tableName))
+		b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, pipeName)
 	}
 
 	d.bindings = append(d.bindings, b)
@@ -420,8 +416,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, error) {
-	// Check to see if a pipe for this version already exists
-	var query = fmt.Sprintf("SHOW PIPES LIKE '%s';", pipeName)
+	// _ is a wildcard character in LIKE patterns, so we escape it with two backslashes
+	var query = fmt.Sprintf("SHOW PIPES LIKE '%s';", strings.ReplaceAll(pipeName, "_", "\\\\_"))
 	rows, err := d.db.QueryContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("finding pipe %q: %w", pipeName, err)
@@ -517,7 +513,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// it means if the spec has been updated, we will end up creating a new pipe
 			if !exists {
 				log.WithField("name", b.pipeName).Info("store: creating pipe")
-				if createPipe, err := renderTableShardVersionTemplate(b.target, d._range.KeyBegin, d.version, d.templates.createPipe); err != nil {
+				if createPipe, err := renderTablePipeTemplate(b.target, b.pipeName, d.templates.createPipe); err != nil {
 					return nil, fmt.Errorf("createPipe template: %w", err)
 				} else if _, err := d.db.ExecContext(ctx, createPipe); err != nil {
 					return nil, fmt.Errorf("creating pipe for table %q: %w", b.target.Path, err)

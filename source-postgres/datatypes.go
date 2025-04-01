@@ -23,6 +23,8 @@ import (
 const (
 	infinityTimestamp         = "9999-12-31T23:59:59Z"
 	negativeInfinityTimestamp = "0000-01-01T00:00:00Z"
+	infinityDate              = "9999-12-31"
+	negativeInfinityDate      = "0000-01-01"
 	rfc3339TimeFormat         = "15:04:05.999999999Z07:00"
 	truncateColumnThreshold   = 8 * 1024 * 1024 // Arbitrarily selected value
 )
@@ -277,6 +279,17 @@ func (db *postgresDatabase) translateRecordField(column *sqlcapture.ColumnInfo, 
 			} else {
 				return formatRFC3339(t) // Historical behavior
 			}
+		} else if x, ok := val.(pgtype.InfinityModifier); ok {
+			if !db.featureFlags["date_as_date"] {
+				if x == pgtype.Infinity {
+					return infinityTimestamp, nil
+				}
+				return negativeInfinityTimestamp, nil
+			}
+			if x == pgtype.Infinity {
+				return infinityDate, nil
+			}
+			return negativeInfinityDate, nil
 		} else if val == nil {
 			return nil, nil
 		}

@@ -20,16 +20,31 @@ func (fc fieldConfig) Validate() error { return nil }
 func (fc fieldConfig) CastToString() bool { return fc.CastToString_ }
 
 type mapped struct {
-	type_    iceberg.Type
-	required bool
+	type_ iceberg.Type
 }
 
-func (m mapped) IsBinary() bool {
-	return m.type_ == iceberg.BinaryType{}
+func (m mapped) String() string {
+	return m.type_.String()
 }
+
+func (m mapped) Compatible(existing boilerplate.ExistingField) bool {
+	return strings.EqualFold(existing.Type, m.type_.String())
+}
+
+func (m mapped) CanMigrate(existing boilerplate.ExistingField) bool {
+	return allowedMigrations.CanMigrate(existing.Type, m.type_)
+}
+
+var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
+	"long":                      {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
+	"decimal(38, 0)":            {iceberg.Float64Type{}},
+	boilerplate.AnyExistingType: {iceberg.StringType{}},
+}
+
+var migrateFieldSuffix = "_flow_tmp"
 
 func mapProjection(p boilerplate.Projection) (mapped, boilerplate.ElementConverter) {
-	m := mapped{required: p.MustExist}
+	var m mapped
 	var converter boilerplate.ElementConverter
 
 	switch ft := p.FlatType.(type) {
@@ -125,18 +140,81 @@ func computeSchemaForNewTable(res boilerplate.MappedBinding[config, resource, ma
 	return iceberg.NewSchemaWithIdentifiers(1, identifierFields, fields...)
 }
 
-func computeSchemaForUpdatedTable(current *iceberg.Schema, update boilerplate.MaterializerBindingUpdate[mapped]) *iceberg.Schema {
+func computeSchemaForUpdatedTable(
+	currentHighestID int,
+	current *iceberg.Schema,
+	update boilerplate.MaterializerBindingUpdate[mapped],
+) *iceberg.Schema {
 	var nextFields []iceberg.NestedField
 	for _, f := range current.Fields() {
+		if slices.ContainsFunc(update.FieldsToMigrate, func(upd boilerplate.MigrateField[mapped]) bool {
+			return f.Name == upd.From.Name+migrateFieldSuffix
+		}) {
+			// Prune columns from a prior failed migrations of this spec update.
+			// This prevents rare cases where a prior migration column type is
+			// incompatible with a source field that has undergone further
+			// schema evolution before the migration could be applied.
+			continue
+		}
+
 		if slices.ContainsFunc(update.NewlyNullableFields, func(field boilerplate.ExistingField) bool {
 			return field.Name == f.Name
 		}) {
 			f.Required = false
 		}
+
 		nextFields = append(nextFields, f)
 	}
 
-	appendProjectionsAsFields(&nextFields, update.NewProjections, getHighestFieldID(current))
+	var tempMigrateProjections []boilerplate.MappedProjection[mapped]
+	for _, f := range update.FieldsToMigrate {
+		temp := f.To
+		temp.Field += migrateFieldSuffix
+		tempMigrateProjections = append(tempMigrateProjections, temp)
+	}
+
+	_, lastId := appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID)
+	appendProjectionsAsFields(&nextFields, tempMigrateProjections, lastId)
+
+	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
+}
+
+func computeSchemaForCompletedMigrations(current *iceberg.Schema, fieldsToMigrate []boilerplate.MigrateField[mapped]) *iceberg.Schema {
+	fieldWasMigrated := func(f iceberg.NestedField) bool {
+		return slices.ContainsFunc(fieldsToMigrate, func(field boilerplate.MigrateField[mapped]) bool {
+			return f.Name == field.From.Name
+		})
+	}
+
+	fieldMigratedTo := func(f iceberg.NestedField) bool {
+		return slices.ContainsFunc(fieldsToMigrate, func(field boilerplate.MigrateField[mapped]) bool {
+			return f.Name == field.From.Name+migrateFieldSuffix
+		})
+	}
+
+	// Sanity checks that we don't remove a column without also renaming one to
+	// its original name.
+	var fieldsRemoved []string
+	var fieldsRenamedTo []string
+
+	var nextFields []iceberg.NestedField
+	for _, f := range current.Fields() {
+		if fieldWasMigrated(f) {
+			fieldsRemoved = append(fieldsRemoved, f.Name)
+			continue
+		} else if fieldMigratedTo(f) {
+			f.Name = strings.TrimSuffix(f.Name, migrateFieldSuffix)
+			fieldsRenamedTo = append(fieldsRenamedTo, f.Name)
+		}
+
+		nextFields = append(nextFields, f)
+	}
+
+	slices.Sort(fieldsRemoved)
+	slices.Sort(fieldsRenamedTo)
+	if !slices.Equal(fieldsRemoved, fieldsRenamedTo) {
+		panic(fmt.Sprintf("application error: fields removed and renamed to are not equal: %s vs %s", fieldsRemoved, fieldsRenamedTo))
+	}
 
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }
@@ -156,33 +234,11 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 			ID:       id,
 			Name:     p.Field,
 			Type:     p.Mapped.type_,
-			Required: p.Mapped.required,
+			Required: p.MustExist,
 			Doc:      strings.ReplaceAll(p.Comment, "\n", " - "), // Glue catalogs don't support newlines in field comments
 		})
 		ids = append(ids, id)
 	}
 
 	return ids, id
-}
-
-// TODO(whb): The version of go-iceberg we are using has a broken
-// (*Schema).HighestFieldID method which does not work with most logical types.
-// It looks like that is probably fixed in a more recent version, but we need to
-// be on Go 1.23 to use that.
-func getHighestFieldID(sch *iceberg.Schema) int {
-	var out int
-
-	for _, f := range sch.Fields() {
-		out = max(out, f.ID)
-		if l, ok := f.Type.(*iceberg.ListType); ok {
-			out = max(out, l.ElementID)
-		}
-		// Ignoring the possibility of Map and Struct types, which also have
-		// elements with their own field IDs since we don't create columns with
-		// those types. We _also_ don't create columns with list types, but it
-		// is more conceivable that we could add that in the short term. This
-		// should all be removed when we upgrade Go & iceberg-go anyway.
-	}
-
-	return out
 }

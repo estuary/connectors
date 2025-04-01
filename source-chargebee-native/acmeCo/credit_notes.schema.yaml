@@ -1,0 +1,45 @@
+---
+$defs:
+  CreditNoteData:
+    additionalProperties: true
+    properties:
+      id:
+        title: Id
+        type: string
+    required:
+      - id
+    title: CreditNoteData
+    type: object
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  credit_note:
+    $ref: "#/$defs/CreditNoteData"
+required:
+  - credit_note
+title: CreditNote
+type: object
+x-infer-schema: true

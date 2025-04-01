@@ -14,7 +14,7 @@ import (
 	"github.com/segmentio/encoding/json"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
 
 var (
@@ -158,13 +158,13 @@ var (
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Perform discovery and log the full results for convenience. This info
 	// will be needed when activating all currently-active bindings below.
-	logrus.Info("discovering tables")
+	log.WithField("eventType", "connectorStatus").Info("Discovering database tables")
 	discovery, err := c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	}
 	for streamID, discoveryInfo := range discovery {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"table":     streamID,
 			"discovery": discoveryInfo,
 		}).Debug("discovered table")
@@ -174,6 +174,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
+	log.WithField("cursor", c.State.Cursor).WithField("eventType", "connectorStatus").Info("Initializing replication")
 	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
@@ -198,11 +199,12 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	// and relay them to the replication stream acknowledgement.
 	go func() {
 		if err := c.acknowledgeWorker(ctx, c.Output, replStream); err != nil {
-			logrus.WithField("err", err).Fatal("error relaying acknowledgements from stdin")
+			log.WithField("err", err).Fatal("error relaying acknowledgements from stdin")
 		}
 	}()
 
 	// Perform an initial "catch-up" stream-to-fence before entering the main capture loop.
+	log.WithField("eventType", "connectorStatus").Info("Catching up on CDC history")
 	if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
@@ -210,6 +212,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	var rediscoverAfter time.Time
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
+			log.WithField("eventType", "connectorStatus").Info("Rediscovering database tables")
 			discovery, err = c.Database.DiscoverTables(ctx)
 			if err != nil {
 				return fmt.Errorf("error discovering database tables: %w", err)
@@ -223,6 +226,10 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 		// If any tables are currently backfilling, go perform another backfill iteration.
 		if c.BindingsCurrentlyBackfilling() != nil {
+			log.WithField("eventType", "connectorStatus").Infof("Backfilling %d out of %d tables",
+				len(c.BindingsCurrentlyBackfilling()),
+				len(c.BindingsCurrentlyActive()),
+			)
 			if err := c.backfillStreams(ctx, discovery); err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
 			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
@@ -245,6 +252,9 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 
 		// Finally, since there's no other work to do right now, we just stream changes for a period of time.
+		log.WithField("eventType", "connectorStatus").Infof("Streaming CDC events (all %d tables are backfilled)",
+			len(c.BindingsCurrentlyActive()),
+		)
 		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
 			return err
 		}
@@ -271,7 +281,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 			continue
 		}
 
-		logrus.WithField("stateKey", stateKey).Info("binding added to capture")
+		log.WithField("stateKey", stateKey).Info("binding added to capture")
 		c.State.Streams[stateKey] = &TableState{Mode: TableStatePending, dirty: true}
 	}
 
@@ -289,7 +299,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	}
 	for stateKey, state := range c.State.Streams {
 		if state.Mode != TableStateIgnore && !streamExistsInCatalog(stateKey) {
-			logrus.WithField("stateKey", stateKey).Info("binding removed from capture")
+			log.WithField("stateKey", stateKey).Info("binding removed from capture")
 			c.State.Streams[stateKey] = &TableState{
 				Mode:     TableStateIgnore,
 				Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
@@ -310,10 +320,10 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 				}
 			}
 			if len(binding.Resource.PrimaryKey) > 0 {
-				logrus.WithFields(logrus.Fields{"stateKey": binding.StateKey, "key": binding.Resource.PrimaryKey}).Debug("key overriden by resource config")
+				log.WithFields(log.Fields{"stateKey": binding.StateKey, "key": binding.Resource.PrimaryKey}).Debug("key overriden by resource config")
 				state.KeyColumns = binding.Resource.PrimaryKey
 			}
-			logrus.WithField("stateKey", binding.StateKey).WithField("key", state.KeyColumns).Info("initialized missing KeyColumns state for only-changes binding")
+			log.WithField("stateKey", binding.StateKey).WithField("key", state.KeyColumns).Info("initialized missing KeyColumns state for only-changes binding")
 			state.dirty = true
 		}
 	}
@@ -324,9 +334,9 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 	// recovery path after WAL deletion, just hit the "Backfill Everything" button in the UI.
 	if allStreamsAreNew {
 		if len(c.Bindings) > 0 {
-			logrus.Info("all bindings are new, resetting replication cursor")
+			log.Info("all bindings are new, resetting replication cursor")
 		} else {
-			logrus.Info("capture has no bindings, resetting replication cursor")
+			log.Info("capture has no bindings, resetting replication cursor")
 		}
 		c.State.Cursor = ""
 	}
@@ -369,7 +379,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		// remove it in the future once it will not break any otherwise-successful
 		// captures.
 		if !discoveryInfo.BaseTable {
-			logrus.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
+			log.WithField("stream", streamID).Warn("automatically ignoring a binding whose type is not `BASE TABLE`")
 			state.Mode = TableStateIgnore
 			continue
 		}
@@ -386,33 +396,33 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 			}
 		}
 		if len(binding.Resource.PrimaryKey) > 0 {
-			logrus.WithFields(logrus.Fields{"stream": streamID, "key": binding.Resource.PrimaryKey}).Debug("key overriden by resource config")
+			log.WithFields(log.Fields{"stream": streamID, "key": binding.Resource.PrimaryKey}).Debug("key overriden by resource config")
 			state.KeyColumns = binding.Resource.PrimaryKey
 		}
 
 		// Select the appropriate state transition depending on the backfill mode in the resource config.
-		logrus.WithFields(logrus.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
+		log.WithFields(log.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
 		switch binding.Resource.Mode {
 		case BackfillModeAutomatic:
 			if discoveryInfo.UnpredictableKeyOrdering {
-				logrus.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
+				log.WithField("stream", streamID).Info("autoselected unfiltered (normal) backfill mode (database key ordering is unpredictable)")
 				state.Mode = TableStateUnfilteredBackfill
 			} else {
-				logrus.WithField("stream", streamID).Info("autoselected precise backfill mode")
+				log.WithField("stream", streamID).Info("autoselected precise backfill mode")
 				state.Mode = TableStatePreciseBackfill
 			}
 		case BackfillModePrecise:
-			logrus.WithField("stream", streamID).Info("user selected precise backfill mode")
+			log.WithField("stream", streamID).Info("user selected precise backfill mode")
 			state.Mode = TableStatePreciseBackfill
 		case BackfillModeNormal:
-			logrus.WithField("stream", streamID).Info("user selected unfiltered (normal) backfill mode")
+			log.WithField("stream", streamID).Info("user selected unfiltered (normal) backfill mode")
 			state.Mode = TableStateUnfilteredBackfill
 		case BackfillModeWithoutKey:
-			logrus.WithField("stream", streamID).Info("user selected keyless backfill mode")
+			log.WithField("stream", streamID).Info("user selected keyless backfill mode")
 			state.Mode = TableStateKeylessBackfill
 			state.KeyColumns = nil
 		case BackfillModeOnlyChanges:
-			logrus.WithField("stream", streamID).Info("user selected only changes, skipping backfill")
+			log.WithField("stream", streamID).Info("user selected only changes, skipping backfill")
 			state.Mode = TableStateActive
 		default:
 			return fmt.Errorf("invalid backfill mode %q for stream %q", binding.Resource.Mode, streamID)
@@ -421,9 +431,9 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		// Log an informational notice if the key we'll be using for a backfill differs from
 		// the discovered primary key of a table.
 		if state.Mode == TableStatePreciseBackfill || state.Mode == TableStateUnfilteredBackfill {
-			logrus.WithFields(logrus.Fields{"stream": streamID, "key": state.KeyColumns}).Debug("using backfill key")
+			log.WithFields(log.Fields{"stream": streamID, "key": state.KeyColumns}).Debug("using backfill key")
 			if !slices.Equal(state.KeyColumns, discoveryInfo.PrimaryKey) {
-				logrus.WithFields(logrus.Fields{
+				log.WithFields(log.Fields{
 					"stream":      streamID,
 					"backfillKey": state.KeyColumns,
 					"databaseKey": discoveryInfo.PrimaryKey,
@@ -453,7 +463,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 	for _, binding := range c.BindingsCurrentlyBackfilling() {
 		if !c.Database.ShouldBackfill(binding.StreamID) {
 			var state = c.State.Streams[binding.StateKey]
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(log.Fields{
 				"stream":  binding.StreamID,
 				"scanned": state.Scanned,
 			}).Info("skipping backfill for stream")
@@ -476,13 +486,13 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 // The fenceAfter argument is passed to the underlying replication stream, so that
 // it can make sure to stream changes for at least that length of time.
 func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream, fenceAfter time.Duration, reportFlush bool) error {
-	logrus.WithField("fenceAfter", fenceAfter.String()).Info("streaming to fence")
+	log.WithField("fenceAfter", fenceAfter.String()).Info("streaming to fence")
 
 	// Log a warning and perform replication diagnostics if we don't observe the next fence within a few minutes
 	var diagnosticsTimeout = time.AfterFunc(fenceAfter+automatedDiagnosticsTimeout, func() {
-		logrus.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
+		log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
 		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
-			logrus.WithField("err", err).Error("replication diagnostics error")
+			log.WithField("err", err).Error("replication diagnostics error")
 		}
 	})
 	defer diagnosticsTimeout.Stop()
@@ -490,7 +500,7 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	// When streaming completes (because we've either reached the fence or encountered an error),
 	// log the number of events which have been processed.
 	var eventCount int
-	defer func() { logrus.WithField("events", eventCount).Info("processed replication events") }()
+	defer func() { log.WithField("events", eventCount).Info("processed replication events") }()
 
 	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		eventCount++
@@ -522,7 +532,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		if binding == nil {
 			return nil // Should be impossible, but safe to ignore
 		}
-		logrus.WithFields(logrus.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("marking table as missing")
+		log.WithFields(log.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("marking table as missing")
 		c.State.Streams[binding.StateKey] = &TableState{
 			Mode:     TableStateMissing,
 			Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
@@ -543,7 +553,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 
 		var stateKey = binding.StateKey
 		if state, ok := c.State.Streams[stateKey]; ok {
-			logrus.WithField("stateKey", stateKey).Trace("stream metadata updated")
+			log.WithField("stateKey", stateKey).Trace("stream metadata updated")
 			state.Metadata = event.Metadata
 			state.dirty = true
 			c.State.Streams[stateKey] = state
@@ -565,7 +575,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 
 	// Decide what to do with the change event based on the state of the table.
 	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableStateIgnore {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"stream": streamID,
 			"op":     change.Operation,
 		}).Debug("ignoring stream")
@@ -605,7 +615,7 @@ func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*D
 	// might be concurrently backfilling.
 	if len(streams) != 0 {
 		var streamID = streams[rand.Intn(len(streams))]
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"count":    len(streams),
 			"selected": streamID,
 		}).Info("backfilling streams")
@@ -623,10 +633,10 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string, discovery
 	var streamState = c.State.Streams[stateKey]
 
 	// Process backfill query results as a callback-driven stream.
-	var lastRowKey = streamState.Scanned
+	var prevRowKey = streamState.Scanned
 	var eventCount int
-	backfillComplete, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
-		if streamState.Mode == TableStatePreciseBackfill && compareTuples(lastRowKey, event.RowKey) > 0 {
+	backfillComplete, nextRowKey, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
+		if streamState.Mode == TableStatePreciseBackfill && compareTuples(prevRowKey, event.RowKey) > 0 {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
 			// row keys.
@@ -641,9 +651,9 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string, discovery
 			// should have set `UnpredictableKeyOrdering` to true, which should have resulted in a
 			// backfill using the "UnfilteredBackfill" mode instead, which would not perform that
 			// filtering or this sanity check.
-			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", lastRowKey, event.RowKey)
+			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", prevRowKey, event.RowKey)
 		}
-		lastRowKey = event.RowKey
+		prevRowKey = event.RowKey
 
 		if err := c.emitChange(event); err != nil {
 			return fmt.Errorf("error emitting %q backfill row: %w", streamID, err)
@@ -656,18 +666,18 @@ func (c *Capture) backfillStream(ctx context.Context, streamID string, discovery
 	}
 
 	// Update stream state to reflect backfill results
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"stream": streamID,
 		"rows":   eventCount,
 	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	state.BackfilledCount += eventCount
 	if backfillComplete {
-		logrus.WithField("stream", streamID).Info("backfill completed")
+		log.WithField("stream", streamID).Info("backfill completed")
 		state.Mode = TableStateActive
 		state.Scanned = nil
 	} else {
-		state.Scanned = lastRowKey
+		state.Scanned = nextRowKey
 	}
 	state.dirty = true
 	c.State.Streams[stateKey] = state
@@ -694,7 +704,7 @@ func (c *Capture) emitChange(event *ChangeEvent) error {
 		record = event.Before // After is never used.
 	}
 	if record == nil {
-		logrus.WithField("op", event.Operation).Warn("change event data map is nil")
+		log.WithField("op", event.Operation).Warn("change event data map is nil")
 		record = make(map[string]interface{})
 	}
 	record["_meta"] = &meta
@@ -708,7 +718,7 @@ func (c *Capture) emitChange(event *ChangeEvent) error {
 
 	var bs, err = json.Marshal(record)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
+		log.WithFields(log.Fields{
 			"document": fmt.Sprintf("%#v", record),
 			"stream":   streamID,
 			"err":      err,
@@ -742,7 +752,7 @@ func (c *Capture) emitState() error {
 	if err != nil {
 		return fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
-	logrus.WithField("state", string(bs)).Trace("emitting state update")
+	log.WithField("state", string(bs)).Trace("emitting state update")
 	return c.Output.Checkpoint(bs, true)
 }
 
@@ -782,7 +792,7 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 
 	var cursor = c.pending.cursors[count-1]
 	c.pending.cursors = c.pending.cursors[count:]
-	logrus.WithFields(logrus.Fields{
+	log.WithFields(log.Fields{
 		"count":  count,
 		"cursor": cursor,
 	}).Debug("acknowledged up to cursor")

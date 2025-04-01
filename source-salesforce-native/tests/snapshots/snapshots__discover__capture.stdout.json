@@ -1,0 +1,932 @@
+[
+  {
+    "recommendedName": "Account",
+    "resourceConfig": {
+      "name": "Account",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Campaign",
+    "resourceConfig": {
+      "name": "Campaign",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Case",
+    "resourceConfig": {
+      "name": "Case",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Contact",
+    "resourceConfig": {
+      "name": "Contact",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Entitlement",
+    "resourceConfig": {
+      "name": "Entitlement",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Lead",
+    "resourceConfig": {
+      "name": "Lead",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "LeadHistory",
+    "resourceConfig": {
+      "name": "LeadHistory",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "MessagingSession",
+    "resourceConfig": {
+      "name": "MessagingSession",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Opportunity",
+    "resourceConfig": {
+      "name": "Opportunity",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "ServiceAppointment",
+    "resourceConfig": {
+      "name": "ServiceAppointment",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "ServiceContract",
+    "resourceConfig": {
+      "name": "ServiceContract",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Task",
+    "resourceConfig": {
+      "name": "Task",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "User",
+    "resourceConfig": {
+      "name": "User",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "WorkOrder",
+    "resourceConfig": {
+      "name": "WorkOrder",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "WorkOrderLineItem",
+    "resourceConfig": {
+      "name": "WorkOrderLineItem",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "title": "SalesforceResource",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/Id"
+    ]
+  }
+]

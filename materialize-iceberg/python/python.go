@@ -6,6 +6,10 @@ type NestedField struct {
 	Element string `json:"element,omitempty"`
 }
 
+type ExecInput struct {
+	Query string `json:"query"`
+}
+
 type LoadBinding struct {
 	Binding int           `json:"binding"`
 	Keys    []NestedField `json:"keys"`

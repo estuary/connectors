@@ -54,6 +54,18 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 		return nil, fmt.Errorf("invalid mysql address: %w", err)
 	}
 
+	// If we have no resume cursor but we do have an initial backfill cursor, use that as the start position.
+	if startCursor == "" && db.initialBackfillCursor != "" {
+		logrus.WithField("cursor", db.initialBackfillCursor).Info("using initial backfill cursor as start position")
+		startCursor = db.initialBackfillCursor
+	}
+
+	// If the `force_reset_cursor=XYZ` hackery flag is set, use that as the start position regardless of anything else.
+	if db.forceResetCursor != "" {
+		logrus.WithField("cursor", db.forceResetCursor).Info("forcibly modified resume cursor")
+		startCursor = db.forceResetCursor
+	}
+
 	var pos mysql.Position
 	if startCursor != "" {
 		pos, err = parseCursor(startCursor)

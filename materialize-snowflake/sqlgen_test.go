@@ -106,5 +106,22 @@ func TestSQLGeneration(t *testing.T) {
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
+	for _, tpl := range []*template.Template{
+		templates.createPipe,
+	} {
+		tbl := tables[0]
+		require.False(t, tbl.DeltaUpdates)
+		var testcase = tbl.Identifier + " " + tpl.Name()
+
+		var tf = tablePipe{
+			Table:    tbl,
+			PipeName: "db.schema.flow_pipe_0_tableName_00000000_0",
+		}
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &tf))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
 	cupaloy.SnapshotT(t, snap.String())
 }

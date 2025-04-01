@@ -13,6 +13,11 @@ import (
 // ShouldBackfill returns true if a given table's contents should be backfilled, given
 // that we intend to capture that table.
 func (db *sqlserverDatabase) ShouldBackfill(streamID string) bool {
+	// Allow the setting "*.*" to skip backfilling any tables.
+	if db.config.Advanced.SkipBackfills == "*.*" {
+		return false
+	}
+
 	if db.config.Advanced.SkipBackfills != "" {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
@@ -26,7 +31,7 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID string) bool {
 }
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, error) {
+func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -57,10 +62,10 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		if resumeAfter != nil {
 			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
 			if err != nil {
-				return false, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
+				return false, nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
 			}
 			if len(resumeKey) != len(keyColumns) {
-				return false, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
+				return false, nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
 			}
 			log.WithFields(log.Fields{
 				"stream":     streamID,
@@ -77,20 +82,20 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
 		}
 	default:
-		return false, fmt.Errorf("invalid backfill mode %q", state.Mode)
+		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
 	rows, err := db.conn.QueryContext(ctx, query, args...)
 	if err != nil {
-		return false, fmt.Errorf("unable to execute query %q: %w", query, err)
+		return false, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
 	defer rows.Close()
 
 	// Set up the necessary slices for generic scanning over query rows
 	cnames, err := rows.Columns()
 	if err != nil {
-		return false, err
+		return false, nil, err
 	}
 	var vals = make([]any, len(cnames))
 	var vptrs = make([]any, len(vals))
@@ -99,11 +104,12 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	// Iterate over the result set appending change events to the list
-	var resultRows int // Count of rows received within the current backfill chunk
+	var resultRows int    // Count of rows received within the current backfill chunk
+	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		if err := rows.Scan(vptrs...); err != nil {
-			return false, fmt.Errorf("error scanning result row: %w", err)
+			return false, nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 		var fields = make(map[string]interface{})
 		for idx, name := range cnames {
@@ -122,11 +128,13 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
-				return false, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+				return false, nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
+		nextRowKey = rowKey
+
 		if err := db.translateRecordFields(columnTypes, fields); err != nil {
-			return false, fmt.Errorf("error backfilling table %q: %w", table, err)
+			return false, nil, fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
 		log.WithField("fields", fields).Trace("got row")
@@ -148,14 +156,14 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			After:  fields,
 		}
 		if err := callback(event); err != nil {
-			return false, fmt.Errorf("error processing change event: %w", err)
+			return false, nil, fmt.Errorf("error processing change event: %w", err)
 		}
 		resultRows++
 		rowOffset++
 	}
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, rows.Err()
+	return backfillComplete, nextRowKey, rows.Err()
 }
 
 func (db *sqlserverDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {

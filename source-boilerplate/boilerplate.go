@@ -68,6 +68,9 @@ func RunMain(connector Connector) {
 		log.SetLevel(lvl)
 	}
 
+	// Log an 'Initializing' message as soon as logging is configured.
+	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
+
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	var stream pc.Connector_CaptureServer
 
@@ -131,24 +134,28 @@ func (s *ConnectorServer) Capture(stream pc.Connector_CaptureServer) error {
 				return err
 			}
 		case request.Discover != nil:
+			// No connectorStatus logging here, Discover RPC logging doesn't go into the ops log collection.
 			if response, err := s.Connector.Discover(ctx, request.Discover); err != nil {
 				return err
 			} else if err := stream.Send(&pc.Response{Discovered: response}); err != nil {
 				return err
 			}
 		case request.Validate != nil:
+			log.WithField("eventType", "connectorStatus").Info("Validating capture configuration")
 			if response, err := s.Connector.Validate(ctx, request.Validate); err != nil {
 				return err
 			} else if err := stream.Send(&pc.Response{Validated: response}); err != nil {
 				return err
 			}
 		case request.Apply != nil:
+			log.WithField("eventType", "connectorStatus").Info("Applying capture configuration")
 			if response, err := s.Connector.Apply(ctx, request.Apply); err != nil {
 				return err
 			} else if err := stream.Send(&pc.Response{Applied: response}); err != nil {
 				return err
 			}
 		case request.Open != nil:
+			log.WithField("eventType", "connectorStatus").Info("Starting capture")
 			return s.Connector.Pull(request.Open, &PullOutput{Connector_CaptureServer: stream})
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
@@ -166,7 +173,7 @@ type PullOutput struct {
 
 // Ready sends a PullResponse_Opened message to indicate that the capture has started.
 func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
-	log.Debug("sending PullResponse.Opened")
+	log.WithField("eventType", "connectorStatus").Info("Capture started")
 	out.Lock()
 	defer out.Unlock()
 	if err := out.Send(&pc.Response{

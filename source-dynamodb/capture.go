@@ -13,6 +13,7 @@ import (
 	streamTypes "github.com/aws/aws-sdk-go-v2/service/dynamodbstreams/types"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/semaphore"
 	"golang.org/x/time/rate"
 )
 
@@ -51,6 +52,7 @@ type capture struct {
 	state captureState
 
 	listShardsLimiter *rate.Limiter
+	sem               *semaphore.Weighted
 }
 
 func (c *capture) getSegmentState(sk boilerplate.StateKey, segment int) segmentState {

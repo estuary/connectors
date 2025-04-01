@@ -46,6 +46,16 @@ var featureFlagDefaults = map[string]bool{
 	// When true, the capture will use a fence mechanism based on observing CDC worker runs
 	// and LSN positions rather than the old watermark write mechanism.
 	"read_only": true,
+
+	// When true, the connector will tolerate missed changes in the CDC stream and will not
+	// trigger an automatic re-backfill if changes go missing. This may be useful if the CDC
+	// event data starts to expire before it can be captured, but should generally only be
+	// needed in exceptional circumstances when recovering from some sort of major breakage.
+	"tolerate_missed_changes": false,
+
+	// Force use of the 'replica fence' mechanism, which is normally used automatically
+	// when the target database is detected as a replica.
+	"replica_fencing": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -181,6 +191,20 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 		log.WithField("flags", featureFlags).Info("parsed feature flags")
 	}
 
+	// This is a bit of an ugly hack to allow us to specify a single _value_ as part of a feature flag.
+	// The alternative would be that we'd have to add a visible advanced option for what is really just
+	// an internal mechanism for us to use.
+	var initialBackfillCursor string
+	var forceResetCursor string
+	for flag, value := range featureFlags {
+		if strings.HasPrefix(flag, "initial_backfill_cursor=") && value {
+			initialBackfillCursor = strings.TrimPrefix(flag, "initial_backfill_cursor=")
+		}
+		if strings.HasPrefix(flag, "force_reset_cursor=") && value {
+			forceResetCursor = strings.TrimPrefix(flag, "force_reset_cursor=")
+		}
+	}
+
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		host, port, err := net.SplitHostPort(config.Address)
@@ -205,8 +229,10 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 	}
 
 	var db = &sqlserverDatabase{
-		config:       &config,
-		featureFlags: featureFlags,
+		config:                &config,
+		featureFlags:          featureFlags,
+		initialBackfillCursor: initialBackfillCursor,
+		forceResetCursor:      forceResetCursor,
 	}
 	if err := db.connect(ctx); err != nil {
 		return nil, err
@@ -218,8 +244,10 @@ type sqlserverDatabase struct {
 	config *Config
 	conn   *sql.DB
 
-	featureFlags     map[string]bool // Parsed feature flag settings with defaults applied
-	datetimeLocation *time.Location  // The location in which to interpret DATETIME column values as timestamps.
+	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
+	datetimeLocation      *time.Location  // The location in which to interpret DATETIME column values as timestamps.
+	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
+	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {
