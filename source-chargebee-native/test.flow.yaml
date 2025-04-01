@@ -19,12 +19,24 @@ captures:
     bindings:
       - resource:
           name: site_migration_details
-          interval: PT2M
+          interval: PT1H
         target: acmeCo/site_migration_details
       - resource:
-          name: addons
+          name: quote_line_groups
           interval: PT2M
-        target: acmeCo/addons
+        target: acmeCo/quote_line_groups
+      - resource:
+          name: gifts
+          interval: PT1H
+        target: acmeCo/gifts
+      - resource:
+          name: unbilled_charges
+          interval: PT1H
+        target: acmeCo/unbilled_charges
+      - resource:
+          name: comments
+          interval: PT2M
+        target: acmeCo/comments
       - resource:
           name: coupons
           interval: PT2M
@@ -58,9 +70,9 @@ captures:
           interval: PT2M
         target: acmeCo/payment_sources
       - resource:
-          name: plans
+          name: promotional_credits
           interval: PT2M
-        target: acmeCo/plans
+        target: acmeCo/promotional_credits
       - resource:
           name: quotes
           interval: PT2M
@@ -77,3 +89,19 @@ captures:
           name: virtual_bank_accounts
           interval: PT2M
         target: acmeCo/virtual_bank_accounts
+      - resource:
+          name: addons
+          interval: PT2M
+        target: acmeCo/addons
+      - resource:
+          name: plans
+          interval: PT2M
+        target: acmeCo/plans
+      - resource:
+          name: contacts
+          interval: PT2M
+        target: acmeCo/contacts
+      - resource:
+          name: subscriptions_with_scheduled_changes
+          interval: PT2M
+        target: acmeCo/subscriptions_with_scheduled_changes
