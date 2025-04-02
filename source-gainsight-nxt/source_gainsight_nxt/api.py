@@ -1,18 +1,17 @@
 from datetime import datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator, Literal, TypeVar, cast
+from typing import Any, AsyncGenerator, Literal, TypeVar
 
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from estuary_cdk.capture.common import (
     PageCursor,
     LogCursor,
 )
 from source_gainsight_nxt.models import (
-    APIResponse,
     GainsightResource,
     GainsightResourceWithModifiedDate,
     DescribeObjectResponse,
-    RecordsDataObject,
 )
 
 
@@ -95,22 +94,17 @@ async def _fetch_object_data(
     domain: str,
     object_type: type[GainsightResourceType],
     request_body: dict[str, Any],
-) -> list[GainsightResourceType]:
+) -> AsyncGenerator[GainsightResourceType, None]:
     url = f"{domain.rstrip('/')}/v1/data/objects/query/{object_type.OBJECT_NAME}"
 
-    response = APIResponse[GainsightResourceType].model_validate_json(
-        await http.request(log, url, method="POST", json=request_body)
-    )
+    _, body = await http.request_stream(log, url, method="POST", json=request_body)
 
-    if not response.data:
-        return []
-
-    if isinstance(response.data, RecordsDataObject):
-        if not response.data.records:
-            return []
-        return cast(list[GainsightResourceType], response.data.records)
-
-    return cast(list[GainsightResourceType], response.data)
+    async for item in IncrementalJsonProcessor(
+        body(),
+        "data.records.item",
+        object_type,
+    ):
+        yield item
 
 
 async def snapshot_resource(
@@ -134,17 +128,15 @@ async def snapshot_resource(
             ordering="desc",
         )
 
-        resource_data = await _fetch_object_data(
-            http, log, domain, resource, request_body
-        )
-
-        if not resource_data:
-            break
-
-        for doc in resource_data:
+        count = 0
+        async for doc in _fetch_object_data(http, log, domain, resource, request_body):
+            count += 1
             yield doc
 
-        offset += len(resource_data)
+        if count == 0:
+            break
+
+        offset += count
 
 
 async def fetch_resource_page(
@@ -170,15 +162,13 @@ async def fetch_resource_page(
         ordering="desc",
     )
 
-    resource_data = await _fetch_object_data(http, log, domain, resource, request_body)
-
-    if not resource_data:
-        return
-
-    for doc in resource_data:
+    count = 0
+    async for doc in _fetch_object_data(http, log, domain, resource, request_body):
+        count += 1
         yield doc
 
-    yield current_offset + len(resource_data)
+    if count > 0:
+        yield current_offset + count
 
 
 async def fetch_resource_changes(
@@ -206,25 +196,17 @@ async def fetch_resource_changes(
             ordering="desc",
         )
 
-        resource_data = await _fetch_object_data(
-            http, log, domain, resource, request_body
-        )
-
-        if not resource_data:
-            break
-
-        has_results = True
-
-        for doc in resource_data:
-            max_updated_at = max(
-                max_updated_at, getattr(doc, resource.MODIFIED_DATE_FIELD)
-            )
+        count = 0
+        async for doc in _fetch_object_data(http, log, domain, resource, request_body):
+            max_updated_at = max(max_updated_at, getattr(doc, resource.MODIFIED_DATE_FIELD))
+            offset += 1
             yield doc
 
-        if len(resource_data) == 0:
+        if count == 0:
             break
 
-        offset += len(resource_data)
+        offset += count
+        has_results = True
 
     if has_results:
         yield max_updated_at + timedelta(seconds=1)
