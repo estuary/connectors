@@ -6,8 +6,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
@@ -111,7 +113,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		totalRows++
 
 		// Scan the row values and copy into the equivalent map
-		var vals, err = rows.Values()
+		var vals, err = decodeRowValues(rows)
 		if err != nil {
 			return false, nil, fmt.Errorf("unable to get row values: %w", err)
 		}
@@ -397,4 +399,49 @@ func (db *postgresDatabase) explainQuery(ctx context.Context, streamID, query st
 			"response": result,
 		}).Info("explain backfill query")
 	}
+}
+
+// decodeRowValues decodes the raw values from a pgx.Rows object into a slice of Go values.
+func decodeRowValues(rows pgx.Rows) ([]any, error) {
+	var fds = rows.FieldDescriptions()
+	var typeMap = rows.Conn().TypeMap()
+	var values = make([]any, 0, len(fds))
+	var rawValues = rows.RawValues()
+
+	for i := range fds {
+		var buf = rawValues[i]
+		var fd = &fds[i]
+
+		if buf == nil {
+			values = append(values, nil)
+			continue
+		}
+
+		if dt, ok := typeMap.TypeForOID(fd.DataTypeOID); ok {
+			value, err := dt.Codec.DecodeValue(typeMap, fd.DataTypeOID, fd.Format, buf)
+			if _, ok := err.(*time.ParseError); ok && fd.DataTypeOID == pgtype.TimestamptzOID {
+				// PostgreSQL supports dates/timestamps with years greater than 9999 or less than
+				// 0 AD, but the PGX client library uses a naive `time.Parse()` call which doesn't
+				// support 5-digit or negative years. We can't represent those as RFC3339 timestamps
+				// anyway, so if a timestamp fails to parse just map it to a sentinel value.
+				value = negativeInfinityTimestamp
+			} else if err != nil {
+				return nil, fmt.Errorf("error decoding value for column %q: %w", string(fd.Name), err)
+			}
+			values = append(values, value)
+		} else {
+			switch fd.Format {
+			case pgtype.TextFormatCode:
+				values = append(values, string(buf))
+			case pgtype.BinaryFormatCode:
+				newBuf := make([]byte, len(buf))
+				copy(newBuf, buf)
+				values = append(values, newBuf)
+			default:
+				return nil, fmt.Errorf("unknown format code %d", fd.Format)
+			}
+		}
+	}
+
+	return values, nil
 }
