@@ -349,6 +349,8 @@ async def fetch_conversations(
     url = f"{API}/conversations/search"
     body = _generate_conversations_or_tickets_search_body(start, end)
 
+    count = 0
+
     while True:
         response = ConversationsSearchResponse.model_validate_json(
                 await http.request(log, url, "POST", json=body)
@@ -365,19 +367,20 @@ async def fetch_conversations(
                 'start': _s_to_dt(start),
             })
 
-        if (
-            last_seen_ts > start
-            and response.conversations
-            and response.conversations[0].updated_at > last_seen_ts
-        ):
-            yield _s_to_dt(last_seen_ts)
-
         for conversation in response.conversations:
+            # It's possible to update multiple conversations at the same time in Intercom, making it difficult to find
+            # a safe spot to checkpoint between pages returned by the API. To checkpoint more frequently when processing these bulk updates,
+            # conversations looks for any safe spot to checkpoint after yielding SEARCH_PAGE_SIZE documents.
             if conversation.updated_at > last_seen_ts:
+                if count >= SEARCH_PAGE_SIZE:
+                    yield _s_to_dt(last_seen_ts)
+                    count = 0
+
                 last_seen_ts = conversation.updated_at
 
             if conversation.updated_at > start:
                 yield conversation
+                count += 1
 
         if response.pages.next is None:
             yield _s_to_dt(last_seen_ts)
