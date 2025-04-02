@@ -1,13 +1,13 @@
 # ================================
 # Collection "acmeCo/test/test/specialtemporalvalues_33220241": 8 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"1970-01-01","a_time":null,"a_timestamp":"<TIMESTAMP>","id":0}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"9999-12-31","a_time":null,"a_timestamp":"<TIMESTAMP>","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"0000-01-01","a_time":null,"a_timestamp":"<TIMESTAMP>","id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"1970-01-01","a_time":null,"a_timestamp":"1970-01-01T00:00:00Z","id":0}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"9999-12-31","a_time":null,"a_timestamp":"9999-12-31T23:59:59Z","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"0000-01-01","a_time":null,"a_timestamp":"0000-01-01T00:00:00Z","id":2}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":null,"a_time":"00:00:00Z","a_timestamp":null,"id":3}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"1970-01-01","a_time":null,"a_timestamp":"<TIMESTAMP>","id":10}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"9999-12-31","a_time":null,"a_timestamp":"<TIMESTAMP>","id":11}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"0000-01-01","a_time":null,"a_timestamp":"<TIMESTAMP>","id":12}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"1970-01-01","a_time":null,"a_timestamp":"1970-01-01T00:00:00Z","id":10}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"9999-12-31","a_time":null,"a_timestamp":"9999-12-31T23:59:59Z","id":11}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"0000-01-01","a_time":null,"a_timestamp":"0000-01-01T00:00:00Z","id":12}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":null,"a_time":"00:00:00Z","a_timestamp":null,"id":13}
 # ================================
 # Final State Checkpoint

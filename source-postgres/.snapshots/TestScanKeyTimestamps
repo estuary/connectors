@@ -4,7 +4,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"aood","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"aood","ts":"1991-08-31T12:34:56Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -17,7 +17,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"xwxt","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"xwxt","ts":"1991-08-31T12:34:56.111Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -30,7 +30,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"tpxi","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"tpxi","ts":"1991-08-31T12:34:56.222Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -43,7 +43,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"jvqz","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"jvqz","ts":"1991-08-31T12:34:56.333Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -56,7 +56,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"juwf","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"juwf","ts":"1991-08-31T12:34:56.444Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -69,7 +69,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"znzn","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"znzn","ts":"1991-08-31T12:34:56.555Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -82,7 +82,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"zocp","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"zocp","ts":"1991-08-31T12:34:56.666Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -95,7 +95,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"pxoi","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"pxoi","ts":"1991-08-31T12:34:56.777Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -108,7 +108,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"vdug","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"vdug","ts":"1991-08-31T12:34:56.888Z"}
 # ================================
 # Final State Checkpoint
 # ================================
@@ -121,7 +121,7 @@
 # ================================
 # Collection "acmeCo/test/test/scankeytimestamps_26812649": 1 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"xerk","ts":"<TIMESTAMP>"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytimestamps_26812649","loc":[11111111,11111111,11111111]}},"data":"xerk","ts":"1991-08-31T12:34:56.999Z"}
 # ================================
 # Final State Checkpoint
 # ================================

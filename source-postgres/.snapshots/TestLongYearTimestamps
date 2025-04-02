@@ -1,10 +1,10 @@
 # ================================
 # Collection "acmeCo/test/test/longyeartimestamps_15366164": 4 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"<TIMESTAMP>","description":"Recent date","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"<TIMESTAMP>","description":"Far future date","id":2}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"<TIMESTAMP>","description":"Another recent date","id":4}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"<TIMESTAMP>","description":"Even further future","id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"2023-01-01T04:30:45-08:00","description":"Recent date","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"0000-01-01T00:00:00Z","description":"Far future date","id":2}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"2024-05-15T02:30:00-07:00","description":"Another recent date","id":4}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"0000-01-01T00:00:00Z","description":"Even further future","id":5}
 # ================================
 # Final State Checkpoint
 # ================================
