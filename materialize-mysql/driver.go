@@ -525,17 +525,22 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	allColumns := target.Columns()
 	columnMetas := make([]varcharColumnMeta, len(allColumns))
 	for idx, col := range allColumns {
-		existing := is.GetResource(target.Path).GetField(col.Field)
-		if existing.Type == "varchar" {
+		existingResource := is.GetResource(target.Path)
+		if existingResource == nil {
+			return fmt.Errorf("failed to find existing table for resource %q in info schema (possible permissions problem?)", target.Path)
+		}
+
+		existingField := existingResource.GetField(col.Field)
+		if existingField.Type == "varchar" {
 			columnMetas[idx] = varcharColumnMeta{
 				identifier: col.Identifier,
-				maxLength:  existing.CharacterMaxLength,
+				maxLength:  existingField.CharacterMaxLength,
 			}
 
 			log.WithFields(log.Fields{
 				"table":            b.target.Identifier,
 				"column":           col.Identifier,
-				"varcharMaxLength": existing.CharacterMaxLength,
+				"varcharMaxLength": existingField.CharacterMaxLength,
 				"collection":       b.target.Source.String(),
 				"field":            col.Field,
 			}).Debug("matched string collection field to table VARCHAR column")
