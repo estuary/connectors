@@ -105,7 +105,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var nextRowKey []byte         // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
 	var prevTID pgtype.TID // Used when processing keyless backfill results to sanity-check ordering
-	var xidFiltered = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
+	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
 		totalRows++
@@ -161,14 +161,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			if db.config.Advanced.MinimumBackfillXID != "" {
 				minXID, _ := strconv.ParseUint(db.config.Advanced.MinimumBackfillXID, 10, 64) // Error ignored as it's validated at config load
 				if xmin < minXID {
-					continue // Skip this row
-				}
-			}
-
-			// Apply MaximumBackfillXID filter
-			if db.config.Advanced.MaximumBackfillXID != "" {
-				maxXID, _ := strconv.ParseUint(db.config.Advanced.MaximumBackfillXID, 10, 64) // Error ignored as it's validated at config load
-				if xmin > maxXID {
 					continue // Skip this row
 				}
 			}
@@ -270,15 +262,18 @@ var columnBinaryKeyComparison = map[string]bool{
 // the table which are fully excluded. When XID filtering is not in use the resulting expression
 // is empty since we don't need any of that.
 func (db *postgresDatabase) backfillQueryFilterXMIN() string {
-	var clauses []string
 	if db.config.Advanced.MinimumBackfillXID != "" {
-		clauses = append(clauses, fmt.Sprintf(`((((xmin::text::bigint - %s::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)`, db.config.Advanced.MinimumBackfillXID))
-	}
-	if db.config.Advanced.MaximumBackfillXID != "" {
-		clauses = append(clauses, fmt.Sprintf(`((((%s::bigint - xmin::text::bigint)<<32)>>32) > 0 AND xmin::text::bigint >= 3)`, db.config.Advanced.MaximumBackfillXID))
-	}
-	if len(clauses) > 0 {
-		return fmt.Sprintf("((%s) OR (RANDOM() < 0.001))", strings.Join(clauses, " AND "))
+		const filterValidXID = "(xmin::text::bigint >= 3)"
+		var filterLowerXID = fmt.Sprintf("((((xmin::text::bigint - %s::bigint)<<32)>>32) > 0)", db.config.Advanced.MinimumBackfillXID)
+		const exprUpperXID = "(CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
+		const filterUpperXID = "((((" + exprUpperXID + " - xmin::text::bigint)<<32)>>32) >= 0)"
+
+		// Final query expression:
+		//   - Select 0.1% of rows at random to ensure we have a trickle of data movement even in fully excluded parts of the table.
+		//   - Exclude rows with invalid XIDs. This may not actually be necessary as PostgreSQL should never send those, but it can't hurt.
+		//   - Exclude rows whose XMIN value is less than the configured minimum.
+		//   - Exclude rows whose XMIN valid is _greater_ than the current server XID, as they're from earlier wraparound epochs.
+		return fmt.Sprintf("((RANDOM() < 0.001) OR (%s AND %s AND %s))", filterValidXID, filterLowerXID, filterUpperXID)
 	}
 	return ""
 }
@@ -287,7 +282,7 @@ func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schema
 	var query = new(strings.Builder)
 
 	// Include xmin when using XID filtering
-	var xidFiltered = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
+	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
 	if xidFiltered {
 		fmt.Fprintf(query, `SELECT ctid, xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
 	} else {
@@ -324,7 +319,7 @@ func (db *postgresDatabase) buildScanQuery(start, isPrecise bool, keyColumns []s
 		whereClauses = append(whereClauses, fmt.Sprintf(`(%s) > (%s)`, strings.Join(pkey, ", "), strings.Join(args, ", ")))
 	}
 
-	var xidFiltered = db.config.Advanced.MinimumBackfillXID != "" || db.config.Advanced.MaximumBackfillXID != ""
+	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
 	if xidFiltered {
 		whereClauses = append(whereClauses, db.backfillQueryFilterXMIN())
 	}

@@ -16,7 +16,6 @@ func TestBackfillQueryGeneration(t *testing.T) {
 		schemaName     string
 		tableName      string
 		minBackfillXID string
-		maxBackfillXID string
 	}{
 		{
 			name:        "integer_key_precise",
@@ -52,16 +51,6 @@ func TestBackfillQueryGeneration(t *testing.T) {
 			minBackfillXID: "12345",
 		},
 		{
-			name:           "string_key_with_min_max_xid",
-			isPrecise:      false,
-			keyColumns:     []string{"name"},
-			columnTypes:    map[string]interface{}{"name": "text"},
-			schemaName:     "public",
-			tableName:      "users",
-			minBackfillXID: "12345",
-			maxBackfillXID: "67890",
-		},
-		{
 			name:        "quoted_column_name",
 			isPrecise:   true,
 			keyColumns:  []string{"user-id", "group.name"},
@@ -77,7 +66,6 @@ func TestBackfillQueryGeneration(t *testing.T) {
 			config: &Config{
 				Advanced: advancedConfig{
 					MinimumBackfillXID: tc.minBackfillXID,
-					MaximumBackfillXID: tc.maxBackfillXID,
 					BackfillChunkSize:  100,
 				},
 			},
@@ -97,7 +85,6 @@ func TestKeylessBackfillQueryGeneration(t *testing.T) {
 	var testCases = []struct {
 		name           string
 		minBackfillXID string
-		maxBackfillXID string
 	}{
 		{
 			name: "no_xid_filtering",
@@ -105,7 +92,6 @@ func TestKeylessBackfillQueryGeneration(t *testing.T) {
 		{
 			name:           "with_xid_filtering",
 			minBackfillXID: "12345",
-			maxBackfillXID: "67890",
 		},
 	}
 
@@ -115,7 +101,6 @@ func TestKeylessBackfillQueryGeneration(t *testing.T) {
 			config: &Config{
 				Advanced: advancedConfig{
 					MinimumBackfillXID: tc.minBackfillXID,
-					MaximumBackfillXID: tc.maxBackfillXID,
 					BackfillChunkSize:  100,
 				},
 			},
