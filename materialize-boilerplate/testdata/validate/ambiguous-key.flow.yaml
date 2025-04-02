@@ -1,0 +1,26 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        thekey: { type: string }
+        THEKEY: { type: "string" }
+        value: { type: "string" }
+      required: [thekey, THEKEY]
+    key: [/THEKEY]
+    projections:
+      flow_document: ""
+      second_root: ""
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+          exclude: [thekey]

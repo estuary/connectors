@@ -275,8 +275,10 @@ func (v Validator) validateMatchesExistingBinding(
 			} else if c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED || c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
 				// None of these ambiguous fields have been selected yet, so it's still possible to
 				// pick one.
-				if p.Explicit {
-					// User-defined projections of ambiguous fields are allowed as-is.
+				if p.Explicit || p.IsPrimaryKey {
+					// User-defined projections of ambiguous fields & collection
+					// keys are allowed as-is, which will let them keep their
+					// "recommended" status.
 				} else {
 					c = &pm.Response_Validated_Constraint{
 						Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,

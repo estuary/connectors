@@ -25,6 +25,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullable-key.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/long-fields.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/key-subset.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-key.flow.yaml
 
 //go:embed testdata/validate/generated_specs
 var validateFS embed.FS
@@ -166,6 +167,15 @@ func TestValidate(t *testing.T) {
 			specForInfoSchema:  loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			existingSpec:       nil,
 			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
+			fieldNameTransform: ambiguousTestTransform,
+			maxFieldLength:     0,
+		},
+		{
+			name:               "table already exists with a key column for an ambiguous field for a new materialization",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "ambiguous-key.flow.proto"),
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "ambiguous-key.flow.proto"),
 			fieldNameTransform: ambiguousTestTransform,
 			maxFieldLength:     0,
 		},
