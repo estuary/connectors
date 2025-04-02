@@ -1,10 +1,12 @@
 # ================================
+# Collection "acmeCo/test/test/longyeartimestamps_15366164": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"<TIMESTAMP>","description":"Recent date","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"<TIMESTAMP>","description":"Far future date","id":2}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"<TIMESTAMP>","description":"Another recent date","id":4}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"<TIMESTAMP>","description":"Even further future","id":5}
+# ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2Flongyeartimestamps_15366164":{"backfilled":0,"key_columns":null,"mode":"Pending","scanned":null}},"cursor":"0/1111111"}
-# ================================
-# Captures Terminated With Errors
-# ================================
-error performing backfill: error scanning table "test.longyeartimestamps_15366164": unable to get row values: parsing time "12345-06-07 01:09:10-07" as "2006-01-02 15:04:05.999999999Z07": cannot parse "5-06-07 01:09:10-07" as "-"
-error performing backfill: error scanning table "test.longyeartimestamps_15366164": unable to get row values: parsing time "12345-06-07 01:09:10-07" as "2006-01-02 15:04:05.999999999Z07": cannot parse "5-06-07 01:09:10-07" as "-"
+{"bindingStateV1":{"test%2Flongyeartimestamps_15366164":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
 
