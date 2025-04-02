@@ -279,3 +279,32 @@ func TestSpecialTemporalValues(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestLongYearTimestamps validates that timestamps with 5-digit years can be
+// properly captured both during backfill and replication.
+func TestLongYearTimestamps(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "15366164"
+	var tableDef = "(id INTEGER PRIMARY KEY, created_at TIMESTAMPTZ, description TEXT)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Initial backfill with normal and 5-digit year timestamps
+	tb.Insert(ctx, t, tableName, [][]any{
+		{1, "2023-01-01 12:30:45+00", "Recent date"},
+		{2, "12345-06-07 08:09:10+00", "Far future date"},
+	})
+	cs.Capture(ctx, t, nil)
+
+	// Replication with more normal and 5-digit year timestamps
+	tb.Insert(ctx, t, tableName, [][]any{
+		{4, "2024-05-15 09:30:00+00", "Another recent date"},
+		{5, "54321-10-11 12:13:14+00", "Even further future"},
+	})
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
