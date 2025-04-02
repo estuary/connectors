@@ -417,13 +417,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, error) {
-	// _ is a wildcard character in LIKE patterns, so we escape it with two backslashes
-	var query = fmt.Sprintf("SHOW PIPES LIKE '%s';", strings.ReplaceAll(pipeName, "_", "\\\\_"))
+	var query = fmt.Sprintf("SELECT * FROM INFORMATION_SCHEMA.PIPES WHERE CONCAT(PIPE_CATALOG, '.', PIPE_SCHEMA, '.', PIPE_NAME)='%s';", pipeName)
 	rows, err := d.db.QueryContext(ctx, query)
-	defer rows.Close()
 	if err != nil {
 		return false, fmt.Errorf("finding pipe %q: %w", pipeName, err)
 	}
+	defer rows.Close()
 	return rows.Next(), nil
 }
 
@@ -502,11 +501,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// Reset for next round.
 			b.store.mustMerge = false
 		} else if b.pipeName != "" {
-			var pipeNameParts = strings.Split(b.pipeName, ".")
-			var pipeNameLastPart = pipeNameParts[len(pipeNameParts)-1]
-
 			// Check to see if a pipe for this version already exists
-			exists, err := d.pipeExists(ctx, pipeNameLastPart)
+			exists, err := d.pipeExists(ctx, b.pipeName)
 			if err != nil {
 				return nil, err
 			}
@@ -525,7 +521,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			// Our understanding is that CREATE PIPE is _eventually consistent_, and so we
 			// wait until we can make sure the pipe exists before continuing
 			for !exists {
-				exists, err = d.pipeExists(ctx, pipeNameLastPart)
+				exists, err = d.pipeExists(ctx, b.pipeName)
 				if err != nil {
 					return nil, err
 				}
@@ -685,13 +681,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					// default role of the user must have access to use the pipe. So here we make an additional check to make sure
 					// the user has access to the pipe directly, or it has a default role which has access, otherwise
 					// we advise the user to set a default role.
-					var pipeNameParts = strings.Split(item.PipeName, ".")
-					var pipeNameLastPart = pipeNameParts[len(pipeNameParts)-1]
-
-					if exists, err := d.pipeExists(ctx, pipeNameLastPart); err != nil {
+					if exists, err := d.pipeExists(ctx, item.PipeName); err != nil {
 						return nil, fmt.Errorf("checking pipe existence %q: %w", item.PipeName, err)
 					} else if exists {
-						return nil, fmt.Errorf("pipe exists %q but Snowpipe cannot access it. This is most likely because the user does not have access to pipes through its default role. Try setting the default role of the user:\nALTER USER %s SET DEFAULT_ROLE=%s", pipeNameLastPart, d.cfg.Credentials.User, d.cfg.Role)
+						return nil, fmt.Errorf("pipe exists %q but Snowpipe cannot access it. This is most likely because the user does not have access to pipes through its default role. Try setting the default role of the user:\nALTER USER %s SET DEFAULT_ROLE=%s", item.PipeName, d.cfg.Credentials.User, d.cfg.Role)
 					}
 
 					// Pipe was not found for this checkpoint item. We take this to mean that this item has already
