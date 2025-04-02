@@ -9,6 +9,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/gogo/protobuf/proto"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
@@ -73,7 +74,7 @@ func (it *LoadIterator) Next() bool {
 		it.WaitForAcknowledged()
 		return false
 	} else if err = it.request.Validate_(); err != nil {
-		it.err = fmt.Errorf("validation failed: %w", err)
+		it.err = fmt.Errorf("validation failed: %w (%v)", err, proto.CompactTextString(it.request))
 		return false
 	}
 	var l = it.request.Load
