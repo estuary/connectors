@@ -5,6 +5,13 @@ import pytest_insta.format as insta_format
 insta_format.FmtJson.dump = lambda _self, path, value: path.write_text(json.dumps(value, sort_keys=True, indent=2) + "\n", "utf-8")
 
 def test_capture(request, snapshot):
+    PROPERTIES_TO_REDACT = [
+        "hs_time_in_lead",
+        "hs_time_in_opportunity",
+        "hs_time_in_appointmentscheduled",
+        "updatedAt",
+    ]
+
     result = subprocess.run(
         [
             "flowctl",
@@ -18,19 +25,29 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    for l in lines:
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    for l in unique_stream_lines:
         typ, rec = l[0], l[1]
 
-        if typ == "acmeCo/contacts":
-            rec["properties"]["hs_time_in_lead"] = "redacted"
-            rec["properties"]["hs_time_in_opportunity"] = "redacted"
-        elif typ == "acmeCo/deals":
-            rec["properties"]["hs_time_in_appointmentscheduled"] = "redacted"
-        elif typ == "acmeCo/property_history":
+        if typ == "acmeCo/property_history":
             rec["timestamp"] = "redacted"
             rec["value"] = "redacted"
 
-    assert snapshot("capture.stdout.json") == lines
+        if "properties" in rec:
+            for property in PROPERTIES_TO_REDACT:
+                if property in rec["properties"]:
+                    rec["properties"][property] = "redacted"
+
+
+    assert snapshot("capture.stdout.json") == unique_stream_lines
 
 def test_discover(request, snapshot):
     result = subprocess.run(

@@ -1,5 +1,201 @@
 [
   [
+    "acmeCo/companies",
+    {
+      "_meta": {
+        "op": "u",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "archived": false,
+      "contacts": [
+        "72810357568",
+        "72811506244",
+        "72810357568",
+        "72811506244"
+      ],
+      "createdAt": "2024-10-28T16:39:01.173Z",
+      "id": "25177527565",
+      "properties": {
+        "about_us": null,
+        "address": null,
+        "address2": null,
+        "annualrevenue": null,
+        "city": null,
+        "closedate": null,
+        "country": null,
+        "createdate": "2024-10-28T16:39:01.173000+00:00",
+        "days_to_close": null,
+        "description": null,
+        "domain": "hubspot.com",
+        "engagements_last_meeting_booked": null,
+        "engagements_last_meeting_booked_campaign": null,
+        "engagements_last_meeting_booked_medium": null,
+        "engagements_last_meeting_booked_source": null,
+        "facebook_company_page": null,
+        "facebookfans": null,
+        "first_contact_createdate": "2024-10-28T16:39:00.846000+00:00",
+        "first_contact_createdate_timestamp_earliest_value_78b50eea": null,
+        "first_conversion_date": null,
+        "first_conversion_event_name": null,
+        "first_deal_created_date": null,
+        "founded_year": null,
+        "googleplus_page": null,
+        "hs_additional_domains": null,
+        "hs_all_accessible_team_ids": null,
+        "hs_all_owner_ids": null,
+        "hs_all_team_ids": null,
+        "hs_analytics_first_timestamp": "2024-10-28T16:39:00.612000+00:00",
+        "hs_analytics_first_touch_converting_campaign": null,
+        "hs_analytics_first_visit_timestamp": null,
+        "hs_analytics_last_timestamp": null,
+        "hs_analytics_last_timestamp_timestamp_latest_value_4e16365a": null,
+        "hs_analytics_last_touch_converting_campaign": null,
+        "hs_analytics_last_touch_converting_campaign_timestamp_latest_value_81a64e30": null,
+        "hs_analytics_last_visit_timestamp": null,
+        "hs_analytics_last_visit_timestamp_timestamp_latest_value_999a0fce": null,
+        "hs_analytics_latest_source": "OFFLINE",
+        "hs_analytics_latest_source_data_1": "API",
+        "hs_analytics_latest_source_data_2": "sample-contact",
+        "hs_analytics_latest_source_timestamp": "2024-10-28T16:39:01.246000+00:00",
+        "hs_analytics_num_page_views": 0,
+        "hs_analytics_num_page_views_cardinality_sum_e46e85b0": null,
+        "hs_analytics_num_visits": 0,
+        "hs_analytics_num_visits_cardinality_sum_53d952a6": null,
+        "hs_analytics_source": "OFFLINE",
+        "hs_analytics_source_data_1": "API",
+        "hs_analytics_source_data_2": "sample-contact",
+        "hs_annual_revenue_currency_code": null,
+        "hs_avatar_filemanager_key": null,
+        "hs_country_code": null,
+        "hs_created_by_user_id": null,
+        "hs_createdate": null,
+        "hs_date_entered_customer": null,
+        "hs_date_entered_evangelist": null,
+        "hs_date_entered_lead": "2024-10-28T16:39:01.173000+00:00",
+        "hs_date_entered_marketingqualifiedlead": null,
+        "hs_date_entered_opportunity": null,
+        "hs_date_entered_other": null,
+        "hs_date_entered_salesqualifiedlead": null,
+        "hs_date_entered_subscriber": null,
+        "hs_date_exited_customer": null,
+        "hs_date_exited_evangelist": null,
+        "hs_date_exited_lead": null,
+        "hs_date_exited_marketingqualifiedlead": null,
+        "hs_date_exited_opportunity": null,
+        "hs_date_exited_other": null,
+        "hs_date_exited_salesqualifiedlead": null,
+        "hs_date_exited_subscriber": null,
+        "hs_employee_range": null,
+        "hs_ideal_customer_profile": null,
+        "hs_industry_group": null,
+        "hs_is_enriched": null,
+        "hs_is_target_account": null,
+        "hs_keywords": null,
+        "hs_last_booked_meeting_date": null,
+        "hs_last_logged_call_date": null,
+        "hs_last_logged_outgoing_email_date": null,
+        "hs_last_metered_enrichment_timestamp": null,
+        "hs_last_open_task_date": null,
+        "hs_last_sales_activity_date": null,
+        "hs_last_sales_activity_timestamp": null,
+        "hs_last_sales_activity_type": null,
+        "hs_lastmodifieddate": "2025-01-18T21:49:41.259000+00:00",
+        "hs_latest_createdate_of_active_subscriptions": null,
+        "hs_latest_meeting_activity": null,
+        "hs_lead_status": null,
+        "hs_linkedin_handle": null,
+        "hs_live_enrichment_deadline": null,
+        "hs_logo_url": "https://logo.clearbit.com/hubspot.com",
+        "hs_merged_object_ids": null,
+        "hs_notes_last_activity": null,
+        "hs_notes_next_activity": null,
+        "hs_notes_next_activity_type": null,
+        "hs_num_blockers": 0,
+        "hs_num_child_companies": 0,
+        "hs_num_contacts_with_buying_roles": 0,
+        "hs_num_decision_makers": 0,
+        "hs_num_open_deals": 0,
+        "hs_object_id": 25177527565,
+        "hs_object_source": "COMPANIES",
+        "hs_object_source_detail_1": "\"Create and associate companies with contacts\" setting",
+        "hs_object_source_detail_2": null,
+        "hs_object_source_detail_3": null,
+        "hs_object_source_id": "FetchAssociatedCompanyIdStep",
+        "hs_object_source_label": "CRM_SETTING",
+        "hs_object_source_user_id": null,
+        "hs_parent_company_id": null,
+        "hs_pinned_engagement_id": null,
+        "hs_pipeline": "companies-lifecycle-pipeline",
+        "hs_predictivecontactscore_v2_next_max_max_d4e58c1e": null,
+        "hs_quick_context": null,
+        "hs_read_only": null,
+        "hs_revenue_range": null,
+        "hs_sales_email_last_replied": null,
+        "hs_state_code": null,
+        "hs_target_account": null,
+        "hs_target_account_probability": 0.5596858859062195,
+        "hs_target_account_recommendation_snooze_time": null,
+        "hs_target_account_recommendation_state": null,
+        "hs_task_label": "HubSpot",
+        "hs_time_in_customer": null,
+        "hs_time_in_evangelist": null,
+        "hs_time_in_lead": "redacted",
+        "hs_time_in_marketingqualifiedlead": null,
+        "hs_time_in_opportunity": "redacted",
+        "hs_time_in_other": null,
+        "hs_time_in_salesqualifiedlead": null,
+        "hs_time_in_subscriber": null,
+        "hs_total_deal_value": null,
+        "hs_unique_creation_key": null,
+        "hs_updated_by_user_id": null,
+        "hs_user_ids_of_all_notification_followers": null,
+        "hs_user_ids_of_all_notification_unfollowers": null,
+        "hs_user_ids_of_all_owners": null,
+        "hs_was_imported": null,
+        "hubspot_owner_assigneddate": null,
+        "hubspot_owner_id": null,
+        "hubspot_team_id": null,
+        "hubspotscore": null,
+        "industry": null,
+        "is_public": null,
+        "lifecyclestage": "lead",
+        "linkedin_company_page": null,
+        "linkedinbio": null,
+        "name": "HubSpot",
+        "notes_last_contacted": null,
+        "notes_last_updated": null,
+        "notes_next_activity_date": null,
+        "num_associated_contacts": 2,
+        "num_associated_deals": null,
+        "num_contacted_notes": null,
+        "num_conversion_events": 0,
+        "num_conversion_events_cardinality_sum_d095f14b": null,
+        "num_notes": null,
+        "numberofemployees": null,
+        "phone": null,
+        "recent_conversion_date": null,
+        "recent_conversion_date_timestamp_latest_value_72856da1": null,
+        "recent_conversion_event_name": null,
+        "recent_conversion_event_name_timestamp_latest_value_66c820bf": null,
+        "recent_deal_amount": null,
+        "recent_deal_close_date": null,
+        "state": null,
+        "timezone": null,
+        "total_money_raised": null,
+        "total_revenue": null,
+        "twitterbio": null,
+        "twitterfollowers": null,
+        "twitterhandle": null,
+        "type": null,
+        "web_technologies": null,
+        "website": "hubspot.com",
+        "zip": null
+      },
+      "updatedAt": "2025-01-18T21:49:41.259Z"
+    }
+  ],
+  [
     "acmeCo/contacts",
     {
       "_meta": {
@@ -8,19 +204,23 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "archived": false,
-      "createdAt": "2024-01-31T17:37:43.662Z",
-      "id": "1",
+      "companies": [
+        "25177527565",
+        "25177527565"
+      ],
+      "createdAt": "2024-10-28T16:39:00.846Z",
+      "id": "72810357568",
       "properties": {
         "address": null,
         "annualrevenue": null,
-        "associatedcompanyid": null,
+        "associatedcompanyid": 25177527565,
         "associatedcompanylastupdated": null,
         "city": "Brisbane",
         "closedate": null,
         "company": "HubSpot",
         "company_size": null,
         "country": null,
-        "createdate": "2024-01-31T17:37:43.662000+00:00",
+        "createdate": "2024-10-28T16:39:00.846000+00:00",
         "currentlyinworkflow": null,
         "date_of_birth": null,
         "days_to_close": null,
@@ -34,18 +234,18 @@
         "field_of_study": null,
         "first_conversion_date": null,
         "first_conversion_event_name": null,
-        "first_deal_created_date": "2024-01-31T17:38:10.993000+00:00",
+        "first_deal_created_date": null,
         "firstname": "Maria",
         "gender": null,
         "graduation_date": null,
         "hs_additional_emails": null,
         "hs_all_accessible_team_ids": null,
-        "hs_all_contact_vids": "1",
+        "hs_all_contact_vids": "72810357568",
         "hs_all_owner_ids": null,
         "hs_all_team_ids": null,
         "hs_analytics_average_page_views": 0,
         "hs_analytics_first_referrer": null,
-        "hs_analytics_first_timestamp": "2024-01-31T17:37:43.653000+00:00",
+        "hs_analytics_first_timestamp": "2024-10-28T16:39:00.612000+00:00",
         "hs_analytics_first_touch_converting_campaign": null,
         "hs_analytics_first_url": null,
         "hs_analytics_first_visit_timestamp": null,
@@ -61,6 +261,7 @@
         "hs_analytics_source": "OFFLINE",
         "hs_analytics_source_data_1": "API",
         "hs_analytics_source_data_2": "sample-contact",
+        "hs_associated_target_accounts": 0,
         "hs_avatar_filemanager_key": null,
         "hs_buying_role": null,
         "hs_calculated_form_submissions": null,
@@ -71,6 +272,8 @@
         "hs_calculated_phone_number_country_code": null,
         "hs_calculated_phone_number_region_code": null,
         "hs_clicked_linkedin_ad": null,
+        "hs_contact_enrichment_opt_out": null,
+        "hs_contact_enrichment_opt_out_timestamp": null,
         "hs_content_membership_email": null,
         "hs_content_membership_email_confirmed": null,
         "hs_content_membership_follow_up_enqueued_at": null,
@@ -82,25 +285,10 @@
         "hs_conversations_visitor_email": null,
         "hs_count_is_unworked": null,
         "hs_count_is_worked": null,
+        "hs_country_region_code": null,
         "hs_created_by_conversations": null,
         "hs_created_by_user_id": null,
         "hs_createdate": null,
-        "hs_date_entered_customer": null,
-        "hs_date_entered_evangelist": null,
-        "hs_date_entered_lead": "2024-01-31T17:37:43.653000+00:00",
-        "hs_date_entered_marketingqualifiedlead": null,
-        "hs_date_entered_opportunity": "2024-01-31T17:38:12.141000+00:00",
-        "hs_date_entered_other": null,
-        "hs_date_entered_salesqualifiedlead": null,
-        "hs_date_entered_subscriber": null,
-        "hs_date_exited_customer": null,
-        "hs_date_exited_evangelist": null,
-        "hs_date_exited_lead": "2024-01-31T17:38:12.141000+00:00",
-        "hs_date_exited_marketingqualifiedlead": null,
-        "hs_date_exited_opportunity": null,
-        "hs_date_exited_other": null,
-        "hs_date_exited_salesqualifiedlead": null,
-        "hs_date_exited_subscriber": null,
         "hs_document_last_revisited": null,
         "hs_email_bad_address": null,
         "hs_email_bounce": null,
@@ -122,24 +310,30 @@
         "hs_email_last_send_date": null,
         "hs_email_open": null,
         "hs_email_optout": null,
-        "hs_email_optout_286760152": null,
-        "hs_email_optout_286760157": null,
+        "hs_email_optout_453651751": null,
+        "hs_email_optout_453651753": null,
         "hs_email_quarantined": null,
         "hs_email_quarantined_reason": null,
         "hs_email_replied": null,
         "hs_email_sends_since_last_engagement": null,
         "hs_emailconfirmationstatus": null,
+        "hs_enriched_email_bounce_detected": null,
         "hs_facebook_ad_clicked": null,
         "hs_facebook_click_id": null,
+        "hs_first_closed_order_id": null,
         "hs_first_engagement_object_id": null,
+        "hs_first_order_closed_date": null,
         "hs_first_outreach_date": null,
         "hs_first_subscription_create_date": null,
+        "hs_full_name_or_email": null,
         "hs_google_click_id": null,
         "hs_has_active_subscription": null,
         "hs_ip_timezone": null,
         "hs_is_contact": true,
+        "hs_is_enriched": null,
         "hs_is_unworked": true,
         "hs_language": null,
+        "hs_last_metered_enrichment_timestamp": null,
         "hs_last_sales_activity_date": null,
         "hs_last_sales_activity_timestamp": null,
         "hs_last_sales_activity_type": null,
@@ -156,23 +350,21 @@
         "hs_latest_source": "OFFLINE",
         "hs_latest_source_data_1": "API",
         "hs_latest_source_data_2": "sample-contact",
-        "hs_latest_source_timestamp": "2024-01-31",
+        "hs_latest_source_timestamp": "2024-10-28",
         "hs_latest_subscription_create_date": null,
         "hs_lead_status": null,
         "hs_legal_basis": null,
-        "hs_lifecyclestage_customer_date": null,
-        "hs_lifecyclestage_evangelist_date": null,
-        "hs_lifecyclestage_lead_date": "2024-01-31T17:37:43.653000+00:00",
-        "hs_lifecyclestage_marketingqualifiedlead_date": null,
-        "hs_lifecyclestage_opportunity_date": "2024-01-31T17:38:12.141000+00:00",
-        "hs_lifecyclestage_other_date": null,
-        "hs_lifecyclestage_salesqualifiedlead_date": null,
-        "hs_lifecyclestage_subscriber_date": null,
         "hs_linkedin_ad_clicked": null,
+        "hs_linkedin_url": null,
+        "hs_live_enrichment_deadline": null,
+        "hs_membership_has_accessed_private_content": 0,
+        "hs_membership_last_private_content_access_date": null,
         "hs_merged_object_ids": null,
         "hs_mobile_sdk_push_tokens": null,
+        "hs_notes_last_activity": null,
+        "hs_notes_next_activity": null,
         "hs_notes_next_activity_type": null,
-        "hs_object_id": 1,
+        "hs_object_id": 72810357568,
         "hs_object_source": "API",
         "hs_object_source_detail_1": null,
         "hs_object_source_detail_2": null,
@@ -183,7 +375,13 @@
         "hs_persona": null,
         "hs_pinned_engagement_id": null,
         "hs_pipeline": "contacts-lifecycle-pipeline",
+        "hs_prospecting_agent_actively_enrolled_count": 0,
+        "hs_quarantined_emails": null,
         "hs_read_only": null,
+        "hs_recent_closed_order_date": null,
+        "hs_registered_member": 0,
+        "hs_registration_method": null,
+        "hs_role": null,
         "hs_sa_first_engagement_date": null,
         "hs_sa_first_engagement_descr": null,
         "hs_sa_first_engagement_object_type": null,
@@ -194,21 +392,14 @@
         "hs_searchable_calculated_international_phone_number": null,
         "hs_searchable_calculated_mobile_number": null,
         "hs_searchable_calculated_phone_number": null,
+        "hs_seniority": null,
         "hs_sequences_actively_enrolled_count": 0,
         "hs_sequences_enrolled_count": null,
         "hs_sequences_is_enrolled": null,
-        "hs_shared_team_ids": null,
-        "hs_shared_user_ids": null,
+        "hs_state_code": null,
+        "hs_sub_role": null,
         "hs_testpurge": null,
         "hs_testrollback": null,
-        "hs_time_in_customer": null,
-        "hs_time_in_evangelist": null,
-        "hs_time_in_lead": "redacted",
-        "hs_time_in_marketingqualifiedlead": null,
-        "hs_time_in_opportunity": "redacted",
-        "hs_time_in_other": null,
-        "hs_time_in_salesqualifiedlead": null,
-        "hs_time_in_subscriber": null,
         "hs_time_to_first_engagement": null,
         "hs_timezone": null,
         "hs_unique_creation_key": null,
@@ -218,295 +409,7 @@
         "hs_user_ids_of_all_owners": null,
         "hs_v2_date_entered_customer": null,
         "hs_v2_date_entered_evangelist": null,
-        "hs_v2_date_entered_lead": "2024-01-31T17:37:43.653000+00:00",
-        "hs_v2_date_entered_marketingqualifiedlead": null,
-        "hs_v2_date_entered_opportunity": "2024-01-31T17:38:12.141000+00:00",
-        "hs_v2_date_entered_other": null,
-        "hs_v2_date_entered_salesqualifiedlead": null,
-        "hs_v2_date_entered_subscriber": null,
-        "hs_v2_date_exited_customer": null,
-        "hs_v2_date_exited_evangelist": null,
-        "hs_v2_date_exited_lead": "2024-01-31T17:38:12.141000+00:00",
-        "hs_v2_date_exited_marketingqualifiedlead": null,
-        "hs_v2_date_exited_opportunity": null,
-        "hs_v2_date_exited_other": null,
-        "hs_v2_date_exited_salesqualifiedlead": null,
-        "hs_v2_date_exited_subscriber": null,
-        "hs_was_imported": null,
-        "hs_whatsapp_phone_number": null,
-        "hubspot_owner_assigneddate": null,
-        "hubspot_owner_id": null,
-        "hubspot_team_id": null,
-        "hubspotscore": null,
-        "industry": null,
-        "ip_city": null,
-        "ip_country": null,
-        "ip_country_code": null,
-        "ip_latlon": null,
-        "ip_state": null,
-        "ip_state_code": null,
-        "ip_zipcode": null,
-        "job_function": null,
-        "jobtitle": "Salesperson",
-        "lastmodifieddate": "2024-01-31T17:38:25.412000+00:00",
-        "lastname": "Johnson (Sample Contact)",
-        "lifecyclestage": "opportunity",
-        "linkedin_account": null,
-        "marital_status": null,
-        "message": null,
-        "military_status": null,
-        "mobilephone": null,
-        "notes_last_contacted": null,
-        "notes_last_updated": null,
-        "notes_next_activity_date": null,
-        "num_associated_deals": 1,
-        "num_contacted_notes": null,
-        "num_conversion_events": 0,
-        "num_notes": null,
-        "num_unique_conversion_events": 0,
-        "numemployees": null,
-        "phone": null,
-        "recent_conversion_date": null,
-        "recent_conversion_event_name": null,
-        "recent_deal_amount": null,
-        "recent_deal_close_date": null,
-        "relationship_status": null,
-        "salutation": null,
-        "school": null,
-        "seniority": null,
-        "start_date": null,
-        "state": "QLD",
-        "surveymonkeyeventlastupdated": null,
-        "total_revenue": null,
-        "twitterhandle": null,
-        "webinareventlastupdated": null,
-        "website": "http://www.HubSpot.com",
-        "work_email": null,
-        "zip": null
-      },
-      "updatedAt": "2024-01-31T17:38:25.412Z"
-    }
-  ],
-  [
-    "acmeCo/contacts",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 2,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "archived": false,
-      "createdAt": "2024-01-31T17:38:50.249Z",
-      "id": "101",
-      "properties": {
-        "address": null,
-        "annualrevenue": null,
-        "associatedcompanyid": null,
-        "associatedcompanylastupdated": null,
-        "city": null,
-        "closedate": null,
-        "company": null,
-        "company_size": null,
-        "country": null,
-        "createdate": "2024-01-31T17:38:50.249000+00:00",
-        "currentlyinworkflow": null,
-        "date_of_birth": null,
-        "days_to_close": null,
-        "degree": null,
-        "email": "jonathanwihl@gmail.com",
-        "engagements_last_meeting_booked": null,
-        "engagements_last_meeting_booked_campaign": null,
-        "engagements_last_meeting_booked_medium": null,
-        "engagements_last_meeting_booked_source": null,
-        "fax": null,
-        "field_of_study": null,
-        "first_conversion_date": null,
-        "first_conversion_event_name": null,
-        "first_deal_created_date": null,
-        "firstname": "Jonathan",
-        "gender": null,
-        "graduation_date": null,
-        "hs_additional_emails": null,
-        "hs_all_accessible_team_ids": null,
-        "hs_all_contact_vids": "101",
-        "hs_all_owner_ids": null,
-        "hs_all_team_ids": null,
-        "hs_analytics_average_page_views": 0,
-        "hs_analytics_first_referrer": null,
-        "hs_analytics_first_timestamp": "2024-01-31T17:38:50.249000+00:00",
-        "hs_analytics_first_touch_converting_campaign": null,
-        "hs_analytics_first_url": null,
-        "hs_analytics_first_visit_timestamp": null,
-        "hs_analytics_last_referrer": null,
-        "hs_analytics_last_timestamp": null,
-        "hs_analytics_last_touch_converting_campaign": null,
-        "hs_analytics_last_url": null,
-        "hs_analytics_last_visit_timestamp": null,
-        "hs_analytics_num_event_completions": 0,
-        "hs_analytics_num_page_views": 0,
-        "hs_analytics_num_visits": 0,
-        "hs_analytics_revenue": 0.0,
-        "hs_analytics_source": "OFFLINE",
-        "hs_analytics_source_data_1": "CRM_UI",
-        "hs_analytics_source_data_2": "userId:63597369",
-        "hs_avatar_filemanager_key": null,
-        "hs_buying_role": null,
-        "hs_calculated_form_submissions": null,
-        "hs_calculated_merged_vids": null,
-        "hs_calculated_mobile_number": null,
-        "hs_calculated_phone_number": null,
-        "hs_calculated_phone_number_area_code": null,
-        "hs_calculated_phone_number_country_code": null,
-        "hs_calculated_phone_number_region_code": null,
-        "hs_clicked_linkedin_ad": null,
-        "hs_content_membership_email": null,
-        "hs_content_membership_email_confirmed": null,
-        "hs_content_membership_follow_up_enqueued_at": null,
-        "hs_content_membership_notes": null,
-        "hs_content_membership_registered_at": null,
-        "hs_content_membership_registration_domain_sent_to": null,
-        "hs_content_membership_registration_email_sent_at": null,
-        "hs_content_membership_status": null,
-        "hs_conversations_visitor_email": null,
-        "hs_count_is_unworked": null,
-        "hs_count_is_worked": null,
-        "hs_created_by_conversations": null,
-        "hs_created_by_user_id": 63597369,
-        "hs_createdate": null,
-        "hs_date_entered_customer": null,
-        "hs_date_entered_evangelist": null,
-        "hs_date_entered_lead": null,
-        "hs_date_entered_marketingqualifiedlead": null,
-        "hs_date_entered_opportunity": null,
-        "hs_date_entered_other": null,
-        "hs_date_entered_salesqualifiedlead": null,
-        "hs_date_entered_subscriber": null,
-        "hs_date_exited_customer": null,
-        "hs_date_exited_evangelist": null,
-        "hs_date_exited_lead": null,
-        "hs_date_exited_marketingqualifiedlead": null,
-        "hs_date_exited_opportunity": null,
-        "hs_date_exited_other": null,
-        "hs_date_exited_salesqualifiedlead": null,
-        "hs_date_exited_subscriber": null,
-        "hs_document_last_revisited": null,
-        "hs_email_bad_address": null,
-        "hs_email_bounce": null,
-        "hs_email_click": null,
-        "hs_email_customer_quarantined_reason": null,
-        "hs_email_delivered": null,
-        "hs_email_domain": "gmail.com",
-        "hs_email_first_click_date": null,
-        "hs_email_first_open_date": null,
-        "hs_email_first_reply_date": null,
-        "hs_email_first_send_date": null,
-        "hs_email_hard_bounce_reason": null,
-        "hs_email_hard_bounce_reason_enum": null,
-        "hs_email_is_ineligible": null,
-        "hs_email_last_click_date": null,
-        "hs_email_last_email_name": null,
-        "hs_email_last_open_date": null,
-        "hs_email_last_reply_date": null,
-        "hs_email_last_send_date": null,
-        "hs_email_open": null,
-        "hs_email_optout": null,
-        "hs_email_optout_286760152": null,
-        "hs_email_optout_286760157": null,
-        "hs_email_quarantined": null,
-        "hs_email_quarantined_reason": null,
-        "hs_email_replied": null,
-        "hs_email_sends_since_last_engagement": null,
-        "hs_emailconfirmationstatus": null,
-        "hs_facebook_ad_clicked": null,
-        "hs_facebook_click_id": null,
-        "hs_first_engagement_object_id": null,
-        "hs_first_outreach_date": null,
-        "hs_first_subscription_create_date": null,
-        "hs_google_click_id": null,
-        "hs_has_active_subscription": null,
-        "hs_ip_timezone": null,
-        "hs_is_contact": true,
-        "hs_is_unworked": true,
-        "hs_language": null,
-        "hs_last_sales_activity_date": null,
-        "hs_last_sales_activity_timestamp": null,
-        "hs_last_sales_activity_type": null,
-        "hs_lastmodifieddate": null,
-        "hs_latest_disqualified_lead_date": null,
-        "hs_latest_meeting_activity": null,
-        "hs_latest_open_lead_date": null,
-        "hs_latest_qualified_lead_date": null,
-        "hs_latest_sequence_ended_date": null,
-        "hs_latest_sequence_enrolled": null,
-        "hs_latest_sequence_enrolled_date": null,
-        "hs_latest_sequence_finished_date": null,
-        "hs_latest_sequence_unenrolled_date": null,
-        "hs_latest_source": "OFFLINE",
-        "hs_latest_source_data_1": "CRM_UI",
-        "hs_latest_source_data_2": "userId:63597369",
-        "hs_latest_source_timestamp": "2024-01-31",
-        "hs_latest_subscription_create_date": null,
-        "hs_lead_status": null,
-        "hs_legal_basis": null,
-        "hs_lifecyclestage_customer_date": null,
-        "hs_lifecyclestage_evangelist_date": null,
-        "hs_lifecyclestage_lead_date": null,
-        "hs_lifecyclestage_marketingqualifiedlead_date": null,
-        "hs_lifecyclestage_opportunity_date": null,
-        "hs_lifecyclestage_other_date": null,
-        "hs_lifecyclestage_salesqualifiedlead_date": null,
-        "hs_lifecyclestage_subscriber_date": null,
-        "hs_linkedin_ad_clicked": null,
-        "hs_merged_object_ids": null,
-        "hs_mobile_sdk_push_tokens": null,
-        "hs_notes_next_activity_type": null,
-        "hs_object_id": 101,
-        "hs_object_source": "CRM_UI",
-        "hs_object_source_detail_1": null,
-        "hs_object_source_detail_2": null,
-        "hs_object_source_detail_3": null,
-        "hs_object_source_id": "userId:63597369",
-        "hs_object_source_label": "CRM_UI",
-        "hs_object_source_user_id": 63597369,
-        "hs_persona": null,
-        "hs_pinned_engagement_id": null,
-        "hs_pipeline": "contacts-lifecycle-pipeline",
-        "hs_read_only": null,
-        "hs_sa_first_engagement_date": null,
-        "hs_sa_first_engagement_descr": null,
-        "hs_sa_first_engagement_object_type": null,
-        "hs_sales_email_last_clicked": null,
-        "hs_sales_email_last_opened": null,
-        "hs_sales_email_last_replied": null,
-        "hs_searchable_calculated_international_mobile_number": null,
-        "hs_searchable_calculated_international_phone_number": null,
-        "hs_searchable_calculated_mobile_number": null,
-        "hs_searchable_calculated_phone_number": null,
-        "hs_sequences_actively_enrolled_count": 0,
-        "hs_sequences_enrolled_count": null,
-        "hs_sequences_is_enrolled": null,
-        "hs_shared_team_ids": null,
-        "hs_shared_user_ids": null,
-        "hs_testpurge": null,
-        "hs_testrollback": null,
-        "hs_time_in_customer": null,
-        "hs_time_in_evangelist": null,
-        "hs_time_in_lead": "redacted",
-        "hs_time_in_marketingqualifiedlead": null,
-        "hs_time_in_opportunity": "redacted",
-        "hs_time_in_other": null,
-        "hs_time_in_salesqualifiedlead": null,
-        "hs_time_in_subscriber": null,
-        "hs_time_to_first_engagement": null,
-        "hs_timezone": null,
-        "hs_unique_creation_key": null,
-        "hs_updated_by_user_id": 63597369,
-        "hs_user_ids_of_all_notification_followers": null,
-        "hs_user_ids_of_all_notification_unfollowers": null,
-        "hs_user_ids_of_all_owners": null,
-        "hs_v2_date_entered_customer": null,
-        "hs_v2_date_entered_evangelist": null,
-        "hs_v2_date_entered_lead": null,
+        "hs_v2_date_entered_lead": "2024-10-28T16:39:00.612000+00:00",
         "hs_v2_date_entered_marketingqualifiedlead": null,
         "hs_v2_date_entered_opportunity": null,
         "hs_v2_date_entered_other": null,
@@ -535,11 +438,10 @@
         "ip_state_code": null,
         "ip_zipcode": null,
         "job_function": null,
-        "jobtitle": "Engineer",
-        "lastmodifieddate": "2024-01-31T17:39:09.574000+00:00",
-        "lastname": "Wihl",
-        "lifecyclestage": null,
-        "linkedin_account": null,
+        "jobtitle": "Salesperson",
+        "lastmodifieddate": "2024-10-28T16:40:17.996000+00:00",
+        "lastname": "Johnson (Sample Contact)",
+        "lifecyclestage": "lead",
         "marital_status": null,
         "message": null,
         "military_status": null,
@@ -568,299 +470,11 @@
         "total_revenue": null,
         "twitterhandle": null,
         "webinareventlastupdated": null,
-        "website": null,
-        "work_email": null,
-        "zip": null
-      },
-      "updatedAt": "2024-01-31T17:39:09.574Z"
-    }
-  ],
-  [
-    "acmeCo/contacts",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 1,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "archived": false,
-      "createdAt": "2024-01-31T17:37:44.164Z",
-      "id": "51",
-      "properties": {
-        "address": null,
-        "annualrevenue": null,
-        "associatedcompanyid": null,
-        "associatedcompanylastupdated": null,
-        "city": "Cambridge",
-        "closedate": null,
-        "company": "HubSpot",
-        "company_size": null,
-        "country": null,
-        "createdate": "2024-01-31T17:37:44.164000+00:00",
-        "currentlyinworkflow": null,
-        "date_of_birth": null,
-        "days_to_close": null,
-        "degree": null,
-        "email": "bh@hubspot.com",
-        "engagements_last_meeting_booked": null,
-        "engagements_last_meeting_booked_campaign": null,
-        "engagements_last_meeting_booked_medium": null,
-        "engagements_last_meeting_booked_source": null,
-        "fax": null,
-        "field_of_study": null,
-        "first_conversion_date": null,
-        "first_conversion_event_name": null,
-        "first_deal_created_date": null,
-        "firstname": "Brian",
-        "gender": null,
-        "graduation_date": null,
-        "hs_additional_emails": null,
-        "hs_all_accessible_team_ids": null,
-        "hs_all_contact_vids": "51",
-        "hs_all_owner_ids": null,
-        "hs_all_team_ids": null,
-        "hs_analytics_average_page_views": 0,
-        "hs_analytics_first_referrer": null,
-        "hs_analytics_first_timestamp": "2024-01-31T17:37:44.164000+00:00",
-        "hs_analytics_first_touch_converting_campaign": null,
-        "hs_analytics_first_url": null,
-        "hs_analytics_first_visit_timestamp": null,
-        "hs_analytics_last_referrer": null,
-        "hs_analytics_last_timestamp": null,
-        "hs_analytics_last_touch_converting_campaign": null,
-        "hs_analytics_last_url": null,
-        "hs_analytics_last_visit_timestamp": null,
-        "hs_analytics_num_event_completions": 0,
-        "hs_analytics_num_page_views": 0,
-        "hs_analytics_num_visits": 0,
-        "hs_analytics_revenue": 0.0,
-        "hs_analytics_source": "OFFLINE",
-        "hs_analytics_source_data_1": "API",
-        "hs_analytics_source_data_2": "sample-contact",
-        "hs_avatar_filemanager_key": null,
-        "hs_buying_role": null,
-        "hs_calculated_form_submissions": null,
-        "hs_calculated_merged_vids": null,
-        "hs_calculated_mobile_number": null,
-        "hs_calculated_phone_number": null,
-        "hs_calculated_phone_number_area_code": null,
-        "hs_calculated_phone_number_country_code": null,
-        "hs_calculated_phone_number_region_code": null,
-        "hs_clicked_linkedin_ad": null,
-        "hs_content_membership_email": null,
-        "hs_content_membership_email_confirmed": null,
-        "hs_content_membership_follow_up_enqueued_at": null,
-        "hs_content_membership_notes": null,
-        "hs_content_membership_registered_at": null,
-        "hs_content_membership_registration_domain_sent_to": null,
-        "hs_content_membership_registration_email_sent_at": null,
-        "hs_content_membership_status": null,
-        "hs_conversations_visitor_email": null,
-        "hs_count_is_unworked": null,
-        "hs_count_is_worked": null,
-        "hs_created_by_conversations": null,
-        "hs_created_by_user_id": null,
-        "hs_createdate": null,
-        "hs_date_entered_customer": null,
-        "hs_date_entered_evangelist": null,
-        "hs_date_entered_lead": "2024-01-31T17:37:44.164000+00:00",
-        "hs_date_entered_marketingqualifiedlead": null,
-        "hs_date_entered_opportunity": null,
-        "hs_date_entered_other": null,
-        "hs_date_entered_salesqualifiedlead": null,
-        "hs_date_entered_subscriber": null,
-        "hs_date_exited_customer": null,
-        "hs_date_exited_evangelist": null,
-        "hs_date_exited_lead": null,
-        "hs_date_exited_marketingqualifiedlead": null,
-        "hs_date_exited_opportunity": null,
-        "hs_date_exited_other": null,
-        "hs_date_exited_salesqualifiedlead": null,
-        "hs_date_exited_subscriber": null,
-        "hs_document_last_revisited": null,
-        "hs_email_bad_address": null,
-        "hs_email_bounce": null,
-        "hs_email_click": null,
-        "hs_email_customer_quarantined_reason": null,
-        "hs_email_delivered": null,
-        "hs_email_domain": "hubspot.com",
-        "hs_email_first_click_date": null,
-        "hs_email_first_open_date": null,
-        "hs_email_first_reply_date": null,
-        "hs_email_first_send_date": null,
-        "hs_email_hard_bounce_reason": null,
-        "hs_email_hard_bounce_reason_enum": null,
-        "hs_email_is_ineligible": null,
-        "hs_email_last_click_date": null,
-        "hs_email_last_email_name": null,
-        "hs_email_last_open_date": null,
-        "hs_email_last_reply_date": null,
-        "hs_email_last_send_date": null,
-        "hs_email_open": null,
-        "hs_email_optout": null,
-        "hs_email_optout_286760152": null,
-        "hs_email_optout_286760157": null,
-        "hs_email_quarantined": null,
-        "hs_email_quarantined_reason": null,
-        "hs_email_replied": null,
-        "hs_email_sends_since_last_engagement": null,
-        "hs_emailconfirmationstatus": null,
-        "hs_facebook_ad_clicked": null,
-        "hs_facebook_click_id": null,
-        "hs_first_engagement_object_id": null,
-        "hs_first_outreach_date": null,
-        "hs_first_subscription_create_date": null,
-        "hs_google_click_id": null,
-        "hs_has_active_subscription": null,
-        "hs_ip_timezone": null,
-        "hs_is_contact": true,
-        "hs_is_unworked": true,
-        "hs_language": null,
-        "hs_last_sales_activity_date": null,
-        "hs_last_sales_activity_timestamp": null,
-        "hs_last_sales_activity_type": null,
-        "hs_lastmodifieddate": null,
-        "hs_latest_disqualified_lead_date": null,
-        "hs_latest_meeting_activity": null,
-        "hs_latest_open_lead_date": null,
-        "hs_latest_qualified_lead_date": null,
-        "hs_latest_sequence_ended_date": null,
-        "hs_latest_sequence_enrolled": null,
-        "hs_latest_sequence_enrolled_date": null,
-        "hs_latest_sequence_finished_date": null,
-        "hs_latest_sequence_unenrolled_date": null,
-        "hs_latest_source": "OFFLINE",
-        "hs_latest_source_data_1": "API",
-        "hs_latest_source_data_2": "sample-contact",
-        "hs_latest_source_timestamp": "2024-01-31",
-        "hs_latest_subscription_create_date": null,
-        "hs_lead_status": null,
-        "hs_legal_basis": null,
-        "hs_lifecyclestage_customer_date": null,
-        "hs_lifecyclestage_evangelist_date": null,
-        "hs_lifecyclestage_lead_date": "2024-01-31T17:37:44.164000+00:00",
-        "hs_lifecyclestage_marketingqualifiedlead_date": null,
-        "hs_lifecyclestage_opportunity_date": null,
-        "hs_lifecyclestage_other_date": null,
-        "hs_lifecyclestage_salesqualifiedlead_date": null,
-        "hs_lifecyclestage_subscriber_date": null,
-        "hs_linkedin_ad_clicked": null,
-        "hs_merged_object_ids": null,
-        "hs_mobile_sdk_push_tokens": null,
-        "hs_notes_next_activity_type": null,
-        "hs_object_id": 51,
-        "hs_object_source": "API",
-        "hs_object_source_detail_1": null,
-        "hs_object_source_detail_2": null,
-        "hs_object_source_detail_3": null,
-        "hs_object_source_id": "sample-contact",
-        "hs_object_source_label": "INTERNAL_PROCESSING",
-        "hs_object_source_user_id": null,
-        "hs_persona": null,
-        "hs_pinned_engagement_id": null,
-        "hs_pipeline": "contacts-lifecycle-pipeline",
-        "hs_read_only": null,
-        "hs_sa_first_engagement_date": null,
-        "hs_sa_first_engagement_descr": null,
-        "hs_sa_first_engagement_object_type": null,
-        "hs_sales_email_last_clicked": null,
-        "hs_sales_email_last_opened": null,
-        "hs_sales_email_last_replied": null,
-        "hs_searchable_calculated_international_mobile_number": null,
-        "hs_searchable_calculated_international_phone_number": null,
-        "hs_searchable_calculated_mobile_number": null,
-        "hs_searchable_calculated_phone_number": null,
-        "hs_sequences_actively_enrolled_count": 0,
-        "hs_sequences_enrolled_count": null,
-        "hs_sequences_is_enrolled": null,
-        "hs_shared_team_ids": null,
-        "hs_shared_user_ids": null,
-        "hs_testpurge": null,
-        "hs_testrollback": null,
-        "hs_time_in_customer": null,
-        "hs_time_in_evangelist": null,
-        "hs_time_in_lead": "redacted",
-        "hs_time_in_marketingqualifiedlead": null,
-        "hs_time_in_opportunity": "redacted",
-        "hs_time_in_other": null,
-        "hs_time_in_salesqualifiedlead": null,
-        "hs_time_in_subscriber": null,
-        "hs_time_to_first_engagement": null,
-        "hs_timezone": null,
-        "hs_unique_creation_key": null,
-        "hs_updated_by_user_id": null,
-        "hs_user_ids_of_all_notification_followers": null,
-        "hs_user_ids_of_all_notification_unfollowers": null,
-        "hs_user_ids_of_all_owners": null,
-        "hs_v2_date_entered_customer": null,
-        "hs_v2_date_entered_evangelist": null,
-        "hs_v2_date_entered_lead": "2024-01-31T17:37:44.164000+00:00",
-        "hs_v2_date_entered_marketingqualifiedlead": null,
-        "hs_v2_date_entered_opportunity": null,
-        "hs_v2_date_entered_other": null,
-        "hs_v2_date_entered_salesqualifiedlead": null,
-        "hs_v2_date_entered_subscriber": null,
-        "hs_v2_date_exited_customer": null,
-        "hs_v2_date_exited_evangelist": null,
-        "hs_v2_date_exited_lead": null,
-        "hs_v2_date_exited_marketingqualifiedlead": null,
-        "hs_v2_date_exited_opportunity": null,
-        "hs_v2_date_exited_other": null,
-        "hs_v2_date_exited_salesqualifiedlead": null,
-        "hs_v2_date_exited_subscriber": null,
-        "hs_was_imported": null,
-        "hs_whatsapp_phone_number": null,
-        "hubspot_owner_assigneddate": null,
-        "hubspot_owner_id": null,
-        "hubspot_team_id": null,
-        "hubspotscore": null,
-        "industry": null,
-        "ip_city": null,
-        "ip_country": null,
-        "ip_country_code": null,
-        "ip_latlon": null,
-        "ip_state": null,
-        "ip_state_code": null,
-        "ip_zipcode": null,
-        "job_function": null,
-        "jobtitle": "CEO",
-        "lastmodifieddate": "2024-01-31T17:38:01.260000+00:00",
-        "lastname": "Halligan (Sample Contact)",
-        "lifecyclestage": "lead",
-        "linkedin_account": null,
-        "marital_status": null,
-        "message": null,
-        "military_status": null,
-        "mobilephone": null,
-        "notes_last_contacted": null,
-        "notes_last_updated": null,
-        "notes_next_activity_date": null,
-        "num_associated_deals": null,
-        "num_contacted_notes": null,
-        "num_conversion_events": 0,
-        "num_notes": null,
-        "num_unique_conversion_events": 0,
-        "numemployees": null,
-        "phone": null,
-        "recent_conversion_date": null,
-        "recent_conversion_event_name": null,
-        "recent_deal_amount": null,
-        "recent_deal_close_date": null,
-        "relationship_status": null,
-        "salutation": null,
-        "school": null,
-        "seniority": null,
-        "start_date": null,
-        "state": "MA",
-        "surveymonkeyeventlastupdated": null,
-        "total_revenue": null,
-        "twitterhandle": "bhalligan",
-        "webinareventlastupdated": null,
         "website": "http://www.HubSpot.com",
         "work_email": null,
         "zip": null
       },
-      "updatedAt": "2024-01-31T17:38:01.260Z"
+      "updatedAt": "2024-10-28T16:40:17.996Z"
     }
   ],
   [
@@ -875,50 +489,14 @@
       "createdAt": 0,
       "default": true,
       "displayOrder": 0,
-      "label": "Deals pipeline",
+      "label": " Sample Pipeline",
       "objectType": "DEAL",
       "objectTypeId": "0-3",
       "pipelineId": "default",
       "stages": [
         {
           "active": true,
-          "createdAt": 1706722690744,
-          "displayOrder": 0,
-          "label": "Appointment Scheduled",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.2"
-          },
-          "stageId": "appointmentscheduled",
-          "updatedAt": 1706722690744
-        },
-        {
-          "active": true,
-          "createdAt": 1706722690744,
-          "displayOrder": 2,
-          "label": "Presentation Scheduled",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.6"
-          },
-          "stageId": "presentationscheduled",
-          "updatedAt": 1706722690744
-        },
-        {
-          "active": true,
-          "createdAt": 1706722690744,
-          "displayOrder": 5,
-          "label": "Closed Won",
-          "metadata": {
-            "isClosed": "true",
-            "probability": "1.0"
-          },
-          "stageId": "closedwon",
-          "updatedAt": 1706722690744
-        },
-        {
-          "active": true,
-          "createdAt": 1706722690744,
+          "createdAt": 1743685132529,
           "displayOrder": 6,
           "label": "Closed Lost",
           "metadata": {
@@ -926,35 +504,11 @@
             "probability": "0.0"
           },
           "stageId": "closedlost",
-          "updatedAt": 1706722690744
+          "updatedAt": 1743685150749
         },
         {
           "active": true,
-          "createdAt": 1706722690744,
-          "displayOrder": 3,
-          "label": "Decision Maker Bought-In",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.8"
-          },
-          "stageId": "decisionmakerboughtin",
-          "updatedAt": 1706722690744
-        },
-        {
-          "active": true,
-          "createdAt": 1706722690744,
-          "displayOrder": 4,
-          "label": "Contract Sent",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.9"
-          },
-          "stageId": "contractsent",
-          "updatedAt": 1706722690744
-        },
-        {
-          "active": true,
-          "createdAt": 1706722690744,
+          "createdAt": 1743685132529,
           "displayOrder": 1,
           "label": "Qualified To Buy",
           "metadata": {
@@ -962,10 +516,70 @@
             "probability": "0.4"
           },
           "stageId": "qualifiedtobuy",
-          "updatedAt": 1706722690744
+          "updatedAt": 1743685150749
+        },
+        {
+          "active": true,
+          "createdAt": 1743685132529,
+          "displayOrder": 3,
+          "label": "Decision Maker Bought-In",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.8"
+          },
+          "stageId": "decisionmakerboughtin",
+          "updatedAt": 1743685150749
+        },
+        {
+          "active": true,
+          "createdAt": 1743685132529,
+          "displayOrder": 4,
+          "label": "Contract Sent",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.9"
+          },
+          "stageId": "contractsent",
+          "updatedAt": 1743685150749
+        },
+        {
+          "active": true,
+          "createdAt": 1743685132529,
+          "displayOrder": 5,
+          "label": "Closed Won",
+          "metadata": {
+            "isClosed": "true",
+            "probability": "1.0"
+          },
+          "stageId": "closedwon",
+          "updatedAt": 1743685150749
+        },
+        {
+          "active": true,
+          "createdAt": 1743685132529,
+          "displayOrder": 0,
+          "label": "Appointment Scheduled",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.2"
+          },
+          "stageId": "appointmentscheduled",
+          "updatedAt": 1743685150749
+        },
+        {
+          "active": true,
+          "createdAt": 1743685132529,
+          "displayOrder": 2,
+          "label": "Presentation Scheduled",
+          "metadata": {
+            "isClosed": "false",
+            "probability": "0.6"
+          },
+          "stageId": "presentationscheduled",
+          "updatedAt": 1743685150749
         }
       ],
-      "updatedAt": 1706722690744
+      "updatedAt": 1743685150749
     }
   ],
   [
@@ -977,20 +591,17 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "archived": false,
-      "contacts": [
-        "1"
-      ],
-      "createdAt": "2024-01-31T17:38:10.993Z",
-      "id": "17271840164",
+      "createdAt": "2025-04-03T12:59:10.726Z",
+      "id": "35447325508",
       "properties": {
-        "amount": 1000.0,
-        "amount_in_home_currency": 1000.0,
+        "amount": 43,
+        "amount_in_home_currency": 43,
         "closed_lost_reason": null,
         "closed_won_reason": null,
-        "closedate": "2024-01-03T09:37:11.118000+00:00",
-        "createdate": "2024-01-31T17:38:10.993000+00:00",
+        "closedate": null,
+        "createdate": "2025-04-03T12:59:10.726000+00:00",
         "days_to_close": 0,
-        "dealname": "HubSpot - New Deal (Sample Deal)",
+        "dealname": "Sample Deal",
         "dealstage": "appointmentscheduled",
         "dealtype": null,
         "description": null,
@@ -1002,59 +613,50 @@
         "hs_all_accessible_team_ids": null,
         "hs_all_collaborator_owner_ids": null,
         "hs_all_deal_split_owner_ids": null,
-        "hs_all_owner_ids": null,
+        "hs_all_owner_ids": "904875188",
         "hs_all_team_ids": null,
-        "hs_analytics_latest_source": "OFFLINE",
+        "hs_analytics_latest_source": null,
         "hs_analytics_latest_source_company": null,
-        "hs_analytics_latest_source_contact": "OFFLINE",
-        "hs_analytics_latest_source_data_1": "API",
+        "hs_analytics_latest_source_contact": null,
+        "hs_analytics_latest_source_data_1": null,
         "hs_analytics_latest_source_data_1_company": null,
-        "hs_analytics_latest_source_data_1_contact": "API",
-        "hs_analytics_latest_source_data_2": "sample-contact",
+        "hs_analytics_latest_source_data_1_contact": null,
+        "hs_analytics_latest_source_data_2": null,
         "hs_analytics_latest_source_data_2_company": null,
-        "hs_analytics_latest_source_data_2_contact": "sample-contact",
-        "hs_analytics_latest_source_timestamp": "2024-01-31T17:37:43.778000+00:00",
+        "hs_analytics_latest_source_data_2_contact": null,
+        "hs_analytics_latest_source_timestamp": null,
         "hs_analytics_latest_source_timestamp_company": null,
-        "hs_analytics_latest_source_timestamp_contact": "2024-01-31T17:37:43.778000+00:00",
-        "hs_analytics_source": "OFFLINE",
-        "hs_analytics_source_data_1": "API",
-        "hs_analytics_source_data_2": "sample-contact",
+        "hs_analytics_latest_source_timestamp_contact": null,
+        "hs_analytics_source": null,
+        "hs_analytics_source_data_1": null,
+        "hs_analytics_source_data_2": null,
         "hs_arr": null,
+        "hs_campaign": null,
         "hs_closed_amount": 0,
         "hs_closed_amount_in_home_currency": 0,
-        "hs_closed_deal_close_date": null,
-        "hs_closed_deal_create_date": null,
+        "hs_closed_deal_close_date": 0,
+        "hs_closed_deal_create_date": 0,
         "hs_closed_won_count": 0,
         "hs_closed_won_date": null,
-        "hs_created_by_user_id": 63597369,
-        "hs_createdate": "2024-01-31T17:38:10.999000+00:00",
-        "hs_date_entered_appointmentscheduled": "2024-01-31T17:38:10.999000+00:00",
-        "hs_date_entered_closedlost": null,
-        "hs_date_entered_closedwon": null,
-        "hs_date_entered_contractsent": null,
-        "hs_date_entered_decisionmakerboughtin": null,
-        "hs_date_entered_presentationscheduled": null,
-        "hs_date_entered_qualifiedtobuy": null,
-        "hs_date_exited_appointmentscheduled": null,
-        "hs_date_exited_closedlost": null,
-        "hs_date_exited_closedwon": null,
-        "hs_date_exited_contractsent": null,
-        "hs_date_exited_decisionmakerboughtin": null,
-        "hs_date_exited_presentationscheduled": null,
-        "hs_date_exited_qualifiedtobuy": null,
+        "hs_created_by_user_id": 73074756,
+        "hs_createdate": "2025-04-03T12:59:10.726000+00:00",
         "hs_days_to_close_raw": 0,
         "hs_deal_amount_calculation_preference": null,
         "hs_deal_stage_probability": 0.2,
         "hs_deal_stage_probability_shadow": 0.2,
         "hs_exchange_rate": null,
-        "hs_forecast_amount": 1000.0,
+        "hs_forecast_amount": 43,
         "hs_forecast_probability": null,
         "hs_has_empty_conditional_stage_properties": null,
         "hs_is_closed": false,
+        "hs_is_closed_count": 0,
+        "hs_is_closed_lost": false,
         "hs_is_closed_won": false,
-        "hs_is_in_first_deal_stage": null,
+        "hs_is_in_first_deal_stage": true,
         "hs_is_open_count": 1,
-        "hs_lastmodifieddate": "2024-01-31T17:38:24.674000+00:00",
+        "hs_lastmodifieddate": "2025-04-03T12:59:43.469000+00:00",
+        "hs_latest_approval_status": null,
+        "hs_latest_approval_status_approval_id": null,
         "hs_latest_meeting_activity": null,
         "hs_likelihood_to_close": null,
         "hs_line_item_global_term_hs_discount_percentage": null,
@@ -1069,54 +671,48 @@
         "hs_merged_object_ids": null,
         "hs_mrr": null,
         "hs_next_step": null,
+        "hs_next_step_updated_at": null,
+        "hs_notes_last_activity": null,
+        "hs_notes_next_activity": null,
         "hs_notes_next_activity_type": null,
         "hs_num_of_associated_line_items": 0,
         "hs_num_target_accounts": 0,
-        "hs_object_id": 17271840164,
+        "hs_object_id": 35447325508,
         "hs_object_source": "CRM_UI",
         "hs_object_source_detail_1": null,
         "hs_object_source_detail_2": null,
         "hs_object_source_detail_3": null,
-        "hs_object_source_id": null,
+        "hs_object_source_id": "userId:73074756",
         "hs_object_source_label": "CRM_UI",
-        "hs_object_source_user_id": 63597369,
-        "hs_open_deal_create_date": null,
+        "hs_object_source_user_id": 73074756,
+        "hs_open_deal_create_date": 1743685150726,
         "hs_pinned_engagement_id": null,
         "hs_predicted_amount": null,
         "hs_predicted_amount_in_home_currency": null,
         "hs_priority": null,
-        "hs_projected_amount": 200.0,
-        "hs_projected_amount_in_home_currency": 200.0,
+        "hs_projected_amount": 8.6,
+        "hs_projected_amount_in_home_currency": 8.6,
         "hs_read_only": null,
         "hs_sales_email_last_replied": null,
-        "hs_shared_team_ids": null,
-        "hs_shared_user_ids": null,
         "hs_tcv": null,
-        "hs_time_in_appointmentscheduled": "redacted",
-        "hs_time_in_closedlost": null,
-        "hs_time_in_closedwon": null,
-        "hs_time_in_contractsent": null,
-        "hs_time_in_decisionmakerboughtin": null,
-        "hs_time_in_presentationscheduled": null,
-        "hs_time_in_qualifiedtobuy": null,
         "hs_unique_creation_key": null,
-        "hs_updated_by_user_id": 63597369,
+        "hs_updated_by_user_id": 73074756,
         "hs_user_ids_of_all_notification_followers": null,
         "hs_user_ids_of_all_notification_unfollowers": null,
-        "hs_user_ids_of_all_owners": null,
+        "hs_user_ids_of_all_owners": "73074756",
         "hs_was_imported": null,
-        "hubspot_owner_assigneddate": null,
-        "hubspot_owner_id": null,
+        "hubspot_owner_assigneddate": "2025-04-03T12:59:10.726000+00:00",
+        "hubspot_owner_id": "904875188",
         "hubspot_team_id": null,
         "notes_last_contacted": null,
         "notes_last_updated": null,
         "notes_next_activity_date": null,
-        "num_associated_contacts": 1,
+        "num_associated_contacts": 0,
         "num_contacted_notes": null,
-        "num_notes": null,
+        "num_notes": 0,
         "pipeline": "default"
       },
-      "updatedAt": "2024-01-31T17:38:24.674Z"
+      "updatedAt": "2025-04-03T12:59:43.469Z"
     }
   ],
   [
@@ -1132,31 +728,11 @@
       "category": "Sales",
       "channel": "Email",
       "description": "One to One emails",
-      "id": 286760152,
+      "id": 453651751,
       "internal": true,
       "internalName": "ONE_TO_ONE",
       "name": "One to One",
-      "portalId": 45111954
-    }
-  ],
-  [
-    "acmeCo/email_subscriptions",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "active": true,
-      "businessUnitId": 0,
-      "category": "Marketing",
-      "channel": "Email",
-      "description": "Marketing offers and updates.",
-      "id": 286760157,
-      "internal": false,
-      "internalName": "MARKETING_INFORMATION",
-      "name": "Marketing Information",
-      "portalId": 45111954
+      "portalId": 47912630
     }
   ],
   [
@@ -1168,14 +744,15 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "archived": false,
-      "createdAt": "2024-01-31T17:37:42.736Z",
-      "email": "fivetranfan@gmail.com",
-      "firstName": "Jon",
-      "id": "711847525",
-      "lastName": "Williams",
-      "updatedAt": "2024-02-01T16:19:49.900Z",
-      "userId": 63597369,
-      "userIdIncludingInactive": 63597369
+      "createdAt": "2024-10-28T16:38:58.288Z",
+      "email": "alexb@estuary.dev",
+      "firstName": "Alexander",
+      "id": "904875188",
+      "lastName": "Bair",
+      "type": "PERSON",
+      "updatedAt": "2024-12-18T20:19:29.405Z",
+      "userId": 73074756,
+      "userIdIncludingInactive": 73074756
     }
   ],
   [
@@ -1186,197 +763,9 @@
         "row_id": 4,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "property": "city",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 52,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "city",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 21,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "company",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 66,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "company",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 10,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "createdate",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 58,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "createdate",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 96,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "createdate",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 23,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "email",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 68,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "email",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 105,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "email",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 15,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "first_deal_created_date",
+      "data-sensitivity": null,
+      "is-encrypted": null,
+      "property": "associatedcompanyid",
       "selected": false,
       "source-id": "RollupProperties",
       "source-label": null,
@@ -1384,2097 +773,7 @@
       "timestamp": "redacted",
       "updated-by-user-id": null,
       "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 3,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "firstname",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 51,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "firstname",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 91,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "firstname",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 33,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_all_contact_vids",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 75,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_all_contact_vids",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 111,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_all_contact_vids",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 74,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_average_page_views",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 32,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_average_page_views",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 109,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_average_page_views",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 72,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_first_timestamp",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 28,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_first_timestamp",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 108,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_first_timestamp",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 81,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_event_completions",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 40,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_event_completions",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 116,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_event_completions",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 64,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_page_views",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 19,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_page_views",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 104,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_page_views",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 59,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_visits",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 12,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_visits",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 97,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_num_visits",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 56,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_revenue",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 8,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_revenue",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 95,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_revenue",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 62,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 16,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 101,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 84,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source_data_1",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 43,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source_data_1",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 119,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source_data_1",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 83,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source_data_2",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 42,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source_data_2",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 117,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_analytics_source_data_2",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 102,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_created_by_user_id",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 5,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_date_entered_lead",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 53,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_date_entered_lead",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 37,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_date_entered_opportunity",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 29,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_date_exited_lead",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 20,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_email_domain",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 65,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_email_domain",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 103,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_email_domain",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 36,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_is_contact",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 78,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_is_contact",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 112,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_is_contact",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 1,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_is_unworked",
-      "selected": false,
-      "source-id": "CalculatedPropertyComputer",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 49,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_is_unworked",
-      "selected": false,
-      "source-id": "CalculatedPropertyComputer",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 90,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_is_unworked",
-      "selected": false,
-      "source-id": "CalculatedPropertyComputer",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 54,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 6,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 93,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 50,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_data_1",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 2,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_data_1",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 89,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_data_1",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 48,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_data_2",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_data_2",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 88,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_data_2",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 69,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_timestamp",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 25,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_timestamp",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 106,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_latest_source_timestamp",
-      "selected": false,
-      "source-id": "WebAnalyticsPropertyCalculation",
-      "source-label": null,
-      "source-type": "ANALYTICS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 44,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_lifecyclestage_lead_date",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 85,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_lifecyclestage_lead_date",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 11,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_lifecyclestage_opportunity_date",
-      "selected": false,
-      "source-id": "deals-lifecycle-sync",
-      "source-label": null,
-      "source-type": "DEALS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 39,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_id",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 80,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_id",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 114,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_id",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 41,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 82,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 115,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 17,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source_id",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 63,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source_id",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 100,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source_id",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 13,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source_label",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 60,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source_label",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 98,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source_label",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 118,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_object_source_user_id",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 9,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_pipeline",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 57,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_pipeline",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 94,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_pipeline",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 61,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_sequences_actively_enrolled_count",
-      "selected": false,
-      "source-id": "RollupProperties",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 14,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_sequences_actively_enrolled_count",
-      "selected": false,
-      "source-id": "RollupProperties",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 99,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_sequences_actively_enrolled_count",
-      "selected": false,
-      "source-id": "RollupProperties",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 31,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_time_in_lead",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 73,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_time_in_lead",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 30,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_time_in_opportunity",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 120,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_updated_by_user_id",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 45,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_v2_date_entered_lead",
-      "selected": false,
-      "source-id": "",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 86,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_v2_date_entered_lead",
-      "selected": false,
-      "source-id": "",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 24,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_v2_date_entered_opportunity",
-      "selected": false,
-      "source-id": "",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 35,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "hs_v2_date_exited_lead",
-      "selected": false,
-      "source-id": "",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 27,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "jobtitle",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 71,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "jobtitle",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 107,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "jobtitle",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 34,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "lastname",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 76,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "lastname",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 110,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "lastname",
-      "selected": false,
-      "source-id": "userId:63597369",
-      "source-label": null,
-      "source-type": "CRM_UI",
-      "timestamp": "redacted",
-      "updated-by-user-id": 63597369,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 47,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "lifecyclestage",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 87,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "lifecyclestage",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "API",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 46,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "lifecyclestage",
-      "selected": false,
-      "source-id": "deals-lifecycle-sync",
-      "source-label": null,
-      "source-type": "DEALS",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 18,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "num_associated_deals",
-      "selected": false,
-      "source-id": "RollupProperties",
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 38,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "num_conversion_events",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 79,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "num_conversion_events",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 113,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "num_conversion_events",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 7,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "num_unique_conversion_events",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 55,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "num_unique_conversion_events",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 92,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "num_unique_conversion_events",
-      "selected": false,
-      "source-id": null,
-      "source-label": null,
-      "source-type": "CALCULATED",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 101
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 22,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "state",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 67,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "state",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 77,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "twitterhandle",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 26,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "website",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 1
-    }
-  ],
-  [
-    "acmeCo/property_history",
-    {
-      "_meta": {
-        "op": "u",
-        "row_id": 70,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "property": "website",
-      "selected": false,
-      "source-id": "sample-contact",
-      "source-label": null,
-      "source-type": "INTERNAL_PROCESSING",
-      "timestamp": "redacted",
-      "updated-by-user-id": null,
-      "value": "redacted",
-      "vid": 51
+      "vid": 72810357568
     }
   ]
 ]
