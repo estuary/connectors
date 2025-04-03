@@ -754,3 +754,52 @@ func TestXMINBackfill(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.MinimumBackfillXID = fmt.Sprintf("%d", uint32(lowerXID))
 	tests.VerifiedCapture(ctx, t, cs)
 }
+
+// TestRowLevelSecurity demonstrates that RLS policies do not necessarily apply to change
+// event replication. Note that the test snapshot includes documents with visible=false
+// after the initial backfill.
+func TestRowLevelSecurity(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "67424191"
+	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT, visible BOOLEAN)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ENABLE ROW LEVEL SECURITY;", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("CREATE POLICY visibility_policy ON %s USING (visible = true);", tableName))
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Insert five rows (three visible)
+	tb.Insert(ctx, t, tableName, [][]any{
+		{1, "one", true},
+		{2, "two", false},
+		{3, "three", true},
+		{4, "four", false},
+		{5, "five", true},
+	})
+	cs.Capture(ctx, t, nil)
+
+	// Five more rows (three visible)
+	tb.Insert(ctx, t, tableName, [][]any{
+		{6, "six", true},
+		{7, "seven", false},
+		{8, "eight", true},
+		{9, "nine", false},
+		{10, "ten", true},
+	})
+	// Two updates (one visible)
+	tb.Update(ctx, t, tableName, "id", 1, "data", "one-modified")
+	tb.Update(ctx, t, tableName, "id", 2, "data", "two-modified")
+	// Two deletes (one visible)
+	tb.Delete(ctx, t, tableName, "id", 3)
+	tb.Delete(ctx, t, tableName, "id", 4)
+	// Update a row's visibility status directly
+	tb.Update(ctx, t, tableName, "id", 5, "visible", false)
+	tb.Update(ctx, t, tableName, "id", 5, "visible", true)
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
