@@ -42,6 +42,11 @@ def test_capture(request, snapshot):
         if "last_login_at" in rec:
             rec["last_login_at"] = "redacted"
 
+        if stream == "acmeCo/ticket_audits":
+            rec["id"] = "redacted"
+            rec["created_at"] = "redacted"
+            rec["events"] = "redacted"
+            rec["ticket_id"] = "redacted"
 
     assert snapshot("capture.stdout.json") == unique_stream_lines
 
