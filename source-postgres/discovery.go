@@ -735,17 +735,10 @@ func getColumnDescriptions(ctx context.Context, conn *pgx.Conn) ([]columnDescrip
 
 func queryAndLogCurrentXID(ctx context.Context, conn *pgx.Conn) {
 	var xid uint64
-	if err := conn.QueryRow(ctx, "SELECT txid_current()").Scan(&xid); err == nil {
-		logrus.WithField("xid", xid).Info("current transaction ID (from txid_current)")
-		return
+	const query = "SELECT (CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
+	if err := conn.QueryRow(ctx, query).Scan(&xid); err == nil {
+		logrus.WithField("xid", xid).Info("current transaction ID")
 	} else {
-		logrus.WithError(err).Info("failed to query txid_current(), trying txid_snapshot_xmax()")
-	}
-
-	if err := conn.QueryRow(ctx, "SELECT txid_snapshot_xmax(txid_current_snapshot())").Scan(&xid); err == nil {
-		logrus.WithField("xid", xid).Info("current transaction ID (from txid_snapshot_xmax)")
-		return
-	} else {
-		logrus.WithError(err).Info("failed to query txid_snapshot_xmax()")
+		logrus.WithError(err).Warn("error querying current transaction ID")
 	}
 }
