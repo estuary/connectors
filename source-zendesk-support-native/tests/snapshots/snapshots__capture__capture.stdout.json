@@ -714,6 +714,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
         "row_id": 0
       },
+      "deleted": false,
       "id": 28835704018964,
       "instance_id": 1,
       "metric": "agent_work_time",
