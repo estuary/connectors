@@ -2469,9 +2469,6 @@
         "hs_analytics_source": "OFFLINE",
         "hs_analytics_source_data_1": "API",
         "hs_analytics_source_data_2": "sample-contact",
-        "hs_date_entered_lead": "2024-02-08T02:34:10.388Z",
-        "hs_date_entered_opportunity": "2024-02-08T02:34:38.253Z",
-        "hs_date_exited_lead": "2024-02-08T02:34:38.253Z",
         "hs_is_unworked": "true",
         "hs_latest_source": "OFFLINE",
         "hs_latest_source_data_1": "API",
@@ -2495,8 +2492,6 @@
         "hs_social_num_broadcast_clicks": "0",
         "hs_social_twitter_clicks": "0",
         "hs_time_between_contact_creation_and_deal_creation": "26878",
-        "hs_time_in_lead": "redacted",
-        "hs_time_in_opportunity": "redacted",
         "hs_v2_cumulative_time_in_lead": "27865",
         "hs_v2_date_entered_lead": "2024-02-08T02:34:10.388Z",
         "hs_v2_date_entered_opportunity": "2024-02-08T02:34:38.253Z",
@@ -2629,27 +2624,6 @@
             "sourceType": "ANALYTICS",
             "timestamp": "2024-02-08T02:34:15.950000Z",
             "value": "sample-contact"
-          }
-        ],
-        "hs_date_entered_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-02-08T02:34:10.388000Z",
-            "value": "2024-02-08T02:34:10.388Z"
-          }
-        ],
-        "hs_date_entered_opportunity": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-02-08T02:34:38.253000Z",
-            "value": "2024-02-08T02:34:38.253Z"
-          }
-        ],
-        "hs_date_exited_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-02-08T02:34:38.253000Z",
-            "value": "2024-02-08T02:34:38.253Z"
           }
         ],
         "hs_is_unworked": [
@@ -2836,8 +2810,6 @@
             "value": "26878"
           }
         ],
-        "hs_time_in_lead": "redacted",
-        "hs_time_in_opportunity": "redacted",
         "hs_v2_cumulative_time_in_lead": [
           {
             "sourceType": "CALCULATED",
@@ -3007,7 +2979,6 @@
         "hs_analytics_source_data_2": "sample-contact",
         "hs_count_is_unworked": "1",
         "hs_count_is_worked": "0",
-        "hs_date_entered_lead": "2024-02-08T02:34:10.795Z",
         "hs_is_unworked": "true",
         "hs_latest_source": "OFFLINE",
         "hs_latest_source_data_1": "API",
@@ -3029,7 +3000,6 @@
         "hs_social_linkedin_clicks": "0",
         "hs_social_num_broadcast_clicks": "0",
         "hs_social_twitter_clicks": "0",
-        "hs_time_in_lead": "redacted",
         "hs_updated_by_user_id": "63843671",
         "hs_user_ids_of_all_owners": "63843671",
         "hs_v2_date_entered_lead": "2024-02-08T02:34:10.795Z",
@@ -3190,13 +3160,6 @@
             "timestamp": "2024-02-15T18:48:26.440000Z",
             "updatedByUserId": 63843671,
             "value": "0"
-          }
-        ],
-        "hs_date_entered_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-02-08T02:34:10.795000Z",
-            "value": "2024-02-08T02:34:10.795Z"
           }
         ],
         "hs_is_unworked": [
@@ -3367,7 +3330,6 @@
             "value": "0"
           }
         ],
-        "hs_time_in_lead": "redacted",
         "hs_updated_by_user_id": [
           {
             "sourceId": "userId:63843671",
@@ -3543,7 +3505,6 @@
         "hs_count_is_unworked": "1",
         "hs_count_is_worked": "0",
         "hs_created_by_user_id": "63843671",
-        "hs_date_entered_lead": "2024-02-08T16:09:32.359Z",
         "hs_is_unworked": "true",
         "hs_latest_source": "OFFLINE",
         "hs_latest_source_data_1": "CRM_UI",
@@ -3562,7 +3523,6 @@
         "hs_social_linkedin_clicks": "0",
         "hs_social_num_broadcast_clicks": "0",
         "hs_social_twitter_clicks": "0",
-        "hs_time_in_lead": "redacted",
         "hs_updated_by_user_id": "63843671",
         "hs_user_ids_of_all_owners": "63843671",
         "hs_v2_date_entered_lead": "2024-02-08T16:09:32.359Z",
@@ -3724,13 +3684,6 @@
             "value": "63843671"
           }
         ],
-        "hs_date_entered_lead": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-02-08T16:09:32.359000Z",
-            "value": "2024-02-08T16:09:32.359Z"
-          }
-        ],
         "hs_is_unworked": [
           {
             "sourceId": "CalculatedPropertyComputer",
@@ -3883,7 +3836,6 @@
             "value": "0"
           }
         ],
-        "hs_time_in_lead": "redacted",
         "hs_updated_by_user_id": [
           {
             "sourceId": "userId:63843671",
@@ -4037,7 +3989,6 @@
         "hs_count_is_unworked": "1",
         "hs_count_is_worked": "0",
         "hs_created_by_user_id": "63843671",
-        "hs_date_entered_opportunity": "2024-02-08T16:11:29.216Z",
         "hs_is_unworked": "true",
         "hs_latest_source": "OFFLINE",
         "hs_latest_source_data_1": "CRM_UI",
@@ -4056,7 +4007,6 @@
         "hs_social_linkedin_clicks": "0",
         "hs_social_num_broadcast_clicks": "0",
         "hs_social_twitter_clicks": "0",
-        "hs_time_in_opportunity": "redacted",
         "hs_updated_by_user_id": "63843671",
         "hs_user_ids_of_all_owners": "63843671",
         "hs_v2_date_entered_opportunity": "2024-02-08T16:11:29.216Z",
@@ -4211,13 +4161,6 @@
             "value": "63843671"
           }
         ],
-        "hs_date_entered_opportunity": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-02-08T16:11:29.216000Z",
-            "value": "2024-02-08T16:11:29.216Z"
-          }
-        ],
         "hs_is_unworked": [
           {
             "sourceId": "CalculatedPropertyComputer",
@@ -4370,7 +4313,6 @@
             "value": "0"
           }
         ],
-        "hs_time_in_opportunity": "redacted",
         "hs_updated_by_user_id": [
           {
             "sourceId": "userId:63843671",
@@ -4650,7 +4592,6 @@
         "hs_closed_amount_in_home_currency": "0",
         "hs_created_by_user_id": "63843671",
         "hs_createdate": "2024-02-08T02:34:37.283Z",
-        "hs_date_entered_appointmentscheduled": "2024-02-08T02:34:37.283Z",
         "hs_deal_stage_probability": "0.200000000000000011102230246251565404236316680908203125",
         "hs_deal_stage_probability_shadow": "0.200000000000000011102230246251565404236316680908203125",
         "hs_is_active_shared_deal": "false",
@@ -4664,7 +4605,6 @@
         "hs_object_source_user_id": "63843671",
         "hs_projected_amount": "200.0000000000000111022302462515654042363166809082031250000",
         "hs_projected_amount_in_home_currency": "200.0000000000000111022302462515654042363166809082031250000",
-        "hs_time_in_appointmentscheduled": "redacted",
         "hs_updated_by_user_id": "63843671",
         "hs_v2_date_entered_appointmentscheduled": "2024-02-08T02:34:37.283Z",
         "pipeline": "default"
@@ -4806,13 +4746,6 @@
             "sourceType": "CRM_UI",
             "timestamp": "2024-02-08T02:34:37.283000Z",
             "updatedByUserId": 63843671,
-            "value": "2024-02-08T02:34:37.283Z"
-          }
-        ],
-        "hs_date_entered_appointmentscheduled": [
-          {
-            "sourceType": "CALCULATED",
-            "timestamp": "2024-02-08T02:34:37.283000Z",
             "value": "2024-02-08T02:34:37.283Z"
           }
         ],
@@ -4958,7 +4891,6 @@
             "value": "0"
           }
         ],
-        "hs_time_in_appointmentscheduled": "redacted",
         "hs_updated_by_user_id": [
           {
             "sourceType": "CRM_UI",
