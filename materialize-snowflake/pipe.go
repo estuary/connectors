@@ -22,26 +22,52 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type pipeParts struct {
+	Catalog   string
+	Schema    string
+	Binding   string
+	KeyBegin  string
+	Version   string
+	TableName string
+}
+
+func (parts *pipeParts) toPipeName() string {
+	return strings.ToUpper(fmt.Sprintf("%s.%s.FLOW_PIPE_%s_%s_%s_%s", parts.Catalog, parts.Schema, parts.Binding, parts.KeyBegin, parts.Version, parts.TableName))
+}
+
+// Deconstruct a pipeName into its constituent parts
+func pipeNameToParts(pipeName string) pipeParts {
+	pipeNameSplit := strings.Split(pipeName, ".")
+	nameParts := strings.Split(strings.TrimPrefix(pipeNameSplit[2], "FLOW_PIPE_"), "_")
+	tableName := strings.Join(nameParts[3:], "_")
+	return pipeParts{
+		Catalog:   pipeNameSplit[0],
+		Schema:    pipeNameSplit[1],
+		Binding:   nameParts[0],
+		KeyBegin:  nameParts[1],
+		Version:   nameParts[2],
+		TableName: tableName,
+	}
+}
+
 var pipeSanitizeRegex = regexp.MustCompile("(?i)[^a-z0-9_]")
 
 // sanitizeAndAppendHash adapts an input into a reasonably human-readable
 // representation, sanitizing problematic characters and including a hash of the
 // "original" value to guarantee a unique (with respect to the input) and
 // deterministic output.
-func sanitizeAndAppendHash(prefix string, binding int, keyBegin string, version string, tableName string) string {
-	pre := strings.Join([]string{prefix, fmt.Sprintf("%d", binding), keyBegin, version}, "_")
-	sanitizedPre := pipeSanitizeRegex.ReplaceAllString(pre, "_")
+func sanitizeAndAppendHash(tableName string) string {
 	sanitizedTable := pipeSanitizeRegex.ReplaceAllString(tableName, "_")
-	full := sanitizedPre + "_" + sanitizedTable
-	limitedFull := full
 
-	if len(limitedFull) > 64 {
+	limited := sanitizedTable
+
+	if len(sanitizedTable) > 32 {
 		// Limit the length of the "human readable" part of the table name to
 		// something reasonable, but make sure only the tableName portion is cut
-		limitedFull = sanitizedPre + "_" + sanitizedTable[:64-len(sanitizedPre)]
+		limited = sanitizedTable[:32]
 	}
 
-	return fmt.Sprintf("%s_%016X", limitedFull, xxhash.Sum64String(full))
+	return fmt.Sprintf("%s_%016X", limited, xxhash.Sum64String(sanitizedTable))
 }
 
 type PipeClient struct {
