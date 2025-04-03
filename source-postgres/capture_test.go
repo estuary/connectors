@@ -729,3 +729,28 @@ func TestFeatureFlagFlattenArrays(t *testing.T) {
 		})
 	}
 }
+
+func TestXMINBackfill(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "60228969"
+	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	// Insert some initial rows, then establish the current server XID.
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+
+	var lowerXID uint64
+	const queryXID = "SELECT (CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
+	require.NoError(t, tb.control.QueryRow(ctx, queryXID).Scan(&lowerXID))
+
+	// Changes from after the minimum backfill XID can be observed.
+	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+	tb.Delete(ctx, t, tableName, "id", 0) // Except this delete won't be, since it's a delete
+	tb.Update(ctx, t, tableName, "id", 1, "data", "one-modified")
+
+	// Run the capture and verify results
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	cs.EndpointSpec.(*Config).Advanced.MinimumBackfillXID = fmt.Sprintf("%d", uint32(lowerXID))
+	tests.VerifiedCapture(ctx, t, cs)
+}

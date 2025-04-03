@@ -1,0 +1,12 @@
+# ================================
+# Collection "acmeCo/test/test/xminbackfill_60228969": 4 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"one-modified","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"three","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fxminbackfill_60228969":{"backfilled":4,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+
