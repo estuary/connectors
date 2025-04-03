@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "source-criteo-estuary"
+name = "source_criteo"
 version = "0.1.0"
 description = ""
 authors = []
