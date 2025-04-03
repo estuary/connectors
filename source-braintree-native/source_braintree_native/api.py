@@ -247,6 +247,45 @@ async def _determine_next_transaction_window_end(
     return end
 
 
+async def _fetch_transactions_disbursed_between(
+    braintree_gateway: BraintreeGateway,
+    start: datetime,
+    end: datetime,
+    log: Logger,
+) -> AsyncGenerator[IncrementalResource, None]:
+    # Both start_date and end_date are kept as datetimes to retain timezone information (e.g. UTC)
+    # when searching. If timezone information is not included (like with dates), Braintree
+    # defaults to using the Braintree account's timezone instead of UTC.
+    start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_date = end.replace(hour=0, minute=0, second=0, microsecond=0)
+    log.info(f"Fetching disbursed transactions.", {
+        "start": start_date,
+        "end": end_date,
+    })
+
+    earliest_created_at = end_date + timedelta(days=1)
+
+    # Results from Braintree are always returned in descending order of the created_at field.
+    # To make sure we get all transactions disbursed on the date, we iteratively reduce 
+    # earliest_created_at and perform more searches until all results have been fetched.
+    while True:
+        collection: ResourceCollection = await asyncio.to_thread(
+            braintree_gateway.transaction.search,
+            TransactionSearch.disbursement_date.between(start_date, end_date),
+            TransactionSearch.created_at.less_than_or_equal_to(earliest_created_at)
+        )
+
+        async for object in _async_iterator_wrapper(collection):
+            doc = Transaction.model_validate(_braintree_object_to_dict(object))
+            yield doc
+
+            if doc.created_at < earliest_created_at:
+                earliest_created_at = doc.created_at
+
+        if collection.maximum_size < TRANSACTION_SEARCH_LIMIT:
+            return
+
+
 async def fetch_transactions(
         braintree_gateway: BraintreeGateway,
         window_size: int,
@@ -260,6 +299,20 @@ async def fetch_transactions(
         start=log_cursor,
         latest_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC))
     )
+
+    # When a transaction's disbursement_details/disbursed_date is updated, none of the TRANSACTION_SEARCH_FIELDS
+    # or the non-searchable updated_at field are updated. Meaning, only incrementally replicating based off
+    # the TRANSACTION_SEARCH_FIELDS will cause the connector to miss updates to transactions' disbursement dates.
+    # To capture these elusive updates, we search the previous day(s) for disbursed transactions and yield them
+    # when the date window spans more than a single day.
+    if not _are_same_day(log_cursor, end):
+        async for doc in _fetch_transactions_disbursed_between(
+            braintree_gateway=braintree_gateway,
+            start=log_cursor,
+            end=end - timedelta(days=1),
+            log=log
+        ):
+            yield doc
 
     ids = await _fetch_unique_updated_transaction_ids(
         braintree_gateway,
