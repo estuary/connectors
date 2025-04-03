@@ -17,11 +17,15 @@
         "support_url": null,
         "url": "www.pudim.com.br"
       },
+      "business_type": "non_profit",
       "capabilities": {
         "card_payments": "active",
         "transfers": "active"
       },
       "charges_enabled": true,
+      "company": {
+        "name": "Teste"
+      },
       "controller": {
         "fees": {
           "payer": "application_express"
@@ -143,7 +147,8 @@
           "timezone": "Etc/UTC"
         },
         "invoices": {
-          "default_account_tax_ids": null
+          "default_account_tax_ids": null,
+          "hosted_payment_method_save": "always"
         },
         "payments": {
           "statement_descriptor": "WWW.PUDIM.COM.BR",
@@ -184,11 +189,15 @@
         "support_url": null,
         "url": "www.pudim.com.br"
       },
+      "business_type": "non_profit",
       "capabilities": {
         "card_payments": "active",
         "transfers": "active"
       },
       "charges_enabled": true,
+      "company": {
+        "name": "Teste"
+      },
       "controller": {
         "fees": {
           "payer": "application_express"
@@ -310,7 +319,8 @@
           "timezone": "Etc/UTC"
         },
         "invoices": {
-          "default_account_tax_ids": null
+          "default_account_tax_ids": null,
+          "hosted_payment_method_save": "always"
         },
         "payments": {
           "statement_descriptor": "WWW.PUDIM.COM.BR",
@@ -708,7 +718,8 @@
           "timezone": "Etc/UTC"
         },
         "invoices": {
-          "default_account_tax_ids": null
+          "default_account_tax_ids": null,
+          "hosted_payment_method_save": "always"
         },
         "payments": {
           "statement_descriptor": null,
@@ -1108,7 +1119,8 @@
           "timezone": "Etc/UTC"
         },
         "invoices": {
-          "default_account_tax_ids": null
+          "default_account_tax_ids": null,
+          "hosted_payment_method_save": "always"
         },
         "payments": {
           "statement_descriptor": null,
@@ -1151,6 +1163,7 @@
         "support_url": null,
         "url": null
       },
+      "business_type": null,
       "capabilities": {},
       "charges_enabled": false,
       "controller": {
@@ -1248,7 +1261,8 @@
           "timezone": "Etc/UTC"
         },
         "invoices": {
-          "default_account_tax_ids": null
+          "default_account_tax_ids": null,
+          "hosted_payment_method_save": "always"
         },
         "payments": {
           "statement_descriptor": null,
@@ -1289,6 +1303,7 @@
         "support_url": null,
         "url": null
       },
+      "business_type": null,
       "capabilities": {},
       "charges_enabled": false,
       "controller": {
@@ -1386,7 +1401,8 @@
           "timezone": "Etc/UTC"
         },
         "invoices": {
-          "default_account_tax_ids": null
+          "default_account_tax_ids": null,
+          "hosted_payment_method_save": "always"
         },
         "payments": {
           "statement_descriptor": null,
