@@ -108,6 +108,9 @@ def _braintree_object_to_dict(braintree_object):
         return data
 
 
+# If more than search_limit results match the search criteria, only the most recent search_limit results
+# are returned. To make sure we aren't missing results, _determine_window_end reduces the end date until
+# fewer than search_limit results are returned & we can be confident no results are missed.
 async def _determine_window_end(
         search_method,
         search_range_node_builder: Search.RangeNodeBuilder,
@@ -220,6 +223,30 @@ async def _fetch_unique_updated_transaction_ids(
     return list(id_set)
 
 
+async def _determine_next_transaction_window_end(
+    braintree_gateway: BraintreeGateway,
+    start: datetime,
+    latest_end: datetime,
+    log: Logger,
+) -> datetime:
+    end = latest_end
+
+    # Any of the transaction search fields could hit the TRANSACTION_SEARCH_LIMIT,
+    # so we continue reassigning & reducing the end datetime until we know none
+    # of the search fields will return TRANSACTION_SEARCH_LIMIT records.
+    for field in TRANSACTION_SEARCH_FIELDS:
+        end, _ = await _determine_window_end(
+            search_method=braintree_gateway.transaction.search,
+            search_range_node_builder=getattr(TransactionSearch, field),
+            start = start,
+            initial_end=end,
+            search_limit=TRANSACTION_SEARCH_LIMIT,
+            log=log,
+        )
+
+    return end
+
+
 async def fetch_transactions(
         braintree_gateway: BraintreeGateway,
         window_size: int,
@@ -227,13 +254,11 @@ async def fetch_transactions(
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
-    end, _ = await _determine_window_end(
-        search_method=braintree_gateway.transaction.search,
-        search_range_node_builder=TransactionSearch.created_at,
+    end = await _determine_next_transaction_window_end(
+        braintree_gateway=braintree_gateway,
+        log=log,
         start=log_cursor,
-        initial_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC)),
-        search_limit=TRANSACTION_SEARCH_LIMIT,
-        log=log
+        latest_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC))
     )
 
     ids = await _fetch_unique_updated_transaction_ids(
