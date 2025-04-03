@@ -182,3 +182,6 @@ captures:
           cursorField:
             - updatedAt
         target: acmeCo/workflows
+        # The Hubspot account we're using for snapshot tests doesn't
+        # have access to workflows, so it's disbled for snapshotting purposes.
+        disable: true
