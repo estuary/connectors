@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -311,8 +310,15 @@ func (d *transactor) addBinding(target sql.Table) error {
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
 		var tableName = b.target.Path[len(b.target.Path)-1]
-		var pipeName = strings.ToUpper(sanitizeAndAppendHash("flow_pipe", b.target.Binding, keyBegin, d.version, tableName))
-		b.pipeName = fmt.Sprintf("%s.%s.%s", d.cfg.Database, d.cfg.Schema, pipeName)
+		parts := pipeParts{
+			Catalog:   d.cfg.Database,
+			Schema:    d.cfg.Schema,
+			Binding:   fmt.Sprintf("%d", b.target.Binding),
+			KeyBegin:  keyBegin,
+			Version:   d.version,
+			TableName: sanitizeAndAppendHash(tableName),
+		}
+		b.pipeName = parts.toPipeName()
 	}
 
 	d.bindings = append(d.bindings, b)
@@ -819,10 +825,30 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// we also run this before cleaning up the checkpoint from active bindings to avoid
 	// deleting pipes which may be used for the next transaction of the same active bindings
 	var currentPipeNames []string
-	for _, item := range d.cp {
+	for stateKey, item := range d.cp {
 		if item.PipeName != "" {
 			currentPipeNames = append(currentPipeNames, item.PipeName)
+			var cpKey = strings.Split(stateKey, ".")[0]
+
+			// Delete old pipe names of this binding which may not be detected by cleanupPipes due to different
+			// formatting
+			for _, b := range d.bindings {
+				var bindingKey = strings.Split(b.target.StateKey, ".")[0]
+				if cpKey == bindingKey && item.PipeName != b.pipeName {
+					log.WithFields(log.Fields{
+						"pipeName":        item.PipeName,
+						"previousVersion": cpKey,
+						"newVersion":      bindingKey,
+					}).Info("dropping previous-version pipe")
+					if err := d.dropPipe(ctx, item.PipeName); err != nil {
+						return nil, err
+					}
+				}
+			}
 		}
+	}
+	if err := d.cleanupPipes(ctx, currentPipeNames); err != nil {
+		return nil, fmt.Errorf("cleaning up pipes: %w", err)
 	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
@@ -837,9 +863,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	for _, b := range d.bindings {
 		checkpointClear[b.target.StateKey] = nil
 		delete(d.cp, b.target.StateKey)
-	}
-	if err := d.cleanupPipes(ctx, currentPipeNames); err != nil {
-		return nil, fmt.Errorf("cleaning up pipes: %w", err)
 	}
 
 	checkpointJSON, err := json.Marshal(checkpointClear)
@@ -869,17 +892,31 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
 	return nil
 }
 
-func (d *transactor) cleanupPipes(ctx context.Context, exclude []string) error {
-	var query = "SELECT PIPE_CATALOG, PIPE_SCHEMA, PIPE_NAME FROM INFORMATION_SCHEMA.PIPES WHERE PIPE_NAME LIKE 'FLOW_PIPE_%';"
+func (d *transactor) dropPipe(ctx context.Context, pipeName string) error {
+	if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP PIPE %s", pipeName)); err != nil {
+		return fmt.Errorf("dropping pipe %q: %w", pipeName, err)
+	}
+	return nil
+}
+
+// Clean up any pipes that have a matching table name and keyBegin, but a different version
+// Binding number match is not considered as binding ordering may change and we may need to cleanup
+// pipes after such a change as well
+func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string) error {
+	var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
+
+	var currentPipes []pipeParts
+	for _, pipeName := range currentPipeNames {
+		currentPipes = append(currentPipes, pipeNameToParts(pipeName))
+	}
+
+	// Find all FLOW_PIPEs with a matching KeyBegin
+	var query = fmt.Sprintf("SELECT PIPE_CATALOG, PIPE_SCHEMA, PIPE_NAME FROM INFORMATION_SCHEMA.PIPES WHERE PIPE_NAME LIKE 'FLOW_PIPE_%%_%s_%%_%%';", keyBegin)
 	rows, err := d.db.QueryContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("listing pipes: %w", err)
 	}
 	defer rows.Close()
-
-	log.WithFields(log.Fields{
-		"exclusions": exclude,
-	}).Debug("snowpipe cleanup exclusion")
 
 	var toDelete []string
 	for rows.Next() {
@@ -887,19 +924,25 @@ func (d *transactor) cleanupPipes(ctx context.Context, exclude []string) error {
 		if err := rows.Scan(&db, &schema, &name); err != nil {
 			return fmt.Errorf("scanning pipe: %w", err)
 		}
-		var fullName = fmt.Sprintf("%s.%s.%s", db, schema, name)
-		if slices.Contains(exclude, fullName) {
-			continue
+
+		fullName := fmt.Sprintf("%s.%s.%s", db, schema, name)
+		parts := pipeNameToParts(fullName)
+
+		for _, pipe := range currentPipes {
+			if pipe.Catalog == db && pipe.Schema == schema && pipe.TableName == parts.TableName && pipe.Version != parts.Version {
+				log.WithFields(log.Fields{
+					"pipeName":       fullName,
+					"currentVersion": parts.Version,
+				}).Info("snowpipe: cleaning up leftover pipe")
+				toDelete = append(toDelete, fullName)
+				break
+			}
 		}
-		toDelete = append(toDelete, fullName)
 	}
 
 	for _, pipeName := range toDelete {
-		log.WithFields(log.Fields{
-			"pipe": pipeName,
-		}).Info("snowpipe: cleaning up leftover pipe")
-		if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP PIPE %s", pipeName)); err != nil {
-			return fmt.Errorf("dropping pipe %q: %w", pipeName, err)
+		if err := d.dropPipe(ctx, pipeName); err != nil {
+			return err
 		}
 	}
 
