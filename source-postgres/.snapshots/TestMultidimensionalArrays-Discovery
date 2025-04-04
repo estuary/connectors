@@ -15,12 +15,6 @@ Binding 0:
           "$anchor": "TestMultidimensionalarrays_82375147",
           "properties": {
             "arr": {
-              "items": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
               "description": "(source type: _text)",
               "type": [
                 "array",
