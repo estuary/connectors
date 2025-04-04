@@ -893,7 +893,7 @@ func (d *transactor) deleteFiles(ctx context.Context, files []string) error {
 }
 
 func (d *transactor) dropPipe(ctx context.Context, pipeName string) error {
-	if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP PIPE %s", pipeName)); err != nil {
+	if _, err := d.db.ExecContext(ctx, fmt.Sprintf("DROP PIPE IF EXISTS %s", pipeName)); err != nil {
 		return fmt.Errorf("dropping pipe %q: %w", pipeName, err)
 	}
 	return nil
