@@ -286,7 +286,18 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, 
 	}
 
 	var jsonType *jsonschema.Schema
-	if arrayColumn && db.featureFlags["flatten_arrays"] {
+	if arrayColumn && db.featureFlags["multidimensional_arrays"] {
+		// When 'multidimensional_arrays' is enabled, we don't specify an element type
+		// in order to avoid the mess of trying to describe the recursive scalar-or-self
+		// nature of the array elements. It's just an array of unspecified values.
+		jsonType = &jsonschema.Schema{
+			Extras: map[string]any{"type": "array"},
+		}
+		if column.IsNullable {
+			// The column value itself may be null if the column is nullable.
+			jsonType.Extras["type"] = []string{"array", "null"}
+		}
+	} else if arrayColumn && db.featureFlags["flatten_arrays"] {
 		colSchema.nullable = true // Array elements might be null
 
 		// New behavior: If the column is an array, turn the element type into a JSON array.
