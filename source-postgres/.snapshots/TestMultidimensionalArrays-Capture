@@ -1,0 +1,26 @@
+# ================================
+# Collection "acmeCo/test/test/multidimensionalarrays_82375147": 18 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":null,"id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":[],"id":2}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":[],"id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":["x"],"id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":["x"],"id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":["a","b","c","d"],"id":6}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":["a","b","c","d"],"id":7}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x"],"id":8}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111]}},"arr":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x"],"id":9}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":null,"id":11}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":[],"id":12}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":[],"id":13}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":["x"],"id":14}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":["x"],"id":15}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":["a","b","c","d"],"id":16}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":["a","b","c","d"],"id":17}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x"],"id":18}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"multidimensionalarrays_82375147","loc":[11111111,11111111,11111111],"txid":111111}},"arr":["a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x"],"id":19}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fmultidimensionalarrays_82375147":{"backfilled":9,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+
