@@ -225,9 +225,20 @@ func getClusterOpTime(ctx context.Context, client *mongo.Client) (primitive.Time
 
 	// Note: Although we are using the "admin" database, this command works for any database, even
 	// if it doesn't exist, no matter what permissions the connecting user has.
-	if raw, err := client.Database("admin").RunCommand(ctx, bson.M{"hello": "1"}).Raw(); err != nil {
-		return out, fmt.Errorf("running 'hello' command: %w", err)
-	} else if opRaw, err := raw.LookupErr("operationTime"); err != nil {
+	var raw bson.Raw
+	var err error
+	if raw, err = client.Database("admin").RunCommand(ctx, bson.M{"hello": "1"}).Raw(); err != nil {
+		// Very old versions of MongoDB do not support the 'hello' command and
+		// must use the deprecated 'isMaster' command instead. In these cases
+		// it's not very efficient to always call 'hello' first and see that it
+		// fails, but this function is only used every 5 minutes so it doesn't
+		// really matter.
+		log.Debug("running 'hello' command failed, falling back to 'isMaster' command")
+		if raw, err = client.Database("admin").RunCommand(ctx, bson.M{"isMaster": "1"}).Raw(); err != nil {
+			return out, fmt.Errorf("fetching 'operationTime', both 'hello' and 'isMaster' commands failed: %w", err)
+		}
+	}
+	if opRaw, err := raw.LookupErr("operationTime"); err != nil {
 		return out, fmt.Errorf("looking up 'operationTime' field: %w", err)
 	} else if err := opRaw.Unmarshal(&out); err != nil {
 		return out, fmt.Errorf("unmarshaling 'operationTime' field: %w", err)
