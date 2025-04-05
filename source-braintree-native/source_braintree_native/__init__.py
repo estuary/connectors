@@ -48,7 +48,7 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfigWithSchedule],
     ) -> response.Validated:
-        validate_credentials(log, validate.config)
+        await validate_credentials(log, self, validate.config)
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
