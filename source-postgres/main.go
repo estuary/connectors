@@ -148,9 +148,32 @@ var featureFlagDefaults = map[string]bool{
 	// which is usually not what users expect.
 	"time_as_time": true,
 
-	// When true, array columns are captured as a flat array of values in the JSON output.
-	// When false, array columns are captured as a `{dimensions, elements}` object which
-	// preserves dimensionality (at the cost of being awful to use in most cases).
+	// When true, array columns are captured as an actual multidimensional array of values.
+	// Confusingly, this is not the opposite of the 'flatten_arrays' flag. There are three
+	// different ways we can handle arrays:
+	//
+	// - multidimensional_arrays=false and flatten_arrays=false: The legacy behavior, in
+	//   which arrays are captured as a `{dimensions, elements}` object which combines a
+	//   dimensions array (of integers) with a flattened elements array (of the array type).
+	//   This is the only way that we can represent PostgreSQL arrays with specific JSON
+	//   schema value types _and_ without discarding dimensionality information, but it's
+	//   a pain to actually use the resulting data for any purpose.
+	//
+	// - multidimensional_arrays=false and flatten_arrays=true: The current default behavior,
+	//   in which arrays are captured as just the `elements` array. This preserves JSON schema
+	//   value types, but discards the dimensionality information in favor of being easier to
+	//   use in the common case (1D arrays, or arrays where the dimensionality is unimportant).
+	//
+	// - multidimensional_arrays=true: A new opt-in behavior, in which arrays are captured as
+	//   actual nested arrays as necessary to represent a specific value. The problem is, since
+	//   PostgreSQL array dimensionality can vary wildly on a per-row basis, the JSON schema type
+	//   for this would be disgusting and not actually usable by a materialization, so instead we
+	//   just schematize this as `{type: array}` without any information about element types or
+	//   the fact that elements might themselves be either scalars or arrays of the same type.
+	"multidimensional_arrays": false,
+
+	// When true (and so long as 'multidimensional_arrays' isn't also set) array columns are
+	// captured as a flat array of values in the JSON output.
 	"flatten_arrays": true,
 }
 

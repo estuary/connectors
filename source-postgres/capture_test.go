@@ -754,3 +754,49 @@ func TestXMINBackfill(t *testing.T) {
 	cs.EndpointSpec.(*Config).Advanced.MinimumBackfillXID = fmt.Sprintf("%d", uint32(lowerXID))
 	tests.VerifiedCapture(ctx, t, cs)
 }
+
+func TestMultidimensionalArrays(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "82375147"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, arr TEXT[])")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	cs.EndpointSpec.(*Config).Advanced.FeatureFlags = "multidimensional_arrays"
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+	sqlcapture.TestShutdownAfterCaughtUp = true
+
+	t.Run("Discovery", func(t *testing.T) {
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+
+	t.Run("Capture", func(t *testing.T) {
+		tb.Insert(ctx, t, tableName, [][]any{
+			{1, nil},
+			{2, []string{}},
+			{3, [][]string{}},
+			{4, []string{"x"}},
+			{5, [][][]string{{{"x"}}}},
+			{6, []string{"a", "b", "c", "d"}},
+			{7, [][]string{{"a", "b"}, {"c", "d"}}},
+			{8, [][][]string{{{"a", "b", "c", "d"}, {"e", "f", "g", "h"}, {"i", "j", "k", "l"}}, {{"m", "n", "o", "p"}, {"q", "r", "s", "t"}, {"u", "v", "w", "x"}}}},                           // 2x3x4 array
+			{9, [][][][]string{{{{"a", "b"}, {"c", "d"}}, {{"e", "f"}, {"g", "h"}}, {{"i", "j"}, {"k", "l"}}}, {{{"m", "n"}, {"o", "p"}}, {{"q", "r"}, {"s", "t"}}, {{"u", "v"}, {"w", "x"}}}}}, // 2x3x2x2 array
+		})
+		cs.Capture(ctx, t, nil)
+
+		tb.Insert(ctx, t, tableName, [][]any{
+			{11, nil},
+			{12, []string{}},
+			{13, [][]string{}},
+			{14, []string{"x"}},
+			{15, [][][]string{{{"x"}}}},
+			{16, []string{"a", "b", "c", "d"}},
+			{17, [][]string{{"a", "b"}, {"c", "d"}}},
+			{18, [][][]string{{{"a", "b", "c", "d"}, {"e", "f", "g", "h"}, {"i", "j", "k", "l"}}, {{"m", "n", "o", "p"}, {"q", "r", "s", "t"}, {"u", "v", "w", "x"}}}},                           // 2x3x4 array
+			{19, [][][][]string{{{{"a", "b"}, {"c", "d"}}, {{"e", "f"}, {"g", "h"}}, {{"i", "j"}, {"k", "l"}}}, {{{"m", "n"}, {"o", "p"}}, {{"q", "r"}, {"s", "t"}}, {{"u", "v"}, {"w", "x"}}}}}, // 2x3x2x2 array
+		})
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+
+	})
+}
