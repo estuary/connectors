@@ -1,161 +1,8 @@
 [
   {
-    "recommendedName": "merchant_accounts",
-    "resourceConfig": {
-      "name": "merchant_accounts",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        }
-      },
-      "title": "FullRefreshResource",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/_meta/row_id"
-    ]
-  },
-  {
-    "recommendedName": "discounts",
-    "resourceConfig": {
-      "name": "discounts",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        }
-      },
-      "title": "FullRefreshResource",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/_meta/row_id"
-    ]
-  },
-  {
     "recommendedName": "add_ons",
     "resourceConfig": {
       "name": "add_ons",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        }
-      },
-      "title": "FullRefreshResource",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/_meta/row_id"
-    ]
-  },
-  {
-    "recommendedName": "plans",
-    "resourceConfig": {
-      "name": "plans",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -334,6 +181,57 @@
     ]
   },
   {
+    "recommendedName": "discounts",
+    "resourceConfig": {
+      "name": "discounts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
     "recommendedName": "disputes",
     "resourceConfig": {
       "name": "disputes",
@@ -396,6 +294,108 @@
     },
     "key": [
       "/id"
+    ]
+  },
+  {
+    "recommendedName": "merchant_accounts",
+    "resourceConfig": {
+      "name": "merchant_accounts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "plans",
+    "resourceConfig": {
+      "name": "plans",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
     ]
   },
   {
