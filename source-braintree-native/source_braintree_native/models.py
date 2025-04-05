@@ -1,8 +1,9 @@
+import braintree
 from braintree import BraintreeGateway
 from datetime import datetime, timezone, timedelta
 from logging import Logger
 from pydantic import AwareDatetime, BaseModel, Field
-from typing import Annotated, AsyncGenerator, Callable, Literal
+from typing import Annotated, Any, AsyncGenerator, Callable, Literal
 
 from estuary_cdk.capture.common import (
     BaseDocument,
@@ -13,6 +14,7 @@ from estuary_cdk.capture.common import (
     ResourceConfigWithSchedule,
     ResourceState,
 )
+from estuary_cdk.http import HTTPSession
 
 def default_start_date():
     dt = datetime.now(timezone.utc) - timedelta(days=30)
@@ -84,12 +86,105 @@ class Transaction(IncrementalResource):
     updated_at: AwareDatetime
 
 
-IncrementalResourceFetchChangesFn = Callable[
-    [BraintreeGateway, int, Logger, LogCursor],
-    AsyncGenerator[IncrementalResource | LogCursor, None],
+SnapshotFn = Callable[
+    [HTTPSession, str, BraintreeGateway, Logger],
+    AsyncGenerator[FullRefreshResource, None]
 ]
 
-IncrementalResourceFetchPageFn = Callable[
-    [BraintreeGateway, int, Logger, PageCursor, LogCursor],
-    AsyncGenerator[IncrementalResource | PageCursor, None],
+
+NonPaginatedSnapshotBraintreeClass = type[
+    braintree.AddOn |
+    braintree.Discount |
+    braintree.Plan
 ]
+
+
+IncrementalResourceBraintreeClass = type[
+    braintree.CreditCardVerification |
+    braintree.Customer |
+    braintree.Subscription |
+    braintree.Transaction
+]
+
+# Response models for undocumented APIs
+class IdSearchResponse(BaseModel, extra="allow"):
+    class SearchResults(BaseModel, extra="forbid"):
+        page_size: int
+        ids: list[str]
+
+    search_results: SearchResults
+
+
+SearchResponseResource = list[dict[str , Any]] | dict[str, Any] | None
+
+
+class SearchResponseResources(BaseModel, extra="forbid"):
+    current_page_number: int
+    page_size: int
+    total_items: int
+    resource: SearchResponseResource
+
+
+class SearchResponse(BaseModel, extra="allow"):
+    resources: SearchResponseResources
+
+
+class TransactionSearchResponse(SearchResponse):
+    class CreditCardTransactions(SearchResponseResources):
+        resource: SearchResponseResource = Field(alias="transaction", default=None)
+
+    resources: CreditCardTransactions = Field(alias="credit_card_transactions")
+
+
+class CreditCardVerificationSearchResponse(SearchResponse):
+    class CreditCardVerifications(SearchResponseResources):
+        resource: SearchResponseResource = Field(alias="verification", default=None)
+
+    resources: CreditCardVerifications = Field(alias="credit_card_verifications")
+
+
+class CustomerSearchResponse(SearchResponse):
+    class Customers(SearchResponseResources):
+        resource: SearchResponseResource = Field(alias="customer", default=None)
+
+    resources: Customers = Field(alias="customers")
+
+
+class SubscriptionSearchResponse(SearchResponse):
+    class Subscriptions(SearchResponseResources):
+        resource: SearchResponseResource = Field(alias="subscription", default=None)
+
+    resources: Subscriptions = Field(alias="subscriptions")
+
+
+class DisputesSearchResponse(SearchResponse):
+    class Disputes(SearchResponseResources):
+        resource: SearchResponseResource = Field(alias="dispute", default=None)
+
+    resources: Disputes = Field(alias="disputes")
+
+
+class MerchantAccountsResponse(BaseModel, extra="allow"):
+    class MerchantAccounts(BaseModel, extra="forbid"):
+        current_page_number: int
+        page_size: int
+        total_items: int
+        merchant_account: list[dict[str, Any]] | dict[str, Any] | None = None
+
+    merchant_accounts: MerchantAccounts
+
+
+class NonPaginatedSnapshotResponse(BaseModel, extra="allow"):
+    resources: list[dict[str, Any]] | None = None
+
+
+class PlansResponse(NonPaginatedSnapshotResponse):
+    resources: list[dict[str, Any]] | None = Field(alias="plans", default=None)
+
+
+class DiscountsResponse(NonPaginatedSnapshotResponse):
+    resources: list[dict[str, Any]] | None = Field(alias="discounts", default=None)
+
+
+class AddOnsResponse(NonPaginatedSnapshotResponse):
+    resources: list[dict[str, Any]] | None = Field(alias="add_ons", default=None)
