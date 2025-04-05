@@ -7,7 +7,7 @@ from logging import Logger
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPMixin
+from estuary_cdk.http import HTTPMixin, TokenSource
 
 
 from .models import (
@@ -60,8 +60,8 @@ def _create_gateway(config: EndpointConfig) -> BraintreeGateway:
         braintree.Configuration(
             environment=environment,
             merchant_id=config.merchant_id,
-            public_key=config.credentials.public_key,
-            private_key=config.credentials.private_key,
+            public_key=config.credentials.username,
+            private_key=config.credentials.password,
         )
     )
 
@@ -78,7 +78,7 @@ def validate_credentials(
 
 
 def full_refresh_resources(
-        log: Logger, config: EndpointConfig,
+        log: Logger, http: HTTPMixin, config: EndpointConfig,
 ) -> list[common.Resource]:
 
     def open(
@@ -122,7 +122,7 @@ def full_refresh_resources(
 
 
 def incremental_resources(
-        log: Logger, config: EndpointConfig
+        log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
     def open(
@@ -175,7 +175,7 @@ def incremental_resources(
 
 
 def transactions(
-        log: Logger, config: EndpointConfig
+        log: Logger, http: HTTPMixin, config: EndpointConfig,
 ) -> common.Resource:
 
     def open(
@@ -225,8 +225,10 @@ def transactions(
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
+    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+
     return [
-        *full_refresh_resources(log, config),
-        *incremental_resources(log, config),
-        transactions(log, config),
+        *full_refresh_resources(log, http, config),
+        *incremental_resources(log, http, config),
+        transactions(log, http, config),
     ]
