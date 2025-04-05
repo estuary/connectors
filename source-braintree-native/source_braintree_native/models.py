@@ -6,6 +6,7 @@ from typing import Annotated, AsyncGenerator, Callable, Literal
 
 from estuary_cdk.capture.common import (
     BaseDocument,
+    BasicAuth,
     ConnectorState as GenericConnectorState,
     LogCursor,
     PageCursor,
@@ -28,16 +29,16 @@ class EndpointConfig(BaseModel):
         title="Merchant ID",
     )
 
-    class ApiKey(BaseModel):
+    class ApiKey(BasicAuth):
         credentials_title: Literal["API Key"] = Field(
             default="API Key",
             json_schema_extra={"type": "string"}
         )
-        public_key: str = Field(
+        username: str = Field(
             title="Public Key",
             json_schema_extra={"secret": True},
         )
-        private_key: str = Field(
+        password: str = Field(
             title="Private Key",
             json_schema_extra={"secret": True},
         )

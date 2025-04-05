@@ -30,20 +30,20 @@
               "title": "Credentials Title",
               "type": "string"
             },
-            "public_key": {
+            "username": {
               "secret": true,
               "title": "Public Key",
               "type": "string"
             },
-            "private_key": {
+            "password": {
               "secret": true,
               "title": "Private Key",
               "type": "string"
             }
           },
           "required": [
-            "public_key",
-            "private_key"
+            "username",
+            "password"
           ],
           "title": "ApiKey",
           "type": "object"
