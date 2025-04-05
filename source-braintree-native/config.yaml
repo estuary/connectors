@@ -2,11 +2,11 @@ merchant_id: 7bsbj4jzqs733j2f
 start_date: "2024-09-01T00:00:00Z"
 credentials:
     credentials_title: API Key
-    public_key_sops: ENC[AES256_GCM,data:rgJbAJ7+b5jZrSveNAKwCw==,iv:2YVQm5cTouyUD42FXq/46aLQnp1OrfsOQcs6pwh+is8=,tag:6phCQv8+LgdzCUgWi+h5mA==,type:str]
-    private_key_sops: ENC[AES256_GCM,data:x2pTFZqlycBlRYO+TrguTvJ+LeB+91iIO8Q0oNLzrBY=,iv:x/2wq0MPdw88DonfNoiA/TfSrbMw5Qov5Aw6+jnnOTk=,tag:+Gt/KPG0janD/cOBKQLfHw==,type:str]
+    username_sops: ENC[AES256_GCM,data:d+uSBcQzzHLpXrS5V3YUaw==,iv:nVZCDUet+7KSzntkkAD2UUJICykpFyNhTayESOseQhY=,tag:Xnq3RFeWj+R1BZyeqq1quQ==,type:str]
+    password_sops: ENC[AES256_GCM,data:9ZA97LWsl71jev6gUU/xejm62/wU+E5prjLcwahtb2c=,iv:c7biwuboJb6uMrnNHoPX5udegxpM49P4qBnupoDNmes=,tag:3i6DsY4IFC6bEfRiOtHARA==,type:str]
 advanced:
     is_sandbox: true
-    window_size: 300
+    window_size: 30000
 sops:
     kms: []
     gcp_kms:
@@ -16,8 +16,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-12-04T16:27:37Z"
-    mac: ENC[AES256_GCM,data:lzvH1MDnxT8E6d7aJRnpxOtHC8a6r0qxShSY8iyyngppBa4fm47/WbHyk29zgPXoR372D3SeQLuNNT0RGScAlovx4pfXvsO9BHhNWE5JiVs2IN14Ss/uCgHjMA9cA5TEu466GE9DWtlcyPabk+GI2TGNtORRKia1pGZxlQYyebo=,iv:eQSVXXGhT9gMHmrOVr7NuwWAST61UYAcKDRCqZXHWw4=,tag:9G2lM3l5ymFIxRTPXv14Vw==,type:str]
+    lastmodified: "2025-04-05T15:07:49Z"
+    mac: ENC[AES256_GCM,data:JwplkP6EkLTpQOFL+7tcJGts4xEsbPi44vbmtYKg2GLUWTeAEJIFNsh4liLaR4hZhInHZrEzwzioFaXnnzU384Moy3Xl1qo3k4mJ9zxtru0yuFchvD+dNsf/UZ2Fiku3goGfdLMJBePALaqylLHZCa7CJthh6ZKIbQggZgV5J4U=,iv:IcRUmCHq/As7xNNu8J9/RZbPQ1gva8QDg3j4XfAuC4E=,tag:mxtG3JbUWf1c1dLXkabVfw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.7.3
