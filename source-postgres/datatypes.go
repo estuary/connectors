@@ -458,20 +458,61 @@ func (db *postgresDatabase) translateArray(column *sqlcapture.ColumnInfo, isPrim
 		x.Elements[idx] = translated
 	}
 
-	// If we're supposed to produce flat arrays, just return the elements array now.
-	if db.featureFlags["flatten_arrays"] {
+	// If we're supposed to produce flat element arrays, just return the elements array now.
+	if db.featureFlags["flatten_arrays"] && !db.featureFlags["multidimensional_arrays"] {
 		return x.Elements, nil
 	}
 
-	// Otherwise translate the array dimensions and return the old object representation.
 	var dims = make([]int, 0)
 	for _, dim := range x.Dims {
 		dims = append(dims, int(dim.Length))
 	}
-	return map[string]any{
-		"dimensions": dims,
-		"elements":   x.Elements,
-	}, nil
+
+	// If we're supposed to output the old object representation, return that object now.
+	if !db.featureFlags["flatten_arrays"] && !db.featureFlags["multidimensional_arrays"] {
+		return map[string]any{
+			"dimensions": dims,
+			"elements":   x.Elements,
+		}, nil
+	}
+
+	// Otherwise we need to un-flatten the elements array into the appropriate dimensionality.
+	return unflattenArray(x.Elements, dims)
+}
+
+func unflattenArray(elements []any, dims []int) (any, error) {
+	// Special cases
+	if len(dims) == 0 {
+		return []any{}, nil
+	} else if len(dims) == 1 {
+		return elements, nil
+	}
+
+	// Validate correct element count (should always be the case since it's
+	// coming from PostgreSQL, but just in case we ought to pad it out with
+	// nulls or something)
+	var cardinality = dims[0]
+	for _, d := range dims[1:] {
+		cardinality *= d
+	}
+	if len(elements) != cardinality {
+		elements = append(elements, make([]any, cardinality-len(elements))...)
+	}
+
+	// Iterate from last dimension to first, chunking up the elements into slices
+	// of the appropriate length and then replacing the original elements array
+	// with the new chunked version. We won't need to actually do anything with
+	// the first dimension since the elements array will have the appropriate
+	// length once we reach it.
+	for dimensionIndex := len(dims) - 1; dimensionIndex > 0; dimensionIndex-- {
+		var dimensionSize = dims[dimensionIndex]
+		var chunks = make([]any, len(elements)/dimensionSize)
+		for idx := range chunks {
+			chunks[idx] = elements[idx*dimensionSize : (idx+1)*dimensionSize]
+		}
+		elements = chunks
+	}
+	return elements, nil
 }
 
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
