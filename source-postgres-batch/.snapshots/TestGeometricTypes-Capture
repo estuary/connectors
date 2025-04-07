@@ -11,5 +11,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_geometrictypes_696406":{"Mode":"Incremental (XMIN)","LastPolled":"<TIMESTAMP>","DocumentCount":7,"CursorNames":["txid"],"CursorValues":[999999]}}}
+{"bindingStateV1":{"test_geometrictypes_696406":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":7,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)"}}}
 

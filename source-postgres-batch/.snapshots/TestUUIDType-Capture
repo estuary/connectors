@@ -15,5 +15,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_uuidtype_694251":{"Mode":"Incremental (XMIN)","LastPolled":"<TIMESTAMP>","DocumentCount":11,"CursorNames":["txid"],"CursorValues":[999999]}}}
+{"bindingStateV1":{"test_uuidtype_694251":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":11,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)"}}}
 

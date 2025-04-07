@@ -17,6 +17,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 )
 
 const (
@@ -40,6 +41,10 @@ const (
 	// This timeout can be less generous, because after the first row is received we
 	// ought to be getting a consistent stream of results until the query completes.
 	pollingWatchdogTimeout = 15 * time.Minute
+
+	// Maximum number of concurrent polling operations to run at once. Might be
+	// worth making this configurable in the advanced endpoint settings.
+	maxConcurrentQueries = 5
 )
 
 var (
@@ -224,6 +229,7 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 		Bindings:       bindings,
 		Output:         stream,
 		TranslateValue: drv.TranslateValue,
+		Sempahore:      semaphore.NewWeighted(maxConcurrentQueries),
 	}
 	return capture.Run(stream.Context())
 }
@@ -316,6 +322,7 @@ type capture struct {
 	Bindings       []bindingInfo
 	Output         *boilerplate.PullOutput
 	TranslateValue func(val any, databaseTypeName string) (any, error)
+	Sempahore      *semaphore.Weighted
 }
 
 type bindingInfo struct {
@@ -344,13 +351,7 @@ func (s *captureState) Validate() error {
 
 func (c *capture) Run(ctx context.Context) error {
 	var eg, workerCtx = errgroup.WithContext(ctx)
-	for idx, binding := range c.Bindings {
-		if idx > 0 {
-			// Slightly stagger worker thread startup. Five seconds should be long
-			// enough for most fast queries to complete their first execution, and
-			// the hope is this reduces peak load on both the database and us.
-			time.Sleep(5 * time.Second)
-		}
+	for _, binding := range c.Bindings {
 		var binding = binding // Copy for goroutine closure
 		eg.Go(func() error { return c.worker(workerCtx, &binding) })
 	}
@@ -362,18 +363,62 @@ func (c *capture) Run(ctx context.Context) error {
 
 func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	var res = binding.resource
+	var stateKey = binding.stateKey
+	var state, ok = c.State.Streams[stateKey]
+	if !ok {
+		return fmt.Errorf("internal error: no state for stream %q", res.Name)
+	}
+
+	// Polling schedule can be configured per binding. If unset, falls back to the connector default.
+	var pollScheduleStr = c.Config.Advanced.PollSchedule
+	if res.PollSchedule != "" {
+		pollScheduleStr = res.PollSchedule
+	}
+	var pollSchedule, err = schedule.Parse(pollScheduleStr)
+	if err != nil {
+		return fmt.Errorf("failed to parse polling schedule %q: %w", pollScheduleStr, err)
+	}
+
 	log.WithFields(log.Fields{
 		"name":   res.Name,
 		"schema": res.SchemaName,
 		"table":  res.TableName,
-		"cursor": res.Cursor,
-		"poll":   res.PollSchedule,
+		"poll":   pollScheduleStr,
 	}).Info("starting worker")
 
 	for ctx.Err() == nil {
-		if err := c.poll(ctx, binding); err != nil {
-			return fmt.Errorf("error polling binding %q: %w", res.Name, err)
+		// Wait for next scheduled polling cycle.
+		log.WithFields(log.Fields{
+			"name": res.Name,
+			"poll": pollScheduleStr,
+			"prev": state.LastPolled.Format(time.RFC3339Nano),
+		}).Info("waiting for next scheduled poll")
+		if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
+			return err
 		}
+		var pollTime = time.Now().UTC()
+
+		// Acquire semaphore and execute polling operation.
+		if err := c.Sempahore.Acquire(ctx, 1); err != nil {
+			return fmt.Errorf("error acquiring semaphore: %w", err)
+		}
+		if err := func() error {
+			// Ensure that the semaphore is released when we finish polling.
+			defer c.Sempahore.Release(1)
+			log.WithFields(log.Fields{"name": res.Name}).Info("polling binding")
+			if err := c.poll(ctx, binding); err != nil {
+				return fmt.Errorf("error polling binding %q: %w", res.Name, err)
+			}
+			return nil
+		}(); err != nil {
+			return err
+		}
+
+		state.LastPolled = pollTime
+		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+			return err
+		}
+
 		if TestShutdownAfterQuery {
 			return nil // In tests, we want each worker to shut down after one poll
 		}
@@ -402,29 +447,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var isFullRefresh = len(cursorNames) == 0
 	var isInitialBackfill = len(cursorValues) == 0
 
-	// Polling schedule can be configured per binding. If unset, falls back to the
-	// connector global polling schedule.
-	var pollScheduleStr = c.Config.Advanced.PollSchedule
-	if res.PollSchedule != "" {
-		pollScheduleStr = res.PollSchedule
-	}
-	var pollSchedule, err = schedule.Parse(pollScheduleStr)
-	if err != nil {
-		return fmt.Errorf("failed to parse polling schedule %q: %w", pollScheduleStr, err)
-	}
-	log.WithFields(log.Fields{
-		"name": res.Name,
-		"poll": pollScheduleStr,
-		"prev": state.LastPolled.Format(time.RFC3339Nano),
-	}).Info("waiting for next scheduled poll")
-	if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
-		return err
-	}
-	log.WithFields(log.Fields{
-		"name": res.Name,
-		"poll": pollScheduleStr,
-	}).Info("ready to poll")
-
 	query, err := c.Driver.buildQuery(res, state)
 	if err != nil {
 		return fmt.Errorf("error building query: %w", err)
@@ -439,6 +461,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	}
 
 	log.WithFields(log.Fields{
+		"name":  res.Name,
 		"query": query,
 		"args":  cursorValues,
 		"rowID": nextRowID,
@@ -597,7 +620,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		}
 	}
 
-	state.LastPolled = pollTime
 	state.DocumentCount = nextRowID // Always update persisted count on successful completion
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
