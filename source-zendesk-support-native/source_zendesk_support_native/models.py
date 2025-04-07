@@ -1,4 +1,5 @@
 from datetime import datetime, UTC, timedelta
+from enum import StrEnum
 import json
 from typing import Annotated, Any, Literal, TYPE_CHECKING
 
@@ -242,11 +243,21 @@ class TicketMetricEventsResponse(IncrementalCursorPaginatedResponse):
     resources: list[ZendeskResource] = Field(alias="ticket_metric_events")
 
 
+class TicketActivitiesResponse(IncrementalCursorPaginatedResponse):
+    resources: list[ZendeskResource] = Field(alias="activities")
+
+
+class FilterParam(StrEnum):
+    START_TIME = "start_time"
+    SINCE = "since"
+
+
 # Incremental resources that can be filtered by a start_time query param.
-# Tuples contain the name, path, cursor field, and response model for each resource. 
-INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, str, type[IncrementalCursorPaginatedResponse]]] = [
-    ("ticket_skips", "skips", "updated_at", TicketSkipsResponse),
-    ("ticket_metric_events", "incremental/ticket_metric_events", "time", TicketMetricEventsResponse)
+# Tuples contain the name, path, filter param name, cursor field, and response model for each resource. 
+INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, type[IncrementalCursorPaginatedResponse]]] = [
+    ("ticket_skips", "skips", FilterParam.START_TIME, "updated_at", TicketSkipsResponse),
+    ("ticket_metric_events", "incremental/ticket_metric_events", FilterParam.START_TIME, "time", TicketMetricEventsResponse),
+    ("ticket_activities", "activities", FilterParam.START_TIME, "updated_at", TicketActivitiesResponse),
 ]
 
 

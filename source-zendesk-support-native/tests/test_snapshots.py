@@ -6,6 +6,9 @@ def test_capture(request, snapshot):
     OMITTED_STREAMS = [
         "acmeCo/audit_logs",
         "acmeCo/tags",
+        # The Zendesk API only returns the past 30 days of ticket_activities,
+        # so we can't reliably include ticket_activities in the capture snapshot.
+        "acmeCo/ticket_activities",
     ]
 
     result = subprocess.run(

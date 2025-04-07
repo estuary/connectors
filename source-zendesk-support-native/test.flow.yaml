@@ -92,6 +92,10 @@ captures:
           interval: PT5M
         target: acmeCo/ticket_metric_events
       - resource:
+          name: ticket_activities
+          interval: PT5M
+        target: acmeCo/ticket_activities
+      - resource:
           name: organizations
           interval: PT5M
         target: acmeCo/organizations
