@@ -79,234 +79,6 @@
     ]
   },
   {
-    "recommendedName": "Persons",
-    "resourceConfig": {
-      "name": "Persons",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Parent Stream: Accounts",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        }
-      },
-      "required": [
-        "id",
-        "object"
-      ],
-      "title": "Persons",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "ExternalAccountCards",
-    "resourceConfig": {
-      "name": "ExternalAccountCards",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Parent Stream: Accounts",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        }
-      },
-      "required": [
-        "id",
-        "object"
-      ],
-      "title": "ExternalAccountCards",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "ExternalBankAccount",
-    "resourceConfig": {
-      "name": "ExternalBankAccount",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Parent Stream: Accounts",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        }
-      },
-      "required": [
-        "id",
-        "object"
-      ],
-      "title": "ExternalBankAccount",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
     "recommendedName": "ApplicationFees",
     "resourceConfig": {
       "name": "ApplicationFees",
@@ -463,9 +235,9 @@
     ]
   },
   {
-    "recommendedName": "Customers",
+    "recommendedName": "BalanceTransactions",
     "resourceConfig": {
-      "name": "Customers",
+      "name": "BalanceTransactions",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -495,6 +267,7 @@
         }
       },
       "additionalProperties": true,
+      "description": "Incremental stream with no Events",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -534,7 +307,7 @@
         "object",
         "created"
       ],
-      "title": "Customers",
+      "title": "BalanceTransactions",
       "type": "object",
       "x-infer-schema": true
     },
@@ -687,158 +460,6 @@
         "object"
       ],
       "title": "Cards",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "CustomerBalanceTransaction",
-    "resourceConfig": {
-      "name": "CustomerBalanceTransaction",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Parent Stream: Customers",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        }
-      },
-      "required": [
-        "id",
-        "object"
-      ],
-      "title": "CustomerBalanceTransaction",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "PaymentMethods",
-    "resourceConfig": {
-      "name": "PaymentMethods",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Parent Stream: Customers\n\nWhen backfilling, PaymentMethods behaves as a child stream. But during incremental replication,\nPaymentMethods listens to distinct events that contain PaymentMethods documents, meaning it\nisn't a child stream.",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        }
-      },
-      "required": [
-        "id",
-        "object"
-      ],
-      "title": "PaymentMethods",
       "type": "object",
       "x-infer-schema": true
     },
@@ -1319,6 +940,162 @@
     ]
   },
   {
+    "recommendedName": "CustomerBalanceTransaction",
+    "resourceConfig": {
+      "name": "CustomerBalanceTransaction",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parent Stream: Customers",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        }
+      },
+      "required": [
+        "id",
+        "object"
+      ],
+      "title": "CustomerBalanceTransaction",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Customers",
+    "resourceConfig": {
+      "name": "Customers",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        },
+        "created": {
+          "title": "Created",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "created"
+      ],
+      "title": "Customers",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
     "recommendedName": "Disputes",
     "resourceConfig": {
       "name": "Disputes",
@@ -1479,6 +1256,320 @@
     ]
   },
   {
+    "recommendedName": "ExternalAccountCards",
+    "resourceConfig": {
+      "name": "ExternalAccountCards",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parent Stream: Accounts",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        }
+      },
+      "required": [
+        "id",
+        "object"
+      ],
+      "title": "ExternalAccountCards",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "ExternalBankAccount",
+    "resourceConfig": {
+      "name": "ExternalBankAccount",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parent Stream: Accounts",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        }
+      },
+      "required": [
+        "id",
+        "object"
+      ],
+      "title": "ExternalBankAccount",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Files",
+    "resourceConfig": {
+      "name": "Files",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Incremental stream with no Events",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        },
+        "created": {
+          "title": "Created",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "created"
+      ],
+      "title": "Files",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "FilesLink",
+    "resourceConfig": {
+      "name": "FilesLink",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Incremental stream with no Events",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        },
+        "created": {
+          "title": "Created",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "created"
+      ],
+      "title": "FilesLink",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
     "recommendedName": "InvoiceItems",
     "resourceConfig": {
       "name": "InvoiceItems",
@@ -1551,6 +1642,82 @@
         "created"
       ],
       "title": "InvoiceItems",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "InvoiceLineItems",
+    "resourceConfig": {
+      "name": "InvoiceLineItems",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parent Stream: Invoices",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        }
+      },
+      "required": [
+        "id",
+        "object"
+      ],
+      "title": "InvoiceLineItems",
       "type": "object",
       "x-infer-schema": true
     },
@@ -1639,82 +1806,6 @@
     ]
   },
   {
-    "recommendedName": "InvoiceLineItems",
-    "resourceConfig": {
-      "name": "InvoiceLineItems",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Parent Stream: Invoices",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        }
-      },
-      "required": [
-        "id",
-        "object"
-      ],
-      "title": "InvoiceLineItems",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
     "recommendedName": "PaymentIntents",
     "resourceConfig": {
       "name": "PaymentIntents",
@@ -1795,6 +1886,82 @@
     ]
   },
   {
+    "recommendedName": "PaymentMethods",
+    "resourceConfig": {
+      "name": "PaymentMethods",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parent Stream: Customers\n\nWhen backfilling, PaymentMethods behaves as a child stream. But during incremental replication,\nPaymentMethods listens to distinct events that contain PaymentMethods documents, meaning it\nisn't a child stream.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        }
+      },
+      "required": [
+        "id",
+        "object"
+      ],
+      "title": "PaymentMethods",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
     "recommendedName": "Payouts",
     "resourceConfig": {
       "name": "Payouts",
@@ -1867,6 +2034,82 @@
         "created"
       ],
       "title": "Payouts",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Persons",
+    "resourceConfig": {
+      "name": "Persons",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parent Stream: Accounts",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        }
+      },
+      "required": [
+        "id",
+        "object"
+      ],
+      "title": "Persons",
       "type": "object",
       "x-infer-schema": true
     },
@@ -2275,86 +2518,6 @@
     ]
   },
   {
-    "recommendedName": "SetupIntents",
-    "resourceConfig": {
-      "name": "SetupIntents",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        },
-        "created": {
-          "title": "Created",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "created"
-      ],
-      "title": "SetupIntents",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
     "recommendedName": "SetupAttempts",
     "resourceConfig": {
       "name": "SetupAttempts",
@@ -2431,9 +2594,9 @@
     ]
   },
   {
-    "recommendedName": "Subscriptions",
+    "recommendedName": "SetupIntents",
     "resourceConfig": {
-      "name": "Subscriptions",
+      "name": "SetupIntents",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -2502,87 +2665,7 @@
         "object",
         "created"
       ],
-      "title": "Subscriptions",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "SubscriptionSchedule",
-    "resourceConfig": {
-      "name": "SubscriptionSchedule",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        },
-        "created": {
-          "title": "Created",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "created"
-      ],
-      "title": "SubscriptionsSchedule",
+      "title": "SetupIntents",
       "type": "object",
       "x-infer-schema": true
     },
@@ -2706,9 +2789,9 @@
     ]
   },
   {
-    "recommendedName": "UsageRecords",
+    "recommendedName": "SubscriptionSchedule",
     "resourceConfig": {
-      "name": "UsageRecords",
+      "name": "SubscriptionSchedule",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -2738,7 +2821,6 @@
         }
       },
       "additionalProperties": true,
-      "description": "Parent Stream: SubscriptionItems",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -2768,22 +2850,102 @@
           "description": "The account ID associated with the resource.",
           "title": "Account Id"
         },
-        "subscription_item": {
-          "title": "Subscription Item",
-          "type": "string"
+        "created": {
+          "title": "Created",
+          "type": "integer"
         }
       },
       "required": [
         "id",
         "object",
-        "subscription_item"
+        "created"
       ],
-      "title": "UsageRecords",
+      "title": "SubscriptionsSchedule",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/subscription_item"
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Subscriptions",
+    "resourceConfig": {
+      "name": "Subscriptions",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        },
+        "created": {
+          "title": "Created",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "object",
+        "created"
+      ],
+      "title": "Subscriptions",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
     ]
   },
   {
@@ -2859,6 +3021,82 @@
         "created"
       ],
       "title": "TopUps",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "TransferReversals",
+    "resourceConfig": {
+      "name": "TransferReversals",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Parent Stream: Transfers",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "object": {
+          "title": "Object",
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The account ID associated with the resource.",
+          "title": "Account Id"
+        }
+      },
+      "required": [
+        "id",
+        "object"
+      ],
+      "title": "TransferReversals",
       "type": "object",
       "x-infer-schema": true
     },
@@ -2947,9 +3185,9 @@
     ]
   },
   {
-    "recommendedName": "TransferReversals",
+    "recommendedName": "UsageRecords",
     "resourceConfig": {
-      "name": "TransferReversals",
+      "name": "UsageRecords",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -2979,83 +3217,7 @@
         }
       },
       "additionalProperties": true,
-      "description": "Parent Stream: Transfers",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        }
-      },
-      "required": [
-        "id",
-        "object"
-      ],
-      "title": "TransferReversals",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "Files",
-    "resourceConfig": {
-      "name": "Files",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Incremental stream with no Events",
+      "description": "Parent Stream: SubscriptionItems",
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -3085,184 +3247,22 @@
           "description": "The account ID associated with the resource.",
           "title": "Account Id"
         },
-        "created": {
-          "title": "Created",
-          "type": "integer"
+        "subscription_item": {
+          "title": "Subscription Item",
+          "type": "string"
         }
       },
       "required": [
         "id",
         "object",
-        "created"
+        "subscription_item"
       ],
-      "title": "Files",
+      "title": "UsageRecords",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "FilesLink",
-    "resourceConfig": {
-      "name": "FilesLink",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Incremental stream with no Events",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        },
-        "created": {
-          "title": "Created",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "created"
-      ],
-      "title": "FilesLink",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
-    ]
-  },
-  {
-    "recommendedName": "BalanceTransactions",
-    "resourceConfig": {
-      "name": "BalanceTransactions",
-      "interval": "PT5M"
-    },
-    "documentSchema": {
-      "$defs": {
-        "Meta": {
-          "properties": {
-            "op": {
-              "default": "u",
-              "description": "Operation type (c: Create, u: Update, d: Delete)",
-              "enum": [
-                "c",
-                "u",
-                "d"
-              ],
-              "title": "Op",
-              "type": "string"
-            },
-            "row_id": {
-              "default": -1,
-              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
-              "title": "Row Id",
-              "type": "integer"
-            }
-          },
-          "title": "Meta",
-          "type": "object"
-        }
-      },
-      "additionalProperties": true,
-      "description": "Incremental stream with no Events",
-      "properties": {
-        "_meta": {
-          "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
-          "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
-        },
-        "object": {
-          "title": "Object",
-          "type": "string"
-        },
-        "account_id": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The account ID associated with the resource.",
-          "title": "Account Id"
-        },
-        "created": {
-          "title": "Created",
-          "type": "integer"
-        }
-      },
-      "required": [
-        "id",
-        "object",
-        "created"
-      ],
-      "title": "BalanceTransactions",
-      "type": "object",
-      "x-infer-schema": true
-    },
-    "key": [
-      "/id"
+      "/subscription_item"
     ]
   }
 ]

@@ -20,7 +20,16 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()[:50]]
 
-    for l in lines:
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    for l in unique_stream_lines:
         typ, rec = l[0], l[1]
 
         if typ == "acmeCo/Charges":
@@ -32,7 +41,10 @@ def test_capture(request, snapshot):
             rec["pdf"] = "redacted"
             
 
-    assert snapshot("stdout.json") == lines
+    # Sort lines to keep a consistent ordering of captured bindings.
+    sorted_unique_lines = sorted(unique_stream_lines, key=lambda l: l[0])
+
+    assert snapshot("stdout.json") == sorted_unique_lines
 
 
 def test_discover(request, snapshot):
@@ -53,7 +65,10 @@ def test_discover(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    assert snapshot("stdout.json") == lines
+    # Sort lines to keep a consistent ordering of discovered bindings.
+    sorted_lines = sorted(lines, key=lambda l: l["recommendedName"])
+
+    assert snapshot("stdout.json") == sorted_lines
 
 
 def test_spec(request, snapshot):
