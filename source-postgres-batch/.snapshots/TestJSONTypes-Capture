@@ -14,5 +14,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_jsontypes_447235":{"CursorNames":["txid"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>","DocumentCount":10}}}
+{"bindingStateV1":{"test_jsontypes_447235":{"Mode":"Incremental (XMIN)","LastPolled":"<TIMESTAMP>","DocumentCount":10,"CursorNames":["txid"],"CursorValues":[999999]}}}
 

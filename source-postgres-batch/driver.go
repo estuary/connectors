@@ -67,7 +67,8 @@ type BatchSQLDriver struct {
 
 // Resource represents the capture configuration of a single resource binding.
 type Resource struct {
-	Name string `json:"name" jsonschema:"title=Resource Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
+	Name string      `json:"name" jsonschema:"title=Resource Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
+	Mode CaptureMode `json:"mode,omitempty" jsonschema:"Capture Mode,description=The capture mode of this resource. Defaults to 'Automatic' when unspecified.,default=,enum=,enum=Automatic,enum=Custom Query,enum=Full Refresh,enum=Incremental (XMIN)"`
 
 	SchemaName string   `json:"schema,omitempty" jsonschema:"title=Schema Name,description=The name of the schema in which the captured table lives. The query template must be overridden if this is unset."  jsonschema_extras:"order=1"`
 	TableName  string   `json:"table,omitempty" jsonschema:"title=Table Name,description=The name of the table to be captured. The query template must be overridden if this is unset."  jsonschema_extras:"order=2"`
@@ -76,6 +77,33 @@ type Resource struct {
 	PollSchedule string `json:"poll,omitempty" jsonschema:"title=Polling Schedule,description=When and how often to execute the fetch query (overrides the connector default setting). Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day." jsonschema_extras:"order=4,pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
 	Template     string `json:"template,omitempty" jsonschema:"title=Query Template Override,description=Optionally overrides the query template which will be rendered and then executed. Consult documentation for examples." jsonschema_extras:"multiline=true,order=5"`
 }
+
+// CaptureMode represents the different ways we might want to capture a table.
+type CaptureMode string
+
+const (
+	// CaptureModeUnspecified means the same thing as CaptureModeAutomatic.
+	CaptureModeUnspecified = CaptureMode("")
+
+	// CaptureModeAutomatic means the connector will automatically determine
+	// the appropriate capture mode to use at runtime.
+	CaptureModeAutomatic = CaptureMode("Automatic")
+
+	// CaptureModeCustom means the user has specified a custom query to be run
+	// at each polling interval, along with an optional cursor to preserve some
+	// column's value as the cursor for subsequent polling. This is the legacy
+	// capture behavior which used to be applied all the time.
+	CaptureModeCustom = CaptureMode("Custom Query")
+
+	// CaptureModeFullRefresh means the connector will capture the entire contents
+	// of the source table, using CTID order for incremental progress across restarts.
+	CaptureModeFullRefresh = CaptureMode("Full Refresh")
+
+	// CaptureModeIncremental means the connector will capture new/updated rows of the
+	// table according to their `xmin` system column value. The first polling cycle of
+	// the capture will effectively be a full refresh.
+	CaptureModeIncremental = CaptureMode("Incremental (XMIN)")
+)
 
 // Validate checks that the resource spec possesses all required properties.
 func (r Resource) Validate() error {
@@ -86,6 +114,9 @@ func (r Resource) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+	if !slices.Contains([]CaptureMode{CaptureModeUnspecified, CaptureModeAutomatic, CaptureModeCustom, CaptureModeFullRefresh, CaptureModeIncremental}, r.Mode) {
+		return fmt.Errorf("invalid capture mode %q", r.Mode)
 	}
 	if r.Template == "" && (r.SchemaName == "" || r.TableName == "") {
 		return fmt.Errorf("must specify schema+table name or else a template override")
@@ -561,19 +592,43 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 	for _, binding := range bindings {
 		var sk = binding.stateKey
 		var res = binding.resource
-		var stream = prevState.Streams[sk]
-		if stream != nil && !slices.Equal(stream.CursorNames, res.Cursor) {
+		var state = prevState.Streams[sk]
+
+		// Determine the appropriate capture mode, if it's supposed to be automatic.
+		var mode = binding.resource.Mode
+		if mode == CaptureModeUnspecified || mode == CaptureModeAutomatic {
+			if res.Template == "" && len(res.Cursor) == 1 && res.Cursor[0] == "txid" {
+				mode = CaptureModeIncremental
+			} else {
+				mode = CaptureModeCustom
+			}
+		}
+
+		// Reset stream state if the capture mode or cursor selection changes.
+		if state != nil && mode != state.Mode {
 			log.WithFields(log.Fields{
 				"name": res.Name,
-				"prev": stream.CursorNames,
+				"prev": state.Mode,
+				"next": mode,
+			}).Warn("capture mode changed, resetting stream state")
+			state = nil
+		}
+		if state != nil && !slices.Equal(state.CursorNames, res.Cursor) {
+			log.WithFields(log.Fields{
+				"name": res.Name,
+				"prev": state.CursorNames,
 				"next": res.Cursor,
 			}).Warn("cursor columns changed, resetting stream state")
-			stream = nil
+			state = nil
 		}
-		if stream == nil {
-			stream = &streamState{CursorNames: res.Cursor}
+
+		if state == nil {
+			state = &streamState{
+				Mode:        mode,
+				CursorNames: res.Cursor,
+			}
 		}
-		newState.Streams[sk] = stream
+		newState.Streams[sk] = state
 	}
 	return newState, nil
 }
@@ -600,10 +655,12 @@ type captureState struct {
 }
 
 type streamState struct {
-	CursorNames   []string
-	CursorValues  []any
-	LastPolled    time.Time
-	DocumentCount int64 // A count of the number of documents emitted since the last full refresh started.
+	Mode          CaptureMode // Current mode of the stream (after autoselection). Changes will always reset the state.
+	LastPolled    time.Time   // The time at which the last successful polling iteration started.
+	DocumentCount int64       // A count of the number of documents emitted since the last full refresh started.
+
+	CursorNames  []string // The names of cursor columns which will be persisted in CaptureModeCustom.
+	CursorValues []any    // The values of persisted cursor columns in CaptureModeCustom.
 }
 
 func (s *captureState) Validate() error {

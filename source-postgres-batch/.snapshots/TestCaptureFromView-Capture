@@ -41,5 +41,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_capturefromview_194890":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":23,"LastPolled":"<TIMESTAMP>"},"test_capturefromview_227836":{"CursorNames":["updated_at"],"CursorValues":["2025-02-13T12:20:00Z"],"DocumentCount":11,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_capturefromview_194890":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":23,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)"},"test_capturefromview_227836":{"CursorNames":["updated_at"],"CursorValues":["2025-02-13T12:20:00Z"],"DocumentCount":11,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query"}}}
 
