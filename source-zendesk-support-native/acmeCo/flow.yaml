@@ -72,6 +72,10 @@ collections:
     schema: tags.schema.yaml
     key:
       - /_meta/row_id
+  acmeCo/ticket_activities:
+    schema: ticket_activities.schema.yaml
+    key:
+      - /id
   acmeCo/ticket_audits:
     schema: ticket_audits.schema.yaml
     key:

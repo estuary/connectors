@@ -12,6 +12,7 @@ from .models import (
     ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
     EndpointConfig,
+    FilterParam,
     FullRefreshResponse,
     FullRefreshOffsetPaginatedResponse,
     FullRefreshCursorPaginatedResponse,
@@ -488,6 +489,7 @@ def incremental_cursor_paginated_resources(
 
     def open(
         path: str,
+        filter_param: FilterParam,
         cursor_field: str,
         response_model: type[IncrementalCursorPaginatedResponse],
         binding: CaptureBinding[ResourceConfig],
@@ -506,6 +508,7 @@ def incremental_cursor_paginated_resources(
                 http,
                 config.subdomain,
                 path,
+                filter_param,
                 cursor_field,
                 response_model,
             ),
@@ -514,6 +517,7 @@ def incremental_cursor_paginated_resources(
                 http,
                 config.subdomain,
                 path,
+                filter_param,
                 cursor_field,
                 response_model,
                 config.start_date,
@@ -527,7 +531,7 @@ def incremental_cursor_paginated_resources(
             name=name,
             key=["/id"],
             model=ZendeskResource,
-            open=functools.partial(open, path, cursor_field, response_model),
+            open=functools.partial(open, path, filter_param, cursor_field, response_model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
@@ -537,7 +541,7 @@ def incremental_cursor_paginated_resources(
             ),
             schema_inference=True,
         )
-        for (name, path, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES
+        for (name, path, filter_param, cursor_field, response_model) in INCREMENTAL_CURSOR_PAGINATED_RESOURCES
     ]
 
     return resources
