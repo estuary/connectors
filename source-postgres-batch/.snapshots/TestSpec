@@ -124,6 +124,18 @@
         "description": "The unique name of this resource.",
         "order": 0
       },
+      "mode": {
+        "type": "string",
+        "enum": [
+          "",
+          "Automatic",
+          "Custom Query",
+          "Full Refresh",
+          "Incremental (XMIN)"
+        ],
+        "description": "The capture mode of this resource. Defaults to 'Automatic' when unspecified.",
+        "default": ""
+      },
       "schema": {
         "type": "string",
         "title": "Schema Name",

@@ -39,5 +39,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_keylessfullrefreshcapture_941246":{"DocumentCount":10,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_keylessfullrefreshcapture_941246":{"DocumentCount":10,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query"}}}
 

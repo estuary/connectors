@@ -38,5 +38,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_featureflagkeylessrowid_disabled_906545":{"DocumentCount":9,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_featureflagkeylessrowid_disabled_906545":{"DocumentCount":9,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query"}}}
 

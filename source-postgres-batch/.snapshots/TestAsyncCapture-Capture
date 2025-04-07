@@ -254,5 +254,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_asynccapture_817595":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":250,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_asynccapture_817595":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":250,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)"}}}
 
