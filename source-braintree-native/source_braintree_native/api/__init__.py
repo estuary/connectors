@@ -18,7 +18,7 @@ from logging import Logger
 from typing import AsyncGenerator
 from estuary_cdk.capture.common import LogCursor, PageCursor
 
-from .models import (
+from ..models import (
     FullRefreshResource,
     IncrementalResource,
     Transaction,
