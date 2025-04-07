@@ -31,6 +31,7 @@ from .models import (
     PostCommentsResponse,
     PostCommentVotesResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
+    FilterParam,
 )
 
 CHECKPOINT_INTERVAL = 1000
@@ -240,10 +241,24 @@ async def fetch_client_side_incremental_cursor_paginated_resources(
         yield last_seen
 
 
+def _convert_log_cursor_for_filter_param(
+    cursor: datetime,
+    filter_param: FilterParam,
+) -> str | int:
+    match filter_param:
+        case FilterParam.START_TIME:
+            return _dt_to_s(cursor)
+        case FilterParam.SINCE:
+            return _dt_to_str(cursor)
+        case _:
+            raise RuntimeError(f"Unknown filter parameter type {filter}.")
+
+
 async def fetch_incremental_cursor_paginated_resources(
     http: HTTPSession,
     subdomain: str,
     path: str,
+    filter_param: FilterParam,
     cursor_field: str,
     response_model: type[IncrementalCursorPaginatedResponse],
     log: Logger,
@@ -254,7 +269,7 @@ async def fetch_incremental_cursor_paginated_resources(
     url = f"{url_base(subdomain)}/{path}"
 
     params: dict[str, str | int] = {
-        "start_time": _dt_to_s(log_cursor),
+        filter_param: _convert_log_cursor_for_filter_param(log_cursor, filter_param),
         "page[size]": 1000 if "ticket_metric_events" in path else CURSOR_PAGINATION_PAGE_SIZE,
     }
 
@@ -294,6 +309,7 @@ async def backfill_incremental_cursor_paginated_resources(
     http: HTTPSession,
     subdomain: str,
     path: str,
+    filter_param: FilterParam,
     cursor_field: str,
     response_model: type[IncrementalCursorPaginatedResponse],
     start_date: datetime,
@@ -306,7 +322,7 @@ async def backfill_incremental_cursor_paginated_resources(
     url = f"{url_base(subdomain)}/{path}"
 
     params: dict[str, str | int] = {
-        "start_time": _dt_to_s(start_date),
+        filter_param: _convert_log_cursor_for_filter_param(start_date, filter_param),
         "page[size]": 1000 if "ticket_metric_events" in path else CURSOR_PAGINATION_PAGE_SIZE,
     }
 
