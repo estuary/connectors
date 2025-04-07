@@ -16,5 +16,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_capturewithtwocolumncursor_321285":{"CursorNames":["major","minor"],"CursorValues":[4,3],"DocumentCount":12,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_capturewithtwocolumncursor_321285":{"CursorNames":["major","minor"],"CursorValues":[4,3],"DocumentCount":12,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query"}}}
 

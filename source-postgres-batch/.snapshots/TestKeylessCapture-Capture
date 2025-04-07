@@ -21,5 +21,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_keylesscapture_315710":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":17,"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"test_keylesscapture_315710":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":17,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)"}}}
 
