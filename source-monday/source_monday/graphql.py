@@ -1,3 +1,4 @@
+import json
 from logging import Logger
 from typing import Any, AsyncGenerator, Dict, Literal
 
@@ -32,16 +33,20 @@ async def execute_query(
     query: str,
     variables: Dict[str, Any] | None = None,
 ) -> GraphQLResponse[ResponseObject]:
-    response = GraphQLResponse[cls].model_validate_json(
+    res: dict[str, Any] = json.loads(
         await http.request(
-            log,
-            API,
-            method="POST",
-            json={"query": query, "variables": variables}
-            if variables
-            else {"query": query},
-        )
+          log,
+          API,
+          method="POST",
+          json={"query": query, "variables": variables}
+          if variables
+          else {"query": query},
+      )
     )
+    if "errors" in res:
+        raise GraphQLQueryError([GraphQLError.model_validate(e) for e in res["errors"]])
+
+    response = GraphQLResponse[cls].model_validate(res)
 
     if response.errors:
         raise GraphQLQueryError(response.errors)
@@ -317,7 +322,6 @@ query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) 
     workspace {
       id
       name
-      kind
       description
     }
   }
