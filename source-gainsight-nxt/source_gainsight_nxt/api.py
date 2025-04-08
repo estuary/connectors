@@ -182,7 +182,6 @@ async def fetch_resource_changes(
     assert isinstance(log_cursor, datetime)
 
     max_updated_at = log_cursor
-    has_results = False
     offset = 0
     end_date = min(log_cursor + timedelta(days=30), datetime.now(tz=log_cursor.tzinfo))
 
@@ -198,15 +197,14 @@ async def fetch_resource_changes(
 
         count = 0
         async for doc in _fetch_object_data(http, log, domain, resource, request_body):
-            max_updated_at = max(max_updated_at, getattr(doc, resource.MODIFIED_DATE_FIELD))
-            offset += 1
+            max_updated_at = max(max_updated_at, doc.cursor_value)
+            count += 1
             yield doc
 
         if count == 0:
             break
 
         offset += count
-        has_results = True
 
-    if has_results:
+    if offset > 0:
         yield max_updated_at + timedelta(seconds=1)
