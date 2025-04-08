@@ -13,5 +13,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_binarytypes_537491":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":9,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)"}}}
+{"bindingStateV1":{"test_binarytypes_537491":{"BaseXID":999999,"CursorNames":["txid"],"DocumentCount":9,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)","NextXID":0,"ScanTID":""}}}
 

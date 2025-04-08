@@ -34,5 +34,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_fullrefresh_902536":{"DocumentCount":20,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query"}}}
+{"bindingStateV1":{"test_fullrefresh_902536":{"BaseXID":999999,"DocumentCount":20,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query","NextXID":0,"ScanTID":""}}}
 
