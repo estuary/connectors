@@ -1,3 +1,4 @@
+import json
 from logging import Logger
 from typing import Any, AsyncGenerator, Dict, Literal
 
@@ -32,16 +33,22 @@ async def execute_query(
     query: str,
     variables: Dict[str, Any] | None = None,
 ) -> GraphQLResponse[ResponseObject]:
-    response = GraphQLResponse[cls].model_validate_json(
+    res: dict[str, Any] = json.loads(
         await http.request(
             log,
             API,
             method="POST",
-            json={"query": query, "variables": variables}
-            if variables
-            else {"query": query},
+            json=(
+                {"query": query, "variables": variables}
+                if variables
+                else {"query": query}
+            ),
         )
     )
+    if "errors" in res:
+        raise GraphQLQueryError([GraphQLError.model_validate(e) for e in res["errors"]])
+
+    response = GraphQLResponse[cls].model_validate(res)
 
     if response.errors:
         raise GraphQLQueryError(response.errors)
@@ -91,6 +98,42 @@ async def fetch_recently_updated(
     return list(ids)
 
 
+async def _fetch_single_board(
+    http: HTTPSession,
+    log: Logger,
+    page: int,
+) -> AsyncGenerator[Board, None]:
+    variables: Dict[str, Any] = {"limit": 1, "page": page}
+    try:
+        log.info(f"Trying to fetch board {page} with workspace 'kind' field")
+        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
+            yield board
+    except GraphQLQueryError:
+        log.info(f"Trying to fetch board {page} without workspace 'kind' field")
+        async for board in _fetch_boards(http, log, BOARDS_WITHOUT_KIND, variables):
+            yield board
+
+
+async def _fetch_boards(
+    http: HTTPSession,
+    log: Logger,
+    query: str,
+    variables: Dict[str, Any],
+) -> AsyncGenerator[Board, None]:
+    response = await execute_query(
+        BoardsResponse,
+        http,
+        log,
+        query,
+        variables,
+    )
+    if not response.data or not response.data.boards:
+        return
+
+    for board in response.data.boards:
+        yield board
+
+
 async def fetch_boards(
     http: HTTPSession,
     log: Logger,
@@ -101,29 +144,69 @@ async def fetch_boards(
     """
     Note: If `page` is specified, `limit` is required.
     If `ids` is not provided, all boards will be fetched.
+
+    This function first attempts to query with the 'kind' field in the workspace section.
+    If that fails for a page, it switches to querying one board at a time for that page,
+    trying with 'kind' first and falling back to without 'kind' if necessary. This is necessary for
+    boards that are set up as templates. Template boards error when the workspace 'kind' field is queried
+    and there is not a way to query them otherwise.
     """
     if page is not None and limit is None:
         raise ValueError("limit is required when specifying page")
 
-    variables: dict[str, Any] = {
-        "limit": limit,
-        "page": page if page is not None else 1,
-        "ids": ids,
-    }
+    current_page = 1 if not page else page
+    current_limit = 10 if not limit else limit
 
     while True:
-        response = await execute_query(BoardsResponse, http, log, BOARDS, variables)
+        try:
+            variables = {
+                "limit": current_limit,
+                "page": current_page,
+                "ids": ids,
+            }
 
-        if not response.data or not response.data.boards:
-            return
+            boards_in_page = 0
+            async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
+                yield board
+                boards_in_page += 1
 
-        for board in response.data.boards:
-            yield board
+            if page is not None or boards_in_page < current_limit:
+                break
 
-        if page is not None or (limit and len(response.data.boards) < limit):
-            break
+        except GraphQLQueryError:
+            log.info(
+                f"Boards query with workspace 'kind' field failed for page {current_page}, switching to querying one board at a time."
+            )
 
-        variables["page"] += 1
+            # Calculate the starting item index based on the current page and limit
+            # For example, if we're on page 139 with limit 5, we start from item 691 (138*5 + 1)
+            start_item = ((current_page - 1) * current_limit) + 1
+            boards_in_page = 0
+
+            for i in range(int(current_limit)):
+                item_page = start_item + i
+
+                try:
+                    async for board in _fetch_single_board(http, log, item_page):
+                        yield board
+                        boards_in_page += 1
+
+                except GraphQLQueryError:
+                    log.error(
+                        f"Failed to fetch board {item_page} with or without workspace 'kind' field"
+                    )
+                    raise GraphQLQueryError(
+                        [
+                            GraphQLError(
+                                message=f"Failed to fetch board {item_page} with or without workspace 'kind' field"
+                            )
+                        ]
+                    )
+
+            if page is not None or boards_in_page < current_limit:
+                break
+
+        current_page += 1
 
 
 async def _filter_parent_items(
@@ -258,9 +341,9 @@ query GetActivityLogs($start: ISO8601DateTime!) {
 }
 """
 
-BOARDS = """
-query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) {
-  boards(order_by: $order_by, page: $page, limit: $limit) {
+BOARDS_TEMPLATE = """
+query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10, $ids: [ID!]) {
+  boards(order_by: $order_by, page: $page, limit: $limit, ids: $ids) {
     id
     name
     board_kind
@@ -317,12 +400,15 @@ query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) 
     workspace {
       id
       name
-      kind
       description
+      %s
     }
   }
 }
 """
+
+BOARDS_WITH_KIND = BOARDS_TEMPLATE % "kind"
+BOARDS_WITHOUT_KIND = BOARDS_TEMPLATE % ""
 
 TEAMS = """
 query {
