@@ -3,12 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
@@ -37,7 +39,15 @@ const (
 	// of "overhead" to actual data size, and the batchBytesLimit alone may
 	// result in excessive memory use.
 	batchSizeLimit = 5000
+
+	// Prevent queries from hanging forever, which we have commonly seen if the
+	// destination database disk is full.
+	queryTimeout = 1 * time.Hour
 )
+
+func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
+}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
@@ -408,8 +418,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Issue a union join of the target tables and their (now staged) load keys,
 	// and send results to the |loaded| callback.
+	loadCtx, cancel := ctxWithQueryTimeout(ctx)
+	defer cancel()
+
 	d.be.StartedEvaluatingLoads()
-	rows, err := txn.Query(ctx, d.load.unionSQL)
+	rows, err := txn.Query(loadCtx, d.load.unionSQL)
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
@@ -520,7 +533,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				return fmt.Errorf("results.Close(): %w", err)
 			}
 
-			if err := txn.Commit(ctx); err != nil {
+			commitCtx, cancel := ctxWithQueryTimeout(ctx)
+			defer cancel()
+			if err := txn.Commit(commitCtx); err != nil {
 				return fmt.Errorf("committing Store transaction: %w", err)
 			}
 
@@ -541,8 +556,11 @@ func main() {
 // Send a single batch of queries with the given transaction, discarding any results. The batch is
 // zero'd upon completion.
 func sendBatch(ctx context.Context, txn pgx.Tx, batch *pgx.Batch) error {
+	ctx, cancel := ctxWithQueryTimeout(ctx)
+	defer cancel()
+
 	results := txn.SendBatch(ctx, batch)
-	for i := 0; i < batch.Len(); i++ {
+	for i := range batch.Len() {
 		if _, err := results.Exec(); err != nil {
 			return fmt.Errorf("exec at index %d: %w", i, err)
 		}
