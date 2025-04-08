@@ -278,7 +278,7 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 		// Determine the appropriate capture mode, if it's supposed to be automatic.
 		var mode = binding.resource.Mode
 		if mode == CaptureModeUnspecified || mode == CaptureModeAutomatic {
-			if res.Template == "" && len(res.Cursor) == 1 && res.Cursor[0] == "txid" {
+			if res.Template == "" && len(res.Cursor) == 1 && res.Cursor[0] == "txid" && (state == nil || len(state.CursorValues) == 0) {
 				mode = CaptureModeIncremental
 			} else {
 				mode = CaptureModeCustom
@@ -341,8 +341,12 @@ type streamState struct {
 	LastPolled    time.Time   // The time at which the last successful polling iteration started.
 	DocumentCount int64       // A count of the number of documents emitted since the last full refresh started.
 
-	CursorNames  []string // The names of cursor columns which will be persisted in CaptureModeCustom.
-	CursorValues []any    // The values of persisted cursor columns in CaptureModeCustom.
+	CursorNames  []string `json:"CursorNames,omitempty"`  // The names of cursor columns which will be persisted in CaptureModeCustom.
+	CursorValues []any    `json:"CursorValues,omitempty"` // The values of persisted cursor columns in CaptureModeCustom.
+
+	BaseXID uint64 // The base XID used in CaptureModeIncremental. This is the value we filter on currently. Zero means no filtering.
+	NextXID uint64 // The next XID to be used in CaptureModeIncremental. After the current scan finishes this will become BaseXID.
+	ScanTID string // The CTID of the last row scanned in CaptureModeIncremental and CaptureModeFullRefresh, used to resume after interruption.
 }
 
 func (s *captureState) Validate() error {
@@ -426,7 +430,37 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	return ctx.Err()
 }
 
+func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamState) error {
+	var checkpointPatch = captureState{Streams: make(map[boilerplate.StateKey]*streamState)}
+	checkpointPatch.Streams[sk] = state
+
+	if checkpointJSON, err := json.Marshal(checkpointPatch); err != nil {
+		return fmt.Errorf("error serializing state checkpoint: %w", err)
+	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+		return fmt.Errorf("error emitting checkpoint: %w", err)
+	}
+	return nil
+}
+
 func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
+	var stateKey = binding.stateKey
+	var state, ok = c.State.Streams[stateKey]
+	if !ok {
+		return fmt.Errorf("internal error: no state for stream %q", binding.resource.Name)
+	}
+
+	switch state.Mode {
+	case CaptureModeCustom:
+		return c.pollCustomQuery(ctx, binding)
+	case CaptureModeFullRefresh:
+		return c.pollFullRefresh(ctx, binding)
+	case CaptureModeIncremental:
+		return c.pollIncremental(ctx, binding)
+	}
+	return fmt.Errorf("internal error: unhandled capture mode %q", state.Mode)
+}
+
+func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) error {
 	var res = binding.resource
 	var stateKey = binding.stateKey
 	var state, ok = c.State.Streams[stateKey]
@@ -627,22 +661,203 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	return nil
 }
 
-func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamState) error {
-	var checkpointPatch = captureState{Streams: make(map[boilerplate.StateKey]*streamState)}
-	checkpointPatch.Streams[sk] = state
-
-	if checkpointJSON, err := json.Marshal(checkpointPatch); err != nil {
-		return fmt.Errorf("error serializing state checkpoint: %w", err)
-	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
-		return fmt.Errorf("error emitting checkpoint: %w", err)
-	}
-	return nil
+func (c *capture) pollFullRefresh(ctx context.Context, binding *bindingInfo) error {
+	// TODO(wgd): Implement the improved CTID-ordered full refresh logic
+	return c.pollCustomQuery(ctx, binding)
 }
 
-func quoteIdentifier(name string) string {
-	// From https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS:
-	//
-	//     Quoted identifiers can contain any character, except the character with code zero.
-	//     (To include a double quote, write two double quotes.)
-	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) error {
+	var res = binding.resource
+	var stateKey = binding.stateKey
+	var state, ok = c.State.Streams[stateKey]
+	if !ok {
+		return fmt.Errorf("internal error: no state for stream %q", res.Name)
+	}
+
+	// If the key of the output collection for this binding is the Row ID then we
+	// can automatically provide useful `/_meta/op` values and inferred deletions.
+	var isRowIDKey = len(binding.collectionKey) == 1 && binding.collectionKey[0] == "/_meta/row_id"
+
+	if state.ScanTID == "" {
+		state.ScanTID = "(0,0)"
+	}
+	if state.NextXID == 0 {
+		var xid, err = queryCurrentXID(ctx, c.DB)
+		if err != nil {
+			return err
+		}
+		state.NextXID = xid
+	}
+
+	// Build the query. The base CTID for scanning is $1 and the minimum/maximum XIDs for filtering are $2 and $3.
+	var queryBuf = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(queryBuf, `SELECT ctid, xmin AS txid, * FROM %s WHERE ctid > $1`, quoteTableName(res.SchemaName, res.TableName))
+	args = append(args, state.ScanTID)
+	if state.BaseXID != 0 {
+		const filterRandom = "(RANDOM() < 0.001)"
+		const filterValidXID = "(xmin::text::bigint >= 3)"
+		const filterMinimumXID = "((((xmin::text::bigint - $2::bigint)<<32)>>32) >= 0)"
+		const filterMaximumXID = "(((($3::bigint - xmin::text::bigint)<<32)>>32) >= 0)"
+		fmt.Fprintf(queryBuf, ` AND (%s OR (%s AND %s AND %s))`, filterRandom, filterValidXID, filterMinimumXID, filterMaximumXID)
+		args = append(args, state.BaseXID, state.NextXID)
+	}
+	var query = queryBuf.String()
+
+	log.WithFields(log.Fields{
+		"name":  res.Name,
+		"query": query,
+		"args":  args,
+	}).Info("executing query")
+	var pollTime = time.Now().UTC()
+
+	// Set up a watchdog timeout which will terminate the capture task if no data is
+	// received after a long period of time. The deferred stop ensures that the timeout
+	// will always be cancelled for good when the polling operation finishes.
+	var watchdog = time.AfterFunc(pollingWatchdogFirstRowTimeout, func() {
+		log.WithField("name", res.Name).Fatal("polling timed out")
+	})
+	defer watchdog.Stop()
+
+	rows, err := c.DB.QueryContext(ctx, query, args...)
+	if err != nil {
+		return fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+
+	columnNames, err := rows.Columns()
+	if err != nil {
+		return fmt.Errorf("error processing query result: %w", err)
+	}
+	columnTypes, err := rows.ColumnTypes()
+	if err != nil {
+		return fmt.Errorf("error processing query result: %w", err)
+	}
+	for i, columnType := range columnTypes {
+		log.WithFields(log.Fields{
+			"idx":          i,
+			"name":         columnType.DatabaseTypeName(),
+			"scanTypeName": columnType.ScanType().Name(),
+		}).Debug("column type")
+	}
+	var columnIndices = make(map[string]int)
+	for idx, name := range columnNames {
+		columnIndices[name] = idx
+	}
+	var columnValues = make([]any, len(columnNames))
+	var columnPointers = make([]any, len(columnValues))
+	for i := range columnPointers {
+		columnPointers[i] = &columnValues[i]
+	}
+
+	// Ensure that the CTID and XMIN columns come first and add special handling for them.
+	var ctidIndex = 0
+	var txidIndex = 1
+	if columnNames[ctidIndex] != "ctid" || columnNames[txidIndex] != "txid" {
+		return fmt.Errorf("unexpected column names: %q", columnNames[0:1])
+	}
+
+	var outputNames = append(append([]string(nil), columnNames[1:]...), "_meta")
+	var outputValues = make([]any, len(columnNames)) // Minus ctid and plus _meta
+
+	var shape = encrow.NewShape(outputNames)
+	var serializedDocument []byte
+
+	var queryResultsCount int
+	for rows.Next() {
+		if err := rows.Scan(columnPointers...); err != nil {
+			return fmt.Errorf("error scanning result row: %w", err)
+		}
+		watchdog.Reset(pollingWatchdogTimeout) // Reset the no-data watchdog timeout after each row received
+
+		var resultCTID = columnValues[ctidIndex].(string)
+		var resultXMIN = uint32(columnValues[txidIndex].(int64))
+		if compareXID32(resultXMIN, uint32(state.BaseXID)) <= 0 || compareXID32(uint32(state.NextXID), resultXMIN) < 0 {
+			// When a row is rejected because its XMIN is unsuitable, it might be
+			// part of the random 0.1% sampling that ensures consistent progress,
+			// so we should update the state checkpoint with its CTID.
+			state.ScanTID = resultCTID
+			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+				return err
+			}
+			continue
+		}
+
+		// Iterate over all values except the CTID, which will not be output
+		for idx := 1; idx < len(columnValues); idx++ {
+			var translatedVal, err = c.TranslateValue(columnValues[idx], columnTypes[idx].DatabaseTypeName())
+			if err != nil {
+				return fmt.Errorf("error translating column %q value: %w", columnNames[idx], err)
+			}
+			outputValues[idx-1] = translatedVal
+		}
+		var metadata = &documentMetadata{
+			RowID:  state.DocumentCount,
+			Polled: pollTime,
+			Index:  queryResultsCount,
+		}
+		if isRowIDKey {
+			metadata.Op = "c" // Always create for incremental bindings with row ID key
+		}
+		outputValues[len(outputValues)-1] = metadata
+
+		serializedDocument, err = shape.Encode(serializedDocument, outputValues)
+		if err != nil {
+			return fmt.Errorf("error serializing document: %w", err)
+		} else if err := c.Output.Documents(binding.index, serializedDocument); err != nil {
+			return fmt.Errorf("error emitting document: %w", err)
+		}
+
+		// Update CTID cursor so we can make incremental progress across restarts
+		state.ScanTID = resultCTID
+		queryResultsCount++
+		state.DocumentCount++
+		if queryResultsCount%documentsPerCheckpoint == 0 {
+			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+				return err
+			}
+		}
+		if queryResultsCount%100000 == 1 {
+			log.WithFields(log.Fields{
+				"name":  res.Name,
+				"count": queryResultsCount,
+				"rowID": state.DocumentCount,
+			}).Info("processing query results")
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("error processing results iterator: %w", err)
+	}
+
+	log.WithFields(log.Fields{
+		"name":  res.Name,
+		"query": query,
+		"count": queryResultsCount,
+		"docs":  state.DocumentCount,
+	}).Info("polling complete")
+	// Reset scanning state for the next poll
+	state.ScanTID = ""
+	state.BaseXID = state.NextXID
+	state.NextXID = 0
+	return c.streamStateCheckpoint(stateKey, state)
+}
+
+func queryCurrentXID(ctx context.Context, db *sql.DB) (uint64, error) {
+	var xid uint64
+	const queryXID = "SELECT (CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
+	if err := db.QueryRowContext(ctx, queryXID).Scan(&xid); err != nil {
+		return 0, fmt.Errorf("error querying current XID: %w", err)
+	}
+	return xid, nil
+}
+
+func compareXID32(a, b uint32) int {
+	// Compare two XIDs according to circular comparison logic such that
+	// a < b if B lies in the range [a, a+2^31).
+	if a == b {
+		return 0 // a == b
+	} else if ((b - a) & 0x80000000) == 0 {
+		return -1 // a < b
+	}
+	return 1 // a > b
 }
