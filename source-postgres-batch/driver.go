@@ -68,8 +68,7 @@ type BatchSQLDriver struct {
 
 // Resource represents the capture configuration of a single resource binding.
 type Resource struct {
-	Name string      `json:"name" jsonschema:"title=Resource Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
-	Mode CaptureMode `json:"mode,omitempty" jsonschema:"Capture Mode,description=The capture mode of this resource. Defaults to 'Automatic' when unspecified.,default=,enum=,enum=Automatic,enum=Custom Query,enum=Full Refresh,enum=Incremental (XMIN)"`
+	Name string `json:"name" jsonschema:"title=Resource Name,description=The unique name of this resource." jsonschema_extras:"order=0"`
 
 	SchemaName string   `json:"schema,omitempty" jsonschema:"title=Schema Name,description=The name of the schema in which the captured table lives. The query template must be overridden if this is unset."  jsonschema_extras:"order=1"`
 	TableName  string   `json:"table,omitempty" jsonschema:"title=Table Name,description=The name of the table to be captured. The query template must be overridden if this is unset."  jsonschema_extras:"order=2"`
@@ -83,27 +82,16 @@ type Resource struct {
 type CaptureMode string
 
 const (
-	// CaptureModeUnspecified means the same thing as CaptureModeAutomatic.
-	CaptureModeUnspecified = CaptureMode("")
-
-	// CaptureModeAutomatic means the connector will automatically determine
-	// the appropriate capture mode to use at runtime.
-	CaptureModeAutomatic = CaptureMode("Automatic")
+	// CaptureModeIncremental means the connector will capture new/updated rows of the
+	// table according to their `xmin` system column value. The first polling cycle of
+	// the capture will effectively be a full refresh.
+	CaptureModeIncremental = CaptureMode("Incremental (XMIN)")
 
 	// CaptureModeCustom means the user has specified a custom query to be run
 	// at each polling interval, along with an optional cursor to preserve some
 	// column's value as the cursor for subsequent polling. This is the legacy
 	// capture behavior which used to be applied all the time.
 	CaptureModeCustom = CaptureMode("Custom Query")
-
-	// CaptureModeFullRefresh means the connector will capture the entire contents
-	// of the source table, using CTID order for incremental progress across restarts.
-	CaptureModeFullRefresh = CaptureMode("Full Refresh")
-
-	// CaptureModeIncremental means the connector will capture new/updated rows of the
-	// table according to their `xmin` system column value. The first polling cycle of
-	// the capture will effectively be a full refresh.
-	CaptureModeIncremental = CaptureMode("Incremental (XMIN)")
 )
 
 // Validate checks that the resource spec possesses all required properties.
@@ -115,9 +103,6 @@ func (r Resource) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
-	}
-	if !slices.Contains([]CaptureMode{CaptureModeUnspecified, CaptureModeAutomatic, CaptureModeCustom, CaptureModeFullRefresh, CaptureModeIncremental}, r.Mode) {
-		return fmt.Errorf("invalid capture mode %q", r.Mode)
 	}
 	if r.Template == "" && (r.SchemaName == "" || r.TableName == "") {
 		return fmt.Errorf("must specify schema+table name or else a template override")
@@ -275,14 +260,17 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 		var res = binding.resource
 		var state = prevState.Streams[sk]
 
-		// Determine the appropriate capture mode, if it's supposed to be automatic.
-		var mode = binding.resource.Mode
-		if mode == CaptureModeUnspecified || mode == CaptureModeAutomatic {
-			if res.Template == "" && len(res.Cursor) == 1 && res.Cursor[0] == "txid" && (state == nil || len(state.CursorValues) == 0) {
-				mode = CaptureModeIncremental
-			} else {
-				mode = CaptureModeCustom
-			}
+		// Determine the appropriate capture mode, either the new CTID+XMIN incremental sync logic
+		// when appropriate, or the custom/legacy query execution otherwise.
+		var mode = CaptureModeCustom
+		if res.Template == "" && len(res.Cursor) == 1 && res.Cursor[0] == "txid" && (state == nil || len(state.CursorValues) == 0) {
+			mode = CaptureModeIncremental
+		}
+
+		// Migration logic: Ensure that the mode is set on pre-existing streams. Since we always set
+		// the mode to a non-empty value on new streams, this should only ever happen once.
+		if state != nil && state.Mode == "" {
+			state.Mode = mode
 		}
 
 		// Reset stream state if the capture mode or cursor selection changes.
@@ -346,7 +334,7 @@ type streamState struct {
 
 	BaseXID uint64 // The base XID used in CaptureModeIncremental. This is the value we filter on currently. Zero means no filtering.
 	NextXID uint64 // The next XID to be used in CaptureModeIncremental. After the current scan finishes this will become BaseXID.
-	ScanTID string // The CTID of the last row scanned in CaptureModeIncremental and CaptureModeFullRefresh, used to resume after interruption.
+	ScanTID string // The CTID of the last row scanned in CaptureModeIncremental, used to resume after interruption.
 }
 
 func (s *captureState) Validate() error {
@@ -452,8 +440,6 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	switch state.Mode {
 	case CaptureModeCustom:
 		return c.pollCustomQuery(ctx, binding)
-	case CaptureModeFullRefresh:
-		return c.pollFullRefresh(ctx, binding)
 	case CaptureModeIncremental:
 		return c.pollIncremental(ctx, binding)
 	}
@@ -659,11 +645,6 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 		return err
 	}
 	return nil
-}
-
-func (c *capture) pollFullRefresh(ctx context.Context, binding *bindingInfo) error {
-	// TODO(wgd): Implement the improved CTID-ordered full refresh logic
-	return c.pollCustomQuery(ctx, binding)
 }
 
 func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) error {
