@@ -18,5 +18,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_modificationsanddeletions_172811":{"CursorNames":["txid"],"CursorValues":[999999],"DocumentCount":14,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)"}}}
+{"bindingStateV1":{"test_modificationsanddeletions_172811":{"BaseXID":999999,"CursorNames":["txid"],"DocumentCount":14,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)","NextXID":0,"ScanTID":""}}}
 

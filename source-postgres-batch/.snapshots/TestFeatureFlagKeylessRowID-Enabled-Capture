@@ -39,5 +39,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_featureflagkeylessrowid_enabled_905157":{"DocumentCount":9,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query"}}}
+{"bindingStateV1":{"test_featureflagkeylessrowid_enabled_905157":{"BaseXID":999999,"DocumentCount":9,"LastPolled":"<TIMESTAMP>","Mode":"Custom Query","NextXID":0,"ScanTID":""}}}
 
