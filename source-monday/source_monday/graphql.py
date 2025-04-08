@@ -96,6 +96,21 @@ async def fetch_recently_updated(
     return list(ids)
 
 
+async def _try_fetch_board(
+    http: HTTPSession,
+    log: Logger,
+    query: str,
+    variables: Dict[str, Any],
+) -> list[Board] | None:
+    try:
+        response = await execute_query(BoardsResponse, http, log, query, variables)
+        if not response.data or not response.data.boards:
+            return []
+        return response.data.boards
+    except GraphQLQueryError:
+        return None
+
+
 async def fetch_boards(
     http: HTTPSession,
     log: Logger,
@@ -106,29 +121,71 @@ async def fetch_boards(
     """
     Note: If `page` is specified, `limit` is required.
     If `ids` is not provided, all boards will be fetched.
+
+    This function first attempts to query with the 'kind' field in the workspace section.
+    If that fails for a page, it switches to querying one board at a time for that page,
+    trying with 'kind' first and falling back to without 'kind' if necessary.
     """
     if page is not None and limit is None:
         raise ValueError("limit is required when specifying page")
 
-    variables: dict[str, Any] = {
-        "limit": limit,
-        "page": page if page is not None else 1,
-        "ids": ids,
-    }
+    current_page = 1 if not page else page
+    current_limit = 10 if not limit else limit
 
     while True:
-        response = await execute_query(BoardsResponse, http, log, BOARDS, variables)
+        variables: dict[str, Any] = {
+            "limit": current_limit,
+            "page": current_page,
+            "ids": ids,
+        }
 
-        if not response.data or not response.data.boards:
-            return
+        boards = await _try_fetch_board(http, log, BOARDS_WITH_KIND, variables)
 
-        for board in response.data.boards:
-            yield board
+        if boards is not None:
+            for board in boards:
+                yield board
 
-        if page is not None or (limit and len(response.data.boards) < limit):
-            break
+            if page is not None or (len(boards) < current_limit):
+                break
 
-        variables["page"] += 1
+            current_page += 1
+            continue
+
+        log.info(f"Boards query with workspace 'kind' field failed for page {current_page}, switching to querying one board at a time.")
+
+        # Calculate the starting item index based on the current page and limit
+        # For example, if we're on page 139 with limit 5, we start from item 691 (138*5 + 1)
+        start_item = ((current_page - 1) * current_limit) + 1
+
+        for i in range(int(current_limit)):
+            item_page = start_item + i
+            item_variables = {
+                "limit": 1,
+                "page": item_page,
+                "ids": ids,
+            }
+
+            log.info(f"Trying to fetch board {item_page} with workspace 'kind' field")
+            boards = await _try_fetch_board(http, log, BOARDS_WITH_KIND, item_variables)
+
+            if boards is not None:
+                for board in boards:
+                    yield board
+                continue
+
+            log.info(f"Retrying query for board {item_page} without workspace 'kind' field")
+            boards = await _try_fetch_board(http, log, BOARDS_WITHOUT_KIND, item_variables)
+
+            if boards is not None:
+                for board in boards:
+                    board.workspace.kind = None
+                    yield board
+                continue
+
+            log.error(f"Failed to fetch board {item_page} with or without workspace 'kind' field")
+            raise GraphQLQueryError([GraphQLError(message=f"Failed to fetch board {item_page} with or without workspace 'kind' field")])
+
+        current_page += 1
 
 
 async def _filter_parent_items(
@@ -263,7 +320,7 @@ query GetActivityLogs($start: ISO8601DateTime!) {
 }
 """
 
-BOARDS = """
+BOARDS_TEMPLATE = """
 query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) {
   boards(order_by: $order_by, page: $page, limit: $limit) {
     id
@@ -323,10 +380,14 @@ query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10) 
       id
       name
       description
+      %s
     }
   }
 }
 """
+
+BOARDS_WITH_KIND = BOARDS_TEMPLATE % "kind"
+BOARDS_WITHOUT_KIND = BOARDS_TEMPLATE % ""
 
 TEAMS = """
 query {

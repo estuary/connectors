@@ -292,7 +292,7 @@
           "id": "subitems_mkn5v6ah",
           "text": null,
           "type": "subtasks",
-          "value": "{\"changed_at\":\"2025-02-20 19:15:53 +0000\",\"linkedPulseIds\":[{\"linkedPulseId\":8531539316},{\"linkedPulseId\":8531684828}]}"
+          "value": null
         },
         {
           "id": "project_owner",
@@ -445,7 +445,7 @@
           "id": "subitems_mkn5v6ah",
           "text": null,
           "type": "subtasks",
-          "value": "{\"changed_at\":\"2025-02-24 17:14:40 +0000\",\"linkedPulseIds\":[{\"linkedPulseId\":8553814342}]}"
+          "value": null
         },
         {
           "id": "project_owner",
