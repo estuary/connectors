@@ -163,6 +163,13 @@ class BalanceTransactions(BaseStripeObjectNoEvents):
     SEARCH_NAME: ClassVar[str] = "balance_transactions"
 
 
+class Events(BaseStripeObjectWithEvents):
+    NAME: ClassVar[str] = "Events"
+    SEARCH_NAME: ClassVar[str] = "events"
+    # EVENT_TYPES is left empty so all event types are captured.
+    EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {}
+
+
 # Could not verify Accounts events are generated in test mode, but suspect
 # they are generated in Stripe's live mode.
 class Accounts(BaseStripeObjectWithEvents):
@@ -725,6 +732,7 @@ STREAMS = [
     },
     {"stream": Disputes},
     {"stream": EarlyFraudWarning},
+    {"stream": Events},
     {"stream": InvoiceItems},
     {
         "stream": Invoices,

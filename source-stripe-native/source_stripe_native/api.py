@@ -14,6 +14,7 @@ from estuary_cdk.http import HTTPError
 
 
 from .models import (
+    Events,
     EventResult,
     BackfillResult,
     ListResult,
@@ -36,6 +37,7 @@ MISSING_RESOURCE_REGEXES = [
 ]
 NOT_ON_LEGACY_BILLING_REGEX = r"Cannot list usage record summaries for.+because it is not on the legacy metered billing system"
 DO_NOT_HAVE_PLATFORM_CONTROLS_REGEX = r"You cannot perform this request as you do not have Platform Controls for the Stripe Dashboard on the account"
+EVENT_NO_LONGER_RETAINED = r"is no longer available because it's aged out of our retention policy"
 
 
 def add_event_types(
@@ -105,8 +107,12 @@ async def fetch_incremental(
 
             # Emit documents if we haven't seen them.
             if event_ts >= log_cursor:
-                doc = cls.model_validate(event.data.object)
-                doc.meta_ = cls.Meta(op=cls.EVENT_TYPES[event.type])
+                if cls == Events:
+                    doc = cls.model_validate(event.model_dump())
+                    doc.meta_ = cls.Meta(op="c")
+                else:
+                    doc = cls.model_validate(event.data.object)
+                    doc.meta_ = cls.Meta(op=cls.EVENT_TYPES[event.type])
 
                 if account_id:
                     doc.account_id = account_id
@@ -174,9 +180,18 @@ async def fetch_backfill(
     if cls.NAME == "Subscriptions" or cls.NAME == "SubscriptionItems":
         parameters["status"] = "all"
 
-    result = BackfillResult[cls].model_validate_json(
-        await http.request(log, url, method="GET", params=parameters, headers=headers)
-    )
+    try:
+        result = BackfillResult[cls].model_validate_json(
+            await http.request(log, url, method="GET", params=parameters, headers=headers)
+        )
+    except HTTPError as err:
+        # Once we reach the very last event when backfilling Events, it's possible for event
+        # we checkpointed as the page token to age out of Stripe's retention window. This
+        # means we've reached the end of the events stream & the backfill is complete.
+        if err.code == 400 and EVENT_NO_LONGER_RETAINED in err.message and cls == Events:
+            return
+        else:
+            raise
 
     for doc in result.data:
         # Sometimes API results don't have a created field. These may have been added by some legacy Stripe system

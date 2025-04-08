@@ -64,6 +64,10 @@ collections:
     schema: EarlyFraudWarning.schema.yaml
     key:
       - /id
+  acmeCo/Events:
+    schema: Events.schema.yaml
+    key:
+      - /id
   acmeCo/ExternalAccountCards:
     schema: ExternalAccountCards.schema.yaml
     key:
