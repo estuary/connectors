@@ -33,6 +33,7 @@ from ..flow import (
     OAuth2Spec,
     ValidationError,
     BasicAuth,
+    RotatingOAuth2Credentials,
 )
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
@@ -216,6 +217,8 @@ class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
 
     bindingStateV1: dict[str, _BaseResourceState | None] = {}
     backfillRequests: dict[str, bool | None] = {}
+    # An encrypted refresh token that's more recent than the one in the connector's spec.
+    refresh_token: str | None = None
 
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
