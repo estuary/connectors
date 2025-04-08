@@ -139,7 +139,11 @@ class Tag(BaseDocument, extra="allow"):
 
 
 class Board(BaseDocument, extra="allow"):
+    class Workspace(BaseModel, extra="allow"):
+        kind: str | None = None
+    
     updated_at: AwareDatetime
+    workspace: Workspace
 
 
 class BoardsResponse(BaseModel, extra="forbid"):
