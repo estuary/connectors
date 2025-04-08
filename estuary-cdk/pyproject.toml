@@ -15,6 +15,7 @@ pydantic = ">1.10,<3"
 xxhash = "^3.4.1"
 ijson = "^3.3.0"
 pycron = "^3.1.2"
+cryptography = "^44.0.2"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
