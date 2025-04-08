@@ -1,6 +1,6 @@
 from datetime import datetime, UTC, timedelta
-from typing import ClassVar, Generic, TypeVar
-from pydantic import AwareDatetime, BaseModel, Field, HttpUrl
+from typing import ClassVar, Generic, TypeVar, List
+from pydantic import AwareDatetime, BaseModel, Field, HttpUrl, model_validator
 
 from estuary_cdk.flow import AccessToken
 from estuary_cdk.capture.common import (
@@ -73,6 +73,37 @@ class GainsightResource(BaseDocument, extra="allow"):
 
 class GainsightResourceWithModifiedDate(GainsightResource):
     Gsid: str
+    cursor_value: datetime = Field(exclude=True)
+
+    @staticmethod
+    def validate_required_class_attrs(class_obj, attrs: List[str]) -> None:
+        for attr in attrs:
+            if not hasattr(class_obj, attr) or getattr(class_obj, attr) == "":
+                raise TypeError(
+                    f"Class {class_obj.__name__} must define class attribute '{attr}'"
+                )
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        GainsightResourceWithModifiedDate.validate_required_class_attrs(
+            cls,
+            [
+                "OBJECT_NAME",
+            ],
+        )
+
+    @model_validator(mode="before")
+    @classmethod
+    def set_cursor_value(cls, data):
+        if isinstance(data, dict) and cls.MODIFIED_DATE_FIELD in data:
+            modified_date_str = data[cls.MODIFIED_DATE_FIELD]
+            if isinstance(modified_date_str, str):
+                data["cursor_value"] = datetime.fromisoformat(
+                    modified_date_str.replace("Z", "+00:00")
+                )
+            else:
+                data["cursor_value"] = modified_date_str
+        return data
 
 
 class Company(GainsightResourceWithModifiedDate):
