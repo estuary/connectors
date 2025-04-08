@@ -1,6 +1,6 @@
 import json
 from logging import Logger
-from typing import Any, AsyncGenerator, Dict, Literal
+from typing import Any, AsyncGenerator, Dict, Literal, Callable
 
 from estuary_cdk.http import HTTPSession
 
@@ -134,6 +134,96 @@ async def _fetch_boards(
         yield board
 
 
+async def _fetch_in_chunks[T](
+    http: HTTPSession,
+    log: Logger,
+    ids: list[str],
+    chunk_size: int,
+    fetch_fn: Callable[
+        [HTTPSession, Logger, list[str], int | None], AsyncGenerator[T, None]
+    ],
+    limit: int | None = None,
+) -> AsyncGenerator[T, None]:
+    if not ids:
+        raise ValueError("No IDs provided.")
+
+    for i in range(0, len(ids), chunk_size):
+        chunk = ids[i : i + chunk_size]
+        async for item in fetch_fn(http, log, chunk, limit):
+            yield item
+
+
+async def _fetch_items_chunk(
+    http: HTTPSession,
+    log: Logger,
+    chunk: list[str],
+    limit: int | None = None,
+) -> AsyncGenerator[Item, None]:
+    page = 1
+    while True:
+        response = await execute_query(
+            ItemsByIdResponse,
+            http,
+            log,
+            ITEMS_BY_IDS,
+            {
+                "limit": limit,
+                "ids": chunk,
+                "page": page,
+            },
+        )
+
+        if not response.data or not response.data.items:
+            break
+
+        async for item in _filter_parent_items(response.data.items):
+            yield item
+
+        if limit is not None and len(response.data.items) < limit:
+            break
+
+        page += 1
+
+
+async def _fetch_boards_chunk(
+    http: HTTPSession,
+    log: Logger,
+    chunk: list[str],
+    limit: int | None = None,
+) -> AsyncGenerator[Board, None]:
+    try:
+        variables = {
+            "limit": limit,
+            "page": 1,
+            "ids": chunk,
+        }
+        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
+            yield board
+    except GraphQLQueryError:
+        log.info(
+            "Boards query with workspace 'kind' field failed, switching to querying one board at a time."
+        )
+        for board_id in chunk:
+            try:
+                variables = {
+                    "limit": 1,
+                    "page": 1,
+                    "ids": [board_id],
+                }
+                async for board in _fetch_boards(
+                    http, log, BOARDS_WITH_KIND, variables
+                ):
+                    yield board
+            except GraphQLQueryError:
+                log.info(
+                    f"Trying to fetch board {board_id} without workspace 'kind' field"
+                )
+                async for board in _fetch_boards(
+                    http, log, BOARDS_WITHOUT_KIND, variables
+                ):
+                    yield board
+
+
 async def fetch_boards(
     http: HTTPSession,
     log: Logger,
@@ -142,6 +232,8 @@ async def fetch_boards(
     ids: list[str] | None = None,
 ) -> AsyncGenerator[Board, None]:
     """
+    Fetch boards, either by IDs (handling the API's 100-item limit) or paginated.
+
     Note: If `page` is specified, `limit` is required.
     If `ids` is not provided, all boards will be fetched.
 
@@ -154,6 +246,13 @@ async def fetch_boards(
     if page is not None and limit is None:
         raise ValueError("limit is required when specifying page")
 
+    if ids:
+        async for board in _fetch_in_chunks(
+            http, log, ids, chunk_size=100, fetch_fn=_fetch_boards_chunk, limit=limit
+        ):
+            yield board
+        return
+
     current_page = 1 if not page else page
     current_limit = 10 if not limit else limit
 
@@ -162,7 +261,6 @@ async def fetch_boards(
             variables = {
                 "limit": current_limit,
                 "page": current_page,
-                "ids": ids,
             }
 
             boards_in_page = 0
@@ -229,33 +327,10 @@ async def fetch_items_by_ids(
     item_ids: list[str],
     limit: int | None = None,
 ) -> AsyncGenerator[Item, None]:
-    if not item_ids:
-        raise ValueError("No item IDs provided.")
-
-    page = 1
-    while True:
-        response = await execute_query(
-            ItemsByIdResponse,
-            http,
-            log,
-            ITEMS_BY_IDS,
-            {
-                "limit": limit,
-                "ids": item_ids,
-                "page": page,
-            },
-        )
-
-        if not response.data or not response.data.items:
-            return
-
-        async for item in _filter_parent_items(response.data.items):
-            yield item
-
-        if limit is not None and len(response.data.items) < limit:
-            break
-
-        page += 1
+    async for item in _fetch_in_chunks(
+        http, log, item_ids, chunk_size=100, fetch_fn=_fetch_items_chunk, limit=limit
+    ):
+        yield item
 
 
 async def fetch_items_by_boards(
