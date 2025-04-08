@@ -3,6 +3,12 @@ import subprocess
 
 
 def test_capture(request, snapshot):
+    OMITTED_STREAMS = [
+        # Only the past 30 days of events are available via the
+        # Stripe API, so we cannot reliably include an event document
+        # in the capture snapshot.
+        "acmeCo/events",
+    ]
     result = subprocess.run(
         [
             "flowctl",
@@ -25,7 +31,7 @@ def test_capture(request, snapshot):
 
     for line in lines:
         stream = line[0]
-        if stream not in seen:
+        if stream not in seen and stream not in OMITTED_STREAMS:
             unique_stream_lines.append(line)
             seen.add(stream)
 

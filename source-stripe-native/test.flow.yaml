@@ -134,5 +134,8 @@ captures:
       - resource:
           name: UsageRecords
         target: acmeCo/UsageRecords
+      - resource:
+          name: Events
+        target: acmeCo/Events
     shards:
       logLevel: debug
