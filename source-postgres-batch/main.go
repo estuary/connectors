@@ -199,6 +199,14 @@ func quoteTableName(schema, table string) string {
 	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
 }
 
+func quoteIdentifier(name string) string {
+	// From https://www.postgresql.org/docs/14/sql-syntax-lexical.html#SQL-SYNTAX-IDENTIFIERS:
+	//
+	//     Quoted identifiers can contain any character, except the character with code zero.
+	//     (To include a double quote, write two double quotes.)
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
 var templateFuncs = template.FuncMap{
 	"add":             func(a, b int) int { return a + b },
 	"quoteTableName":  quoteTableName,
