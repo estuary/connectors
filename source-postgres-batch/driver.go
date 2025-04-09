@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"text/template"
@@ -15,6 +16,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/jackc/pgconn"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -353,6 +355,11 @@ func (c *capture) Run(ctx context.Context) error {
 	return nil
 }
 
+var (
+	statementTimeoutRegexp = regexp.MustCompile(`canceling statement due to statement timeout`)
+	recoveryConflictRegexp = regexp.MustCompile(`canceling statement due to conflict with recovery`)
+)
+
 func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	var res = binding.resource
 	var stateKey = binding.stateKey
@@ -379,16 +386,25 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	}).Info("starting worker")
 
 	for ctx.Err() == nil {
+		// This short delay serves a couple of purposes. Partly it just makes task startup
+		// logs a bit cleaner, but it also spaces out retries after statement cancellations.
+		time.Sleep(100 * time.Millisecond)
+
 		// Wait for next scheduled polling cycle.
-		log.WithFields(log.Fields{
-			"name": res.Name,
-			"poll": pollScheduleStr,
-			"prev": state.LastPolled.Format(time.RFC3339Nano),
-		}).Info("waiting for next scheduled poll")
 		if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
 			return err
 		}
 		var pollTime = time.Now().UTC()
+		log.WithFields(log.Fields{
+			"name": res.Name,
+			"poll": pollScheduleStr,
+			"prev": state.LastPolled.Format(time.RFC3339Nano),
+		}).Info("ready to poll")
+
+		// This delay has no purpose other than to make startup logs a bit easier to read
+		// by letting the initial burst of "ready to poll" messages finish before we start
+		// actually executing any queries.
+		time.Sleep(100 * time.Millisecond)
 
 		// Acquire semaphore and execute polling operation.
 		if err := c.Sempahore.Acquire(ctx, 1); err != nil {
@@ -403,6 +419,15 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 			}
 			return nil
 		}(); err != nil {
+			// As a special case, we consider statement cancellation from timeouts or recovery conflicts
+			// to be not an error. This avoids an unnecessary failure of the entire capture task, since
+			// the next poll() cycle will just pick up where we left off anyway.
+			if pgErr, ok := err.(*pgconn.PgError); ok && (statementTimeoutRegexp.MatchString(pgErr.Message) || recoveryConflictRegexp.MatchString(pgErr.Message)) {
+				log.WithFields(log.Fields{
+					"name": res.Name,
+				}).WithError(err).Warn("polling query interrupted by statement cancellation, will continue")
+				continue
+			}
 			return err
 		}
 
