@@ -249,8 +249,9 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	// It is faster to first find the smallest and the largest ROWIDs of the range we want to cover and then query
 	// all of the data in that range, instead of ordering all rows based on ROWID and then filtering the ROWID
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
-	fmt.Fprintf(query, ` WHERE ROWID > (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC FETCH FIRST 1 ROW ONLY)`, schemaName, tableName)
-	fmt.Fprintf(query, ` AND ROWID <= (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC OFFSET %d ROWS FETCH FIRST 1 ROW ONLY)`, schemaName, tableName, db.config.Advanced.BackfillChunkSize)
+	fmt.Fprintf(query, ` WHERE ROWID >= (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC FETCH FIRST 1 ROW ONLY)`, schemaName, tableName)
+	fmt.Fprintf(query, ` AND ROWID <= (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC OFFSET`, schemaName, tableName)
+	fmt.Fprintf(query, ` (SELECT LEAST((SELECT COUNT(*) FROM "%s"."%s" WHERE ROWID > :1) -1, %d) FROM DUAL) ROWS FETCH FIRST 1 ROW ONLY)`, schemaName, tableName, db.config.Advanced.BackfillChunkSize)
 	fmt.Fprintf(query, ` ORDER BY ROWID ASC`)
 	return query.String()
 }
