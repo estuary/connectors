@@ -191,22 +191,23 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 		logrus.WithField("file", fmt.Sprintf("%+v", f)).Debug("adding log file")
 
 		// The current log file has the same sequence as the last archived log file
-		// in this case we prefer reading from the current log file
+		// in this case we prefer reading from the current log file. It is also possible for
+		// log files to have an ACTIVE and an ARCHIVED version at the same time, we prefer ACTIVE
 		if f.Sequence == redoSequence {
 			var last = redoFiles[len(redoFiles)-1]
 			logrus.WithFields(logrus.Fields{
 				"this": fmt.Sprintf("%+v", f),
 				"last": fmt.Sprintf("%+v", last),
-			}).Debug("found two log files with the same sequence number, keeping CURRENT")
+			}).Debug("found two log files with the same sequence number, keeping CURRENT or ACTIVE")
 
-			if f.Status == "CURRENT" {
+			if f.Status == "CURRENT" || f.Status == "ACTIVE" {
 				// Remove the last archived log file from the list
 				redoFiles = redoFiles[:len(redoFiles)-1]
-			} else if last.Status == "CURRENT" {
+			} else if last.Status == "CURRENT" || last.Status == "ACTIVE" {
 				// Skip this file
 				continue
 			} else {
-				return 0, fmt.Errorf("found two log files with the same sequence number, but neither is CURRENT: %+v, %+v", f, last)
+				return 0, fmt.Errorf("found two log files with the same sequence number, but neither is CURRENT or ACTIVE: %+v, %+v", f, last)
 			}
 		}
 
