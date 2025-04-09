@@ -107,7 +107,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var nextRowKey []byte         // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
 	var prevTID pgtype.TID // Used when processing keyless backfill results to sanity-check ordering
-	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
 		totalRows++
@@ -147,28 +146,22 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		}
 		nextRowKey = rowKey
 
-		if xidFiltered {
-			// XMIN filtering
+		// Filter result rows based on XMIN values
+		if db.config.Advanced.MinimumBackfillXID != "" {
 			xminStr, ok := fields["xmin"].(string)
 			if !ok {
-				// This should not happen if xidFiltered is true, as the query should include it.
 				return false, nil, fmt.Errorf("internal error: xmin column missing or not a string despite filtering being enabled")
 			}
 			xmin, err := strconv.ParseUint(xminStr, 10, 64)
 			if err != nil {
 				return false, nil, fmt.Errorf("invalid xmin value %q: %w", xminStr, err)
 			}
+			minXID, _ := strconv.ParseUint(db.config.Advanced.MinimumBackfillXID, 10, 64) // Error ignored as it's validated at config load
 
-			// Apply MinimumBackfillXID filter
-			if db.config.Advanced.MinimumBackfillXID != "" {
-				minXID, _ := strconv.ParseUint(db.config.Advanced.MinimumBackfillXID, 10, 64) // Error ignored as it's validated at config load
-				if xmin < minXID {
-					continue // Skip this row
-				}
+			if compareXID32(uint32(xmin), uint32(minXID)) < 0 {
+				continue // Skip this row
 			}
-
-			// Remove xmin from fields before processing further
-			delete(fields, "xmin")
+			delete(fields, "xmin") // Remove xmin from captured fields now
 		}
 
 		for _, name := range generatedColumns {
@@ -267,8 +260,10 @@ func (db *postgresDatabase) backfillQueryFilterXMIN() string {
 	if db.config.Advanced.MinimumBackfillXID != "" {
 		const filterValidXID = "(xmin::text::bigint >= 3)"
 		var filterLowerXID = fmt.Sprintf("((((xmin::text::bigint - %s::bigint)<<32)>>32) > 0)", db.config.Advanced.MinimumBackfillXID)
-		const exprUpperXID = "(CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
-		const filterUpperXID = "((((" + exprUpperXID + " - xmin::text::bigint)<<32)>>32) >= 0)"
+
+		// Note: We use XMAX here because it's the largest of the "current XID" values and we never want to
+		// exclude anything except for rows whose xmin values are from earlier wraparound epochs.
+		const filterUpperXID = "((((txid_snapshot_xmax(txid_current_snapshot()) - xmin::text::bigint)<<32)>>32) >= 0)"
 
 		// Final query expression:
 		//   - Select 0.1% of rows at random to ensure we have a trickle of data movement even in fully excluded parts of the table.
@@ -439,4 +434,15 @@ func decodeRowValues(rows pgx.Rows) ([]any, error) {
 	}
 
 	return values, nil
+}
+
+func compareXID32(a, b uint32) int {
+	// Compare two XIDs according to circular comparison logic such that
+	// a < b if B lies in the range [a, a+2^31).
+	if a == b {
+		return 0 // a == b
+	} else if ((b - a) & 0x80000000) == 0 {
+		return -1 // a < b
+	}
+	return 1 // a > b
 }

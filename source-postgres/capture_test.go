@@ -740,7 +740,7 @@ func TestXMINBackfill(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
 
 	var lowerXID uint64
-	const queryXID = "SELECT (CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
+	const queryXID = "SELECT txid_snapshot_xmin(txid_current_snapshot())"
 	require.NoError(t, tb.control.QueryRow(ctx, queryXID).Scan(&lowerXID))
 
 	// Changes from after the minimum backfill XID can be observed.
