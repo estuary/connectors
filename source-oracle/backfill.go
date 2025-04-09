@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -246,10 +245,13 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	for _, col := range info.Columns {
 		columnSelect = append(columnSelect, castColumn(col))
 	}
+
+	// It is faster to first find the smallest and the largest ROWIDs of the range we want to cover and then query
+	// all of the data in that range, instead of ordering all rows based on ROWID and then filtering the ROWID
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
-	fmt.Fprintf(query, ` WHERE ROWID > :1`)
+	fmt.Fprintf(query, ` WHERE ROWID > (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC FETCH FIRST 1 ROW ONLY)`, schemaName, tableName)
+	fmt.Fprintf(query, ` AND ROWID <= (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC OFFSET %d ROWS FETCH FIRST 1 ROW ONLY)`, schemaName, tableName, db.config.Advanced.BackfillChunkSize)
 	fmt.Fprintf(query, ` ORDER BY ROWID ASC`)
-	fmt.Fprintf(query, ` FETCH NEXT %d ROWS ONLY`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
 
