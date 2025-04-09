@@ -755,7 +755,20 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 
 		var resultCTID = columnValues[ctidIndex].(string)
 		var resultXMIN = uint32(columnValues[txidIndex].(int64))
-		if compareXID32(resultXMIN, uint32(state.BaseXID)) < 0 || compareXID32(uint32(state.NextXID), resultXMIN) <= 0 {
+
+		// In the common case, our XID filtering logic is just applying a circular comparison
+		// to ensure that we output rows whose XMIN lies between the lower and upper values.
+		//
+		// But on an initial backfill query it's not appropriate to apply a lower bound, and
+		// we can only apply an upper bound when the server XID has never wrapped around. In
+		// that case it's appropriate to compare XID values directly and not circularly.
+		var filterBaseXID = compareXID32(resultXMIN, uint32(state.BaseXID)) < 0
+		var filterNextXID = compareXID32(uint32(state.NextXID), resultXMIN) <= 0
+		var filterXID = filterBaseXID || filterNextXID
+		if state.BaseXID == 0 {
+			filterXID = state.NextXID <= uint64(resultXMIN)
+		}
+		if filterXID {
 			// When a row is rejected because its XMIN is unsuitable, it might be
 			// part of the random 0.1% sampling that ensures consistent progress,
 			// so we should update the state checkpoint with its CTID.
