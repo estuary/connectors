@@ -746,7 +746,7 @@ func getColumnDescriptions(ctx context.Context, conn *pgx.Conn) ([]columnDescrip
 
 func queryAndLogCurrentXID(ctx context.Context, conn *pgx.Conn) {
 	var xid uint64
-	const query = "SELECT (CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
+	const query = "SELECT txid_snapshot_xmin(txid_current_snapshot())"
 	if err := conn.QueryRow(ctx, query).Scan(&xid); err == nil {
 		logrus.WithField("xid", xid).Info("current transaction ID")
 	} else {
