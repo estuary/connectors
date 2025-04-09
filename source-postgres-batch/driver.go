@@ -671,6 +671,8 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 	}
 
 	// Build the query. The base CTID for scanning is $1 and the minimum/maximum XIDs for filtering are $2 and $3.
+	// The XID filtering clauses here include both the upper/lower bound XIDs on the assumption that we can apply
+	// more precise filtering when processing query results if desired.
 	var queryBuf = new(strings.Builder)
 	var args []any
 	fmt.Fprintf(queryBuf, `SELECT ctid, xmin AS txid, * FROM %s WHERE ctid > $1`, quoteTableName(res.SchemaName, res.TableName))
@@ -753,7 +755,7 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 
 		var resultCTID = columnValues[ctidIndex].(string)
 		var resultXMIN = uint32(columnValues[txidIndex].(int64))
-		if compareXID32(resultXMIN, uint32(state.BaseXID)) <= 0 || compareXID32(uint32(state.NextXID), resultXMIN) < 0 {
+		if compareXID32(resultXMIN, uint32(state.BaseXID)) < 0 || compareXID32(uint32(state.NextXID), resultXMIN) <= 0 {
 			// When a row is rejected because its XMIN is unsuitable, it might be
 			// part of the random 0.1% sampling that ensures consistent progress,
 			// so we should update the state checkpoint with its CTID.
@@ -825,7 +827,11 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 
 func queryCurrentXID(ctx context.Context, db *sql.DB) (uint64, error) {
 	var xid uint64
-	const queryXID = "SELECT (CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END)"
+	// The expression `txid_snapshot_xmin(txid_current_snapshot())` returns an XID
+	// such that all transactions with earlier XIDs must now be committed and visible
+	// (or rolled-back and dead). This is subtly different from `txid_current()` and
+	// we actually need that bit of nuance to make our XMIN filtering bulletproof.
+	const queryXID = "SELECT txid_snapshot_xmin(txid_current_snapshot())"
 	if err := db.QueryRowContext(ctx, queryXID).Scan(&xid); err != nil {
 		return 0, fmt.Errorf("error querying current XID: %w", err)
 	}
