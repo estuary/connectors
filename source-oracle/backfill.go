@@ -317,29 +317,19 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query stri
 		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
 		return
 	}
-	rows, err := db.conn.QueryContext(ctx, "SELECT * FROM table(dbms_xplan.display)")
+
+	rows, err := db.conn.QueryContext(ctx, "SELECT PLAN_TABLE_OUTPUT FROM table(dbms_xplan.display)")
 	if err != nil {
 		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
 		return
 	}
 	defer rows.Close()
 
-	// Log the response, doing a bit of extra work to make it readable
-	cols, err := rows.Columns()
-	if err != nil {
-		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("unable to explain query")
-		return
-	}
+	var outputLines []string
 	for rows.Next() {
-		// Scan the row values and copy into the equivalent map
-		var fields = logrus.Fields{"streamID": streamID}
-		var fieldsPtr = make([]any, len(cols))
-		for idx, col := range cols {
-			fields[col] = new(any)
-			fieldsPtr[idx] = fields[col]
-		}
+		var outputLine string
 
-		if err := rows.Scan(fieldsPtr...); err != nil {
+		if err := rows.Scan(&outputLine); err != nil {
 			logrus.WithFields(logrus.Fields{
 				"id":  streamID,
 				"err": err,
@@ -347,14 +337,11 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query stri
 			return
 		}
 
-		for key, v := range fields {
-			val := reflect.ValueOf(v)
-			if val.Kind() == reflect.Ptr {
-				val = val.Elem()
-			}
-			fields[key] = val
-		}
-
-		logrus.WithFields(fields).Info("explain backfill query")
+		outputLines = append(outputLines, outputLine)
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"streamID": streamID,
+		"output":   strings.Join(outputLines, "\n"),
+	}).Info("explain backfill query")
 }
