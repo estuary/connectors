@@ -209,6 +209,7 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 const queryTableObjectIdentifiers = `SELECT OWNER, OBJECT_NAME, OBJECT_ID, DATA_OBJECT_ID FROM ALL_OBJECTS WHERE OBJECT_TYPE='TABLE'`
 
 type tableObject struct {
+	streamID     string
 	objectID     int
 	dataObjectID int
 }
@@ -241,7 +242,7 @@ func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *s
 			return nil, fmt.Errorf("scanning table object identifier row: %w", err)
 		}
 
-		mapping[joinObjectID(objectID, dataObjectID)] = tableObject{objectID: objectID, dataObjectID: dataObjectID}
+		mapping[joinObjectID(objectID, dataObjectID)] = tableObject{streamID: sqlcapture.JoinStreamID(owner, tableName), objectID: objectID, dataObjectID: dataObjectID}
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
