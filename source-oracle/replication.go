@@ -77,16 +77,6 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		"startSCN": startSCN,
 	}).Info("starting replication")
 
-	var logminerQuery = generateLogminerQuery(db.tableObjectMapping)
-	logrus.WithFields(logrus.Fields{
-		"query": logminerQuery,
-	}).Info("logminer contents query")
-
-	stmt, err := conn.PrepareContext(ctx, logminerQuery)
-	if err != nil {
-		return nil, fmt.Errorf("preparing logminer query: %w", err)
-	}
-
 	var smartMode = db.config.Advanced.DictionaryMode == DictionaryModeSmart
 	var dictionaryMode = db.config.Advanced.DictionaryMode
 	if smartMode {
@@ -97,7 +87,6 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		conn: conn,
 
 		lastTxnEndSCN: startSCN,
-		logminerStmt:  stmt,
 
 		smartMode:      smartMode,
 		dictionaryMode: dictionaryMode,
@@ -413,6 +402,10 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
 	}
 
+	if err := s.generateLogminerQuery(ctx); err != nil {
+		return err
+	}
+
 	var eg, egCtx = errgroup.WithContext(ctx)
 	var streamCtx, streamCancel = context.WithCancel(egCtx)
 	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
@@ -587,21 +580,35 @@ const (
 	opUpdate = 3
 )
 
-func generateLogminerQuery(tableObjectMapping map[string]tableObject) string {
-	var tablesCondition = ""
-	var i = 0
-	for _, mapping := range tableObjectMapping {
-		if i > 0 {
-			tablesCondition += " OR "
-		}
-		tablesCondition += fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping.objectID, mapping.dataObjectID)
-		i++
+func (s *replicationStream) generateLogminerQuery(ctx context.Context) error {
+	if s.logminerStmt != nil {
+		s.logminerStmt.Close()
 	}
-	return fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
+
+	var tableObjectMapping = s.db.tableObjectMapping
+
+	var conditions []string
+	for _, mapping := range tableObjectMapping {
+		if !s.tableActive(mapping.streamID) {
+			logrus.WithField("streamID", mapping.streamID).Debug("logminer: removing disabled table from replication query")
+			continue
+		}
+		conditions = append(conditions, fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping.objectID, mapping.dataObjectID))
+	}
+	var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
     FROM V$LOGMNR_CONTENTS
     WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :startSCN AND SCN <= :endSCN AND
     SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
-    AND (%s)`, tablesCondition)
+    AND (%s)`, strings.Join(conditions, " OR "))
+
+	stmt, err := s.conn.PrepareContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("preparing logminer query: %w", err)
+	}
+
+	s.logminerStmt = stmt
+
+	return nil
 }
 
 // receiveMessage reads and parses the next replication message from the database,
@@ -614,7 +621,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 	}
 
 	var totalMessages = 0
-	var relevantMessages = 0
+	var fullMessages = 0
 	var lastMsg *logminerMessage
 	for rows.Next() {
 		totalMessages++
@@ -652,6 +659,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		// further processing on it.
 		var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
 		if !s.tableActive(streamID) {
+			logrus.WithField("streamID", streamID).Debug("logminer: received message for unknown table")
 			var isKnownTable = false
 			// if the table has been dropped, check their object identifier
 			if strings.HasPrefix(msg.TableName, "OBJ#") || (strings.HasPrefix(msg.TableName, "BIN$") && strings.HasSuffix(msg.TableName, "==$0") && len(msg.TableName) == 30) {
@@ -693,7 +701,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 				if err := s.decodeAndEmitMessage(ctx, *lastMsg); err != nil {
 					return err
 				}
-				relevantMessages++
+				fullMessages++
 			}
 
 			continue
@@ -707,7 +715,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		if err := s.decodeAndEmitMessage(ctx, msg); err != nil {
 			return err
 		}
-		relevantMessages++
+		fullMessages++
 	}
 
 	if err := rows.Err(); err != nil {
@@ -721,11 +729,11 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		finalSCN = lastMsg.SCN
 	}
 	logrus.WithFields(logrus.Fields{
-		"totalMessages":    totalMessages,
-		"relevantMessages": relevantMessages,
-		"startSCN":         startSCN,
-		"endSCN":           endSCN,
-		"finalSCN":         finalSCN,
+		"totalMessages": totalMessages,
+		"fullMessages":  fullMessages,
+		"startSCN":      startSCN,
+		"endSCN":        endSCN,
+		"finalSCN":      finalSCN,
 	}).Debug("received messages")
 
 	return nil
