@@ -1,12 +1,14 @@
 from datetime import datetime
 import json
 from logging import Logger
-from typing import Optional, AsyncGenerator, Any, Dict, List
+from typing import Optional, AsyncGenerator, Any, Dict, List, Type, TypeVar
 
 from estuary_cdk.capture.common import PageCursor, LogCursor
 from estuary_cdk.http import HTTPSession
+from pydantic import TypeAdapter
 
-from .models import Item, User
+from .models import Item, User, Story, Comment, Job, Poll, PollOption
+from .buffer_ordered import buffer_ordered
 
 # API Constants
 API_BASE_URL = "https://hacker-news.firebaseio.com"
@@ -26,6 +28,8 @@ ENDPOINTS = {
     "job_stories": "/jobstories.json",
     "updates": "/updates.json"
 }
+
+MAX_CONCURRENT_REQUESTS = 5
 
 async def _make_request(http: HTTPSession, log: Logger, endpoint: str, **kwargs) -> Optional[bytes]:
     """
@@ -60,73 +64,101 @@ async def _parse_json_response(response: Optional[bytes]) -> Optional[Any]:
     except json.JSONDecodeError:
         return None
 
-async def fetch_page(
-    http: HTTPSession, 
-    log: Logger, 
-    start_cursor: PageCursor, 
-    log_cutoff: LogCursor
-) -> AsyncGenerator[Item | int, None]:
+async def fetch_item(http: HTTPSession, log, item_id: int) -> Optional[Item]:
+    """Fetch a single item from the Hacker News API."""
+    url = f"{API_URL}{ENDPOINTS['item'].format(item_id=item_id)}"
+    try:
+        response = await http.request(log, url)
+        if response == "null":
+            return None
+        return TypeAdapter(Item).validate_json(response)
+    except json.JSONDecodeError:
+        log.warning(f"Failed to decode JSON for item {item_id}")
+        return None
+
+async def fetch_items_parallel(
+    http: HTTPSession,
+    log,
+    item_ids: List[int],
+    item_type: Optional[Type[Item]] = None,
+) -> AsyncGenerator[Item, None]:
     """
-    Fetch a single item from the API and yield it if it's newer than the cutoff.
+    Fetch multiple items in parallel while preserving order.
     
     Args:
         http: HTTP session
-        log: Logger instance
-        start_cursor: Item ID to fetch
-        log_cutoff: Time cutoff for backfill
+        log: Logger
+        item_ids: List of item IDs to fetch
+        item_type: Optional type to filter items by
         
     Yields:
-        Item | int: The fetched item or next cursor
+        Items in the same order as item_ids
     """
-    response = await _make_request(http, log, ENDPOINTS["item"], item_id=start_cursor)
-    data = await _parse_json_response(response)
+    async def gen():
+        for item_id in item_ids:
+            yield fetch_item(http, log, item_id)
     
-    if not data:
-        return
-        
-    try:
-        item = Item.model_validate(data)
-        
-        # Stop the backfill when we catch up
-        if item.time > log_cutoff:
-            return
+    async for item in buffer_ordered(gen(), MAX_CONCURRENT_REQUESTS):
+        if item is not None and (item_type is None or isinstance(item, item_type)):
+            yield item
 
+async def fetch_page(
+    http: HTTPSession,
+    log,
+    page: Optional[int] = None,
+    item_type: Optional[Type[Item]] = None,
+) -> AsyncGenerator[Item | int, None]:
+    """
+    Fetch a page of items from the Hacker News API.
+    
+    Args:
+        http: HTTP session
+        log: Logger
+        page: Optional page number
+        item_type: Optional type to filter items by
+        
+    Yields:
+        Items or next page number
+    """
+    url = f"{API_URL}{ENDPOINTS['new_stories']}"
+    response = await http.request(log, url)
+    item_ids = TypeAdapter(List[int]).validate_json(response)
+    
+    start_idx = page or 0
+    end_idx = min(start_idx + 30, len(item_ids))
+    
+    async for item in fetch_items_parallel(http, log, item_ids[start_idx:end_idx], item_type):
         yield item
-        yield start_cursor + 1
-    except Exception as e:
-        log.error(f"Error processing item {start_cursor}: {e}")
-        return
+    
+    if end_idx < len(item_ids):
+        yield end_idx
 
 async def fetch_changes(
-    http: HTTPSession, 
-    log: Logger, 
-    start_cursor: PageCursor
-) -> AsyncGenerator[Item | int, None]:
+    http: HTTPSession,
+    log,
+    since: datetime,
+    until: Optional[datetime] = None,
+) -> AsyncGenerator[Item, None]:
     """
-    Fetch a single item for change detection.
+    Fetch items that have changed since a given time.
     
     Args:
         http: HTTP session
-        log: Logger instance
-        start_cursor: Item ID to fetch
+        log: Logger
+        since: Start time
+        until: Optional end time
         
     Yields:
-        Item | int: The fetched item or next cursor
+        Changed items
     """
-    response = await _make_request(http, log, ENDPOINTS["item"], item_id=start_cursor)
-    data = await _parse_json_response(response)
+    url = f"{API_URL}{ENDPOINTS['updates']}"
+    response = await http.request(log, url)
+    updates = TypeAdapter(dict).validate_json(response)
     
-    if not data:
-        return
-        
-    try:
-        item = Item.model_validate(data)
-        yield item
-        yield start_cursor + 1
-    except Exception as e:
-        log.debug(f"Failed to fetch item {start_cursor}: {e}")
-        return
-
+    item_ids = updates.get("items", [])
+    async for item in fetch_items_parallel(http, log, item_ids):
+        if item.time >= since and (until is None or item.time <= until):
+            yield item
 
 async def fetch_user(http: HTTPSession, log: Logger, user_id: str) -> Optional[User]:
     """
