@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -422,7 +423,8 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 			// As a special case, we consider statement cancellation from timeouts or recovery conflicts
 			// to be not an error. This avoids an unnecessary failure of the entire capture task, since
 			// the next poll() cycle will just pick up where we left off anyway.
-			if pgErr, ok := err.(*pgconn.PgError); ok && (statementTimeoutRegexp.MatchString(pgErr.Message) || recoveryConflictRegexp.MatchString(pgErr.Message)) {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && (statementTimeoutRegexp.MatchString(pgErr.Message) || recoveryConflictRegexp.MatchString(pgErr.Message)) {
 				log.WithFields(log.Fields{
 					"name": res.Name,
 				}).WithError(err).Warn("polling query interrupted by statement cancellation, will continue")
