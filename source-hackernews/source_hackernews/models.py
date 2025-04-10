@@ -24,62 +24,21 @@ class Item(BaseDocument):
     """
     Base Hackernews Item model with common fields
     """
-    id: Optional[int] = None
-    deleted: bool = False
-    type: Optional[str] = Field(None, description='One of "job", "story", "comment", "poll", or "pollopt"')
-    by: Optional[str] = None
-    time: Optional[datetime] = Field(None, description='Unix Time')
-    dead: bool = False
-    kids: List[int] = Field(default_factory=list, description="List of IDs of comments")
-
-
-class Story(Item):
-    """
-    Hackernews Story or Ask HN
-    """
-    title: Optional[str] = Field(None, description='HTML')
-    url: Optional[HttpUrl] = None
-    score: Optional[int] = None
-    descendants: Optional[int] = Field(None, description="Total comment count")
-    text: Optional[str] = Field(None, description='HTML')
-
-
-class Comment(Item):
-    """
-    Hackernews Comment
-    """
-    parent: int = Field(..., description="ID of the parent item")
-    text: str = Field(..., description='HTML')
-
-
-class Job(Item):
-    """
-    Hackernews Job Posting
-    """
-    title: str = Field(..., description='HTML')
-    text: str = Field(..., description='HTML')
-    url: Optional[HttpUrl] = None
-    score: Optional[int] = None
-
-
-class Poll(Item):
-    """
-    Hackernews Poll
-    """
-    title: str = Field(..., description='HTML')
-    text: Optional[str] = Field(None, description='HTML')
-    score: int
-    descendants: int = Field(..., description="Total comment count")
-    parts: List[int] = Field(..., description="List of related pollopts")
-
-
-class PollOption(Item):
-    """
-    Hackernews Poll Option
-    """
-    poll: int = Field(..., description="ID of the associated poll")
-    text: str = Field(..., description='HTML')
-    score: int
+    id: int = Field(description="The item's unique id.")
+    deleted: bool = Field(False, description="true if the item is deleted.")
+    type: str = Field(description='The type of item. One of "job", "story", "comment", "poll", or "pollopt".')
+    by: Optional[str] = Field(None, description="The username of the item's author.")
+    time: datetime = Field(description="Creation date of the item, in Unix Time.")
+    text: Optional[str] = Field(None, description="The comment, story or poll text. HTML.")
+    dead: bool = Field(False, description="true if the item is dead.")
+    parent: Optional[int] = Field(None, description="The comment's parent: either another comment or the relevant story.")
+    poll: Optional[int] = Field(None, description="The pollopt's associated poll.")
+    kids: List[int] = Field(default_factory=list, description="The ids of the item's comments, in ranked display order.")
+    url: Optional[HttpUrl] = Field(None, description="The URL of the story.")
+    score: Optional[int] = Field(None, description="The story's score, or the votes for a pollopt.")
+    title: Optional[str] = Field(None, description="The title of the story, poll or job. HTML.")
+    parts: Optional[List[int]] = Field(None, description="A list of related pollopts, in display order.")
+    descendants: Optional[int] = Field(None, description="In the case of stories or polls, the total comment count.")
 
 
 class User(BaseDocument):

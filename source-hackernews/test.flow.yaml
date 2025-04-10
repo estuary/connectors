@@ -11,30 +11,10 @@ captures:
           - source_hackernews
         config: config.yaml
     bindings:
-      # - resource:
-      #     name: items
-      #     interval: PT3600S
-      #   target: acmeCo/items
       - resource:
-          name: stories
+          name: items
           interval: PT3600S
-        target: acmeCo/stories
-      - resource:
-          name: comments
-          interval: PT3600S
-        target: acmeCo/comments
-      - resource:
-          name: jobs
-          interval: PT3600S
-        target: acmeCo/jobs
-      - resource:
-          name: polls
-          interval: PT3600S
-        target: acmeCo/polls
-      - resource:
-          name: poll_options
-          interval: PT3600S
-        target: acmeCo/poll_options
+        target: acmeCo/items
       # - resource:
       #     name: users
       #     interval: PT3600S

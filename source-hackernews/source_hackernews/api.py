@@ -6,7 +6,7 @@ from typing import Optional, AsyncGenerator, Any, Dict, List
 from estuary_cdk.capture.common import PageCursor, LogCursor
 from estuary_cdk.http import HTTPSession
 
-from .models import Item, Story, Comment, Job, Poll, PollOption, User
+from .models import Item, User
 
 # API Constants
 API_BASE_URL = "https://hacker-news.firebaseio.com"
@@ -85,7 +85,7 @@ async def fetch_page(
         return
         
     try:
-        item = parse_item(data)
+        item = Item.model_validate(data)
         
         # Stop the backfill when we catch up
         if item.time > log_cutoff:
@@ -120,39 +120,13 @@ async def fetch_changes(
         return
         
     try:
-        item = parse_item(data)
+        item = Item.model_validate(data)
         yield item
         yield start_cursor + 1
     except Exception as e:
         log.debug(f"Failed to fetch item {start_cursor}: {e}")
         return
 
-def parse_item(data: Dict[str, Any]) -> Item:
-    """
-    Parse the raw item data into the appropriate model based on its type.
-    
-    Args:
-        data: Raw item data from API
-        
-    Returns:
-        Item: Parsed item of the appropriate type
-        
-    Raises:
-        ValueError: If the item type is unknown
-    """
-    item_type = data.get("type")
-    model_map = {
-        "story": Story,
-        "comment": Comment,
-        "job": Job,
-        "poll": Poll,
-        "pollopt": PollOption
-    }
-    
-    if item_type not in model_map:
-        raise ValueError(f"Unknown item type: {item_type}")
-        
-    return model_map[item_type].model_validate(data)
 
 async def fetch_user(http: HTTPSession, log: Logger, user_id: str) -> Optional[User]:
     """

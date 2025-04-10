@@ -8,7 +8,7 @@ from estuary_cdk.http import HTTPSession, HTTPMixin
 
 from .models import (
     EndpointConfig,
-    ResourceState, Item, Story, Comment, Job, Poll, PollOption, User, ResourceConfig
+    ResourceState, Item, User, ResourceConfig
 )
 from .api import (
     fetch_page, fetch_user, fetch_max_item_id, fetch_top_stories,
@@ -22,11 +22,6 @@ async def all_resources(
 ) -> list[common.Resource]:
     return [
         items(http),
-        stories(http),
-        comments(http),
-        jobs(http),
-        polls(http),
-        poll_options(http),
         users(http),
         top_stories(http),
         new_stories(http),
@@ -61,176 +56,6 @@ def items(http: HTTPSession):
         open=open,
         initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
         initial_config=ResourceConfig(name="items", interval=timedelta(hours=1)),
-        schema_inference=False,
-    )
-
-
-def stories(http: HTTPSession):
-    def open(
-            binding: CaptureBinding,
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings
-    ):
-        async def fetch_page_filtered(log, start_cursor, log_cutoff):
-            async for item in fetch_page(http, log, start_cursor, log_cutoff):
-                if isinstance(item, Story):
-                    yield item
-                elif isinstance(item, int):  # This is the page cursor
-                    yield item
-
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_page=fetch_page_filtered,
-        )
-
-    return common.Resource(
-        name="stories",
-        key=["/id"],
-        model=Story,
-        open=open,
-        initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
-        initial_config=ResourceConfig(name="stories", interval=timedelta(hours=1)),
-        schema_inference=False,
-    )
-
-
-def comments(http: HTTPSession):
-    def open(
-            binding: CaptureBinding,
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings
-    ):
-        async def fetch_page_filtered(log, start_cursor, log_cutoff):
-            async for item in fetch_page(http, log, start_cursor, log_cutoff):
-                if isinstance(item, Comment):
-                    yield item
-                elif isinstance(item, int):  # This is the page cursor
-                    yield item
-
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_page=fetch_page_filtered,
-        )
-
-    return common.Resource(
-        name="comments",
-        key=["/id"],
-        model=Comment,
-        open=open,
-        initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
-        initial_config=ResourceConfig(name="comments", interval=timedelta(hours=1)),
-        schema_inference=False,
-    )
-
-
-def jobs(http: HTTPSession):
-    def open(
-            binding: CaptureBinding,
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings
-    ):
-        async def fetch_page_filtered(log, start_cursor, log_cutoff):
-            async for item in fetch_page(http, log, start_cursor, log_cutoff):
-                if isinstance(item, Job):
-                    yield item
-                elif isinstance(item, int):  # This is the page cursor
-                    yield item
-
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_page=fetch_page_filtered,
-        )
-
-    return common.Resource(
-        name="jobs",
-        key=["/id"],
-        model=Job,
-        open=open,
-        initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
-        initial_config=ResourceConfig(name="jobs", interval=timedelta(hours=1)),
-        schema_inference=False,
-    )
-
-
-def polls(http: HTTPSession):
-    def open(
-            binding: CaptureBinding,
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings
-    ):
-        async def fetch_page_filtered(log, start_cursor, log_cutoff):
-            async for item in fetch_page(http, log, start_cursor, log_cutoff):
-                if isinstance(item, Poll):
-                    yield item
-                elif isinstance(item, int):  # This is the page cursor
-                    yield item
-
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_page=fetch_page_filtered,
-        )
-
-    return common.Resource(
-        name="polls",
-        key=["/id"],
-        model=Poll,
-        open=open,
-        initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
-        initial_config=ResourceConfig(name="polls", interval=timedelta(hours=1)),
-        schema_inference=False,
-    )
-
-
-def poll_options(http: HTTPSession):
-    def open(
-            binding: CaptureBinding,
-            binding_index: int,
-            state: ResourceState,
-            task: Task,
-            all_bindings
-    ):
-        async def fetch_page_filtered(log, start_cursor, log_cutoff):
-            async for item in fetch_page(http, log, start_cursor, log_cutoff):
-                if isinstance(item, PollOption):
-                    yield item
-                elif isinstance(item, int):  # This is the page cursor
-                    yield item
-
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_page=fetch_page_filtered,
-        )
-
-    return common.Resource(
-        name="poll_options",
-        key=["/id"],
-        model=PollOption,
-        open=open,
-        initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
-        initial_config=ResourceConfig(name="poll_options", interval=timedelta(hours=1)),
         schema_inference=False,
     )
 
@@ -280,10 +105,7 @@ def top_stories(http: HTTPSession):
             story_ids = await fetch_top_stories(http, log)
             for story_id in story_ids:
                 async for item in fetch_page(http, log, story_id, log_cutoff):
-                    if isinstance(item, Story):
-                        yield item
-                    elif isinstance(item, int):  # This is the page cursor
-                        yield item
+                    yield item
             yield start_cursor + 1
 
         common.open_binding(
@@ -297,7 +119,7 @@ def top_stories(http: HTTPSession):
     return common.Resource(
         name="top_stories",
         key=["/id"],
-        model=Story,
+        model=Item,
         open=open,
         initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
         initial_config=ResourceConfig(name="top_stories", interval=timedelta(minutes=5)),
@@ -317,10 +139,7 @@ def new_stories(http: HTTPSession):
             story_ids = await fetch_new_stories(http, log)
             for story_id in story_ids:
                 async for item in fetch_page(http, log, story_id, log_cutoff):
-                    if isinstance(item, Story):
-                        yield item
-                    elif isinstance(item, int):  # This is the page cursor
-                        yield item
+                    yield item
             yield start_cursor + 1
 
         common.open_binding(
@@ -334,7 +153,7 @@ def new_stories(http: HTTPSession):
     return common.Resource(
         name="new_stories",
         key=["/id"],
-        model=Story,
+        model=Item,
         open=open,
         initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
         initial_config=ResourceConfig(name="new_stories", interval=timedelta(minutes=5)),
@@ -354,10 +173,7 @@ def best_stories(http: HTTPSession):
             story_ids = await fetch_best_stories(http, log)
             for story_id in story_ids:
                 async for item in fetch_page(http, log, story_id, log_cutoff):
-                    if isinstance(item, Story):
-                        yield item
-                    elif isinstance(item, int):  # This is the page cursor
-                        yield item
+                    yield item
             yield start_cursor + 1
 
         common.open_binding(
@@ -371,7 +187,7 @@ def best_stories(http: HTTPSession):
     return common.Resource(
         name="best_stories",
         key=["/id"],
-        model=Story,
+        model=Item,
         open=open,
         initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
         initial_config=ResourceConfig(name="best_stories", interval=timedelta(minutes=5)),
@@ -391,10 +207,7 @@ def ask_stories(http: HTTPSession):
             story_ids = await fetch_ask_stories(http, log)
             for story_id in story_ids:
                 async for item in fetch_page(http, log, story_id, log_cutoff):
-                    if isinstance(item, Story):
-                        yield item
-                    elif isinstance(item, int):  # This is the page cursor
-                        yield item
+                    yield item
             yield start_cursor + 1
 
         common.open_binding(
@@ -408,7 +221,7 @@ def ask_stories(http: HTTPSession):
     return common.Resource(
         name="ask_stories",
         key=["/id"],
-        model=Story,
+        model=Item,
         open=open,
         initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
         initial_config=ResourceConfig(name="ask_stories", interval=timedelta(minutes=5)),
@@ -428,10 +241,7 @@ def show_stories(http: HTTPSession):
             story_ids = await fetch_show_stories(http, log)
             for story_id in story_ids:
                 async for item in fetch_page(http, log, story_id, log_cutoff):
-                    if isinstance(item, Story):
-                        yield item
-                    elif isinstance(item, int):  # This is the page cursor
-                        yield item
+                    yield item
             yield start_cursor + 1
 
         common.open_binding(
@@ -445,7 +255,7 @@ def show_stories(http: HTTPSession):
     return common.Resource(
         name="show_stories",
         key=["/id"],
-        model=Story,
+        model=Item,
         open=open,
         initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
         initial_config=ResourceConfig(name="show_stories", interval=timedelta(minutes=5)),
@@ -465,10 +275,7 @@ def job_stories(http: HTTPSession):
             story_ids = await fetch_job_stories(http, log)
             for story_id in story_ids:
                 async for item in fetch_page(http, log, story_id, log_cutoff):
-                    if isinstance(item, Job):
-                        yield item
-                    elif isinstance(item, int):  # This is the page cursor
-                        yield item
+                    yield item
             yield start_cursor + 1
 
         common.open_binding(
@@ -482,7 +289,7 @@ def job_stories(http: HTTPSession):
     return common.Resource(
         name="job_stories",
         key=["/id"],
-        model=Job,
+        model=Item,
         open=open,
         initial_state=ResourceState(backfill=ResourceState.Backfill(next_page=1, cutoff=datetime.now(tz=UTC))),
         initial_config=ResourceConfig(name="job_stories", interval=timedelta(minutes=5)),
