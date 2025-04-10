@@ -7,7 +7,7 @@ from estuary_cdk.capture.common import PageCursor, LogCursor
 from estuary_cdk.http import HTTPSession
 from pydantic import TypeAdapter
 
-from .models import Item, User, Story, Comment, Job, Poll, PollOption
+from .models import Item, User
 from .buffer_ordered import buffer_ordered
 
 # API Constants
@@ -20,13 +20,6 @@ ENDPOINTS = {
     "item": "/item/{item_id}.json",
     "user": "/user/{user_id}.json",
     "max_item": "/maxitem.json",
-    "top_stories": "/topstories.json",
-    "new_stories": "/newstories.json",
-    "best_stories": "/beststories.json",
-    "ask_stories": "/askstories.json",
-    "show_stories": "/showstories.json",
-    "job_stories": "/jobstories.json",
-    "updates": "/updates.json"
 }
 
 MAX_CONCURRENT_REQUESTS = 5
@@ -80,7 +73,6 @@ async def fetch_items_parallel(
     http: HTTPSession,
     log,
     item_ids: List[int],
-    item_type: Optional[Type[Item]] = None,
 ) -> AsyncGenerator[Item, None]:
     """
     Fetch multiple items in parallel while preserving order.
@@ -89,7 +81,6 @@ async def fetch_items_parallel(
         http: HTTP session
         log: Logger
         item_ids: List of item IDs to fetch
-        item_type: Optional type to filter items by
         
     Yields:
         Items in the same order as item_ids
@@ -99,66 +90,44 @@ async def fetch_items_parallel(
             yield fetch_item(http, log, item_id)
     
     async for item in buffer_ordered(gen(), MAX_CONCURRENT_REQUESTS):
-        if item is not None and (item_type is None or isinstance(item, item_type)):
-            yield item
+        yield item
 
 async def fetch_page(
-    http: HTTPSession,
-    log,
-    page: Optional[int] = None,
-    item_type: Optional[Type[Item]] = None,
+    http: HTTPSession, 
+    log: Logger, 
+    start_cursor: PageCursor, 
+    log_cutoff: LogCursor
 ) -> AsyncGenerator[Item | int, None]:
     """
-    Fetch a page of items from the Hacker News API.
+    Fetch a single item from the API and yield it if it's newer than the cutoff.
     
     Args:
         http: HTTP session
-        log: Logger
-        page: Optional page number
-        item_type: Optional type to filter items by
+        log: Logger instance
+        start_cursor: Item ID to fetch
+        log_cutoff: Time cutoff for backfill
         
     Yields:
-        Items or next page number
+        Item | int: The fetched item or next cursor
     """
-    url = f"{API_URL}{ENDPOINTS['new_stories']}"
-    response = await http.request(log, url)
-    item_ids = TypeAdapter(List[int]).validate_json(response)
-    
-    start_idx = page or 0
-    end_idx = min(start_idx + 30, len(item_ids))
-    
-    async for item in fetch_items_parallel(http, log, item_ids[start_idx:end_idx], item_type):
-        yield item
-    
-    if end_idx < len(item_ids):
-        yield end_idx
+    response = await _make_request(http, log, ENDPOINTS["item"], item_id=start_cursor)
+    data = await _parse_json_response(response)
 
-async def fetch_changes(
-    http: HTTPSession,
-    log,
-    since: datetime,
-    until: Optional[datetime] = None,
-) -> AsyncGenerator[Item, None]:
-    """
-    Fetch items that have changed since a given time.
-    
-    Args:
-        http: HTTP session
-        log: Logger
-        since: Start time
-        until: Optional end time
-        
-    Yields:
-        Changed items
-    """
-    url = f"{API_URL}{ENDPOINTS['updates']}"
-    response = await http.request(log, url)
-    updates = TypeAdapter(dict).validate_json(response)
-    
-    item_ids = updates.get("items", [])
-    async for item in fetch_items_parallel(http, log, item_ids):
-        if item.time >= since and (until is None or item.time <= until):
-            yield item
+    if not data:
+        return
+
+    try:
+        item = Item.model_validate(data)
+
+        # Stop the backfill when we catch up
+        if item.time > log_cutoff:
+            return
+
+        yield item
+        yield start_cursor + 1
+    except Exception as e:
+        log.error(f"Error processing item {start_cursor}: {e}")
+        return
 
 async def fetch_user(http: HTTPSession, log: Logger, user_id: str) -> Optional[User]:
     """
@@ -190,58 +159,3 @@ async def fetch_max_item_id(http: HTTPSession, log: Logger) -> int:
     response = await _make_request(http, log, ENDPOINTS["max_item"])
     data = await _parse_json_response(response)
     return int(data) if data else 0
-
-async def _fetch_story_list(http: HTTPSession, log: Logger, endpoint: str) -> List[int]:
-    """
-    Generic function to fetch a list of story IDs.
-    
-    Args:
-        http: HTTP session
-        log: Logger instance
-        endpoint: Endpoint to fetch stories from
-        
-    Returns:
-        List[int]: List of story IDs
-    """
-    response = await _make_request(http, log, endpoint)
-    data = await _parse_json_response(response)
-    return data if data else []
-
-async def fetch_top_stories(http: HTTPSession, log: Logger) -> List[int]:
-    """Fetch the IDs of the top stories."""
-    return await _fetch_story_list(http, log, ENDPOINTS["top_stories"])
-
-async def fetch_new_stories(http: HTTPSession, log: Logger) -> List[int]:
-    """Fetch the IDs of the newest stories."""
-    return await _fetch_story_list(http, log, ENDPOINTS["new_stories"])
-
-async def fetch_best_stories(http: HTTPSession, log: Logger) -> List[int]:
-    """Fetch the IDs of the best stories."""
-    return await _fetch_story_list(http, log, ENDPOINTS["best_stories"])
-
-async def fetch_ask_stories(http: HTTPSession, log: Logger) -> List[int]:
-    """Fetch the IDs of the latest Ask HN stories."""
-    return await _fetch_story_list(http, log, ENDPOINTS["ask_stories"])
-
-async def fetch_show_stories(http: HTTPSession, log: Logger) -> List[int]:
-    """Fetch the IDs of the latest Show HN stories."""
-    return await _fetch_story_list(http, log, ENDPOINTS["show_stories"])
-
-async def fetch_job_stories(http: HTTPSession, log: Logger) -> List[int]:
-    """Fetch the IDs of the latest job stories."""
-    return await _fetch_story_list(http, log, ENDPOINTS["job_stories"])
-
-async def fetch_updates(http: HTTPSession, log: Logger) -> Dict[str, List[int]]:
-    """
-    Fetch the latest changed items and profiles.
-    
-    Args:
-        http: HTTP session
-        log: Logger instance
-        
-    Returns:
-        Dict[str, List[int]]: Dictionary containing lists of changed items and profiles
-    """
-    response = await _make_request(http, log, ENDPOINTS["updates"])
-    data = await _parse_json_response(response)
-    return data if data else {"items": [], "profiles": []}

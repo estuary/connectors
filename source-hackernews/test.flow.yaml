@@ -19,34 +19,6 @@ captures:
       #     name: users
       #     interval: PT3600S
       #   target: acmeCo/users
-      # - resource:
-      #     name: top_stories
-      #     interval: PT300S
-      #   target: acmeCo/top_stories
-      # - resource:
-      #     name: new_stories
-      #     interval: PT300S
-      #   target: acmeCo/new_stories
-      # - resource:
-      #     name: best_stories
-      #     interval: PT300S
-      #   target: acmeCo/best_stories
-      # - resource:
-      #     name: ask_stories
-      #     interval: PT300S
-      #   target: acmeCo/ask_stories
-      # - resource:
-      #     name: show_stories
-      #     interval: PT300S
-      #   target: acmeCo/show_stories
-      # - resource:
-      #     name: job_stories
-      #     interval: PT300S
-      #   target: acmeCo/job_stories
-      # - resource:
-      #     name: updates
-      #     interval: PT60S
-      #   target: acmeCo/updates
     interval: 3m
     shards:
       logLevel: debug
