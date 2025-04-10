@@ -13,7 +13,7 @@ from .models import (
     ResourceState, Item, User, ResourceConfig
 )
 from .api import (
-    fetch_page, fetch_user, fetch_items_parallel
+    fetch_page, fetch_user
 )
 
 from .buffer_ordered import buffer_ordered

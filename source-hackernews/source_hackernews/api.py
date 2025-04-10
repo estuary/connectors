@@ -23,8 +23,6 @@ ENDPOINTS = {
     "max_item": "/maxitem.json",
 }
 
-MAX_CONCURRENT_REQUESTS = 5
-
 async def _make_request(http: HTTPSession, log: Logger, endpoint: str, **kwargs) -> Optional[bytes]:
     """
     Make a request to the Hacker News API.
@@ -69,46 +67,6 @@ async def fetch_item(http: HTTPSession, log, item_id: int) -> Optional[Item]:
     except json.JSONDecodeError:
         log.warning(f"Failed to decode JSON for item {item_id}")
         return None
-
-async def fetch_items_parallel(
-    http: HTTPSession,
-    log,
-    item_ids: List[int],
-) -> AsyncGenerator[Item, None]:
-    """
-    Fetch multiple items in parallel while preserving order.
-    
-    Args:
-        http: HTTP session
-        log: Logger
-        item_ids: List of item IDs to fetch
-        
-    Yields:
-        Items in the same order as item_ids
-    """
-    async def _do_batch_fetch(batch: List[int]) -> Iterable[Item]:
-        results = []
-        for item_id in batch:
-            item = await fetch_item(http, log, item_id)
-            if item:
-                results.append(item)
-        return results
-
-    async def _batches_gen() -> AsyncGenerator[Awaitable[Iterable[Item]], None]:
-        for batch_it in itertools.batched(item_ids, 100):
-            yield _do_batch_fetch(list(batch_it))
-
-    total = len(item_ids)
-    if total >= 10_000:
-        log.info("will process large batch of items", {"total": total})
-
-    count = 0
-    async for res in buffer_ordered(_batches_gen(), MAX_CONCURRENT_REQUESTS):
-        for item in res:
-            count += 1
-            if count > 0 and count % 10_000 == 0:
-                log.info("fetching items", {"count": count, "total": total})
-            yield item
 
 async def fetch_page(
     http: HTTPSession, 
