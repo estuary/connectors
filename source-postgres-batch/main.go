@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/estuary/connectors/go/common"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -38,11 +39,12 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DiscoverViews   bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
-	PollSchedule    string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '5m' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
-	DiscoverSchemas []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
-	SSLMode         string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	FeatureFlags    string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	DiscoverViews    bool     `json:"discover_views,omitempty" jsonschema:"title=Discover Views,description=When set views will be automatically discovered as resources. If unset only tables will be discovered."`
+	PollSchedule     string   `json:"poll,omitempty" jsonschema:"title=Default Polling Schedule,description=When and how often to execute fetch queries. Accepts a Go duration string like '5m' or '6h' for frequency-based polling or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to '5m' if unset." jsonschema_extras:"pattern=^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"`
+	DiscoverSchemas  []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
+	SSLMode          string   `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	FeatureFlags     string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	StatementTimeout string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout for queries.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default="`
 
 	parsedFeatureFlags map[string]bool // Parsed feature flags setting with defaults applied
 }
@@ -62,6 +64,11 @@ func (c *Config) Validate() error {
 	if c.Advanced.PollSchedule != "" {
 		if err := schedule.Validate(c.Advanced.PollSchedule); err != nil {
 			return fmt.Errorf("invalid default polling schedule %q: %w", c.Advanced.PollSchedule, err)
+		}
+	}
+	if c.Advanced.StatementTimeout != "" {
+		if _, err := time.ParseDuration(c.Advanced.StatementTimeout); err != nil {
+			return fmt.Errorf("invalid statement timeout %q: %w", c.Advanced.StatementTimeout, err)
 		}
 	}
 	// Strictly speaking this feature-flag parsing isn't validation at all, but it's a convenient
@@ -104,6 +111,11 @@ func (c *Config) ToURI() string {
 	var params = make(url.Values)
 	if c.Advanced.SSLMode != "" {
 		params.Set("sslmode", c.Advanced.SSLMode)
+	}
+	if c.Advanced.StatementTimeout != "" {
+		if timeout, err := time.ParseDuration(c.Advanced.StatementTimeout); err == nil {
+			params.Set("options", fmt.Sprintf("-c statement_timeout=%d", timeout.Milliseconds()))
+		}
 	}
 	if len(params) > 0 {
 		uri.RawQuery = params.Encode()

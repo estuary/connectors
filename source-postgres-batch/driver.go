@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"regexp"
 	"slices"
@@ -17,7 +16,6 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/jackc/pgconn"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -384,6 +382,7 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 		"schema": res.SchemaName,
 		"table":  res.TableName,
 		"poll":   pollScheduleStr,
+		"last":   state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("starting worker")
 
 	for ctx.Err() == nil {
@@ -423,11 +422,8 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 			// As a special case, we consider statement cancellation from timeouts or recovery conflicts
 			// to be not an error. This avoids an unnecessary failure of the entire capture task, since
 			// the next poll() cycle will just pick up where we left off anyway.
-			var pgErr *pgconn.PgError
-			if errors.As(err, &pgErr) && (statementTimeoutRegexp.MatchString(pgErr.Message) || recoveryConflictRegexp.MatchString(pgErr.Message)) {
-				log.WithFields(log.Fields{
-					"name": res.Name,
-				}).WithError(err).Warn("polling query interrupted by statement cancellation, will continue")
+			if statementTimeoutRegexp.MatchString(err.Error()) || recoveryConflictRegexp.MatchString(err.Error()) {
+				log.WithField("name", res.Name).WithError(err).Warn("polling query interrupted by statement cancellation, will continue")
 				continue
 			}
 			return err
