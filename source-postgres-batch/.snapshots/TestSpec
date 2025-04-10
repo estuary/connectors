@@ -65,6 +65,19 @@
             "type": "string",
             "title": "Feature Flags",
             "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          },
+          "statement_timeout": {
+            "type": "string",
+            "enum": [
+              "",
+              "30s",
+              "1m",
+              "5m",
+              "30m"
+            ],
+            "title": "Statement Timeout",
+            "description": "Overrides the default statement timeout for queries.",
+            "default": ""
           }
         },
         "additionalProperties": false,
