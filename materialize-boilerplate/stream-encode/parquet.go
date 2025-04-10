@@ -3,7 +3,6 @@ package stream_encode
 import (
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -16,8 +15,10 @@ import (
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
 	"github.com/apache/arrow-go/v18/parquet/file"
+	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/apache/arrow-go/v18/parquet/schema"
 	"github.com/google/uuid"
+	"github.com/segmentio/encoding/json"
 	iso8601 "github.com/senseyeio/duration"
 	log "github.com/sirupsen/logrus"
 )
@@ -127,6 +128,7 @@ type parquetConfig struct {
 	compression       ParquetCompression
 	rowGroupRowLimit  int
 	rowGroupByteLimit int
+	metadata          map[string]string
 }
 
 type ParquetEncoder struct {
@@ -147,10 +149,10 @@ type ParquetEncoder struct {
 		columnChunkCount int
 	}
 
-	// buffer contains rows of values that are pending to be written as a row group to the scratch
+	// rowBuffer contains rows of values that are pending to be written as a row group to the scratch
 	// file when bufferSizeBytes exceeds the threshold.
-	buffer          [][]any
-	bufferSizeBytes int
+	rowBufferSizeBytes int
+	buffers            []parquetValueBuffer
 }
 
 type ParquetOption func(*parquetConfig)
@@ -173,6 +175,12 @@ func WithParquetRowGroupByteLimit(n int) ParquetOption {
 	}
 }
 
+func WithParquetMetadata(meta map[string]string) ParquetOption {
+	return func(cfg *parquetConfig) {
+		cfg.metadata = meta
+	}
+}
+
 func NewParquetEncoder(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) *ParquetEncoder {
 	cfg := parquetConfig{
 		compression:       Uncompressed,
@@ -184,8 +192,10 @@ func NewParquetEncoder(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOptio
 	}
 
 	fields := make(schema.FieldList, 0, len(sch))
+	buffers := make([]parquetValueBuffer, 0, len(sch))
 	for _, e := range sch {
 		fields = append(fields, makeNode(e))
+		buffers = append(buffers, makeBuffer(e))
 	}
 
 	schemaRoot := schema.MustGroup(schema.NewGroupNode("schema", parquet.Repetitions.Required, fields, -1))
@@ -196,13 +206,14 @@ func NewParquetEncoder(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOptio
 		cfg:        cfg,
 		schema:     sch,
 		schemaRoot: schemaRoot,
-		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)),
+		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)...),
 		cwc:        cwc,
 		rs:         newRowSizing(sch),
+		buffers:    buffers,
 	}
 }
 
-func writerOpts(cfg parquetConfig) file.WriteOption {
+func writerOpts(cfg parquetConfig) []file.WriteOption {
 	propOpts := []parquet.WriterProperty{}
 
 	switch cfg.compression {
@@ -216,7 +227,19 @@ func writerOpts(cfg parquetConfig) file.WriteOption {
 		panic(fmt.Sprintf("unknown compression setting: %d", cfg.compression))
 	}
 
-	return file.WithWriterProps(parquet.NewWriterProperties(propOpts...))
+	writeOpts := []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
+
+	if len(cfg.metadata) > 0 {
+		meta := metadata.NewKeyValueMetadata()
+		for k, v := range cfg.metadata {
+			if err := meta.Append(k, v); err != nil {
+				panic(fmt.Sprintf("invalid metadata: %s", err)) // only possible if the metadata keys/values contain invalid UTF-8
+			}
+		}
+		writeOpts = append(writeOpts, file.WithWriteMetadata(meta))
+	}
+
+	return writeOpts
 }
 
 // Encode encodes a row of data by buffering it in the encoder's buffer, and if thresholds are
@@ -224,6 +247,10 @@ func writerOpts(cfg parquetConfig) file.WriteOption {
 // groups from the scratch file collectively as a single row group to the output.
 func (e *ParquetEncoder) Encode(row []any) error {
 	var err error
+
+	if len(row) != len(e.schema) {
+		return fmt.Errorf("encode: row length (%d) does not match schema length (%d)", len(row), len(e.schema))
+	}
 
 	if e.scratch.writer == nil {
 		// Either the very first row, or the first one after flushing the scratch file.
@@ -233,11 +260,15 @@ func (e *ParquetEncoder) Encode(row []any) error {
 		e.scratch.writer = file.NewParquetWriter(e.scratch.file, e.schemaRoot)
 	}
 
-	e.buffer = append(e.buffer, row)
-	e.bufferSizeBytes += e.rs.estSize(row)
+	for idx := range row {
+		if err := e.buffers[idx].add(row[idx]); err != nil {
+			return fmt.Errorf("encode adding value to buffer: %w", err)
+		}
+	}
+	e.rowBufferSizeBytes += e.rs.estSize(row)
 	e.scratch.rowCount += 1
 
-	if e.bufferSizeBytes >= maxBufferSize {
+	if e.rowBufferSizeBytes >= maxBufferSize {
 		// Write out the buffer as a single row group to the scratch file.
 		if err := e.flushBuffer(); err != nil {
 			return fmt.Errorf("encode flushing buffer based on buffer size: %w", err)
@@ -315,7 +346,7 @@ func (e *ParquetEncoder) flushScratchFile() error {
 
 // flushBuffer writes the current buffered rows as a single row group to the scratch file.
 func (e *ParquetEncoder) flushBuffer() error {
-	if len(e.buffer) == 0 {
+	if e.rowBufferSizeBytes == 0 {
 		return nil
 	}
 
@@ -328,50 +359,51 @@ func (e *ParquetEncoder) flushBuffer() error {
 			return fmt.Errorf("getting next column: %w", err)
 		}
 
+		buf := e.buffers[colIdx]
 		switch f.DataType {
 		case PrimitiveTypeInteger:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getIntVal); err != nil {
-				return fmt.Errorf("writing integer column '%s': %w", f.Name, err)
+			if err := buf.writeInt64(cw.(*file.Int64ColumnChunkWriter)); err != nil {
+				return err
 			}
 		case PrimitiveTypeNumber:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Float64ColumnChunkWriter), getNumberVal); err != nil {
-				return fmt.Errorf("writing number column '%s': %w", f.Name, err)
+			if err := buf.writeFloat(cw.(*file.Float64ColumnChunkWriter)); err != nil {
+				return err
 			}
 		case PrimitiveTypeBoolean:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.BooleanColumnChunkWriter), getBooleanVal); err != nil {
-				return fmt.Errorf("writing boolean column '%s': %w", f.Name, err)
-			}
-		case PrimitiveTypeBinary:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getBinaryVal); err != nil {
-				return fmt.Errorf("writing byte array column '%s': %w", f.Name, err)
-			}
-		case LogicalTypeJson:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getJsonVal); err != nil {
-				return fmt.Errorf("writing byte array (json) column '%s': %w", f.Name, err)
-			}
-		case LogicalTypeString:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getStringVal); err != nil {
-				return fmt.Errorf("writing byte array (string) column '%s': %w", f.Name, err)
-			}
-		case LogicalTypeUuid:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getUuidVal); err != nil {
-				return fmt.Errorf("writing uuid column '%s': %w", f.Name, err)
+			if err := buf.writeBool(cw.(*file.BooleanColumnChunkWriter)); err != nil {
+				return err
 			}
 		case LogicalTypeDate:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int32ColumnChunkWriter), getDateVal); err != nil {
-				return fmt.Errorf("writing date column '%s': %w", f.Name, err)
+			if err := buf.writeInt32(cw.(*file.Int32ColumnChunkWriter)); err != nil {
+				return err
 			}
 		case LogicalTypeTime:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getTimeVal); err != nil {
-				return fmt.Errorf("writing time column '%s': %w", f.Name, err)
+			if err := buf.writeInt64(cw.(*file.Int64ColumnChunkWriter)); err != nil {
+				return err
 			}
 		case LogicalTypeTimestamp:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
-				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
+			if err := buf.writeInt64(cw.(*file.Int64ColumnChunkWriter)); err != nil {
+				return err
+			}
+		case PrimitiveTypeBinary:
+			if err := buf.writeBytes(cw.(*file.ByteArrayColumnChunkWriter)); err != nil {
+				return err
+			}
+		case LogicalTypeJson:
+			if err := buf.writeBytes(cw.(*file.ByteArrayColumnChunkWriter)); err != nil {
+				return err
+			}
+		case LogicalTypeString:
+			if err := buf.writeBytes(cw.(*file.ByteArrayColumnChunkWriter)); err != nil {
+				return err
+			}
+		case LogicalTypeUuid:
+			if err := buf.writeFixedBytes(cw.(*file.FixedLenByteArrayColumnChunkWriter)); err != nil {
+				return err
 			}
 		case LogicalTypeInterval:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getIntervalVal); err != nil {
-				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
+			if err := buf.writeFixedBytes(cw.(*file.FixedLenByteArrayColumnChunkWriter)); err != nil {
+				return err
 			}
 		default:
 			panic(fmt.Sprintf("attempted to encode unknown type of column '%s': %d", f.Name, f.DataType))
@@ -388,14 +420,22 @@ func (e *ParquetEncoder) flushBuffer() error {
 
 	e.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
 	e.scratch.columnChunkCount += len(e.schema)
-	e.buffer = e.buffer[:0]
-	e.bufferSizeBytes = 0
+	// e.rowBuffer = e.rowBuffer[:0]
+	e.rowBufferSizeBytes = 0
 
 	return nil
 }
 
+type parquetValueScalar interface {
+	int64 | int32 | float64 | bool
+}
+
+type parquetValueBytes interface {
+	parquet.FixedLenByteArray | parquet.ByteArray
+}
+
 type parquetValue interface {
-	int64 | int32 | float64 | bool | parquet.FixedLenByteArray | parquet.ByteArray
+	parquetValueScalar | parquetValueBytes
 }
 
 // columnBatchReader is a generic wrapper for reading a batch of values having type T from a column.
@@ -424,41 +464,24 @@ type columnBatchWriter[T parquetValue] interface {
 	WriteBatch(vals []T, defLvls []int16, repLvls []int16) (valueOffset int64, err error)
 }
 
-type getValFn[T parquetValue] func(v any) (got T, err error)
+type getScalarValFn[T parquetValueScalar] func(v any) (got T, err error)
 
-func writeColumn[T parquetValue](
-	colIdx int,
-	buf [][]any,
-	w columnBatchWriter[T],
-	getVal getValFn[T],
-) error {
-	var vals []T
-	var defLevels []int16
+type appendBytesFn func([]byte, any) ([]byte, error)
 
-	for _, row := range buf {
-		v := row[colIdx]
-		switch tv := v.(type) {
-		case nil:
-			defLevels = append(defLevels, 0)
-		default:
-			got, err := getVal(tv)
-			if err != nil {
-				return fmt.Errorf("getting typed value for value: %w (type %T)", err, tv)
-			}
+// func writeColumnFromBuffer[T parquetValue](buf parquetValueBuffer, w columnBatchWriter[T]) error {
+// 	vals, defLevels := buf.getColumn()
+// 	typedVales := vals.([]T)
 
-			vals = append(vals, got)
-			defLevels = append(defLevels, 1)
-		}
-	}
+// 	if valuesWritten, err := w.WriteBatch(typedVales, defLevels, nil); err != nil {
+// 		return fmt.Errorf("writing batch of values: %w", err)
+// 	} else if int(valuesWritten) != len(typedVales) {
+// 		return fmt.Errorf("written %d values vs. %d values in vals", valuesWritten, len(typedVales))
+// 	}
 
-	if valuesWritten, err := w.WriteBatch(vals, defLevels, nil); err != nil {
-		return fmt.Errorf("writing batch of values: %w", err)
-	} else if int(valuesWritten) != len(vals) {
-		return fmt.Errorf("written %d values vs. %d values in vals", valuesWritten, len(vals))
-	}
+// 	buf.reset() // TODO: Needed? maybe we can reset in getColumn() instead
 
-	return nil
-}
+// 	return nil
+// }
 
 // transferColumnValues reads columns from the scratch file r and writes the values to w. The
 // scratch file may contain many row groups, and the corresponding column from each row group is
@@ -542,7 +565,7 @@ func doTransfer[T parquetValue](numRows int, r columnBatchReader[T], w columnBat
 	return nil
 }
 
-// The remaining "getXVal" functions are for getting a specifically typed value from the provided
+// The following "getXVal" functions are for getting a specifically typed value from the provided
 // "any" values, as well as performing any processing necessary on that value to make it suitable
 // for storing in a parquet file.
 
@@ -619,70 +642,6 @@ func getBooleanVal(val any) (got bool, err error) {
 	return
 }
 
-func getBinaryVal(val any) (got parquet.ByteArray, err error) {
-	switch v := val.(type) {
-	case string:
-		if got, err = base64.StdEncoding.DecodeString(v); err != nil {
-			err = fmt.Errorf("unable to parse string %q as binary: %w", v, err)
-		}
-	default:
-		err = fmt.Errorf("getBinaryVal unhandled type: %T", v)
-	}
-
-	return
-}
-
-func getJsonVal(val any) (got parquet.ByteArray, err error) {
-	switch v := val.(type) {
-	case []byte:
-		got = v
-	default:
-		got, err = json.Marshal(v)
-	}
-
-	return
-}
-
-func getStringVal(val any) (got parquet.ByteArray, err error) {
-	switch v := val.(type) {
-	case string:
-		got = []byte(v)
-	case []byte:
-		got = v
-	case json.RawMessage:
-		got = []byte(v)
-	case bool:
-		got = []byte(strconv.FormatBool(v))
-	case int64:
-		got = []byte(strconv.Itoa(int(v)))
-	case uint64:
-		got = []byte(strconv.FormatUint(v, 10))
-	case float64:
-		got = []byte(strconv.FormatFloat(v, 'f', -1, 64))
-	default:
-		err = fmt.Errorf("getStringVal unhandled type: %T", v)
-	}
-
-	return
-}
-
-func getUuidVal(val any) (got parquet.FixedLenByteArray, err error) {
-	switch v := val.(type) {
-	case string:
-		if p, parseErr := uuid.Parse(v); parseErr != nil {
-			err = fmt.Errorf("unable to parse string %q as UUID: %w", v, parseErr)
-		} else if b, marshalErr := p.MarshalBinary(); marshalErr != nil {
-			err = fmt.Errorf("failed to marshal string %q as binary: %w", v, marshalErr)
-		} else {
-			got = b
-		}
-	default:
-		err = fmt.Errorf("getUuidVal unhandled type: %T", v)
-	}
-
-	return
-}
-
 func getDateVal(val any) (got int32, err error) {
 	switch v := val.(type) {
 	case string:
@@ -732,26 +691,101 @@ func getTimestampVal(val any) (got int64, err error) {
 	return
 }
 
-func getIntervalVal(val any) (got parquet.FixedLenByteArray, err error) {
+// The remaining "appendXVal" functions similarly determine the appropriate byte
+// representation for the source data to be stored in a certain column, and
+// append those bytes to the provided buffer, returning the buffer so that it
+// may be re-used.
+
+func appendBinaryVal(buf []byte, val any) ([]byte, error) {
+	switch v := val.(type) {
+	case []byte:
+		buf = append(buf, v...)
+	case string:
+		var err error
+		if buf, err = base64.StdEncoding.AppendDecode(buf, []byte(v)); err != nil {
+			return nil, fmt.Errorf("unable to parse string %q as binary: %w", v, err)
+		}
+	default:
+		return nil, fmt.Errorf("getBinaryVal unhandled type: %T", v)
+	}
+
+	return buf, nil
+}
+
+func appendJsonVal(buf []byte, val any) ([]byte, error) {
+	switch v := val.(type) {
+	case []byte:
+		buf = append(buf, v...)
+	case json.RawMessage:
+		buf = append(buf, v...)
+	default:
+		var err error
+		buf, err = json.Append(buf, v, 0)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return buf, nil
+}
+
+func appendStringVal(buf []byte, val any) ([]byte, error) {
+	switch v := val.(type) {
+	case string:
+		buf = append(buf, v...)
+	case []byte:
+		buf = append(buf, v...)
+	case json.RawMessage:
+		buf = append(buf, v...)
+	case bool:
+		buf = append(buf, strconv.FormatBool(v)...)
+	case int64:
+		buf = append(buf, strconv.Itoa(int(v))...)
+	case uint64:
+		buf = append(buf, strconv.FormatUint(v, 10)...)
+	case float64:
+		buf = append(buf, strconv.FormatFloat(v, 'f', -1, 64)...)
+	default:
+		return nil, fmt.Errorf("getStringVal unhandled type: %T", v)
+	}
+
+	return buf, nil
+}
+
+func appendUuidVal(buf []byte, val any) ([]byte, error) {
+	switch v := val.(type) {
+	case string:
+		if p, parseErr := uuid.Parse(v); parseErr != nil {
+			return nil, fmt.Errorf("unable to parse string %q as UUID: %w", v, parseErr)
+		} else if b, marshalErr := p.MarshalBinary(); marshalErr != nil {
+			return nil, fmt.Errorf("failed to marshal string %q as binary: %w", v, marshalErr)
+		} else {
+			buf = append(buf, b...)
+		}
+	default:
+		return nil, fmt.Errorf("getUuidVal unhandled type: %T", v)
+	}
+
+	return buf, nil
+}
+
+func appendIntervalVal(buf []byte, val any) ([]byte, error) {
 	switch v := val.(type) {
 	case string:
 		if d, parseErr := iso8601.ParseISO8601(v); parseErr != nil {
-			err = fmt.Errorf("unable to parse string %q as ISO8601 duration string: %w", v, parseErr)
+			return nil, fmt.Errorf("unable to parse string %q as ISO8601 duration string: %w", v, parseErr)
 		} else {
 			months := uint32(d.Y*12 + d.M)
 			days := uint32(d.W*7 + d.D)
 			millis := uint32(d.TH*60*60*1000 + d.TM*60*1000 + d.TS*1000)
 
-			val := make([]byte, 0, 12)
-			val = binary.LittleEndian.AppendUint32(val, months)
-			val = binary.LittleEndian.AppendUint32(val, days)
-			val = binary.LittleEndian.AppendUint32(val, millis)
-
-			got = val
+			buf = binary.LittleEndian.AppendUint32(buf, months)
+			buf = binary.LittleEndian.AppendUint32(buf, days)
+			buf = binary.LittleEndian.AppendUint32(buf, millis)
 		}
 	default:
-		err = fmt.Errorf("getIntervalVal unhandled type: %T", v)
+		return nil, fmt.Errorf("getIntervalVal unhandled type: %T", v)
 	}
 
-	return
+	return buf, nil
 }

@@ -18,6 +18,7 @@ type ParquetSchemaElement struct {
 	Name     string
 	DataType ParquetDataType
 	Required bool
+	FieldId  *int32
 }
 
 // ParquetDataType provides a mapping for the JSON types we support to an appropriate parquet data
@@ -50,6 +51,7 @@ type ParquetDataType int
 
 const (
 	PrimitiveTypeInteger ParquetDataType = iota // INT64 primitive type
+	PrimitiveTypeInt32                          // INT32 primitive type
 	PrimitiveTypeNumber                         // DOUBLE primitive type, which is a 64-bit float
 	PrimitiveTypeBoolean                        // BOOLEAN primitive type
 	PrimitiveTypeBinary                         // BYTE_ARRAY primitive type
@@ -60,6 +62,7 @@ const (
 	LogicalTypeTimestamp                        // Extends INT64
 	LogicalTypeUuid                             // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
 	LogicalTypeInterval                         // Extends FIXED_LEN_BYTE_ARRAY, with a length of 12 bytes
+	LogicalTypeFixed16                          // EXTENDS FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes, as a general blob
 	LogicalTypeUnknown                          // Must always be nil
 )
 
@@ -69,16 +72,20 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 	if !e.Required {
 		repetition = parquet.Repetitions.Optional
 	}
+	fieldId := int32(-1)
+	if e.FieldId != nil {
+		fieldId = *e.FieldId
+	}
 
 	switch e.DataType {
 	case PrimitiveTypeInteger:
-		return schema.NewInt64Node(e.Name, repetition, -1)
+		return schema.NewInt64Node(e.Name, repetition, fieldId)
 	case PrimitiveTypeNumber:
-		return schema.NewFloat64Node(e.Name, repetition, -1)
+		return schema.NewFloat64Node(e.Name, repetition, fieldId)
 	case PrimitiveTypeBoolean:
-		return schema.NewBooleanNode(e.Name, repetition, -1)
+		return schema.NewBooleanNode(e.Name, repetition, fieldId)
 	case PrimitiveTypeBinary:
-		return schema.NewByteArrayNode(e.Name, repetition, -1)
+		return schema.NewByteArrayNode(e.Name, repetition, fieldId)
 	case LogicalTypeString:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
 			e.Name,
@@ -86,7 +93,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.StringLogicalType{},
 			parquet.Types.ByteArray,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeUuid:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -95,7 +102,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.UUIDLogicalType{},
 			parquet.Types.FixedLenByteArray,
 			16,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeJson:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -104,7 +111,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.JSONLogicalType{},
 			parquet.Types.ByteArray,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeDate:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -113,7 +120,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.DateLogicalType{},
 			parquet.Types.Int32,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeTime:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -131,7 +138,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.NewTimestampLogicalType(true, schema.TimeUnitMicros),
 			parquet.Types.Int64,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeInterval:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -140,7 +147,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.IntervalLogicalType{},
 			parquet.Types.FixedLenByteArray,
 			12,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeUnknown:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -149,7 +156,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.UnknownLogicalType{},
 			parquet.Types.Undefined,
 			-1,
-			-1,
+			fieldId,
 		))
 	default:
 		panic(fmt.Sprintf("makeNode unknown type: %d", e.DataType))
