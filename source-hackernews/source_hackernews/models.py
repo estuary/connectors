@@ -22,21 +22,73 @@ class ResourceConfig(BaseResourceConfig):
 
 class Item(BaseDocument):
     """
-    Hackernews Item
+    Base Hackernews Item model with common fields
     """
-    id: int
+    id: Optional[int] = None
     deleted: bool = False
     type: Optional[str] = Field(None, description='One of "job", "story", "comment", "poll", or "pollopt"')
     by: Optional[str] = None
     time: Optional[datetime] = Field(None, description='Unix Time')
-    text: Optional[str] = Field(None, description='HTML')
     dead: bool = False
-    parent: Optional[int] = Field(None, description="ID of the parent item")
-    poll: Optional[int] = Field(None, description="ID of the associated poll for pollopt")
     kids: List[int] = Field(default_factory=list, description="List of IDs of comments")
+
+
+class Story(Item):
+    """
+    Hackernews Story or Ask HN
+    """
+    title: Optional[str] = Field(None, description='HTML')
     url: Optional[HttpUrl] = None
     score: Optional[int] = None
-    title: Optional[str] = Field(None, description='HTML')
-    parts: List[int] = Field(default_factory=list, description="List of related pollopts")
-    descendants: Optional[int] = Field(None, description="Total comment count for stories or polls")
+    descendants: Optional[int] = Field(None, description="Total comment count")
+    text: Optional[str] = Field(None, description='HTML')
+
+
+class Comment(Item):
+    """
+    Hackernews Comment
+    """
+    parent: int = Field(..., description="ID of the parent item")
+    text: str = Field(..., description='HTML')
+
+
+class Job(Item):
+    """
+    Hackernews Job Posting
+    """
+    title: str = Field(..., description='HTML')
+    text: str = Field(..., description='HTML')
+    url: Optional[HttpUrl] = None
+    score: Optional[int] = None
+
+
+class Poll(Item):
+    """
+    Hackernews Poll
+    """
+    title: str = Field(..., description='HTML')
+    text: Optional[str] = Field(None, description='HTML')
+    score: int
+    descendants: int = Field(..., description="Total comment count")
+    parts: List[int] = Field(..., description="List of related pollopts")
+
+
+class PollOption(Item):
+    """
+    Hackernews Poll Option
+    """
+    poll: int = Field(..., description="ID of the associated poll")
+    text: str = Field(..., description='HTML')
+    score: int
+
+
+class User(BaseDocument):
+    """
+    Hackernews User
+    """
+    id: str
+    created: datetime
+    karma: int
+    about: Optional[str] = Field(None, description='HTML')
+    submitted: List[int] = Field(default_factory=list, description="List of the user's stories, polls and comments")
 

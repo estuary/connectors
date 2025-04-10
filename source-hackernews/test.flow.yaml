@@ -11,10 +11,62 @@ captures:
           - source_hackernews
         config: config.yaml
     bindings:
+      # - resource:
+      #     name: items
+      #     interval: PT3600S
+      #   target: acmeCo/items
       - resource:
-          name: items
+          name: stories
           interval: PT3600S
-        target: acmeCo/items
+        target: acmeCo/stories
+      - resource:
+          name: comments
+          interval: PT3600S
+        target: acmeCo/comments
+      - resource:
+          name: jobs
+          interval: PT3600S
+        target: acmeCo/jobs
+      - resource:
+          name: polls
+          interval: PT3600S
+        target: acmeCo/polls
+      - resource:
+          name: poll_options
+          interval: PT3600S
+        target: acmeCo/poll_options
+      # - resource:
+      #     name: users
+      #     interval: PT3600S
+      #   target: acmeCo/users
+      # - resource:
+      #     name: top_stories
+      #     interval: PT300S
+      #   target: acmeCo/top_stories
+      # - resource:
+      #     name: new_stories
+      #     interval: PT300S
+      #   target: acmeCo/new_stories
+      # - resource:
+      #     name: best_stories
+      #     interval: PT300S
+      #   target: acmeCo/best_stories
+      # - resource:
+      #     name: ask_stories
+      #     interval: PT300S
+      #   target: acmeCo/ask_stories
+      # - resource:
+      #     name: show_stories
+      #     interval: PT300S
+      #   target: acmeCo/show_stories
+      # - resource:
+      #     name: job_stories
+      #     interval: PT300S
+      #   target: acmeCo/job_stories
+      # - resource:
+      #     name: updates
+      #     interval: PT60S
+      #   target: acmeCo/updates
     interval: 3m
     shards:
       logLevel: debug

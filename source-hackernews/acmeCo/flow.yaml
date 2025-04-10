@@ -1,6 +1,58 @@
 ---
+# Hacker News Flow Configuration
 collections:
   acmeCo/items:
     schema: items.schema.yaml
-    key:
-      - /id
+    key: [/id]
+
+  acmeCo/stories:
+    schema: stories.schema.yaml
+    key: [/id]
+
+  acmeCo/comments:
+    schema: comments.schema.yaml
+    key: [/id]
+
+  acmeCo/jobs:
+    schema: jobs.schema.yaml
+    key: [/id]
+
+  acmeCo/polls:
+    schema: polls.schema.yaml
+    key: [/id]
+
+  acmeCo/poll_options:
+    schema: poll_options.schema.yaml
+    key: [/id]
+
+  acmeCo/users:
+    schema: users.schema.yaml
+    key: [/id]
+
+  acmeCo/top_stories:
+    schema: top_stories.schema.yaml
+    key: [/id]
+
+  acmeCo/new_stories:
+    schema: new_stories.schema.yaml
+    key: [/id]
+
+  acmeCo/best_stories:
+    schema: best_stories.schema.yaml
+    key: [/id]
+
+  acmeCo/ask_stories:
+    schema: ask_stories.schema.yaml
+    key: [/id]
+
+  acmeCo/show_stories:
+    schema: show_stories.schema.yaml
+    key: [/id]
+
+  acmeCo/job_stories:
+    schema: jobs.schema.yaml
+    key: [/id]
+
+  acmeCo/updates:
+    schema: updates.schema.yaml
+    key: [/id]
