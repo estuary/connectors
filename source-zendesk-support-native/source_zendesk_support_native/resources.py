@@ -65,7 +65,12 @@ from .api import (
 )
 
 
-ENTERPRISE_STREAMS = ["audit_logs", "account_attributes"]
+ENTERPRISE_STREAMS = [
+    "audit_logs",
+    "account_attributes",
+    "schedules",
+    "sla_policies",
+]
 
 
 async def _is_enterprise_account(
