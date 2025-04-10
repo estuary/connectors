@@ -21,7 +21,10 @@ from ..flow import (
     ConnectorStateUpdate,
     EndpointConfig,
     ResourceConfig,
+    RotatingOAuth2Credentials,
 )
+from ..encryption import encrypt, decrypt
+from ..http import HTTPError, HTTPMixin, TokenSource
 from ..pydantic_polyfill import GenericModel
 
 
@@ -286,6 +289,9 @@ class BaseCaptureConnector(
             # want to block on it.
             asyncio.create_task(periodic_stop())
 
+            # Allow subclasses to perform setup prior to running tasks.
+            await self._setup(log, open)
+
             async with asyncio.TaskGroup() as tg:
 
                 task = Task(
@@ -317,3 +323,23 @@ class BaseCaptureConnector(
         )
         self.output.write(b"\n")
         self.output.flush()
+
+    def _checkpoint(
+        self,
+        state: ConnectorState,
+        merge_patch: bool = True
+    ):
+        r = Response[Any, Any, ConnectorState](
+            checkpoint=response.Checkpoint(
+                state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
+            )
+        )
+
+        self._emit(r)
+
+    async def _setup(
+        self,
+        log: Logger,
+        open: request.Open[EndpointConfig, ResourceConfig, ConnectorState]
+    ):
+        pass
