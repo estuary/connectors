@@ -1,6 +1,8 @@
 import functools
 from datetime import timedelta, datetime, UTC
 from logging import Logger
+from typing import List, AsyncGenerator, Awaitable
+import itertools
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import common, Task
@@ -11,8 +13,10 @@ from .models import (
     ResourceState, Item, User, ResourceConfig
 )
 from .api import (
-    fetch_page, fetch_user
+    fetch_page, fetch_user, fetch_items_parallel
 )
+
+from .buffer_ordered import buffer_ordered
 
 
 async def all_resources(
@@ -32,12 +36,35 @@ def items(http: HTTPSession):
             task: Task,
             all_bindings
     ):
+        async def fetch_items_batched(log, start_cursor, log_cutoff) -> AsyncGenerator[Item | int, None]:
+            async def _do_batch_fetch(batch: List[int]) -> List[Item]:
+                results = []
+                for item_id in batch:
+                    async for response in fetch_page(http, log, item_id, log_cutoff):
+                        if response is not None and isinstance(response, Item):
+                            results.append(response)
+                return results
+
+            async def _batches_gen() -> AsyncGenerator[Awaitable[List[Item]], None]:
+                for batch_it in itertools.batched(range(start_cursor, start_cursor + 100), 10):
+                    yield _do_batch_fetch(list(batch_it))
+
+            total = 100
+            count = 0
+            async for res in buffer_ordered(_batches_gen(), 5):
+                for item in res:
+                    count += 1
+                    if count > 0 and count % 10_000 == 0:
+                        log.info("fetching items", {"count": count, "total": total})
+                    yield item
+                yield start_cursor + count  # Yield the next cursor position
+
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_page=functools.partial(fetch_page, http),
+            fetch_page=fetch_items_batched,
         )
 
     return common.Resource(

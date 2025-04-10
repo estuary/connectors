@@ -1,7 +1,8 @@
 from datetime import datetime
 import json
 from logging import Logger
-from typing import Optional, AsyncGenerator, Any, Dict, List, Type, TypeVar
+from typing import Optional, AsyncGenerator, Any, Dict, List, Type, TypeVar, Awaitable, Iterable
+import itertools
 
 from estuary_cdk.capture.common import PageCursor, LogCursor
 from estuary_cdk.http import HTTPSession
@@ -85,12 +86,29 @@ async def fetch_items_parallel(
     Yields:
         Items in the same order as item_ids
     """
-    async def gen():
-        for item_id in item_ids:
-            yield fetch_item(http, log, item_id)
-    
-    async for item in buffer_ordered(gen(), MAX_CONCURRENT_REQUESTS):
-        yield item
+    async def _do_batch_fetch(batch: List[int]) -> Iterable[Item]:
+        results = []
+        for item_id in batch:
+            item = await fetch_item(http, log, item_id)
+            if item:
+                results.append(item)
+        return results
+
+    async def _batches_gen() -> AsyncGenerator[Awaitable[Iterable[Item]], None]:
+        for batch_it in itertools.batched(item_ids, 100):
+            yield _do_batch_fetch(list(batch_it))
+
+    total = len(item_ids)
+    if total >= 10_000:
+        log.info("will process large batch of items", {"total": total})
+
+    count = 0
+    async for res in buffer_ordered(_batches_gen(), MAX_CONCURRENT_REQUESTS):
+        for item in res:
+            count += 1
+            if count > 0 and count % 10_000 == 0:
+                log.info("fetching items", {"count": count, "total": total})
+            yield item
 
 async def fetch_page(
     http: HTTPSession, 
