@@ -3,7 +3,6 @@ package stream_encode
 import (
 	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math"
@@ -12,12 +11,14 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/schema"
 	"github.com/google/uuid"
+	"github.com/segmentio/encoding/json"
 	iso8601 "github.com/senseyeio/duration"
 	log "github.com/sirupsen/logrus"
 )
@@ -636,6 +637,8 @@ func getJsonVal(val any) (got parquet.ByteArray, err error) {
 	switch v := val.(type) {
 	case []byte:
 		got = v
+	case json.RawMessage:
+		got = []byte(v)
 	default:
 		got, err = json.Marshal(v)
 	}
@@ -646,7 +649,9 @@ func getJsonVal(val any) (got parquet.ByteArray, err error) {
 func getStringVal(val any) (got parquet.ByteArray, err error) {
 	switch v := val.(type) {
 	case string:
-		got = []byte(v)
+		// Safety: This value is immediately written to the output and never
+		// modified.
+		got = unsafe.Slice(unsafe.StringData(v), len(v))
 	case []byte:
 		got = v
 	case json.RawMessage:
