@@ -718,9 +718,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
 
-	// If we see no results from the REST API for 5 minutes, then we fallback to asking the `COPY_HISTORY` table
+	// If we see no results from the REST API for 10 minutes, then we fallback to asking the `COPY_HISTORY` table
 	var retryDelay = 500 * time.Millisecond
-	var maxTryTime = time.Now().Add(5 * time.Minute)
+	var maxTryTime = time.Now().Add(10 * time.Minute)
 
 	for len(pipes) > 0 {
 		for pipeName, pipe := range pipes {
