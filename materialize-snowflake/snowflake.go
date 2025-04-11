@@ -827,8 +827,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var currentPipeNames []string
 	for stateKey, item := range d.cp {
 		if item.PipeName != "" {
-			currentPipeNames = append(currentPipeNames, item.PipeName)
 			var cpKey = strings.Split(stateKey, ".")[0]
+			var cleanedUp = false
 
 			// Delete old pipe names of this binding which may not be detected by cleanupPipes due to different
 			// formatting
@@ -836,14 +836,21 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				var bindingKey = strings.Split(b.target.StateKey, ".")[0]
 				if cpKey == bindingKey && item.PipeName != b.pipeName {
 					log.WithFields(log.Fields{
-						"pipeName":        item.PipeName,
-						"previousVersion": cpKey,
-						"newVersion":      bindingKey,
+						"cpPipeName":      item.PipeName,
+						"previousVersion": stateKey,
+						"bindingPipeName": b.pipeName,
+						"newVersion":      b.target.StateKey,
 					}).Info("dropping previous-version pipe")
 					if err := d.dropPipe(ctx, item.PipeName); err != nil {
 						return nil, err
 					}
+
+					cleanedUp = true
 				}
+			}
+
+			if !cleanedUp {
+				currentPipeNames = append(currentPipeNames, item.PipeName)
 			}
 		}
 	}
@@ -931,8 +938,9 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 		for _, pipe := range currentPipes {
 			if pipe.Catalog == db && pipe.Schema == schema && pipe.TableName == parts.TableName && pipe.Version != parts.Version {
 				log.WithFields(log.Fields{
-					"pipeName":       fullName,
-					"currentVersion": parts.Version,
+					"pipeName":        fullName,
+					"currentVersion":  pipe.Version,
+					"previousVersion": parts.Version,
 				}).Info("snowpipe: cleaning up leftover pipe")
 				toDelete = append(toDelete, fullName)
 				break
