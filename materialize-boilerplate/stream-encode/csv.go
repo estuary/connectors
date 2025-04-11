@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"unicode"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/klauspost/compress/gzip"
 )
@@ -126,7 +127,9 @@ func (w *csvWriter) writeRow(row []any) error {
 		case []byte:
 			w.buf = w.appendString(w.buf, value)
 		case string:
-			w.buf = w.appendString(w.buf, []byte(value))
+			// Safety: This value is immediately written to the output and never
+			// modified.
+			w.buf = w.appendString(w.buf, unsafe.Slice(unsafe.StringData(value), len(value)))
 		case bool:
 			w.buf = strconv.AppendBool(w.buf, value)
 		case int64:
