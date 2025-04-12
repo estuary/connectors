@@ -51,7 +51,7 @@ class Connector(
         if (
             not validate.lastCapture
             or (
-                validate.lastCapture.config.config.get("capture_connected_accounts")
+                validate.lastCapture.config.config.get("capture_connected_accounts", False)
                 == validate.config.capture_connected_accounts
             )
             or not validate.lastCapture.bindings
