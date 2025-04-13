@@ -514,3 +514,42 @@ func TestSchemaChangesOnline(t *testing.T) {
 
 	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
+
+func TestCrossSCNTransactions(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var uniqueID = "23135019"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+
+	var captureCtx, cancelCapture = context.WithCancel(ctx)
+
+	cs.EndpointSpec.(*Config).Advanced.DictionaryMode = "online"
+
+	tb.Insert(ctx, t, tableName, [][]any{{1930, "BB", "No Such State", 10000}})
+
+	cs.Capture(captureCtx, t, func(data json.RawMessage) {
+		if !strings.Contains(string(data), "bindingStateV1") {
+			var d doc
+			err := json.Unmarshal(data, &d)
+			require.NoError(t, err)
+
+			if d.Year == "1930" {
+				var tx, err = tb.control.BeginTx(ctx, nil)
+				if err != nil {
+					t.Fatalf("unable to begin transaction query: %v", err)
+				}
+				if _, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE %s SET year = '1950'", tableName)); err != nil {
+					t.Fatalf("unable to update transaction query: %v", err)
+				}
+				time.Sleep(5 * time.Second)
+				if err := tx.Commit(); err != nil {
+					t.Fatalf("unable to commit transaction query: %v", err)
+				}
+			} else if d.Year == "1950" {
+				cancelCapture()
+			}
+		}
+	})
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
