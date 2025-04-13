@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -90,6 +91,8 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 
 		smartMode:      smartMode,
 		dictionaryMode: dictionaryMode,
+
+		txs: make(map[string][]logminerMessage),
 	}
 
 	stream.tables.active = make(map[string]struct{})
@@ -246,16 +249,16 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int64) error {
 	var dictionaryOption = ""
 	if s.dictionaryMode == DictionaryModeExtract {
-		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
+		dictionaryOption = "DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
 	} else if s.dictionaryMode == DictionaryModeOnline {
-		dictionaryOption = "+ DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG"
+		dictionaryOption = "DBMS_LOGMNR.DICT_FROM_ONLINE_CATALOG"
 	}
 
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
 		"endSCN":   endSCN,
 	}).Debug("starting logminer")
-	var startQuery = fmt.Sprintf("BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,ENDSCN=>:end,OPTIONS=>DBMS_LOGMNR.COMMITTED_DATA_ONLY %s); END;", dictionaryOption)
+	var startQuery = fmt.Sprintf("BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,ENDSCN=>:end,OPTIONS=>%s); END;", dictionaryOption)
 	if _, err := s.conn.ExecContext(ctx, startQuery, startSCN, endSCN); err != nil {
 		return fmt.Errorf("starting logminer: %w", err)
 	}
@@ -268,7 +271,7 @@ type oracleSource struct {
 	sqlcapture.SourceCommon
 
 	// System Change Number, available for incremental changes only
-	SCN int `json:"scn,omitempty" jsonschema:"description=SCN of this event, only present for incremental changes"`
+	SCN int64 `json:"scn,omitempty" jsonschema:"description=SCN of this event, only present for incremental changes"`
 
 	RowID string `json:"row_id" jsonschema:"description=ROWID of the document"`
 
@@ -306,6 +309,9 @@ type replicationStream struct {
 	lastTxnEndSCN int64 // End SCN (record + 1) of the last completed transaction.
 
 	logminerStmt *sql.Stmt
+
+	// Transactions being tracked, a mapping of XID to logminer messages
+	txs map[string][]logminerMessage
 
 	// The 'active tables' set, guarded by a mutex so it can be modified from
 	// the main goroutine while it's read by the replication goroutine.
@@ -401,10 +407,6 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	}
 	if err := s.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
-	}
-
-	if err := s.generateLogminerQuery(ctx); err != nil {
-		return err
 	}
 
 	var eg, egCtx = errgroup.WithContext(ctx)
@@ -523,6 +525,16 @@ func (s *replicationStream) poll(ctx context.Context) error {
 		// on restart, but it saves us from missing events
 		s.lastTxnEndSCN = endSCN
 
+		// If there are pending transactions which have started but we have not seen their commit or rollback yet
+		// we need to re-try fetching their range to make sure we cover them
+		for _, tx := range s.txs {
+			for _, m := range tx {
+				if m.SCN < s.lastTxnEndSCN {
+					s.lastTxnEndSCN = m.SCN
+				}
+			}
+		}
+
 		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.FormatInt(s.lastTxnEndSCN, 10)}
 
 		if s.smartMode && s.dictionaryMode == DictionaryModeExtract && int64(s.lastDDLSCN) < endSCN {
@@ -535,6 +547,29 @@ func (s *replicationStream) poll(ctx context.Context) error {
 
 		s.redoSequence = redoSequence
 	}
+}
+
+func (s *replicationStream) handleTransactionBoundaries(ctx context.Context, msg logminerMessage) error {
+	switch msg.Op {
+	case opStart:
+		s.txs[msg.XID] = []logminerMessage{msg}
+	case opCommit:
+		for _, m := range s.txs[msg.XID] {
+			if m.Op == opStart {
+				continue
+			}
+			if err := s.decodeAndEmitMessage(ctx, m); err != nil {
+				return err
+			}
+		}
+		delete(s.txs, msg.XID)
+	case opRollback:
+		delete(s.txs, msg.XID)
+	default:
+		s.txs[msg.XID] = append(s.txs[msg.XID], msg)
+	}
+
+	return nil
 }
 
 func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logminerMessage) error {
@@ -558,8 +593,7 @@ func unquote(s string) string {
 }
 
 type logminerMessage struct {
-	SCN          int
-	EndSCN       int
+	SCN          int64
 	Op           int
 	SQL          string
 	UndoSQL      string
@@ -573,12 +607,16 @@ type logminerMessage struct {
 	CSF          int
 	ObjectID     int
 	DataObjectID int
+	XID          string
 }
 
 const (
-	opInsert = 1
-	opDelete = 2
-	opUpdate = 3
+	opInsert   = 1
+	opDelete   = 2
+	opUpdate   = 3
+	opStart    = 6
+	opCommit   = 7
+	opRollback = 36
 )
 
 func (s *replicationStream) generateLogminerQuery(ctx context.Context) error {
@@ -596,11 +634,15 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context) error {
 		}
 		conditions = append(conditions, fmt.Sprintf("(DATA_OBJ# = %d AND DATA_OBJD# = %d)", mapping.objectID, mapping.dataObjectID))
 	}
-	var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#
+	var opCodes = []int{opInsert, opDelete, opUpdate, opStart, opCommit, opRollback}
+	var opPredicate = strings.Trim(strings.Join(strings.Fields(fmt.Sprint(opCodes)), ","), "[]")
+	// START and COMMIT operations do not seg_owner and have data_obj#=0 and data_objd#=0
+	var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#, XID
     FROM V$LOGMNR_CONTENTS
-    WHERE OPERATION_CODE IN (1, 2, 3) AND SCN >= :startSCN AND SCN <= :endSCN AND
-    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS')
-    AND (%s)`, strings.Join(conditions, " OR "))
+    WHERE OPERATION_CODE IN (%s) AND SCN >= :startSCN AND SCN <= :endSCN AND
+    (SEG_OWNER IS NULL OR
+    SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS'))
+    AND ((DATA_OBJ#=0 AND DATA_OBJD#=0) OR %s)`, opPredicate, strings.Join(conditions, " OR "))
 
 	stmt, err := s.conn.PrepareContext(ctx, query)
 	if err != nil {
@@ -631,13 +673,26 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		var ts time.Time
 		var redoSql sql.NullString
 		var undoSql sql.NullString
+		var tableName sql.NullString
+		var owner sql.NullString
 		var info sql.NullString
-		if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &redoSql, &undoSql, &msg.TableName, &msg.Owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID); err != nil {
+		var xidRaw []byte
+		if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &redoSql, &undoSql, &tableName, &owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID, &xidRaw); err != nil {
 			return err
 		}
 
+		msg.XID = base64.StdEncoding.EncodeToString(xidRaw)
+
 		// For some reason RSID comes with a space before and after it
 		msg.RSID = strings.TrimSpace(msg.RSID)
+
+		if tableName.Valid {
+			msg.TableName = tableName.String
+		}
+
+		if owner.Valid {
+			msg.Owner = owner.String
+		}
 
 		if redoSql.Valid {
 			msg.SQL = redoSql.String
@@ -653,13 +708,13 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		msg.Timestamp = ts.UnixMilli()
 
 		logrus.WithFields(logrus.Fields{
-			"msg": msg,
+			"msg": fmt.Sprintf("%+v", msg),
 		}).Trace("received message")
 
 		// If this change event is on a table we're not capturing, skip doing any
 		// further processing on it.
 		var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
-		if !s.tableActive(streamID) {
+		if !s.tableActive(streamID) && (msg.Op != opStart && msg.Op != opCommit) {
 			logrus.WithField("streamID", streamID).Debug("logminer: received message for unknown table")
 			var isKnownTable = false
 			// if the table has been dropped, check their object identifier
@@ -699,7 +754,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 
 			// last message was CSF, this one is not. This is the end of the continuation chain
 			if msg.CSF == 0 {
-				if err := s.decodeAndEmitMessage(ctx, *lastMsg); err != nil {
+				if err := s.handleTransactionBoundaries(ctx, *lastMsg); err != nil {
 					return err
 				}
 				fullMessages++
@@ -713,7 +768,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 			continue
 		}
 
-		if err := s.decodeAndEmitMessage(ctx, msg); err != nil {
+		if err := s.handleTransactionBoundaries(ctx, msg); err != nil {
 			return err
 		}
 		fullMessages++
@@ -725,7 +780,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		return err
 	}
 
-	var finalSCN = 0
+	var finalSCN int64
 	if lastMsg != nil {
 		finalSCN = lastMsg.SCN
 	}
@@ -756,10 +811,14 @@ func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
 
 func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
-	defer s.tables.Unlock()
 	s.tables.active[streamID] = struct{}{}
 	s.tables.keyColumns[streamID] = keyColumns
 	s.tables.discovery[streamID] = discovery
+	s.tables.Unlock()
+
+	if err := s.generateLogminerQuery(ctx); err != nil {
+		return err
+	}
 	return nil
 }
 
