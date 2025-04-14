@@ -1,0 +1,77 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-outreach:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_outreach
+        config: config.yaml
+    bindings:
+      - resource:
+          name: accounts
+          interval: PT5M
+        target: acmeCo/accounts
+      - resource:
+          name: calls
+          interval: PT5M
+        target: acmeCo/calls
+      - resource:
+          name: call_dispositions
+          interval: PT5M
+        target: acmeCo/call_dispositions
+      - resource:
+          name: call_purposes
+          interval: PT5M
+        target: acmeCo/call_purposes
+      - resource:
+          name: email_addresses
+          interval: PT5M
+        target: acmeCo/email_addresses
+      - resource:
+          name: mailboxes
+          interval: PT5M
+        target: acmeCo/mailboxes
+      - resource:
+          name: mailings
+          interval: PT5M
+        target: acmeCo/mailings
+      - resource:
+          name: prospects
+          interval: PT5M
+        target: acmeCo/prospects
+      - resource:
+          name: teams
+          interval: PT5M
+        target: acmeCo/teams
+      - resource:
+          name: templates
+          interval: PT5M
+        target: acmeCo/templates
+      - resource:
+          name: users
+          interval: PT5M
+        target: acmeCo/users
+      - resource:
+          name: tasks
+          interval: PT5M
+        target: acmeCo/tasks
+      - resource:
+          name: stages
+          interval: PT5M
+        target: acmeCo/stages
+      - resource:
+          name: opportunities
+          interval: PT5M
+        target: acmeCo/opportunities
+      - resource:
+          name: opportunity_stages
+          interval: PT5M
+        target: acmeCo/opportunity_stages
+      - resource:
+          name: events
+          interval: PT5M
+        target: acmeCo/events
