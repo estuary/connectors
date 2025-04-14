@@ -286,6 +286,12 @@ func (c *capture) readShard(
 			StreamARN:     &stream.arn,
 		})
 		if err != nil {
+			var throughputExceededError *types.ProvisionedThroughputExceededException
+			if errors.As(err, &throughputExceededError) {
+				ll.WithError(err).Info("retying GetRecords due to ThroughputExceeded")
+				continue
+			}
+
 			return fmt.Errorf("get records: %w", err)
 		}
 
