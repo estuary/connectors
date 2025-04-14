@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"golang.org/x/sync/errgroup"
@@ -59,7 +60,10 @@ func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
 			// errors before giving up and crashing the connector.
 			//
 			// Ref: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/
-			return retry.AddWithMaxAttempts(retry.NewStandard(), 20)
+			return retry.NewStandard(func(o *retry.StandardOptions) {
+				o.RateLimiter = ratelimit.None // rely on the standard error backoff for rate limiting
+				o.MaxAttempts = 20
+			})
 		}),
 	}
 

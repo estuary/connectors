@@ -280,6 +280,7 @@ func (c *capture) readShard(
 		break
 	}
 
+	var didLogNoData bool
 	for {
 		res, err := c.client.GetRecords(ctx, &kinesis.GetRecordsInput{
 			ShardIterator: iterator,
@@ -306,11 +307,15 @@ func (c *capture) readShard(
 		iterator = res.NextShardIterator
 
 		if *res.MillisBehindLatest != 0 && len(res.Records) == 0 {
-			ll.WithField("MillisBehindLatest", *res.MillisBehindLatest).Info("shard is not current but returned no new data")
+			ll.WithField("MillisBehindLatest", *res.MillisBehindLatest).Info("shard is not caught up but returned no new data")
+			didLogNoData = true
 		}
 
 		if *res.MillisBehindLatest == 0 && len(res.Records) == 0 {
-			ll.Debug("waiting before polling for new data since shard is caught up")
+			if didLogNoData {
+				ll.Info("shard is caught up")
+				didLogNoData = false
+			}
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
