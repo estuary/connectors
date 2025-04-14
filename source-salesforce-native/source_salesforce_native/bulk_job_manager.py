@@ -27,6 +27,7 @@ ATTEMPT_LOG_THRESHOLD = 10
 COUNT_HEADER = "Sforce-NumberOfRecords"
 CANNOT_FETCH_COMPOUND_DATA = r"Selecting compound data not supported in Bulk Query"
 NOT_SUPPORTED_BY_BULK_API = r"is not supported by the Bulk API"
+DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED = r"Max bulk v2 query result size stored (1000000000) kb per 24 hrs has been exceeded"
 
 
 # Python's csv module has a default field size limit of 131,072 bytes, and it will raise an _csv.Error exception if a field value
@@ -88,12 +89,15 @@ class BulkJobManager:
                 await self.http.request(self.log, self.base_url, method="POST", json=body)
             )
         except HTTPError as err:
-            if err.code == 400 and re.search(CANNOT_FETCH_COMPOUND_DATA, err.message, re.DOTALL):
+            if err.code == 400 and CANNOT_FETCH_COMPOUND_DATA in err.message:
                 msg = "Complex fields cannot be fetched via the Bulk API."
                 raise BulkJobError(msg, body['query'], err.message)
-            elif err.code == 400 and re.search(NOT_SUPPORTED_BY_BULK_API, err.message, re.DOTALL):
+            elif err.code == 400 and NOT_SUPPORTED_BY_BULK_API in err.message:
                 msg = f"Object {object_name} is not supported by the Bulk API."
                 raise BulkJobError(msg, body["query"], err.message)
+            elif err.code == 400 and DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED in err.message:
+                msg = "Maximum size of bulk results per rolling 24 hour period (1 TB) has been exceeded."
+                raise BulkJobError(msg, body['query'], err.message)
             else:
                 raise
 

@@ -5,7 +5,13 @@ from typing import Any, AsyncGenerator
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 
-from .bulk_job_manager import BulkJobError, BulkJobManager, NOT_SUPPORTED_BY_BULK_API, CANNOT_FETCH_COMPOUND_DATA
+from .bulk_job_manager import (
+    BulkJobError,
+    BulkJobManager,
+    CANNOT_FETCH_COMPOUND_DATA,
+    DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED,
+    NOT_SUPPORTED_BY_BULK_API,
+)
 from .rest_query_manager import RestQueryManager
 from .shared import dt_to_str, str_to_dt, now
 from .models import (
@@ -155,11 +161,18 @@ async def backfill_incremental_resources(
             yield doc_or_str
     except BulkJobError as err:
         # If this object can't be queried via the Bulk API, fallback to using the REST API.
-        if err.errors and (CANNOT_FETCH_COMPOUND_DATA in err.errors or NOT_SUPPORTED_BY_BULK_API in err.errors):
-            log.info(f"{name} cannot be queried via the Bulk API. Attempting to use the REST API instead.", {"errors": err.errors})
+        should_fallback_to_rest_api = False
+        if err.errors:
+            if CANNOT_FETCH_COMPOUND_DATA in err.errors or NOT_SUPPORTED_BY_BULK_API in err.errors:
+                log.info(f"{name} cannot be queried via the Bulk API. Attempting to use the REST API instead.", {"errors": err.errors})
+                should_fallback_to_rest_api = True
+            elif DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED in err.errors:
+                log.info(f"{err.message}. Attempting to use the REST API instead.", {"errors": err.errors})
+                should_fallback_to_rest_api = True
+
+        if should_fallback_to_rest_api:
             async for doc_or_str in _execute(rest_query_manager, REST_CHECKPOINT_INTERVAL):
                 yield doc_or_str
-        
         else:
             raise
 
