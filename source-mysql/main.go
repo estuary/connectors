@@ -248,17 +248,23 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		address = "localhost:3306"
 	}
 
+	// The MySQL client library plumbing around net.Conn timeouts is hackish and terrible
+	// and must not be trusted. However we still want to protect against hangs during the
+	// initial connection process. Since all we're going to do if the connection hangs is
+	// error out anyway, we can do this by cutting out the middleman and just setting up
+	// a directly fatal-if-not-cancelled timer.
+	var connectionTimer = time.AfterFunc(60*time.Second, func() {
+		logrus.WithField("addr", address).Fatal("failed to connect before deadline")
+	})
+	defer connectionTimer.Stop()
+
 	const mysqlErrorCodeSecureTransportRequired = 3159 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
 	var mysqlErr *mysql.MyError
 	var withTLS = func(c *client.Conn) error {
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 		return nil
 	}
-	var withTimeouts = func(c *client.Conn) error {
-		c.ReadTimeout = 60 * time.Second
-		c.WriteTimeout = 60 * time.Second
-		return nil
-	}
+
 	// The following if-else chain looks somewhat complicated but it's really very simple.
 	// * We'd prefer to use TLS, so we first try to connect with TLS, and then if that fails
 	//   we try again without.
@@ -266,12 +272,12 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	// * Otherwise we report both errors because it's better to be clear what failed and how.
 	// * Except if the non-TLS connection specifically failed because TLS is required then
 	//   we don't need to mention that and just return the with-TLS error.
-	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTimeouts, withTLS); errWithTLS == nil {
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
 		db.conn = connWithTLS
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTimeouts); errWithoutTLS == nil {
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = connWithoutTLS
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
@@ -282,6 +288,7 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	} else {
 		return fmt.Errorf("unable to connect to database: failed both with TLS (%w) and without TLS (%w)", errWithTLS, errWithoutTLS)
 	}
+	connectionTimer.Stop() // Connection successful, cancel the timeout
 
 	// Debug logging hook so we can get the server config variables when needed
 	if err := db.logServerVariables(); err != nil {
