@@ -1,0 +1,110 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "_OAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "refresh_token": {
+              "secret": true,
+              "title": "Refresh Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "refresh_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "outreach"
+        }
+      },
+      "properties": {
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/_OAuth2Credentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/_OAuth2Credentials"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-outreach",
+    "oauth2": {
+      "provider": "outreach",
+      "authUrlTemplate": "https://api.outreach.io/oauth/authorize?response_type=code&scope=accounts.read%20auditLogs.read%20batches.read%20batchItems.read%20calls.read%20callDispositions.read%20callPurposes.read%20complianceRequests.read%20contentCategories.read%20contentCategoryMemberships.read%20contentCategoryOwnerships.read%20currencyTypes.read%20customObjectRecords.read%20datedConversionRates.read%20duties.read%20emailAddresses.read%20events.read%20favorites.read%20imports.read%20jobRoles.read%20mailboxes.read%20mailings.read%20mailAliases.read%20opportunities.read%20opportunityProspectRoles.read%20opportunityStages.read%20orgSettings.read%20personas.read%20phoneNumbers.read%20products.read%20profiles.read%20prospects.read%20purchases.read%20recipients.read%20recordActorAssignments.read%20roles.read%20rulesets.read%20sequences.read%20sequenceStates.read%20sequenceSteps.read%20sequenceTemplates.read%20snippets.read%20stages.read%20tasks.read%20taskDispositions.read%20taskPriorities.read%20taskPurposes.read%20teams.read%20templates.read%20users.read%20webhooks.read&state={{#urlencode}}{{{ state }}}{{/urlencode}}&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://api.outreach.io/oauth/token",
+      "accessTokenBody": "{\"grant_type\": \"authorization_code\", \"code\": \"{{{ code }}}\", \"client_id\": \"{{{ client_id }}}\", \"client_secret\": \"{{{ client_secret }}}\", \"redirect_uri\": \"{{{ redirect_uri }}}\"}",
+      "accessTokenHeaders": {
+        "Content-Type": "application/json"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token",
+        "expires_in": "/expires_in",
+        "refresh_token": "/refresh_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
