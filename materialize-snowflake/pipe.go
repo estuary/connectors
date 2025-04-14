@@ -32,7 +32,11 @@ type pipeParts struct {
 }
 
 func (parts *pipeParts) toPipeName() string {
-	return strings.ToUpper(fmt.Sprintf("%s.%s.FLOW_PIPE_%s_%s_%s_%s", parts.Catalog, parts.Schema, parts.Binding, parts.KeyBegin, parts.Version, parts.TableName))
+	return strings.ToUpper(fmt.Sprintf("FLOW_PIPE_%s_%s_%s_%s", parts.Binding, parts.KeyBegin, parts.Version, parts.TableName))
+}
+
+func (parts *pipeParts) toQualifiedName() string {
+	return strings.ToUpper(fmt.Sprintf("%s.%s.%s", parts.Catalog, parts.Schema, parts.toPipeName()))
 }
 
 // Deconstruct a pipeName into its constituent parts

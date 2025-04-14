@@ -318,7 +318,7 @@ func (d *transactor) addBinding(target sql.Table) error {
 			Version:   d.version,
 			TableName: sanitizeAndAppendHash(tableName),
 		}
-		b.pipeName = parts.toPipeName()
+		b.pipeName = parts.toQualifiedName()
 	}
 
 	d.bindings = append(d.bindings, b)
@@ -423,7 +423,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, error) {
-	var query = fmt.Sprintf("SELECT * FROM INFORMATION_SCHEMA.PIPES WHERE CONCAT(PIPE_CATALOG, '.', PIPE_SCHEMA, '.', PIPE_NAME)='%s';", pipeName)
+	// We use SHOW PIPES to avoid waking up the warehouse. SELECT from INFORMATION_SCHEMA.PIPES wakes up the warehouse.
+	var parts = pipeNameToParts(pipeName)
+	var query = fmt.Sprintf("SHOW PIPES LIKE '%s';", strings.ReplaceAll(parts.toPipeName(), "_", "\\\\_"))
 	rows, err := d.db.QueryContext(ctx, query)
 	if err != nil {
 		return false, fmt.Errorf("finding pipe %q: %w", pipeName, err)
@@ -854,8 +856,10 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			}
 		}
 	}
-	if err := d.cleanupPipes(ctx, currentPipeNames); err != nil {
-		return nil, fmt.Errorf("cleaning up pipes: %w", err)
+	if len(currentPipeNames) > 0 {
+		if err := d.cleanupPipes(ctx, currentPipeNames); err != nil {
+			return nil, fmt.Errorf("cleaning up pipes: %w", err)
+		}
 	}
 
 	// After having applied the checkpoint, we try to clean up the checkpoint in the ack response
@@ -918,7 +922,8 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 	}
 
 	// Find all FLOW_PIPEs with a matching KeyBegin
-	var query = fmt.Sprintf("SELECT PIPE_CATALOG, PIPE_SCHEMA, PIPE_NAME FROM INFORMATION_SCHEMA.PIPES WHERE PIPE_NAME LIKE 'FLOW_PIPE_%%_%s_%%_%%';", keyBegin)
+	// We use SHOW PIPES to avoid waking up the warehouse. SELECT from INFORMATION_SCHEMA.PIPES wakes up the warehouse.
+	var query = fmt.Sprintf("SHOW PIPES LIKE 'FLOW\\\\_PIPE\\\\_%%\\\\_%s\\\\_%%\\\\_%%';", keyBegin)
 	rows, err := d.db.QueryContext(ctx, query)
 	if err != nil {
 		return fmt.Errorf("listing pipes: %w", err)
@@ -928,7 +933,10 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 	var toDelete []string
 	for rows.Next() {
 		var db, schema, name string
-		if err := rows.Scan(&db, &schema, &name); err != nil {
+		// a string value to discard all the columns we don't want from SHOW PIPES
+		var x stdsql.NullString
+		var created time.Time
+		if err := rows.Scan(&created, &name, &db, &schema, &x, &x, &x, &x, &x, &x, &x, &x, &x, &x, &x); err != nil {
 			return fmt.Errorf("scanning pipe: %w", err)
 		}
 
