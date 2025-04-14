@@ -36,6 +36,6 @@ properties:
 required:
   - id
   - updatedAt
-title: IncrementalResource
+title: TimestampedResource
 type: object
 x-infer-schema: true

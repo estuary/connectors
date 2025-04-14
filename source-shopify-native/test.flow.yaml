@@ -12,6 +12,30 @@ captures:
         config: config.yaml
     bindings:
       - resource:
+          name: abandoned_checkouts
+          interval: PT5M
+        target: acmeCo/abandoned_checkouts
+      - resource:
           name: products
           interval: PT5M
         target: acmeCo/products
+      - resource:
+          name: customers
+          interval: PT5M
+        target: acmeCo/customers
+      - resource:
+          name: orders
+          interval: PT5M
+        target: acmeCo/orders
+      - resource:
+          name: inventory_items
+          interval: PT5M
+        target: acmeCo/inventory_items
+      - resource:
+          name: custom_collections
+          interval: PT5M
+        target: acmeCo/custom_collections
+      - resource:
+          name: locations
+          interval: PT1H
+        target: acmeCo/locations
