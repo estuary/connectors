@@ -29,6 +29,11 @@ func TestParquetEncoder(t *testing.T) {
 			nulls: false,
 			opts:  []ParquetOption{WithParquetRowGroupRowLimit(1)},
 		},
+		{
+			name:  "dictionary encoding disabled",
+			nulls: true,
+			opts:  []ParquetOption{WithDisableDictionaryEncoding()},
+		},
 	}
 
 	for _, tt := range tests {

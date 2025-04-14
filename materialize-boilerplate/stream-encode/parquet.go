@@ -125,9 +125,10 @@ const (
 )
 
 type parquetConfig struct {
-	compression       ParquetCompression
-	rowGroupRowLimit  int
-	rowGroupByteLimit int
+	compression               ParquetCompression
+	disableDictionaryEncoding bool
+	rowGroupRowLimit          int
+	rowGroupByteLimit         int
 }
 
 type ParquetEncoder struct {
@@ -159,6 +160,12 @@ type ParquetOption func(*parquetConfig)
 func WithParquetCompression(c ParquetCompression) ParquetOption {
 	return func(cfg *parquetConfig) {
 		cfg.compression = c
+	}
+}
+
+func WithDisableDictionaryEncoding() ParquetOption {
+	return func(cfg *parquetConfig) {
+		cfg.disableDictionaryEncoding = true
 	}
 }
 
@@ -217,6 +224,10 @@ func writerOpts(cfg parquetConfig) file.WriteOption {
 		panic(fmt.Sprintf("unknown compression setting: %d", cfg.compression))
 	}
 
+	if cfg.disableDictionaryEncoding {
+		propOpts = append(propOpts, parquet.WithDictionaryDefault(false))
+	}
+
 	return file.WithWriterProps(parquet.NewWriterProperties(propOpts...))
 }
 
@@ -231,7 +242,11 @@ func (e *ParquetEncoder) Encode(row []any) error {
 		if e.scratch.file, err = os.CreateTemp("", "parquet-scratch-*"); err != nil {
 			return fmt.Errorf("encode creating scratch file: %w", err)
 		}
-		e.scratch.writer = file.NewParquetWriter(e.scratch.file, e.schemaRoot)
+		// Don't use dictionary encoding for the scratch file, since it is much
+		// slower to write than plain encoding with the small row groups of the
+		// scratch file.
+		scratchOpts := []parquet.WriterProperty{parquet.WithDictionaryDefault(false)}
+		e.scratch.writer = file.NewParquetWriter(e.scratch.file, e.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
 
 	e.buffer = append(e.buffer, row)
