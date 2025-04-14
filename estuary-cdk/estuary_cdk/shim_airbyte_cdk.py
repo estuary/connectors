@@ -10,13 +10,13 @@ import os
 
 
 from .capture import (
-    BaseCaptureConnector,
     Request,
     Task,
     common,
     request,
     response,
 )
+from .capture.base_capture_connector import BaseCaptureConnector
 from .flow import CaptureBinding, OAuth2Spec, ConnectorSpec
 from . import ValidationError
 
