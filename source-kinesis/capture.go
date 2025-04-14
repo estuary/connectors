@@ -305,7 +305,12 @@ func (c *capture) readShard(
 		}
 		iterator = res.NextShardIterator
 
+		if *res.MillisBehindLatest != 0 && len(res.Records) == 0 {
+			ll.WithField("MillisBehindLatest", *res.MillisBehindLatest).Info("shard is not current but returned no new data")
+		}
+
 		if *res.MillisBehindLatest == 0 && len(res.Records) == 0 {
+			ll.Debug("waiting before polling for new data since shard is caught up")
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
