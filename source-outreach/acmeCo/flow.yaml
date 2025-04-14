@@ -1,0 +1,66 @@
+---
+collections:
+  acmeCo/accounts:
+    schema: accounts.schema.yaml
+    key:
+      - /id
+  acmeCo/call_dispositions:
+    schema: call_dispositions.schema.yaml
+    key:
+      - /id
+  acmeCo/call_purposes:
+    schema: call_purposes.schema.yaml
+    key:
+      - /id
+  acmeCo/calls:
+    schema: calls.schema.yaml
+    key:
+      - /id
+  acmeCo/email_addresses:
+    schema: email_addresses.schema.yaml
+    key:
+      - /id
+  acmeCo/events:
+    schema: events.schema.yaml
+    key:
+      - /id
+  acmeCo/mailboxes:
+    schema: mailboxes.schema.yaml
+    key:
+      - /id
+  acmeCo/mailings:
+    schema: mailings.schema.yaml
+    key:
+      - /id
+  acmeCo/opportunities:
+    schema: opportunities.schema.yaml
+    key:
+      - /id
+  acmeCo/opportunity_stages:
+    schema: opportunity_stages.schema.yaml
+    key:
+      - /id
+  acmeCo/prospects:
+    schema: prospects.schema.yaml
+    key:
+      - /id
+  acmeCo/stages:
+    schema: stages.schema.yaml
+    key:
+      - /id
+  acmeCo/tasks:
+    schema: tasks.schema.yaml
+    key:
+      - /id
+  acmeCo/teams:
+    schema: teams.schema.yaml
+    key:
+      - /id
+  acmeCo/templates:
+    schema: templates.schema.yaml
+    key:
+      - /id
+  acmeCo/users:
+    schema: users.schema.yaml
+    key:
+      - /id

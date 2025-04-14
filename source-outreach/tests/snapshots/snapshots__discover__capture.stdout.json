@@ -1,0 +1,930 @@
+[
+    {
+      "recommendedName": "accounts",
+      "resourceConfig": {
+        "name": "accounts",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "call_dispositions",
+      "resourceConfig": {
+        "name": "call_dispositions",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "call_purposes",
+      "resourceConfig": {
+        "name": "call_purposes",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "calls",
+      "resourceConfig": {
+        "name": "calls",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "email_addresses",
+      "resourceConfig": {
+        "name": "email_addresses",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "events",
+      "resourceConfig": {
+        "name": "events",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "mailboxes",
+      "resourceConfig": {
+        "name": "mailboxes",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "mailings",
+      "resourceConfig": {
+        "name": "mailings",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "opportunities",
+      "resourceConfig": {
+        "name": "opportunities",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "opportunity_stages",
+      "resourceConfig": {
+        "name": "opportunity_stages",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "prospects",
+      "resourceConfig": {
+        "name": "prospects",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "stages",
+      "resourceConfig": {
+        "name": "stages",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "tasks",
+      "resourceConfig": {
+        "name": "tasks",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "teams",
+      "resourceConfig": {
+        "name": "teams",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "templates",
+      "resourceConfig": {
+        "name": "templates",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    },
+    {
+      "recommendedName": "users",
+      "resourceConfig": {
+        "name": "users",
+        "interval": "PT5M"
+      },
+      "documentSchema": {
+        "$defs": {
+          "Meta": {
+            "properties": {
+              "op": {
+                "default": "u",
+                "description": "Operation type (c: Create, u: Update, d: Delete)",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Op",
+                "type": "string"
+              },
+              "row_id": {
+                "default": -1,
+                "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+                "title": "Row Id",
+                "type": "integer"
+              }
+            },
+            "title": "Meta",
+            "type": "object"
+          }
+        },
+        "additionalProperties": true,
+        "properties": {
+          "_meta": {
+            "$ref": "#/$defs/Meta",
+            "default": {
+              "op": "u",
+              "row_id": -1
+            },
+            "description": "Document metadata"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "OutreachResource",
+        "type": "object",
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ]
+    }
+  ]
