@@ -2,13 +2,13 @@ from logging import Logger
 from typing import Awaitable, Callable
 
 from estuary_cdk.capture import (
-    BaseCaptureConnector,
     Request,
     Task,
     common,
     request,
     response,
 )
+from estuary_cdk.capture.base_capture_connector import BaseCaptureConnector
 from estuary_cdk.capture.common import ResourceConfig
 from estuary_cdk.flow import (
     ConnectorSpec,

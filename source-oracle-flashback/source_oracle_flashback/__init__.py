@@ -4,13 +4,13 @@ import oracledb
 
 from estuary_cdk.flow import ConnectorSpec
 from estuary_cdk.capture import (
-    BaseCaptureConnector,
     Request,
     Task,
     common,
     request,
     response,
 )
+from estuary_cdk.capture.base_capture_connector import BaseCaptureConnector
 from estuary_cdk.http import HTTPMixin
 
 from .ssh_tunnel import ssh_tunnel

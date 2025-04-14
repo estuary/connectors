@@ -5,13 +5,13 @@ from estuary_cdk.flow import (
     ConnectorSpec,
 )
 from estuary_cdk.capture import (
-    BaseCaptureConnector,
     Request,
     Task,
     common,
     request,
     response,
 )
+from estuary_cdk.capture.base_capture_connector import BaseCaptureConnector
 from estuary_cdk.http import HTTPMixin
 
 from .resources import all_resources, validate_config, validate_custom_reports_json
