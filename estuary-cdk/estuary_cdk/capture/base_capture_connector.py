@@ -125,3 +125,16 @@ class BaseCaptureConnector(
         )
         self.output.write(b"\n")
         self.output.flush()
+
+    def _checkpoint(
+        self,
+        state: ConnectorState,
+        merge_patch: bool = True
+    ):
+        r = Response[Any, Any, ConnectorState](
+            checkpoint=response.Checkpoint(
+                state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
+            )
+        )
+
+        self._emit(r)
