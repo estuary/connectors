@@ -256,3 +256,22 @@ class BaseOAuth2Credentials(abc.ABC, BaseModel):
             def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
         return _OAuth2Credentials
+
+class RotatingOAuth2Credentials(BaseOAuth2Credentials):
+    @staticmethod
+    def for_provider(provider: str) -> type["RotatingOAuth2Credentials"]:
+        """
+        Builds an OAuth2Credentials model for the given OAuth2 `provider`.
+        This routine is only available in Pydantic V2 environments.
+        """
+        from pydantic import ConfigDict
+
+        class _OAuth2Credentials(RotatingOAuth2Credentials):
+            model_config = ConfigDict(
+                json_schema_extra={"x-oauth2-provider": provider},
+                title="OAuth",
+            )
+
+            def _you_must_build_oauth2_credentials_for_a_provider(self): ...
+
+        return _OAuth2Credentials

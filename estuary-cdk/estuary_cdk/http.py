@@ -18,6 +18,7 @@ from .flow import (
     ClientCredentialsOAuth2Credentials,
     ClientCredentialsOAuth2Spec,
     LongLivedClientCredentialsOAuth2Credentials,
+    RotatingOAuth2Credentials,
     OAuth2Spec,
 )
 
@@ -212,13 +213,32 @@ class TokenSource:
         )
         return ("Bearer", self._access_token.access_token)
 
+    async def initialize_oauth2_tokens(
+        self,
+        log: Logger,
+        session: HTTPSession,
+    ) -> AccessTokenResponse:
+        assert (
+            isinstance(self.credentials, BaseOAuth2Credentials)
+            or isinstance(self.credentials, ClientCredentialsOAuth2Credentials)
+            or isinstance(self.credentials, AuthorizationCodeFlowOAuth2Credentials)
+        )
+
+        self._fetched_at = int(time.time())
+        response = await self._fetch_oauth2_token(
+            log, session, self.credentials,
+        )
+        self._access_token = response
+        return response
+
     async def _fetch_oauth2_token(
         self,
         log: Logger,
         session: HTTPSession,
         credentials: BaseOAuth2Credentials
         | ClientCredentialsOAuth2Credentials
-        | AuthorizationCodeFlowOAuth2Credentials,
+        | AuthorizationCodeFlowOAuth2Credentials
+        | RotatingOAuth2Credentials,
     ) -> AccessTokenResponse:
         assert self.oauth_spec
 
@@ -226,7 +246,7 @@ class TokenSource:
         form = {}
 
         match credentials:
-            case BaseOAuth2Credentials():
+            case BaseOAuth2Credentials() | RotatingOAuth2Credentials():
                 form = {
                     "grant_type": "refresh_token",
                     "client_id": credentials.client_id,
