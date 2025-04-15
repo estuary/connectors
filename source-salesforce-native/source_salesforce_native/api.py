@@ -25,6 +25,16 @@ from .models import (
 REST_CHECKPOINT_INTERVAL = 2_000
 BULK_CHECKPOINT_INTERVAL = 200_000
 
+# We have reason to believe the Salesforce API is eventually consistent to some degree. Fivetran
+# re-fetches all records in the 5 minutes before their cursor value to combat eventual consistency.
+# That approach emits duplicate data. Another approach is to ensure the incremental tasks never
+# fetch data more recent than 5 minutes in the past. This caps how "real-time" the streams can be
+# but it's a simple fix that easily rolled back if we come up with a better solution. The default
+# interval is already 5 minutes, so the connector is not really "real-time" anyway.
+LAG = timedelta(minutes=5)
+MIN_INCREMENTAL_WINDOW_SIZE = timedelta(minutes=1)
+
+
 def _determine_cursor_field(
     fields: FieldDetailsDict,
 ) -> CursorFields:
@@ -191,7 +201,13 @@ async def fetch_incremental_resources(
 ) -> AsyncGenerator[SalesforceResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    end = min(now(), log_cursor + timedelta(days=window_size))
+    max_end = now() - LAG
+    end = min(max_end, log_cursor + timedelta(days=window_size))
+
+    # Return early and sleep if the end date is before the start date or if the date window is too small.
+    # This is done to prevent repeatedly sending API requests for tiny date windows.
+    if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE):
+        return
 
     cursor_field = _determine_cursor_field(fields)
 
