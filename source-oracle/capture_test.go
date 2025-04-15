@@ -538,10 +538,12 @@ func TestCrossSCNTransactions(t *testing.T) {
 				if err != nil {
 					t.Fatalf("unable to begin transaction query: %v", err)
 				}
+				logrus.Info("starting tx")
 				if _, err := tx.ExecContext(ctx, fmt.Sprintf("UPDATE %s SET year = '1950'", tableName)); err != nil {
 					t.Fatalf("unable to update transaction query: %v", err)
 				}
 				time.Sleep(5 * time.Second)
+				logrus.Info("committing tx")
 				if err := tx.Commit(); err != nil {
 					t.Fatalf("unable to commit transaction query: %v", err)
 				}

@@ -239,6 +239,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			}
 
 			if TestShutdownAfterBackfill {
+				log.Info("Shutting down after backfill due to TestShutdownAfterBackfill")
 				return nil // In tests we sometimes want to shut down here
 			}
 			continue // Repeat the main loop from the top
@@ -248,6 +249,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		// a state checkpoint to ensure that streams reliably transition into the Active
 		// state during tests even if there is no backfill work to do.
 		if TestShutdownAfterCaughtUp {
+			log.Info("Shutting down after backfill due to TestShutdownAfterCaughtUp")
 			return c.emitState()
 		}
 
