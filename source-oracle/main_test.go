@@ -88,12 +88,14 @@ func (tb *testBackend) UpperCaseMode() bool { return true }
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"scn":11111111`] = regexp.MustCompile(`"scn":([0-9]+)`)
-	sanitizers[`"cursor":"11111111"`] = regexp.MustCompile(`"cursor":"([0-9]+)"`)
 	sanitizers[`"row_id":"AAAAAAAAAAAAAAAAAA"`] = regexp.MustCompile(`"row_id":"[^"]+"`)
 	sanitizers[`"rs_id":"111111111111111111"`] = regexp.MustCompile(`"rs_id":"[^"]+"`)
 	sanitizers[`"ssn":111`] = regexp.MustCompile(`"ssn":[0-9]+`)
 	sanitizers[`"ts_ms":1111111111111`] = regexp.MustCompile(`"ts_ms":[0-9]+`)
 	sanitizers[`"scanned":"AAAAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"scanned":"[^"]+"`)
+	sanitizers[`"AAAAAAA=":{"MessageCount"`] = regexp.MustCompile(`"[^"]+":{"MessageCount"`)
+	sanitizers[`"StartSCN":111111111"`] = regexp.MustCompile(`"StartSCN":[0-9]+`)
+	sanitizers[`"SCN":111111111"`] = regexp.MustCompile(`"SCN":[0-9]+`)
 
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{
