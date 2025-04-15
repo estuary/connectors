@@ -16,7 +16,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
-
 type driver struct{}
 
 type config struct {
