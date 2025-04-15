@@ -88,6 +88,7 @@ async def _execution_wrapper(
     cursor_field: CursorFields,
     start: datetime,
     end: datetime,
+    max_window_size: timedelta,
     checkpoint_interval: int,
 ) -> AsyncGenerator[dict[str, Any] | datetime, None]:
     last_seen_dt = start
@@ -96,6 +97,8 @@ async def _execution_wrapper(
     async for record in record_generator:
         record_dt = str_to_dt(record[cursor_field])
 
+        # If we see a record updated more recently than the previous record we emitted,
+        # checkpoint the previous records.
         if (
             count >= checkpoint_interval and 
             record_dt > last_seen_dt
@@ -107,9 +110,13 @@ async def _execution_wrapper(
         count += 1
         last_seen_dt = record_dt
 
+    # Emit a final checkpoint if we saw records.
     if last_seen_dt != start and count > 0:
         yield last_seen_dt
-    else:
+    # If we didn't find any results in this date window, only checkpoint if we've checked the entire date window.
+    # The connector should reuse the same start on the next invocation but have a more recent end if we haven't
+    # checked a maximum size date window yet.
+    elif (end - start >= max_window_size):
         yield end
 
 
@@ -135,7 +142,8 @@ async def backfill_incremental_resources(
     if start >= cutoff:
         return
 
-    end = min(cutoff, start + timedelta(days=window_size))
+    max_window_size = min(timedelta(days=window_size), cutoff - start)
+    end = min(cutoff, start + max_window_size)
 
     cursor_field = _determine_cursor_field(fields)
 
@@ -159,7 +167,7 @@ async def backfill_incremental_resources(
             end,
         )
 
-        async for record_or_dt in _execution_wrapper(gen, cursor_field, start, end, checkpoint_interval):
+        async for record_or_dt in _execution_wrapper(gen, cursor_field, start, end, max_window_size, checkpoint_interval):
             if isinstance(record_or_dt, datetime):
                 yield dt_to_str(record_or_dt)
             else:
@@ -201,8 +209,9 @@ async def fetch_incremental_resources(
 ) -> AsyncGenerator[SalesforceResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
+    max_window_size = timedelta(days=window_size)
     max_end = now() - LAG
-    end = min(max_end, log_cursor + timedelta(days=window_size))
+    end = min(max_end, log_cursor + max_window_size)
 
     # Return early and sleep if the end date is before the start date or if the date window is too small.
     # This is done to prevent repeatedly sending API requests for tiny date windows.
@@ -219,7 +228,7 @@ async def fetch_incremental_resources(
         end,
     )
 
-    async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, REST_CHECKPOINT_INTERVAL):
+    async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, max_window_size, REST_CHECKPOINT_INTERVAL):
         if isinstance(record_or_dt, datetime):
             yield record_or_dt
         else:
