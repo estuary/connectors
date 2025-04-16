@@ -42,7 +42,7 @@ var (
 	streamToFenceWatchdogTimeout = 5 * time.Minute
 )
 
-func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
+func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
@@ -52,6 +52,12 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursor stri
 	var host, port, err = splitHostPort(address)
 	if err != nil {
 		return nil, fmt.Errorf("invalid mysql address: %w", err)
+	}
+
+	// Decode start cursor from a JSON quoted string into its actual string contents
+	startCursor, err := unmarshalJSONString(startCursorJSON)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start cursor JSON: %w", err)
 	}
 
 	// If we have no resume cursor but we do have an initial backfill cursor, use that as the start position.
@@ -154,6 +160,28 @@ func parseCursor(cursor string) (mysql.Position, error) {
 		Name: seps[0],
 		Pos:  uint32(offset),
 	}, nil
+}
+
+// marshalJSONString returns the serialized JSON representation of the provided string.
+//
+// A Go string can always be successfully serialized into JSON.
+func marshalJSONString(str string) json.RawMessage {
+	var bs, err = json.Marshal(str)
+	if err != nil {
+		panic(fmt.Errorf("internal error: failed to marshal string %q to JSON: %w", str, err))
+	}
+	return bs
+}
+
+func unmarshalJSONString(bs json.RawMessage) (string, error) {
+	if bs == nil {
+		return "", nil
+	}
+	var str string
+	if err := json.Unmarshal(bs, &str); err != nil {
+		return "", err
+	}
+	return str, nil
 }
 
 func splitHostPort(addr string) (string, int64, error) {
@@ -531,7 +559,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			// handled elsewhere already.
 			if !binlogOffsetOverflow {
 				if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-					Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+					Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 				}); err != nil {
 					return err
 				}
@@ -564,7 +592,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				// the XIDEvent handling.
 				if !binlogOffsetOverflow {
 					if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-						Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+						Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 					}); err != nil {
 						return err
 					}
@@ -610,7 +638,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		// with the latest position.
 		if implicitFlush && rs.uncommittedChanges == 0 && !binlogOffsetOverflow {
 			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
-				Cursor: fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos),
+				Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 			}); err != nil {
 				return err
 			}
@@ -1203,7 +1231,11 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 				}
 				timedEventsSinceFlush++
 				if event, ok := event.(*sqlcapture.FlushEvent); ok {
-					latestFlushCursor = event.Cursor
+					if str, err := unmarshalJSONString(event.Cursor); err != nil {
+						return fmt.Errorf("internal error: failed to unmarshal flush event cursor value %q: %w", event.Cursor, err)
+					} else {
+						latestFlushCursor = str
+					}
 					timedEventsSinceFlush = 0
 				}
 			}
@@ -1217,6 +1249,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		return fmt.Errorf("error establishing binlog fence position: %w", err)
 	}
 	logrus.WithField("cursor", latestFlushCursor).WithField("target", fencePosition.Pos).Debug("beginning fenced streaming phase")
+
 	if latestFlushPosition, err := parseCursor(latestFlushCursor); err != nil {
 		return fmt.Errorf("internal error: failed to parse flush cursor value %q", latestFlushCursor)
 	} else if fencePosition == latestFlushPosition {
@@ -1234,7 +1267,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{Cursor: latestFlushCursor})
+		return callback(&sqlcapture.FlushEvent{Cursor: marshalJSONString(latestFlushCursor)})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -1265,7 +1298,11 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// a bit of work to preserve the position as a typed struct.
-				var eventPosition, err = parseCursor(event.Cursor)
+				var eventCursor, err = unmarshalJSONString(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to unmarshal flush event cursor value %q: %w", event.Cursor, err)
+				}
+				eventPosition, err := parseCursor(eventCursor)
 				if err != nil {
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
@@ -1279,7 +1316,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 	}
 }
 
-func (rs *mysqlReplicationStream) Acknowledge(ctx context.Context, cursor string) error {
+func (rs *mysqlReplicationStream) Acknowledge(ctx context.Context, cursor json.RawMessage) error {
 	// No acknowledgements are necessary or possible in MySQL. The binlog is just
 	// a series of logfiles on disk which get erased after log rotation according
 	// to a time-based retention policy, without any server-side "have all clients

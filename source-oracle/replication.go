@@ -34,7 +34,7 @@ const OUT_DATE_FORMAT = "2006-01-02T15:04:05"
 const OUT_TS_FORMAT = "2006-01-02T15:04:05.999999999"
 const OUT_TSTZ_FORMAT = time.RFC3339Nano
 
-func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
+func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursorJSON json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	var dbConn, err = sql.Open("oracle", db.config.ToURI(db.config.Advanced.IncrementalChunkSize+1))
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
@@ -59,6 +59,12 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, startCursor str
 		if _, err := conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
 			return nil, fmt.Errorf("switching to CDB: %w", err)
 		}
+	}
+
+	// Decode start cursor from a JSON quoted string into its actual string contents
+	startCursor, err := unmarshalJSONString(startCursorJSON)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start cursor JSON: %w", err)
 	}
 
 	var startSCN int64
@@ -535,7 +541,7 @@ func (s *replicationStream) poll(ctx context.Context) error {
 			}
 		}
 
-		s.events <- &sqlcapture.FlushEvent{Cursor: strconv.FormatInt(s.lastTxnEndSCN, 10)}
+		s.events <- &sqlcapture.FlushEvent{Cursor: marshalJSONString(strconv.FormatInt(s.lastTxnEndSCN, 10))}
 
 		if s.smartMode && s.dictionaryMode == DictionaryModeExtract && int64(s.lastDDLSCN) < endSCN {
 			s.dictionaryMode = DictionaryModeOnline
@@ -884,7 +890,7 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (int64, error
 
 // Acknowledge informs the ReplicationStream that all messages up to the specified
 // SCN have been persisted
-func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
+func (s *replicationStream) Acknowledge(ctx context.Context, cursor json.RawMessage) error {
 	return nil
 }
 
@@ -961,4 +967,26 @@ func (db *oracleDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	query("SELECT * FROM " + db.config.Advanced.WatermarksTable)
 	query("SELECT current_scn from V$DATABASE")
 	return nil
+}
+
+// marshalJSONString returns the serialized JSON representation of the provided string.
+//
+// A Go string can always be successfully serialized into JSON.
+func marshalJSONString(str string) json.RawMessage {
+	var bs, err = json.Marshal(str)
+	if err != nil {
+		panic(fmt.Errorf("internal error: failed to marshal string %q to JSON: %w", str, err))
+	}
+	return bs
+}
+
+func unmarshalJSONString(bs json.RawMessage) (string, error) {
+	if bs == nil {
+		return "", nil
+	}
+	var str string
+	if err := json.Unmarshal(bs, &str); err != nil {
+		return "", err
+	}
+	return str, nil
 }
