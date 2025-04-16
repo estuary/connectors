@@ -23,6 +23,7 @@ from .models import (
 INITIAL_SLEEP = 0.2
 MAX_SLEEP = 300
 ATTEMPT_LOG_THRESHOLD = 10
+MAX_BULK_QUERY_SET_SIZE = 200_000
 
 COUNT_HEADER = "Sforce-NumberOfRecords"
 CANNOT_FETCH_COMPOUND_DATA = r"Selecting compound data not supported in Bulk Query"
@@ -141,7 +142,9 @@ class BulkJobManager:
     async def _fetch_results(self, job_id: str) -> AsyncGenerator[dict[str, str], None]:
         url = f"{self.base_url}/{job_id}/results"
         request_headers = {"Accept-Encoding": "gzip"}
-        params: dict[str, str] = {}
+        params: dict[str, str | int] = {
+            "maxRecords": MAX_BULK_QUERY_SET_SIZE,
+        }
 
         while True:
             headers, body = await self.http.request_stream(self.log, url, params=params, headers=request_headers)
