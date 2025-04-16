@@ -37,7 +37,7 @@ var (
 // PersistentState represents the part of a connector's state which can be serialized
 // and emitted in a state checkpoint, and resumed from after a restart.
 type PersistentState struct {
-	Cursor  string                               `json:"cursor"`                   // The replication cursor of the most recent 'Commit' event
+	Cursor  json.RawMessage                      `json:"cursor"`                   // The replication cursor of the most recent 'Commit' event
 	Streams map[boilerplate.StateKey]*TableState `json:"bindingStateV1,omitempty"` // A mapping from runtime-provided state keys to table-specific state.
 }
 
@@ -139,7 +139,7 @@ type Capture struct {
 	// acknowledgement-relaying goroutine receives an Acknowledge message.
 	pending struct {
 		sync.Mutex
-		cursors []string
+		cursors []json.RawMessage
 	}
 }
 
@@ -338,7 +338,7 @@ func (c *Capture) reconcileStateWithBindings(_ context.Context) error {
 		} else {
 			log.Info("capture has no bindings, resetting replication cursor")
 		}
-		c.State.Cursor = ""
+		c.State.Cursor = nil
 	}
 
 	// Emit the new state to stdout. This isn't strictly necessary but it helps to make

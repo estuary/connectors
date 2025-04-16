@@ -22,7 +22,7 @@ import (
 
 var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
 
-func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
+func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJSON json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	// Replication database connection used for event streaming
 	connConfig, err := pgconn.ParseConfig(db.config.ToURI())
 	if err != nil {
@@ -35,6 +35,12 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursor s
 	conn, err := pgconn.ConnectConfig(ctx, connConfig)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database for replication: %w", err)
+	}
+
+	// Decode start cursor from a JSON quoted string into its actual string contents
+	startCursor, err := unmarshalJSONString(startCursorJSON)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start cursor JSON: %w", err)
 	}
 
 	// If we have no resume cursor but we do have an initial backfill cursor, use that as the start position.
@@ -304,7 +310,11 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 				}
 				timedEventsSinceFlush++
 				if event, ok := event.(*sqlcapture.FlushEvent); ok {
-					latestFlushCursor = event.Cursor
+					if eventCursor, err := unmarshalJSONString(event.Cursor); err != nil {
+						return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
+					} else {
+						latestFlushCursor = eventCursor
+					}
 					timedEventsSinceFlush = 0
 				}
 			}
@@ -335,7 +345,7 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{Cursor: latestFlushLSN.String()})
+		return callback(&sqlcapture.FlushEvent{Cursor: marshalJSONString(latestFlushLSN.String())})
 	}
 
 	// After establishing a target fence position, issue a watermark write. This ensures
@@ -378,7 +388,11 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// more work to preserve cursors as a typed value instead of a string.
-				var eventLSN, err = pglogrepl.ParseLSN(event.Cursor)
+				var eventCursor, err = unmarshalJSONString(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
+				}
+				eventLSN, err := pglogrepl.ParseLSN(eventCursor)
 				if err != nil {
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
@@ -592,7 +606,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		s.nextTxnXID = 0
 		s.lastTxnEndLSN = msg.TransactionEndLSN
 		var event = &sqlcapture.FlushEvent{
-			Cursor: s.lastTxnEndLSN.String(),
+			Cursor: marshalJSONString(s.lastTxnEndLSN.String()),
 		}
 		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
 		return event, nil
@@ -912,14 +926,18 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, 
 // Thus you shouldn't expect that a specific "Committed LSN" value will necessarily
 // advance the "Restart LSN" to the same point, but so long as you ignore the details
 // things will work out in the end.
-func (s *replicationStream) Acknowledge(ctx context.Context, cursor string) error {
+func (s *replicationStream) Acknowledge(ctx context.Context, cursorJSON json.RawMessage) error {
+	var cursor, err = unmarshalJSONString(cursorJSON)
+	if err != nil {
+		return fmt.Errorf("error unmarshalling acknowledge cursor: %w", err)
+	}
 	if cursor == "" {
 		// The empty cursor will be acknowledged once at startup when all bindings
 		// are new, because the initial state checkpoint will have an unspecified
 		// cursor value on purpose. We don't need to do anything with those.
 		return nil
 	}
-	var lsn, err = pglogrepl.ParseLSN(cursor)
+	lsn, err := pglogrepl.ParseLSN(cursor)
 	if err != nil {
 		return fmt.Errorf("error parsing acknowledge cursor: %w", err)
 	}
@@ -985,4 +1003,26 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	query("SELECT * FROM pg_replication_slots;")
 	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
 	return nil
+}
+
+// marshalJSONString returns the serialized JSON representation of the provided string.
+//
+// A Go string can always be successfully serialized into JSON.
+func marshalJSONString(str string) json.RawMessage {
+	var bs, err = json.Marshal(str)
+	if err != nil {
+		panic(fmt.Errorf("internal error: failed to marshal string %q to JSON: %w", str, err))
+	}
+	return bs
+}
+
+func unmarshalJSONString(bs json.RawMessage) (string, error) {
+	if bs == nil {
+		return "", nil
+	}
+	var str string
+	if err := json.Unmarshal(bs, &str); err != nil {
+		return "", err
+	}
+	return str, nil
 }

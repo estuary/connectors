@@ -79,7 +79,7 @@ type ChangeEvent struct {
 // FlushEvent informs the generic sqlcapture logic about transaction boundaries.
 type FlushEvent struct {
 	// The cursor value at which the current transaction was committed.
-	Cursor string
+	Cursor json.RawMessage
 }
 
 // MetadataEvent informs the generic sqlcapture logic about changes to
@@ -136,7 +136,7 @@ type Database interface {
 	Close(ctx context.Context) error
 	// ReplicationStream constructs a new ReplicationStream object, from which
 	// a neverending sequence of change events can be read.
-	ReplicationStream(ctx context.Context, startCursor string) (ReplicationStream, error)
+	ReplicationStream(ctx context.Context, startCursor json.RawMessage) (ReplicationStream, error)
 
 	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
@@ -199,7 +199,7 @@ type ReplicationStream interface {
 	// that indefinite streaming doesn't busy-loop on an idle database.
 	StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event DatabaseEvent) error) error
 
-	Acknowledge(ctx context.Context, cursor string) error
+	Acknowledge(ctx context.Context, cursor json.RawMessage) error
 	Close(ctx context.Context) error
 }
 
