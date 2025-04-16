@@ -68,10 +68,16 @@ func (si *sqlserverSourceInfo) Common() sqlcapture.SourceCommon {
 
 // ReplicationStream constructs a new ReplicationStream object, from which
 // a neverending sequence of change events can be read.
-func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursor string) (sqlcapture.ReplicationStream, error) {
+func (db *sqlserverDatabase) ReplicationStream(ctx context.Context, startCursorJSON json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	var stream = &sqlserverReplicationStream{db: db, conn: db.conn, cfg: db.config}
 	if err := stream.open(ctx); err != nil {
 		return nil, fmt.Errorf("error opening replication stream: %w", err)
+	}
+
+	// Decode start cursor from a JSON quoted string into its actual string contents
+	startCursor, err := unmarshalJSONString(startCursorJSON)
+	if err != nil {
+		return nil, fmt.Errorf("invalid start cursor JSON: %w", err)
 	}
 
 	// If we have no resume cursor but we do have an initial backfill cursor, use that as the start position.
@@ -296,7 +302,11 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 				}
 				timedEventsSinceFlush++
 				if event, ok := event.(*sqlcapture.FlushEvent); ok {
-					var eventLSN, err = base64.StdEncoding.DecodeString(event.Cursor)
+					var eventCursor, err = unmarshalJSONString(event.Cursor)
+					if err != nil {
+						return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
+					}
+					eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
 					if err != nil {
 						return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 					}
@@ -335,7 +345,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
 		return callback(&sqlcapture.FlushEvent{
-			Cursor: base64.StdEncoding.EncodeToString(latestFlushLSN),
+			Cursor: marshalJSONString(base64.StdEncoding.EncodeToString(latestFlushLSN)),
 		})
 	}
 
@@ -367,7 +377,11 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// a bit more work to preserve the position as a typed struct.
-				var eventLSN, err = base64.StdEncoding.DecodeString(event.Cursor)
+				var eventCursor, err = unmarshalJSONString(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
+				}
+				eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
 				if err != nil {
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
@@ -451,7 +465,11 @@ loop:
 			}
 			timedEventsSinceFlush++
 			if event, ok := event.(*sqlcapture.FlushEvent); ok {
-				var eventLSN, err = base64.StdEncoding.DecodeString(event.Cursor)
+				var eventCursor, err = unmarshalJSONString(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
+				}
+				eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
 				if err != nil {
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
@@ -481,7 +499,7 @@ loop:
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
 		return callback(&sqlcapture.FlushEvent{
-			Cursor: base64.StdEncoding.EncodeToString(latestFlushLSN),
+			Cursor: marshalJSONString(base64.StdEncoding.EncodeToString(latestFlushLSN)),
 		})
 	}
 
@@ -513,7 +531,11 @@ loop:
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// a bit more work to preserve the position as a typed struct.
-				var eventLSN, err = base64.StdEncoding.DecodeString(event.Cursor)
+				var eventCursor, err = unmarshalJSONString(event.Cursor)
+				if err != nil {
+					return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
+				}
+				eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
 				if err != nil {
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
@@ -689,13 +711,18 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 	}
 }
 
-func (rs *sqlserverReplicationStream) Acknowledge(ctx context.Context, cursor string) error {
+func (rs *sqlserverReplicationStream) Acknowledge(ctx context.Context, cursorJSON json.RawMessage) error {
+	var cursor, err = unmarshalJSONString(cursorJSON)
+	if err != nil {
+		return fmt.Errorf("error unmarshalling cursor: %w", err)
+	}
+
 	log.WithField("cursor", cursor).Debug("acknowledged up to cursor")
 	if cursor == "" {
 		return nil
 	}
 
-	var cursorLSN, err = base64.StdEncoding.DecodeString(cursor)
+	cursorLSN, err := base64.StdEncoding.DecodeString(cursor)
 	if err != nil {
 		return fmt.Errorf("error decoding cursor %q: %w", cursor, err)
 	}
@@ -763,7 +790,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		// get an opportunity to observe the latest position.
 		var cursor = base64.StdEncoding.EncodeToString(toLSN)
 		log.WithField("cursor", cursor).Trace("server lsn hasn't advanced, not polling any tables")
-		rs.events <- &sqlcapture.FlushEvent{Cursor: cursor}
+		rs.events <- &sqlcapture.FlushEvent{Cursor: marshalJSONString(cursor)}
 		return nil
 	}
 
@@ -860,7 +887,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 
 	var cursor = base64.StdEncoding.EncodeToString(toLSN)
 	log.WithField("cursor", cursor).Debug("checkpoint at cursor")
-	rs.events <- &sqlcapture.FlushEvent{Cursor: cursor}
+	rs.events <- &sqlcapture.FlushEvent{Cursor: marshalJSONString(cursor)}
 	rs.fromLSN = toLSN
 
 	return nil
@@ -1542,4 +1569,26 @@ func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	query("SELECT * FROM msdb.dbo.cdc_jobs;")
 	query("EXEC sys.sp_cdc_help_change_data_capture;")
 	return nil
+}
+
+// marshalJSONString returns the serialized JSON representation of the provided string.
+//
+// A Go string can always be successfully serialized into JSON.
+func marshalJSONString(str string) json.RawMessage {
+	var bs, err = json.Marshal(str)
+	if err != nil {
+		panic(fmt.Errorf("internal error: failed to marshal string %q to JSON: %w", str, err))
+	}
+	return bs
+}
+
+func unmarshalJSONString(bs json.RawMessage) (string, error) {
+	if bs == nil {
+		return "", nil
+	}
+	var str string
+	if err := json.Unmarshal(bs, &str); err != nil {
+		return "", err
+	}
+	return str, nil
 }

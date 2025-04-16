@@ -306,11 +306,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	// value at which the replacement should occur, so the replacements are very narrowly
 	// scoped.
 	var hackyCursorReplacements = map[string]map[string]string{
-		"TASKHASH415b69936fe1324600d67943e50235fc57fb7e0196b8f5f0TASKHASH": {"binlog.000123:456789": "binlog.000123:456789"}, // Example
-
-		// Added 2025-02-18
-		"cec31becf409bcdd486898a57a02850ad73d1fdf04d0fce71663e913f339778e": {"mysql-bin.079013:2708461504": "mysql-bin.079013:4"},
-		"7414746d7079ddf14cb3afff10762f873b99dc8e66d63a9ed98d6bde40b46080": {"mysql-bin.079013:2717599422": "mysql-bin.079013:4"},
+		"TASKHASH415b69936fe1324600d67943e50235fc57fb7e0196b8f5f0TASKHASH": {`"binlog.000123:456789"`: `"binlog.000123:456789"`}, // Example
 	}
 	var hasher = sha256.New()
 	hasher.Write([]byte(open.Capture.Name))
@@ -320,13 +316,13 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		"cursor":   state.Cursor,
 	}).Debug("checking for cursor replacements")
 	if replacementsForTask, ok := hackyCursorReplacements[nameHash]; ok {
-		if replacementForCursor, ok := replacementsForTask[state.Cursor]; ok {
+		if replacementForCursor, ok := replacementsForTask[string(state.Cursor)]; ok {
 			log.WithFields(log.Fields{
 				"namehash":  nameHash,
 				"oldCursor": state.Cursor,
 				"newCursor": replacementForCursor,
 			}).Warn("cursor replacement triggered")
-			state.Cursor = replacementForCursor
+			state.Cursor = json.RawMessage(replacementForCursor)
 		}
 	}
 
