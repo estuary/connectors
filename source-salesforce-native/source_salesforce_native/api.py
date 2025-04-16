@@ -11,6 +11,7 @@ from .bulk_job_manager import (
     CANNOT_FETCH_COMPOUND_DATA,
     DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED,
     NOT_SUPPORTED_BY_BULK_API,
+    MAX_BULK_QUERY_SET_SIZE,
 )
 from .rest_query_manager import RestQueryManager
 from .shared import dt_to_str, str_to_dt, now
@@ -23,7 +24,7 @@ from .models import (
 )
 
 REST_CHECKPOINT_INTERVAL = 2_000
-BULK_CHECKPOINT_INTERVAL = 200_000
+BULK_CHECKPOINT_INTERVAL = MAX_BULK_QUERY_SET_SIZE
 
 # We have reason to believe the Salesforce API is eventually consistent to some degree. Fivetran
 # re-fetches all records in the 5 minutes before their cursor value to combat eventual consistency.
