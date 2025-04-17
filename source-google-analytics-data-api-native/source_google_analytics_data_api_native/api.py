@@ -77,6 +77,9 @@ def _build_report_body(
     if report.metricFilter:
         body["metricFilter"] = report.metricFilter
 
+    if report.metricAggregations:
+        body["metricAggregations"] = report.metricAggregations
+
     return body
 
 
@@ -143,11 +146,16 @@ async def _paginate_through_report_results(
 
         remainder = processor.get_remainder()
 
-        if remainder.rowCount is None:
-            return
-
         offset += MAX_REPORT_RESULTS_LIMIT
-        if offset >= remainder.rowCount:
+
+        # Pagination is complete if there are no results or the next offset is beyond the total number of rows.
+        if remainder.rowCount is None or offset >= remainder.rowCount:
+            # If there are metric aggregates for this report, emit them after processing all non-aggregate rows.
+            for aggregate in [remainder.totals, remainder.minimums, remainder.maximums]:
+                if aggregate is not None:
+                    record = _transform_into_record(aggregate[0], dimension_headers, metric_headers, property_id, date)
+                    yield report_doc_model.model_validate(record)
+
             return
 
 
