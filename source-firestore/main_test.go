@@ -16,9 +16,11 @@ import (
 
 	firestore "cloud.google.com/go/firestore"
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/option"
@@ -523,4 +525,119 @@ func TestDocumentReferences(t *testing.T) {
 		})
 		verifyCapture(ctx, t, capture)
 	})
+}
+
+func TestInitResourceStates(t *testing.T) {
+	var testNow = time.Date(2024, 5, 30, 12, 0, 0, 0, time.UTC)
+
+	// Helper to construct a binding with specific path and backfill mode.
+	var createBinding = func(path string, mode backfillMode, restartCursorPath string) *pf.CaptureSpec_Binding {
+		resourceConfig := resource{
+			Path:              path,
+			BackfillMode:      mode,
+			RestartCursorPath: restartCursorPath,
+		}
+		configJSON, _ := json.Marshal(resourceConfig)
+		return &pf.CaptureSpec_Binding{
+			StateKey:           url.QueryEscape(path),
+			ResourceConfigJson: configJSON,
+		}
+	}
+
+	var tcs = []struct {
+		name     string
+		states   map[boilerplate.StateKey]*resourceState
+		bindings []*pf.CaptureSpec_Binding
+	}{
+		{
+			name:   "new binding with no previous state",
+			states: map[boilerplate.StateKey]*resourceState{},
+			bindings: []*pf.CaptureSpec_Binding{
+				createBinding("users/*/docs", "async", ""),
+			},
+		},
+		{
+			name: "still consistent with ongoing backfill should continue backfill",
+			states: map[boilerplate.StateKey]*resourceState{
+				"users%2F%2A%2Fdocs": {
+					ReadTime: testNow.Add(-1 * time.Hour),
+					Backfill: &backfillState{
+						StartAfter: testNow.Add(-30 * time.Minute),
+						Cursor:     "users/123/docs/456",
+						MTime:      testNow.Add(-45 * time.Minute),
+					},
+				},
+			},
+			bindings: []*pf.CaptureSpec_Binding{
+				createBinding("users/*/docs", "async", ""),
+			},
+		},
+		{
+			name: "still consistent with completed backfill should preserve that",
+			states: map[boilerplate.StateKey]*resourceState{
+				"users%2F%2A%2Fdocs": {
+					ReadTime: testNow.Add(-1 * time.Hour),
+					Backfill: &backfillState{
+						StartAfter: testNow.Add(-2 * time.Hour),
+						Completed:  true,
+					},
+				},
+			},
+			bindings: []*pf.CaptureSpec_Binding{
+				createBinding("users/*/docs", "async", ""),
+			},
+		},
+		{
+			name: "inconsistent state with ongoing backfill should continue backfill",
+			states: map[boilerplate.StateKey]*resourceState{
+				"users%2F%2A%2Fdocs": {
+					ReadTime:     testNow.Add(-1 * time.Hour),
+					Inconsistent: true,
+					Backfill: &backfillState{
+						StartAfter: testNow.Add(-30 * time.Minute),
+						Cursor:     "users/123/docs/456",
+						MTime:      testNow.Add(-45 * time.Minute),
+					},
+				},
+			},
+			bindings: []*pf.CaptureSpec_Binding{
+				createBinding("users/*/docs", "async", ""),
+			},
+		},
+		{
+			name: "inconsistent state with completed backfill should schedule new backfill",
+			states: map[boilerplate.StateKey]*resourceState{
+				"users%2F%2A%2Fdocs": {
+					ReadTime:     testNow.Add(-1 * time.Hour),
+					Inconsistent: true,
+					Backfill: &backfillState{
+						StartAfter: testNow.Add(-2 * time.Hour),
+						Completed:  true,
+					},
+				},
+			},
+			bindings: []*pf.CaptureSpec_Binding{
+				createBinding("users/*/docs", "async", ""),
+			},
+		},
+	}
+
+	var out = new(strings.Builder)
+	for i, tc := range tcs {
+		if i > 0 {
+			fmt.Fprintf(out, "\n")
+		}
+		fmt.Fprintf(out, "--- %s ---\n", tc.name)
+		var outputStates, err = initResourceStates(tc.states, tc.bindings, testNow)
+		if err != nil {
+			fmt.Fprintf(out, "error: %v\n", err)
+			continue
+		}
+		for stateKey, state := range outputStates {
+			var bs, err = json.MarshalIndent(state, "", "  ")
+			require.NoError(t, err)
+			fmt.Fprintf(out, "%s:\n%s\n", stateKey, string(bs))
+		}
+	}
+	cupaloy.SnapshotT(t, out.String())
 }

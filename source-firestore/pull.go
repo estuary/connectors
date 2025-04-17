@@ -81,7 +81,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 	}
 
-	updatedResourceStates, err := initResourceStates(prevState.Resources, open.Capture.Bindings)
+	updatedResourceStates, err := initResourceStates(prevState.Resources, open.Capture.Bindings, time.Now())
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
 	}
@@ -173,8 +173,7 @@ func (s *backfillState) String() string {
 
 // Given the prior resource states from the last DriverCheckpoint along with
 // the current capture bindings, compute a new set of resource states.
-func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bindings []*pf.CaptureSpec_Binding) (map[boilerplate.StateKey]*resourceState, error) {
-	var now = time.Now()
+func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bindings []*pf.CaptureSpec_Binding, now time.Time) (map[boilerplate.StateKey]*resourceState, error) {
 	var states = make(map[boilerplate.StateKey]*resourceState)
 	for idx, binding := range bindings {
 		var res resource
@@ -183,6 +182,8 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 		}
 		var stateKey = boilerplate.StateKey(binding.StateKey)
 
+		// Construct a new state and add it to the map. Since it's a pointer we can fill
+		// out the rest of the state later in the function.
 		var state = &resourceState{
 			bindingIndex: idx,
 			path:         res.Path,
@@ -190,46 +191,18 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 		if res.RestartCursorPath != "" {
 			state.restartCursorPath = parseJSONPointer(res.RestartCursorPath)
 		}
-		if prevState, ok := prevStates[stateKey]; ok && !prevState.Inconsistent {
-			state.RestartCursorValue = prevState.RestartCursorValue
-			state.ReadTime = prevState.ReadTime
-			state.Backfill = prevState.Backfill
-		} else if ok && prevState.Inconsistent {
-			// Since we entered an inconsistent state previously, we know that some amount of
-			// change data has been skipped. To get back into a consistent state, we will have
-			// to restart from the current moment (to maximize our changes of staying caught
-			// up going forward) and start a new backfill of the entire collection.
-			var startTime time.Time
-			if prevState.Backfill != nil {
-				startTime = prevState.Backfill.StartAfter
-			}
-			// Add a restart delay unless the current StartAfter time is already in the future.
-			if startTime.Before(time.Now()) {
-				var backfillRestartDelay = backfillRestartDelayNoRestartCursor
-				if len(state.restartCursorPath) != 0 {
-					backfillRestartDelay = backfillRestartDelayWithRestartCursor
-				}
-				startTime = startTime.Add(backfillRestartDelay)
-			}
-			// If the adjusted start time is still in the past, we ought to start immediately.
-			if startTime.Before(time.Now()) {
-				startTime = time.Now()
-			}
-			state.RestartCursorValue = prevState.RestartCursorValue
-			state.ReadTime = now
-			if res.BackfillMode == backfillModeNone {
-				state.Backfill = nil
-			} else {
-				state.Backfill = &backfillState{StartAfter: startTime}
-			}
-		} else {
+		states[stateKey] = state
+
+		// If there is no prior state for the binding, initialize it from scratch.
+		var prevState, ok = prevStates[stateKey]
+		if !ok {
 			switch res.BackfillMode {
 			case backfillModeNone:
 				state.ReadTime = now
 				state.Backfill = nil
 			case backfillModeAsync:
 				state.ReadTime = now
-				state.Backfill = &backfillState{StartAfter: time.Now()}
+				state.Backfill = &backfillState{StartAfter: now}
 			case backfillModeSync:
 				state.ReadTime = time.Time{}
 				state.Backfill = nil
@@ -243,10 +216,55 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 				}
 				state.ReadTime = ts
 			}
+			continue
 		}
-		states[stateKey] = state
+
+		// Always retain the latest restart cursor value.
+		state.RestartCursorValue = prevState.RestartCursorValue
+
+		// If we're still consistent, we don't need to mess with anything else.
+		if !prevState.Inconsistent {
+			state.ReadTime = prevState.ReadTime
+			state.Backfill = prevState.Backfill
+			continue
+		}
+
+		// Since we're already inconsistent we can't make it worse, and resetting the read time
+		// here makes it slightly more likely that we'll remain caught up going forward.
+		state.ReadTime = now
+
+		// If we're inconsistent but there's an ongoing backfill, we need to let it finish,
+		// otherwise we need to initialize a new backfill.
+		if prevState.Backfill != nil && !prevState.Backfill.Completed {
+			state.Backfill = prevState.Backfill
+		} else if res.BackfillMode == backfillModeAsync {
+			state.Backfill = &backfillState{
+				StartAfter: computeBackfillStartTime(
+					prevState.Backfill, now,
+					len(prevState.restartCursorPath) != 0,
+				),
+			}
+		}
 	}
 	return states, nil
+}
+
+func computeBackfillStartTime(prevBackfill *backfillState, now time.Time, hasRestartCursor bool) time.Time {
+	var startTime time.Time
+	if prevBackfill != nil {
+		startTime = prevBackfill.StartAfter
+	}
+
+	var delay = backfillRestartDelayNoRestartCursor
+	if hasRestartCursor {
+		delay = backfillRestartDelayWithRestartCursor
+	}
+	startTime = startTime.Add(delay)
+
+	if startTime.Before(now) {
+		startTime = now
+	}
+	return startTime
 }
 
 func (s *captureState) Validate() error {
