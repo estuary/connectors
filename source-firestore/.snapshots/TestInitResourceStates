@@ -1,0 +1,60 @@
+--- new binding with no previous state ---
+users%2F%2A%2Fdocs:
+{
+  "ReadTime": "2024-05-30T12:00:00Z",
+  "Backfill": {
+    "StartAfter": "2024-05-30T12:00:00Z",
+    "Completed": false,
+    "Cursor": "",
+    "MTime": "0001-01-01T00:00:00Z"
+  }
+}
+
+--- still consistent with ongoing backfill should continue backfill ---
+users%2F%2A%2Fdocs:
+{
+  "ReadTime": "2024-05-30T11:00:00Z",
+  "Backfill": {
+    "StartAfter": "2024-05-30T11:30:00Z",
+    "Completed": false,
+    "Cursor": "users/123/docs/456",
+    "MTime": "2024-05-30T11:15:00Z"
+  }
+}
+
+--- still consistent with completed backfill should preserve that ---
+users%2F%2A%2Fdocs:
+{
+  "ReadTime": "2024-05-30T11:00:00Z",
+  "Backfill": {
+    "StartAfter": "2024-05-30T10:00:00Z",
+    "Completed": true,
+    "Cursor": "",
+    "MTime": "0001-01-01T00:00:00Z"
+  }
+}
+
+--- inconsistent state with ongoing backfill should continue backfill ---
+users%2F%2A%2Fdocs:
+{
+  "ReadTime": "2024-05-30T12:00:00Z",
+  "Backfill": {
+    "StartAfter": "2024-05-30T11:30:00Z",
+    "Completed": false,
+    "Cursor": "users/123/docs/456",
+    "MTime": "2024-05-30T11:15:00Z"
+  }
+}
+
+--- inconsistent state with completed backfill should schedule new backfill ---
+users%2F%2A%2Fdocs:
+{
+  "ReadTime": "2024-05-30T12:00:00Z",
+  "Backfill": {
+    "StartAfter": "2024-05-31T10:00:00Z",
+    "Completed": false,
+    "Cursor": "",
+    "MTime": "0001-01-01T00:00:00Z"
+  }
+}
+
