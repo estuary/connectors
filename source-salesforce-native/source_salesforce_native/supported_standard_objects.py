@@ -106,6 +106,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "Address": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "AgentWork": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "AlternativePaymentMethod": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
