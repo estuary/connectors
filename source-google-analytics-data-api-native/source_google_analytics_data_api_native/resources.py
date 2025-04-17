@@ -23,6 +23,7 @@ from .models import (
     ResourceState,
     OAUTH2_SPEC,
     create_report_doc_model,
+    MetricAggregation,
     Report,
     ReportDocument,
 )
@@ -89,6 +90,8 @@ async def validate_custom_reports_json(
 
         raise ValidationError([msg])
 
+    valid_metric_aggregations = [a.value for a in MetricAggregation]
+
     for custom_report_details in custom_reports:
         try:
             assert isinstance(custom_report_details, dict)
@@ -103,6 +106,11 @@ async def validate_custom_reports_json(
             for metric in model.metrics:
                 if metric not in valid_metrics:
                     errors.append(f'"{metric}" in report "{model.name}" is not a valid metric. Consult {VALID_METRICS_DOCS_URL} for a list of valid metrics.')
+
+            if model.metricAggregations:
+                for aggregation in model.metricAggregations:
+                    if aggregation not in valid_metric_aggregations:
+                        errors.append(f'"{aggregation} in report "{model.name}" is not a supported metric aggregation. Supported metric aggregations are {valid_metric_aggregations}.')
 
         except (AssertionError, ModelValidationError) as err:
             if isinstance(err, AssertionError):
