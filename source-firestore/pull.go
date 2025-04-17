@@ -237,6 +237,7 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 		// otherwise we need to initialize a new backfill.
 		if prevState.Backfill != nil && !prevState.Backfill.Completed {
 			state.Backfill = prevState.Backfill
+			state.Inconsistent = true // Still inconsistent for later
 		} else if res.BackfillMode == backfillModeAsync {
 			state.Backfill = &backfillState{
 				StartAfter: computeBackfillStartTime(
