@@ -43,7 +43,8 @@ users%2F%2A%2Fdocs:
     "Completed": false,
     "Cursor": "users/123/docs/456",
     "MTime": "2024-05-30T11:15:00Z"
-  }
+  },
+  "Inconsistent": true
 }
 
 --- inconsistent state with completed backfill should schedule new backfill ---
