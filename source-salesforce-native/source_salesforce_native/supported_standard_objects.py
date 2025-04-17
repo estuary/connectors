@@ -19,12 +19,16 @@ class ObjectDetails(TypedDict, total=False):
     is_supported_by_bulk_api: Optional[bool] # If absent, the object is supported by the Bulk API. If present and False, the object is not supported by the Bulk API.
 
 
-COMMON_CUSTOM_OBJECT_DETAILS: ObjectDetails = {
+CUSTOM_OBJECT_WITH_SYSTEM_MODSTAMP_DETAILS: ObjectDetails = {
     "cursor_field": CursorFields.SYSTEM_MODSTAMP,
 }
 
-COMMON_CUSTOM_OBJECT_HISTORY_DETAILS: ObjectDetails = {
+CUSTOM_OBJECT_WITH_CREATED_DATE_DETAILS: ObjectDetails = {
     "cursor_field": CursorFields.CREATED_DATE,
+}
+
+CUSTOM_OBJECT_WITH_LAST_MODIFIED_DATE_DETAILS: ObjectDetails = {
+    "cursor_field": CursorFields.LAST_MODIFIED_DATE,
 }
 
 
