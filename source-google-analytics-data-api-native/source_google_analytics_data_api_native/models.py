@@ -106,6 +106,14 @@ ConnectorState = GenericConnectorState[ResourceState]
 class ReportDocument(BaseDocument, extra="allow"):
     pass
 
+# Google's docs state that COUNT is a valid MetricAggregation, but trying to use a COUNT aggregation
+# in a runReport call returns a 400 error saying COUNT isn't supported. If users want to use the
+# COUNT aggregation in the future, we can investigate what's going on further at that time.
+class MetricAggregation(StrEnum):
+    TOTAL = "TOTAL"
+    MINIMUM = "MINIMUM"
+    MAXIMUM = "MAXIMUM"
+
 
 # Report represents a valid configured report stream.
 class Report(BaseModel, extra="forbid"):
@@ -116,6 +124,9 @@ class Report(BaseModel, extra="forbid"):
     # Valid variations of these fields are described here: https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/FilterExpression.
     dimensionFilter: Optional[dict[str, Any]] = None
     metricFilter: Optional[dict[str, Any]] = None
+    # metricAggregations do not use the MetricAggregation enum in order to provide a nicer
+    # validation message than Pydantic's validation error message when validate_custom_reports_json is invoked.
+    metricAggregations: Optional[list[str]] = None
 
 
 def create_report_doc_model(
@@ -164,6 +175,10 @@ class RunReportResponse(BaseModel, extra="allow"):
     # If rows or rowCount is None, that means we requested data for days that haven't started yet.
     rows: Optional[list[Row]] = None
     rowCount: Optional[int] = None
+    # totals, minimums, and maximums are only present if the report specifies the associated MetricAggregation.
+    totals: Optional[list[Row]] = None
+    minimums: Optional[list[Row]] = None
+    maximums: Optional[list[Row]] = None
 
     class Metadata(BaseModel, extra="allow"):
         timeZone: str
