@@ -10,8 +10,9 @@ from estuary_cdk.capture.common import ReductionStrategy
 from estuary_cdk.http import HTTPMixin
 
 from .supported_standard_objects import (
-    COMMON_CUSTOM_OBJECT_DETAILS,
-    COMMON_CUSTOM_OBJECT_HISTORY_DETAILS,
+    CUSTOM_OBJECT_WITH_SYSTEM_MODSTAMP_DETAILS,
+    CUSTOM_OBJECT_WITH_CREATED_DATE_DETAILS,
+    CUSTOM_OBJECT_WITH_LAST_MODIFIED_DATE_DETAILS,
     SUPPORTED_STANDARD_OBJECTS,
 
 )
@@ -42,7 +43,10 @@ from .api import (
 
 
 CUSTOM_OBJECT_SUFFIX = '__c'
+CUSTOM_OBJECT_FEED_SUFFIX = '__Feed'
+CUSTOM_OBJECT_METADATA_SUFFIX = '__mdt'
 CUSTOM_OBJECT_HISTORY_SUFFIX = '__History'
+CUSTOM_OBJECT_SHARE_SUFFIX = '__Share'
 BUILD_RESOURCE_SEMAPHORE_LIMIT = 15
 
 
@@ -218,13 +222,27 @@ async def _object_to_resource(
         name: str,
         should_fetch_fields: bool = False,
     ) -> common.Resource | None:
-    is_custom_object = name.endswith(CUSTOM_OBJECT_SUFFIX)
-    is_custom_object_history = name.endswith(CUSTOM_OBJECT_HISTORY_SUFFIX)
 
-    if is_custom_object:
-        details = COMMON_CUSTOM_OBJECT_DETAILS
-    elif is_custom_object_history:
-        details = COMMON_CUSTOM_OBJECT_HISTORY_DETAILS
+    is_custom_object_with_system_modstamp = (
+        name.endswith(CUSTOM_OBJECT_SUFFIX)
+        or name.endswith(CUSTOM_OBJECT_FEED_SUFFIX)
+        or name.endswith(CUSTOM_OBJECT_METADATA_SUFFIX)
+    )
+
+    is_custom_object_with_last_modified_date = (
+        name.endswith(CUSTOM_OBJECT_SHARE_SUFFIX)
+    )
+
+    is_custom_object_with_created_date = (
+        name.endswith(CUSTOM_OBJECT_HISTORY_SUFFIX)
+    )
+
+    if is_custom_object_with_system_modstamp:
+        details = CUSTOM_OBJECT_WITH_SYSTEM_MODSTAMP_DETAILS
+    elif is_custom_object_with_last_modified_date:
+        details = CUSTOM_OBJECT_WITH_LAST_MODIFIED_DATE_DETAILS
+    elif is_custom_object_with_created_date:
+        details = CUSTOM_OBJECT_WITH_CREATED_DATE_DETAILS
     else:
         details = SUPPORTED_STANDARD_OBJECTS.get(name, None)
 
