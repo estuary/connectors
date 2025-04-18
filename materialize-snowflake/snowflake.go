@@ -12,6 +12,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cespare/xxhash/v2"
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -97,6 +99,12 @@ func newSnowflakeDriver() *sql.Driver {
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
+			var featureFlags = common.ParseFeatureFlags(parsed.Advanced.FeatureFlags, featureFlagDefaults)
+			if parsed.Advanced.FeatureFlags != "" {
+				log.WithField("flags", featureFlags).Info("parsed feature flags")
+			}
+			snowpipeStreaming := featureFlags["snowpipe_streaming"]
+
 			dsn, err := parsed.toURI(tenant)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
@@ -125,7 +133,7 @@ func newSnowflakeDriver() *sql.Driver {
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				NewTransactor:       prepareNewTransactor(snowpipeStreaming),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
 			}, nil
@@ -164,10 +172,11 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 }
 
 type transactor struct {
-	cfg        *config
-	ep         *sql.Endpoint
-	db         *stdsql.DB
-	pipeClient *PipeClient
+	cfg           *config
+	ep            *sql.Endpoint
+	db            *stdsql.DB
+	streamManager *streamManager
+	pipeClient    *PipeClient
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -196,92 +205,105 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-func newTransactor(
-	ctx context.Context,
-	ep *sql.Endpoint,
-	fence sql.Fence,
-	bindings []sql.Table,
-	open pm.Request_Open,
-	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-	var cfg = ep.Config.(*config)
+func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+	return func(
+		ctx context.Context,
+		ep *sql.Endpoint,
+		fence sql.Fence,
+		bindings []sql.Table,
+		open pm.Request_Open,
+		is *boilerplate.InfoSchema,
+		be *boilerplate.BindingEvents,
+	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
+		var cfg = ep.Config.(*config)
 
-	dsn, err := cfg.toURI(ep.Tenant)
-	if err != nil {
-		return nil, nil, fmt.Errorf("building snowflake dsn: %w", err)
-	}
-
-	db, err := stdsql.Open("snowflake", dsn)
-	if err != nil {
-		return nil, nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
-	}
-
-	var pipeClient *PipeClient
-	if cfg.Credentials.AuthType == JWT {
-		var accountName string
-		if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
-			return nil, nil, fmt.Errorf("fetching current account name: %w", err)
-		}
-		pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
+		dsn, err := cfg.toURI(ep.Tenant)
 		if err != nil {
-			return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
+			return nil, nil, fmt.Errorf("building snowflake dsn: %w", err)
 		}
-	}
 
-	var d = &transactor{
-		cfg:        cfg,
-		ep:         ep,
-		templates:  renderTemplates(ep.Dialect),
-		db:         db,
-		pipeClient: pipeClient,
-		_range:     open.Range,
-		version:    open.Version,
-		be:         be,
-	}
-
-	d.store.fence = &fence
-
-	// Establish connections.
-	if db, err := stdsql.Open("snowflake", dsn); err != nil {
-		return nil, nil, fmt.Errorf("load stdsql.Open: %w", err)
-	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, nil, fmt.Errorf("load db.Conn: %w", err)
-	}
-
-	if db, err := stdsql.Open("snowflake", dsn); err != nil {
-		return nil, nil, fmt.Errorf("store stdsql.Open: %w", err)
-	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, nil, fmt.Errorf("store db.Conn: %w", err)
-	}
-
-	// Create stage for file-based transfers.
-	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
-		return nil, nil, fmt.Errorf("creating transfer stage : %w", err)
-	}
-
-	for _, binding := range bindings {
-		if err = d.addBinding(binding); err != nil {
-			return nil, nil, fmt.Errorf("%v: %w", binding, err)
+		db, err := stdsql.Open("snowflake", dsn)
+		if err != nil {
+			return nil, nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 		}
-	}
 
-	opts := &boilerplate.MaterializeOptions{
-		ExtendedLogging: true,
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: cfg.Schedule,
-			Jitter: []byte(cfg.Host + cfg.Warehouse),
-		},
-		DBTJobTrigger: &cfg.DBTJobTrigger,
-	}
+		var sm *streamManager
+		var pipeClient *PipeClient
+		if cfg.Credentials.AuthType == JWT {
+			var accountName string
+			if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
+				return nil, nil, fmt.Errorf("fetching current account name: %w", err)
+			}
 
-	return d, opts, nil
+			if snowpipeStreaming {
+				sm, err = newStreamManager(cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin)
+				if err != nil {
+					return nil, nil, fmt.Errorf("newStreamManager: %w", err)
+				}
+			} else {
+				pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
+				if err != nil {
+					return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
+				}
+			}
+		}
+
+		var d = &transactor{
+			cfg:           cfg,
+			ep:            ep,
+			templates:     renderTemplates(ep.Dialect),
+			db:            db,
+			streamManager: sm,
+			pipeClient:    pipeClient,
+			_range:        open.Range,
+			version:       open.Version,
+			be:            be,
+		}
+
+		d.store.fence = &fence
+
+		// Establish connections.
+		if db, err := stdsql.Open("snowflake", dsn); err != nil {
+			return nil, nil, fmt.Errorf("load stdsql.Open: %w", err)
+		} else if d.load.conn, err = db.Conn(ctx); err != nil {
+			return nil, nil, fmt.Errorf("load db.Conn: %w", err)
+		}
+
+		if db, err := stdsql.Open("snowflake", dsn); err != nil {
+			return nil, nil, fmt.Errorf("store stdsql.Open: %w", err)
+		} else if d.store.conn, err = db.Conn(ctx); err != nil {
+			return nil, nil, fmt.Errorf("store db.Conn: %w", err)
+		}
+
+		// Create stage for file-based transfers.
+		if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
+			return nil, nil, fmt.Errorf("creating transfer stage : %w", err)
+		}
+
+		for _, binding := range bindings {
+			if err = d.addBinding(ctx, binding, snowpipeStreaming); err != nil {
+				return nil, nil, fmt.Errorf("%v: %w", binding, err)
+			}
+		}
+
+		opts := &boilerplate.MaterializeOptions{
+			ExtendedLogging: true,
+			AckSchedule: &boilerplate.AckScheduleOption{
+				Config: cfg.Schedule,
+				Jitter: []byte(cfg.Host + cfg.Warehouse),
+			},
+			DBTJobTrigger: &cfg.DBTJobTrigger,
+		}
+
+		return d, opts, nil
+	}
 }
 
 type binding struct {
 	target sql.Table
 
-	pipeName string
+	isStreaming bool
+	pipeName    string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery   string
@@ -298,27 +320,34 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(target sql.Table) error {
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, snowpipeStreaming bool) error {
 	var b = new(binding)
 	b.target = target
-
-	b.load.stage = newStagedFile(os.TempDir())
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
-	b.store.stage = newStagedFile(os.TempDir())
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
-		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
-		var tableName = b.target.Path[len(b.target.Path)-1]
-		parts := pipeParts{
-			Catalog:   d.cfg.Database,
-			Schema:    d.cfg.Schema,
-			Binding:   fmt.Sprintf("%d", b.target.Binding),
-			KeyBegin:  keyBegin,
-			Version:   d.version,
-			TableName: sanitizeAndAppendHash(tableName),
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT && snowpipeStreaming {
+		b.isStreaming = true
+		loc := d.ep.Dialect.TableLocator(b.target.Path)
+		if err := d.streamManager.addBinding(ctx, loc.TableSchema, target); err != nil {
+			return fmt.Errorf("adding binding to stream manager: %w", err)
 		}
-		b.pipeName = parts.toQualifiedName()
+	} else {
+		b.load.stage = newStagedFile(os.TempDir())
+		b.store.stage = newStagedFile(os.TempDir())
+		if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
+			var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
+			var tableName = b.target.Path[len(b.target.Path)-1]
+			parts := pipeParts{
+				Catalog:   d.cfg.Database,
+				Schema:    d.cfg.Schema,
+				Binding:   fmt.Sprintf("%d", b.target.Binding),
+				KeyBegin:  keyBegin,
+				Version:   d.version,
+				TableName: sanitizeAndAppendHash(tableName),
+			}
+			b.pipeName = parts.toQualifiedName()
+		}
 	}
 
 	d.bindings = append(d.bindings, b)
@@ -350,7 +379,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var subqueries = make(map[int]string)
 	var filesToCleanup []string
 	for i, b := range d.bindings {
-		if !b.load.stage.started {
+		if b.load.stage == nil || !b.load.stage.started {
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
@@ -435,12 +464,13 @@ func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, err
 }
 
 type checkpointItem struct {
-	Table     string
-	Query     string
-	StagedDir string
-	PipeName  string
-	PipeFiles []fileRecord
-	Version   string
+	Table       string
+	Query       string
+	StagedDir   string
+	StreamBlobs []*blobMetadata
+	PipeName    string
+	PipeFiles   []fileRecord
+	Version     string
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -465,27 +495,61 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		if err := b.store.stage.start(ctx, d.db); err != nil {
-			return nil, err
+		if !b.isStreaming {
+			if err := b.store.stage.start(ctx, d.db); err != nil {
+				return nil, err
+			}
 		}
-		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
-		if err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
-		}
-		if err = b.store.stage.encodeRow(converted); err != nil {
+		} else if b.isStreaming {
+			if err := d.streamManager.encodeRow(ctx, it.Binding, converted); err != nil {
+				return nil, fmt.Errorf("encoding Store to stream: %w", err)
+			}
+		} else if err := b.store.stage.encodeRow(converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
+		} else {
+			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
-		b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
+	}
+	if err := it.Err(); err != nil {
+		return nil, fmt.Errorf("iterating Store: %w", err)
 	}
 
-	// Upload the staged files and build a list of merge and copy into queries that need to be run
-	// to effectively commit the files into destination tables. These queries are stored
-	// in the checkpoint so that if the connector is restarted in middle of a commit
-	// it can run the same queries on the next startup. This is the pattern for
-	// recovery log being authoritative and the connector idempotently applies a commit
-	// These are keyed on the binding table name so that in case of a recovery being necessary
-	// we don't run queries belonging to bindings that have been removed
-	for _, b := range d.bindings {
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		cp, err := d.buildDriverCheckpoint(ctx, runtimeCheckpoint)
+		if err != nil {
+			return nil, pf.FinishedOperation(err)
+		}
+
+		return &pf.ConnectorState{UpdatedJson: cp, MergePatch: true}, nil
+	}, nil
+}
+
+func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (json.RawMessage, error) {
+	streamBlobs := make(map[int][]*blobMetadata)
+	if d.streamManager != nil {
+		// The "base token" only really needs to be sufficiently random that it
+		// doesn't collide with the prior or next transaction's value. Deriving
+		// it from the runtime checkpoint is not strictly necessary, but it's
+		// convenient to make testing outputs consistent.
+		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
+			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
+		} else if streamBlobs, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
+			return nil, fmt.Errorf("flushing stream manager: %w", err)
+		}
+	}
+
+	for idx, b := range d.bindings {
+		if b.isStreaming {
+			if blobs, ok := streamBlobs[idx]; ok {
+				d.cp[b.target.StateKey] = &checkpointItem{
+					StreamBlobs: blobs,
+				}
+			}
+			continue
+		}
+
 		if !b.store.stage.started {
 			continue
 		}
@@ -559,14 +623,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var checkpointJSON, err = json.Marshal(d.cp)
-		if err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
-		}
+	var checkpointJSON, err = json.Marshal(d.cp)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint json: %w", err)
+	}
 
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
-	}, nil
+	return checkpointJSON, nil
 }
 
 type pipeRecord struct {
@@ -659,7 +721,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		if len(item.Query) > 0 {
-			item := item
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				if _, err := d.db.ExecContext(groupCtx, item.Query); err != nil {
@@ -670,6 +731,16 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				if err := d.deleteFiles(ctx, []string{item.StagedDir}); err != nil {
 					return fmt.Errorf("cleaning up files: %w", err)
 				}
+
+				return nil
+			})
+		} else if len(item.StreamBlobs) > 0 {
+			group.Go(func() error {
+				d.be.StartedResourceCommit(path)
+				if err := d.streamManager.write(groupCtx, item.StreamBlobs); err != nil {
+					return fmt.Errorf("writing streaming blobs for %s: %w", path, err)
+				}
+				d.be.FinishedResourceCommit(path)
 
 				return nil
 			})
