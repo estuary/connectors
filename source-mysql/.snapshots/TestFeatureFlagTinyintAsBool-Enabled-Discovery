@@ -19,9 +19,9 @@ Binding 0:
               "description": "(source type: non-nullable int)"
             },
             "v_bool": {
-              "description": "(source type: tinyint)",
+              "description": "(source type: boolean)",
               "type": [
-                "integer",
+                "boolean",
                 "null"
               ]
             },

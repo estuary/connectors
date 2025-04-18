@@ -53,7 +53,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 
 	// Enumerate every column of every table, and then aggregate into a
 	// map from StreamID to TableInfo structs.
-	columns, err := getColumns(ctx, db.conn)
+	columns, err := db.getColumns(ctx, db.conn)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering columns: %w", err)
 	}
@@ -540,7 +540,7 @@ const queryDiscoverColumns = `
   WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
   ORDER BY table_schema, table_name, ordinal_position;`
 
-func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, error) {
+func (db *mysqlDatabase) getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, error) {
 	var results, err = conn.Execute(queryDiscoverColumns)
 	if err != nil {
 		return nil, fmt.Errorf("error querying columns: %w", err)
@@ -569,13 +569,13 @@ func getColumns(_ context.Context, conn *client.Conn) ([]sqlcapture.ColumnInfo, 
 			Index:       int(row[2].AsInt64()),
 			Name:        columnName,
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    parseDataType(dataType, fullColumnType, charsetName, maxLength),
+			DataType:    db.parseDataType(dataType, fullColumnType, charsetName, maxLength),
 		})
 	}
 	return columns, err
 }
 
-func parseDataType(typeName, fullColumnType, charset string, maxLength int) any {
+func (db *mysqlDatabase) parseDataType(typeName, fullColumnType, charset string, maxLength int) any {
 	switch typeName {
 	case "enum":
 		// Illegal values are represented internally by MySQL as the integer 0. Adding
@@ -584,6 +584,13 @@ func parseDataType(typeName, fullColumnType, charset string, maxLength int) any 
 	case "set":
 		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
+		if typeName == "tinyint" && fullColumnType == "tinyint(1)" && db.featureFlags["tinyint1_as_bool"] {
+			// Booleans in MySQL are annoying because 'BOOLEAN' is just an alias for 'TINYINT(1)'
+			// and 'TRUE/FALSE' for 1/0, but since it's 'TINYINT(1)' rather than just 'TINYINT'
+			// and nobody uses TINYINT(1) for other purposes we can reliably assume that it means
+			// the user wants us to treat it as a boolean anyway, so translate this as "boolean".
+			return &mysqlColumnType{Type: "boolean"}
+		}
 		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
 		return &mysqlColumnType{Type: typeName, Charset: charset}
@@ -642,6 +649,14 @@ func (t *mysqlColumnType) translateRecordField(isBackfill bool, val interface{})
 			return string(bs), nil
 		}
 		return val, nil
+	case "boolean":
+		if val == nil {
+			return nil, nil
+		}
+		// This is an ugly hack, but it works without requiring a bunch of annoying type
+		// assertions to make sure we handle the possible value types coming from backfills
+		// and from replication, and it's significantly less likely to break in the future.
+		return fmt.Sprintf("%d", val) != "0", nil
 	case "tinyint":
 		if sval, ok := val.(int8); ok && t.Unsigned {
 			return uint8(sval), nil
@@ -718,7 +733,7 @@ func (t *mysqlColumnType) encodeKeyFDB(val any) (tuple.TupleElement, error) {
 			return val, fmt.Errorf("internal error: failed to translate enum value %q to integer index", string(bs))
 		}
 		return val, nil
-	case "tinyint", "smallint", "mediumint", "int", "bigint":
+	case "boolean", "tinyint", "smallint", "mediumint", "int", "bigint":
 		return val, nil
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
 		// Backfill text keys are serialized as the raw bytes or string we receive, which is generally
@@ -985,6 +1000,9 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"int":       {jsonType: "integer"},
 	"bigint":    {jsonType: "integer"},
 	"bit":       {jsonType: "integer"},
+
+	// BOOLEAN is a pseudo-type that doesn't entirely exist in MySQL except as an alias for TINYINT(1)
+	"boolean": {jsonType: "boolean"},
 
 	"float":   {jsonType: "number"},
 	"double":  {jsonType: "number"},
