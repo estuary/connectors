@@ -105,7 +105,7 @@
       "title": "Gift Card",
       "totalInventory": 0,
       "tracksInventory": false,
-      "updatedAt": "2025-01-15T03:10:30Z",
+      "updatedAt": "2025-04-10T17:45:43Z",
       "variants": [
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -192,7 +192,7 @@
             }
           ],
           "inventoryPolicy": "DENY",
-          "inventoryQuantity": 0,
+          "inventoryQuantity": -1,
           "legacyResourceId": "43217823367213",
           "position": 2,
           "price": "25.00",
@@ -209,7 +209,7 @@
           "sku": null,
           "taxable": false,
           "title": "$25",
-          "updatedAt": "2025-01-14T15:10:14Z"
+          "updatedAt": "2025-04-10T17:43:00Z"
         },
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -244,7 +244,7 @@
             }
           ],
           "inventoryPolicy": "DENY",
-          "inventoryQuantity": 0,
+          "inventoryQuantity": -1,
           "legacyResourceId": "43217823399981",
           "position": 3,
           "price": "50.00",
@@ -261,7 +261,7 @@
           "sku": null,
           "taxable": false,
           "title": "$50",
-          "updatedAt": "2025-01-14T15:10:14Z"
+          "updatedAt": "2025-04-10T17:43:00Z"
         },
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -321,6 +321,108 @@
         "precision": "EXACT"
       },
       "vendor": "Snowboard Vendor"
+    }
+  ],
+  [
+    "acmeCo/customers",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "addresses": [],
+      "createdAt": "2025-01-14T15:10:14Z",
+      "defaultAddress": null,
+      "displayName": "Ayumu Hirano",
+      "email": "ayumu.hirano@example.com",
+      "firstName": "Ayumu",
+      "id": "gid://shopify/Customer/7609762938925",
+      "lastName": "Hirano",
+      "locale": "en",
+      "metafields": [],
+      "note": null,
+      "phone": "+16135550127",
+      "state": "DISABLED",
+      "statistics": {
+        "predictedSpendTier": null
+      },
+      "taxExempt": false,
+      "taxExemptions": [],
+      "updatedAt": "2025-04-10T17:42:58Z",
+      "verifiedEmail": true
+    }
+  ],
+  [
+    "acmeCo/orders",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "billingAddress": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "closedAt": "2025-04-10T17:54:23Z",
+      "createdAt": "2025-04-10T17:42:58Z",
+      "currencyCode": "USD",
+      "customer": {
+        "id": "gid://shopify/Customer/7609762938925"
+      },
+      "displayFinancialStatus": "PENDING",
+      "displayFulfillmentStatus": "UNFULFILLED",
+      "email": "ayumu.hirano@example.com",
+      "fulfillments": [],
+      "fullyPaid": false,
+      "id": "gid://shopify/Order/5714619858989",
+      "lineItems": [
+        {
+          "__parentId": "gid://shopify/Order/5714619858989",
+          "discountedUnitPrice": "25.00",
+          "id": "gid://shopify/LineItem/14150963134509",
+          "name": "Gift Card - $25",
+          "originalUnitPrice": "25.00",
+          "quantity": 1,
+          "variant": {
+            "id": "gid://shopify/ProductVariant/43217823367213",
+            "price": "25.00",
+            "product": {
+              "id": "gid://shopify/Product/8086707830829",
+              "title": "Gift Card"
+            },
+            "sku": null,
+            "title": "$25"
+          }
+        },
+        {
+          "__parentId": "gid://shopify/Order/5714619858989",
+          "discountedUnitPrice": "50.00",
+          "id": "gid://shopify/LineItem/14150963167277",
+          "name": "Gift Card - $50",
+          "originalUnitPrice": "50.00",
+          "quantity": 1,
+          "variant": {
+            "id": "gid://shopify/ProductVariant/43217823399981",
+            "price": "50.00",
+            "product": {
+              "id": "gid://shopify/Product/8086707830829",
+              "title": "Gift Card"
+            },
+            "sku": null,
+            "title": "$50"
+          }
+        }
+      ],
+      "metafields": [],
+      "name": "#1001",
+      "note": "Testing a note.",
+      "phone": "+16135550127",
+      "processedAt": "2025-04-10T17:42:57Z",
+      "shippingAddress": null,
+      "subtotalPrice": "75.00",
+      "totalPrice": "75.00",
+      "totalRefunded": "0.00",
+      "totalShippingPrice": "0.00",
+      "totalTax": "0.00",
+      "transactions": [],
+      "updatedAt": "2025-04-10T17:54:23Z"
     }
   ]
 ]
