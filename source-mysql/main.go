@@ -33,6 +33,9 @@ var featureFlagDefaults = map[string]bool{
 	// When true, date columns will be discovered as `type: string, format: date`
 	// instead of simply `type: string`
 	"date_schema_format": true,
+
+	// When true, columns of type TINYINT(1) will be treated as booleans.
+	"tinyint1_as_bool": false,
 }
 
 type sshForwarding struct {

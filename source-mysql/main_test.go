@@ -657,3 +657,44 @@ func TestNonCommitFinalQuery(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra TEXT;", tableName))
 	tests.VerifiedCapture(ctx, t, cs)
 }
+
+// TestFeatureFlagTinyintAsBool exercises the "tinyint1_as_bool" feature flag
+// in both discovery and captures.
+func TestFeatureFlagTinyintAsBool(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "21925183"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, v_bool BOOLEAN, v_tinyint TINYINT)")
+
+	tb.Insert(ctx, t, tableName, [][]any{
+		{1, true, 1}, {2, false, 0}, {3, true, 2}, {4, false, 127},
+		{5, true, -128}, {6, nil, 1}, {7, true, nil}, {8, nil, nil},
+	})
+
+	for _, tc := range []struct {
+		name  string
+		flags string
+	}{
+		{"Default", ""},
+		{"Enabled", "tinyint1_as_bool"},
+		{"Disabled", "no_tinyint1_as_bool"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cs = tb.CaptureSpec(ctx, t)
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flags
+
+			t.Run("Discovery", func(t *testing.T) {
+				cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+			})
+
+			t.Run("Capture", func(t *testing.T) {
+				cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
+				cs.Validator = &st.OrderedCaptureValidator{}
+				sqlcapture.TestShutdownAfterCaughtUp = true
+				t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+				cs.Capture(ctx, t, nil)
+				cupaloy.SnapshotT(t, cs.Summary())
+			})
+		})
+	}
+}
