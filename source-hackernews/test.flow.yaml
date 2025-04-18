@@ -1,0 +1,24 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-hackernews:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_hackernews
+        config: config.yaml
+    bindings:
+      - resource:
+          name: items
+          interval: PT3600S
+        target: acmeCo/items
+      # - resource:
+      #     name: users
+      #     interval: PT3600S
+      #   target: acmeCo/users
+    interval: 3m
+    shards:
+      logLevel: debug
