@@ -8,7 +8,7 @@ import signal
 import sys
 import traceback
 
-from .logger import init_logger
+from .logger import init_logger, FlowLogger
 from .flow import ValidationError
 
 # Request type served by this connector.
@@ -63,7 +63,7 @@ class BaseConnector(Generic[Request], abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    async def handle(self, log: Logger, request: Request) -> None:
+    async def handle(self, log: FlowLogger, request: Request) -> None:
         raise NotImplementedError()
 
     # Serve this connector by invoking `handle()` for all incoming instances of
@@ -74,7 +74,7 @@ class BaseConnector(Generic[Request], abc.ABC):
     # exit code which indicates whether an error occurred.
     async def serve(
         self,
-        log: Logger | None = None,
+        log: FlowLogger | None = None,
         requests: Callable[
             [type[Request]], AsyncGenerator[Request, None]
         ] = stdin_jsonl,
@@ -82,7 +82,7 @@ class BaseConnector(Generic[Request], abc.ABC):
         if not log:
             log = init_logger()
 
-        assert isinstance(log, Logger)  # Narrow type to non-None.
+        assert isinstance(log, FlowLogger)  # Narrow type to non-None.
 
         loop = asyncio.get_running_loop()
         this_task = asyncio.current_task(loop)
@@ -166,5 +166,5 @@ class BaseConnector(Generic[Request], abc.ABC):
         if failed:
             raise SystemExit(1)
 
-    async def exit(self, log: Logger):
+    async def exit(self, log: FlowLogger):
         return  # no-op default
