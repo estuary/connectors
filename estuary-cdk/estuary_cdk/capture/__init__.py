@@ -22,6 +22,7 @@ from ..flow import (
     EndpointConfig,
     ResourceConfig,
 )
+from ..logger import FlowLogger
 from ..pydantic_polyfill import GenericModel
 
 
@@ -71,7 +72,7 @@ class Task:
     Task also facilitates logging and graceful stop of a capture coroutine.
     """
 
-    log: Logger
+    log: FlowLogger
     """Attached Logger of this Task instance, to use for scoped logging."""
 
     @dataclass
@@ -103,7 +104,7 @@ class Task:
 
     def __init__(
         self,
-        log: Logger,
+        log: FlowLogger,
         name: str,
         output: BinaryIO,
         stopping: Stopping,

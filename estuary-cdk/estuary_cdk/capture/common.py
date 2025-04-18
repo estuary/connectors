@@ -34,6 +34,7 @@ from ..flow import (
     ValidationError,
     BasicAuth,
 )
+from ..logger import FlowLogger
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
 
@@ -233,7 +234,7 @@ class AssociatedDocument(Generic[_BaseDocument]):
     binding: int
 
 
-FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
+FetchSnapshotFn = Callable[[FlowLogger], AsyncGenerator[_BaseDocument | dict, None]]
 """
 FetchSnapshotFn is a function which fetches a complete snapshot of a resource.
 
@@ -244,7 +245,7 @@ not emitted by the connector.
 """
 
 FetchPageFn = Callable[
-    [Logger, PageCursor, LogCursor],
+    [FlowLogger, PageCursor, LogCursor],
     AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
 ]
 """
@@ -269,7 +270,7 @@ returning without yielding a final PageCursor.
 """
 
 RecurringFetchPageFn = Callable[
-    [Logger, PageCursor, LogCursor, bool],
+    [FlowLogger, PageCursor, LogCursor, bool],
     AsyncGenerator[_BaseDocument | dict | AssociatedDocument | PageCursor, None],
 ]
 """
@@ -300,7 +301,7 @@ returning without yielding a final PageCursor.
 """
 
 FetchChangesFn = Callable[
-    [Logger, LogCursor],
+    [FlowLogger, LogCursor],
     AsyncGenerator[_BaseDocument | dict | AssociatedDocument | LogCursor, None],
 ]
 """
@@ -335,7 +336,7 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 """
 
 
-def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
+def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: FlowLogger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
     """Check if the function signature accepts the arguments of a RecurringFetchPageFn."""
     try:
         inspect.signature(fn).bind(log, page, cutoff, is_connector_initiated)
