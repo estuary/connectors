@@ -26,6 +26,7 @@ import (
 
 const (
 	// BYTES_16_MB is the common Snowflake "maximum string length" of 16 MiB.
+	// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/DataValidationUtil.java#L73
 	BYTES_16_MB = 16 * 1024 * 1024
 
 	// MAX_SEMI_STRUCTURED_LENGTH is the same as maxStrLen, but includes room
@@ -44,6 +45,7 @@ const (
 	// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/TimestampWrapper.java#L31-L41
 	MASK_OF_TIMEZONE = (1 << 14) - 1
 
+	// Always "bdec".
 	// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/utils/Constants.java#L55
 	BLOB_EXTENSION_TYPE = "bdec"
 
