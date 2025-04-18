@@ -13,8 +13,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/estuary/connectors/go/obj"
 	sql "github.com/estuary/connectors/materialize-sql"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
+	"golang.org/x/oauth2"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/api/option"
 )
 
 // channelName produces a reasonably readable channel name that is globally
@@ -264,21 +267,44 @@ func (sm *streamManager) maybeInitializeStore(ctx context.Context) error {
 	sm.prefix = cfg.Prefix
 	sm.deploymentId = cfg.DeploymentID
 
-	if cfg.StageLocation.LocationType == "S3" {
+	switch cfg.StageLocation.LocationType {
+	case "S3":
 		provider := credentials.NewStaticCredentialsProvider(
 			cfg.StageLocation.Creds.AwsKeyId,
 			cfg.StageLocation.Creds.AwsSecretKey,
 			cfg.StageLocation.Creds.AwsToken,
 		)
-		if sm.store, err = obj.NewS3Store(ctx, provider, bucket, cfg.StageLocation.Region, nil); err != nil {
+		if sm.store, err = obj.NewS3Store(ctx, bucket, provider); err != nil {
 			return fmt.Errorf("new s3 store: %w", err)
 		}
-	} else {
-		// TODO(whb): Add support for GCS and Azure.
+	case "GCS":
+		opts := []option.ClientOption{
+			option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
+				AccessToken: cfg.StageLocation.Creds.GcsAccessToken,
+			})),
+		}
+		if sm.store, err = obj.NewGCSStore(ctx, bucket, opts); err != nil {
+			return fmt.Errorf("new gcs store: %w", err)
+		}
+	case "AZURE":
+		opts := []obj.AzureConfigOption{
+			obj.WithAzureSasToken(cfg.StageLocation.Creds.AzureSasToken),
+			obj.WithAzureEndpoint(cfg.StageLocation.Endpoint),
+		}
+		if sm.store, err = obj.NewAzureBlobStore(ctx, bucket, cfg.StageLocation.StorageAccount, opts); err != nil {
+			return fmt.Errorf("new azure store: %w", err)
+		}
+	default:
 		return fmt.Errorf("unknown stage location type %q", cfg.StageLocation.LocationType)
 	}
 
 	sm.storeExpiresAt = time.Now().Add(30 * time.Minute)
+	log.WithFields(log.Fields{
+		"locationType": cfg.StageLocation.LocationType,
+		"location":     cfg.StageLocation.Location,
+		"prefix":       cfg.Prefix,
+		"deploymentId": cfg.DeploymentID,
+	}).Info("configured store for Snowpipe streaming")
 
 	return nil
 }

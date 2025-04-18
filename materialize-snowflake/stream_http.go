@@ -100,14 +100,22 @@ type blobMetadata struct {
 type streamConfig struct {
 	Prefix        string `json:"prefix"`
 	StageLocation struct {
-		Creds struct {
+		LocationType   string `json:"locationType"`
+		Location       string `json:"location"`
+		StorageAccount string `json:"storageAccount"` // for Azure
+		Endpoint       string `json:"endPoint"`       // for Azure
+		Creds          struct {
+			// For AWS authorization.
 			AwsKeyId     string `json:"AWS_KEY_ID"`
 			AwsSecretKey string `json:"AWS_SECRET_KEY"`
 			AwsToken     string `json:"AWS_TOKEN"`
+
+			// For GCS authorization.
+			GcsAccessToken string `json:"GCS_ACCESS_TOKEN"`
+
+			// For Azure authorization.
+			AzureSasToken string `json:"AZURE_SAS_TOKEN"`
 		} `json:"creds"`
-		Location     string `json:"location"`
-		LocationType string `json:"locationType"`
-		Region       string `json:"region"`
 	} `json:"stage_location"`
 	DeploymentID int    `json:"deployment_id"`
 	Message      string `json:"message"`

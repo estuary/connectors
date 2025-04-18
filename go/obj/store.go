@@ -27,6 +27,9 @@ func getPutStreamConfig(opts []PutStreamOption) putStreamConfig {
 	return cfg
 }
 
+// Store is a common interface for object storage implementations.
 type Store interface {
+	// PutStream uploads an object as a stream, reading from `r` and writing an
+	// object named `key`.
 	PutStream(ctx context.Context, key string, r io.Reader, opts ...PutStreamOption) error
 }
