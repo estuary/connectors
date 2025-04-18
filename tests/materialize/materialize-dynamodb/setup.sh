@@ -47,37 +47,6 @@ resources_json_template='[
   },
   {
     "resource": {
-      "table": "duplicated-keys-delta",
-      "delta_updates": true
-    },
-    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}",
-    "fields": {
-      "recommended": true,
-      "include": {
-        "int": {},
-        "str": {}
-      }
-    }
-  },
-  {
-    "resource": {
-      "table": "duplicated-keys-delta-exclude-flow-doc",
-      "delta_updates": true
-    },
-    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}",
-    "fields": {
-      "recommended": true,
-      "exclude": [
-        "flow_document" 
-      ],
-      "include": {
-        "int": {},
-        "str": {}
-      }
-    }
-  },
-  {
-    "resource": {
       "table": "multiple-types"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",

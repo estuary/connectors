@@ -46,8 +46,7 @@ func (c *config) Validate() error {
 }
 
 type resource struct {
-	Table        string `json:"table" jsonschema:"title=Table Name,description=The name of the table to be materialized to." jsonschema_extras:"x-collection-name=true"`
-	DeltaUpdates bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false" jsonschema_extras:"x-delta-updates=true"`
+	Table string `json:"table" jsonschema:"title=Table Name,description=The name of the table to be materialized to." jsonschema_extras:"x-collection-name=true"`
 }
 
 func (r *resource) Validate() error {
@@ -201,11 +200,6 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 	var bindings = []*pm.Response_Validated_Binding{}
 	for i, binding := range req.Bindings {
-		res, err := resolveResourceConfig(binding.ResourceConfigJson)
-		if err != nil {
-			return nil, fmt.Errorf("building resource for binding %v: %w", binding.Collection.Name.String(), err)
-		}
-
 		// The primary key for a DynamoDB table is the partition key, and an optional sort key. For
 		// now we only support materializing collections with at most 2 collection keys, to map to
 		// this table structure.
@@ -219,7 +213,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 
 		constraints, err := validator.ValidateBinding(
 			[]string{tableNames[i]},
-			res.DeltaUpdates,
+			false,
 			binding.Backfill,
 			binding.Collection,
 			binding.FieldConfigJsonMap,
@@ -232,7 +226,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		bindings = append(bindings, &pm.Response_Validated_Binding{
 			Constraints:  constraints,
 			ResourcePath: []string{tableNames[i]},
-			DeltaUpdates: res.DeltaUpdates,
+			DeltaUpdates: false,
 		})
 	}
 	var response = &pm.Response_Validated{Bindings: bindings}

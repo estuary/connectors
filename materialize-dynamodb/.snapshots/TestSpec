@@ -53,12 +53,6 @@
         "title": "Table Name",
         "description": "The name of the table to be materialized to.",
         "x-collection-name": true
-      },
-      "delta_updates": {
-        "type": "boolean",
-        "title": "Delta updates",
-        "default": false,
-        "x-delta-updates": true
       }
     },
     "type": "object",
