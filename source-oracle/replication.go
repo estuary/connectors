@@ -67,11 +67,20 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 	var cp checkpoint
 	if len(cpJSON) > 0 {
 		if err := json.Unmarshal(cpJSON, &cp); err != nil {
-			return nil, fmt.Errorf("decoding checkpoint: %w", err)
+			var oldCheckpoint string
+			if err2 := json.Unmarshal(cpJSON, &oldCheckpoint); err2 != nil {
+				return nil, fmt.Errorf("decoding checkpoint: %w and %w", err, err2)
+			}
+			if oldCheckpoint != "" {
+				cp.SCN, err = strconv.ParseInt(oldCheckpoint, 10, 64)
+				if err != nil {
+					return nil, fmt.Errorf("parsing old cursor: %w", err)
+				}
+			}
 		}
 	}
 
-	var startSCN int64
+	var startSCN SCN
 	if cp.SCN != 0 {
 		startSCN = cp.SCN
 	} else {
@@ -123,7 +132,7 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 		smartMode:      smartMode,
 		dictionaryMode: dictionaryMode,
 
-		pendingTransactions: make(map[string]checkpointTx),
+		pendingTransactions: make(map[XID]checkpointTx),
 
 		transactionsStmt: transactionsStmt,
 	}
@@ -150,12 +159,12 @@ type redoFile struct {
 	Status      string
 	Name        string
 	Sequence    int
-	FirstChange int64
+	FirstChange SCN
 	DictStart   string
 	DictEnd     string
 }
 
-func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN int64) (int, error) {
+func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SCN) (int, error) {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
 		"endSCN":   endSCN,
@@ -279,7 +288,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN in
 	return redoSequence, nil
 }
 
-func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN int64) error {
+func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN SCN) error {
 	var dictionaryOption = ""
 	if s.dictionaryMode == DictionaryModeExtract {
 		dictionaryOption = "DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
@@ -364,7 +373,7 @@ type checkpointTx struct {
 
 type checkpoint struct {
 	SCN                 SCN
-	PendingTransactions map[string]checkpointTx
+	PendingTransactions map[XID]checkpointTx
 }
 
 func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
@@ -567,7 +576,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 		}
 
 		// Exclude rollbacked transactions from processing, and keep track of pending transactions
-		var rollbackedXIDs map[string]struct{}
+		var rollbackedXIDs map[XID]struct{}
 		if len(transactions) == 0 {
 			var newPendingTxs map[XID]SCN
 			newPendingTxs, rollbackedXIDs, err = s.pendingAndRollbackedTransactions(ctx, startSCN, endSCN)
@@ -784,7 +793,7 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 	for rows.Next() {
 		var xidRaw []byte
 		var rollbacks, commits int
-		var startSCN int64
+		var startSCN SCN
 		if err := rows.Scan(&xidRaw, &rollbacks, &commits, &startSCN); err != nil {
 			return nil, nil, fmt.Errorf("scanning transactions: %w", err)
 		}
@@ -810,7 +819,7 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 // receiveMessage reads and parses the next replication message from the database,
 // blocking until a message is available, the context is cancelled, or an error
 // occurs.
-func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSCN int64, stmt *sql.Stmt, excludeXIDs map[string]struct{}) error {
+func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSCN SCN, stmt *sql.Stmt, excludeXIDs map[XID]struct{}) error {
 	rows, err := stmt.QueryContext(ctx, startSCN, endSCN)
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
@@ -936,7 +945,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		return err
 	}
 
-	var finalSCN int64
+	var finalSCN SCN
 	if lastMsg != nil {
 		finalSCN = lastMsg.SCN
 	}
@@ -1007,7 +1016,7 @@ func (s *replicationStream) switchToPDB(ctx context.Context) error {
 // by a DDL statement. This function returns the maximum of all of those times
 // across all tables. When we hit a dictionary mismatch, we stay on Extract mode until
 // we have covered all the latest DDLs on all tables before switching back to online mode
-func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (int64, error) {
+func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (SCN, error) {
 	var tablesCondition = ""
 	var i = 0
 	for _, mapping := range s.db.tableObjectMapping {
@@ -1025,7 +1034,7 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (int64, error
 
 	row := s.conn.QueryRowContext(ctx, query)
 
-	var maximumDDLSCN int64
+	var maximumDDLSCN SCN
 	if err := row.Scan(&maximumDDLSCN); err != nil {
 		return 0, fmt.Errorf("fetching maximum last DDL SCN: %w", err)
 	}
