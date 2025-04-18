@@ -234,7 +234,7 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 			ID:       id,
 			Name:     p.Field,
 			Type:     p.Mapped.type_,
-			Required: p.MustExist,
+			Required: p.MustExist || p.IsPrimaryKey,
 			Doc:      strings.ReplaceAll(p.Comment, "\n", " - "), // Glue catalogs don't support newlines in field comments
 		})
 		ids = append(ids, id)
