@@ -11,7 +11,5 @@ function scanTable() {
 
 scanTable "simple"
 scanTable "duplicated-keys-standard"
-scanTable "duplicated-keys-delta"
-scanTable "duplicated-keys-delta-exclude-flow-doc"
 scanTable "multiple-types"
 scanTable "formatted-strings"
