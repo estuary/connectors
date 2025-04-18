@@ -152,7 +152,7 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 	log.WithFields(log.Fields{
-		"checkpoint": cs.Checkpoint,
+		"checkpoint": string(cs.Checkpoint),
 	}).Debug("running test capture")
 
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)

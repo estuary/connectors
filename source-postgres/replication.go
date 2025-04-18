@@ -397,7 +397,7 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
 				if eventLSN >= fenceLSN {
-					logrus.WithField("cursor", event.Cursor).Debug("finished fenced streaming phase")
+					logrus.WithField("cursor", eventCursor).Debug("finished fenced streaming phase")
 					s.previousFenceLSN = eventLSN
 					return nil
 				}

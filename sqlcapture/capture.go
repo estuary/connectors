@@ -174,7 +174,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
-	log.WithField("cursor", c.State.Cursor).WithField("eventType", "connectorStatus").Info("Initializing replication")
+	log.WithField("cursor", string(c.State.Cursor)).WithField("eventType", "connectorStatus").Info("Initializing replication")
 	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
@@ -499,14 +499,21 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 
 	// When streaming completes (because we've either reached the fence or encountered an error),
 	// log the number of events which have been processed.
-	var eventCount int
-	defer func() { log.WithField("events", eventCount).Info("processed replication events") }()
+	var flushCount int  // Flush events
+	var changeCount int // Change events
+	var otherCount int  // All other events
+	defer func() {
+		log.WithFields(log.Fields{
+			"change": changeCount,
+			"flush":  flushCount,
+			"other":  otherCount,
+		}).Info("processed replication events")
+	}()
 
 	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
-		eventCount++
-
 		// Flush events update the checkpoint LSN and may trigger a state update.
 		if event, ok := event.(*FlushEvent); ok {
+			flushCount++
 			c.State.Cursor = event.Cursor
 			if reportFlush {
 				if err := c.emitState(); err != nil {
@@ -514,6 +521,14 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 				}
 			}
 			return nil
+		}
+
+		// The core event dispatch happens in handleReplicationEvent but it's useful to
+		// count changes separately from other stuff here.
+		if _, ok := event.(*ChangeEvent); ok {
+			changeCount++
+		} else {
+			otherCount++
 		}
 
 		return c.handleReplicationEvent(event)
@@ -794,7 +809,7 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 	c.pending.cursors = c.pending.cursors[count:]
 	log.WithFields(log.Fields{
 		"count":  count,
-		"cursor": cursor,
+		"cursor": string(cursor),
 	}).Debug("acknowledged up to cursor")
 	return replStream.Acknowledge(ctx, cursor)
 }
