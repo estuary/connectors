@@ -17,8 +17,12 @@ import (
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
-// config represents the endpoint configuration for snowflake.
-// It must match the one defined for the source specs (flow.yaml) in Rust.
+var featureFlagDefaults = map[string]bool{
+	// Use Snowpipe streaming for delta-updates bindings that use JWT
+	// authentication.
+	"snowpipe_streaming": false,
+}
+
 type config struct {
 	Host          string                     `json:"host" jsonschema:"title=Host (Account URL),description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
 	Database      string                     `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=3"`
@@ -30,6 +34,12 @@ type config struct {
 	Credentials   credentialConfig           `json:"credentials" jsonschema:"title=Authentication"`
 	Schedule      boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // toURI manually builds the DSN connection string.

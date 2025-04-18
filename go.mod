@@ -74,15 +74,15 @@ require (
 	golang.org/x/crypto v0.36.0
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 	golang.org/x/oauth2 v0.28.0
-	golang.org/x/sync v0.12.0
+	golang.org/x/sync v0.13.0
 	golang.org/x/text v0.23.0
 	golang.org/x/time v0.11.0
 	google.golang.org/api v0.226.0
 	google.golang.org/genproto v0.0.0-20250313205543-e70fdf4c4cb4
 	google.golang.org/grpc v1.71.0
-	google.golang.org/protobuf v1.36.5
+	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
-	resty.dev/v3 v3.0.0-beta.1
+	resty.dev/v3 v3.0.0-beta.2
 	vitess.io/vitess v0.21.3
 )
 

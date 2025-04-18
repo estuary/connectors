@@ -7,8 +7,8 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -239,7 +239,7 @@ func (col *anyColumn) Scan(i interface{}) error {
 		// database or local timezone.
 		sval = ii.UTC().Format(time.RFC3339Nano)
 	case string:
-		if _, err := strconv.Atoi(ii); err == nil {
+		if _, ok := new(big.Int).SetString(ii, 10); ok {
 			// Snowflake integer value columns scan into an interface{} with a concrete type of
 			// string.
 			sval = fmt.Sprint(i)
