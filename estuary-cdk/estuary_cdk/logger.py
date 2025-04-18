@@ -40,7 +40,37 @@ class LogFormatter(logging.Formatter):
         return OpsLog(level=record.levelname, msg=record.msg, fields=fields).model_dump_json()
 
 
-def init_logger():
+class EventLogger:
+    def __init__(self, logger: logging.Logger):
+        self._logger = logger
+
+    # Config updates must contain restatements (not patches) of the connector's config
+    # and contain whatever updates are relevant.
+    def config_update(self, msg: str, config: str):
+        self._logger.info(
+            msg,
+            extra={
+                "eventType": "configUpdate",
+                "config": config,
+            }
+        )
+
+    def status(self, msg: str):
+        self._logger.info(
+            msg,
+            extra={
+                "eventType": "connectorStatus",
+            }
+        )
+
+
+class FlowLogger(logging.Logger):
+    def __init__(self, name):
+        super().__init__(name)
+        self.event = EventLogger(self)
+
+
+def init_logger() -> FlowLogger:
     LOGGING_CONFIG = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -62,9 +92,12 @@ def init_logger():
         },
     }
 
+    logging.setLoggerClass(FlowLogger)
     logging.config.dictConfig(LOGGING_CONFIG)
 
     logger = logging.getLogger("flow")
     logger.setLevel(os.environ.get("LOG_LEVEL", "INFO").upper())
+
+    assert isinstance(logger, FlowLogger)
 
     return logger
