@@ -13,7 +13,7 @@ import (
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
-	logrus.WithField("state", state).Debug("ScanChunk")
+	logrus.WithField("state", state).Debug("backfill: ScanChunk")
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -35,7 +35,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		if resumeAfter != nil {
 			afterRowID = string(resumeAfter)
 		}
-		logEntry.WithField("rowid", afterRowID).Debug("scanning keyless table chunk")
+		logEntry.WithField("rowid", afterRowID).Debug("backfill: scanning keyless table chunk")
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterRowID}
 
@@ -51,7 +51,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 			logEntry.WithFields(logrus.Fields{
 				"keyColumns": keyColumns,
 				"resumeKey":  resumeKey,
-			}).Debug("scanning subsequent table chunk")
+			}).Debug("backfill: scanning subsequent table chunk")
 			query = db.buildScanQuery(false, info, keyColumns, columnTypes, schema, table)
 			for idx, k := range resumeKey {
 				args = append(args, sql.Named(fmt.Sprintf("p%d", idx+1), k))
@@ -82,7 +82,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	}
 	var resultRows int    // Count of rows received within the current backfill chunk
 	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
-	logEntry.Debug("translating query rows to change events")
+	logEntry.Debug("backfill: translating query rows to change events")
 
 	var fields = make(map[string]any, len(cols)-1)
 	var rowid string
