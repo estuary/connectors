@@ -1307,7 +1307,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
 				}
 				if eventPosition.Compare(fencePosition) >= 0 {
-					logrus.WithField("cursor", event.Cursor).Debug("finished fenced streaming phase")
+					logrus.WithField("cursor", eventCursor).Debug("finished fenced streaming phase")
 					rs.fencePosition = eventPosition
 					return nil
 				}
