@@ -102,3 +102,12 @@ func (s *AzureBlobStore) PutStream(ctx context.Context, key string, r io.Reader,
 
 	return err
 }
+
+func (s *AzureBlobStore) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
+	r, err := s.client.DownloadStream(ctx, s.container, key, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Body, nil
+}

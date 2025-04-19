@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"hash"
 	"io"
@@ -97,14 +98,9 @@ func newBdecWriter(
 			physicalTypeOrdinals[col.PhysicalType]
 	}
 
-	derivedKey, err := deriveKey(encryptionKey, fileName)
+	cipherStream, err := getCipherStream(encryptionKey, fileName)
 	if err != nil {
-		return nil, fmt.Errorf("deriving key: %w", err)
-	}
-
-	block, err := aes.NewCipher(derivedKey)
-	if err != nil {
-		return nil, fmt.Errorf("creating cipher: %w", err)
+		return nil, fmt.Errorf("getting cipher stream: %w", err)
 	}
 
 	blobStats := &blobStatsTracker{
@@ -112,7 +108,7 @@ func newBdecWriter(
 		md5:      md5.New(),
 		start:    time.Now(),
 		w:        w,
-		stream:   cipher.NewCTR(block, make([]byte, aes.BlockSize)), // IV is always 0, since there is a single chunk per blob
+		stream:   cipherStream,
 	}
 
 	for _, c := range orderedCols {
@@ -406,6 +402,87 @@ func (cs *columnStatsTracker) nextNum(v float64) {
 	if v < cs.numStats.minVal {
 		cs.numStats.minVal = v
 	}
+}
+
+func getCipherStream(encryptionKey string, fileName blobFileName) (cipher.Stream, error) {
+	derivedKey, err := deriveKey(encryptionKey, fileName)
+	if err != nil {
+		return nil, fmt.Errorf("deriving key: %w", err)
+	}
+
+	block, err := aes.NewCipher(derivedKey)
+	if err != nil {
+		return nil, fmt.Errorf("creating cipher: %w", err)
+	}
+
+	// The initialization vector (iv) is always 0, since there is a single chunk
+	// per blob.
+	return cipher.NewCTR(block, make([]byte, aes.BlockSize)), nil
+}
+
+// reencrypt reads encrypted blob data from r, decrypts it using the encryption
+// key and original file name, and then re-encrypts it using the new file name
+// and writes the output to w. The blob metadata is updated in place.
+func reencrypt(
+	r io.Reader,
+	w io.Writer,
+	blob *blobMetadata,
+	encryptionKey string,
+	newFileName blobFileName,
+) error {
+	decryptStream, err := getCipherStream(encryptionKey, blobFileName(blob.Path))
+	if err != nil {
+		return fmt.Errorf("getting decryptStream: %w", err)
+	}
+
+	encryptStream, err := getCipherStream(encryptionKey, newFileName)
+	if err != nil {
+		return fmt.Errorf("getting encryptStream: %w", err)
+	}
+
+	downMd5 := md5.New()
+	upMd5 := md5.New()
+
+	buf := make([]byte, 64*1024)
+	for {
+		n, err := r.Read(buf)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return fmt.Errorf("reading from r: %w", err)
+		} else if n == 0 {
+			break
+		}
+
+		if m, err := downMd5.Write(buf[:n]); err != nil {
+			return fmt.Errorf("writing to downMd5: %w", err)
+		} else if m != n {
+			return fmt.Errorf("written to downMd5 %d != expected bytes %d", m, n)
+		}
+
+		decryptStream.XORKeyStream(buf[:n], buf[:n])
+		encryptStream.XORKeyStream(buf[:n], buf[:n])
+
+		if m, err := upMd5.Write(buf[:n]); err != nil {
+			return fmt.Errorf("writing to upMd5: %w", err)
+		} else if m != n {
+			return fmt.Errorf("written to upMd5 %d != expected bytes %d", m, n)
+		} else if written, err := w.Write(buf[:n]); err != nil {
+			return fmt.Errorf("writing to w: %w", err)
+		} else if written != n {
+			return fmt.Errorf("written bytes %d != expected bytes %d", written, n)
+		}
+	}
+
+	downHash := hex.EncodeToString(downMd5.Sum(nil))
+	upHash := hex.EncodeToString(upMd5.Sum(nil))
+	if downHash != blob.MD5 || downHash != blob.Chunks[0].ChunkMD5 {
+		return fmt.Errorf("md5 mismatch: %s != %s", downHash, blob.MD5)
+	}
+
+	blob.Path = string(newFileName)
+	blob.MD5 = upHash
+	blob.Chunks[0].ChunkMD5 = upHash
+
+	return nil
 }
 
 // Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/utils/Cryptor.java#L61-L74

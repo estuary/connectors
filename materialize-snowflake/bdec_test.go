@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
 	"crypto/rand"
 	stdsql "database/sql"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"math/big"
 	"os"
@@ -107,6 +109,51 @@ func BenchmarkBlobStatsWrite(b *testing.B) {
 		}
 		b.SetBytes(int64(chunkSize))
 	}
+}
+
+func TestReencrypt(t *testing.T) {
+	input := make([]byte, 1024*1024+3)
+	_, err := rand.Read(input)
+	require.NoError(t, err)
+	encryptionKey := "aGVsbG8K"
+	oldFileName := blobFileName("old")
+	newFileName := blobFileName("new")
+
+	// Simulate the originally encrypted data.
+	encryptStream, err := getCipherStream(encryptionKey, oldFileName)
+	if err != nil {
+		t.Fatalf("getCipherStream (encrypt): %v", err)
+	}
+
+	encrypted := make([]byte, len(input))
+	encryptStream.XORKeyStream(encrypted, input)
+
+	sum := md5.Sum(encrypted)
+	hsh := hex.EncodeToString(sum[:])
+
+	blob := &blobMetadata{
+		Path:   string(oldFileName),
+		MD5:    hsh,
+		Chunks: []uploadChunkMetadata{{ChunkMD5: hsh}},
+	}
+
+	var in = bytes.NewReader(encrypted)
+	var out bytes.Buffer
+
+	require.NoError(t, reencrypt(in, &out, blob, encryptionKey, newFileName))
+
+	// The re-encrypted file matches the original input.
+	newKey, err := deriveKey(encryptionKey, newFileName)
+	require.NoError(t, err)
+	got := decrypt(t, out.Bytes(), newKey, 0)
+	require.Equal(t, input, got)
+
+	// The blob metadata has been updated.
+	sum = md5.Sum(out.Bytes())
+	hsh = hex.EncodeToString(sum[:])
+	require.Equal(t, string(newFileName), blob.Path)
+	require.Equal(t, hsh, blob.MD5)
+	require.Equal(t, hsh, blob.Chunks[0].ChunkMD5)
 }
 
 func TestTruncateBytesAsHex(t *testing.T) {

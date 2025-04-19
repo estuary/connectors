@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -145,15 +146,11 @@ func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
 
 	r, w := io.Pipe()
 	fName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
-	meta := map[string]string{
-		"ingestclientname": fmt.Sprintf("%s_EstuaryFlow", sm.tenant),
-		"ingestclientkey":  sm.prefix,
-	}
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	sm.group = group
 	sm.group.Go(func() error {
-		if err := sm.store.PutStream(groupCtx, path.Join(sm.bucketPath, string(fName)), r, obj.WithPutStreamMetadata(meta)); err != nil {
+		if err := sm.store.PutStream(groupCtx, path.Join(sm.bucketPath, string(fName)), r, sm.objMetadata()); err != nil {
 			r.CloseWithError(err)
 			return fmt.Errorf("uploading file: %w", err)
 		}
@@ -169,6 +166,13 @@ func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
 	sm.bdecWriter = bdecWriter
 
 	return nil
+}
+
+func (sm *streamManager) objMetadata() obj.PutStreamOption {
+	return obj.WithPutStreamMetadata(map[string]string{
+		"ingestclientname": fmt.Sprintf("%s_EstuaryFlow", sm.tenant),
+		"ingestclientkey":  sm.prefix,
+	})
 }
 
 func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, error) {
@@ -221,10 +225,47 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 		blob.Chunks[0].Channels[0].ClientSequencer = thisChannel.ClientSequencer
 		blob.Chunks[0].Channels[0].RowSequencer = thisChannel.RowSequencer + 1
 
-		// TODO(whb): Handle cases where the blob file name is too old, and we
-		// need download & re-stage it with a newer name.
 		if err := sm.c.write(ctx, blob); err != nil {
-			return fmt.Errorf("write: %w", err)
+			var apiError *streamingApiError
+			if errors.As(err, &apiError) && apiError.code == 38 {
+				// The "blob has wrong format or extension" error occurs if the
+				// blob was written not-so-recently; apparently anything older
+				// than an hour or so is rejected by what seems to be a
+				// server-side check the examines the name of the file, which
+				// contains the timestamp it was written.
+				//
+				// In these cases, which may arise from re-enabling a disabled
+				// binding / materialization, or extended outages, we have to
+				// download the file and re-upload it with an up-to-date name.
+				//
+				// This should be quite rare, even more rare than one may think,
+				// since blob registration tokens are persisted in Snowflake
+				// rather than exclusively managed by our Acknowledge
+				// checkpoints. But it is still technically possible and so it
+				// is handled with this.
+				if err := sm.maybeInitializeStore(ctx); err != nil {
+					return fmt.Errorf("initializing store to rename: %w", err)
+				}
+				nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
+
+				ll := log.WithFields(log.Fields{
+					"oldName": blob.Path,
+					"newName": nextName,
+					"token":   blobToken,
+				})
+				ll.Info("attempting to register blob with malformed name by renaming")
+
+				if err := sm.renameBlob(ctx, blob, thisChannel.EncryptionKey, nextName); err != nil {
+					return fmt.Errorf("renameBlob: %w", err)
+				}
+
+				if err := sm.c.write(ctx, blob); err != nil {
+					return fmt.Errorf("failed to write renamed blob: %w", err)
+				}
+				ll.Info("successfully registered renamed blob")
+			} else {
+				return fmt.Errorf("write: %w", err)
+			}
 		}
 
 		thisChannel.RowSequencer++
@@ -246,6 +287,35 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 	}
 
 	return nil
+}
+
+func (sm *streamManager) renameBlob(ctx context.Context, blob *blobMetadata, encryptionKey string, newName blobFileName) error {
+	r, err := sm.store.GetStream(ctx, path.Join(sm.bucketPath, blob.Path))
+	if err != nil {
+		return fmt.Errorf("GetStream: %w", err)
+	}
+
+	pr, pw := io.Pipe()
+
+	var group errgroup.Group
+	group.Go(func() error {
+		if err := sm.store.PutStream(ctx, path.Join(sm.bucketPath, string(newName)), pr, sm.objMetadata()); err != nil {
+			pr.CloseWithError(err)
+			return fmt.Errorf("PutStream: %w", err)
+		}
+
+		return nil
+	})
+
+	if err := reencrypt(r, pw, blob, encryptionKey, newName); err != nil {
+		return fmt.Errorf("reencrypt: %w", err)
+	} else if err := r.Close(); err != nil {
+		return fmt.Errorf("closing r: %w", err)
+	} else if err := pw.Close(); err != nil {
+		return fmt.Errorf("closing pw: %w", err)
+	}
+
+	return group.Wait()
 }
 
 // maybeInitializeStore retrieves object storage parameters and initializes the

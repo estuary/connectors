@@ -64,6 +64,18 @@ func (s *S3Store) PutStream(ctx context.Context, key string, r io.Reader, opts .
 	return err
 }
 
+func (s *S3Store) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
+	r, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Body, nil
+}
+
 func getBucketRegion(bucket string) (string, error) {
 	// It's apparently impossible to get the region of a bucket if you don't
 	// already know it using the AWS Go SDKs, but this silly mechanism actually

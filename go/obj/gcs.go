@@ -41,3 +41,12 @@ func (s *GCSStore) PutStream(ctx context.Context, key string, r io.Reader, opts 
 
 	return nil
 }
+
+func (s *GCSStore) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
+	r, err := s.client.Bucket(s.bucket).Object(key).NewReader(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return r, nil
+}
