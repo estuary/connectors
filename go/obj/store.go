@@ -1,5 +1,10 @@
 // Package obj provides a high-level interface and specific implementations for
 // working with object storage providers.
+//
+// This may eventually replace the fragmented versions of these we have
+// scattered throughout the various captures and materializations, and it is
+// expected that the basic initial structure is enhanced as additional
+// requirements are incorporated.
 package obj
 
 import (
@@ -32,4 +37,8 @@ type Store interface {
 	// PutStream uploads an object as a stream, reading from `r` and writing an
 	// object named `key`.
 	PutStream(ctx context.Context, key string, r io.Reader, opts ...PutStreamOption) error
+
+	// GetStream downloads an object as a stream. The caller is responsible for
+	// closing the returned ReadCloser.
+	GetStream(ctx context.Context, key string) (io.ReadCloser, error)
 }

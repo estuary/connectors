@@ -449,13 +449,22 @@ var streamingIngestResponseCodes = map[int]string{
 	49: "tngestion into this table is not allowed at this time, please contact Snowflake support",
 }
 
+type streamingApiError struct {
+	code    int
+	message string
+}
+
+func (e *streamingApiError) Error() string {
+	return fmt.Sprintf("code %d: %s", e.code, e.message)
+}
+
 func getErrorByCode(code int) error {
 	if code == 0 {
 		return nil
 	}
 
 	if msg, ok := streamingIngestResponseCodes[code]; ok {
-		return fmt.Errorf("code %d: %s", code, msg)
+		return &streamingApiError{code: code, message: msg}
 	}
 
 	return fmt.Errorf("unknown status message for code %d", code)
