@@ -327,27 +327,37 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, snowpipeS
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT && snowpipeStreaming {
-		b.isStreaming = true
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
 		if err := d.streamManager.addBinding(ctx, loc.TableSchema, target); err != nil {
-			return fmt.Errorf("adding binding to stream manager: %w", err)
-		}
-	} else {
-		b.load.stage = newStagedFile(os.TempDir())
-		b.store.stage = newStagedFile(os.TempDir())
-		if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
-			var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
-			var tableName = b.target.Path[len(b.target.Path)-1]
-			parts := pipeParts{
-				Catalog:   d.cfg.Database,
-				Schema:    d.cfg.Schema,
-				Binding:   fmt.Sprintf("%d", b.target.Binding),
-				KeyBegin:  keyBegin,
-				Version:   d.version,
-				TableName: sanitizeAndAppendHash(tableName),
+			var apiError *streamingApiError
+			// Errors with code 55 come from tables that don't support streaming
+			// at all, so we will fall back to a non-streaming strategy for them
+			// if they are encountered. Any other error here is a fatal error.
+			if errors.As(err, &apiError) && apiError.code != 55 {
+				return fmt.Errorf("adding binding to stream manager: %w", err)
 			}
-			b.pipeName = parts.toQualifiedName()
+			log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming for table")
+		} else {
+			b.isStreaming = true
+			d.bindings = append(d.bindings, b)
+			return nil
 		}
+	}
+
+	b.load.stage = newStagedFile(os.TempDir())
+	b.store.stage = newStagedFile(os.TempDir())
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
+		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
+		var tableName = b.target.Path[len(b.target.Path)-1]
+		parts := pipeParts{
+			Catalog:   d.cfg.Database,
+			Schema:    d.cfg.Schema,
+			Binding:   fmt.Sprintf("%d", b.target.Binding),
+			KeyBegin:  keyBegin,
+			Version:   d.version,
+			TableName: sanitizeAndAppendHash(tableName),
+		}
+		b.pipeName = parts.toQualifiedName()
 	}
 
 	d.bindings = append(d.bindings, b)

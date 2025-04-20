@@ -446,7 +446,8 @@ var streamingIngestResponseCodes = map[int]string{
 	46: "interleaving among tables is not supported at this time",
 	47: "table is read-only",
 	48: "the request contains invalid column metadata, please contact Snowflake support",
-	49: "tngestion into this table is not allowed at this time, please contact Snowflake support",
+	49: "ingestion into this table is not allowed at this time, please contact Snowflake support",
+	55: "Snowpipe Streaming does not support columns of type AUTOINCREMENT, IDENTITY, GEO, or columns with a default value or collation",
 }
 
 type streamingApiError struct {
