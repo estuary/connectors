@@ -1,0 +1,16 @@
+--- Column Statistics ---
+{"rows":11,"columns":{"KEY":{"columnId":1,"nullCount":0,"maxStrValue":null,"minStrValue":null,"maxLength":0,"maxIntValue":10,"minIntValue":0,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null},"VAL":{"columnId":2,"nullCount":1,"maxStrValue":null,"minStrValue":null,"maxLength":0,"maxIntValue":4151744710901759999983617,"minIntValue":-1018549133967359999997121,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null}}}
+
+--- Column Values ---
+key, val
+0, 2022-08-17T04:32:19.987654321Z
+1, 2022-08-17T02:32:19.987654321Z
+2, 2022-08-17T01:02:19.987654321Z
+3, 2022-08-17T11:32:19.987654321Z
+4, 0000-01-01T00:00:00Z
+5, -0001-12-31T00:01:00Z
+6, 0000-01-01T23:59:00Z
+7, 9999-12-31T23:59:59.999999999Z
+8, 9999-12-31T00:00:59.999999999Z
+9, 10000-01-01T23:58:59.999999999Z
+10, <nil>
