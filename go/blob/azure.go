@@ -1,4 +1,4 @@
-package obj
+package blob
 
 import (
 	"context"
@@ -39,17 +39,17 @@ func WithAzureEndpoint(ep string) AzureConfigOption {
 	}
 }
 
-var _ Store = (*AzureBlobStore)(nil)
+var _ Bucket = (*AzureBlobBucket)(nil)
 
-type AzureBlobStore struct {
+type AzureBlobBucket struct {
 	client    *azblob.Client
 	container string
 }
 
-// NewAzureBlobStore creates an Azure Blob object store. At least one
+// NewAzureBlobBucket creates an Azure Blob object storage bucket. At least one
 // AzureConfigOption must be provided to specify authentication; either storage
 // account key or SAS token.
-func NewAzureBlobStore(ctx context.Context, container string, accountName string, opts []AzureConfigOption) (*AzureBlobStore, error) {
+func NewAzureBlobBucket(ctx context.Context, container string, accountName string, opts []AzureConfigOption) (*AzureBlobBucket, error) {
 	cfg := azureBlobStoreConfig{endpoint: defaultAzureEndpoint}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -79,14 +79,27 @@ func NewAzureBlobStore(ctx context.Context, container string, accountName string
 		return nil, fmt.Errorf("must specify either SAS token or storage account key")
 	}
 
-	return &AzureBlobStore{
+	return &AzureBlobBucket{
 		client:    client,
 		container: container,
 	}, nil
 }
 
-func (s *AzureBlobStore) PutStream(ctx context.Context, key string, r io.Reader, opts ...PutStreamOption) error {
-	cfg := getPutStreamConfig(opts)
+func (s *AzureBlobBucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
+	r, err := s.client.DownloadStream(ctx, s.container, key, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return r.Body, nil
+}
+
+func (s *AzureBlobBucket) NewWriter(ctx context.Context, key string, opts ...WriterOption) io.WriteCloser {
+	return newBlobWriteCloser(ctx, s.Upload, key, opts...)
+}
+
+func (s *AzureBlobBucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
+	cfg := getWriterConfig(opts)
 
 	var uploadOpts *azblob.UploadStreamOptions
 	if cfg.metadata != nil {
@@ -101,13 +114,4 @@ func (s *AzureBlobStore) PutStream(ctx context.Context, key string, r io.Reader,
 	_, err := s.client.UploadStream(ctx, s.container, key, r, uploadOpts)
 
 	return err
-}
-
-func (s *AzureBlobStore) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
-	r, err := s.client.DownloadStream(ctx, s.container, key, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return r.Body, nil
 }

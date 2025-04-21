@@ -1,4 +1,4 @@
-package obj
+package blob
 
 import (
 	"context"
@@ -12,20 +12,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
-var _ Store = (*S3Store)(nil)
+var _ Bucket = (*S3Bucket)(nil)
 
-type S3Store struct {
+type S3Bucket struct {
 	client   *s3.Client
 	bucket   string
 	uploader *manager.Uploader
 }
 
-// NewS3Store creates an S3 object storage. clientOpts are optional, but may be
-// useful for things like an alternate endpoint. The region of the bucket is
-// determined automatically, if possible. If using an S3 endpoint other than
+// NewS3Bucket creates an S3 object storage bucket. clientOpts are optional, but
+// may be useful for things like an alternate endpoint. The region of the bucket
+// is determined automatically, if possible. If using an S3 endpoint other than
 // s3.amazonaws.com, set the region in one of the clientOpts if it is required
 // by the alternate endpoint.
-func NewS3Store(ctx context.Context, bucket string, creds aws.CredentialsProvider, clientOpts ...func(*s3.Options)) (*S3Store, error) {
+func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvider, clientOpts ...func(*s3.Options)) (*S3Bucket, error) {
 	configOpts := []func(*config.LoadOptions) error{
 		config.WithCredentialsProvider(creds),
 	}
@@ -41,30 +41,14 @@ func NewS3Store(ctx context.Context, bucket string, creds aws.CredentialsProvide
 
 	s3Client := s3.NewFromConfig(cfg, clientOpts...)
 
-	uploader := manager.NewUploader(s3Client, func(u *manager.Uploader) {
-		u.Concurrency = 1
-		u.PartSize = manager.MinUploadPartSize
-	})
-
-	return &S3Store{
+	return &S3Bucket{
 		client:   s3Client,
 		bucket:   bucket,
-		uploader: uploader,
+		uploader: manager.NewUploader(s3Client),
 	}, nil
 }
 
-func (s *S3Store) PutStream(ctx context.Context, key string, r io.Reader, opts ...PutStreamOption) error {
-	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
-		Bucket:   aws.String(s.bucket),
-		Key:      aws.String(key),
-		Body:     r,
-		Metadata: getPutStreamConfig(opts).metadata,
-	})
-
-	return err
-}
-
-func (s *S3Store) GetStream(ctx context.Context, key string) (io.ReadCloser, error) {
+func (s *S3Bucket) NewReader(ctx context.Context, key string) (io.ReadCloser, error) {
 	r, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
@@ -74,6 +58,21 @@ func (s *S3Store) GetStream(ctx context.Context, key string) (io.ReadCloser, err
 	}
 
 	return r.Body, nil
+}
+
+func (s *S3Bucket) NewWriter(ctx context.Context, key string, opts ...WriterOption) io.WriteCloser {
+	return newBlobWriteCloser(ctx, s.Upload, key, opts...)
+}
+
+func (s *S3Bucket) Upload(ctx context.Context, key string, r io.Reader, opts ...WriterOption) error {
+	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
+		Bucket:   aws.String(s.bucket),
+		Key:      aws.String(key),
+		Body:     r,
+		Metadata: getWriterConfig(opts).metadata,
+	})
+
+	return err
 }
 
 func getBucketRegion(bucket string) (string, error) {

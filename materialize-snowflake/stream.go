@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"path"
 	"slices"
 	"strconv"
@@ -12,12 +11,11 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/estuary/connectors/go/obj"
+	"github.com/estuary/connectors/go/blob"
 	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 )
 
@@ -51,12 +49,11 @@ type streamManager struct {
 	bucketPath   string
 
 	// For writing blob data to object storage.
-	store          obj.Store
-	storeExpiresAt time.Time
-	bdecWriter     *bdecWriter
-	group          *errgroup.Group
-	counter        int
-	lastBinding    int // bookkeeping for when to flush the writer when a new binding starts writing rows
+	bucket          blob.Bucket
+	bucketExpiresAt time.Time
+	bdecWriter      *bdecWriter
+	counter         int
+	lastBinding     int // bookkeeping for when to flush the writer when a new binding starts writing rows
 
 	blobStats map[int][]*blobStatsTracker
 }
@@ -130,8 +127,6 @@ func (sm *streamManager) finishBlob() error {
 
 	if err := sm.bdecWriter.close(); err != nil {
 		return fmt.Errorf("bdecWriter close: %w", err)
-	} else if err := sm.group.Wait(); err != nil {
-		return fmt.Errorf("group wait: %w", err)
 	}
 	sm.blobStats[sm.lastBinding] = append(sm.blobStats[sm.lastBinding], sm.bdecWriter.blobStats)
 	sm.bdecWriter = nil
@@ -140,23 +135,12 @@ func (sm *streamManager) finishBlob() error {
 }
 
 func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
-	if err := sm.maybeInitializeStore(ctx); err != nil {
-		return fmt.Errorf("initializing store: %w", err)
+	if err := sm.maybeInitializeBucket(ctx); err != nil {
+		return fmt.Errorf("initializing bucket: %w", err)
 	}
 
-	r, w := io.Pipe()
 	fName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
-
-	group, groupCtx := errgroup.WithContext(ctx)
-	sm.group = group
-	sm.group.Go(func() error {
-		if err := sm.store.PutStream(groupCtx, path.Join(sm.bucketPath, string(fName)), r, sm.objMetadata()); err != nil {
-			r.CloseWithError(err)
-			return fmt.Errorf("uploading file: %w", err)
-		}
-
-		return nil
-	})
+	w := sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(fName)), sm.objMetadata())
 
 	ts := sm.tableStreams[binding]
 	bdecWriter, err := newBdecWriter(w, ts.mappedColumns, ts.channel.TableColumns, ts.channel.EncryptionKey, fName)
@@ -168,8 +152,8 @@ func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
 	return nil
 }
 
-func (sm *streamManager) objMetadata() obj.PutStreamOption {
-	return obj.WithPutStreamMetadata(map[string]string{
+func (sm *streamManager) objMetadata() blob.WriterOption {
+	return blob.WithObjectMetadata(map[string]string{
 		"ingestclientname": fmt.Sprintf("%s_EstuaryFlow", sm.tenant),
 		"ingestclientkey":  sm.prefix,
 	})
@@ -243,8 +227,8 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 				// rather than exclusively managed by our Acknowledge
 				// checkpoints. But it is still technically possible and so it
 				// is handled with this.
-				if err := sm.maybeInitializeStore(ctx); err != nil {
-					return fmt.Errorf("initializing store to rename: %w", err)
+				if err := sm.maybeInitializeBucket(ctx); err != nil {
+					return fmt.Errorf("initializing bucket to rename: %w", err)
 				}
 				nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
 
@@ -290,39 +274,28 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 }
 
 func (sm *streamManager) renameBlob(ctx context.Context, blob *blobMetadata, encryptionKey string, newName blobFileName) error {
-	r, err := sm.store.GetStream(ctx, path.Join(sm.bucketPath, blob.Path))
+	r, err := sm.bucket.NewReader(ctx, path.Join(sm.bucketPath, blob.Path))
 	if err != nil {
-		return fmt.Errorf("GetStream: %w", err)
+		return fmt.Errorf("NewReader: %w", err)
 	}
+	w := sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(newName)), sm.objMetadata())
 
-	pr, pw := io.Pipe()
-
-	var group errgroup.Group
-	group.Go(func() error {
-		if err := sm.store.PutStream(ctx, path.Join(sm.bucketPath, string(newName)), pr, sm.objMetadata()); err != nil {
-			pr.CloseWithError(err)
-			return fmt.Errorf("PutStream: %w", err)
-		}
-
-		return nil
-	})
-
-	if err := reencrypt(r, pw, blob, encryptionKey, newName); err != nil {
+	if err := reencrypt(r, w, blob, encryptionKey, newName); err != nil {
 		return fmt.Errorf("reencrypt: %w", err)
 	} else if err := r.Close(); err != nil {
 		return fmt.Errorf("closing r: %w", err)
-	} else if err := pw.Close(); err != nil {
-		return fmt.Errorf("closing pw: %w", err)
+	} else if err := w.Close(); err != nil {
+		return fmt.Errorf("closing w: %w", err)
 	}
 
-	return group.Wait()
+	return nil
 }
 
-// maybeInitializeStore retrieves object storage parameters and initializes the
-// applicable storage client. A basic expiry mechanism is used to prevent this
-// from being re-done too frequently.
-func (sm *streamManager) maybeInitializeStore(ctx context.Context) error {
-	if time.Now().Before(sm.storeExpiresAt) {
+// maybeInitializeBucket retrieves blob storage parameters and initializes the
+// appropriate blob storage bucket. A basic expiry mechanism is used to prevent
+// this from being re-done too frequently.
+func (sm *streamManager) maybeInitializeBucket(ctx context.Context) error {
+	if time.Now().Before(sm.bucketExpiresAt) {
 		return nil
 	}
 
@@ -344,8 +317,8 @@ func (sm *streamManager) maybeInitializeStore(ctx context.Context) error {
 			cfg.StageLocation.Creds.AwsSecretKey,
 			cfg.StageLocation.Creds.AwsToken,
 		)
-		if sm.store, err = obj.NewS3Store(ctx, bucket, provider); err != nil {
-			return fmt.Errorf("new s3 store: %w", err)
+		if sm.bucket, err = blob.NewS3Bucket(ctx, bucket, provider); err != nil {
+			return fmt.Errorf("new s3 blob bucket: %w", err)
 		}
 	case "GCS":
 		opts := []option.ClientOption{
@@ -353,28 +326,28 @@ func (sm *streamManager) maybeInitializeStore(ctx context.Context) error {
 				AccessToken: cfg.StageLocation.Creds.GcsAccessToken,
 			})),
 		}
-		if sm.store, err = obj.NewGCSStore(ctx, bucket, opts); err != nil {
-			return fmt.Errorf("new gcs store: %w", err)
+		if sm.bucket, err = blob.NewGCSBucket(ctx, bucket, opts); err != nil {
+			return fmt.Errorf("new gcs blob bucket: %w", err)
 		}
 	case "AZURE":
-		opts := []obj.AzureConfigOption{
-			obj.WithAzureSasToken(cfg.StageLocation.Creds.AzureSasToken),
-			obj.WithAzureEndpoint(cfg.StageLocation.Endpoint),
+		opts := []blob.AzureConfigOption{
+			blob.WithAzureSasToken(cfg.StageLocation.Creds.AzureSasToken),
+			blob.WithAzureEndpoint(cfg.StageLocation.Endpoint),
 		}
-		if sm.store, err = obj.NewAzureBlobStore(ctx, bucket, cfg.StageLocation.StorageAccount, opts); err != nil {
-			return fmt.Errorf("new azure store: %w", err)
+		if sm.bucket, err = blob.NewAzureBlobBucket(ctx, bucket, cfg.StageLocation.StorageAccount, opts); err != nil {
+			return fmt.Errorf("new azure blob bucket: %w", err)
 		}
 	default:
 		return fmt.Errorf("unknown stage location type %q", cfg.StageLocation.LocationType)
 	}
 
-	sm.storeExpiresAt = time.Now().Add(30 * time.Minute)
+	sm.bucketExpiresAt = time.Now().Add(30 * time.Minute)
 	log.WithFields(log.Fields{
 		"locationType": cfg.StageLocation.LocationType,
 		"location":     cfg.StageLocation.Location,
 		"prefix":       cfg.Prefix,
 		"deploymentId": cfg.DeploymentID,
-	}).Info("configured store for Snowpipe streaming")
+	}).Info("configured bucket for Snowpipe streaming")
 
 	return nil
 }
@@ -443,7 +416,7 @@ func shouldWriteNextToken(next string, current *string) (bool, error) {
 	if current == nil {
 		// Maybe this should be more strict and error out unless `next` is the
 		// first one in the sequence, but that would block cases where a user
-		// has manually dropped a table for some reason, which has happened.
+		// has manually dropped a table for some reason.
 		return true, nil
 	}
 
