@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"path"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -38,7 +37,7 @@ type tableStream struct {
 // resulting blobs to tables.
 type streamManager struct {
 	c            *streamClient
-	tableStreams []*tableStream
+	tableStreams map[int]*tableStream
 	tenant       string // used for the `ingestclientname` metadata
 	keyBegin     uint32
 	channelName  string
@@ -65,30 +64,27 @@ func newStreamManager(cfg *config, materialization string, tenant string, accoun
 	}
 
 	return &streamManager{
-		c:           c,
-		tenant:      tenant,
-		keyBegin:    keyBegin,
-		channelName: channelName(materialization, keyBegin),
-		lastBinding: -1,
-		blobStats:   make(map[int][]*blobStatsTracker),
-		counter:     0,
+		c:            c,
+		tableStreams: make(map[int]*tableStream),
+		tenant:       tenant,
+		keyBegin:     keyBegin,
+		channelName:  channelName(materialization, keyBegin),
+		lastBinding:  -1,
+		blobStats:    make(map[int][]*blobStatsTracker),
+		counter:      0,
 	}, nil
 }
 
 func (sm *streamManager) addBinding(ctx context.Context, schema string, table sql.Table) error {
-	if table.Binding != len(sm.tableStreams) {
-		panic("bindings must be added monotonically increasing order starting with binding 0")
-	}
-
 	channel, err := sm.c.openChannel(ctx, schema, table.Identifier, sm.channelName)
 	if err != nil {
 		return fmt.Errorf("openChannel: %w", err)
 	}
 
-	sm.tableStreams = append(sm.tableStreams, &tableStream{
+	sm.tableStreams[table.Binding] = &tableStream{
 		mappedColumns: table.Columns(),
 		channel:       channel,
-	})
+	}
 
 	return nil
 }
@@ -205,14 +201,19 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 	var schema = blobs[0].Chunks[0].Schema
 	var table = blobs[0].Chunks[0].Table
 	var channelName = blobs[0].Chunks[0].Channels[0].Channel
-	var binding = slices.IndexFunc(sm.tableStreams, func(ts *tableStream) bool {
-		return ts.channel.Schema == schema && ts.channel.Table == table && ts.channel.Channel == channelName
-	})
-	if binding == -1 {
+	var thisChannel *channel
+	for _, v := range sm.tableStreams {
+		matches := v.channel.Schema == schema && v.channel.Table == table && v.channel.Channel == channelName
+		if matches && thisChannel != nil {
+			return fmt.Errorf("internal error: found duplicate duplicate channel %s in tableStreams", channelName)
+		} else if matches {
+			thisChannel = v.channel
+		}
+	}
+	if thisChannel == nil {
 		return fmt.Errorf("unknown channel %s", channelName)
 	}
 
-	thisChannel := sm.tableStreams[binding].channel
 	for _, blob := range blobs {
 		blobToken := blob.Chunks[0].Channels[0].OffsetToken
 		currentChannelToken := thisChannel.OffsetToken
