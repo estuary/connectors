@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"net/url"
 	"strings"
 
@@ -60,7 +59,7 @@ func NewAzureBlobBucket(ctx context.Context, container string, accountName strin
 
 	serviceUrl, err := url.Parse(fmt.Sprintf("https://%s.%s/", accountName, cfg.endpoint))
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to parse service url: %w", err)
 	}
 
 	var client *azblob.Client
