@@ -520,6 +520,20 @@ func truncateBytesAsHex(bytes []byte, truncateUp bool) string {
 	return hex.EncodeToString(result)
 }
 
+type unhandledColError struct {
+	msg string
+}
+
+func (u unhandledColError) Error() string {
+	return u.msg
+}
+
+func newUnhandledColError(format string, a ...any) unhandledColError {
+	return unhandledColError{
+		msg: fmt.Sprintf(format, a...),
+	}
+}
+
 // Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/ParquetTypeGenerator.java#L77-L148
 func makeSchemaElement(col tableColumn) (enc.ParquetSchemaElement, error) {
 	fieldId := int32(col.Ordinal)
@@ -544,7 +558,7 @@ func makeSchemaElement(col tableColumn) (enc.ParquetSchemaElement, error) {
 			e.DataType = enc.LogicalTypeDecimal
 			e.Scale = 0
 		} else {
-			return e, fmt.Errorf("fixed column with physical type %q and scale %s not supported", col.PhysicalType, nilOrScale(col.Scale))
+			return e, newUnhandledColError("fixed column with physical type %q and scale %s not supported", col.PhysicalType, nilOrScale(col.Scale))
 		}
 	case "text", "variant":
 		e.DataType = enc.LogicalTypeString
@@ -554,7 +568,7 @@ func makeSchemaElement(col tableColumn) (enc.ParquetSchemaElement, error) {
 			e.DataType = enc.LogicalTypeDecimal
 			e.Scale = 9
 		} else {
-			return e, fmt.Errorf("%s column with physical type %q and scale %s not supported", col.LogicalType, col.PhysicalType, nilOrScale(col.Scale))
+			return e, newUnhandledColError("%s column with physical type %q and scale %s not supported", col.LogicalType, col.PhysicalType, nilOrScale(col.Scale))
 		}
 	case "date":
 		e.DataType = enc.LogicalTypeDate
@@ -563,7 +577,7 @@ func makeSchemaElement(col tableColumn) (enc.ParquetSchemaElement, error) {
 	case "real":
 		e.DataType = enc.PrimitiveTypeNumber
 	default:
-		return e, fmt.Errorf("unhandled type %q", col.Type)
+		return e, newUnhandledColError("unhandled type %q", col.Type)
 	}
 
 	return e, nil

@@ -330,10 +330,16 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, snowpipeS
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
 		if err := d.streamManager.addBinding(ctx, loc.TableSchema, target); err != nil {
 			var apiError *streamingApiError
-			// Errors with code 55 come from tables that don't support streaming
-			// at all, so we will fall back to a non-streaming strategy for them
-			// if they are encountered. Any other error here is a fatal error.
-			if errors.As(err, &apiError) && apiError.code != 55 {
+			var colError *unhandledColError
+			if errors.As(err, &apiError) && apiError.code == 55 {
+				// Streaming API errors with code 55 come from tables that don't
+				// support streaming at all, so we will fall back to a
+				// non-streaming strategy for them if they are encountered.
+			} else if errors.As(err, &colError) {
+				// This column type is something that we haven't yet implemented
+				// Snowpipe Streaming support for, although we could at some
+				// point.
+			} else {
 				return fmt.Errorf("adding binding to stream manager: %w", err)
 			}
 			log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming for table")
