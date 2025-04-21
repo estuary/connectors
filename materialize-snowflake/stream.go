@@ -181,6 +181,22 @@ func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, error
 	return out, nil
 }
 
+// write registers a series of blobs to the table. All the blobs must be for the
+// same table.
+//
+// Exactly-once semantics are achieved using the offset tokens for the blobs:
+// The offset token consists of the "base" token which is a string, each for
+// each blob it is appended with a sequential counter, starting at 0. So if
+// there are multiple blobs to append, they are organized with offset tokens
+// like "basetoken:0, basetoken:1, basetoken2:" etc.
+//
+// Blobs are registered in this order, and it's possible that only some of the
+// blobs get registered in a single Acknowledge before the connector fails for
+// some reason, or all of the blobs get registered by the Acknowledge response
+// is not persisted to the runtime before the connector restarts. The Snowpipe
+// channel itself persists the last registered token, and this allows us to
+// filter out blobs that had previously been registered and don't need
+// registered again on a re-attempt of an Acknowledge.
 func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error {
 	if err := validWriteBlobs(blobs); err != nil {
 		return fmt.Errorf("validWriteBlobs: %w", err)
