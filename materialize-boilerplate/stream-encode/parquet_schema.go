@@ -18,6 +18,8 @@ type ParquetSchemaElement struct {
 	Name     string
 	DataType ParquetDataType
 	Required bool
+	FieldId  *int32
+	Scale    int32 // only applicable to LogicalTypeDecimal
 }
 
 // ParquetDataType provides a mapping for the JSON types we support to an appropriate parquet data
@@ -36,6 +38,11 @@ type ParquetSchemaElement struct {
 //
 // UUIDs are the binary representation of a 16 byte UUID, an annotate a FIXED_LEN_BYTE_ARRAY of the
 // requisite length.
+//
+// Decimals use a FIXED_LEN_BYTE_ARRAY of length 16. They always have a precision of 38, and the
+// scale is configurable. Values should be provided using the decimal128 type exported by the
+// arrow-go package. This data type is intended to allow storing large exact-precision numeric values,
+// often integers that would overflow an int64, and for that case would use a scale of 0.
 //
 // Intervals use a FIXED_LEN_BYTE_ARRAY of length 12 to store as three little-endian unsigned
 // integers that represent durations at different granularities of time. The first stores a number
@@ -59,6 +66,7 @@ const (
 	LogicalTypeTime                             // Extends INT64
 	LogicalTypeTimestamp                        // Extends INT64
 	LogicalTypeUuid                             // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
+	LogicalTypeDecimal                          // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
 	LogicalTypeInterval                         // Extends FIXED_LEN_BYTE_ARRAY, with a length of 12 bytes
 	LogicalTypeUnknown                          // Must always be nil
 )
@@ -69,16 +77,20 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 	if !e.Required {
 		repetition = parquet.Repetitions.Optional
 	}
+	fieldId := int32(-1)
+	if e.FieldId != nil {
+		fieldId = *e.FieldId
+	}
 
 	switch e.DataType {
 	case PrimitiveTypeInteger:
-		return schema.NewInt64Node(e.Name, repetition, -1)
+		return schema.NewInt64Node(e.Name, repetition, fieldId)
 	case PrimitiveTypeNumber:
-		return schema.NewFloat64Node(e.Name, repetition, -1)
+		return schema.NewFloat64Node(e.Name, repetition, fieldId)
 	case PrimitiveTypeBoolean:
-		return schema.NewBooleanNode(e.Name, repetition, -1)
+		return schema.NewBooleanNode(e.Name, repetition, fieldId)
 	case PrimitiveTypeBinary:
-		return schema.NewByteArrayNode(e.Name, repetition, -1)
+		return schema.NewByteArrayNode(e.Name, repetition, fieldId)
 	case LogicalTypeString:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
 			e.Name,
@@ -86,7 +98,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.StringLogicalType{},
 			parquet.Types.ByteArray,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeUuid:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -95,7 +107,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.UUIDLogicalType{},
 			parquet.Types.FixedLenByteArray,
 			16,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeJson:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -104,7 +116,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.JSONLogicalType{},
 			parquet.Types.ByteArray,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeDate:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -113,7 +125,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.DateLogicalType{},
 			parquet.Types.Int32,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeTime:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -131,7 +143,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.NewTimestampLogicalType(true, schema.TimeUnitMicros),
 			parquet.Types.Int64,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeInterval:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -140,7 +152,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.IntervalLogicalType{},
 			parquet.Types.FixedLenByteArray,
 			12,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeUnknown:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
@@ -149,7 +161,16 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.UnknownLogicalType{},
 			parquet.Types.Undefined,
 			-1,
-			-1,
+			fieldId,
+		))
+	case LogicalTypeDecimal:
+		return schema.Must(schema.NewPrimitiveNodeLogical(
+			e.Name,
+			repetition,
+			schema.NewDecimalLogicalType(38, e.Scale),
+			parquet.Types.FixedLenByteArray,
+			16,
+			fieldId,
 		))
 	default:
 		panic(fmt.Sprintf("makeNode unknown type: %d", e.DataType))
