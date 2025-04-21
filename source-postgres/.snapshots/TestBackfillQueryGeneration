@@ -14,9 +14,9 @@ SELECT * FROM "public"."users" ORDER BY "first_name", "last_name" LIMIT 100;
 SELECT * FROM "public"."users" WHERE ("first_name", "last_name") > ($1, $2) ORDER BY "first_name", "last_name" LIMIT 100;
 
 --- string_key_with_min_xid ---
-SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ((RANDOM() < 0.001) OR ((xmin::text::bigint >= 3) AND ((((xmin::text::bigint - 12345::bigint)<<32)>>32) > 0) AND (((((CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END) - xmin::text::bigint)<<32)>>32) >= 0))) ORDER BY "name" LIMIT 100;
+SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ((RANDOM() < 0.001) OR ((xmin::text::bigint >= 3) AND ((((xmin::text::bigint - 12345::bigint)<<32)>>32) >= 0) AND ((((txid_snapshot_xmax(txid_current_snapshot()) - xmin::text::bigint)<<32)>>32) >= 0))) ORDER BY "name" LIMIT 100;
 
-SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ("name") > ($1) AND ((RANDOM() < 0.001) OR ((xmin::text::bigint >= 3) AND ((((xmin::text::bigint - 12345::bigint)<<32)>>32) > 0) AND (((((CASE WHEN pg_is_in_recovery() THEN txid_snapshot_xmax(txid_current_snapshot()) ELSE txid_current() END) - xmin::text::bigint)<<32)>>32) >= 0))) ORDER BY "name" LIMIT 100;
+SELECT xmin::text AS xmin, * FROM "public"."users" WHERE ("name") > ($1) AND ((RANDOM() < 0.001) OR ((xmin::text::bigint >= 3) AND ((((xmin::text::bigint - 12345::bigint)<<32)>>32) >= 0) AND ((((txid_snapshot_xmax(txid_current_snapshot()) - xmin::text::bigint)<<32)>>32) >= 0))) ORDER BY "name" LIMIT 100;
 
 --- quoted_column_name ---
 SELECT * FROM "public"."special_users" ORDER BY "user-id", "group.name" COLLATE "C" LIMIT 100;
