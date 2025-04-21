@@ -6,9 +6,34 @@ import (
 	"strings"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 var dialect = func() sql.Dialect {
+	// Although the documentation states this limit as 1MB, via empirical
+	// testing I have determined it to actually be 1 MiB.
+	const maxFabricStringLength = 1024 * 1024
+
+	checkedStringLength := func(conv sql.ElementConverter) sql.ElementConverter {
+		return func(te tuple.TupleElement) (any, error) {
+			var err error
+			if conv != nil {
+				te, err = conv(te)
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			if str, ok := te.(string); ok {
+				if len(str) > maxFabricStringLength {
+					return nil, fmt.Errorf("string byte size too large: %d vs maximum allowed by Fabric Warehouse %d", len(str), maxFabricStringLength)
+				}
+			}
+
+			return te, nil
+		}
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -17,10 +42,10 @@ var dialect = func() sql.Dialect {
 			),
 			sql.NUMBER:   sql.MapStatic("FLOAT"),
 			sql.BOOLEAN:  sql.MapStatic("BIT"),
-			sql.OBJECT:   sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(sql.ToJsonString)),
-			sql.ARRAY:    sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(sql.ToJsonString)),
+			sql.OBJECT:   sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(sql.ToJsonString))),
+			sql.ARRAY:    sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(sql.ToJsonString))),
 			sql.BINARY:   sql.MapStatic("VARBINARY(MAX)", sql.AlsoCompatibleWith("VARBINARY")),
-			sql.MULTIPLE: sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(sql.ToJsonString)),
+			sql.MULTIPLE: sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(sql.ToJsonString))),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("DECIMAL(38,0)", sql.AlsoCompatibleWith("DECIMAL"), sql.UsingConverter(sql.StrToInt)),
 				sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(sql.ToStr)),
@@ -30,7 +55,7 @@ var dialect = func() sql.Dialect {
 			),
 			sql.STRING_NUMBER: sql.MapStatic("FLOAT", sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR")),
+				Fallback: sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(nil))),
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
 					"date-time": sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime)),
