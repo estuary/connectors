@@ -71,7 +71,7 @@ func sanitizeAndAppendHash(tableName string) string {
 		limited = sanitizedTable[:32]
 	}
 
-	return fmt.Sprintf("%s_%016X", limited, xxhash.Sum64String(sanitizedTable))
+	return fmt.Sprintf("%s_%016X", limited, xxhash.Sum64String(tableName))
 }
 
 type PipeClient struct {
