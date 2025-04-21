@@ -1,0 +1,14 @@
+--- Column Statistics ---
+{"rows":9,"columns":{"KEY":{"columnId":1,"nullCount":0,"maxStrValue":null,"minStrValue":null,"maxLength":0,"maxIntValue":8,"minIntValue":0,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null},"VAL":{"columnId":2,"nullCount":1,"maxStrValue":"7b22736f6d65223a22646f63227d","minStrValue":"","maxLength":14,"maxIntValue":0,"minIntValue":0,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null}}}
+
+--- Column Values ---
+key, val
+0, hello
+1, 
+2, <nil>
+3, 1234
+4, true
+5, 4321
+6, 1234.1234
+7, [1,2,3]
+8, {"some":"doc"}
