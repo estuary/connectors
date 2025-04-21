@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -97,6 +98,12 @@ func newSnowflakeDriver() *sql.Driver {
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
+			var featureFlags = common.ParseFeatureFlags(parsed.Advanced.FeatureFlags, featureFlagDefaults)
+			if parsed.Advanced.FeatureFlags != "" {
+				log.WithField("flags", featureFlags).Info("parsed feature flags")
+			}
+			snowpipeStreaming := featureFlags["snowpipe_streaming"]
+
 			dsn, err := parsed.toURI(tenant)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
@@ -125,7 +132,7 @@ func newSnowflakeDriver() *sql.Driver {
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,
-				NewTransactor:       newTransactor,
+				NewTransactor:       prepareNewTransactor(snowpipeStreaming),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
 			}, nil
@@ -196,86 +203,88 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-func newTransactor(
-	ctx context.Context,
-	ep *sql.Endpoint,
-	fence sql.Fence,
-	bindings []sql.Table,
-	open pm.Request_Open,
-	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-	var cfg = ep.Config.(*config)
+func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+	return func(
+		ctx context.Context,
+		ep *sql.Endpoint,
+		fence sql.Fence,
+		bindings []sql.Table,
+		open pm.Request_Open,
+		is *boilerplate.InfoSchema,
+		be *boilerplate.BindingEvents,
+	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
+		var cfg = ep.Config.(*config)
 
-	dsn, err := cfg.toURI(ep.Tenant)
-	if err != nil {
-		return nil, nil, fmt.Errorf("building snowflake dsn: %w", err)
-	}
-
-	db, err := stdsql.Open("snowflake", dsn)
-	if err != nil {
-		return nil, nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
-	}
-
-	var pipeClient *PipeClient
-	if cfg.Credentials.AuthType == JWT {
-		var accountName string
-		if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
-			return nil, nil, fmt.Errorf("fetching current account name: %w", err)
-		}
-		pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
+		dsn, err := cfg.toURI(ep.Tenant)
 		if err != nil {
-			return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
+			return nil, nil, fmt.Errorf("building snowflake dsn: %w", err)
 		}
-	}
 
-	var d = &transactor{
-		cfg:        cfg,
-		ep:         ep,
-		templates:  renderTemplates(ep.Dialect),
-		db:         db,
-		pipeClient: pipeClient,
-		_range:     open.Range,
-		version:    open.Version,
-		be:         be,
-	}
-
-	d.store.fence = &fence
-
-	// Establish connections.
-	if db, err := stdsql.Open("snowflake", dsn); err != nil {
-		return nil, nil, fmt.Errorf("load stdsql.Open: %w", err)
-	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, nil, fmt.Errorf("load db.Conn: %w", err)
-	}
-
-	if db, err := stdsql.Open("snowflake", dsn); err != nil {
-		return nil, nil, fmt.Errorf("store stdsql.Open: %w", err)
-	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, nil, fmt.Errorf("store db.Conn: %w", err)
-	}
-
-	// Create stage for file-based transfers.
-	if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
-		return nil, nil, fmt.Errorf("creating transfer stage : %w", err)
-	}
-
-	for _, binding := range bindings {
-		if err = d.addBinding(binding); err != nil {
-			return nil, nil, fmt.Errorf("%v: %w", binding, err)
+		db, err := stdsql.Open("snowflake", dsn)
+		if err != nil {
+			return nil, nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 		}
-	}
 
-	opts := &boilerplate.MaterializeOptions{
-		ExtendedLogging: true,
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: cfg.Schedule,
-			Jitter: []byte(cfg.Host + cfg.Warehouse),
-		},
-		DBTJobTrigger: &cfg.DBTJobTrigger,
-	}
+		var pipeClient *PipeClient
+		if cfg.Credentials.AuthType == JWT {
+			var accountName string
+			if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
+				return nil, nil, fmt.Errorf("fetching current account name: %w", err)
+			}
+			pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
+			if err != nil {
+				return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
+			}
+		}
 
-	return d, opts, nil
+		var d = &transactor{
+			cfg:        cfg,
+			ep:         ep,
+			templates:  renderTemplates(ep.Dialect),
+			db:         db,
+			pipeClient: pipeClient,
+			_range:     open.Range,
+			version:    open.Version,
+			be:         be,
+		}
+
+		d.store.fence = &fence
+
+		// Establish connections.
+		if db, err := stdsql.Open("snowflake", dsn); err != nil {
+			return nil, nil, fmt.Errorf("load stdsql.Open: %w", err)
+		} else if d.load.conn, err = db.Conn(ctx); err != nil {
+			return nil, nil, fmt.Errorf("load db.Conn: %w", err)
+		}
+
+		if db, err := stdsql.Open("snowflake", dsn); err != nil {
+			return nil, nil, fmt.Errorf("store stdsql.Open: %w", err)
+		} else if d.store.conn, err = db.Conn(ctx); err != nil {
+			return nil, nil, fmt.Errorf("store db.Conn: %w", err)
+		}
+
+		// Create stage for file-based transfers.
+		if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
+			return nil, nil, fmt.Errorf("creating transfer stage : %w", err)
+		}
+
+		for _, binding := range bindings {
+			if err = d.addBinding(binding); err != nil {
+				return nil, nil, fmt.Errorf("%v: %w", binding, err)
+			}
+		}
+
+		opts := &boilerplate.MaterializeOptions{
+			ExtendedLogging: true,
+			AckSchedule: &boilerplate.AckScheduleOption{
+				Config: cfg.Schedule,
+				Jitter: []byte(cfg.Host + cfg.Warehouse),
+			},
+			DBTJobTrigger: &cfg.DBTJobTrigger,
+		}
+
+		return d, opts, nil
+	}
 }
 
 type binding struct {
@@ -477,14 +486,21 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 	}
+	if it.Err() != nil {
+		return nil, it.Err()
+	}
 
-	// Upload the staged files and build a list of merge and copy into queries that need to be run
-	// to effectively commit the files into destination tables. These queries are stored
-	// in the checkpoint so that if the connector is restarted in middle of a commit
-	// it can run the same queries on the next startup. This is the pattern for
-	// recovery log being authoritative and the connector idempotently applies a commit
-	// These are keyed on the binding table name so that in case of a recovery being necessary
-	// we don't run queries belonging to bindings that have been removed
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		var checkpointJSON, err = d.buildDriverCheckpoint(ctx)
+		if err != nil {
+			return nil, pf.FinishedOperation(err)
+		}
+
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
+	}, nil
+}
+
+func (d *transactor) buildDriverCheckpoint(ctx context.Context) (json.RawMessage, error) {
 	for _, b := range d.bindings {
 		if !b.store.stage.started {
 			continue
@@ -559,14 +575,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var checkpointJSON, err = json.Marshal(d.cp)
-		if err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
-		}
+	var checkpointJSON, err = json.Marshal(d.cp)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint json: %w", err)
+	}
 
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
-	}, nil
+	return checkpointJSON, nil
 }
 
 type pipeRecord struct {
