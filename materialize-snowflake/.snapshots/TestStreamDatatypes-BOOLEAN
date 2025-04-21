@@ -1,0 +1,8 @@
+--- Column Statistics ---
+{"rows":3,"columns":{"KEY":{"columnId":1,"nullCount":0,"maxStrValue":null,"minStrValue":null,"maxLength":0,"maxIntValue":2,"minIntValue":0,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null},"VAL":{"columnId":2,"nullCount":1,"maxStrValue":null,"minStrValue":null,"maxLength":0,"maxIntValue":0,"minIntValue":0,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null}}}
+
+--- Column Values ---
+key, val
+0, 1
+1, 0
+2, <nil>

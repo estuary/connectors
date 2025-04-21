@@ -1,0 +1,9 @@
+--- Column Statistics ---
+{"rows":4,"columns":{"KEY":{"columnId":1,"nullCount":0,"maxStrValue":null,"minStrValue":null,"maxLength":0,"maxIntValue":3,"minIntValue":0,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null},"VAL":{"columnId":2,"nullCount":1,"maxStrValue":null,"minStrValue":null,"maxLength":0,"maxIntValue":2932896,"minIntValue":-719528,"maxRealValue":null,"minRealValue":null,"distinctValues":-1,"collation":null,"minStrNonCollated":null,"maxStrNonCollated":null}}}
+
+--- Column Values ---
+key, val
+0, 2022-03-21T00:00:00Z
+1, <nil>
+2, 0000-01-01T00:00:00Z
+3, 9999-12-31T00:00:00Z
