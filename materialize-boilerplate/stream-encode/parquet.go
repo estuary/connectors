@@ -8,14 +8,17 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 	"unsafe"
 
+	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/compress"
 	"github.com/apache/arrow-go/v18/parquet/file"
+	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/apache/arrow-go/v18/parquet/schema"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
@@ -77,7 +80,7 @@ func newRowSizing(sch ParquetSchema) rowSize {
 			rs.fixed += 8
 		case PrimitiveTypeBoolean:
 			rs.fixed += 1
-		case PrimitiveTypeBinary, LogicalTypeJson:
+		case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeDecimal:
 			rs.fixed += 24 // slice header
 			rs.calcLen = append(rs.calcLen, idx)
 		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeInterval:
@@ -129,6 +132,7 @@ type parquetConfig struct {
 	disableDictionaryEncoding bool
 	rowGroupRowLimit          int
 	rowGroupByteLimit         int
+	metadata                  map[string]string
 }
 
 type ParquetEncoder struct {
@@ -181,6 +185,12 @@ func WithParquetRowGroupByteLimit(n int) ParquetOption {
 	}
 }
 
+func WithParquetMetadata(meta map[string]string) ParquetOption {
+	return func(cfg *parquetConfig) {
+		cfg.metadata = meta
+	}
+}
+
 func NewParquetEncoder(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) *ParquetEncoder {
 	cfg := parquetConfig{
 		compression:       Uncompressed,
@@ -204,13 +214,13 @@ func NewParquetEncoder(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOptio
 		cfg:        cfg,
 		schema:     sch,
 		schemaRoot: schemaRoot,
-		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)),
+		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)...),
 		cwc:        cwc,
 		rs:         newRowSizing(sch),
 	}
 }
 
-func writerOpts(cfg parquetConfig) file.WriteOption {
+func writerOpts(cfg parquetConfig) []file.WriteOption {
 	propOpts := []parquet.WriterProperty{}
 
 	switch cfg.compression {
@@ -228,7 +238,18 @@ func writerOpts(cfg parquetConfig) file.WriteOption {
 		propOpts = append(propOpts, parquet.WithDictionaryDefault(false))
 	}
 
-	return file.WithWriterProps(parquet.NewWriterProperties(propOpts...))
+	out := []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
+	if len(cfg.metadata) > 0 {
+		meta := metadata.NewKeyValueMetadata()
+		for k, v := range cfg.metadata {
+			if err := meta.Append(k, v); err != nil {
+				panic(fmt.Sprintf("invalid metadata: %s", err)) // only possible if the metadata keys/values contain invalid UTF-8
+			}
+		}
+		out = append(out, file.WithWriteMetadata(meta))
+	}
+
+	return out
 }
 
 // Encode encodes a row of data by buffering it in the encoder's buffer, and if thresholds are
@@ -237,15 +258,24 @@ func writerOpts(cfg parquetConfig) file.WriteOption {
 func (e *ParquetEncoder) Encode(row []any) error {
 	var err error
 
+	if len(row) != len(e.schema) {
+		return fmt.Errorf("encode: row length (%d) does not match schema length (%d)", len(row), len(e.schema))
+	}
+
 	if e.scratch.writer == nil {
 		// Either the very first row, or the first one after flushing the scratch file.
 		if e.scratch.file, err = os.CreateTemp("", "parquet-scratch-*"); err != nil {
 			return fmt.Errorf("encode creating scratch file: %w", err)
 		}
-		// Don't use dictionary encoding for the scratch file, since it is much
-		// slower to write than plain encoding with the small row groups of the
-		// scratch file.
-		scratchOpts := []parquet.WriterProperty{parquet.WithDictionaryDefault(false)}
+
+		scratchOpts := []parquet.WriterProperty{
+			// Don't use dictionary encoding for the scratch file, since it is
+			// much slower to write than plain encoding with the small row
+			// groups of the scratch file.
+			parquet.WithDictionaryDefault(false),
+			// Turning off stats calculations helps too, but just a tiny bit.
+			parquet.WithStats(false),
+		}
 		e.scratch.writer = file.NewParquetWriter(e.scratch.file, e.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
 
@@ -299,6 +329,14 @@ func (e *ParquetEncoder) Close() error {
 		return fmt.Errorf("closing sink: %w", err)
 	}
 	return nil
+}
+
+// ScratchSize provides an estimate of the current _uncompressed_ data size for
+// data that has been written to the scratch file. If the current row group is
+// flushed, this is approximately how large the resulting output row group will
+// be on an uncompressed basis.
+func (e *ParquetEncoder) ScratchSize() int {
+	return e.scratch.sizeBytes
 }
 
 func (e *ParquetEncoder) flushScratchFile() error {
@@ -384,6 +422,10 @@ func (e *ParquetEncoder) flushBuffer() error {
 		case LogicalTypeTimestamp:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
+			}
+		case LogicalTypeDecimal:
+			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
+				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeInterval:
 			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getIntervalVal); err != nil {
@@ -771,6 +813,20 @@ func getIntervalVal(val any) (got parquet.FixedLenByteArray, err error) {
 		}
 	default:
 		err = fmt.Errorf("getIntervalVal unhandled type: %T", v)
+	}
+
+	return
+}
+
+func getDecimalVal(val any) (got parquet.FixedLenByteArray, err error) {
+	switch v := val.(type) {
+	case decimal128.Num:
+		got = slices.Grow(got, 16)[:16]
+		// Big Endian, 2's compliment encoding.
+		binary.BigEndian.PutUint64(got, uint64(v.HighBits()))
+		binary.BigEndian.PutUint64(got[8:], v.LowBits())
+	default:
+		err = fmt.Errorf("getDecimalVal unhandled type: %T", v)
 	}
 
 	return
