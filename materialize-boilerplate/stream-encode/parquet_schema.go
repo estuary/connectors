@@ -215,7 +215,7 @@ func ProjectionToParquetSchemaElement(p pf.Projection, opts ...ParquetSchemaOpti
 
 	out := ParquetSchemaElement{
 		Name:     p.Field,
-		Required: p.Inference.Exists == pf.Inference_MUST,
+		Required: !slices.Contains(p.Inference.Types, "null") && (p.Inference.Exists == pf.Inference_MUST || p.Inference.DefaultJson != nil),
 	}
 
 	if numFormat, ok := boilerplate.AsFormattedNumeric(&p); ok {
