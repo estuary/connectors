@@ -26,7 +26,7 @@ func mustGetCfg(t *testing.T) config {
 
 	out := config{
 		Credentials: credentialConfig{
-			AuthType: UserPass,
+			AuthType: JWT,
 		},
 	}
 
@@ -37,12 +37,15 @@ func mustGetCfg(t *testing.T) config {
 		{"SNOWFLAKE_HOST", &out.Host},
 		{"SNOWFLAKE_ACCOUNT", &out.Account},
 		{"SNOWFLAKE_USER", &out.Credentials.User},
-		{"SNOWFLAKE_PASSWORD", &out.Credentials.Password},
 		{"SNOWFLAKE_DATABASE", &out.Database},
 		{"SNOWFLAKE_SCHEMA", &out.Schema},
 	} {
 		*prop.dest = os.Getenv(prop.key)
 	}
+
+	key, err := os.ReadFile(os.Getenv("SNOWFLAKE_PRIVATE_KEY_PATH"))
+	require.NoError(t, err)
+	out.Credentials.PrivateKey = string(key)
 
 	if err := out.Validate(); err != nil {
 		t.Fatal(err)
