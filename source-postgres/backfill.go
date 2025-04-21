@@ -259,7 +259,7 @@ var columnBinaryKeyComparison = map[string]bool{
 func (db *postgresDatabase) backfillQueryFilterXMIN() string {
 	if db.config.Advanced.MinimumBackfillXID != "" {
 		const filterValidXID = "(xmin::text::bigint >= 3)"
-		var filterLowerXID = fmt.Sprintf("((((xmin::text::bigint - %s::bigint)<<32)>>32) > 0)", db.config.Advanced.MinimumBackfillXID)
+		var filterLowerXID = fmt.Sprintf("((((xmin::text::bigint - %s::bigint)<<32)>>32) >= 0)", db.config.Advanced.MinimumBackfillXID)
 
 		// Note: We use XMAX here because it's the largest of the "current XID" values and we never want to
 		// exclude anything except for rows whose xmin values are from earlier wraparound epochs.
