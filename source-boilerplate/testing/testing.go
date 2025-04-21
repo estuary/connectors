@@ -450,7 +450,8 @@ type ChecksumValidator struct {
 }
 
 type checksumValidatorState struct {
-	count    int
+	docs     int
+	bytes    int
 	checksum [32]byte
 }
 
@@ -470,7 +471,8 @@ func (v *ChecksumValidator) Output(collection string, data json.RawMessage) {
 }
 
 func (s *checksumValidatorState) reduce(data json.RawMessage) {
-	s.count++
+	s.docs++
+	s.bytes += len(data)
 	var docSum = sha256.Sum256([]byte(data))
 	for idx := range s.checksum {
 		s.checksum[idx] ^= docSum[idx]
@@ -486,9 +488,10 @@ func (v *ChecksumValidator) Summarize(w io.Writer) error {
 
 	for _, name := range names {
 		fmt.Fprintf(w, "# ================================\n")
-		fmt.Fprintf(w, "# Collection %q: %d Documents\n", name, v.collections[name].count)
+		fmt.Fprintf(w, "# Collection %q: %d Documents\n", name, v.collections[name].docs)
 		fmt.Fprintf(w, "# ================================\n")
 		fmt.Fprintf(w, "Checksum: %x\n", v.collections[name].checksum)
+		fmt.Fprintf(w, "Total Bytes: %d\n", v.collections[name].bytes)
 	}
 	return nil
 }
