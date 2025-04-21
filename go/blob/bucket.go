@@ -52,8 +52,7 @@ type uploadFn func(context.Context, string, io.Reader, ...WriterOption) error
 
 // blobWriteCloser adapts a synchronous uploadFn into an io.WriterCloser.
 type blobWriteCloser struct {
-	pr    *io.PipeReader
-	pw    *io.PipeWriter
+	w     *io.PipeWriter
 	errCh chan (error)
 }
 
@@ -69,14 +68,13 @@ func newBlobWriteCloser(ctx context.Context, u uploadFn, key string, opts ...Wri
 	}()
 
 	return &blobWriteCloser{
-		pr:    pr,
-		pw:    pw,
+		w:     pw,
 		errCh: errCh,
 	}
 }
 
 func (w *blobWriteCloser) Close() error {
-	if err := w.pw.Close(); err != nil {
+	if err := w.w.Close(); err != nil {
 		return err
 	}
 
@@ -84,5 +82,5 @@ func (w *blobWriteCloser) Close() error {
 }
 
 func (w *blobWriteCloser) Write(p []byte) (int, error) {
-	return w.pw.Write(p)
+	return w.w.Write(p)
 }

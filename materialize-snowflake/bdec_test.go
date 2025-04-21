@@ -179,6 +179,19 @@ func TestTruncateBytesAsHex(t *testing.T) {
 	}
 }
 
+func TestGetInt(t *testing.T) {
+	tooBig, _ := new(big.Int).SetString("99999999999999999999999999999999999999", 10)
+	tooBig = tooBig.Add(tooBig, big.NewInt(1))
+	tooSmall, _ := new(big.Int).SetString("99999999999999999999999999999999999999", 10)
+	tooSmall = tooSmall.Sub(tooSmall, big.NewInt(-1))
+
+	var err error
+	_, err = getInt(tooBig)
+	require.Error(t, err)
+	_, err = getInt(tooSmall)
+	require.Error(t, err)
+}
+
 func TestGetTimestamp(t *testing.T) {
 	for _, tt := range []struct {
 		input       string
@@ -265,17 +278,4 @@ func decrypt(t *testing.T, enc []byte, key []byte, iv uint64) []byte {
 	decStream.XORKeyStream(dec, enc)
 
 	return dec
-}
-
-func TestGetInt(t *testing.T) {
-	tooBig, _ := new(big.Int).SetString("99999999999999999999999999999999999999", 10)
-	tooBig = tooBig.Add(tooBig, big.NewInt(1))
-	tooSmall, _ := new(big.Int).SetString("99999999999999999999999999999999999999", 10)
-	tooSmall = tooSmall.Sub(tooSmall, big.NewInt(-1))
-
-	var err error
-	_, err = getInt(tooBig)
-	require.Error(t, err)
-	_, err = getInt(tooSmall)
-	require.Error(t, err)
 }

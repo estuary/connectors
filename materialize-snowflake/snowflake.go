@@ -234,18 +234,15 @@ func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.End
 			if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
 				return nil, nil, fmt.Errorf("fetching current account name: %w", err)
 			}
-
-			if snowpipeStreaming {
-				sm, err = newStreamManager(cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin)
-				if err != nil {
-					return nil, nil, fmt.Errorf("newStreamManager: %w", err)
-				}
-			} else {
-				pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
-				if err != nil {
-					return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
-				}
+			pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant)
+			if err != nil {
+				return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
 			}
+			sm, err = newStreamManager(cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin)
+			if err != nil {
+				return nil, nil, fmt.Errorf("newStreamManager: %w", err)
+			}
+
 		}
 
 		var d = &transactor{
@@ -302,8 +299,8 @@ func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.End
 type binding struct {
 	target sql.Table
 
-	isStreaming bool
-	pipeName    string
+	streaming bool
+	pipeName  string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery   string
@@ -320,13 +317,13 @@ type binding struct {
 	}
 }
 
-func (d *transactor) addBinding(ctx context.Context, target sql.Table, snowpipeStreaming bool) error {
+func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool) error {
 	var b = new(binding)
 	b.target = target
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT && snowpipeStreaming {
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT && streamingEnabled {
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
 		if err := d.streamManager.addBinding(ctx, loc.TableSchema, target); err != nil {
 			var apiError *streamingApiError
@@ -344,7 +341,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, snowpipeS
 			}
 			log.WithError(err).WithField("table", b.target.Path).Info("not using Snowpipe Streaming for table")
 		} else {
-			b.isStreaming = true
+			b.streaming = true
 			d.bindings = append(d.bindings, b)
 			return nil
 		}
@@ -395,7 +392,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	var subqueries = make(map[int]string)
 	var filesToCleanup []string
 	for i, b := range d.bindings {
-		if b.load.stage == nil || !b.load.stage.started {
+		if b.streaming || !b.load.stage.started {
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
@@ -511,14 +508,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		if !b.isStreaming {
+		if !b.streaming {
 			if err := b.store.stage.start(ctx, d.db); err != nil {
 				return nil, err
 			}
 		}
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
-		} else if b.isStreaming {
+		} else if b.streaming {
 			if err := d.streamManager.encodeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream: %w", err)
 			}
@@ -547,7 +544,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	if d.streamManager != nil {
 		// The "base token" only really needs to be sufficiently random that it
 		// doesn't collide with the prior or next transaction's value. Deriving
-		// it from the runtime checkpoint is not strictly necessary, but it's
+		// it from the runtime checkpoint is not absolutely necessary, but it's
 		// convenient to make testing outputs consistent.
 		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
 			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
@@ -557,7 +554,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 	}
 
 	for idx, b := range d.bindings {
-		if b.isStreaming {
+		if b.streaming {
 			if blobs, ok := streamBlobs[idx]; ok {
 				d.cp[b.target.StateKey] = &checkpointItem{
 					StreamBlobs: blobs,

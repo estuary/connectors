@@ -826,7 +826,7 @@ func getDecimalVal(val any) (got parquet.FixedLenByteArray, err error) {
 		binary.BigEndian.PutUint64(got, uint64(v.HighBits()))
 		binary.BigEndian.PutUint64(got[8:], v.LowBits())
 	default:
-		err = fmt.Errorf("getFixedLengthBytesVal unhandled type: %T", v)
+		err = fmt.Errorf("getDecimalVal unhandled type: %T", v)
 	}
 
 	return

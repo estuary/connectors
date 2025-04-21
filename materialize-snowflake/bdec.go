@@ -147,10 +147,6 @@ func newBdecWriter(
 }
 
 func (bw *bdecWriter) encodeRow(row []any) error {
-	if bw.done {
-		return fmt.Errorf("internal error: must close the writer after a row group has been written")
-	}
-
 	for i, col := range bw.cols {
 		stats := bw.blobStats.columns[i]
 
@@ -534,7 +530,8 @@ func newUnhandledColError(format string, a ...any) unhandledColError {
 	}
 }
 
-// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/ParquetTypeGenerator.java#L77-L148
+// Loosely adapted from
+// https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/ParquetTypeGenerator.java#L77-L148
 func makeSchemaElement(col tableColumn) (enc.ParquetSchemaElement, error) {
 	fieldId := int32(col.Ordinal)
 	e := enc.ParquetSchemaElement{
@@ -617,7 +614,7 @@ var physicalTypeOrdinals = map[string]string{
 // the mapped columns from the field selection, followed by the rest of them in
 // the order they came back from the channel open request. Ordering them in this
 // way allows for rows of data to easily be correlated with the target column
-// for selected fields, and adding null values for the rest.
+// for selected fields, and adding null values at the end for the rest.
 func orderExistingColumns(mappedColumns []*sql.Column, existingColumns []tableColumn) ([]tableColumn, error) {
 	findExisting := func(col *sql.Column) (tableColumn, error) {
 		var out tableColumn
@@ -633,7 +630,7 @@ func orderExistingColumns(mappedColumns []*sql.Column, existingColumns []tableCo
 			}
 		})
 		if idx == -1 {
-			return out, fmt.Errorf("column existing column for %q not found", col.Identifier)
+			return out, fmt.Errorf("existing column for %q not found", col.Identifier)
 		}
 
 		return existingColumns[idx], nil

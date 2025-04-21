@@ -336,6 +336,15 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 			break
 		}
 
+		if n > 10 {
+			log.WithFields(log.Fields{
+				"attempt": n,
+				"schema":  schema,
+				"table":   table,
+				"token":   token,
+			}).Info("channel offset token not yet persisted")
+		}
+
 		time.Sleep(backoff)
 		backoff = min(backoff*2, maxBackoff)
 	}
@@ -382,7 +391,7 @@ func post[T any](ctx context.Context, c *streamClient, path string, body any) (*
 		NewRequest().
 		WithContext(ctx).
 		SetHeader("Accept", "application/json").
-		SetHeader("User-Agent", "EstuaryTechnologiesFlow/2.0.0").
+		SetHeader("User-Agent", "EstuaryTechnologiesFlow/2.0.0"). // A semver >= 2.0.0 seems to be necessary for GCS to return Oauth client credentials rather than pre-signed URLs
 		SetAuthToken(token).
 		SetError(&errorResponse{})
 
@@ -447,6 +456,8 @@ var streamingIngestResponseCodes = map[int]string{
 	47: "table is read-only",
 	48: "the request contains invalid column metadata, please contact Snowflake support",
 	49: "ingestion into this table is not allowed at this time, please contact Snowflake support",
+	// I'm not sure what 50...54 are, as they aren't listed in the same place. I
+	// found error code 55 by experimentation.
 	55: "Snowpipe Streaming does not support columns of type AUTOINCREMENT, IDENTITY, GEO, or columns with a default value or collation",
 }
 
