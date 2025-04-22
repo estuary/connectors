@@ -100,6 +100,17 @@ func (t *SshTunnel) Start() error {
 		if err != nil {
 			log.WithField("error", err).Info("error copying stderr of tunnel")
 		}
+
+		// The network tunnel should never stop once started. If it does, the
+		// connector should crash and attempt to log the final error message.
+		// It's not unlikely that some other error will occur within the
+		// connector's processing that will race this log, but we do the best we
+		// can.
+		if err = t.Cmd.Wait(); err != nil {
+			log.WithError(err).Fatal("network-tunnel failed")
+		} else {
+			log.Fatal("network-tunnel exited")
+		}
 	}()
 
 	if err := t.Cmd.Start(); err != nil {
@@ -109,7 +120,7 @@ func (t *SshTunnel) Start() error {
 	var readyBuf = make([]byte, 5)
 	var ready = []byte("READY")
 	if _, err = io.ReadFull(stdout, readyBuf); err != nil {
-		// EOF means the underlying process exit without writing READY, this is most likely
+		// EOF means the underlying process exited without writing READY, this is most likely
 		// an error that we would like to surface to the user without logging anything further
 		// ourselves
 		if err == io.EOF {
