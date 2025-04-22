@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/dbo/test_oversizedfields_81647037": 2 Documents
+# ================================
+Checksum: d2ddab4fa9e99ba53674a1f7d58bc3e850639beec76d5694138d80796df166c8
+Total Bytes: 95071362
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"dbo%2Ftest_OversizedFields_81647037":{"backfilled":1,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+

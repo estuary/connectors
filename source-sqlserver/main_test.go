@@ -177,7 +177,7 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 	var tx, err = tb.control.BeginTx(ctx, nil)
 	require.NoErrorf(t, err, "begin transaction")
 
-	log.WithFields(log.Fields{"table": table, "count": len(rows), "first": rows[0]}).Debug("inserting data")
+	log.WithFields(log.Fields{"table": table, "count": len(rows)}).Debug("inserting data")
 	var query = fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
 	for _, row := range rows {
 		log.WithFields(log.Fields{"table": table, "row": row, "query": query}).Trace("inserting row")
