@@ -36,6 +36,10 @@ const (
 	// field is ignored and we just use the original input string, since that
 	// way the collation-sortable encoding doesn't have to be reversible.
 	collatedTextTag = "ctext"
+
+	// The maximum size of a single column's value. Values larger than this threshold
+	// will be truncated to fit. Arbitrarily set at 8MiB.
+	truncateColumnThreshold = 8 * 1024 * 1024
 )
 
 func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
@@ -143,6 +147,15 @@ func (db *sqlserverDatabase) translateRecordField(columnType interface{}, val in
 			}
 			return u.String(), nil
 		}
+		if len(val) > truncateColumnThreshold {
+			val = val[:truncateColumnThreshold]
+		}
+		return val, nil
+	case string:
+		if len(val) > truncateColumnThreshold {
+			val = val[:truncateColumnThreshold]
+		}
+		return val, nil
 	case time.Time:
 		switch columnType {
 		case "date":
