@@ -215,27 +215,6 @@ func configSchema() json.RawMessage {
 	return json.RawMessage(configSchema)
 }
 
-type mysqlDatabase struct {
-	versionString              string // The raw contents of the 'version' system variable
-	versionProduct             string // Usually either "MySQL" or "MariaDB"
-	versionMajor, versionMinor int    // The major/minor version the server is running
-
-	config *Config
-	conn   *client.Conn
-
-	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
-	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
-	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
-
-	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
-	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
-	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
-}
-
-func (db *mysqlDatabase) HistoryMode() bool {
-	return db.config.HistoryMode
-}
-
 func (db *mysqlDatabase) connect(_ context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"addr":     db.config.Address,
@@ -277,12 +256,12 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	//   we don't need to mention that and just return the with-TLS error.
 	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
-		db.conn = connWithTLS
+		db.conn = &mysqlConnection{connWithTLS}
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
-		db.conn = connWithoutTLS
+		db.conn = &mysqlConnection{connWithoutTLS}
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
@@ -378,7 +357,7 @@ func (db *mysqlDatabase) logServerVariables() error {
 	return nil
 }
 
-func queryTimeZone(conn *client.Conn) (string, error) {
+func queryTimeZone(conn mysqlClient) (string, error) {
 	var tzName, err = queryStringVariable(conn, `SELECT @@GLOBAL.time_zone;`)
 	if err != nil {
 		return "", fmt.Errorf("error querying 'time_zone' system variable: %w", err)
@@ -391,7 +370,7 @@ func queryTimeZone(conn *client.Conn) (string, error) {
 	return tzName, nil
 }
 
-func queryStringVariable(conn *client.Conn, query string) (string, error) {
+func queryStringVariable(conn mysqlClient, query string) (string, error) {
 	var results, err = conn.Execute(query)
 	if err != nil {
 		return "", fmt.Errorf("error executing query %q: %w", query, err)
