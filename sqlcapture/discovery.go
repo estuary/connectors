@@ -22,25 +22,8 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		return nil, err
 	}
 
-	// Shared schema of the embedded "source" property.
-	var sourceSchema = (&jsonschema.Reflector{
-		ExpandedStruct:            true,
-		DoNotReference:            true,
-		AllowAdditionalProperties: true,
-	}).Reflect(db.EmptySourceMetadata())
-	sourceSchema.Version = ""
-
-	if db.HistoryMode() {
-		sourceSchema.Extras = map[string]interface{}{
-			"reduce": map[string]interface{}{
-				"strategy":    "lastWriteWins",
-				"associative": false,
-			},
-		}
-	}
-
 	var catalog []*pc.Response_Discovered_Binding
-	for _, table := range tables {
+	for streamID, table := range tables {
 		var logEntry = log.WithFields(log.Fields{
 			"table":      table.Name,
 			"namespace":  table.Schema,
@@ -65,22 +48,6 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			continue
 		}
 
-		// The suggested collection key is just the discovered primary key of the table (which
-		// may be a unique secondary index if the database-specific discovery logic so chooses),
-		// except that if any of the columns are supposed to be omitted from the generated schema
-		// obviously it's not a suitable key and we should just act like this is a keyless table.
-		var suggestedCollectionKey = table.PrimaryKey
-		var suggestedKeyHasOmittedColumn = false
-		for _, key := range suggestedCollectionKey {
-			if table.Columns[key].OmitColumn {
-				suggestedKeyHasOmittedColumn = true
-				break
-			}
-		}
-		if suggestedKeyHasOmittedColumn {
-			suggestedCollectionKey = nil
-		}
-
 		// Don't discover materialized tables, since that is almost never what is intended, and
 		// causes problems with synthetic projection names. A column of "flow_published_at" is used
 		// as a sentinel for guessing if the table is from a materialization or not. Although not
@@ -91,143 +58,17 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			continue
 		}
 
-		// The anchor by which we'll reference the table schema.
-		//lint:ignore SA1019 We don't need the title-casing to handle punctuation properly so strings.Title() is sufficient
-		var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
-
-		// Build `properties` schemas for each table column.
-		var properties = make(map[string]*jsonschema.Schema)
-		for _, column := range table.Columns {
-			if column.OmitColumn {
-				continue // Skip adding properties corresponding to omitted columns
-			}
-
-			var isPrimaryKey = slices.Contains(suggestedCollectionKey, column.Name)
-			var jsonType, err = db.TranslateDBToJSONType(column, isPrimaryKey)
-			if err != nil {
-				// Unhandled types are translated to the catch-all schema {} but with
-				// a description clarifying that we don't have a better translation.
-				log.WithFields(log.Fields{
-					"error": err,
-					"type":  column.DataType,
-				}).Debug("error translating column type to JSON schema")
-				jsonType = &jsonschema.Schema{
-					Description: fmt.Sprintf("using catch-all schema (%v)", err),
-				}
-			}
-			if jsonType.Description != "" {
-				jsonType.Description += " "
-			}
-			var nullabilityDescription = ""
-			if !column.IsNullable {
-				nullabilityDescription = "non-nullable "
-			}
-			jsonType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, column.DataType)
-			properties[column.Name] = jsonType
-		}
-
-		// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline
-		// literal construction. Instead, use the Schema.Extras mechanism with "properties"
-		// to generate the properties keyword with an inline map.
-		var schema = jsonschema.Schema{
-			Definitions: jsonschema.Definitions{
-				anchor: &jsonschema.Schema{
-					Type: "object",
-					Extras: map[string]interface{}{
-						"$anchor":    anchor,
-						"properties": properties,
-					},
-					Required: suggestedCollectionKey,
-				},
-			},
-			AllOf: []*jsonschema.Schema{
-				{
-					Extras: map[string]interface{}{
-						"properties": map[string]*jsonschema.Schema{
-							"_meta": {
-								Type: "object",
-								Extras: map[string]interface{}{
-									"properties": map[string]*jsonschema.Schema{
-										"op": {
-											Enum:        []interface{}{"c", "d", "u"},
-											Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
-										},
-										"source": sourceSchema,
-										"before": {
-											Ref:         "#" + anchor,
-											Description: "Record state immediately before this change was applied.",
-											Extras: map[string]interface{}{
-												"reduce": map[string]interface{}{
-													"strategy": "firstWriteWins",
-												},
-											},
-										},
-									},
-									"reduce": map[string]interface{}{
-										"strategy": "merge",
-									},
-								},
-								Required: []string{"op", "source"},
-							},
-						},
-					},
-					Required: []string{"_meta"},
-					If: &jsonschema.Schema{
-						Extras: map[string]interface{}{
-							"properties": map[string]*jsonschema.Schema{
-								"_meta": {
-									Extras: map[string]interface{}{
-										"properties": map[string]*jsonschema.Schema{
-											"op": {
-												Extras: map[string]interface{}{
-													"const": "d",
-												},
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-					Then: &jsonschema.Schema{
-						Extras: map[string]interface{}{
-							"reduce": map[string]interface{}{
-								"strategy": "merge",
-								"delete":   true,
-							},
-						},
-					},
-					Else: &jsonschema.Schema{
-						Extras: map[string]interface{}{
-							"reduce": map[string]interface{}{
-								"strategy": "merge",
-							},
-						},
-					},
-				},
-				{Ref: "#" + anchor},
-			},
-		}
-		if table.UseSchemaInference {
-			schema.Extras = map[string]any{"x-infer-schema": true}
-		}
-
-		var rawSchema, err = schema.MarshalJSON()
+		var documentSchema, keyPointers, err = generateCollectionSchema(db, table)
 		if err != nil {
-			return nil, fmt.Errorf("error marshalling schema JSON: %w", err)
+			return nil, fmt.Errorf("error generating schema for %q: %w", streamID, err)
 		}
 
 		log.WithFields(log.Fields{
 			"table":     table.Name,
 			"namespace": table.Schema,
 			"columns":   table.Columns,
-			"schema":    string(rawSchema),
+			"schema":    string(documentSchema),
 		}).Trace("translated table schema")
-
-		var keyPointers []string
-		for _, colName := range suggestedCollectionKey {
-			keyPointers = append(keyPointers, primaryKeyToCollectionKey(colName))
-		}
 
 		var suggestedMode = BackfillModeAutomatic
 		if len(keyPointers) == 0 {
@@ -247,7 +88,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		catalog = append(catalog, &pc.Response_Discovered_Binding{
 			RecommendedName:    recommendedCatalogName(table.Schema, table.Name),
 			ResourceConfigJson: resourceSpecJSON,
-			DocumentSchemaJson: rawSchema,
+			DocumentSchemaJson: documentSchema,
 			Key:                keyPointers,
 		})
 
@@ -258,6 +99,175 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 	}
 
 	return catalog, err
+}
+
+// generateCollectionSchema translates the discovery information of a table into a Flow
+// collection schema (plus the discovered collection key, for convenience).
+func generateCollectionSchema(db Database, table *DiscoveryInfo) (json.RawMessage, []string, error) {
+	// Schema of the embedded "source" property.
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: true,
+	}).Reflect(db.EmptySourceMetadata())
+	sourceSchema.Version = ""
+
+	if db.HistoryMode() {
+		sourceSchema.Extras = map[string]interface{}{
+			"reduce": map[string]interface{}{
+				"strategy":    "lastWriteWins",
+				"associative": false,
+			},
+		}
+	}
+
+	// The discovered collection key is just the discovered primary key of the table (which
+	// may be a unique secondary index if the database-specific discovery logic so chooses),
+	// except that if any of the columns are supposed to be omitted from the generated schema
+	// obviously it's not a suitable key and we should just act like this is a keyless table.
+	var collectionKey = table.PrimaryKey
+	var collectionKeyHasOmittedColumn = false
+	for _, key := range collectionKey {
+		if table.Columns[key].OmitColumn {
+			collectionKeyHasOmittedColumn = true
+			break
+		}
+	}
+	if collectionKeyHasOmittedColumn {
+		collectionKey = nil
+	}
+
+	var keyPointers []string
+	for _, colName := range collectionKey {
+		keyPointers = append(keyPointers, primaryKeyToCollectionKey(colName))
+	}
+
+	// The anchor by which we'll reference the table schema.
+	//lint:ignore SA1019 We don't need the title-casing to handle punctuation properly so strings.Title() is sufficient
+	var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
+
+	// Build `properties` schemas for each table column.
+	var properties = make(map[string]*jsonschema.Schema)
+	for _, column := range table.Columns {
+		if column.OmitColumn {
+			continue // Skip adding properties corresponding to omitted columns
+		}
+
+		var isPrimaryKey = slices.Contains(collectionKey, column.Name)
+		var jsonType, err = db.TranslateDBToJSONType(column, isPrimaryKey)
+		if err != nil {
+			// Unhandled types are translated to the catch-all schema {} but with
+			// a description clarifying that we don't have a better translation.
+			log.WithFields(log.Fields{
+				"error": err,
+				"type":  column.DataType,
+			}).Debug("error translating column type to JSON schema")
+			jsonType = &jsonschema.Schema{
+				Description: fmt.Sprintf("using catch-all schema (%v)", err),
+			}
+		}
+		if jsonType.Description != "" {
+			jsonType.Description += " "
+		}
+		var nullabilityDescription = ""
+		if !column.IsNullable {
+			nullabilityDescription = "non-nullable "
+		}
+		jsonType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, column.DataType)
+		properties[column.Name] = jsonType
+	}
+
+	// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline
+	// literal construction. Instead, use the Schema.Extras mechanism with "properties"
+	// to generate the properties keyword with an inline map.
+	var schema = jsonschema.Schema{
+		Definitions: jsonschema.Definitions{
+			anchor: &jsonschema.Schema{
+				Type: "object",
+				Extras: map[string]interface{}{
+					"$anchor":    anchor,
+					"properties": properties,
+				},
+				Required: collectionKey,
+			},
+		},
+		AllOf: []*jsonschema.Schema{
+			{
+				Extras: map[string]interface{}{
+					"properties": map[string]*jsonschema.Schema{
+						"_meta": {
+							Type: "object",
+							Extras: map[string]interface{}{
+								"properties": map[string]*jsonschema.Schema{
+									"op": {
+										Enum:        []interface{}{"c", "d", "u"},
+										Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+									},
+									"source": sourceSchema,
+									"before": {
+										Ref:         "#" + anchor,
+										Description: "Record state immediately before this change was applied.",
+										Extras: map[string]interface{}{
+											"reduce": map[string]interface{}{
+												"strategy": "firstWriteWins",
+											},
+										},
+									},
+								},
+								"reduce": map[string]interface{}{
+									"strategy": "merge",
+								},
+							},
+							Required: []string{"op", "source"},
+						},
+					},
+				},
+				Required: []string{"_meta"},
+				If: &jsonschema.Schema{
+					Extras: map[string]interface{}{
+						"properties": map[string]*jsonschema.Schema{
+							"_meta": {
+								Extras: map[string]interface{}{
+									"properties": map[string]*jsonschema.Schema{
+										"op": {
+											Extras: map[string]interface{}{
+												"const": "d",
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+				Then: &jsonschema.Schema{
+					Extras: map[string]interface{}{
+						"reduce": map[string]interface{}{
+							"strategy": "merge",
+							"delete":   true,
+						},
+					},
+				},
+				Else: &jsonschema.Schema{
+					Extras: map[string]interface{}{
+						"reduce": map[string]interface{}{
+							"strategy": "merge",
+						},
+					},
+				},
+			},
+			{Ref: "#" + anchor},
+		},
+	}
+	if table.UseSchemaInference {
+		schema.Extras = map[string]any{"x-infer-schema": true}
+	}
+
+	var documentSchema, err = schema.MarshalJSON()
+	if err != nil {
+		return nil, nil, fmt.Errorf("error marshalling schema JSON: %w", err)
+	}
+	return documentSchema, keyPointers, nil
 }
 
 // Per the flow JSON schema: Collection names are paths of Unicode letters, numbers, '-', '_', or

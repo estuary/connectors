@@ -162,6 +162,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	discovery, err := c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
+	} else if err := c.emitSourcedSchemas(discovery); err != nil {
+		return err
 	}
 	for streamID, discoveryInfo := range discovery {
 		log.WithFields(log.Fields{
@@ -216,6 +218,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			discovery, err = c.Database.DiscoverTables(ctx)
 			if err != nil {
 				return fmt.Errorf("error discovering database tables: %w", err)
+			} else if err := c.emitSourcedSchemas(discovery); err != nil {
+				return err
 			}
 			// If any streams are currently pending, initialize them so they can start backfilling.
 			if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
@@ -771,6 +775,28 @@ func (c *Capture) emitState() error {
 	}
 	log.WithField("state", string(bs)).Trace("emitting state update")
 	return c.Output.Checkpoint(bs, true)
+}
+
+// emitSourcedSchemas outputs a SourcedSchema update for every capture binding
+// with corresponding discovery info in the provided map.
+func (c *Capture) emitSourcedSchemas(discovery map[StreamID]*DiscoveryInfo) error {
+	for _, binding := range c.Bindings {
+		var info, ok = discovery[binding.StreamID]
+		if !ok {
+			continue
+		}
+		// TODO(wgd): We need something here which indicates that the generated
+		// schemas should omit nullability information.
+		var collectionSchema, _, err = generateCollectionSchema(c.Database, info)
+		if err != nil {
+			log.WithError(err).WithField("stream", binding.StreamID).Error("error generating schema")
+			continue
+		}
+		if err := c.Output.SourcedSchema(int(binding.Index), collectionSchema); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (c *Capture) acknowledgeWorker(ctx context.Context, stream *boilerplate.PullOutput, replStream ReplicationStream) error {
