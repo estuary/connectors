@@ -75,27 +75,20 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	// Execute the backfill query to fetch rows from the database
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 
-	// There is no helper function for a streaming select query with arguments,
-	// so we have to drop down a level and prepare the statement ourselves here.
-	var stmt, err = db.conn.Prepare(query)
-	if err != nil {
-		return false, nil, fmt.Errorf("error preparing query %q: %w", query, err)
-	}
-	defer stmt.Close()
-
-	var result mysql.Result
-	defer result.Close() // Ensure the resultset allocated during ExecuteSelectStreaming is returned to the pool when done
-
 	var resultRows int    // Count of rows received within the current backfill chunk
 	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
-	if err := stmt.ExecuteSelectStreaming(&result, func(row []mysql.FieldValue) error {
+
+	var result mysql.Result
+	defer result.Close() // Ensure the resultset allocated during QueryStreaming is returned to the pool when done
+	if err := db.conn.WithTimeout(BackfillQueryTimeout).QueryStreaming(query, args, &result, func(row []mysql.FieldValue) error {
 		var fields = make(map[string]any)
 		for idx, val := range row {
 			fields[string(result.Fields[idx].Name)] = val.Value()
 		}
 
 		var rowKey []byte
+		var err error
 		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
 		} else {
@@ -132,7 +125,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		resultRows++
 		rowOffset++
 		return nil
-	}, nil, args...); err != nil {
+	}); err != nil {
 		return false, nil, fmt.Errorf("error executing backfill: %w", err)
 	}
 
