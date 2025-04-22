@@ -12,6 +12,10 @@ CREATE DATABASE test;
 GO
 USE test;
 GO
+EXECUTE sp_configure 'max text repl size', -1;
+GO
+RECONFIGURE;
+GO
 EXEC sys.sp_cdc_enable_db;
 GO
 CREATE LOGIN flow_capture WITH PASSWORD = 'we2rie1E';

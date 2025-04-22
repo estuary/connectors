@@ -4,9 +4,12 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 )
 
@@ -106,4 +109,48 @@ func TestScanKeyTypes(t *testing.T) {
 			cupaloy.SnapshotT(t, summary)
 		})
 	}
+}
+
+// TestOversizedFields tests the behavior of the connector when it encounters
+// individual column values larger than the connector maximum.
+//
+// SQL Server has some special cases for certain "Large Object" data types.
+// For instance 'max text repl size' controls the maximum size of values in
+// image, text, ntext, varchar(max), nvarchar(max), varbinary(max), and xml
+// columns of tables which are enabled for replication.
+//
+// So to a first approximation, we should expect that those column types are
+// the ones we need to worry about truncating because they're the ones which
+// can grow arbitrarily large.
+func TestOversizedFields(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "81647037"
+	var tableDef = "(id INTEGER PRIMARY KEY, v_text TEXT, v_varchar VARCHAR(max), v_image IMAGE, v_binary VARBINARY(max), v_xml XML)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = new(st.ChecksumValidator)
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	var largeText = strings.Repeat("data", 4194304)            // 16MiB string
+	var largeBinary = []byte(largeText)                        // 16MiB binary
+	var largeXML = fmt.Sprintf(`<hello>%s</hello>`, largeText) // ~16MiB XML object
+
+	// Backfill
+	tb.Insert(ctx, t, tableName, [][]any{
+		{100, largeText, largeText, largeBinary, largeBinary, largeXML},
+	})
+	cs.Capture(ctx, t, nil)
+
+	// Replication
+	tb.Insert(ctx, t, tableName, [][]any{
+		{200, largeText, largeText, largeBinary, largeBinary, largeXML},
+	})
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
 }
