@@ -4,6 +4,7 @@
 
 import urllib.parse
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta, UTC
 from typing import Any, Iterable, List, Mapping, MutableMapping, Optional, Union
 
 import pendulum
@@ -18,6 +19,9 @@ from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from .availability_strategy import KlaviyoAvailabilityStrategy
 from .exceptions import KlaviyoBackoffError
 
+# To hopefully try and avoid eventual consistency issues with Klaviyo's API,
+# we only ask for data that older than LAG minutes in the `events` stream.
+LAG = 110
 
 class KlaviyoStream(HttpStream, ABC):
     """Base stream for api version v2023-10-15"""
@@ -143,9 +147,9 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
         :return str: The name of the cursor field.
         """
 
-    # comparison_operator is used to filter what results we receive from Klaviyo. Some endpoints support "greater-or-equal" (preferred)
-    # and others only support "greater-than". comparison_operator must be specified for each incremental stream.
-    comparison_operator: str = "greater-or-equal"
+    # lower_bound_comparison_operator is used to filter what results we receive from Klaviyo. Some endpoints support "greater-or-equal" (preferred)
+    # and others only support "greater-than". lower_bound_comparison_operator must be specified for each incremental stream.
+    lower_bound_comparison_operator: str = "greater-or-equal"
 
     additional_filter_condition: str | None = None
 
@@ -170,14 +174,34 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
 
                     # For streams that can only filter with a "greater-than" comparison, we subtract
                     # one second so we do not miss records updated in the same second.
-                    if self.comparison_operator == 'greater-than':
+                    if self.lower_bound_comparison_operator == 'greater-than':
                         latest_cursor = latest_cursor.subtract(seconds=1)
 
                 # Klaviyo API will throw an error if the request filter is set too close to the current time.
                 # Setting a minimum value of at least 3 seconds from the current time ensures this will never happen,
                 # and allows our 'abnormal_state' acceptance test to pass.
                 latest_cursor = min(latest_cursor, pendulum.now().subtract(seconds=3))
-                params["filter"] = f"{self.comparison_operator}({self.cursor_field},{latest_cursor.isoformat()})"
+                params["filter"] = f"{self.lower_bound_comparison_operator}({self.cursor_field},{latest_cursor.isoformat()})"
+
+                # We've observed eventual consistency with the Klaviyo API's `/events` endpoint. To avoid asking for data while
+                # Klaviyo is inconsistent, we set an upper bound on how recent the data can be. This limits how "real-time" the
+                # connector is, but these Airbyte imports are often relatively slow anyway, and if we wanted a more real-time
+                # solution, we should build a native connector.
+
+                if self.name == "events":
+                    upper_bound = datetime.now(tz=UTC) - timedelta(minutes=LAG)
+
+                    # If the lower bound is more recent than the upper bound, Klaviyo returns a 400 response. Moving
+                    # the lower bound backwards in that situation ensures we avoid that error. The lower bound should always be
+                    # older than the upper bound during normal operations, but this will happen when the upper bound filter
+                    # is rolled out for existing connectors that already have prior state more recent than the upper bound.
+                    assert isinstance(latest_cursor, pendulum.DateTime)
+                    if latest_cursor > upper_bound:
+                        latest_cursor = upper_bound
+
+                    params["filter"] = f"{self.lower_bound_comparison_operator}({self.cursor_field},{latest_cursor.isoformat()})"
+                    params["filter"] += f",less-or-equal({self.cursor_field},{upper_bound.isoformat()})"
+
             params["sort"] = self.cursor_field
 
         filter_param = params.get("filter", None)
@@ -187,7 +211,6 @@ class IncrementalKlaviyoStream(KlaviyoStream, ABC):
                 params["filter"] += f",{self.additional_filter_condition}"
             elif not filter_param:
                 params["filter"] = f"{self.additional_filter_condition}"
-
         return params
 
 
@@ -291,7 +314,7 @@ class Profiles(IncrementalKlaviyoStream):
     transformer: TypeTransformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
 
     cursor_field = "updated"
-    comparison_operator = 'greater-than'
+    lower_bound_comparison_operator = "greater-than"
     page_size = 100
     state_checkpoint_interval = 100  # API can return maximum 100 records per page
 
