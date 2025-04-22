@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
 )
@@ -159,7 +158,7 @@ func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, schema, ta
 	return nil
 }
 
-func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
+func getBinlogExpiry(conn mysqlClient) (time.Duration, error) {
 	// When running on Amazon RDS MySQL there's an RDS-specific configuration
 	// for binlog retention, so that takes precedence if it exists.
 	rdsRetentionHours, err := queryNumericVariable(conn, `SELECT name, value FROM mysql.rds_configuration WHERE name = 'binlog retention hours';`)
@@ -189,7 +188,7 @@ func getBinlogExpiry(conn *client.Conn) (time.Duration, error) {
 	return 365 * 24 * time.Hour, nil
 }
 
-func queryNumericVariable(conn *client.Conn, query string) (float64, error) {
+func queryNumericVariable(conn mysqlClient, query string) (float64, error) {
 	var results, err = conn.Execute(query)
 	if err != nil {
 		return 0, fmt.Errorf("error executing query %q: %w", query, err)
