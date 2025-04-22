@@ -3,11 +3,56 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
 )
+
+type mysqlClient interface {
+	Prepare(query string) (*client.Stmt, error)
+	Execute(command string, args ...any) (*mysql.Result, error)
+	Close() error
+}
+
+type mysqlConnection struct {
+	inner *client.Conn
+}
+
+func (conn *mysqlConnection) Prepare(query string) (*client.Stmt, error) {
+	return conn.inner.Prepare(query)
+}
+
+func (conn *mysqlConnection) Execute(command string, args ...any) (*mysql.Result, error) {
+	return conn.inner.Execute(command, args...)
+}
+
+func (conn *mysqlConnection) Close() error {
+	return conn.inner.Close()
+}
+
+type mysqlDatabase struct {
+	versionString              string // The raw contents of the 'version' system variable
+	versionProduct             string // Usually either "MySQL" or "MariaDB"
+	versionMajor, versionMinor int    // The major/minor version the server is running
+
+	config *Config
+	conn   mysqlClient
+
+	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
+	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
+	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
+
+	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
+	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
+	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
+}
+
+func (db *mysqlDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
+}
 
 // queryDatabaseVersion examines the server version string to figure out what product
 // and release version we're talking to, and saves the results for later use.
