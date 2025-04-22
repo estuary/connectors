@@ -31,7 +31,7 @@ type config struct {
 	Token              string `json:"token" jsonschema:"title=Motherduck Service Token,description=Service token for authenticating with MotherDuck." jsonschema_extras:"secret=true,order=0"`
 	Database           string `json:"database" jsonschema:"title=Database,description=The database to materialize to." jsonschema_extras:"order=1"`
 	Schema             string `json:"schema" jsonschema:"title=Database Schema,default=main,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=2"`
-	Bucket             string `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads." jsonschema_extras:"order=3"`
+	Bucket             string `json:"bucket" jsonschema:"title=S3 Staging Bucket,description=Name of the S3 bucket to use for staging data loads. Must not contain dots (.)" jsonschema_extras:"order=3,pattern=^[^.]*$"`
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for reading and writing data to the S3 staging bucket." jsonschema_extras:"order=4"`
 	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for reading and writing data to the S3 staging bucket." jsonschema_extras:"secret=true,order=5"`
 	Region             string `json:"region" jsonschema:"title=S3 Bucket Region,description=Region of the S3 staging bucket." jsonschema_extras:"order=6"`
@@ -68,6 +68,12 @@ func (c *config) Validate() error {
 		// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
 		// chars in the URI and so that the object key does not start with a /.
 		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
+	}
+
+	// The bucket name must not contain any dots, since this breaks server
+	// certificate validation on MotherDuck's side.
+	if strings.Contains(c.Bucket, ".") {
+		return fmt.Errorf("bucket name must not contain '.'")
 	}
 
 	return nil
