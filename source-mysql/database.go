@@ -11,22 +11,71 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	// Ordinary queries which aren't backfills should generally complete in seconds,
+	// so if they take longer than one minute it's probably time to start erroring out.
+	DefaultQueryTimeout = 60 * time.Second
+
+	// Backfill queries can have very significant startup costs and may run for a while,
+	// but in the common case we expect them to take less than a minute, so if a query
+	// is still running after 6 hours it's probably time to kill it and retry anyway.
+	BackfillQueryTimeout = 6 * time.Hour
+)
+
 type mysqlClient interface {
-	Prepare(query string) (*client.Stmt, error)
+	// Returns a modified mysqlClient which applies the specified timeout to all queries.
+	WithTimeout(timeout time.Duration) mysqlClient
+
+	// Execute the given command with the provided arguments, returning the result.
 	Execute(command string, args ...any) (*mysql.Result, error)
+
+	// Execute a streaming SELECT query, invoking the provided callback once for each result row.
+	QueryStreaming(query string, args []any, result *mysql.Result, perRowCallback func(row []mysql.FieldValue) error) error
+
 	Close() error
 }
 
 type mysqlConnection struct {
-	inner *client.Conn
+	inner        *client.Conn
+	queryTimeout time.Duration // If unset, the default timeout will be used.
 }
 
-func (conn *mysqlConnection) Prepare(query string) (*client.Stmt, error) {
-	return conn.inner.Prepare(query)
+func (conn *mysqlConnection) WithTimeout(timeout time.Duration) mysqlClient {
+	return &mysqlConnection{
+		inner:        conn.inner,
+		queryTimeout: timeout,
+	}
 }
 
 func (conn *mysqlConnection) Execute(command string, args ...any) (*mysql.Result, error) {
+	// Ensure that the entire operation must complete within the timeout, if set.
+	if conn.queryTimeout > 0 {
+		conn.inner.SetDeadline(time.Now().Add(conn.queryTimeout))
+	} else {
+		conn.inner.SetDeadline(time.Time{})
+	}
+	defer conn.inner.SetDeadline(time.Time{})
+
 	return conn.inner.Execute(command, args...)
+}
+
+func (conn *mysqlConnection) QueryStreaming(query string, args []any, result *mysql.Result, perRowCallback func(row []mysql.FieldValue) error) error {
+	// Ensure that the entire operation must complete within the timeout, if set.
+	if conn.queryTimeout > 0 {
+		conn.inner.SetDeadline(time.Now().Add(conn.queryTimeout))
+	} else {
+		conn.inner.SetDeadline(time.Time{})
+	}
+	defer conn.inner.SetDeadline(time.Time{})
+
+	// There is no helper function in the go-mysql client for a streaming select query
+	// _with arguments_ so we have to handle preparing the statement ourselves here.
+	var stmt, err = conn.inner.Prepare(query)
+	if err != nil {
+		return fmt.Errorf("error preparing query %q: %w", query, err)
+	}
+	defer stmt.Close()
+	return stmt.ExecuteSelectStreaming(result, perRowCallback, nil, args...)
 }
 
 func (conn *mysqlConnection) Close() error {

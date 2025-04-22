@@ -256,12 +256,12 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	//   we don't need to mention that and just return the with-TLS error.
 	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
-		db.conn = &mysqlConnection{connWithTLS}
+		db.conn = &mysqlConnection{inner: connWithTLS, queryTimeout: DefaultQueryTimeout}
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
 	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
-		db.conn = &mysqlConnection{connWithoutTLS}
+		db.conn = &mysqlConnection{inner: connWithoutTLS, queryTimeout: DefaultQueryTimeout}
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		logrus.WithFields(logrus.Fields{"withTLS": errWithTLS, "nonTLS": errWithoutTLS}).Error("unable to connect to database")
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
