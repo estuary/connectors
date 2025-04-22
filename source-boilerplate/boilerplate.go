@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -169,6 +170,10 @@ func (s *ConnectorServer) Capture(stream pc.Connector_CaptureServer) error {
 type PullOutput struct {
 	sync.Mutex
 	pc.Connector_CaptureServer
+
+	// Map from binding index to SHA-256 hash of the latest schema JSON we output,
+	// used to avoid outputting identical SourcedSchemas multiple times.
+	schemaHashes map[int][32]byte
 }
 
 // Ready sends a PullResponse_Opened message to indicate that the capture has started.
@@ -278,6 +283,35 @@ func (out *PullOutput) DocumentsAndCheckpoint(checkpoint json.RawMessage, merge 
 	if err := out.Send(cp); err != nil {
 		return fmt.Errorf("writing checkpoint: %w", err)
 	}
+	return nil
+}
+
+func (out *PullOutput) SourcedSchema(binding int, schema json.RawMessage) error {
+	out.Lock()
+	defer out.Unlock()
+
+	// Compute SHA-256 hash of the schema JSON. If it matches the last hash we output
+	// for this schema, suppress actually sending the update since it's unchanged.
+	var hash = sha256.Sum256(schema)
+	if out.schemaHashes == nil {
+		out.schemaHashes = make(map[int][32]byte)
+	}
+	if prevHash, ok := out.schemaHashes[binding]; ok && prevHash == hash {
+		return nil
+	}
+
+	// Send the schema update.
+	if err := out.Send(&pc.Response{
+		SourcedSchema: &pc.Response_SourcedSchema{
+			Binding:    uint32(binding),
+			SchemaJson: schema,
+		},
+	}); err != nil {
+		return fmt.Errorf("error sending PullResponse.SourcedSchema: %w", err)
+	}
+
+	// Update the last-hash tracking.
+	out.schemaHashes[binding] = hash
 	return nil
 }
 
