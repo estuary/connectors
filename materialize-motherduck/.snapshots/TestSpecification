@@ -26,8 +26,9 @@
       "bucket": {
         "type": "string",
         "title": "S3 Staging Bucket",
-        "description": "Name of the S3 bucket to use for staging data loads.",
-        "order": 3
+        "description": "Name of the S3 bucket to use for staging data loads. Must not contain dots (.)",
+        "order": 3,
+        "pattern": "^[^.]*$"
       },
       "awsAccessKeyId": {
         "type": "string",
