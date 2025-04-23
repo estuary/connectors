@@ -26,16 +26,6 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  id:
-    title: Id
-    type: string
-  updatedAt:
-    format: date-time
-    title: Updatedat
-    type: string
-required:
-  - id
-  - updatedAt
-title: IncrementalResource
+title: Locations
 type: object
 x-infer-schema: true

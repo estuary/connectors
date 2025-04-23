@@ -1,5 +1,59 @@
 [
   [
+    "acmeCo/customers",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "addresses": [],
+      "createdAt": "2025-01-14T15:10:14Z",
+      "defaultAddress": null,
+      "defaultEmailAddress": {
+        "marketingOptInLevel": "SINGLE_OPT_IN",
+        "marketingState": "NOT_SUBSCRIBED",
+        "marketingUnsubscribeUrl": "https://estuary-alex-testing.myshopify.com/account/unsubscribe?token=S40RkaKHZ1DgVvsYkbJa1CNwrToGZAVgFpiIaPsMHchdm197VLeoi4rgA_fTSv1xPneFh6oNCRzQqVzcWO_x0bLPNW7Jt4JChqaK8Gu0cBg%3D",
+        "marketingUpdatedAt": null
+      },
+      "defaultPhoneNumber": {
+        "marketingCollectedFrom": "OTHER",
+        "marketingOptInLevel": "SINGLE_OPT_IN",
+        "marketingState": "NOT_SUBSCRIBED",
+        "marketingUpdatedAt": null
+      },
+      "displayName": "Ayumu Hirano",
+      "email": "ayumu.hirano@example.com",
+      "firstName": "Ayumu",
+      "id": "gid://shopify/Customer/7609762938925",
+      "lastName": "Hirano",
+      "legacyResourceId": "7609762938925",
+      "locale": "en",
+      "note": null,
+      "phone": "+16135550127",
+      "state": "DISABLED",
+      "statistics": {
+        "predictedSpendTier": null
+      },
+      "tags": [],
+      "taxExempt": false,
+      "taxExemptions": [],
+      "updatedAt": "2025-04-10T17:42:58Z",
+      "verifiedEmail": true
+    }
+  ],
+  [
+    "acmeCo/customer_metafields",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-01-14T15:10:14Z",
+      "id": "gid://shopify/Customer/7609762938925",
+      "legacyResourceId": "7609762938925",
+      "metafields": [],
+      "updatedAt": "2025-04-10T17:42:58Z"
+    }
+  ],
+  [
     "acmeCo/products",
     {
       "_meta": {
@@ -36,18 +90,6 @@
       "id": "gid://shopify/Product/8086707830829",
       "isGiftCard": true,
       "legacyResourceId": "8086707830829",
-      "media": [
-        {
-          "__parentId": "gid://shopify/Product/8086707830829",
-          "alt": "Gift card that shows text: Generated data gift card",
-          "id": "gid://shopify/MediaImage/26890923409453",
-          "image": {
-            "height": 2881,
-            "url": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/gift_card.png?v=1736867416",
-            "width": 2881
-          }
-        }
-      ],
       "mediaCount": {
         "count": 1,
         "precision": "EXACT"
@@ -105,7 +147,68 @@
       "title": "Gift Card",
       "totalInventory": 0,
       "tracksInventory": false,
-      "updatedAt": "2025-01-15T03:10:30Z",
+      "updatedAt": "2025-04-10T17:45:43Z",
+      "variantsCount": {
+        "count": 4,
+        "precision": "EXACT"
+      },
+      "vendor": "Snowboard Vendor"
+    }
+  ],
+  [
+    "acmeCo/product_media",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-01-14T15:10:14Z",
+      "id": "gid://shopify/Product/8086707830829",
+      "legacyResourceId": "8086707830829",
+      "media": [
+        {
+          "__parentId": "gid://shopify/Product/8086707830829",
+          "alt": "Gift card that shows text: Generated data gift card",
+          "id": "gid://shopify/MediaImage/26890923409453",
+          "image": {
+            "height": 2881,
+            "url": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/gift_card.png?v=1736867416",
+            "width": 2881
+          }
+        }
+      ],
+      "updatedAt": "2025-04-10T17:45:43Z"
+    }
+  ],
+  [
+    "acmeCo/product_metafields",
+    {
+      "__parentId": "gid://shopify/Product/8086707994669",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-01-14T15:10:14Z",
+      "definition": null,
+      "id": "gid://shopify/Metafield/40843185455149",
+      "key": "title_tag",
+      "legacyResourceId": "40843185455149",
+      "metafields": [],
+      "namespace": "global",
+      "ownerType": "PRODUCT",
+      "type": "string",
+      "updatedAt": "2025-01-14T15:10:14Z",
+      "value": "Complete Snowboard"
+    }
+  ],
+  [
+    "acmeCo/product_variants",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-01-14T15:10:14Z",
+      "id": "gid://shopify/Product/8086707830829",
+      "legacyResourceId": "8086707830829",
+      "updatedAt": "2025-04-10T17:45:43Z",
       "variants": [
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -116,29 +219,8 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258934976557",
-            "legacyResourceId": "45258934976557",
-            "measurement": {
-              "id": "gid://shopify/InventoryItemMeasurement/44217186123821",
-              "weight": {
-                "unit": "POUNDS",
-                "value": 0.0
-              }
-            },
-            "requiresShipping": false,
-            "sku": null,
-            "tracked": false
+            "legacyResourceId": "45258934976557"
           },
-          "inventoryLevels": [
-            {
-              "__parentId": "gid://shopify/ProductVariant/43217823334445",
-              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258934976557",
-              "location": {
-                "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813",
-                "name": "Shop location"
-              }
-            }
-          ],
           "inventoryPolicy": "DENY",
           "inventoryQuantity": 0,
           "legacyResourceId": "43217823334445",
@@ -168,31 +250,10 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258935009325",
-            "legacyResourceId": "45258935009325",
-            "measurement": {
-              "id": "gid://shopify/InventoryItemMeasurement/44217186156589",
-              "weight": {
-                "unit": "POUNDS",
-                "value": 0.0
-              }
-            },
-            "requiresShipping": false,
-            "sku": null,
-            "tracked": false
+            "legacyResourceId": "45258935009325"
           },
-          "inventoryLevels": [
-            {
-              "__parentId": "gid://shopify/ProductVariant/43217823367213",
-              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935009325",
-              "location": {
-                "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813",
-                "name": "Shop location"
-              }
-            }
-          ],
           "inventoryPolicy": "DENY",
-          "inventoryQuantity": 0,
+          "inventoryQuantity": -1,
           "legacyResourceId": "43217823367213",
           "position": 2,
           "price": "25.00",
@@ -209,7 +270,7 @@
           "sku": null,
           "taxable": false,
           "title": "$25",
-          "updatedAt": "2025-01-14T15:10:14Z"
+          "updatedAt": "2025-04-10T17:43:00Z"
         },
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -220,31 +281,10 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258935042093",
-            "legacyResourceId": "45258935042093",
-            "measurement": {
-              "id": "gid://shopify/InventoryItemMeasurement/44217186189357",
-              "weight": {
-                "unit": "POUNDS",
-                "value": 0.0
-              }
-            },
-            "requiresShipping": false,
-            "sku": null,
-            "tracked": false
+            "legacyResourceId": "45258935042093"
           },
-          "inventoryLevels": [
-            {
-              "__parentId": "gid://shopify/ProductVariant/43217823399981",
-              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935042093",
-              "location": {
-                "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813",
-                "name": "Shop location"
-              }
-            }
-          ],
           "inventoryPolicy": "DENY",
-          "inventoryQuantity": 0,
+          "inventoryQuantity": -1,
           "legacyResourceId": "43217823399981",
           "position": 3,
           "price": "50.00",
@@ -261,7 +301,7 @@
           "sku": null,
           "taxable": false,
           "title": "$50",
-          "updatedAt": "2025-01-14T15:10:14Z"
+          "updatedAt": "2025-04-10T17:43:00Z"
         },
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -272,29 +312,8 @@
           "image": null,
           "inventoryItem": {
             "id": "gid://shopify/InventoryItem/45258935074861",
-            "legacyResourceId": "45258935074861",
-            "measurement": {
-              "id": "gid://shopify/InventoryItemMeasurement/44217186222125",
-              "weight": {
-                "unit": "POUNDS",
-                "value": 0.0
-              }
-            },
-            "requiresShipping": false,
-            "sku": null,
-            "tracked": false
+            "legacyResourceId": "45258935074861"
           },
-          "inventoryLevels": [
-            {
-              "__parentId": "gid://shopify/ProductVariant/43217823432749",
-              "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258935074861",
-              "location": {
-                "fulfillmentService": null,
-                "id": "gid://shopify/Location/73871392813",
-                "name": "Shop location"
-              }
-            }
-          ],
           "inventoryPolicy": "DENY",
           "inventoryQuantity": 0,
           "legacyResourceId": "43217823432749",
@@ -315,12 +334,124 @@
           "title": "$100",
           "updatedAt": "2025-01-14T15:10:14Z"
         }
-      ],
-      "variantsCount": {
-        "count": 4,
-        "precision": "EXACT"
+      ]
+    }
+  ],
+  [
+    "acmeCo/fulfillment_orders",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "vendor": "Snowboard Vendor"
+      "createdAt": "2025-04-10T17:42:58Z",
+      "fulfillmentOrders": [
+        {
+          "__parentId": "gid://shopify/Order/5714619858989",
+          "__typename": "FulfillmentOrder",
+          "assignedLocation": {
+            "address1": null,
+            "address2": null,
+            "city": null,
+            "countryCode": "US",
+            "location": {
+              "id": "gid://shopify/Location/73871392813",
+              "legacyResourceId": "73871392813"
+            },
+            "name": "Shop location",
+            "phone": null,
+            "province": null,
+            "zip": null
+          },
+          "channelId": null,
+          "createdAt": "2025-04-10T17:42:58Z",
+          "deliveryMethod": {
+            "id": "gid://shopify/DeliveryMethod/1234789171245",
+            "maxDeliveryDateTime": null,
+            "methodType": "NONE",
+            "minDeliveryDateTime": null
+          },
+          "destination": {
+            "address1": null,
+            "address2": null,
+            "city": null,
+            "company": null,
+            "countryCode": null,
+            "email": "ayumu.hirano@example.com",
+            "firstName": null,
+            "id": "gid://shopify/FulfillmentOrderDestination/6991280111661",
+            "lastName": null,
+            "phone": null,
+            "province": null,
+            "zip": null
+          },
+          "fulfillAt": "2025-04-10T17:00:00Z",
+          "fulfillBy": null,
+          "fulfillmentHolds": [],
+          "id": "gid://shopify/FulfillmentOrder/6720249167917",
+          "internationalDuties": null,
+          "lineItems": [
+            {
+              "__parentId": "gid://shopify/FulfillmentOrder/6720249167917",
+              "__typename": "FulfillmentOrderLineItem",
+              "id": "gid://shopify/FulfillmentOrderLineItem/14276053729325",
+              "inventoryItemId": "gid://shopify/InventoryItem/45258935009325",
+              "lineItem": {
+                "currentQuantity": 1,
+                "fulfillableQuantity": 1,
+                "id": "gid://shopify/LineItem/14150963134509",
+                "product": {
+                  "id": "gid://shopify/Product/8086707830829",
+                  "legacyResourceId": "8086707830829"
+                },
+                "variant": {
+                  "id": "gid://shopify/ProductVariant/43217823367213",
+                  "legacyResourceId": "43217823367213"
+                }
+              }
+            },
+            {
+              "__parentId": "gid://shopify/FulfillmentOrder/6720249167917",
+              "__typename": "FulfillmentOrderLineItem",
+              "id": "gid://shopify/FulfillmentOrderLineItem/14276053762093",
+              "inventoryItemId": "gid://shopify/InventoryItem/45258935042093",
+              "lineItem": {
+                "currentQuantity": 1,
+                "fulfillableQuantity": 1,
+                "id": "gid://shopify/LineItem/14150963167277",
+                "product": {
+                  "id": "gid://shopify/Product/8086707830829",
+                  "legacyResourceId": "8086707830829"
+                },
+                "variant": {
+                  "id": "gid://shopify/ProductVariant/43217823399981",
+                  "legacyResourceId": "43217823399981"
+                }
+              }
+            }
+          ],
+          "merchantRequests": [],
+          "requestStatus": "UNSUBMITTED",
+          "status": "OPEN",
+          "supportedActions": [],
+          "updatedAt": "2025-04-10T17:42:58Z"
+        }
+      ],
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/fulfillments",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-10T17:42:58Z",
+      "fulfillments": [],
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "updatedAt": "2025-04-10T17:54:23Z"
     }
   ]
 ]

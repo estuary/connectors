@@ -15,7 +15,7 @@ from source_shopify_native.models import (
     UserErrors,
 )
 
-VERSION = "2025-01"
+VERSION = "2025-07"
 BULK_QUERY_ALREADY_EXISTS_ERROR = r"A bulk query operation for this app and shop is already in progress"
 INITIAL_SLEEP = 5
 MAX_SLEEP = 150
@@ -253,6 +253,10 @@ class BulkJobManager:
                     errors = errors,
                 )
             else:
+                errors = [error.message for error in errors]
+                for error in errors:
+                    self.log.warning(error)
+
                 raise BulkJobError(
                     message = "Errors when submitting query.",
                     query = query,

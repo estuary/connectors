@@ -29,13 +29,8 @@ properties:
   id:
     title: Id
     type: string
-  updatedAt:
-    format: date-time
-    title: Updatedat
-    type: string
 required:
   - id
-  - updatedAt
-title: IncrementalResource
+title: IncrementalResourceWithoutCursor
 type: object
 x-infer-schema: true
