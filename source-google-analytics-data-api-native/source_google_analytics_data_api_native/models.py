@@ -118,8 +118,8 @@ class MetricAggregation(StrEnum):
 # Report represents a valid configured report stream.
 class Report(BaseModel, extra="forbid"):
     name: str
-    dimensions: Annotated[list[str], MinLen(1)]
-    metrics: Annotated[list[str], MinLen(1)]
+    dimensions: list[str]
+    metrics: list[str]
     # TODO(bair): Improve validation of dimensionFilters and metricFilters.
     # Valid variations of these fields are described here: https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/FilterExpression.
     dimensionFilter: Optional[dict[str, Any]] = None
