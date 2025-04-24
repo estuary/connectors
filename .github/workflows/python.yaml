@@ -207,7 +207,7 @@ jobs:
             usage_rate: "1.0"
           - name: source-shopify-native
             type: capture
-            version: v1
+            version: v2
             usage_rate: "1.0"
           - name: source-zendesk-support-native
             type: capture
