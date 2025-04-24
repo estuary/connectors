@@ -120,9 +120,9 @@ type catalogAuthConfig struct {
 }
 
 func (catalogAuthConfig) JSONSchema() *jsonschema.Schema {
-	return oneOfSchema("Catalog Authentication", "Iceberg Catalog Authentication Configuration", "catalog_auth_type", string(catalogAuthTypeClientCredential),
-		oneOfInput{"OAuth 2.0 Client Credentials", catalogAuthClientCredentialConfig{}, string(catalogAuthTypeClientCredential)},
-		oneOfInput{"AWS SigV4 Authentication", catalogAuthSigV4Config{}, string(catalogAuthTypeSigV4)},
+	return schemagen.OneOfSchema("Catalog Authentication", "Iceberg Catalog Authentication Configuration", "catalog_auth_type", string(catalogAuthTypeClientCredential),
+		schemagen.OneOfSubSchema("OAuth 2.0 Client Credentials", catalogAuthClientCredentialConfig{}, string(catalogAuthTypeClientCredential)),
+		schemagen.OneOfSubSchema("AWS SigV4 Authentication", catalogAuthSigV4Config{}, string(catalogAuthTypeSigV4)),
 	)
 }
 
@@ -187,8 +187,8 @@ type computeConfig struct {
 }
 
 func (computeConfig) JSONSchema() *jsonschema.Schema {
-	return oneOfSchema("Compute", "Compute Configuration", "compute_type", string(computeTypeEmrServerless),
-		oneOfInput{"AWS EMR Serverless", emrConfig{}, string(computeTypeEmrServerless)},
+	return schemagen.OneOfSchema("Compute", "Compute Configuration", "compute_type", string(computeTypeEmrServerless),
+		schemagen.OneOfSubSchema("AWS EMR Serverless", emrConfig{}, string(computeTypeEmrServerless)),
 	)
 }
 
@@ -334,39 +334,6 @@ func sanitizePath(path ...string) []string {
 	}
 
 	return out
-}
-
-type oneOfInput struct {
-	title    string
-	instance any
-	default_ string
-}
-
-func oneOfSchema(title, description, discriminator, default_ string, inputs ...oneOfInput) *jsonschema.Schema {
-	var oneOfs []*jsonschema.Schema
-
-	for _, input := range inputs {
-		config := schemagen.GenerateSchema(input.title, input.instance)
-		config.Properties.Set(discriminator, &jsonschema.Schema{
-			Type:    "string",
-			Default: input.default_,
-			Const:   input.default_,
-			Extras:  map[string]any{"order": 0},
-		})
-		config.Properties.MoveToFront(discriminator)
-		oneOfs = append(oneOfs, config)
-	}
-
-	return &jsonschema.Schema{
-		Title:       title,
-		Description: description,
-		Default:     map[string]string{discriminator: default_},
-		OneOf:       oneOfs,
-		Extras: map[string]any{
-			"discriminator": map[string]string{"propertyName": discriminator},
-		},
-		Type: "object",
-	}
 }
 
 // sanitizeAndAppendHash adapts an input into a reasonably human-readable

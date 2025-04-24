@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/estuary/connectors/go/schema-gen/endpoint-config",
+  "properties": {
+    "some_standard_input": {
+      "type": "string"
+    },
+    "authentication": {
+      "oneOf": [
+        {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/go/schema-gen/user-password",
+          "properties": {
+            "auth_type": {
+              "type": "string",
+              "const": "user_password",
+              "default": "user_password",
+              "order": 0
+            },
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "User Name and Password"
+        },
+        {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/go/schema-gen/jwt",
+          "properties": {
+            "auth_type": {
+              "type": "string",
+              "const": "jwt",
+              "default": "jwt",
+              "order": 0
+            },
+            "jwt": {
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "required": [
+            "jwt"
+          ],
+          "title": "JSON Web Token (JWT)"
+        },
+        {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/go/schema-gen/api-key",
+          "properties": {
+            "auth_type": {
+              "type": "string",
+              "const": "api_key",
+              "default": "api_key",
+              "order": 0
+            },
+            "api_key": {
+              "type": "string"
+            }
+          },
+          "type": "object",
+          "required": [
+            "api_key"
+          ],
+          "title": "API Key"
+        }
+      ],
+      "type": "object",
+      "title": "Authentication",
+      "default": {
+        "auth_type": "user_password"
+      },
+      "discriminator": {
+        "propertyName": "auth_type"
+      }
+    }
+  },
+  "type": "object",
+  "required": [
+    "some_standard_input",
+    "authentication"
+  ],
+  "title": "Test Schema"
+}
