@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test/featureflagemitsourcedschemas_64029092": 2 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"featureflagemitsourcedschemas_64029092","loc":[11111111,11111111,11111111]}},"data":"hello","id":1}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"featureflagemitsourcedschemas_64029092","loc":[11111111,11111111,11111111]}},"data":"world","id":2}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Ffeatureflagemitsourcedschemas_64029092":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+
