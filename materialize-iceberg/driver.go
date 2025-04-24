@@ -134,7 +134,13 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 }
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
+	var translate boilerplate.TranslateFieldFn
+	if d.cfg.Advanced.LowercaseColumnNames {
+		translate = func(f string) string { return strings.ToLower(f) }
+	}
+
 	return boilerplate.MaterializeCfg{
+		Translate:             translate,
 		ConcurrentApply:       true,
 		MaxFieldLength:        255,
 		CaseInsensitiveFields: true,
@@ -323,7 +329,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mapped, boilerplate.ElementConverter) {
-	return mapProjection(p)
+	return mapProjection(p, d.cfg.Advanced.LowercaseColumnNames)
 }
 
 func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
@@ -431,7 +437,7 @@ func (d *materialization) UpdateResource(
 			}
 			for _, migration := range update.FieldsToMigrate {
 				input.Migrations = append(input.Migrations, migrateColumn{
-					Field:      migration.From.Name,
+					Name:       migration.From.Name,
 					FromType:   migration.From.Type,
 					TargetType: migration.To.Mapped.type_,
 				})
