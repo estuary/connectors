@@ -10,9 +10,9 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/cespare/xxhash/v2"
+	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/dbt"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -265,13 +265,13 @@ func (c config) toAwsConfig(ctx context.Context) (*aws.Config, error) {
 	return &awsCfg, nil
 }
 
-func (c config) toS3Client(ctx context.Context) (*s3.Client, error) {
+func (c config) toBucket(ctx context.Context) (blob.Bucket, error) {
 	awsCfg, err := c.toAwsConfig(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return s3.NewFromConfig(*awsCfg), nil
+	return blob.NewS3Bucket(ctx, c.Compute.Bucket, awsCfg.Credentials)
 }
 
 func (c config) toEmrClient(ctx context.Context) (*emr.Client, error) {

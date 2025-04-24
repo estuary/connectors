@@ -7,7 +7,6 @@ import (
 	"embed"
 	"errors"
 	"fmt"
-	"net/http"
 	"path"
 	"slices"
 	"strings"
@@ -16,10 +15,8 @@ import (
 
 	"github.com/apache/iceberg-go"
 	"github.com/apache/iceberg-go/table"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	awsHttp "github.com/aws/smithy-go/transport/http"
+	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -84,7 +81,7 @@ func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boiler
 type materialization struct {
 	cfg       config
 	catalog   *catalog.Catalog
-	s3Client  *s3.Client
+	bucket    blob.Bucket
 	ssmClient *ssm.Client
 	emrClient *emrClient
 	templates templates
@@ -99,9 +96,9 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		return nil, fmt.Errorf("creating catalog: %w", err)
 	}
 
-	s3, err := cfg.toS3Client(ctx)
+	bucket, err := cfg.toBucket(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("creating S3 client: %w", err)
+		return nil, fmt.Errorf("creating bucket: %w", err)
 	}
 
 	ssmClient, err := cfg.toSsmClient(ctx)
@@ -115,9 +112,9 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 	}
 
 	return &materialization{
-		cfg:      cfg,
-		catalog:  catalog,
-		s3Client: s3,
+		cfg:     cfg,
+		catalog: catalog,
+		bucket:  bucket,
 		emrClient: &emrClient{
 			cfg:                 cfg.Compute.emrConfig,
 			catalogAuth:         cfg.CatalogAuthentication,
@@ -125,7 +122,7 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 			warehouse:           cfg.Warehouse,
 			materializationName: materializationName,
 			c:                   emr,
-			s3Client:            s3,
+			bucket:              bucket,
 			ssmClient:           ssmClient,
 		},
 		ssmClient: ssmClient,
@@ -234,53 +231,10 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 
 	d.emrClient.checkPrereqs(ctx, errs)
 
-	bucket := d.cfg.Compute.Bucket
-	bucketWithPath := path.Join(bucket, d.cfg.Compute.BucketPath)
-	testKey := path.Join(d.cfg.Compute.BucketPath, uuid.NewString())
-
-	var awsErr *awsHttp.ResponseError
-	if _, err := d.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(testKey),
-		Body:   strings.NewReader("testing"),
+	if err := d.bucket.CheckPermissions(ctx, blob.CheckPermissionsConfig{
+		Prefix: d.cfg.Compute.BucketPath,
+		Lister: true,
 	}); err != nil {
-		if errors.As(err, &awsErr) {
-			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
-				err = fmt.Errorf("bucket %q does not exist", bucket)
-			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to write to %q", bucketWithPath)
-			}
-		}
-		errs.Err(err)
-	} else if _, err := d.s3Client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(testKey),
-	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to read from %q", bucketWithPath)
-		}
-		errs.Err(err)
-	} else if _, err := d.s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
-		Bucket: aws.String(bucket),
-		Prefix: func() *string {
-			if d.cfg.Compute.BucketPath != "" {
-				return aws.String(d.cfg.Compute.BucketPath)
-			}
-			return nil
-		}(),
-		MaxKeys: aws.Int32(1),
-	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to list bucket %q", bucket)
-		}
-		errs.Err(err)
-	} else if _, err := d.s3Client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(testKey),
-	}); err != nil {
-		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to delete from %q", bucketWithPath)
-		}
 		errs.Err(err)
 	}
 
@@ -450,7 +404,7 @@ func (d *materialization) UpdateResource(
 
 			outputPrefix := path.Join(d.emrClient.cfg.BucketPath, uuid.NewString())
 			defer func() {
-				if err := cleanPrefixOnceFn(ctx, d.s3Client, d.emrClient.cfg.Bucket, outputPrefix)(); err != nil {
+				if err := cleanPrefixOnceFn(ctx, d.bucket, outputPrefix)(); err != nil {
 					log.WithError(err).Warn("failed to clean up status file after running a column migration job")
 				}
 			}()
@@ -495,18 +449,16 @@ func (d *materialization) NewMaterializerTransactor(
 		return nil, fmt.Errorf("putting PySpark scripts: %w", err)
 	}
 
-	storageClient := newFileClient(d.s3Client, d.cfg.Compute.emrConfig.Bucket)
-
 	t := &transactor{
 		materializationName: d.emrClient.materializationName,
 		be:                  be,
 		cfg:                 d.cfg,
-		s3Client:            d.s3Client,
+		bucket:              d.bucket,
 		emrClient:           d.emrClient,
 		templates:           d.templates,
 		bindings:            make([]binding, 0, len(mappedBindings)),
-		loadFiles:           boilerplate.NewStagedFiles(storageClient, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, false, false),
-		storeFiles:          boilerplate.NewStagedFiles(storageClient, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, true, true),
+		loadFiles:           boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, false, false),
+		storeFiles:          boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, true, true),
 		pyFiles:             *pyFiles,
 	}
 
@@ -587,11 +539,7 @@ func (d *materialization) putPyFiles(ctx context.Context) (*pyFileURIs, error) {
 	fullMetaPrefix := path.Join(d.cfg.Compute.emrConfig.BucketPath, metadataPrefix, "pySparkFiles", fmt.Sprintf("%x", hasher.Sum(nil)))
 	for idx, pf := range pyFiles {
 		key := path.Join(fullMetaPrefix, fmt.Sprintf("%s.py", pf.name))
-		if _, err := d.s3Client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket: aws.String(d.cfg.Compute.emrConfig.Bucket),
-			Key:    aws.String(key),
-			Body:   bytes.NewReader(pyBytes[idx]),
-		}); err != nil {
+		if err := d.bucket.Upload(ctx, key, bytes.NewReader(pyBytes[idx])); err != nil {
 			return nil, fmt.Errorf("uploading %s: %w", pf.name, err)
 		}
 
