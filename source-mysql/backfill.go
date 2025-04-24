@@ -207,20 +207,14 @@ func (db *mysqlDatabase) explainQuery(streamID, query string, args []interface{}
 	}
 	db.explained[streamID] = struct{}{}
 
-	// Ask the database to analyze the backfill query.
-	// ANALYZE is not universally supported, so try a few forms.
-	var explainResult, err = db.conn.Execute("ANALYZE "+query, args...)
-	if err != nil {
-		explainResult, err = db.conn.Execute("EXPLAIN ANALYZE "+query, args...)
-	}
-	if err != nil {
-		explainResult, err = db.conn.Execute("EXPLAIN "+query, args...)
-	}
+	// Ask the database to explain the backfill query execution plan.
+	var explainResult, err = db.conn.Execute("EXPLAIN "+query, args...)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"query": query,
+			"args":  args,
 			"err":   err,
-		}).Warn("unable to explain query")
+		}).Warn("failed to explain query")
 		return
 	}
 	defer explainResult.Close()
