@@ -7,12 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"path"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -315,30 +315,18 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 		errs.Err(err)
 	}
 
-	// Create, read, and delete an object per the configuration. Storage account
-	// keys don't have fine-grained permissions so if _anything_ works,
-	// everything should work.
-	testKey := path.Join(cfg.Directory, uuid.NewString())
-	data := []byte("testing")
-	if storage, err := cfg.storageClient(); err != nil {
+	bucket, err := blob.NewAzureBlobBucket(
+		ctx,
+		cfg.ContainerName,
+		cfg.StorageAccountName,
+		blob.WithAzureStorageAccountKey(cfg.StorageAccountKey),
+	)
+	if err != nil {
 		errs.Err(err)
-	} else if _, err := storage.UploadBuffer(ctx, cfg.ContainerName, testKey, data, nil); err != nil {
-		var netOpErr *net.OpError
-
-		if errors.As(err, &netOpErr) {
-			err = fmt.Errorf(
-				"could not connect to blob storage endpoint '%s': ensure the storage account name '%s', storage account key, and container name '%s' are correct",
-				storage.URL(), cfg.StorageAccountName, cfg.ContainerName,
-			)
-		} else {
-			err = fmt.Errorf("uploading test blob: %w", err)
-		}
-
+		return errs
+	}
+	if err := bucket.CheckPermissions(ctx, blob.CheckPermissionsConfig{}); err != nil {
 		errs.Err(err)
-	} else if _, err := storage.DownloadBuffer(ctx, cfg.ContainerName, testKey, data, nil); err != nil {
-		errs.Err(fmt.Errorf("downloading test blob: %w", err))
-	} else if _, err := storage.DeleteBlob(ctx, cfg.ContainerName, testKey, nil); err != nil {
-		errs.Err(fmt.Errorf("deleting test blob: %w", err))
 	}
 
 	return errs

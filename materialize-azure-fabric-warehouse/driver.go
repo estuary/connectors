@@ -3,12 +3,10 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
 	"github.com/estuary/connectors/go/dbt"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -75,23 +73,6 @@ func (c *config) db() (*stdsql.DB, error) {
 	}
 
 	return db, nil
-}
-
-func (c *config) storageClient() (*azblob.Client, error) {
-	if _, err := base64.StdEncoding.DecodeString(c.StorageAccountKey); err != nil {
-		return nil, fmt.Errorf("invalid storage account key: must be base64-encoded")
-	}
-
-	cred, err := azblob.NewSharedKeyCredential(c.StorageAccountName, c.StorageAccountKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create storage client credential: %w", err)
-	}
-
-	return azblob.NewClientWithSharedKeyCredential(
-		fmt.Sprintf("https://%s.blob.core.windows.net/", c.StorageAccountName),
-		cred,
-		nil,
-	)
 }
 
 type tableConfig struct {
