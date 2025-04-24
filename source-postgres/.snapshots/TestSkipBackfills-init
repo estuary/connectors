@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test/skipbackfills_24310805": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"skipbackfills_24310805","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"skipbackfills_24310805","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"skipbackfills_24310805","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"skipbackfills_24310805","loc":[11111111,11111111,11111111]}},"data":"six","id":6}
 # ================================
 # Final State Checkpoint

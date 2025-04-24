@@ -1,15 +1,15 @@
 # ================================
 # Collection "acmeCo/test/test/generic_multiplestreams_26016615": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"three","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
 # ================================
 # Collection "acmeCo/test/test/generic_multiplestreams_30084965": 3 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_30084965","loc":[11111111,11111111,11111111]}},"data":"eight","id":8}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_30084965","loc":[11111111,11111111,11111111]}},"data":"seven","id":7}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_30084965","loc":[11111111,11111111,11111111]}},"data":"six","id":6}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_30084965","loc":[11111111,11111111,11111111]}},"data":"seven","id":7}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_30084965","loc":[11111111,11111111,11111111]}},"data":"eight","id":8}
 # ================================
 # Final State Checkpoint
 # ================================

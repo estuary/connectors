@@ -1,103 +1,103 @@
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_000": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_000","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 0 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_000","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 0 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_000","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 0 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_001": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_001","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 1 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_001","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 1 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_001","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 1 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_002": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 2 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 2 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_002","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 2 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_003": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 3 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 3 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 3 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_004": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_004","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 4 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_004","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 4 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_004","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 4 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_005": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 5 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 5 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 5 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_006": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_006","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 6 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_006","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 6 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_006","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 6 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_007": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_007","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 7 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_007","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 7 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_007","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 7 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_008": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_008","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 8 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_008","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 8 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_008","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 8 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_009": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_009","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 9 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_009","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 9 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_009","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 9 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_010": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_010","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 10 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_010","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 10 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_010","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 10 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_011": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_011","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 11 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_011","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 11 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_011","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 11 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_012": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_012","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 12 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_012","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 12 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_012","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 12 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_013": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_013","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 13 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_013","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 13 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_013","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 13 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_014": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_014","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 14 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_014","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 14 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_014","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 14 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_015": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_015","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 15 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_015","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 15 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_015","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 15 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_016": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_016","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 16 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_016","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 16 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_016","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 16 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_017": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_017","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 17 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_017","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 17 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_017","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 17 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_018": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_018","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 18 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_018","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 18 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_018","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 18 row one","id":1}
 # ================================
 # Collection "acmeCo/test/dbo/test_manytables_2546318_019": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_019","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 19 row one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_019","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 19 row zero","id":0}
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ManyTables_2546318_019","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"table 19 row one","id":1}
 # ================================
 # Final State Checkpoint
 # ================================

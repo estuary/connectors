@@ -2,8 +2,8 @@
 # Collection "acmeCo/test/test/floatkeydiscovery_46399195": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"floatkeydiscovery_46399195","loc":[11111111,11111111,11111111]}},"id":"-12.3456789","val":-12.3456789}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"floatkeydiscovery_46399195","loc":[11111111,11111111,11111111]}},"id":"123.456","val":123.456}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"floatkeydiscovery_46399195","loc":[11111111,11111111,11111111]}},"id":"3.14","val":3.14}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"floatkeydiscovery_46399195","loc":[11111111,11111111,11111111]}},"id":"123.456","val":123.456}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"floatkeydiscovery_46399195","loc":[11111111,11111111,11111111]}},"id":"9999999999.99","val":9999999999.99}
 # ================================
 # Final State Checkpoint

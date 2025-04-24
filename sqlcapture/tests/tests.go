@@ -491,6 +491,9 @@ func (v *correctnessInvariantsCaptureValidator) Checkpoint(data json.RawMessage)
 	v.currentTransaction = nil
 }
 
+func (v *correctnessInvariantsCaptureValidator) SourcedSchema(collection string, schema json.RawMessage) {
+}
+
 func (v *correctnessInvariantsCaptureValidator) Reset() {
 	v.violations = new(strings.Builder)
 	v.states = make(map[int]string)

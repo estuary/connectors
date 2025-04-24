@@ -110,7 +110,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 	var cs = &st.CaptureSpec{
 		Driver:       sqlserverDriver,
 		EndpointSpec: &cfg,
-		Validator:    &st.SortedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{IncludeSourcedSchemas: true},
 		Sanitizers:   sanitizers,
 	}
 	if strings.Contains(*testFeatureFlags, "replica_fencing") {

@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/dbo/test_generic_ignoredstreams_17789375": 3 Documents
 # ================================
+{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_IgnoredStreams_17789375","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_IgnoredStreams_17789375","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_IgnoredStreams_17789375","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"two","id":2}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_IgnoredStreams_17789375","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
 # ================================
 # Final State Checkpoint
 # ================================

@@ -245,13 +245,15 @@ func (cs *CaptureSpec) Summary() string {
 }
 
 type pullAdapter struct {
-	ctx         context.Context
-	checkpoint  []byte
-	bindings    []*flow.CaptureSpec_Binding
-	validator   CaptureValidator
-	callback    func(data json.RawMessage)
-	sanitizers  map[string]*regexp.Regexp
-	transaction []*pc.Response_Captured
+	ctx        context.Context
+	checkpoint []byte
+	bindings   []*flow.CaptureSpec_Binding
+	validator  CaptureValidator
+	callback   func(data json.RawMessage)
+	sanitizers map[string]*regexp.Regexp
+
+	transaction        []*pc.Response_Captured
+	transactionSchemas []*pc.Response_SourcedSchema
 
 	// pendingCheckpoints is a counter of checkpoints emitted by the capture,
 	// used to produce valid Acknowledge messages upon request.
@@ -309,24 +311,37 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 		}
 		a.pendingCheckpoints.Add(1)
 
-		for _, doc := range a.transaction {
-			var binding string
-			if idx := doc.Binding; int(idx) < len(a.bindings) {
-				binding = string(a.bindings[idx].Collection.Name)
+		for _, sourcedSchema := range a.transactionSchemas {
+			var bindingName string
+			if idx := sourcedSchema.Binding; int(idx) < len(a.bindings) {
+				bindingName = string(a.bindings[idx].Collection.Name)
 			} else {
-				binding = fmt.Sprintf("Invalid Binding %d", idx)
+				bindingName = fmt.Sprintf("Invalid Binding %d", idx)
 			}
-			a.validator.Output(binding, sanitize(a.sanitizers, doc.DocJson))
+			a.validator.SourcedSchema(bindingName, sourcedSchema.SchemaJson)
+		}
+		for _, doc := range a.transaction {
+			var bindingName string
+			if idx := doc.Binding; int(idx) < len(a.bindings) {
+				bindingName = string(a.bindings[idx].Collection.Name)
+			} else {
+				bindingName = fmt.Sprintf("Invalid Binding %d", idx)
+			}
+			a.validator.Output(bindingName, sanitize(a.sanitizers, doc.DocJson))
 			if a.callback != nil {
 				a.callback(doc.DocJson)
 			}
 		}
 		a.transaction = nil
+		a.transactionSchemas = nil
 
 		a.validator.Checkpoint(a.checkpoint)
 		if a.callback != nil {
 			a.callback(a.checkpoint)
 		}
+	}
+	if m.SourcedSchema != nil {
+		a.transactionSchemas = append(a.transactionSchemas, m.SourcedSchema)
 	}
 	return nil
 }
@@ -344,6 +359,7 @@ func (a *pullAdapter) SetTrailer(metadata.MD)       { panic("SetTrailer is not s
 type CaptureValidator interface {
 	Checkpoint(data json.RawMessage)
 	Output(collection string, data json.RawMessage)
+	SourcedSchema(collection string, schema json.RawMessage)
 	Summarize(w io.Writer) error
 	Reset()
 }
@@ -356,6 +372,9 @@ type SortedCaptureValidator struct {
 
 // Checkpoint ignores checkpoint events.
 func (v *SortedCaptureValidator) Checkpoint(data json.RawMessage) {}
+
+// SourcedSchema ignores sourced schema events.
+func (v *SortedCaptureValidator) SourcedSchema(collection string, schema json.RawMessage) {}
 
 // Output feeds a new document into the CaptureValidator.
 func (v *SortedCaptureValidator) Output(collection string, data json.RawMessage) {
@@ -405,11 +424,20 @@ func (v *SortedCaptureValidator) Reset() {
 // OrderedCaptureValidator maintains a list of every document emitted to each output
 // collection in the order they were emitted.
 type OrderedCaptureValidator struct {
+	IncludeSourcedSchemas bool // When true, collection data includes sourced schema updates
+
 	documents map[string][]json.RawMessage // Map from collection name to list of documents
 }
 
 // Checkpoint ignores checkpoint events.
 func (v *OrderedCaptureValidator) Checkpoint(data json.RawMessage) {}
+
+// SourcedSchema ignores sourced schema events.
+func (v *OrderedCaptureValidator) SourcedSchema(collection string, schema json.RawMessage) {
+	if v.IncludeSourcedSchemas {
+		v.Output(collection, schema)
+	}
+}
 
 // Output feeds a new document into the CaptureValidator.
 func (v *OrderedCaptureValidator) Output(collection string, data json.RawMessage) {
@@ -457,6 +485,9 @@ type checksumValidatorState struct {
 
 // Checkpoint ignores checkpoint events.
 func (v *ChecksumValidator) Checkpoint(data json.RawMessage) {}
+
+// SourcedSchema ignores sourced schema events.
+func (v *ChecksumValidator) SourcedSchema(collection string, schema json.RawMessage) {}
 
 func (v *ChecksumValidator) Output(collection string, data json.RawMessage) {
 	if v.collections == nil {
@@ -512,6 +543,9 @@ type WatchdogValidator struct {
 
 // Checkpoint ignores checkpoint events.
 func (v *WatchdogValidator) Checkpoint(data json.RawMessage) {}
+
+// SourcedSchema ignores sourced schema events.
+func (v *WatchdogValidator) SourcedSchema(collection string, schema json.RawMessage) {}
 
 func (v *WatchdogValidator) Output(collection string, data json.RawMessage) {
 	v.WatchdogTimer.Reset(v.ResetPeriod)
