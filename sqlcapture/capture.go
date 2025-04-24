@@ -783,11 +783,12 @@ func (c *Capture) emitSourcedSchemas(discovery map[StreamID]*DiscoveryInfo) erro
 	for _, binding := range c.Bindings {
 		var info, ok = discovery[binding.StreamID]
 		if !ok {
-			continue
+			continue // Only emit SourcedSchema updates for bindings present in discovery results
 		}
-		// TODO(wgd): We need something here which indicates that the generated
-		// schemas should omit nullability information.
-		var collectionSchema, _, err = generateCollectionSchema(c.Database, info)
+		if !info.EmitSourcedSchemas {
+			continue // Only emit SourcedSchema updates for tables with the feature enabled
+		}
+		var collectionSchema, _, err = generateCollectionSchema(c.Database, info, false)
 		if err != nil {
 			log.WithError(err).WithField("stream", binding.StreamID).Error("error generating schema")
 			continue
