@@ -21,6 +21,10 @@ func (fc fieldConfig) CastToString() bool { return fc.CastToString_ }
 
 type mapped struct {
 	type_ iceberg.Type
+	// Name of the table column, which may be different than the Flow field
+	// name, depending on the materialization configuration. This is exported so
+	// it can be used in templates.
+	Name string
 }
 
 func (m mapped) String() string {
@@ -43,9 +47,14 @@ var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
 
 var migrateFieldSuffix = "_flow_tmp"
 
-func mapProjection(p boilerplate.Projection) (mapped, boilerplate.ElementConverter) {
+func mapProjection(p boilerplate.Projection, lowercaseColumnNames bool) (mapped, boilerplate.ElementConverter) {
 	var m mapped
 	var converter boilerplate.ElementConverter
+
+	m.Name = p.Field
+	if lowercaseColumnNames {
+		m.Name = strings.ToLower(m.Name)
+	}
 
 	switch ft := p.FlatType.(type) {
 	case boilerplate.FlatTypeArray:
@@ -169,7 +178,7 @@ func computeSchemaForUpdatedTable(
 	var tempMigrateProjections []boilerplate.MappedProjection[mapped]
 	for _, f := range update.FieldsToMigrate {
 		temp := f.To
-		temp.Field += migrateFieldSuffix
+		temp.Mapped.Name += migrateFieldSuffix
 		tempMigrateProjections = append(tempMigrateProjections, temp)
 	}
 
@@ -232,7 +241,7 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 
 		*dst = append(*dst, iceberg.NestedField{
 			ID:       id,
-			Name:     p.Field,
+			Name:     p.Mapped.Name,
 			Type:     p.Mapped.type_,
 			Required: p.MustExist || p.IsPrimaryKey,
 			Doc:      strings.ReplaceAll(p.Comment, "\n", " - "), // Glue catalogs don't support newlines in field comments
