@@ -59,6 +59,12 @@ Binding 0:
               "row_id"
             ]
           },
+          "data": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
           }

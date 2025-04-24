@@ -59,6 +59,43 @@ Binding 0:
               "row_id"
             ]
           },
+          "bit3_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bit_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bitvar5_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bitvar_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bool_col": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "bytea_col": {
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
           }

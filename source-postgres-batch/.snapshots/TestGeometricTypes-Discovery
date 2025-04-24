@@ -59,8 +59,50 @@ Binding 0:
               "row_id"
             ]
           },
+          "box_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "circle_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
+          },
+          "line_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lseg_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "point_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "polygon_col": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

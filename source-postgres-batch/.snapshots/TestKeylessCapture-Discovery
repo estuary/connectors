@@ -57,6 +57,18 @@ Binding 0:
               "index",
               "row_id"
             ]
+          },
+          "data": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

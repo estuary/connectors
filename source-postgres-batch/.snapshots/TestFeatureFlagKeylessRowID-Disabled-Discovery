@@ -53,6 +53,18 @@ Binding 0:
               "polled",
               "index"
             ]
+          },
+          "data": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
