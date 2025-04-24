@@ -13,7 +13,6 @@ from estuary_cdk.capture import (
     response,
 )
 from estuary_cdk.capture.common import ResourceConfig
-from estuary_cdk.http import HTTPMixin
 
 from source_gainsight_nxt.resources import all_resources, validate_credentials
 from source_gainsight_nxt.models import (
@@ -24,7 +23,6 @@ from source_gainsight_nxt.models import (
 
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
-    HTTPMixin,
 ):
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
