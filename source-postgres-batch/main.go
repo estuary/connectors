@@ -25,6 +25,10 @@ var featureFlagDefaults = map[string]bool{
 	// When true, the fallback collection key for keyless source tables will be
 	// ["/_meta/row_id"] instead of ["/_meta/polled", "/_meta/index"].
 	"keyless_row_id": true,
+
+	// When set, discovered collection schemas will be emitted as SourcedSchema messages
+	// so that Flow can have access to 'official' schema information from the source DB.
+	"emit_sourced_schemas": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.

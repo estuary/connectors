@@ -79,7 +79,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       postgresDriver,
 		EndpointSpec: endpointSpec,
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{IncludeSourcedSchemas: true},
 		Sanitizers:   sanitizers,
 	}
 }
