@@ -24,6 +24,9 @@ from pydantic import AfterValidator, AwareDatetime, BaseModel, Field
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 
+# Valid subdomains are between 3-63 characters long, start with a
+# lowercase letter, and only contain lowercase letters, digits, or dashes.
+SUBDOMAIN_REGEX = r"^[a-z][a-z0-9-]{2,62}$"
 
 def urlencode_field(field: str):
     return "{{#urlencode}}{{{ " + field + " }}}{{/urlencode}}"
@@ -86,8 +89,9 @@ def default_start_date():
 
 class EndpointConfig(BaseModel):
     subdomain: str = Field(
-        description="This is your Zendesk subdomain that can be found in your account URL. For example, in https://{MY_SUBDOMAIN}.zendesk.com/, where MY_SUBDOMAIN is the value of your subdomain.",
+        description="This is your Zendesk subdomain that can be found in your account URL. For example, in https://{MY_SUBDOMAIN}.zendesk.com, MY_SUBDOMAIN is the value of your subdomain.",
         title="Subdomain",
+        pattern=SUBDOMAIN_REGEX,
     )
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
