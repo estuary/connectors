@@ -800,3 +800,33 @@ func TestMultidimensionalArrays(t *testing.T) {
 
 	})
 }
+
+// TestFeatureFlagEmitSourcedSchemas runs a capture with the `emit_sourced_schemas` feature flag set.
+func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = "64029092"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(32))")
+
+	tb.Insert(ctx, t, tableName, [][]any{{1, "hello"}, {2, "world"}})
+
+	for _, tc := range []struct {
+		name string
+		flag string
+	}{
+		{"Default", ""},
+		{"Enabled", "emit_sourced_schemas"},
+		{"Disabled", "no_emit_sourced_schemas"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cs = tb.CaptureSpec(ctx, t)
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flag
+			cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
+
+			sqlcapture.TestShutdownAfterCaughtUp = true
+			t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+			cs.Capture(ctx, t, nil)
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
+}
