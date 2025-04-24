@@ -18,6 +18,7 @@ from ..flow import (
     RotatingOAuth2Credentials,
 )
 from ..http import HTTPError, HTTPMixin, TokenSource
+from ..logger import FlowLogger
 from ..utils import sort_dict
 
 class BaseCaptureConnector(
@@ -28,13 +29,13 @@ class BaseCaptureConnector(
     output: BinaryIO = sys.stdout.buffer
 
     @abc.abstractmethod
-    async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
+    async def spec(self, log: FlowLogger, _: request.Spec) -> ConnectorSpec:
         raise NotImplementedError()
 
     @abc.abstractmethod
     async def discover(
         self,
-        log: Logger,
+        log: FlowLogger,
         discover: request.Discover[EndpointConfig],
     ) -> response.Discovered[ResourceConfig]:
         raise NotImplementedError()
@@ -42,14 +43,14 @@ class BaseCaptureConnector(
     @abc.abstractmethod
     async def validate(
         self,
-        log: Logger,
+        log: FlowLogger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
         raise NotImplementedError()
 
     async def apply(
         self,
-        log: Logger,
+        log: FlowLogger,
         apply: request.Apply[EndpointConfig, ResourceConfig],
     ) -> response.Applied:
         return response.Applied(actionDescription="")
@@ -57,7 +58,7 @@ class BaseCaptureConnector(
     @abc.abstractmethod
     async def open(
         self,
-        log: Logger,
+        log: FlowLogger,
         open: request.Open[EndpointConfig, ResourceConfig, _ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         raise NotImplementedError()
@@ -67,7 +68,7 @@ class BaseCaptureConnector(
 
     async def handle(
         self,
-        log: Logger,
+        log: FlowLogger,
         request: Request[EndpointConfig, ResourceConfig, _ConnectorState],
     ) -> None:
 
@@ -151,7 +152,7 @@ class BaseCaptureConnector(
 
     async def _encrypt_config(
         self,
-        log: Logger,
+        log: FlowLogger,
         config: EndpointConfig,
     ) -> dict[str, Any]:
         assert isinstance(config, BaseModel)
@@ -178,7 +179,7 @@ class BaseCaptureConnector(
 
     async def _rotate_refresh_tokens(
         self,
-        log: Logger,
+        log: FlowLogger,
         open: request.Open[EndpointConfig, ResourceConfig, _ConnectorState],
     ):
         assert isinstance(self.token_source, TokenSource)
@@ -228,11 +229,6 @@ class BaseCaptureConnector(
 
                 # Encrypt the updated config and emit an event telling the control plane to publish a new spec.
                 encrypted_config = await self._encrypt_config(log, open.capture.config)
-                log.info("Some structured log with the encrypted config", extra={
-                    # Name might need to be different. Need to coordinate with what the control plane expects.
-                    "config": encrypted_config,
-                    # Need to confirm what eventType this should be.
-                    "eventType": "configUpdate",
-                })
+                log.event.config_update("Rotating refresh token in endpoint config.", encrypted_config)
             else:
                 raise
