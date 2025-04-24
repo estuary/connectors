@@ -25,6 +25,10 @@ var featureFlagDefaults = map[string]bool{
 	// used _in addition to_ the full column/types discovery we already do.
 	"use_schema_inference": false,
 
+	// When set, discovered collection schemas will be emitted as SourcedSchema messages
+	// so that Flow can have access to 'official' schema information from the source DB.
+	"emit_sourced_schemas": false,
+
 	// When true, the fallback collection key for keyless source tables will be
 	// ["/_meta/row_id"] instead of [].
 	"keyless_row_id": true,
