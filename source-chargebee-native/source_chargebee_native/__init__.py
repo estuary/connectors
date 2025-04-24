@@ -13,7 +13,6 @@ from estuary_cdk.capture import (
     response,
 )
 from estuary_cdk.capture.common import ResourceConfig
-from estuary_cdk.http import HTTPMixin
 from estuary_cdk.flow import ValidationError
 
 from source_chargebee_native.resources import all_resources, validate_credentials_and_configuration
@@ -25,7 +24,6 @@ from source_chargebee_native.models import (
 
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
-    HTTPMixin,
 ):
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]

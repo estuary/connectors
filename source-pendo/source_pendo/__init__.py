@@ -12,7 +12,6 @@ from estuary_cdk.capture import (
     request,
     response,
 )
-from estuary_cdk.http import HTTPMixin
 
 from .resources import all_resources, validate_api_key
 from .models import (
@@ -24,7 +23,6 @@ from .models import (
 
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
-    HTTPMixin,
 ):
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]

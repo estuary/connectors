@@ -12,7 +12,6 @@ from estuary_cdk.capture import (
     request,
     response,
 )
-from estuary_cdk.http import HTTPMixin
 
 from .resources import all_resources, enabled_resources
 from .models import (
@@ -25,7 +24,6 @@ from .models import (
 
 class Connector(
     BaseCaptureConnector[EndpointConfig, SalesforceResourceConfigWithSchedule, ConnectorState],
-    HTTPMixin,
 ):
     def request_class(self):
         return Request[EndpointConfig, SalesforceResourceConfigWithSchedule, ConnectorState]
