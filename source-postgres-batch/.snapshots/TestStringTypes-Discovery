@@ -59,8 +59,32 @@ Binding 0:
               "row_id"
             ]
           },
+          "bpchar_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "char_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
+          },
+          "text_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_col": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

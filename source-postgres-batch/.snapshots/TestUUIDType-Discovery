@@ -61,6 +61,13 @@ Binding 0:
           },
           "id": {
             "type": "integer"
+          },
+          "uuid_col": {
+            "format": "uuid",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

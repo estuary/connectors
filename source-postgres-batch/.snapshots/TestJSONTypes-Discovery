@@ -61,6 +61,14 @@ Binding 0:
           },
           "id": {
             "type": "integer"
+          },
+          "json_col": {},
+          "jsonb_col": {},
+          "jsonpath_col": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

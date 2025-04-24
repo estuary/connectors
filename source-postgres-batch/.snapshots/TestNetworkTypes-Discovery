@@ -59,8 +59,32 @@ Binding 0:
               "row_id"
             ]
           },
+          "cidr_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
+          },
+          "inet_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "macaddr8_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "macaddr_col": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

@@ -59,8 +59,51 @@ Binding 0:
               "row_id"
             ]
           },
+          "decimal_col": {
+            "format": "number",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "double_col": {
+            "format": "number",
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
+          },
+          "money_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_col": {
+            "format": "number",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_large_col": {
+            "format": "number",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "real_col": {
+            "format": "number",
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
