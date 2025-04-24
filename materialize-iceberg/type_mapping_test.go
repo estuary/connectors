@@ -44,7 +44,7 @@ func TestComputeSchemas(t *testing.T) {
 				},
 				MustExist: mustExist,
 			},
-			Mapped: mapped{type_: type_},
+			Mapped: mapped{type_: type_, Name: field},
 		}
 	}
 
