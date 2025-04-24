@@ -11,9 +11,9 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	emrTypes "github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/materialize-iceberg/python"
 	"github.com/google/uuid"
@@ -28,7 +28,7 @@ type emrClient struct {
 	warehouse           string
 	materializationName string
 	c                   *emr.Client
-	s3Client            *s3.Client
+	bucket              blob.Bucket
 	ssmClient           *ssm.Client
 }
 
@@ -105,13 +105,12 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
 		statusKey := path.Join(workingPrefix, statusFile)
-		if statusObj, err := e.s3Client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket: aws.String(e.cfg.Bucket),
-			Key:    aws.String(statusKey),
-		}); err != nil {
+		if statusObj, err := e.bucket.NewReader(ctx, statusKey); err != nil {
 			return nil, fmt.Errorf("reading status object %q: %w", statusKey, err)
-		} else if err := json.NewDecoder(statusObj.Body).Decode(&status); err != nil {
+		} else if err := json.NewDecoder(statusObj).Decode(&status); err != nil {
 			return nil, fmt.Errorf("decoding status object %q: %w", statusKey, err)
+		} else if err := statusObj.Close(); err != nil {
+			return nil, fmt.Errorf("closing status object reader %q: %w", statusKey, err)
 		}
 		return &status, nil
 	}
@@ -119,11 +118,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 	inputKey := path.Join(workingPrefix, "input.json")
 	if inputBytes, err := encodeInput(input); err != nil {
 		return fmt.Errorf("encoding input: %w", err)
-	} else if _, err := e.s3Client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(e.cfg.Bucket),
-		Key:    aws.String(inputKey),
-		Body:   bytes.NewReader(inputBytes),
-	}); err != nil {
+	} else if err := e.bucket.Upload(ctx, inputKey, bytes.NewReader(inputBytes)); err != nil {
 		return fmt.Errorf("putting input file object: %w", err)
 	}
 
