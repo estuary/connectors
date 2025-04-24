@@ -10,87 +10,11 @@ import (
 	"slices"
 	"strings"
 
-	schemagen "github.com/estuary/connectors/go/schema-gen"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 )
-
-var (
-	// The fallback key of discovered collections when the source table has no primary key.
-	fallbackKey = []string{"/_meta/row_id"}
-
-	// Old captures used a different fallback key which included a value identifying
-	// the specific polling iteration which produced the document. This proved less
-	// than ideal for full-refresh bindings on keyless tables.
-	fallbackKeyOld = []string{"/_meta/polled", "/_meta/index"}
-)
-
-func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
-	// Generate schema for the metadata via reflection
-	var reflector = jsonschema.Reflector{
-		ExpandedStruct: true,
-		DoNotReference: true,
-	}
-	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
-	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
-		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
-	}
-	metadataSchema.Definitions = nil
-	metadataSchema.AdditionalProperties = nil
-
-	var required = []string{"_meta"}
-	var properties = map[string]*jsonschema.Schema{
-		"_meta": metadataSchema,
-	}
-
-	for _, colName := range keyColumns {
-		var columnType = columnTypes[colName]
-		if columnType == nil {
-			return nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
-		}
-		properties[colName] = columnType
-		required = append(required, colName)
-	}
-
-	var schema = &jsonschema.Schema{
-		Type:                 "object",
-		Required:             required,
-		AdditionalProperties: nil,
-		Extras: map[string]interface{}{
-			"properties":     properties,
-			"x-infer-schema": true,
-		},
-	}
-
-	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("error serializing schema: %w", err)
-	}
-	return json.RawMessage(bs), nil
-}
-
-// Spec returns metadata about the capture connector.
-func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	resourceSchema, err := schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("generating resource schema: %w", err)
-	}
-
-	return &pc.Response_Spec{
-		ConfigSchemaJson:         drv.ConfigSchema,
-		ResourceConfigSchemaJson: resourceSchema,
-		DocumentationUrl:         drv.DocumentationURL,
-		ResourcePathPointers:     []string{"/name"},
-	}, nil
-}
-
-// Apply does nothing for batch SQL captures.
-func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
-	return &pc.Response_Applied{ActionDescription: ""}, nil
-}
 
 // Discover enumerates tables and views from `information_schema.tables` and generates
 // placeholder capture queries for thos tables.
@@ -107,28 +31,13 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	defer db.Close()
 
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	tableInfo, err := drv.discoverTables(ctx, db, &cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error listing tables: %w", err)
-	}
-	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing primary keys: %w", err)
-	}
-
-	// We rebuild this map even though `discoverPrimaryKeys` already built and
-	// discarded it, in order to keep the `discoverTables` / `discoverPrimaryKeys`
-	// interface as stupidly simple as possible, which ought to make it just that
-	// little bit easier to do this generically for multiple databases.
-	var keysByTable = make(map[string]*discoveredPrimaryKey)
-	for _, key := range keys {
-		keysByTable[key.Schema+"."+key.Table] = key
+		return nil, fmt.Errorf("error discovering tables: %w", err)
 	}
 
 	var bindings []*pc.Response_Discovered_Binding
-	for _, table := range tables {
-		var tableID = table.Schema + "." + table.Name
-
+	for tableID, table := range tableInfo {
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
 		var res, err = drv.GenerateResource(&cfg, recommendedName, table.Schema, table.Name, table.Type)
 		if err != nil {
@@ -144,27 +53,9 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		// Start with a minimal schema and a fallback collection key, which will be
-		// replaced with more useful versions if we have sufficient information.
-		collectionSchema, err := generateCollectionSchema(&cfg, nil, nil)
+		collectionSchema, collectionKey, err := generateCollectionSchema(&cfg, table, true)
 		if err != nil {
-			return nil, fmt.Errorf("error generating minimal collection schema: %w", err)
-		}
-		var collectionKey = fallbackKey
-		if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
-			collectionKey = fallbackKeyOld
-		}
-
-		if tableKey, ok := keysByTable[tableID]; ok {
-			if generatedSchema, err := generateCollectionSchema(&cfg, tableKey.Columns, tableKey.ColumnTypes); err == nil {
-				collectionSchema = generatedSchema
-				collectionKey = nil
-				for _, colName := range tableKey.Columns {
-					collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
-				}
-			} else {
-				log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
-			}
+			return nil, fmt.Errorf("error generating %q collection schema: %w", tableID, err)
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
@@ -177,6 +68,118 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 
 	return &pc.Response_Discovered{Bindings: bindings}, nil
+}
+
+func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *Config) (map[string]*discoveredTable, error) {
+	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	columns, err := discoverColumns(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing columns: %w", err)
+	}
+	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing primary keys: %w", err)
+	}
+
+	var tableInfo = make(map[string]*discoveredTable)
+	for _, table := range tables {
+		var tableID = table.Schema + "." + table.Name
+		tableInfo[tableID] = table
+	}
+	for _, column := range columns {
+		var tableID = column.Schema + "." + column.Table
+		if table, ok := tableInfo[tableID]; ok {
+			table.columns = append(table.columns, column)
+		}
+	}
+
+	for _, key := range keys {
+		var tableID = key.Schema + "." + key.Table
+		if table, ok := tableInfo[tableID]; ok {
+			table.key = key
+		}
+	}
+	return tableInfo, nil
+}
+
+var (
+	// The fallback key of discovered collections when the source table has no primary key.
+	fallbackKey = []string{"/_meta/row_id"}
+
+	// Old captures used a different fallback key which included a value identifying
+	// the specific polling iteration which produced the document. This proved less
+	// than ideal for full-refresh bindings on keyless tables.
+	fallbackKeyOld = []string{"/_meta/polled", "/_meta/index"}
+)
+
+func generateCollectionSchema(cfg *Config, table *discoveredTable, includeNullability bool) (json.RawMessage, []string, error) {
+	// Extract useful key and column type information
+	var keyColumns []string
+	if table.key != nil {
+		keyColumns = table.key.Columns
+	}
+	var columnTypes = make(map[string]columnType)
+	for _, column := range table.columns {
+		columnTypes[column.Name] = column.DataType
+	}
+
+	// Generate schema for the metadata via reflection
+	var reflector = jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
+		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
+	}
+	metadataSchema.Definitions = nil
+	metadataSchema.AdditionalProperties = nil
+
+	var required = append([]string{"_meta"}, keyColumns...)
+	var properties = map[string]*jsonschema.Schema{
+		"_meta": metadataSchema,
+	}
+	for colName, colType := range columnTypes {
+		var colSchema = colType.JSONSchema()
+		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !includeNullability {
+			// Remove null as an option when there are multiple type options and we don't want nullability
+			colSchema.Extras["type"] = slices.DeleteFunc(types, func(t string) bool { return t == "null" })
+		}
+		properties[colName] = colSchema
+	}
+
+	var schema = &jsonschema.Schema{
+		Type:                 "object",
+		Required:             required,
+		AdditionalProperties: nil,
+		Extras: map[string]interface{}{
+			"properties":     properties,
+			"x-infer-schema": true,
+		},
+	}
+
+	// Marshal schema to JSON
+	bs, err := json.Marshal(schema)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error serializing schema: %w", err)
+	}
+
+	// If the table has a primary key then convert it to a collection key, otherwise
+	// recommend an appropriate fallback collection key.
+	var collectionKey []string
+	if keyColumns != nil {
+		for _, colName := range keyColumns {
+			collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+		}
+	} else if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
+		collectionKey = fallbackKeyOld
+	} else {
+		collectionKey = fallbackKey
+	}
+	return json.RawMessage(bs), collectionKey, nil
 }
 
 // primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key
@@ -193,6 +196,9 @@ type discoveredTable struct {
 	Schema string
 	Name   string
 	Type   string // Usually 'BASE TABLE' or 'VIEW'
+
+	columns []*discoveredColumn
+	key     *discoveredPrimaryKey
 }
 
 func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredTable, error) {
@@ -239,11 +245,127 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	return tables, nil
 }
 
+type discoveredColumn struct {
+	Schema      string     // The schema in which the table resides
+	Table       string     // The name of the table with this column
+	Name        string     // The name of the column
+	Index       int        // The ordinal position of the column within a row
+	IsNullable  bool       // Whether the column can be null
+	DataType    columnType // The datatype of the column
+	Description *string    // The description of the column, if present and known
+}
+
+type columnType interface {
+	JSONSchema() *jsonschema.Schema
+}
+
+type basicColumnType struct {
+	jsonTypes       []string
+	contentEncoding string
+	format          string
+	nullable        bool
+	description     string
+}
+
+func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
+	var sch = &jsonschema.Schema{
+		Format: ct.format,
+		Extras: make(map[string]interface{}),
+	}
+
+	if ct.contentEncoding != "" {
+		sch.Extras["contentEncoding"] = ct.contentEncoding // New in 2019-09.
+	}
+
+	if ct.jsonTypes != nil {
+		var types = append([]string(nil), ct.jsonTypes...)
+		if ct.nullable {
+			types = append(types, "null")
+		}
+		if len(types) == 1 {
+			sch.Type = types[0]
+		} else {
+			sch.Extras["type"] = types
+		}
+	}
+	return sch
+}
+
+func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredColumn, error) {
+	var query = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(query, "SELECT nc.nspname as table_schema,")
+	fmt.Fprintf(query, "       c.relname as table_name,")
+	fmt.Fprintf(query, "       a.attname as column_name,")
+	fmt.Fprintf(query, "       a.attnum as column_index,")
+	fmt.Fprintf(query, "       NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,")
+	fmt.Fprintf(query, "       COALESCE(bt.typname, t.typname) AS udt_name,")
+	fmt.Fprintf(query, "       t.typtype::text AS typtype")
+	fmt.Fprintf(query, "  FROM pg_catalog.pg_attribute a")
+	fmt.Fprintf(query, "  JOIN pg_catalog.pg_type t ON a.atttypid = t.oid")
+	fmt.Fprintf(query, "  JOIN pg_catalog.pg_class c ON a.attrelid = c.oid")
+	fmt.Fprintf(query, "  JOIN pg_catalog.pg_namespace nc ON c.relnamespace = nc.oid")
+	fmt.Fprintf(query, "  LEFT JOIN (pg_catalog.pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)")
+	fmt.Fprintf(query, "    ON t.typtype = 'd'::\"char\" AND t.typbasetype = bt.oid")
+	fmt.Fprintf(query, "  WHERE a.attnum > 0")
+	fmt.Fprintf(query, "    AND NOT a.attisdropped")
+	fmt.Fprintf(query, "    AND c.relkind IN ('r', 'p', 'v', 'f')")
+	if len(discoverSchemas) > 0 {
+		fmt.Fprintf(query, "    AND nc.nspname = ANY ($1)")
+		args = append(args, discoverSchemas)
+	} else {
+		fmt.Fprintf(query, "    AND nc.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
+	}
+	fmt.Fprintf(query, "  ORDER BY nc.nspname, c.relname, a.attnum;")
+
+	rows, err := db.QueryContext(ctx, query.String(), args...)
+	if err != nil {
+		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
+	}
+	defer rows.Close()
+
+	var columns []*discoveredColumn
+	for rows.Next() {
+		var tableSchema, tableName, columnName string
+		var columnIndex int
+		var isNullable bool
+		var typeName, typeType string
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName, &typeType); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+
+		// Decode column type information into a usable form
+		var dataType basicColumnType
+		switch typeType {
+		case "e": // enum values are captured as strings
+			dataType = basicColumnType{jsonTypes: []string{"string"}}
+		case "r", "m": // ranges and multiranges are captured as strings
+			dataType = basicColumnType{jsonTypes: []string{"string"}}
+		default:
+			var ok bool
+			dataType, ok = databaseTypeToJSON[typeName]
+			if !ok {
+				dataType = basicColumnType{description: fmt.Sprintf("using catch-all schema for unknown type %q", typeName)}
+			}
+		}
+		dataType.nullable = isNullable
+
+		columns = append(columns, &discoveredColumn{
+			Schema:     tableSchema,
+			Table:      tableName,
+			Name:       columnName,
+			Index:      columnIndex,
+			IsNullable: isNullable,
+			DataType:   &dataType,
+		})
+	}
+	return columns, nil
+}
+
 type discoveredPrimaryKey struct {
-	Schema      string
-	Table       string
-	Columns     []string
-	ColumnTypes map[string]*jsonschema.Schema
+	Schema  string
+	Table   string
+	Columns []string
 }
 
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
@@ -290,20 +412,12 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 		var keyInfo = keysByTable[tableID]
 		if keyInfo == nil {
 			keyInfo = &discoveredPrimaryKey{
-				Schema:      tableSchema,
-				Table:       tableName,
-				ColumnTypes: make(map[string]*jsonschema.Schema),
+				Schema: tableSchema,
+				Table:  tableName,
 			}
 			keysByTable[tableID] = keyInfo
 		}
 		keyInfo.Columns = append(keyInfo.Columns, columnName)
-		if jsonSchema, ok := databaseTypeToJSON[dataType]; ok {
-			keyInfo.ColumnTypes[columnName] = jsonSchema
-		} else {
-			// Assume unknown types are strings, because it's almost always a string.
-			// (Or it's an object, but those can't be Flow collection keys anyway)
-			keyInfo.ColumnTypes[columnName] = &jsonschema.Schema{Type: "string"}
-		}
 		if ordinalPosition != len(keyInfo.Columns) {
 			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
 		}
@@ -316,12 +430,51 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	return keys, nil
 }
 
-var databaseTypeToJSON = map[string]*jsonschema.Schema{
-	"int2":    {Type: "integer"},
-	"int4":    {Type: "integer"},
-	"int8":    {Type: "integer"},
-	"bool":    {Type: "boolean"},
-	"varchar": {Type: "string"},
+var databaseTypeToJSON = map[string]basicColumnType{
+	"bool": {jsonTypes: []string{"boolean"}},
+
+	"int2": {jsonTypes: []string{"integer"}},
+	"int4": {jsonTypes: []string{"integer"}},
+	"int8": {jsonTypes: []string{"integer"}},
+
+	"numeric": {jsonTypes: []string{"string"}, format: "number"},
+	"float4":  {jsonTypes: []string{"number", "string"}, format: "number"},
+	"float8":  {jsonTypes: []string{"number", "string"}, format: "number"},
+
+	"varchar": {jsonTypes: []string{"string"}},
+	"bpchar":  {jsonTypes: []string{"string"}},
+	"text":    {jsonTypes: []string{"string"}},
+	"bytea":   {jsonTypes: []string{"string"}, contentEncoding: "base64"},
+	"xml":     {jsonTypes: []string{"string"}},
+	"bit":     {jsonTypes: []string{"string"}},
+	"varbit":  {jsonTypes: []string{"string"}},
+
+	"json":     {},
+	"jsonb":    {},
+	"jsonpath": {jsonTypes: []string{"string"}},
+
+	// Domain-Specific Types
+	"date":        {jsonTypes: []string{"string"}, format: "date-time"},
+	"timestamp":   {jsonTypes: []string{"string"}, format: "date-time"},
+	"timestamptz": {jsonTypes: []string{"string"}, format: "date-time"},
+	"time":        {jsonTypes: []string{"integer"}},
+	"timetz":      {jsonTypes: []string{"string"}, format: "time"},
+	"interval":    {jsonTypes: []string{"string"}},
+	"money":       {jsonTypes: []string{"string"}},
+	"point":       {jsonTypes: []string{"string"}},
+	"line":        {jsonTypes: []string{"string"}},
+	"lseg":        {jsonTypes: []string{"string"}},
+	"box":         {jsonTypes: []string{"string"}},
+	"path":        {jsonTypes: []string{"string"}},
+	"polygon":     {jsonTypes: []string{"string"}},
+	"circle":      {jsonTypes: []string{"string"}},
+	"inet":        {jsonTypes: []string{"string"}},
+	"cidr":        {jsonTypes: []string{"string"}},
+	"macaddr":     {jsonTypes: []string{"string"}},
+	"macaddr8":    {jsonTypes: []string{"string"}},
+	"tsvector":    {jsonTypes: []string{"string"}},
+	"tsquery":     {jsonTypes: []string{"string"}},
+	"uuid":        {jsonTypes: []string{"string"}, format: "uuid"},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)

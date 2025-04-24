@@ -13,6 +13,7 @@ import (
 
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/schedule"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -130,6 +131,26 @@ type documentMetadata struct {
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
 	RowID  int64     `json:"row_id" jsonschema:"title=Row ID,description=Row ID of the Document, counting up from zero."`
 	Op     string    `json:"op,omitempty" jsonschema:"title=Change Operation,description=Operation type (c: Create / u: Update / d: Delete),enum=c,enum=u,enum=d,default=u"`
+}
+
+// Spec returns metadata about the capture connector.
+func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
+	resourceSchema, err := schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
+	if err != nil {
+		return nil, fmt.Errorf("generating resource schema: %w", err)
+	}
+
+	return &pc.Response_Spec{
+		ConfigSchemaJson:         drv.ConfigSchema,
+		ResourceConfigSchemaJson: resourceSchema,
+		DocumentationUrl:         drv.DocumentationURL,
+		ResourcePathPointers:     []string{"/name"},
+	}, nil
+}
+
+// Apply does nothing for batch SQL captures.
+func (BatchSQLDriver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response_Applied, error) {
+	return &pc.Response_Applied{ActionDescription: ""}, nil
 }
 
 // Validate checks that the configuration appears correct and that we can connect
@@ -343,6 +364,10 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	if err := c.emitSourcedSchemas(ctx); err != nil {
+		return err
+	}
+
 	var eg, workerCtx = errgroup.WithContext(ctx)
 	for _, binding := range c.Bindings {
 		var binding = binding // Copy for goroutine closure
@@ -350,6 +375,32 @@ func (c *capture) Run(ctx context.Context) error {
 	}
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("capture terminated with error: %w", err)
+	}
+	return nil
+}
+
+func (c *capture) emitSourcedSchemas(ctx context.Context) error {
+	// Discover tables and emit SourcedSchema updates
+	if c.Config.Advanced.parsedFeatureFlags["emit_sourced_schemas"] {
+		var tableInfo, err = c.Driver.discoverTables(ctx, c.DB, c.Config)
+		if err != nil {
+			return fmt.Errorf("error discovering tables: %w", err)
+		}
+		for _, binding := range c.Bindings {
+			if binding.resource.SchemaName == "" || binding.resource.TableName == "" || binding.resource.Template != "" {
+				continue // Skip bindings with no schema/table or a custom query because we can't know what their schema will look like just from discovery info
+			}
+			var tableID = binding.resource.SchemaName + "." + binding.resource.TableName
+			var table, ok = tableInfo[tableID]
+			if !ok {
+				continue // Skip bindings for which we don't have any corresponding discovery information
+			}
+			if schema, _, err := generateCollectionSchema(c.Config, table, false); err != nil {
+				return fmt.Errorf("error generating schema for table %q: %w", tableID, err)
+			} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {
+				return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
+			}
+		}
 	}
 	return nil
 }
