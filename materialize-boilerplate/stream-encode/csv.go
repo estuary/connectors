@@ -136,6 +136,8 @@ func (w *csvWriter) writeRow(row []any) error {
 			w.buf = strconv.AppendInt(w.buf, value, 10)
 		case int:
 			w.buf = strconv.AppendInt(w.buf, int64(value), 10)
+		case uint64:
+			w.buf = strconv.AppendUint(w.buf, value, 10)
 		case float64:
 			w.buf = strconv.AppendFloat(w.buf, value, 'f', -1, 64)
 		case float32:
