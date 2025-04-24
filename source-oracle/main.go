@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
@@ -23,7 +24,18 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/sijms/go-ora/v2"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 )
+
+var featureFlagDefaults = map[string]bool{
+	// When set, discovered collection schemas will request that schema inference be
+	// used _in addition to_ the full column/types discovery we already do.
+	"use_schema_inference": false,
+
+	// When set, discovered collection schemas will be emitted as SourcedSchema messages
+	// so that Flow can have access to 'official' schema information from the source DB.
+	"emit_sourced_schemas": false,
+}
 
 type sshForwarding struct {
 	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
@@ -55,7 +67,16 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 		return nil, fmt.Errorf("error parsing config json: %w", err)
 	}
 	config.SetDefaults(name)
-	var db = &oracleDatabase{config: &config}
+
+	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	if config.Advanced.FeatureFlags != "" {
+		log.WithField("flags", featureFlags).Info("parsed feature flags")
+	}
+
+	var db = &oracleDatabase{
+		config:       &config,
+		featureFlags: featureFlags,
+	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
@@ -124,6 +145,7 @@ type advancedConfig struct {
 	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two modes based on requirements.,enum=extract,enum=online,enum=smart"`
+	FeatureFlags         string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // Validate checks that the configuration possesses all required properties.
@@ -230,6 +252,7 @@ type oracleDatabase struct {
 	explained          map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
+	featureFlags       map[string]bool                  // Parsed feature flag settings with defaults applied
 }
 
 func (db *oracleDatabase) IsRDS() bool {

@@ -58,7 +58,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			continue
 		}
 
-		var documentSchema, keyPointers, err = generateCollectionSchema(db, table)
+		var documentSchema, keyPointers, err = generateCollectionSchema(db, table, true)
 		if err != nil {
 			return nil, fmt.Errorf("error generating schema for %q: %w", streamID, err)
 		}
@@ -103,7 +103,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 // generateCollectionSchema translates the discovery information of a table into a Flow
 // collection schema (plus the discovered collection key, for convenience).
-func generateCollectionSchema(db Database, table *DiscoveryInfo) (json.RawMessage, []string, error) {
+func generateCollectionSchema(db Database, table *DiscoveryInfo, includeNullability bool) (json.RawMessage, []string, error) {
 	// Schema of the embedded "source" property.
 	var sourceSchema = (&jsonschema.Reflector{
 		ExpandedStruct:            true,
@@ -173,6 +173,15 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo) (json.RawMessag
 		if !column.IsNullable {
 			nullabilityDescription = "non-nullable "
 		}
+
+		// If the column type is an array of multiple options, and we don't want nullability
+		// in the generated schema, we need to remove "null" as an option.
+		if types, ok := jsonType.Extras["type"].([]string); ok && len(types) > 1 && !includeNullability {
+			jsonType.Extras["type"] = slices.DeleteFunc(types, func(t string) bool {
+				return t == "null"
+			})
+		}
+
 		jsonType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, column.DataType)
 		properties[column.Name] = jsonType
 	}

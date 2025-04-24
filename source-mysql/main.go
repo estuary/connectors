@@ -36,6 +36,14 @@ var featureFlagDefaults = map[string]bool{
 
 	// When true, columns of type TINYINT(1) will be treated as booleans.
 	"tinyint1_as_bool": false,
+
+	// When set, discovered collection schemas will request that schema inference be
+	// used _in addition to_ the full column/types discovery we already do.
+	"use_schema_inference": false,
+
+	// When set, discovered collection schemas will be emitted as SourcedSchema messages
+	// so that Flow can have access to 'official' schema information from the source DB.
+	"emit_sourced_schemas": false,
 }
 
 type sshForwarding struct {
