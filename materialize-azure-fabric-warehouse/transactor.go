@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -51,19 +52,22 @@ func newTransactor(
 ) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	cfg := ep.Config.(*config)
 
-	azClient, err := cfg.storageClient()
+	bucket, err := blob.NewAzureBlobBucket(
+		ctx,
+		cfg.ContainerName,
+		cfg.StorageAccountName,
+		blob.WithAzureStorageAccountKey(cfg.StorageAccountKey),
+	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating storage client: %w", err)
+		return nil, nil, fmt.Errorf("creating azure blob bucket: %w", err)
 	}
-
-	storageClient := newFileClient(azClient, cfg.ContainerName, cfg.Directory)
 
 	t := &transactor{
 		cfg:        cfg,
 		fence:      fence,
 		be:         be,
-		loadFiles:  boilerplate.NewStagedFiles(storageClient, fileSizeLimit, cfg.Directory, false, false),
-		storeFiles: boilerplate.NewStagedFiles(storageClient, fileSizeLimit, cfg.Directory, true, false),
+		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
+		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
 	}
 
 	for idx, target := range bindings {
