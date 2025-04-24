@@ -61,7 +61,11 @@ Binding 0:
           },
           "id": {
             "type": "integer"
-          }
+          },
+          "int_array": {},
+          "real_array": {},
+          "text_array": {},
+          "uuid_array": {}
         },
         "x-infer-schema": true
       },

@@ -59,7 +59,35 @@ Binding 0:
               "row_id"
             ]
           },
+          "bigint_col": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "bigserial_col": {
+            "type": "integer"
+          },
           "id": {
+            "type": "integer"
+          },
+          "int_col": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "oid_col": {},
+          "serial_col": {
+            "type": "integer"
+          },
+          "smallint_col": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "smallserial_col": {
             "type": "integer"
           }
         },

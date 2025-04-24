@@ -59,8 +59,48 @@ Binding 0:
               "row_id"
             ]
           },
+          "date_col": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
+          },
+          "interval_col": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "time_col": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "timetz_col": {
+            "format": "time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ts_col": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tstz_col": {
+            "format": "date-time",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

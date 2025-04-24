@@ -60,8 +60,26 @@ Binding 0:
               "row_id"
             ]
           },
+          "data": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer"
+          },
+          "major": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "minor": {
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

@@ -61,6 +61,12 @@ Binding 0:
           },
           "id": {
             "type": "integer"
+          },
+          "xml_col": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
