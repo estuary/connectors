@@ -345,20 +345,16 @@ func (sm *streamManager) maybeInitializeBucket(ctx context.Context) error {
 			return fmt.Errorf("new s3 blob bucket: %w", err)
 		}
 	case "GCS":
-		opts := []option.ClientOption{
-			option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
-				AccessToken: cfg.StageLocation.Creds.GcsAccessToken,
-			})),
-		}
-		if sm.bucket, err = blob.NewGCSBucket(ctx, bucket, opts); err != nil {
+		auth := option.WithTokenSource(oauth2.StaticTokenSource(&oauth2.Token{
+			AccessToken: cfg.StageLocation.Creds.GcsAccessToken,
+		}))
+		if sm.bucket, err = blob.NewGCSBucket(ctx, bucket, auth); err != nil {
 			return fmt.Errorf("new gcs blob bucket: %w", err)
 		}
 	case "AZURE":
-		opts := []blob.AzureConfigOption{
-			blob.WithAzureSasToken(cfg.StageLocation.Creds.AzureSasToken),
-			blob.WithAzureEndpoint(cfg.StageLocation.Endpoint),
-		}
-		if sm.bucket, err = blob.NewAzureBlobBucket(ctx, bucket, cfg.StageLocation.StorageAccount, opts); err != nil {
+		auth := blob.WithAzureSasToken(cfg.StageLocation.Creds.AzureSasToken)
+		ep := blob.WithAzureEndpoint(cfg.StageLocation.Endpoint)
+		if sm.bucket, err = blob.NewAzureBlobBucket(ctx, bucket, cfg.StageLocation.StorageAccount, auth, ep); err != nil {
 			return fmt.Errorf("new azure blob bucket: %w", err)
 		}
 	default:
