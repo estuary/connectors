@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/estuary/connectors/go/blob"
 	"github.com/google/uuid"
-	"golang.org/x/sync/errgroup"
 )
 
 // Encoder is any streaming encoder that can be used to write files.
@@ -16,32 +16,21 @@ type Encoder interface {
 	Close() error
 }
 
-// StagedFileStorageClient is a specific implementation of a client that
-// interacts with a staging file system, usually an object store of some kind.
-type StagedFileStorageClient interface {
+// StagedFileClient is a specific implementation of a client that interacts with
+// a staging file system, usually an object store of some kind.
+type StagedFileClient interface {
 	// NewEncoder creates a new Encoder that writes rows to a writer.
 	NewEncoder(w io.WriteCloser, fields []string) Encoder
 
-	// NewObject creates a new file key from keyParts, which include the
-	// bucketPath (if set), a random UUID prefix if prefixFiles is true, and a
-	// random UUID for the specific object.
+	// NewKey creates a new file key from keyParts, which include the bucketPath
+	// (if set), a random UUID prefix if prefixFiles is true, and a random UUID
+	// for the specific key.
 	NewKey(keyParts []string) string
-
-	// URI creates an identifier from a file key, usually be prepending the URI
-	// scheme, for example "s3://".
-	URI(key string) string
-
-	// UploadStream streams data from a reader to the destination file specified
-	// by `key`.
-	UploadStream(ctx context.Context, key string, r io.Reader) error
-
-	// Delete deletes the objects per the list of URIs. This is used for
-	// removing the temporary staged files after transactions are applied.
-	Delete(ctx context.Context, uris []string) error
 }
 
 type StagedFiles struct {
-	client             StagedFileStorageClient
+	client             StagedFileClient
+	bucket             blob.Bucket
 	fileSizeLimit      int
 	bucketPath         string
 	flushOnNextBinding bool
@@ -70,7 +59,8 @@ type StagedFiles struct {
 // to provide additional grouping of files for a binding within a transaction so
 // that all of its files are in the same "folder".
 func NewStagedFiles(
-	client StagedFileStorageClient,
+	client StagedFileClient,
+	bucket blob.Bucket,
 	fileSizeLimit int,
 	bucketPath string,
 	flushOnNextBinding bool,
@@ -78,6 +68,7 @@ func NewStagedFiles(
 ) *StagedFiles {
 	return &StagedFiles{
 		client:             client,
+		bucket:             bucket,
 		fileSizeLimit:      fileSizeLimit,
 		bucketPath:         bucketPath,
 		flushOnNextBinding: flushOnNextBinding,
@@ -97,6 +88,7 @@ func (sf *StagedFiles) AddBinding(binding int, fields []string) {
 
 	sf.stagedFiles = append(sf.stagedFiles, stagedFile{
 		client:        sf.client,
+		bucket:        sf.bucket,
 		fileSizeLimit: sf.fileSizeLimit,
 		bucketPath:    sf.bucketPath,
 		prefixFiles:   sf.prefixFiles,
@@ -135,7 +127,7 @@ func (sf *StagedFiles) CleanupCurrentTransaction(ctx context.Context) error {
 		}
 
 		for _, u := range f.uploaded {
-			uris = append(uris, sf.client.URI(u))
+			uris = append(uris, sf.bucket.URI(u))
 		}
 		f.uploaded = nil
 	}
@@ -143,15 +135,15 @@ func (sf *StagedFiles) CleanupCurrentTransaction(ctx context.Context) error {
 		return nil
 	}
 
-	return sf.client.Delete(ctx, uris)
+	return sf.bucket.Delete(ctx, uris)
 }
 
-// CleanupCheckpoint deletes files specified int he list of URIs. This can be
+// CleanupCheckpoint deletes files specified in the list of URIs. This can be
 // used to cleanup files that have been staged for a materialization using the
 // post-commit apply pattern, where staged files must remain across connector
 // restarts.
 func (sf *StagedFiles) CleanupCheckpoint(ctx context.Context, uris []string) error {
-	return sf.client.Delete(ctx, uris)
+	return sf.bucket.Delete(ctx, uris)
 }
 
 // Started indicates if any rows were encoded for the binding during this
@@ -161,14 +153,14 @@ func (sf *StagedFiles) Started(binding int) bool {
 }
 
 type stagedFile struct {
-	client        StagedFileStorageClient
+	client        StagedFileClient
+	bucket        blob.Bucket
 	fileSizeLimit int
 	bucketPath    string
 	prefixFiles   bool
 	uuidPrefix    string
 	fields        []string
 	encoder       Encoder
-	group         *errgroup.Group
 	started       bool
 	uploaded      []string
 }
@@ -204,7 +196,7 @@ func (f *stagedFile) flush() ([]string, error) {
 
 	var uploaded []string
 	for _, obj := range f.uploaded {
-		uploaded = append(uploaded, f.client.URI(obj))
+		uploaded = append(uploaded, f.bucket.URI(obj))
 	}
 	f.started = false
 
@@ -212,12 +204,6 @@ func (f *stagedFile) flush() ([]string, error) {
 }
 
 func (f *stagedFile) newFile(ctx context.Context) {
-	r, w := io.Pipe()
-	f.encoder = f.client.NewEncoder(w, f.fields)
-
-	group, groupCtx := errgroup.WithContext(ctx)
-	f.group = group
-
 	var nameParts []string
 	if f.bucketPath != "" {
 		nameParts = append(nameParts, f.bucketPath)
@@ -229,15 +215,7 @@ func (f *stagedFile) newFile(ctx context.Context) {
 
 	key := f.client.NewKey(nameParts)
 	f.uploaded = append(f.uploaded, key)
-
-	f.group.Go(func() error {
-		if err := f.client.UploadStream(groupCtx, key, r); err != nil {
-			r.CloseWithError(err)
-			return fmt.Errorf("uploading file: %w", err)
-		}
-
-		return nil
-	})
+	f.encoder = f.client.NewEncoder(f.bucket.NewWriter(ctx, key), f.fields)
 }
 
 func (f *stagedFile) flushFile() error {
@@ -247,10 +225,7 @@ func (f *stagedFile) flushFile() error {
 
 	if err := f.encoder.Close(); err != nil {
 		return fmt.Errorf("closing encoder: %w", err)
-	} else if err := f.group.Wait(); err != nil {
-		return err
 	}
-
 	f.encoder = nil
 
 	return nil
