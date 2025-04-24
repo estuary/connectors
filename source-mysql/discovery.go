@@ -46,7 +46,8 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 		if streamID == db.config.Advanced.WatermarksTable || streamID == "flow.watermarks" {
 			table.OmitBinding = true
 		}
-
+		table.UseSchemaInference = db.featureFlags["use_schema_inference"]
+		table.EmitSourcedSchemas = db.featureFlags["emit_sourced_schemas"]
 		tableMap[streamID] = table
 	}
 

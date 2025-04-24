@@ -46,6 +46,8 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 			// We want to exclude the watermarks table from the output bindings, but we still discover it
 			table.OmitBinding = true
 		}
+		table.UseSchemaInference = db.featureFlags["use_schema_inference"]
+		table.EmitSourcedSchemas = db.featureFlags["emit_sourced_schemas"]
 		tableMap[streamID] = table
 	}
 	for _, column := range columns {
