@@ -13,8 +13,8 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"California","population":3554000,"state":"CA","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Colorado","population":543000,"state":"CO","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Colorado","population":937000,"state":"CO","year":1920}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Connecticut","population":1391000,"state":"CT","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Connecticut","population":910000,"state":"CT","year":1900}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Connecticut","population":1391000,"state":"CT","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Delaware","population":185000,"state":"DE","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Delaware","population":219000,"state":"DE","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"District of Columbia","population":278000,"state":"DC","year":1900}
@@ -63,16 +63,16 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"New Jersey","population":3198000,"state":"NJ","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"New Mexico","population":196000,"state":"NM","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"New Mexico","population":363000,"state":"NM","year":1920}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"New York","population":10282000,"state":"NY","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"New York","population":7283000,"state":"NY","year":1900}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"New York","population":10282000,"state":"NY","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"North Carolina","population":1897000,"state":"NC","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"North Carolina","population":2588000,"state":"NC","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"North Dakota","population":321000,"state":"ND","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"North Dakota","population":646000,"state":"ND","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Ohio","population":4161000,"state":"OH","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Ohio","population":5799000,"state":"OH","year":1920}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Oklahoma","population":2055000,"state":"OK","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Oklahoma","population":800000,"state":"OK","year":1900}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Oklahoma","population":2055000,"state":"OK","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Oregon","population":415000,"state":"OR","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Oregon","population":788000,"state":"OR","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Pennsylvania","population":6313000,"state":"PA","year":1900}
@@ -93,14 +93,14 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Vermont","population":353000,"state":"VT","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Virginia","population":1858000,"state":"VA","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Virginia","population":2347000,"state":"VA","year":1920}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Washington","population":1373000,"state":"WA","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Washington","population":523000,"state":"WA","year":1900}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"West Virginia","population":1470000,"state":"WV","year":1920}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Washington","population":1373000,"state":"WA","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"West Virginia","population":959000,"state":"WV","year":1900}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"West Virginia","population":1470000,"state":"WV","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Wisconsin","population":2072000,"state":"WI","year":1900}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Wisconsin","population":2679000,"state":"WI","year":1920}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Wyoming","population":197000,"state":"WY","year":1920}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Wyoming","population":93000,"state":"WY","year":1900}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_catalogprimarykeyoverride_83617880","loc":[11111111,11111111,11111111]}},"fullname":"Wyoming","population":197000,"state":"WY","year":1920}
 # ================================
 # Final State Checkpoint
 # ================================

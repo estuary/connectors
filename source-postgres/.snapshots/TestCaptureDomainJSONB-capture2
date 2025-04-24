@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/test/capturedomainjsonb_40925847": 2 Documents
 # ================================
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"capturedomainjsonb_40925847","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"asdf":{"a":1,"b":2}},"id":3}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"capturedomainjsonb_40925847","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"baz":[1,2,3]},"id":2}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"capturedomainjsonb_40925847","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"asdf":{"a":1,"b":2}},"id":3}
 # ================================
 # Final State Checkpoint
 # ================================
