@@ -1,10 +1,10 @@
 # ================================
 # Collection "acmeCo/test/test/generic_multiplestreams_26016615": 4 Documents
 # ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"ten","id":10}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"three","id":3}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"generic_multiplestreams_26016615","loc":[11111111,11111111,11111111]}},"data":"ten","id":10}
 # ================================
 # Final State Checkpoint
 # ================================
