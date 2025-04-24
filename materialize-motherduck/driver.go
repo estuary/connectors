@@ -8,7 +8,6 @@ import (
 	"io"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
@@ -222,30 +221,6 @@ func newTransactor(
 	if err != nil {
 		return nil, nil, fmt.Errorf("creating connection: %w", err)
 	}
-
-	// Arrange for periodically refreshing the staging bucket storage
-	// credentials. For as-of-yet unknown reasons, these seem to expire after a
-	// variable amount of time, on the order of several hours, which results in
-	// an error along the lines of "Missing or invalid credentials".
-	go func() {
-		for {
-			select {
-			case <-time.After(30 * time.Minute):
-				for idx, c := range []string{
-					fmt.Sprintf("SET s3_access_key_id='%s'", cfg.AWSAccessKeyID),
-					fmt.Sprintf("SET s3_secret_access_key='%s';", cfg.AWSSecretAccessKey),
-					fmt.Sprintf("SET s3_region='%s';", cfg.Region),
-				} {
-					if _, err := conn.ExecContext(ctx, c); err != nil {
-						log.Fatal(fmt.Errorf("executing credentials refresh command %d: %w", idx, err))
-					}
-				}
-			case <-ctx.Done():
-				return
-			}
-			log.Debug("refreshed staging bucket storage credentials")
-		}
-	}()
 
 	t := &transactor{
 		cfg:      cfg,
