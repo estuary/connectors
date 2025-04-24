@@ -15,24 +15,30 @@ from source_shopify_native.models import (
     UserErrors,
 )
 
-VERSION = "2025-01"
-BULK_QUERY_ALREADY_EXISTS_ERROR = r"A bulk query operation for this app and shop is already in progress"
+VERSION = "2025-04"
+BULK_QUERY_ALREADY_EXISTS_ERROR = (
+    r"A bulk query operation for this app and shop is already in progress"
+)
 INITIAL_SLEEP = 5
 MAX_SLEEP = 150
 
 bulk_job_lock = asyncio.Lock()
 
+
 class BulkJobError(RuntimeError):
     """Exception raised for error when executing a bulk GraphQL query job."""
 
-    def __init__(self, message: str, query: str | None = None, errors: list[UserErrors] | None = None):
+    def __init__(
+        self,
+        message: str,
+        query: str | None = None,
+        errors: list[UserErrors] | None = None,
+    ):
         self.message = message
         self.query = query
         self.errors = errors
 
-        self.details: dict[str, Any] = {
-            "message": self.message
-        }
+        self.details: dict[str, Any] = {"message": self.message}
 
         if self.errors:
             self.details["errors"] = self.errors
@@ -45,11 +51,7 @@ class BulkJobError(RuntimeError):
         return f"BulkJobError: {self.message}"
 
     def __repr__(self):
-        return (
-            f"BulkJobError: {self.message},"
-            f"query: {self.query},"
-            f"errors: {self.errors}"
-        )
+        return f"BulkJobError: {self.message},query: {self.query},errors: {self.errors}"
 
 
 class BulkJobManager:
@@ -67,14 +69,20 @@ class BulkJobManager:
 
         # Do not cancel ongoing bulk mutations.
         if current_job_details.type == BulkOperationTypes.MUTATION:
-            self.log.debug("Currently running query is a mutation. Not cancelling it.", {
-                "current_job_details": current_job_details,
-            })
+            self.log.debug(
+                "Currently running query is a mutation. Not cancelling it.",
+                {
+                    "current_job_details": current_job_details,
+                },
+            )
             return
         elif current_job_details.status != BulkOperationStatuses.RUNNING:
-            self.log.debug("No currently running bulk query.", {
-                "current_job_details": current_job_details,
-            })
+            self.log.debug(
+                "No currently running bulk query.",
+                {
+                    "current_job_details": current_job_details,
+                },
+            )
             return
 
         is_canceled = await self._cancel(current_job_details.id)
@@ -84,9 +92,8 @@ class BulkJobManager:
         else:
             self.log.warning(f"Unabled to cancel job {current_job_details.id}.")
 
-
     # Get currently running job
-    async def _get_currently_running_job(self) -> BulkOperationDetails |  None:
+    async def _get_currently_running_job(self) -> BulkOperationDetails | None:
         query = f"""
             query {{
                 currentBulkOperation {{
@@ -102,11 +109,12 @@ class BulkJobManager:
         """
 
         response = BulkCurrentJobResponse.model_validate_json(
-            await self.http.request(self.log, self.url, method="POST", json={"query": query})
+            await self.http.request(
+                self.log, self.url, method="POST", json={"query": query}
+            )
         )
 
         return response.data.currentBulkOperation
-
 
     async def _get_job(self, job_id: str) -> BulkOperationDetails:
         query = f"""
@@ -126,11 +134,12 @@ class BulkJobManager:
         """
 
         response = BulkSpecificJobResponse.model_validate_json(
-            await self.http.request(self.log, self.url, method="POST", json={"query": query})
+            await self.http.request(
+                self.log, self.url, method="POST", json={"query": query}
+            )
         )
 
         return response.data.node
-
 
     # Cancel a running bulk job
     async def _cancel(self, job_id: str) -> bool:
@@ -157,7 +166,9 @@ class BulkJobManager:
 
         self.log.debug(f"Trying to cancel job {job_id}.")
         response = BulkJobCancelResponse.model_validate_json(
-            await self.http.request(self.log, self.url, method="POST", json={"query": query})
+            await self.http.request(
+                self.log, self.url, method="POST", json={"query": query}
+            )
         )
 
         status = response.data.bulkOperationCancel.bulkOperation.status
@@ -168,13 +179,15 @@ class BulkJobManager:
             case BulkOperationStatuses.CANCELING:
                 self.log.debug(f"Bulk job {job_id} is being cancelled.")
             case _:
-                self.log.debug(f"Could not cancel bulk job {job_id}.", {
-                    "status": status,
-                    "errors": response.data.bulkOperationCancel.userErrors
-                })
+                self.log.debug(
+                    f"Could not cancel bulk job {job_id}.",
+                    {
+                        "status": status,
+                        "errors": response.data.bulkOperationCancel.userErrors,
+                    },
+                )
 
         return status == "CANCELED"
-
 
     # Submits a bulk job & fetches the result URL
     async def execute(self, query: str) -> str | None:
@@ -191,20 +204,33 @@ class BulkJobManager:
                         self.log.info(f"Job {job_id} has completed.", details)
                         return details.url
                     case BulkOperationStatuses.CREATED | BulkOperationStatuses.RUNNING:
-                        self.log.info(f"Job {job_id} is {details.status}. Sleeping {delay} seconds to await job completion.")
+                        self.log.info(
+                            f"Job {job_id} is {details.status}. Sleeping {delay} seconds to await job completion."
+                        )
                         await asyncio.sleep(delay)
                         delay = min(delay * 2, MAX_SLEEP)
-                    case BulkOperationStatuses.CANCELED | BulkOperationStatuses.CANCELING | BulkOperationStatuses.EXPIRED | BulkOperationStatuses.FAILED:
+                    case (
+                        BulkOperationStatuses.CANCELED
+                        | BulkOperationStatuses.CANCELING
+                        | BulkOperationStatuses.EXPIRED
+                        | BulkOperationStatuses.FAILED
+                    ):
                         msg = f"Unanticipated status {details.status} for job {job_id}. Error code: {details.errorCode}."
-                        if details.errorCode and details.errorCode == BulkOperationErrorCodes.ACCESS_DENIED:
+                        if (
+                            details.errorCode
+                            and details.errorCode
+                            == BulkOperationErrorCodes.ACCESS_DENIED
+                        ):
                             msg = (
-                                f'Bulk job {job_id} has failed because the provided credentials do not have sufficient permissions.'
-                                f' If authenticating with an access token, ensure it is granted the permissions listed at'
-                                f' https://docs.estuary.dev/reference/Connectors/capture-connectors/shopify-native/#access-token-permissions.'
+                                f"Bulk job {job_id} has failed because the provided credentials do not have sufficient permissions."
+                                f" If authenticating with an access token, ensure it is granted the permissions listed at"
+                                f" https://docs.estuary.dev/reference/Connectors/capture-connectors/shopify-native/#access-token-permissions."
                             )
                         raise BulkJobError(msg)
                     case _:
-                        raise BulkJobError(f"Unknown status {details.status} for job {job_id}.")
+                        raise BulkJobError(
+                            f"Unknown status {details.status} for job {job_id}."
+                        )
 
     # Submit a bulk job for processing
     async def _submit(self, query: str) -> str:
@@ -232,7 +258,9 @@ class BulkJobManager:
         """
 
         response = BulkJobSubmitResponse.model_validate_json(
-            await self.http.request(self.log, self.url, method="POST", json={"query": query})
+            await self.http.request(
+                self.log, self.url, method="POST", json={"query": query}
+            )
         )
 
         details = response.data.bulkOperationRunQuery.bulkOperation
@@ -240,7 +268,9 @@ class BulkJobManager:
         if details is None:
             errors = response.data.bulkOperationRunQuery.userErrors
 
-            is_ongoing_query_conflict = any(BULK_QUERY_ALREADY_EXISTS_ERROR in error.message for error in errors)
+            is_ongoing_query_conflict = any(
+                BULK_QUERY_ALREADY_EXISTS_ERROR in error.message for error in errors
+            )
 
             if is_ongoing_query_conflict:
                 msg = (
@@ -249,14 +279,18 @@ class BulkJobManager:
                     " submitting bulk query operations to Shopify."
                 )
                 raise BulkJobError(
-                    message = msg,
-                    errors = errors,
+                    message=msg,
+                    errors=errors,
                 )
             else:
+                errors = [error.message for error in errors]
+                for error in errors:
+                    self.log.warning(error)
+
                 raise BulkJobError(
-                    message = "Errors when submitting query.",
-                    query = query,
-                    errors = response.data.bulkOperationRunQuery.userErrors,
+                    message="Errors when submitting query.",
+                    query=query,
+                    errors=response.data.bulkOperationRunQuery.userErrors,
                 )
 
         return details.id
