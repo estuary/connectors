@@ -819,6 +819,7 @@
       "agent_conditions": [],
       "created_at": "2024-07-26T15:40:58Z",
       "default": true,
+      "deleted_at": null,
       "display_name": "Default Ticket Form",
       "end_user_conditions": [],
       "end_user_visible": true,
