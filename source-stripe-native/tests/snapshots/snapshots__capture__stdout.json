@@ -197,7 +197,8 @@
         },
         "email": null,
         "name": null,
-        "phone": null
+        "phone": null,
+        "tax_id": null
       },
       "calculated_statement_descriptor": "Stripe",
       "captured": true,

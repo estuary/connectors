@@ -46,7 +46,7 @@
       "owner": {
         "gid": "1205846102972015"
       },
-      "permalink_url": "https://app.asana.com/0/1205846048939069/1205846048939069",
+      "permalink_url": "https://app.asana.com/1/1205846104557046/project/1205846048939069",
       "public": false,
       "resource_type": "project",
       "start_on": null,
@@ -142,7 +142,7 @@
       "num_likes": 0,
       "num_subtasks": 0,
       "parent": null,
-      "permalink_url": "https://app.asana.com/0/1205846048939069/1205846055668625",
+      "permalink_url": "https://app.asana.com/1/1205846104557046/project/1205846048939069/task/1205846055668625",
       "projects": [
         {
           "gid": "1205846048939069"
