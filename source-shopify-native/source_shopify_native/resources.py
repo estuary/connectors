@@ -1,38 +1,113 @@
-from datetime import datetime, timedelta, UTC
 import functools
+from datetime import timedelta
 from logging import Logger
 
-from estuary_cdk.flow import CaptureBinding, ValidationError
-from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
-
-from .models import (
-    EndpointConfig,
+from estuary_cdk.capture import Task
+from estuary_cdk.capture.common import (
+    CaptureBinding,
+    Resource,
     ResourceConfig,
     ResourceState,
-    TimestampedResource,
+    open_binding,
+)
+from estuary_cdk.flow import ValidationError
+from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
+
+import source_shopify_native.graphql as gql
+
+from .models import (
     OAUTH2_SPEC,
+    EndpointConfig,
+    ShopifyGraphQLResource,
 )
 from .api import (
-    fetch_products,
+    fetch_incremental,
 )
-
-from .graphql.bulk_job_manager import BulkJobManager
-
 
 AUTHORIZATION_HEADER = "X-Shopify-Access-Token"
 
+INCREMENTAL_RESOURCES: list[tuple[str, type[ShopifyGraphQLResource]]] = [
+    ("abandoned_checkouts", gql.AbandonedCheckouts),
+    ("customers", gql.Customers),
+    ("customer_metafields", gql.CustomerMetafields),
+    ("products", gql.Products),
+    ("product_media", gql.ProductMedia),
+    ("product_metafields", gql.ProductMetafields),
+    ("product_variants", gql.ProductVariants),
+    ("fulfillment_orders", gql.FulfillmentOrders),
+    ("fulfillments", gql.Fulfillments),
+    ("orders", gql.Orders),
+    ("order_agreements", gql.OrderAgreements),
+    ("order_metafields", gql.OrderMetafields),
+    ("order_transactions", gql.OrderTransactions),
+    ("order_refunds", gql.OrderRefunds),
+    ("order_risks", gql.OrderRisks),
+    ("inventory_items", gql.InventoryItems),
+    ("inventory_levels", gql.InventoryLevels),
+    ("custom_collections", gql.CustomCollections),
+    ("smart_collections", gql.SmartCollections),
+    ("custom_collection_metafields", gql.CustomCollectionMetafields),
+    ("smart_collection_metafields", gql.SmartCollectionMetafields),
+    ("locations", gql.Locations),
+    ("location_metafields", gql.LocationMetafields),
+]
 
-async def validate_credentials(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
-):
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, authorization_header=AUTHORIZATION_HEADER)
-    bulk_job_manager = BulkJobManager(http, log, config.store)
+
+def _incremental_resources(
+    http: HTTPMixin,
+    config: EndpointConfig,
+    bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
+) -> list[Resource]:
+    def open(
+        model: type[ShopifyGraphQLResource],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings=None,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_incremental,
+                http,
+                config.advanced.window_size,
+                bulk_job_manager,
+                model,
+            ),
+        )
+
+    return [
+        Resource(
+            name=name,
+            key=["/id"],
+            model=ShopifyGraphQLResource,
+            open=functools.partial(open, model),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=config.start_date),
+            ),
+            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
+            schema_inference=True,
+        )
+        for name, model in INCREMENTAL_RESOURCES
+    ]
+
+
+async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
+    http.token_source = TokenSource(
+        oauth_spec=OAUTH2_SPEC,
+        credentials=config.credentials,
+        authorization_header=AUTHORIZATION_HEADER,
+    )
+    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(http, log, config.store)
 
     try:
         await bulk_job_manager._get_currently_running_job()
     except HTTPError as err:
-        msg = 'Unknown error occurred.'
+        msg = "Unknown error occurred."
         if err.code == 401:
             msg = f"Invalid credentials. Please confirm the provided credentials are correct.\n\n{err.message}"
         else:
@@ -41,54 +116,17 @@ async def validate_credentials(
         raise ValidationError([msg])
 
 
-def products(
-        log: Logger, http: HTTPMixin, config: EndpointConfig, bulk_job_manager: BulkJobManager,
-) -> common.Resource:
-
-    def open(
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=functools.partial(
-                fetch_products,
-                http,
-                config.advanced.window_size,
-                bulk_job_manager,
-            )
-        )
-
-    return common.Resource(
-        name='products',
-        key=['/id'],
-        model=TimestampedResource,
-        open=open,
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=config.start_date),
-        ),
-        initial_config=ResourceConfig(
-            name='products', interval=timedelta(minutes=5)
-        ),
-        schema_inference=True,
+async def all_resources(log: Logger, http: HTTPMixin, config: EndpointConfig) -> list:
+    http.token_source = TokenSource(
+        oauth_spec=OAUTH2_SPEC,
+        credentials=config.credentials,
+        authorization_header=AUTHORIZATION_HEADER,
     )
-
-
-async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> list[common.Resource]:
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, authorization_header=AUTHORIZATION_HEADER)
-    bulk_job_manager = BulkJobManager(http, log, config.store)
+    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(http, log, config.store)
 
     # Cancel any ongoing bulk query jobs before the connector starts submitting its own bulk query jobs.
     await bulk_job_manager.cancel_current()
 
     return [
-        products(log, http, config, bulk_job_manager)
+        *_incremental_resources(http, config, bulk_job_manager),
     ]
