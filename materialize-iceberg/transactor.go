@@ -11,9 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/python"
@@ -48,7 +46,7 @@ type transactor struct {
 
 	be        *boilerplate.BindingEvents
 	cfg       config
-	s3Client  *s3.Client
+	bucket    blob.Bucket
 	emrClient *emrClient
 
 	templates  templates
@@ -136,7 +134,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 
 	// In addition to removing the staged load keys, the loaded document result
 	// files that are written to the staging location must also be removed.
-	cleanupResults := cleanPrefixOnceFn(ctx, t.s3Client, t.cfg.Compute.Bucket, outputPrefix)
+	cleanupResults := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 	defer cleanupResults()
 
 	t.be.StartedEvaluatingLoads()
@@ -268,7 +266,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var stateUpdate *pf.ConnectorState
 	if len(mergeInput.Bindings) > 0 {
 		// Make sure the job status output file gets cleaned up.
-		cleanupStatus := cleanPrefixOnceFn(ctx, t.s3Client, t.cfg.Compute.Bucket, outputPrefix)
+		cleanupStatus := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 		defer cleanupStatus()
 
 		if err := t.emrClient.runJob(ctx, mergeInput, t.pyFiles.merge, t.pyFiles.common, fmt.Sprintf("store for: %s", t.materializationName), outputPrefix); err != nil {
@@ -309,44 +307,32 @@ func (t *transactor) readLoadResults(ctx context.Context, prefix string, loaded 
 		group.Go(func() error { return t.loadWorker(groupCtx, lockedAndLoaded, readFileKeys) })
 	}
 
-	paginator := s3.NewListObjectsV2Paginator(t.s3Client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(t.cfg.Compute.Bucket),
-		Prefix: aws.String(prefix),
-	})
-
 	var sawSuccess bool
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return fmt.Errorf("failed to get next page: %w", err)
+	for obj := range t.bucket.List(groupCtx, blob.Query{Prefix: prefix}) {
+		base := path.Base(obj.Key)
+
+		// Sanity checks for the general layout of files we expect. This
+		// shouldn't strictly be necessary, although we do need to not try
+		// to parse loaded documents from the Spark _SUCCESS file or our own
+		// status file.
+		if base == "_SUCCESS" && !sawSuccess {
+			sawSuccess = true
+			continue
+		} else if base == "_SUCCESS" {
+			return fmt.Errorf("application error: multiple _SUCCESS files")
+		} else if !sawSuccess {
+			return fmt.Errorf("application error: missing _SUCCESS file, got key %q", obj.Key)
+		} else if base == statusFile {
+			continue
+		} else if !strings.HasPrefix(base, "part-") {
+			return fmt.Errorf("application error: unexpected key %q", obj.Key)
 		}
 
-		for _, obj := range page.Contents {
-			base := path.Base(*obj.Key)
-
-			// Sanity checks for the general layout of files we expect. This
-			// shouldn't strictly be necessary, although we do need to not try
-			// to parse loaded documents from the Spark _SUCCESS file or our own
-			// status file.
-			if base == "_SUCCESS" && !sawSuccess {
-				sawSuccess = true
-				continue
-			} else if base == "_SUCCESS" {
-				return fmt.Errorf("application error: multiple _SUCCESS files")
-			} else if !sawSuccess {
-				return fmt.Errorf("application error: missing _SUCCESS file, got key %q", *obj.Key)
-			} else if base == statusFile {
-				continue
-			} else if !strings.HasPrefix(base, "part-") {
-				return fmt.Errorf("application error: unexpected key %q", *obj.Key)
-			}
-
-			select {
-			case <-groupCtx.Done():
-				return group.Wait()
-			case readFileKeys <- *obj.Key:
-				continue
-			}
+		select {
+		case <-groupCtx.Done():
+			return group.Wait()
+		case readFileKeys <- obj.Key:
+			continue
 		}
 	}
 
@@ -356,10 +342,7 @@ func (t *transactor) readLoadResults(ctx context.Context, prefix string, loaded 
 
 func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, doc json.RawMessage) error, fileKeys <-chan string) error {
 	for fileKey := range fileKeys {
-		obj, err := t.s3Client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket: aws.String(t.cfg.Compute.Bucket),
-			Key:    aws.String(fileKey),
-		})
+		r, err := t.bucket.NewReader(ctx, fileKey)
 		if err != nil {
 			return err
 		}
@@ -376,7 +359,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, do
 		// which we know cannot occur in valid JSON. This way no values are
 		// quoted since the separate does not appear in them, and nothing is
 		// escaped since nothing is quoted.
-		gzr, err := gzip.NewReader(obj.Body)
+		gzr, err := gzip.NewReader(r)
 		if err != nil {
 			return fmt.Errorf("get gzip reader for load results: %w", err)
 		}
@@ -397,8 +380,8 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, do
 			return err
 		} else if err := gzr.Close(); err != nil {
 			return fmt.Errorf("closing gzip reader: %w", err)
-		} else if err := obj.Body.Close(); err != nil {
-			return fmt.Errorf("closing body: %w", err)
+		} else if err := r.Close(); err != nil {
+			return fmt.Errorf("closing r: %w", err)
 		}
 	}
 
@@ -418,63 +401,36 @@ func (t *transactor) extantFiles(ctx context.Context, originalFileUris []string)
 	}
 
 	out := make(map[string]struct{})
-
-	paginator := s3.NewListObjectsV2Paginator(t.s3Client, &s3.ListObjectsV2Input{
-		Bucket: aws.String(t.cfg.Compute.Bucket),
-		Prefix: aws.String(prefix),
-	})
-
-	for paginator.HasMorePages() {
-		page, err := paginator.NextPage(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get next page: %w", err)
-		}
-
-		for _, obj := range page.Contents {
-			out[fmt.Sprintf("s3://%s/%s", t.cfg.Compute.Bucket, *obj.Key)] = struct{}{}
-		}
+	for obj := range t.bucket.List(ctx, blob.Query{Prefix: prefix}) {
+		out[t.bucket.URI(obj.Key)] = struct{}{}
 	}
 
 	return out, nil
 }
 
-func cleanPrefixOnceFn(ctx context.Context, s3Client *s3.Client, bucket string, prefix string) func() error {
+func cleanPrefixOnceFn(ctx context.Context, bucket blob.Bucket, prefix string) func() error {
 	didClean := false
 	return func() error {
 		if didClean {
 			return nil
 		}
 
-		paginator := s3.NewListObjectsV2Paginator(s3Client, &s3.ListObjectsV2Input{
-			Bucket: aws.String(bucket),
-			Prefix: aws.String(prefix),
-		})
-		if !paginator.HasMorePages() {
+		var batch []string
+		for obj := range bucket.List(ctx, blob.Query{Prefix: prefix}) {
+			batch = append(batch, bucket.URI(obj.Key))
+		}
+
+		if len(batch) == 0 {
 			log.WithFields(log.Fields{
-				"bucket": bucket,
 				"prefix": prefix,
 			}).Warn("called cleanPrefixOnceFn on an empty prefix")
+			return nil
 		}
 
-		for paginator.HasMorePages() {
-			page, err := paginator.NextPage(ctx)
-			if err != nil {
-				return fmt.Errorf("failed to get next page: %w", err)
-			}
-
-			thisPage := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
-			for _, obj := range page.Contents {
-				thisPage = append(thisPage, s3types.ObjectIdentifier{Key: obj.Key})
-			}
-
-			if _, err := s3Client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-				Bucket: aws.String(bucket),
-				Delete: &s3types.Delete{Objects: thisPage},
-			}); err != nil {
-				return err
-			}
-
+		if err := bucket.Delete(ctx, batch); err != nil {
+			return err
 		}
+
 		didClean = true
 		return nil
 	}
