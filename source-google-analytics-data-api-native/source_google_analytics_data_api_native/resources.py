@@ -36,7 +36,8 @@ from .default_reports import DEFAULT_REPORTS
 
 VALID_DIMENSIONS_DOCS_URL = "https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#dimensions"
 VALID_METRICS_DOCS_URL = "https://developers.google.com/analytics/devguides/reporting/data/v1/api-schema#metrics"
-
+MAX_DIMESIONS_COUNT = 9
+MAX_METRICS_COUNT = 10
 
 async def _validate_credentials(
     log: Logger, http: HTTPMixin, config: EndpointConfig
@@ -99,9 +100,21 @@ async def validate_custom_reports_json(
             if model.name in default_report_names:
                 errors.append(f'Custom report name "{model.name}" already exists as a default report. Please rename the custom report.')
 
+            dimensions_count = len(model.dimensions)
+            if dimensions_count == 0:
+                errors.append(f'Report "{model.name}" has 0 dimensions. Reports must contain between 1 - {MAX_DIMESIONS_COUNT} dimensions.')
+            elif dimensions_count > MAX_DIMESIONS_COUNT:
+                errors.append(f'Report "{model.name}" has {dimensions_count} dimensions. There can only be up to {MAX_DIMESIONS_COUNT} dimensions per report.')
+
             for dimension in model.dimensions:
                 if dimension not in valid_dimensions:
                     errors.append(f'"{dimension}" in report "{model.name}" is not a valid dimension. Consult {VALID_DIMENSIONS_DOCS_URL} for a list of valid dimensions.')
+
+            metrics_count = len(model.metrics)
+            if metrics_count == 0:
+                errors.append(f'Report "{model.name}" has 0 metrics. Reports must contain between 1 - {MAX_METRICS_COUNT} metrics.')
+            elif metrics_count > MAX_METRICS_COUNT:
+                errors.append(f'Report "{model.name}" has {metrics_count} metrics. There can only be up to {MAX_METRICS_COUNT} dimensions per report.')
 
             for metric in model.metrics:
                 if metric not in valid_metrics:
