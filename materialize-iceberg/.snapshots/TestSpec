@@ -324,6 +324,19 @@
         ],
         "title": "dbt Cloud Job Trigger",
         "description": "Trigger a dbt Job when new data is available"
+      },
+      "advanced": {
+        "properties": {
+          "LowercaseIdentifiers": {
+            "type": "string",
+            "title": "Lowercase Table \u0026 Column Names",
+            "description": "Create all tables and columns with lowercase names. This is necessary for compatibility with some setups such as querying S3 Table Buckets with Athena."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
       }
     },
     "type": "object",

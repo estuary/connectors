@@ -23,19 +23,19 @@ func TestTemplates(t *testing.T) {
 	}
 
 	keys := []boilerplate.MappedProjection[mapped]{
-		{Projection: makeProjection("first-key"), Mapped: mapped{iceberg.StringType{}}},
-		{Projection: makeProjection("second-key"), Mapped: mapped{iceberg.BinaryType{}}},
-		{Projection: makeProjection("third-key"), Mapped: mapped{iceberg.Int64Type{}}},
+		{Projection: makeProjection("first-key"), Mapped: mapped{iceberg.StringType{}, "first-key"}},
+		{Projection: makeProjection("second-key"), Mapped: mapped{iceberg.BinaryType{}, "second-key"}},
+		{Projection: makeProjection("third-key"), Mapped: mapped{iceberg.Int64Type{}, "third-key"}},
 	}
 
 	values := []boilerplate.MappedProjection[mapped]{
-		{Projection: makeProjection("first-val"), Mapped: mapped{iceberg.StringType{}}},
-		{Projection: makeProjection("second-val"), Mapped: mapped{iceberg.StringType{}}},
-		{Projection: makeProjection("third-val"), Mapped: mapped{iceberg.BinaryType{}}},
-		{Projection: makeProjection("fourth-val"), Mapped: mapped{iceberg.StringType{}}},
+		{Projection: makeProjection("first-val"), Mapped: mapped{iceberg.StringType{}, "first-val"}},
+		{Projection: makeProjection("second-val"), Mapped: mapped{iceberg.StringType{}, "second-val"}},
+		{Projection: makeProjection("third-val"), Mapped: mapped{iceberg.BinaryType{}, "third-val"}},
+		{Projection: makeProjection("fourth-val"), Mapped: mapped{iceberg.StringType{}, "fourth-val"}},
 	}
 
-	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{iceberg.StringType{}}}
+	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{iceberg.StringType{}, "flow_document"}}
 
 	input := templateInput{
 		binding: binding{
@@ -70,17 +70,17 @@ func TestTemplates(t *testing.T) {
 		ResourcePath: []string{"some", "table"},
 		Migrations: []migrateColumn{
 			{
-				Field:      "long_to_decimal",
+				Name:       "long_to_decimal",
 				FromType:   "long",
 				TargetType: iceberg.DecimalTypeOf(38, 0),
 			},
 			{
-				Field:      "datetime_to_string",
+				Name:       "datetime_to_string",
 				FromType:   "timestamptz",
 				TargetType: iceberg.StringType{},
 			},
 			{
-				Field:      "binary_to_string",
+				Name:       "binary_to_string",
 				FromType:   "binary",
 				TargetType: iceberg.StringType{},
 			},

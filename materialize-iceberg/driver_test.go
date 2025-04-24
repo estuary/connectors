@@ -69,8 +69,6 @@ func testConfig(t *testing.T, ns string) config {
 }
 
 func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
 	resourceConfig := resource{
 		Namespace: "test_namespace",
 		Table:     "test_table",
@@ -78,6 +76,23 @@ func TestValidateAndApply(t *testing.T) {
 
 	cfg := testConfig(t, resourceConfig.Namespace)
 
+	runValidateAndApply(t, resourceConfig, cfg)
+}
+
+func TestValidateAndApplyLowercaseColumnNames(t *testing.T) {
+	resourceConfig := resource{
+		Namespace: "test_namespace",
+		Table:     "test_table",
+	}
+
+	cfg := testConfig(t, resourceConfig.Namespace)
+	cfg.Advanced.LowercaseColumnNames = true
+
+	runValidateAndApply(t, resourceConfig, cfg)
+}
+
+func runValidateAndApply(t *testing.T, res resource, cfg config) {
+	ctx := context.Background()
 	catalog, err := cfg.toCatalog(ctx)
 	require.NoError(t, err)
 
@@ -85,16 +100,16 @@ func TestValidateAndApply(t *testing.T) {
 		t,
 		Driver{},
 		cfg,
-		resourceConfig,
+		res,
 		func(t *testing.T) string {
-			table, err := catalog.GetTable(ctx, resourceConfig.Namespace, resourceConfig.Table)
+			table, err := catalog.GetTable(ctx, res.Namespace, res.Table)
 			require.NoError(t, err)
 
 			return table.Metadata.CurrentSchema().String() + "\n"
 		},
 		func(t *testing.T) {
 			t.Helper()
-			catalog.DeleteTable(ctx, resourceConfig.Namespace, resourceConfig.Table)
+			catalog.DeleteTable(ctx, res.Namespace, res.Table)
 		},
 	)
 }
