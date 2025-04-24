@@ -109,7 +109,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       redshiftDriver,
 		EndpointSpec: endpointSpec,
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{IncludeSourcedSchemas: true},
 		Sanitizers:   sanitizers,
 	}
 }
@@ -620,6 +620,7 @@ func TestCaptureFromView(t *testing.T) {
 	var viewName, viewID = testTableName(t, uniqueTableID(t, "view"))
 
 	// Create base table and view
+	executeControlQuery(t, control, fmt.Sprintf("DROP VIEW IF EXISTS %s", viewName))
 	createTestTable(t, control, baseTableName, `(
         id INTEGER PRIMARY KEY,
         name TEXT,
