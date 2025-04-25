@@ -23,44 +23,130 @@
         "default": "main",
         "order": 2
       },
-      "bucket": {
-        "type": "string",
-        "title": "S3 Staging Bucket",
-        "description": "Name of the S3 bucket to use for staging data loads. Must not contain dots (.)",
-        "order": 3,
-        "pattern": "^[^.]*$"
-      },
-      "awsAccessKeyId": {
-        "type": "string",
-        "title": "Access Key ID",
-        "description": "AWS Access Key ID for reading and writing data to the S3 staging bucket.",
-        "order": 4
-      },
-      "awsSecretAccessKey": {
-        "type": "string",
-        "title": "Secret Access Key",
-        "description": "AWS Secret Access Key for reading and writing data to the S3 staging bucket.",
-        "order": 5,
-        "secret": true
-      },
-      "region": {
-        "type": "string",
-        "title": "S3 Bucket Region",
-        "description": "Region of the S3 staging bucket.",
-        "order": 6
-      },
-      "bucketPath": {
-        "type": "string",
-        "title": "Bucket Path",
-        "description": "An optional prefix that will be used to store objects in S3.",
-        "order": 7
-      },
       "hardDelete": {
         "type": "boolean",
         "title": "Hard Delete",
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "default": false,
-        "order": 8
+        "order": 3
+      },
+      "stagingBucket": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-motherduck/staging-bucket-s3-config",
+            "properties": {
+              "stagingBucketType": {
+                "type": "string",
+                "const": "S3",
+                "default": "S3",
+                "order": 0
+              },
+              "bucketS3": {
+                "type": "string",
+                "title": "S3 Staging Bucket",
+                "description": "Name of the S3 bucket to use for staging data loads. Must not contain dots (.)",
+                "order": 0,
+                "pattern": "^[^.]*$"
+              },
+              "awsAccessKeyId": {
+                "type": "string",
+                "title": "Access Key ID",
+                "description": "AWS Access Key ID for the S3 staging bucket.",
+                "order": 1
+              },
+              "awsSecretAccessKey": {
+                "type": "string",
+                "title": "Secret Access Key",
+                "description": "AWS Secret Access Key for the S3 staging bucket.",
+                "order": 2,
+                "secret": true
+              },
+              "region": {
+                "type": "string",
+                "title": "S3 Bucket Region",
+                "description": "Region of the S3 staging bucket.",
+                "order": 3
+              },
+              "bucketPathS3": {
+                "type": "string",
+                "title": "Bucket Path",
+                "description": "An optional prefix that will be used to store objects in the staging bucket.",
+                "order": 4
+              }
+            },
+            "type": "object",
+            "required": [
+              "bucketS3",
+              "awsAccessKeyId",
+              "awsSecretAccessKey",
+              "region"
+            ],
+            "title": "S3"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-motherduck/staging-bucket-gcs-config",
+            "properties": {
+              "stagingBucketType": {
+                "type": "string",
+                "const": "GCS",
+                "default": "GCS",
+                "order": 0
+              },
+              "bucketGCS": {
+                "type": "string",
+                "title": "GCS Staging Bucket",
+                "description": "Name of the GCS bucket to use for staging data loads.",
+                "order": 0
+              },
+              "credentialsJSON": {
+                "type": "string",
+                "title": "Service Account JSON",
+                "description": "The JSON credentials of the service account to use for authorization to the staging bucket.",
+                "multiline": true,
+                "order": 1,
+                "secret": true
+              },
+              "gcsHMACAccessID": {
+                "type": "string",
+                "title": "HMAC Access ID",
+                "description": "HMAC access ID for the service account.",
+                "order": 2
+              },
+              "gcsHMACSecret": {
+                "type": "string",
+                "title": "HMAC Secret",
+                "description": "HMAC secret for the service account.",
+                "order": 3,
+                "secret": true
+              },
+              "bucketPathGCS": {
+                "type": "string",
+                "title": "Bucket Path",
+                "description": "An optional prefix that will be used to store objects in the staging bucket.",
+                "order": 4
+              }
+            },
+            "type": "object",
+            "required": [
+              "bucketGCS",
+              "credentialsJSON",
+              "gcsHMACAccessID",
+              "gcsHMACSecret"
+            ],
+            "title": "GCS"
+          }
+        ],
+        "type": "object",
+        "title": "Staging Bucket Configuration",
+        "default": {
+          "stagingBucketType": "S3"
+        },
+        "discriminator": {
+          "propertyName": "stagingBucketType"
+        },
+        "order": 4
       }
     },
     "type": "object",
@@ -68,10 +154,7 @@
       "token",
       "database",
       "schema",
-      "bucket",
-      "awsAccessKeyId",
-      "awsSecretAccessKey",
-      "region"
+      "stagingBucket"
     ],
     "title": "SQL Connection"
   },

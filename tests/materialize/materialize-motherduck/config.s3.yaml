@@ -1,11 +1,13 @@
-awsAccessKeyId_sops: ENC[AES256_GCM,data:2J3EfC99PfoIXXBz7Hbf+lP31e8=,iv:se8cw6MJK5FX8l4N8UNiF7VpPUR/nJQAV1fJgjJCk9I=,tag:GAQgCyq72XemTEaL9du9mw==,type:str]
-awsSecretAccessKey_sops: ENC[AES256_GCM,data:nNgdzzTIw3VhoEgLrD/B9feVWW8ObdOj13puMkkq5ayaxJx646akJg==,iv:7wVj9SQj71asRcrn+RO6/oQe8oP09wgSIPdOUQx3sKw=,tag:fffXv+4//JaT450o+vuImA==,type:str]
-bucket: estuary-connector-test-bucket
 database: test_db
-region: us-east-2
 schema: main
 token_sops: ENC[AES256_GCM,data:zJKezW9wWrmo5uZHt3BK/P5AWm6dIWnskg3KTh38q9v5O/w/LsVaSH+WVP+hT92zBF8wl83Q02reRcz3VUK1ma0bNkONkj9u2VPQb16TdlRp0f2lG1SOPcDP/1VhSpnoeRo9DFxsejg3+AwfMbkkTX2iCIZL59+yzFEX6PwRNsih1rtxR66MsjuPyFfspIKaxN1MXDpAUi1ESi1CvSB2N7bUtghLQ6n+87fIJ04FcVFwRUfuOPkdxC9ONNoJi/evha5cvfncZ8jOap8fwC1AjNY/5b13E5kEixmIAryWcnhydg5sgufFGsi6WMTMhMzb+4qkZGcuTd953KF3jGtf5qo6vcku8lYN8KUtTlTZb3WldILNO6Lu0/10s718BxR3n71qKGYmThFWwaeguFHbT79fS+/ffFeenx4ReoffAM+GS4DrWH5B/h7VmjqyHtvU3lOi,iv:u2LmumgY2AOqDd57vagcSbRPc13R6UfQyopX+kK/QHI=,tag:PHuliexX5UNKzcOCVvsuJg==,type:str]
 hardDelete: true
+stagingBucket:
+    stagingBucketType: S3
+    awsAccessKeyId_sops: ENC[AES256_GCM,data:UkQeDRAVhzojI2/blFxS6aNINDA=,iv:PsrPfCVyvJedgqKTAr0S3AN2+CeY4Agk92AWq7Qjz54=,tag:ICYef/sIl41l8YHjNXFLDw==,type:str]
+    awsSecretAccessKey_sops: ENC[AES256_GCM,data:jedDyrGXmwXprqeaTmMmM99mtPut7cYVm/+yX+agKPw0YOMZWyq7oA==,iv:P8gLYwp78emfOGI7Ly48IGQjFVXiuQLnkB7/EygdbF0=,tag:vIA9rhFW3Dyhn2qnxxVZ3w==,type:str]
+    bucketS3: estuary-connector-test-bucket
+    region: us-east-2
 sops:
     kms: []
     gcp_kms:
@@ -15,8 +17,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-02-12T15:47:27Z"
-    mac: ENC[AES256_GCM,data:MZHrzQtTqalHm6qGHVWec58naVeg2kMZKObeLgSXM/IBqccqYb/EFiywYvs05GQAh6uaG3qosqTRkuBDJusVIfHDazO9qPbjkEDqJXkBh7V3CUz6CV2lf0Q4ZrL1RcLx57QcQr3W4IfHkrdNT6QHqV/Yt72JIofgTeVYbzI0dXA=,iv:PNscGQB6lBitSsaqAagfQvvSBfKck9vrA7gwdFEnlAU=,tag:Za3gm9Sjv1UVE7++nAcO6A==,type:str]
+    lastmodified: "2025-04-24T20:59:17Z"
+    mac: ENC[AES256_GCM,data:viM4XOMp1kkoEroe64IWIDLX69BW9W5Zoq62PrlsaE3mWhikBDCObL65rzvIi6SoYA3RHGt51rjKvoMbO8c42tN4GEQLmW6brC5pn3U0SGBltw8vt7dNMLtkK6iKO7idgL07uMN3R5DzOn0IdVmpror9KhyE3b/MwzXZYNNRP6g=,iv:0L5xOtZ/Ac8T75Lzoyxpzzcz2QBHgQ5JPRcZervGhcc=,tag:YR5b5J5Ix14Hg/UfG1mIVg==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4
