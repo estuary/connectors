@@ -40,6 +40,7 @@ class Response(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorSt
     applied: response.Applied | None = None
     opened: response.Opened | None = None
     captured: response.Captured | None = None
+    sourcedSchema: response.SourcedSchema | None = None
     checkpoint: response.Checkpoint[ConnectorState] | None = None
 
 
@@ -140,6 +141,17 @@ class Task:
         since the last checkpoint() or reset()"""
 
         return self._hasher.digest().hex()
+
+    def sourced_schema(self, binding_index: int, schema: dict[str, Any]):
+        """Write a SourcedSchema message for the given binding to the buffer.
+        SourcedSchema messages won't be emitted until checkpoint() is called."""
+
+        b = Response(
+            sourcedSchema=response.SourcedSchema(binding=binding_index, schemaJson=schema)
+        ).model_dump_json(by_alias=True, exclude_unset=True).encode()
+
+        self._buffer.write(b)
+        self._buffer.write(b"\n")
 
     def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
         """Emit previously-queued, captured documents follows by a checkpoint"""

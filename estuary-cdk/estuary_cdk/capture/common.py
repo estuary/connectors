@@ -60,6 +60,17 @@ and "no pages remain" in a response context.
 class Triggers(Enum):
     BACKFILL = "BACKFILL"
 
+@dataclass
+class SourcedSchema:
+    """
+    SourcedSchema encapsulates a source-defined schema for a specific binding.
+    SourcedSchemas are used to inform the runtime about types & metadata that
+    aren't easily inferred by inspecting specific documents. The runtime
+    widens inferred schemas to accommodate the current inferred schema along
+    with any SourcedSchemas.
+    """
+    value: dict[str, Any]
+
 
 class BaseDocument(BaseModel):
     class Meta(BaseModel):
