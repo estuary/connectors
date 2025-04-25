@@ -8,10 +8,10 @@ import (
 	"path"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -59,12 +59,15 @@ func newDuckDriver() *sql.Driver {
 type transactor struct {
 	cfg *config
 
-	fence    sql.Fence
-	conn     *stdsql.Conn
-	s3client *s3.Client
+	fence      sql.Fence
+	conn       *stdsql.Conn
+	bucket     blob.Bucket
+	bucketPath string
 
-	bindings []*binding
-	be       *boilerplate.BindingEvents
+	storeFiles *boilerplate.StagedFiles
+	loadFiles  *boilerplate.StagedFiles
+	bindings   []*binding
+	be         *boilerplate.BindingEvents
 }
 
 func newTransactor(
@@ -78,11 +81,6 @@ func newTransactor(
 ) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
 	cfg := ep.Config.(*config)
 
-	s3client, err := cfg.toS3Client(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	db, err := cfg.db(ctx)
 	if err != nil {
 		return nil, nil, err
@@ -93,20 +91,26 @@ func newTransactor(
 		return nil, nil, fmt.Errorf("creating connection: %w", err)
 	}
 
-	t := &transactor{
-		cfg:      cfg,
-		conn:     conn,
-		s3client: s3client,
-		fence:    fence,
-		be:       be,
+	bucket, bucketPath, err := cfg.toBucketAndPath(ctx)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	for _, b := range bindings {
-		t.bindings = append(t.bindings, &binding{
-			target:    b,
-			storeFile: newStagedFile(s3client, cfg.Bucket, cfg.BucketPath, b.ColumnNames()),
-			loadFile:  newStagedFile(s3client, cfg.Bucket, cfg.BucketPath, b.KeyNames()),
-		})
+	t := &transactor{
+		cfg:        cfg,
+		conn:       conn,
+		bucket:     bucket,
+		bucketPath: bucketPath,
+		fence:      fence,
+		be:         be,
+		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, bucketPath, false, false),
+		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, bucketPath, true, false),
+	}
+
+	for idx, target := range bindings {
+		t.loadFiles.AddBinding(idx, target.KeyNames())
+		t.storeFiles.AddBinding(idx, target.ColumnNames())
+		t.bindings = append(t.bindings, &binding{target: target})
 	}
 
 	return t, nil, nil
@@ -114,8 +118,6 @@ func newTransactor(
 
 type binding struct {
 	target    sql.Table
-	storeFile *stagedFile
-	loadFile  *stagedFile
 	mustMerge bool
 }
 
@@ -127,11 +129,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	for it.Next() {
 		b := d.bindings[it.Binding]
-		b.loadFile.start()
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else if err = b.loadFile.encodeRow(ctx, converted); err != nil {
+		} else if err = d.loadFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("encoding Load key to scratch file: %w", err)
 		}
 	}
@@ -139,27 +140,24 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
+	defer d.loadFiles.CleanupCurrentTransaction(ctx)
+
 	var subqueries []string
-	for _, b := range d.bindings {
-		if !b.loadFile.started {
-			// Pass.
-		} else if delete, err := b.loadFile.flush(); err != nil {
-			return fmt.Errorf("load.stage(): %w", err)
-		} else {
-			// Clean up staged files by calling the `delete` function returned
-			// by each binding that had keys to load.
-			defer delete(ctx)
+	for idx, b := range d.bindings {
+		var loadQuery strings.Builder
 
-			var loadQuery strings.Builder
-			if err := tplLoadQuery.Execute(&loadQuery, &queryParams{
-				Table: b.target,
-				Files: b.loadFile.allFiles(),
-			}); err != nil {
-				return fmt.Errorf("rendering load query: %w", err)
-			}
-
-			subqueries = append(subqueries, loadQuery.String())
+		if !d.loadFiles.Started(idx) {
+			continue
+		} else if uris, err := d.loadFiles.Flush(idx); err != nil {
+			return fmt.Errorf("flushing load file: %w", err)
+		} else if err := tplLoadQuery.Execute(&loadQuery, &queryParams{
+			Table: b.target,
+			Files: uris,
+		}); err != nil {
+			return fmt.Errorf("rendering load query: %w", err)
 		}
+
+		subqueries = append(subqueries, loadQuery.String())
 	}
 
 	if len(subqueries) == 0 {
@@ -172,19 +170,21 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// query in-process to avoid blowing out the memory usage of the connector,
 	// since iterating over the returned rows directly results in the entire
 	// query being materialized in-memory.
-	loadResKey := path.Join(d.cfg.BucketPath, "loaded_"+uuid.NewString()+".json.gz")
+	loadResKey := path.Join(d.bucketPath, "loaded_"+uuid.NewString()+".json.gz")
+	loadResURI := d.bucket.URI(loadResKey)
 
 	// TODO(whb): In the future it may be useful to persist the load query
 	// results in the driver checkpoint via the `Flushed` response and use them
 	// for re-application of transactions. This will require idempotent runtime
 	// transactions though.
-	defer d.s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(d.cfg.Bucket),
-		Key:    aws.String(loadResKey),
-	})
+	defer func() {
+		if err := d.bucket.Delete(ctx, []string{loadResURI}); err != nil {
+			log.WithError(err).Warn("failed to delete load results file")
+		}
+	}()
 
 	d.be.StartedEvaluatingLoads()
-	rows, err := d.conn.QueryContext(ctx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, fmt.Sprintf("s3://%s/%s", d.cfg.Bucket, loadResKey)))
+	rows, err := d.conn.QueryContext(ctx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, loadResURI))
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
@@ -202,20 +202,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Now read these results back from the s3 file.
-	r, err := d.s3client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(d.cfg.Bucket),
-		Key:    aws.String(loadResKey),
-	})
+	r, err := d.bucket.NewReader(ctx, loadResKey)
 	if err != nil {
 		return fmt.Errorf("get load results object reader: %w", err)
 	}
-	defer r.Body.Close()
 
-	gzr, err := gzip.NewReader(r.Body)
+	gzr, err := gzip.NewReader(r)
 	if err != nil {
 		return fmt.Errorf("get gzip reader for load results: %w", err)
 	}
-	defer gzr.Close()
 
 	type bindingDoc struct {
 		Binding int
@@ -241,6 +236,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// These counts should always be equal.
 	if loadedCount != loadQueryCount {
 		return fmt.Errorf("mismatched loadedCount vs loadQueryCount: %d vs %d", loadedCount, loadQueryCount)
+	} else if err := gzr.Close(); err != nil {
+		return fmt.Errorf("closing gzip reader: %w", err)
+	} else if err := r.Close(); err != nil {
+		return fmt.Errorf("closing reader: %w", err)
+	} else if err := d.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
+		return fmt.Errorf("cleaning up load files: %w", err)
 	}
 
 	return nil
@@ -256,8 +257,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		b := d.bindings[it.Binding]
-		b.storeFile.start()
-
 		if it.Exists {
 			b.mustMerge = true
 		}
@@ -269,7 +268,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := b.storeFile.encodeRow(ctx, converted); err != nil {
+		} else if err := d.storeFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
 		}
 	}
@@ -289,6 +288,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		return nil, m.RunAsyncOperation(func() error {
+			defer d.storeFiles.CleanupCurrentTransaction(ctx)
+
 			txn, err := d.conn.BeginTx(ctx, nil)
 			if err != nil {
 				return fmt.Errorf("store BeginTx: %w", err)
@@ -296,18 +297,16 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			defer txn.Rollback()
 
 			for idx, b := range d.bindings {
-				if !b.storeFile.started {
-					// No stores for this binding.
+				if !d.storeFiles.Started(idx) {
 					continue
 				}
 
-				delete, err := b.storeFile.flush()
+				uris, err := d.storeFiles.Flush(idx)
 				if err != nil {
-					return fmt.Errorf("flushing store file for binding[%d]: %w", idx, err)
+					return fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 				}
-				defer delete(ctx)
 
-				params := &queryParams{Table: b.target, Files: b.storeFile.allFiles()}
+				params := &queryParams{Table: b.target, Files: uris}
 
 				d.be.StartedResourceCommit(b.target.Path)
 				if b.mustMerge {
@@ -317,7 +316,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					if err := tplStoreDeleteQuery.Execute(&storeDeleteQuery, params); err != nil {
 						return err
 					} else if _, err := txn.ExecContext(ctx, storeDeleteQuery.String()); err != nil {
-						return fmt.Errorf("executing store delete query for binding[%d]: %w", idx, err)
+						return fmt.Errorf("executing store delete query %s: %w", b.target.Path, err)
 					}
 
 				}
@@ -326,7 +325,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				if err := tplStoreQuery.Execute(&storeQuery, params); err != nil {
 					return err
 				} else if _, err := txn.ExecContext(ctx, storeQuery.String()); err != nil {
-					return fmt.Errorf("executing store query for binding[%d]: %w", idx, err)
+					return fmt.Errorf("executing store query for %s: %w", b.target.Path, err)
 				}
 				d.be.FinishedResourceCommit(b.target.Path)
 
@@ -342,6 +341,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				return fmt.Errorf("this instance was fenced off by another")
 			} else if err := txn.Commit(); err != nil {
 				return fmt.Errorf("committing store transaction: %w", err)
+			} else if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
+				return fmt.Errorf("cleaning up store files: %w", err)
 			}
 
 			return nil
