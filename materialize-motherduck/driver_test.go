@@ -12,7 +12,6 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
@@ -24,7 +23,11 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	out := config{}
+	out := config{
+		StagingBucket: stagingBucketConfig{
+			StagingBucketType: stagingBucketTypeS3,
+		},
+	}
 
 	for _, prop := range []struct {
 		key  string
@@ -33,10 +36,10 @@ func mustGetCfg(t *testing.T) config {
 		{"MOTHERDUCK_TOKEN", &out.Token},
 		{"MOTHERDUCK_DATABASE", &out.Database},
 		{"MOTHERDUCK_SCHEMA", &out.Schema},
-		{"MOTHERDUCK_BUCKET", &out.Bucket},
-		{"AWS_ACCESS_KEY_ID", &out.AWSAccessKeyID},
-		{"AWS_SECRET_ACCESS_KEY", &out.AWSSecretAccessKey},
-		{"AWS_REGION", &out.Region},
+		{"MOTHERDUCK_BUCKET", &out.StagingBucket.BucketS3},
+		{"AWS_ACCESS_KEY_ID", &out.StagingBucket.AWSAccessKeyID},
+		{"AWS_SECRET_ACCESS_KEY", &out.StagingBucket.AWSSecretAccessKey},
+		{"AWS_REGION", &out.StagingBucket.Region},
 	} {
 		*prop.dest = os.Getenv(prop.key)
 	}
@@ -187,56 +190,6 @@ func TestFencingCases(t *testing.T) {
 			return sql.StdDumpTable(ctx, c.(*client).db, table)
 		},
 	)
-}
-
-func TestPrereqs(t *testing.T) {
-	cfg := mustGetCfg(t)
-
-	nonExistentBucket := uuid.NewString()
-
-	tests := []struct {
-		name string
-		cfg  func(config) *config
-		want []error
-	}{
-		{
-			name: "valid",
-			cfg:  func(cfg config) *config { return &cfg },
-			want: nil,
-		},
-		{
-			name: "bucket doesn't exist",
-			cfg: func(cfg config) *config {
-				cfg.Bucket = nonExistentBucket
-				return &cfg
-			},
-			want: []error{fmt.Errorf("bucket %q does not exist", nonExistentBucket)},
-		},
-		{
-			name: "unauthorized to bucket: access key id",
-			cfg: func(cfg config) *config {
-				cfg.AWSAccessKeyID = "wrong" + cfg.AWSAccessKeyID
-				return &cfg
-			},
-			want: []error{fmt.Errorf("not authorized to write to %q", cfg.Bucket)},
-		},
-		{
-			name: "unauthorized to bucket: secret access key",
-			cfg: func(cfg config) *config {
-				cfg.AWSSecretAccessKey = "wrong" + cfg.AWSSecretAccessKey
-				return &cfg
-			},
-			want: []error{fmt.Errorf("not authorized to write to %q", cfg.Bucket)},
-		},
-	}
-
-	ctx := context.Background()
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(ctx, tt.cfg(cfg), "testing").Unwrap())
-		})
-	}
 }
 
 func TestSpecification(t *testing.T) {
