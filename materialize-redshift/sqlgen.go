@@ -98,14 +98,17 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"numeric":                  {sql.NewMigrationSpec([]string{"double precision", "text"})},
-			"bigint":                   {sql.NewMigrationSpec([]string{"double precision", "numeric(38,0)", "text"})},
-			"double precision":         {sql.NewMigrationSpec([]string{"text"})},
-			"date":                     {sql.NewMigrationSpec([]string{"text"})},
-			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
-			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
-			"character varying":        {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast))},
-			"*":                        {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
+			"numeric":                {sql.NewMigrationSpec([]string{"double precision", "text"})},
+			"bigint":                 {sql.NewMigrationSpec([]string{"double precision", "numeric(38,0)", "text"})},
+			"double precision":       {sql.NewMigrationSpec([]string{"text"})},
+			"date":                   {sql.NewMigrationSpec([]string{"text"})},
+			"time without time zone": {sql.NewMigrationSpec([]string{"text"})},
+			"timestamp with time zone": {
+				sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast)),
+				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(datetimeToSuperCast)),
+			},
+			"character varying": {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast))},
+			"*":                 {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -150,6 +153,10 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, migration.Identifier)
+}
+
+func datetimeToSuperCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`CAST(%s as SUPER)`, datetimeToStringCast(migration))
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
