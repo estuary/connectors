@@ -14,5 +14,9 @@ create resource for ["extra_collection"]
 delete resource ["key_value"]
 create resource for ["key_value"]
 
+* replace binding disabled -> enabled:
+delete resource ["key_value"]
+create resource for ["key_value"]
+
 * field is newly nullable:
 update resource for ["key_value"] [new projections: 0, newly nullable fields: 1, newly delta updates: false]
