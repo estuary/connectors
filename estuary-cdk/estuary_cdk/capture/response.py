@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Generic, Any
 
 from ..flow import ResourceConfig, ConnectorState, ConnectorStateUpdate
@@ -35,6 +35,13 @@ class Opened(BaseModel):
 class Captured(BaseModel):
     binding: int
     doc: Any
+
+
+class SourcedSchema(BaseModel):
+    binding: int
+    # Pydantic's BaseModel already has a schema_json field, and it complains if we overwrite it.
+    # We use a serialization alias to avoid Pydantic's complaints and serialize the field name correctly.
+    schemaJson: dict = Field(serialization_alias="schema_json")
 
 
 class Checkpoint(BaseModel, Generic[ConnectorState]):
