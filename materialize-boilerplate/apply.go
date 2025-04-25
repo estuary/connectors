@@ -165,7 +165,7 @@ func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*
 		// The existing binding spec is used to extract various properties that can't be learned
 		// from introspecting the destination system, such as the backfill counter and if the
 		// materialization was previously delta updates.
-		lastBinding := findExistingBinding(nextBinding.ResourcePath, last)
+		lastBinding := findLastBinding(nextBinding.ResourcePath, last)
 		if existingResource := is.GetResource(nextBinding.ResourcePath); existingResource == nil {
 			// Resource does not yet exist, and must be created.
 			out.newBindings = append(out.newBindings, bindingIdx)
