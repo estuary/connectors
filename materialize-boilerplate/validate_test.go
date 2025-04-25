@@ -135,6 +135,15 @@ func TestValidate(t *testing.T) {
 			maxFieldLength:     0,
 		},
 		{
+			name:               "increment backfill counter for disabled -> enabled binding",
+			deltaUpdates:       false,
+			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
+			existingSpec:       specWithBindingsDisabled(loadValidateSpec(t, "base.flow.proto")),
+			proposedSpec:       loadValidateSpec(t, "increment-backfill.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
+		},
+		{
 			name:               "table already exists with identical spec",
 			deltaUpdates:       false,
 			specForInfoSchema:  loadValidateSpec(t, "base.flow.proto"),
@@ -317,6 +326,7 @@ func TestValidate(t *testing.T) {
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 		validator := NewValidator(testConstrainter{}, is, 0, true)
 
+		// Enabled binding.
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
 			false,
@@ -327,6 +337,18 @@ func TestValidate(t *testing.T) {
 		)
 
 		require.ErrorContains(t, err, "changing from delta updates to standard updates is not allowed")
+
+		// Disabled -> enabled binding also errors.
+		_, err2 := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			specWithBindingsDisabled(existing),
+		)
+
+		require.Equal(t, err, err2)
 	})
 
 	t.Run("can switch from delta updates to standard updates", func(t *testing.T) {
@@ -596,4 +618,13 @@ func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ js
 		constraint.Reason = "This field is able to be materialized"
 	}
 	return constraint, nil
+}
+
+func specWithBindingsDisabled(spec *pf.MaterializationSpec) *pf.MaterializationSpec {
+	// Simulates a prior spec with all bindings inactive, to see transitions
+	// from disabled -> enabled bindings.
+	bindings := spec.Bindings
+	spec.Bindings = nil
+	spec.InactiveBindings = bindings
+	return spec
 }
