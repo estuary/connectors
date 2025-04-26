@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "c__flow_test_logminer/t12319541",
+    "recommended_name": "C__FLOW_TEST_LOGMINER/T12319541",
     "resource_config_json": {
       "namespace": "C##FLOW_TEST_LOGMINER",
       "stream": "T12319541"

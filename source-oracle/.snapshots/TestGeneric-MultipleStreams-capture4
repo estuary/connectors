@@ -1,9 +1,9 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t14930049": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T14930049": 1 Documents
 # ================================
 {"DATA":"nine","ID":"9","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T14930049","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t30084965": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T30084965": 1 Documents
 # ================================
 {"DATA":"eleven","ID":"11","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T30084965","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
