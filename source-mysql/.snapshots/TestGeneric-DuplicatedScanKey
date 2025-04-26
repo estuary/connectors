@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/generic_duplicatedscankey_92011048": 4 Documents
+# Collection "acmeCo/test/test/Generic_DuplicatedScanKey_92011048": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_DuplicatedScanKey_92011048","cursor":"backfill:0"}},"data":"1","id":"AAA"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_DuplicatedScanKey_92011048","cursor":"backfill:1"}},"data":"2","id":"BBB"}

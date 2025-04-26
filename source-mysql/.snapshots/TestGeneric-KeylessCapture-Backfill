@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/generic_keylesscapture_91511186": 500 Documents
+# Collection "acmeCo/test/test/Generic_KeylessCapture_91511186": 500 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_KeylessCapture_91511186","cursor":"backfill:0"}},"data":"Row Number 0","id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"Generic_KeylessCapture_91511186","cursor":"backfill:1"}},"data":"Row Number 1","id":1}

@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/unicodetext_binary_78412948_05": 18 Documents
+# Collection "acmeCo/test/test/UnicodeText_binary_78412948_05": 18 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:0"}},"data":"U3BoaW54IG9mIGJsYWNrIHF1YXJ0eiwganVkZ2UgbXkgdm93","id":100}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_binary_78412948_05","cursor":"backfill:1"}},"data":"TGUgY8WTdXIgZMOpw6d1IG1haXMgbCfDom1lIHBsdXTDtHQgbmHDr3Zl","id":101}

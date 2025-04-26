@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_generic_replicationonly_34322067": 2048 Documents
+# Collection "acmeCo/test/dbo/test_Generic_ReplicationOnly_34322067": 2048 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_Generic_ReplicationOnly_34322067","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"Batch 10 Value 0","id":10000000}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_Generic_ReplicationOnly_34322067","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"Batch 10 Value 1","id":10000001}

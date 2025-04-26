@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_computedcolumn_18851564": 15 Documents
+# Collection "acmeCo/test/dbo/test_ComputedColumn_18851564": 15 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ComputedColumn_18851564","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"a":"a0","b":"b0","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ComputedColumn_18851564","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"a":null,"b":"b1","id":1}

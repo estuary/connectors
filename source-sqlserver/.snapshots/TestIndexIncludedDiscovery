@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "dbo/test_indexincludeddiscovery_98476798",
+    "recommended_name": "dbo/test_IndexIncludedDiscovery_98476798",
     "resource_config_json": {
       "namespace": "dbo",
       "stream": "test_IndexIncludedDiscovery_98476798"

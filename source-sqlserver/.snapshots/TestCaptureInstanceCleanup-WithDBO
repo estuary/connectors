@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_captureinstancecleanup_withdbo_71329622": 40 Documents
+# Collection "acmeCo/test/dbo/test_CaptureInstanceCleanup_WithDBO_71329622": 40 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_CaptureInstanceCleanup_WithDBO_71329622","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"iteration 0 row four","id":4}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_CaptureInstanceCleanup_WithDBO_71329622","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"iteration 0 row one","id":1}

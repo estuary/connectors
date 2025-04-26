@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_alterationaddcolumn_manual_22713060": 10 Documents
+# Collection "acmeCo/test/dbo/test_AlterationAddColumn_Manual_22713060": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_AlterationAddColumn_Manual_22713060","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_AlterationAddColumn_Manual_22713060","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}

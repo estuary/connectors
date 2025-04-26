@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/altertable_addenumcolumn_30213486": 5 Documents
+# Collection "acmeCo/test/test/AlterTable_AddEnumColumn_30213486": 5 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:0"}},"data":"aaa","enumcol":null,"id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddEnumColumn_30213486","cursor":"backfill:1"}},"data":"bbb","enumcol":null,"id":2}

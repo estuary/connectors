@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/featureflagtinyintasbool_21925183",
+    "recommended_name": "test/FeatureFlagTinyintAsBool_21925183",
     "resource_config_json": {
       "namespace": "test",
       "stream": "FeatureFlagTinyintAsBool_21925183"

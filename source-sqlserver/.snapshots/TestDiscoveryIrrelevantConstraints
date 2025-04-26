@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "dbo/test_discoveryirrelevantconstraints_44516719",
+    "recommended_name": "dbo/test_DiscoveryIrrelevantConstraints_44516719",
     "resource_config_json": {
       "namespace": "dbo",
       "stream": "test_DiscoveryIrrelevantConstraints_44516719"

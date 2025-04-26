@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/altertable_addunsignedcolumn_57413089": 4 Documents
+# Collection "acmeCo/test/test/AlterTable_AddUnsignedColumn_57413089": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddUnsignedColumn_57413089","cursor":"backfill:0"}},"data":"aaa","id":1,"uintval":null}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AlterTable_AddUnsignedColumn_57413089","cursor":"backfill:1"}},"data":"bbb","id":2,"uintval":null}

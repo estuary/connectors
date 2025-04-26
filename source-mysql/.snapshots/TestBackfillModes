@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/backfillmodes_11837744": 1000 Documents
+# Collection "acmeCo/test/test/BackfillModes_11837744": 1000 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillModes_11837744","cursor":"backfill:0"}},"data":"Data for row 0","id":"Row 0"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillModes_11837744","cursor":"backfill:1"}},"data":"Data for row 1","id":"Row 1"}
@@ -1002,7 +1002,7 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillModes_11837744","cursor":"backfill:998"}},"data":"Data for row 998","id":"Row 998"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillModes_11837744","cursor":"backfill:999"}},"data":"Data for row 999","id":"Row 999"}
 # ================================
-# Collection "acmeCo/test/test/backfillmodes_25282936": 1000 Documents
+# Collection "acmeCo/test/test/BackfillModes_25282936": 1000 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillModes_25282936","cursor":"backfill:0"}},"data":"Data for row 0","id":"Row 0"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillModes_25282936","cursor":"backfill:1"}},"data":"Data for row 1","id":"Row 1"}

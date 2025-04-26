@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/enumemptystring_29144777": 8 Documents
+# Collection "acmeCo/test/test/EnumEmptyString_29144777": 8 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"A","id":5}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumEmptyString_29144777","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"B","id":6}

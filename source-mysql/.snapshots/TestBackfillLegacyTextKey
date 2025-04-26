@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test/backfilllegacytextkey_83451544": 1 Documents
+# Collection "acmeCo/test/test/BackfillLegacyTextKey_83451544": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:0"}},"data":"August","id":"août"}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AWFvw7t0AA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/backfilllegacytextkey_83451544": 1 Documents
+# Collection "acmeCo/test/test/BackfillLegacyTextKey_83451544": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:1"}},"data":"forest","id":"forêt"}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "AWZvcsOqdAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/backfilllegacytextkey_83451544": 1 Documents
+# Collection "acmeCo/test/test/BackfillLegacyTextKey_83451544": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:2"}},"data":"test à ordering","id":"oào"}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "AW/DoG8A"
 ####################################
 # ================================
-# Collection "acmeCo/test/test/backfilllegacytextkey_83451544": 1 Documents
+# Collection "acmeCo/test/test/BackfillLegacyTextKey_83451544": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:3"}},"data":"test è ordering","id":"oèo"}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "AW/DqG8A"
 ####################################
 # ================================
-# Collection "acmeCo/test/test/backfilllegacytextkey_83451544": 1 Documents
+# Collection "acmeCo/test/test/BackfillLegacyTextKey_83451544": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:4"}},"data":"test ò ordering","id":"oòo"}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "AW/Dsm8A"
 ####################################
 # ================================
-# Collection "acmeCo/test/test/backfilllegacytextkey_83451544": 1 Documents
+# Collection "acmeCo/test/test/BackfillLegacyTextKey_83451544": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BackfillLegacyTextKey_83451544","cursor":"backfill:5"}},"data":"resume","id":"résumé"}
 # ================================

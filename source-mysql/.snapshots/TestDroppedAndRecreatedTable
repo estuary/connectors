@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/droppedandrecreatedtable_37815596": 15 Documents
+# Collection "acmeCo/test/test/DroppedAndRecreatedTable_37815596": 15 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DroppedAndRecreatedTable_37815596","cursor":"backfill:0"}},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DroppedAndRecreatedTable_37815596","cursor":"backfill:1"}},"data":"one","id":1}
