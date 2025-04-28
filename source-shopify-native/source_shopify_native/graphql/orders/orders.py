@@ -256,8 +256,68 @@ class Orders(ShopifyGraphQLResource):
                 current_order[PAYMENT_TERMS_KEY][PAYMENT_SCHEDULES_KEY] = []
 
             elif (
+                "gid://shopify/AutomaticDiscountApplication/" in id
+                or typename == "AutomaticDiscountApplication"
+            ):
+                if not current_order:
+                    log.error("Found a discount application before finding an order.")
+                    raise RuntimeError()
+                elif record.get("__parentId", "") != current_order.get("id", ""):
+                    log.error(
+                        "Discount application's parent id does not match the current order's id. Check if the JSONL response from Shopify is not ordered correctly.",
+                        {
+                            "discountApplication.id": id,
+                            "discountApplication.__parentId": record.get("__parentId"),
+                            "current_order.id": current_order.get("id"),
+                        },
+                    )
+                    raise RuntimeError()
+
+                current_order[DISCOUNT_APPLICATIONS_KEY].append(record)
+
+            elif (
+                "gid://shopify/DiscountCodeApplication/" in id
+                or typename == "DiscountCodeApplication"
+            ):
+                if not current_order:
+                    log.error("Found a discount application before finding an order.")
+                    raise RuntimeError()
+                elif record.get("__parentId", "") != current_order.get("id", ""):
+                    log.error(
+                        "Discount application's parent id does not match the current order's id. Check if the JSONL response from Shopify is not ordered correctly.",
+                        {
+                            "discountApplication.id": id,
+                            "discountApplication.__parentId": record.get("__parentId"),
+                            "current_order.id": current_order.get("id"),
+                        },
+                    )
+                    raise RuntimeError()
+
+                current_order[DISCOUNT_APPLICATIONS_KEY].append(record)
+
+            elif (
                 "gid://shopify/ManualDiscountApplication/" in id
                 or typename == "ManualDiscountApplication"
+            ):
+                if not current_order:
+                    log.error("Found a discount application before finding an order.")
+                    raise RuntimeError()
+                elif record.get("__parentId", "") != current_order.get("id", ""):
+                    log.error(
+                        "Discount application's parent id does not match the current order's id. Check if the JSONL response from Shopify is not ordered correctly.",
+                        {
+                            "discountApplication.id": id,
+                            "discountApplication.__parentId": record.get("__parentId"),
+                            "current_order.id": current_order.get("id"),
+                        },
+                    )
+                    raise RuntimeError()
+
+                current_order[DISCOUNT_APPLICATIONS_KEY].append(record)
+
+            elif (
+                "gid://shopify/ScriptDiscountApplication/" in id
+                or typename == "ScriptDiscountApplication"
             ):
                 if not current_order:
                     log.error("Found a discount application before finding an order.")
