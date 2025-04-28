@@ -79,6 +79,12 @@ func TestApply(t *testing.T) {
 			want:         testResults{deletedResources: 1, createdResources: 1},
 		},
 		{
+			name:         "replace binding disabled -> enabled",
+			originalSpec: specWithBindingsDisabled(loadApplySpec(t, "base.flow.proto")),
+			newSpec:      loadApplySpec(t, "replace-original-binding.flow.proto"),
+			want:         testResults{deletedResources: 1, createdResources: 1},
+		},
+		{
 			name:         "field is newly nullable",
 			originalSpec: loadApplySpec(t, "base.flow.proto"),
 			newSpec:      loadApplySpec(t, "make-nullable.flow.proto"),
@@ -209,11 +215,11 @@ func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec, transform f
 
 	is := NewInfoSchema(transformPath, transform)
 
-	if s == nil || len(s.Bindings) == 0 {
+	if s == nil || len(s.Bindings)+len(s.InactiveBindings) == 0 {
 		return is
 	}
 
-	for _, b := range s.Bindings {
+	for _, b := range append(s.Bindings, s.InactiveBindings...) {
 		res := is.PushResource(transformPath(b.ResourcePath)...)
 		for _, f := range b.FieldSelection.AllFields() {
 			proj := *b.Collection.GetProjection(f)
