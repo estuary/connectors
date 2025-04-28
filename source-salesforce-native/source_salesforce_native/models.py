@@ -194,10 +194,12 @@ SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API = [
 ]
 
 
-# FieldDetails is used by the connector to convert field types in Bulk API responses.
+# FieldDetails is used by the connector to make decisions based on field metadata, like type
+# conversions or custom/formula field specific behavior.
 class FieldDetails(BaseModel, extra="allow"):
     soapType: SoapTypes # Type of field
     calculated: bool # Indicates whether or not this is a formula field.
+    custom: bool # Indicates whether or not this is a custom field.
 
 
 class SObject(PartialSObject):
@@ -286,3 +288,100 @@ class BulkJobCheckStatusResponse(BulkJobSubmitResponse):
     numberRecordsProcessed: int | None = None
     totalProcessingTime: int
     errorMessage: str | None = None
+
+
+# field_details_dict_to_schema builds a schema to be included in a SourcedSchema response to
+# the runtime. This ultimately tells Flow what each field's type is & causes resulting columns
+# to be included in materializations even when we haven't seen data for that field yet.
+# Since Salesforce is frequently incorrect about custom field types, custom fields are
+# always schematized as & cast to strings.
+def field_details_dict_to_schema(fields_dict: FieldDetailsDict) -> dict[str, Any]:
+    schema = {
+        "additionalProperties": False,
+        "type": "object",
+        "properties": {}
+    }
+
+    for field, details in fields_dict.items():
+        field_schema: dict[str, Any] = {}
+        match details.soapType:
+            case SoapTypes.ID | SoapTypes.BASE64 | SoapTypes.STRING:
+                field_schema = {"type": "string"}
+            case SoapTypes.BOOLEAN:
+                if details.custom:
+                    field_schema = {"type": "string"}
+                else:
+                    field_schema = {"type": "boolean"}
+            case SoapTypes.DATE:
+                field_schema = {
+                    "type": "string",
+                    "format": "date"
+                }
+            case SoapTypes.DATETIME:
+                field_schema = {
+                    "type": "string",
+                    "format": "date-time",
+                }
+            case SoapTypes.TIME:
+                field_schema = {
+                    "type": "string",
+                    "format": "time",
+                }
+            case SoapTypes.INTEGER:
+                if details.custom:
+                    field_schema = {
+                        "type": "string",
+                        "format": "integer",
+                    }
+                else:
+                    field_schema = {"type": "integer"}
+            case SoapTypes.DOUBLE | SoapTypes.LONG:
+                if details.custom:
+                    field_schema = {
+                        "type": "string",
+                        "format": "number",
+                    }
+                else:
+                    field_schema = {"type": "number"}
+            case SoapTypes.ADDRESS:
+                field_schema = {
+                    "additionalProperties": False,
+                    "type": "object",
+                    "properties": {
+                        "city": {"type": "string"},
+                        "country": {"type": "string"},
+                        "geocodeAccuracy": {"type": "string"},
+                        "latitude": {"type": "number"},
+                        "longitude": {"type": "number"},
+                        "postalCode": {"type": "string"},
+                        "state": {"type": "string"},
+                        "street": {"type": "string"},
+                    }
+                }
+            case SoapTypes.LOCATION:
+                field_schema = {
+                    "additionalProperties": False,
+                    "type": "object",
+                    "properties": {
+                        "latitude": {"type": "number"},
+                        "longitude": {"type": "number"},
+                    }
+                }
+            case SoapTypes.ANY_TYPE:
+                field_schema = {
+                    "type": [
+                        "string",
+                        "number",
+                        "boolean",
+                    ],
+                }
+            case _:
+                # Omit fields of all other types from the sourced schema.
+                # The remaining types are uncommon and haven't been observed yet in production. Once
+                # fields with these types are captured and Flow schematizes them, we can add those
+                # types to the emitted sourced schemas.
+                continue
+
+        schema["properties"][field] = field_schema
+
+    return schema

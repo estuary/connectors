@@ -25,6 +25,7 @@ from .models import (
     EndpointConfig,
     SalesforceResourceConfigWithSchedule,
     ResourceState,
+    ConnectorState,
     SalesforceTokenSource,
     GlobalDescribeObjectsResponse,
     SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API,
@@ -34,6 +35,7 @@ from .models import (
     FullRefreshResource,
     SalesforceResource,
     update_oauth_spec,
+    field_details_dict_to_schema,
 )
 from .api import (
     snapshot_resources,
@@ -73,6 +75,7 @@ async def _fetch_object_fields(log: Logger, http: HTTPMixin, instance_url: str, 
         fields[field.name] = {
             "soapType": field.soapType,
             "calculated": field.calculated,
+            "custom": field.custom,
         }
 
     return FieldDetailsDict.model_validate(fields)
@@ -100,6 +103,9 @@ def full_refresh_resource(
         # using API requests during discovery, but we need to make sure the fields are present when validating & opening.
         if fields is None:
             raise RuntimeError(f"Missing fields for {name}. Contact Estuary Support for help resolving this error.")
+
+        task.sourced_schema(binding_index, field_details_dict_to_schema(fields))
+        task.checkpoint(state=ConnectorState())
 
         common.open_binding(
             binding,
@@ -157,6 +163,9 @@ def incremental_resource(
         # using API requests during discovery, but we need to make sure the fields are present when validating & opening.
         if fields is None:
             raise RuntimeError(f"Missing fields for {name}. Contact Estuary Support for help resolving this error.")
+
+        task.sourced_schema(binding_index, field_details_dict_to_schema(fields))
+        task.checkpoint(state=ConnectorState())
 
         common.open_binding(
             binding,
