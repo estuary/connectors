@@ -37,8 +37,20 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 		config.WithCredentialsProvider(creds),
 	}
 
-	if region, err := getBucketRegion(bucket); err == nil {
-		configOpts = append(configOpts, config.WithRegion(region))
+	// Resolve the region of the bucket. If one is explicitly provided in a
+	// clientOpt, use that directly. If not it must be determined dynamically.
+	var tmp s3.Options // only used to see if a region clientOpt is set
+	for _, opt := range clientOpts {
+		opt(&tmp)
+	}
+	if tmp.Region == "" {
+		region, err := getBucketRegion(bucket)
+		if err != nil {
+			return nil, fmt.Errorf("could not determine bucket region: %w", err)
+		}
+		clientOpts = append(clientOpts, func(o *s3.Options) {
+			o.Region = region
+		})
 	}
 
 	cfg, err := config.LoadDefaultConfig(ctx, configOpts...)
@@ -180,5 +192,5 @@ func getBucketRegion(bucket string) (string, error) {
 		return "", err
 	}
 
-	return "", fmt.Errorf("could not find region for bucket %s", bucket)
+	return "", fmt.Errorf("could not find region for bucket %q: %s", bucket, resp.Status)
 }
