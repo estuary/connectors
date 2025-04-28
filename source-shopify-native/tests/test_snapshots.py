@@ -5,11 +5,16 @@ import subprocess
 def sanitize_tokens(data):
     if isinstance(data, dict):
         for key, value in list(data.items()):
-            if isinstance(value, str) and "?token=" in value:
-                token_parts = value.split("?token=")
-                if len(token_parts) > 1:
-                    data[key] = token_parts[0] + "?token=REDACTED"
-            else:
+            if isinstance(value, str):
+                if "?token=" in value:
+                    parts = value.split("?token=", 1)
+                    if len(parts) > 1:
+                        remaining = parts[1].split("&", 1)
+                        if len(remaining) > 1:
+                            data[key] = f"{parts[0]}?token=REDACTED&{remaining[1]}"
+                        else:
+                            data[key] = f"{parts[0]}?token=REDACTED"
+            if isinstance(value, (dict, list)):
                 sanitize_tokens(value)
     elif isinstance(data, list):
         for item in data:
