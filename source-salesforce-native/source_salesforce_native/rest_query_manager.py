@@ -109,6 +109,23 @@ class RestQueryManager:
 
         return chunks
 
+    # _cast_custom_field_to_string does not use Salesforce's reported SOAP type because we've seen
+    # Salesforce be incorrect about types for custom fields. Instead, the field's value is inspected
+    # and then cast based off that inspection.
+    def _cast_custom_field_to_string(self, value: Any | None) -> Any:
+        # If the value is already a string or None, don't cast it.
+        if value is None or isinstance(value, str):
+            return value
+
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        elif isinstance(value, int) or isinstance(value, float):
+            return str(value)
+        else:
+            # All other types are left unchanged. Most of these are complex object types
+            # that can't be cast to strings, like urn:location or urn:address.
+            return value
+
 
     def _transform_fields(
         self,
@@ -123,6 +140,14 @@ class RestQueryManager:
                     record[field] = dt_to_str(str_to_dt(record[field]))
                 except ValueError:
                     pass
+
+            # Since Salesforce is often wrong about the types of custom fields, we
+            # cast them to strings to align with the sourced schemas the connector
+            # emits & the materialized columns types created based off of those
+            # sourced schemas.
+            if details.custom:
+                record[field] = self._cast_custom_field_to_string(record[field])
+
         # REST API query results have an extraneous "attributes" field with a small amount of metadata.
         # This metadata isn't present in the Bulk API response, so we remove it from records fetched
         # via the REST API.

@@ -13,6 +13,7 @@ from estuary_cdk.http import HTTPSession, HTTPError
 from .shared import build_query, VERSION
 from .models import (
     SoapTypes,
+    FieldDetails,
     FieldDetailsDict,
     CursorFields,
     BulkJobStates,
@@ -204,29 +205,32 @@ class BulkJobManager:
     def _transform_value(
         self,
         name: str,
-        soap_type: SoapTypes,
+        field_details: FieldDetails,
         value: str,
     ) -> Any:
-        try:
-            match soap_type:
-                case SoapTypes.ID | SoapTypes.STRING | SoapTypes.DATE | SoapTypes.DATETIME | SoapTypes.TIME | SoapTypes.BASE64:
-                    transformed_value = value
-                case SoapTypes.BOOLEAN:
-                    transformed_value = self._bool_str_to_bool(value)
-                case SoapTypes.INTEGER | SoapTypes.LONG:
-                    transformed_value = int(value)
-                case SoapTypes.DOUBLE:
-                    transformed_value = float(value)
-                case SoapTypes.ANY_TYPE:
-                    transformed_value = self._str_to_anytype(value)
-                case _:
-                    raise BulkJobError(f"Unanticipated field type {soap_type} for field {name}. Please reach out to Estuary support for help resolving this issue.")
-
-            return transformed_value
-        # The Salesforce reported type for custom fields are not always correct. If conversion to the Salesforce reported
-        # type fails, we don't transform the value & we rely on schema inference to do its job.
-        except ValueError:
+        # Since Salesforce is often wrong about the types of custom fields, we
+        # leave them as string to align with the sourced schemas the connector
+        # emits & the materialized columns types created based off of those
+        # sourced schemas.
+        if field_details.custom:
             return value
+
+        # Transform standard fields to the correct type.
+        match field_details.soapType:
+            case SoapTypes.ID | SoapTypes.STRING | SoapTypes.DATE | SoapTypes.DATETIME | SoapTypes.TIME | SoapTypes.BASE64:
+                transformed_value = value
+            case SoapTypes.BOOLEAN:
+                transformed_value = self._bool_str_to_bool(value)
+            case SoapTypes.INTEGER | SoapTypes.LONG:
+                transformed_value = int(value)
+            case SoapTypes.DOUBLE:
+                transformed_value = float(value)
+            case SoapTypes.ANY_TYPE:
+                transformed_value = self._str_to_anytype(value)
+            case _:
+                raise BulkJobError(f"Unanticipated field type {field_details.soapType} for field {name}. Please reach out to Estuary support for help resolving this issue.")
+
+        return transformed_value
 
 
     # Field values are always strings since they're parsed from a CSV file. We use the field types from Salesforce's
@@ -248,7 +252,7 @@ class BulkJobManager:
             if pre_value == "":
                 transformed_value = None
             else:
-                transformed_value = self._transform_value(name, fields[name].soapType, pre_value)
+                transformed_value = self._transform_value(name, fields[name], pre_value)
 
             transformed[name] = transformed_value
 
