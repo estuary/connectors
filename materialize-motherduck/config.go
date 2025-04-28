@@ -196,6 +196,10 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 		path = c.StagingBucket.BucketPathGCS
 	}
 
+	// If BucketPath starts with a /, trim it so we don't end up with repeated /
+	// chars in the URI and so the object key does not start with a /.
+	path = strings.TrimPrefix(path, "/")
+
 	return bucket, path, nil
 }
 
