@@ -16,6 +16,7 @@ from source_chargebee_native.models import (
 
 
 MAX_PAGE_LIMIT = 100
+MIN_INCREMENTAL_INTERVAL = timedelta(seconds=1)
 
 ChargebeeResourceType = TypeVar("ChargebeeResourceType", bound=ChargebeeResource)
 
@@ -122,6 +123,11 @@ async def fetch_resource_page(
     assert isinstance(cutoff, datetime)
     assert isinstance(offset, str | None)
 
+    if cutoff < start_date or (cutoff - start_date) < MIN_INCREMENTAL_INTERVAL:
+        # Return early if cutoff is before start_date
+        # or if the interval is less than the minimum incremental interval.
+        return
+
     resource_data, next_offset = await _fetch_resource_data(
         http,
         log,
@@ -154,10 +160,16 @@ async def fetch_resource_changes(
 ) -> AsyncGenerator[ChargebeeResource | LogCursor, None]:
     assert isinstance(log_cursor, int)
 
-    max_updated_at = _ts_to_dt(log_cursor)
+    start_date = _ts_to_dt(log_cursor)
+    end_date = min(start_date + timedelta(days=30), datetime.now(tz=UTC))
+    max_updated_at = start_date
     has_results = False
-    end_date = min(max_updated_at + timedelta(days=30), datetime.now(tz=UTC))
     offset = None
+
+    if end_date < start_date or (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
+        # Return early if end_date is before start_date
+        # or if the interval is less than the minimum incremental interval.
+        return
 
     while True:
         resource_data, next_offset = await _fetch_resource_data(
@@ -165,7 +177,7 @@ async def fetch_resource_changes(
             log,
             site,
             resource_name,
-            max_updated_at,
+            start_date,
             end_date,
             offset,
             True,
@@ -178,6 +190,9 @@ async def fetch_resource_changes(
         has_results = True
 
         for doc in resource_data:
+            if doc.cursor_value > log_cursor:
+                continue
+
             max_updated_at = max(max_updated_at, _ts_to_dt(doc.cursor_value))
 
             if doc.deleted:
@@ -270,6 +285,11 @@ async def fetch_associated_resource_page(
     assert isinstance(cutoff, datetime)
     assert isinstance(offset, str | None)
 
+    if cutoff < start_date or (cutoff - start_date) < MIN_INCREMENTAL_INTERVAL:
+        # Return early if cutoff is before start_date
+        # or if the interval is less than the minimum incremental interval.
+        return
+
     parent_ids = await _get_parent_ids(
         http,
         site,
@@ -314,9 +334,15 @@ async def fetch_associated_resource_changes(
 ) -> AsyncGenerator[ChargebeeResource | LogCursor, None]:
     assert isinstance(log_cursor, int)
 
-    max_updated_at = _ts_to_dt(log_cursor)
+    start_date = _ts_to_dt(log_cursor)
+    end_date = min(start_date + timedelta(days=30), datetime.now(tz=UTC))
+    max_updated_at = start_date
     has_results = False
-    end_date = min(max_updated_at + timedelta(days=30), datetime.now(tz=UTC))
+
+    if end_date < start_date or (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
+        # Return early if end_date is before start_date
+        # or if the interval is less than the minimum incremental interval.
+        return
 
     parent_ids = await _get_parent_ids(
         http,
@@ -337,7 +363,7 @@ async def fetch_associated_resource_changes(
                 log,
                 site,
                 endpoint,
-                max_updated_at,
+                start_date,
                 end_date,
                 offset,
                 True,
@@ -350,6 +376,9 @@ async def fetch_associated_resource_changes(
             has_results = True
 
             for doc in child_data:
+                if doc.cursor_value > log_cursor:
+                    continue
+                
                 max_updated_at = max(max_updated_at, _ts_to_dt(doc.cursor_value))
 
                 if doc.deleted:
