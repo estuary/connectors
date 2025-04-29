@@ -40,6 +40,16 @@ DO_NOT_HAVE_PLATFORM_CONTROLS_REGEX = r"You cannot perform this request as you d
 EVENT_NO_LONGER_RETAINED = r"is no longer available because it's aged out of our retention policy"
 
 
+# We have reason to believe the Stripe's Events API is eventually consistent. Examples of how to handle this
+# are written in the following article: https://blog.sequin.io/finding-and-fixing-eventual-consistency-with-stripe-events.
+# The approach in the article aims is to ensure the incremental tasks never fetch data more recent than 5 seconds in the past.
+# This is a good approach, however, we air on the side of caution and set the lag to 1 minute to ensure we don't miss any events.
+# This caps how "real-time" the streams can be but it's a simple fix that easily rolled back if we come up with a
+# better solution. The default interval is already 5 minutes, so the connector is not really "real-time" anyway.
+LAG = timedelta(minutes=1)
+MIN_INCREMENTAL_INTERVAL = timedelta(minutes=1)
+
+
 def add_event_types(
     params: dict[str, str | int], event_types: dict[str, Literal["c", "u", "d"]]
 ):
@@ -81,6 +91,15 @@ async def fetch_incremental(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls.EVENT_TYPES)
+    end = datetime.now(tz=UTC) - LAG
+
+    if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_INTERVAL):
+        # Return early and sleep if the end date is before the log cursor
+        # or the difference between the end date and log cursor is less than
+        # the minimum incremental interval.
+        return
+
+    parameters["created.lte"] = int(end.timestamp())
     headers = {}
     account_id = (
         connected_account_id
@@ -240,6 +259,15 @@ async def fetch_incremental_substreams(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
+    end = datetime.now(tz=UTC) - LAG
+
+    if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_INTERVAL):
+        # Return early and sleep if the end date is before the log cursor
+        # or the difference between the end date and log cursor is less than
+        # the minimum incremental interval.
+        return
+
+    parameters["created.lte"] = int(end.timestamp())
     max_ts = log_cursor
     headers = {}
     account_id = (
@@ -577,6 +605,15 @@ async def fetch_incremental_usage_records(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
+    end = datetime.now(tz=UTC) - LAG
+
+    if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_INTERVAL):
+        # Return early and sleep if the end date is before the log cursor
+        # or the difference between the end date and log cursor is less than
+        # the minimum incremental interval.
+        return
+
+    parameters["created.lte"] = int(end.timestamp())
     max_ts = log_cursor
     headers = {}
     account_id = (
