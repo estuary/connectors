@@ -232,48 +232,51 @@ func readdirAll(client *drive.FilesService, ctx context.Context, folderID string
 }
 
 func configSchema(parserSchema json.RawMessage) json.RawMessage {
-	var credentialSchema, _ = json.Marshal(google_auth.CredentialConfig{}.JSONSchema())
+	var credentialSchema, _ = google_auth.CredentialConfig{}.JSONSchema()
 
-	return json.RawMessage(`{
+	var schema = map[string]interface{}{
 		"$schema": "http://json-schema.org/draft-07/schema#",
 		"title":   "Google Drive Source",
 		"type":    "object",
-		"required": [
+		"required": []string{
 			"folderUrl",
-			"credentials"
-		],
-		"properties": {
-			"folderUrl": {
+			"credentials",
+		},
+		"properties": map[string]interface{}{
+			"folderUrl": map[string]interface{}{
 				"type":        "string",
 				"title":       "Folder URL",
 				"description": "URL of the Google Drive Folder to be captured from.",
-				"order":       1
+				"order":       1,
 			},
-			"credentials": ` + string(credentialSchema) + `,
-			"matchKeys": {
+			"credentials": credentialSchema,
+			"matchKeys": map[string]interface{}{
 				"type":        "string",
 				"title":       "Match Keys",
 				"format":      "regex",
 				"description": "Filter applied to file paths under the folder URL. If provided, only files whose paths (relative to the folder) match this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order":       3
+				"order":       3,
 			},
-			"advanced": {
-				"properties": {
-				  "ascendingKeys": {
-					"type":        "boolean",
-					"title":       "Ascending Keys",
-					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/fOMT4s.",
-					"default":     false
-				  }
+			"advanced": map[string]interface{}{
+				"properties": map[string]interface{}{
+					"ascendingKeys": map[string]interface{}{
+						"type":        "boolean",
+						"title":       "Ascending Keys",
+						"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/fOMT4s.",
+						"default":     false,
+					},
 				},
 				"additionalProperties": false,
-				"type": "object",
-				"description": "Options for advanced users. You should not typically need to modify these.",
-				"advanced": true
+				"type":                 "object",
+				"description":          "Options for advanced users. You should not typically need to modify these.",
+				"advanced":             true,
 			},
-			"parser": ` + string(parserSchema) + `
-		}
-    }`)
+			"parser": json.RawMessage(parserSchema),
+		},
+	}
+
+	var result, _ = json.Marshal(schema)
+	return json.RawMessage(result)
 }
 
 func main() {
