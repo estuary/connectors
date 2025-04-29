@@ -103,7 +103,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 // generateCollectionSchema translates the discovery information of a table into a Flow
 // collection schema (plus the discovered collection key, for convenience).
-func generateCollectionSchema(db Database, table *DiscoveryInfo, includeNullability bool) (json.RawMessage, []string, error) {
+func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema bool) (json.RawMessage, []string, error) {
 	// Schema of the embedded "source" property.
 	var sourceSchema = (&jsonschema.Reflector{
 		ExpandedStruct:            true,
@@ -174,9 +174,9 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, includeNullabil
 			nullabilityDescription = "non-nullable "
 		}
 
-		// If the column type is an array of multiple options, and we don't want nullability
-		// in the generated schema, we need to remove "null" as an option.
-		if types, ok := jsonType.Extras["type"].([]string); ok && len(types) > 1 && !includeNullability {
+		// If the column type is an array of multiple options, and we're generating the more
+		// minimal schema used in SourcedSchema messages, we need to remove "null" as an option.
+		if types, ok := jsonType.Extras["type"].([]string); ok && len(types) > 1 && !fullWriteSchema {
 			jsonType.Extras["type"] = slices.DeleteFunc(types, func(t string) bool {
 				return t == "null"
 			})
@@ -186,6 +186,80 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, includeNullabil
 		properties[column.Name] = jsonType
 	}
 
+	var beforeSchema = &jsonschema.Schema{
+		Ref:         "#" + anchor,
+		Description: "Record state immediately before this change was applied.",
+	}
+	if fullWriteSchema {
+		beforeSchema.Extras = map[string]any{
+			"reduce": map[string]any{"strategy": "firstWriteWins"},
+		}
+	}
+
+	var metaPropertySchema = &jsonschema.Schema{
+		Type: "object",
+		Extras: map[string]any{
+			"properties": map[string]*jsonschema.Schema{
+				"op": {
+					Enum:        []any{"c", "d", "u"},
+					Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+				},
+				"source": sourceSchema,
+				"before": beforeSchema,
+			},
+		},
+		Required: []string{"op", "source"},
+	}
+	if fullWriteSchema {
+		metaPropertySchema.Extras["reduce"] = map[string]any{"strategy": "merge"}
+	}
+
+	var metadataSchema = &jsonschema.Schema{
+		Extras: map[string]any{
+			"properties": map[string]*jsonschema.Schema{
+				"_meta": metaPropertySchema,
+			},
+		},
+		Required: []string{"_meta"},
+	}
+
+	// The 'full' schema generated for discovery includes if/then/else conditional reduction
+	// behavior which expresses how deletions work. We don't want that in a SourcedSchema update.
+	if fullWriteSchema {
+		metadataSchema.If = &jsonschema.Schema{
+			Extras: map[string]any{
+				"properties": map[string]*jsonschema.Schema{
+					"_meta": {
+						Extras: map[string]any{
+							"properties": map[string]*jsonschema.Schema{
+								"op": {
+									Extras: map[string]any{
+										"const": "d",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		}
+		metadataSchema.Then = &jsonschema.Schema{
+			Extras: map[string]any{
+				"reduce": map[string]any{
+					"strategy": "merge",
+					"delete":   true,
+				},
+			},
+		}
+		metadataSchema.Else = &jsonschema.Schema{
+			Extras: map[string]any{
+				"reduce": map[string]any{
+					"strategy": "merge",
+				},
+			},
+		}
+	}
+
 	// Schema.Properties is a weird OrderedMap thing, which doesn't allow for inline
 	// literal construction. Instead, use the Schema.Extras mechanism with "properties"
 	// to generate the properties keyword with an inline map.
@@ -193,80 +267,14 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, includeNullabil
 		Definitions: jsonschema.Definitions{
 			anchor: &jsonschema.Schema{
 				Type: "object",
-				Extras: map[string]interface{}{
+				Extras: map[string]any{
 					"$anchor":    anchor,
 					"properties": properties,
 				},
 				Required: collectionKey,
 			},
 		},
-		AllOf: []*jsonschema.Schema{
-			{
-				Extras: map[string]interface{}{
-					"properties": map[string]*jsonschema.Schema{
-						"_meta": {
-							Type: "object",
-							Extras: map[string]interface{}{
-								"properties": map[string]*jsonschema.Schema{
-									"op": {
-										Enum:        []interface{}{"c", "d", "u"},
-										Description: "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
-									},
-									"source": sourceSchema,
-									"before": {
-										Ref:         "#" + anchor,
-										Description: "Record state immediately before this change was applied.",
-										Extras: map[string]interface{}{
-											"reduce": map[string]interface{}{
-												"strategy": "firstWriteWins",
-											},
-										},
-									},
-								},
-								"reduce": map[string]interface{}{
-									"strategy": "merge",
-								},
-							},
-							Required: []string{"op", "source"},
-						},
-					},
-				},
-				Required: []string{"_meta"},
-				If: &jsonschema.Schema{
-					Extras: map[string]interface{}{
-						"properties": map[string]*jsonschema.Schema{
-							"_meta": {
-								Extras: map[string]interface{}{
-									"properties": map[string]*jsonschema.Schema{
-										"op": {
-											Extras: map[string]interface{}{
-												"const": "d",
-											},
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-				Then: &jsonschema.Schema{
-					Extras: map[string]interface{}{
-						"reduce": map[string]interface{}{
-							"strategy": "merge",
-							"delete":   true,
-						},
-					},
-				},
-				Else: &jsonschema.Schema{
-					Extras: map[string]interface{}{
-						"reduce": map[string]interface{}{
-							"strategy": "merge",
-						},
-					},
-				},
-			},
-			{Ref: "#" + anchor},
-		},
+		AllOf: []*jsonschema.Schema{metadataSchema, {Ref: "#" + anchor}},
 	}
 	if table.UseSchemaInference {
 		schema.Extras = map[string]any{"x-infer-schema": true}
