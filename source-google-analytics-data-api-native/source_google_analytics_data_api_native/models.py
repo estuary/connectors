@@ -21,6 +21,11 @@ from estuary_cdk.capture.common import (
 from pydantic import AwareDatetime, BaseModel, Field, create_model
 
 
+# Google enforces that start dates must be greater than 2015-08-13
+# and less than 3000-01-01.
+MIN_START_DATE = datetime(year=2015, month=8, day=14, tzinfo=UTC)
+
+
 def urlencode_field(field: str):
     return "{{#urlencode}}{{{ " + field + " }}}{{/urlencode}}"
 
@@ -80,6 +85,8 @@ class EndpointConfig(BaseModel):
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
         title="Start Date",
         default_factory=default_start_date,
+        ge=MIN_START_DATE,
+        le=datetime.now(tz=UTC),
     )
     credentials: OAuth2Credentials = Field(
         discriminator="credentials_title",
