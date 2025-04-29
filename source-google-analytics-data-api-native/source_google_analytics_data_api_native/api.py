@@ -8,6 +8,7 @@ from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
+    MIN_START_DATE,
     DimensionHeader,
     MetricHeader,
     Report,
@@ -172,7 +173,13 @@ async def fetch_report(
 ) -> AsyncGenerator[ReportDocument | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    lookback_start = max(log_cursor - timedelta(days=lookback_window_size), start_date)
+    lookback_start = max(
+        log_cursor - timedelta(days=lookback_window_size),
+        start_date,
+        # Although the lookback_window_size is unlikely to be large enough to make lookback_start
+        # before MIN_START_DATE, we should handle this case since it'll probably happen eventually.
+        MIN_START_DATE.replace(tzinfo=timezone),
+    )
     start = log_cursor
     end = datetime.now(tz=timezone)
 
