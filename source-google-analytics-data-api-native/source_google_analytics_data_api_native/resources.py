@@ -22,6 +22,7 @@ from .models import (
     ResourceConfig,
     ResourceState,
     OAUTH2_SPEC,
+    MIN_START_DATE,
     create_report_doc_model,
     MetricAggregation,
     Report,
@@ -185,7 +186,12 @@ def reports(
             )
         )
 
-    start = config.start_date.astimezone(tz=timezone)
+    start = max(
+        config.start_date.astimezone(tz=timezone),
+        # The start date used in the report must still be greater than or equal
+        # to the MIN_START_DATE in the user's timezone.
+        MIN_START_DATE.replace(tzinfo=timezone)
+    )
     cutoff = datetime.now(tz=timezone)
     resources: list[common.Resource] = []
 
