@@ -242,6 +242,7 @@ func (c *capture) doBackfill(
 		"collection":         binding.resource.Collection,
 		"estimatedTotalDocs": estimatedTotalDocs,
 	})
+	logEntry.Info("starting backfill for collection")
 
 	for {
 		select {
