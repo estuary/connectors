@@ -521,7 +521,7 @@ async def _scroll_companies(
                 )
             except HTTPError as err:
                 if err.code == 400 and bool(re.search(COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX, err.message, re.DOTALL)):
-                    log.fatal(
+                    log.error(
                         "Unable to access the /companies/scroll endpoint because it's in use by a different application."
                         " Please ensure no other application is using the /companies/scroll endpoint or "
                         " configure the connector to use the alternative /companies/list endpoint."
