@@ -53,6 +53,7 @@ class EndpointConfig(BaseModel):
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated. If left blank, defaults to 30 days before current time.",
         title="Start Date",
         default_factory=default_start_date,
+        le=datetime.now(tz=UTC),
     )
     product_catalog: Literal["1.0", "2.0"] = Field(
         description="The product catalog version to use.",
