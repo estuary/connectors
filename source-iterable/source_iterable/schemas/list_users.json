@@ -7,5 +7,6 @@
       "type": "integer"
     }
   },
+  "required": ["listId"],
   "type": "object"
 }

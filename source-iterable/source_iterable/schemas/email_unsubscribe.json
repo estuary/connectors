@@ -53,5 +53,6 @@
       "type": ["null", "integer"]
     }
   },
+  "required": ["email"],
   "type": "object"
 }

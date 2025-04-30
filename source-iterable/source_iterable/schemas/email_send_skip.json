@@ -129,5 +129,6 @@
       "type": ["null", "integer"]
     }
   },
+  "required": ["email", "messageId"],
   "type": "object"
 }

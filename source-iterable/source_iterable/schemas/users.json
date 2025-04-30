@@ -333,5 +333,6 @@
       "format": "date-time"
     }
   },
+  "required": ["email"],
   "type": "object"
 }

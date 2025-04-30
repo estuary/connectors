@@ -26,5 +26,6 @@
       "type": ["null", "string"]
     }
   },
+  "required": ["templateId"],
   "type": "object"
 }
