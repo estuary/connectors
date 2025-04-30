@@ -60,5 +60,6 @@
       "type": ["null", "string"]
     }
   },
+  "required": ["email", "messageId"],
   "type": "object"
 }

@@ -10,5 +10,6 @@
       "type": ["null", "number"]
     }
   },
+  "required": ["id"],
   "type": "object"
 }
