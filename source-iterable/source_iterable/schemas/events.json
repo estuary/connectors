@@ -30,5 +30,6 @@
       "type": ["null", "object"]
     }
   },
+  "required": ["createdAt", "email"],
   "type": "object"
 }
