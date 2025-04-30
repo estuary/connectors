@@ -154,9 +154,10 @@ async def fetch_resource_changes(
 ) -> AsyncGenerator[ChargebeeResource | LogCursor, None]:
     assert isinstance(log_cursor, int)
 
-    max_updated_at = _ts_to_dt(log_cursor)
+    start_date = _ts_to_dt(log_cursor)
+    end_date = min(start_date + timedelta(days=30), datetime.now(tz=UTC))
+    max_updated_at = start_date
     has_results = False
-    end_date = min(max_updated_at + timedelta(days=30), datetime.now(tz=UTC))
     offset = None
 
     while True:
@@ -165,7 +166,7 @@ async def fetch_resource_changes(
             log,
             site,
             resource_name,
-            max_updated_at,
+            start_date,
             end_date,
             offset,
             True,
@@ -178,6 +179,9 @@ async def fetch_resource_changes(
         has_results = True
 
         for doc in resource_data:
+            if doc.cursor_value > log_cursor:
+                continue
+
             max_updated_at = max(max_updated_at, _ts_to_dt(doc.cursor_value))
 
             if doc.deleted:
@@ -314,9 +318,10 @@ async def fetch_associated_resource_changes(
 ) -> AsyncGenerator[ChargebeeResource | LogCursor, None]:
     assert isinstance(log_cursor, int)
 
-    max_updated_at = _ts_to_dt(log_cursor)
+    start_date = _ts_to_dt(log_cursor)
+    end_date = min(start_date + timedelta(days=30), datetime.now(tz=UTC))
+    max_updated_at = start_date
     has_results = False
-    end_date = min(max_updated_at + timedelta(days=30), datetime.now(tz=UTC))
 
     parent_ids = await _get_parent_ids(
         http,
@@ -337,7 +342,7 @@ async def fetch_associated_resource_changes(
                 log,
                 site,
                 endpoint,
-                max_updated_at,
+                start_date,
                 end_date,
                 offset,
                 True,
@@ -350,6 +355,9 @@ async def fetch_associated_resource_changes(
             has_results = True
 
             for doc in child_data:
+                if doc.cursor_value > log_cursor:
+                    continue
+                
                 max_updated_at = max(max_updated_at, _ts_to_dt(doc.cursor_value))
 
                 if doc.deleted:
