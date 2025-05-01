@@ -336,5 +336,855 @@
         }
       ]
     }
+  ],
+  [
+    "acmeCo/fulfillment_orders",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-10T17:42:58Z",
+      "fulfillmentOrders": [
+        {
+          "__parentId": "gid://shopify/Order/5714619858989",
+          "__typename": "FulfillmentOrder",
+          "assignedLocation": {
+            "address1": null,
+            "address2": null,
+            "city": null,
+            "countryCode": "US",
+            "location": {
+              "id": "gid://shopify/Location/73871392813",
+              "legacyResourceId": "73871392813"
+            },
+            "name": "Shop location",
+            "phone": null,
+            "province": null,
+            "zip": null
+          },
+          "channelId": null,
+          "createdAt": "2025-04-10T17:42:58Z",
+          "deliveryMethod": {
+            "id": "gid://shopify/DeliveryMethod/1234789171245",
+            "maxDeliveryDateTime": null,
+            "methodType": "NONE",
+            "minDeliveryDateTime": null
+          },
+          "destination": {
+            "address1": null,
+            "address2": null,
+            "city": null,
+            "company": null,
+            "countryCode": null,
+            "email": "ayumu.hirano@example.com",
+            "firstName": null,
+            "id": "gid://shopify/FulfillmentOrderDestination/6991280111661",
+            "lastName": null,
+            "phone": null,
+            "province": null,
+            "zip": null
+          },
+          "fulfillAt": "2025-04-10T17:00:00Z",
+          "fulfillBy": null,
+          "fulfillmentHolds": [],
+          "id": "gid://shopify/FulfillmentOrder/6720249167917",
+          "internationalDuties": null,
+          "lineItems": [
+            {
+              "__parentId": "gid://shopify/FulfillmentOrder/6720249167917",
+              "__typename": "FulfillmentOrderLineItem",
+              "id": "gid://shopify/FulfillmentOrderLineItem/14276053729325",
+              "inventoryItemId": "gid://shopify/InventoryItem/45258935009325",
+              "lineItem": {
+                "currentQuantity": 1,
+                "fulfillableQuantity": 1,
+                "id": "gid://shopify/LineItem/14150963134509",
+                "product": {
+                  "id": "gid://shopify/Product/8086707830829",
+                  "legacyResourceId": "8086707830829"
+                },
+                "variant": {
+                  "id": "gid://shopify/ProductVariant/43217823367213",
+                  "legacyResourceId": "43217823367213"
+                }
+              }
+            },
+            {
+              "__parentId": "gid://shopify/FulfillmentOrder/6720249167917",
+              "__typename": "FulfillmentOrderLineItem",
+              "id": "gid://shopify/FulfillmentOrderLineItem/14276053762093",
+              "inventoryItemId": "gid://shopify/InventoryItem/45258935042093",
+              "lineItem": {
+                "currentQuantity": 1,
+                "fulfillableQuantity": 1,
+                "id": "gid://shopify/LineItem/14150963167277",
+                "product": {
+                  "id": "gid://shopify/Product/8086707830829",
+                  "legacyResourceId": "8086707830829"
+                },
+                "variant": {
+                  "id": "gid://shopify/ProductVariant/43217823399981",
+                  "legacyResourceId": "43217823399981"
+                }
+              }
+            }
+          ],
+          "merchantRequests": [],
+          "requestStatus": "UNSUBMITTED",
+          "status": "OPEN",
+          "supportedActions": [],
+          "updatedAt": "2025-04-10T17:42:58Z"
+        }
+      ],
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/fulfillments",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-10T17:42:58Z",
+      "fulfillments": [],
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/orders",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "app": {
+        "id": "gid://shopify/App/1354745"
+      },
+      "billingAddress": null,
+      "cancelReason": null,
+      "cancelledAt": null,
+      "clientIp": "209.25.185.18",
+      "closedAt": "2025-04-10T17:54:23Z",
+      "confirmationNumber": "WIEXW87LG",
+      "confirmed": true,
+      "createdAt": "2025-04-10T17:42:58Z",
+      "currencyCode": "USD",
+      "currentSubtotalPriceSet": {
+        "presentmentMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        }
+      },
+      "currentTotalAdditionalFeesSet": null,
+      "currentTotalDiscountsSet": {
+        "presentmentMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        }
+      },
+      "currentTotalDutiesSet": null,
+      "currentTotalPriceSet": {
+        "presentmentMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        }
+      },
+      "currentTotalTaxSet": {
+        "presentmentMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        }
+      },
+      "customAttributes": [],
+      "customer": {
+        "id": "gid://shopify/Customer/7609762938925",
+        "legacyResourceId": "7609762938925"
+      },
+      "customerAcceptsMarketing": false,
+      "customerJourneySummary": {
+        "customerOrderIndex": 1,
+        "daysToConversion": null,
+        "firstVisit": null,
+        "lastVisit": null,
+        "momentsCount": {
+          "count": 0,
+          "precision": "EXACT"
+        },
+        "ready": true
+      },
+      "customerLocale": "en",
+      "discountApplications": [],
+      "discountCode": null,
+      "discountCodes": [],
+      "displayFinancialStatus": "PENDING",
+      "displayFulfillmentStatus": "UNFULFILLED",
+      "email": "ayumu.hirano@example.com",
+      "estimatedTaxes": false,
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "merchantOfRecordApp": null,
+      "name": "#1001",
+      "note": "Testing a note.",
+      "originalTotalAdditionalFeesSet": null,
+      "originalTotalDutiesSet": null,
+      "paymentGatewayNames": [],
+      "paymentTerms": {
+        "dueInDays": 7,
+        "id": "gid://shopify/PaymentTerms/22703865901",
+        "overdue": true,
+        "paymentSchedules": [
+          {
+            "__parentId": "gid://shopify/Order/5714619858989",
+            "completedAt": null,
+            "dueAt": "2025-04-17T17:40:19Z",
+            "id": "gid://shopify/PaymentSchedule/22655238189",
+            "issuedAt": "2025-04-10T17:40:19Z"
+          }
+        ],
+        "paymentTermsName": "Net 7",
+        "paymentTermsType": "NET"
+      },
+      "phone": "+16135550127",
+      "poNumber": null,
+      "presentmentCurrencyCode": "USD",
+      "processedAt": "2025-04-10T17:42:57Z",
+      "purchasingEntity": {
+        "__typename": "Customer"
+      },
+      "referrerUrl": null,
+      "registeredSourceUrl": null,
+      "sourceIdentifier": null,
+      "sourceName": "shopify_draft_order",
+      "statusPageUrl": "https://estuary-alex-testing.myshopify.com/66340061229/orders/cec7ba12de8a68ac88469d6418753eb4/authenticate?key=7d63fdde023ada08f12771dfd7d82cdc",
+      "subtotalPrice": "75.00",
+      "subtotalPriceSet": {
+        "presentmentMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        }
+      },
+      "tags": [],
+      "taxExempt": false,
+      "taxLines": [],
+      "taxesIncluded": false,
+      "test": false,
+      "totalDiscountsSet": {
+        "presentmentMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        }
+      },
+      "totalOutstandingSet": {
+        "presentmentMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        }
+      },
+      "totalPriceSet": {
+        "presentmentMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "75.0",
+          "currencyCode": "USD"
+        }
+      },
+      "totalShippingPriceSet": {
+        "presentmentMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        }
+      },
+      "totalTaxSet": {
+        "presentmentMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        }
+      },
+      "totalTipReceivedSet": {
+        "presentmentMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        },
+        "shopMoney": {
+          "amount": "0.0",
+          "currencyCode": "USD"
+        }
+      },
+      "totalWeight": "0",
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/order_agreements",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "agreements": [
+        {
+          "__parentId": "gid://shopify/Order/5714619858989",
+          "happenedAt": "2025-04-10T17:42:57Z",
+          "id": "gid://shopify/SalesAgreement/6106772504621",
+          "reason": "ORDER",
+          "sales": [
+            {
+              "__parentId": "gid://shopify/SalesAgreement/6106772504621",
+              "actionType": "ORDER",
+              "id": "gid://shopify/Sale/18159734718509",
+              "lineType": "GIFT_CARD",
+              "quantity": 1,
+              "totalAmount": {
+                "presentmentMoney": {
+                  "amount": "25.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "25.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalDiscountAmountAfterTaxes": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalDiscountAmountBeforeTaxes": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxAmount": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            },
+            {
+              "__parentId": "gid://shopify/SalesAgreement/6106772504621",
+              "actionType": "ORDER",
+              "id": "gid://shopify/Sale/18159734751277",
+              "lineType": "GIFT_CARD",
+              "quantity": 1,
+              "totalAmount": {
+                "presentmentMoney": {
+                  "amount": "50.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "50.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalDiscountAmountAfterTaxes": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalDiscountAmountBeforeTaxes": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              },
+              "totalTaxAmount": {
+                "presentmentMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                },
+                "shopMoney": {
+                  "amount": "0.0",
+                  "currencyCode": "USD"
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "createdAt": "2025-04-10T17:42:58Z",
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/order_metafields",
+    {
+      "__parentId": "gid://shopify/Order/5714631688237",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-18T13:20:25Z",
+      "definition": {
+        "description": "Testing out the metafield definition for an order.",
+        "id": "gid://shopify/MetafieldDefinition/79388246061",
+        "namespace": "custom",
+        "type": {
+          "category": "NUMBER",
+          "name": "number_integer"
+        }
+      },
+      "id": "gid://shopify/Metafield/41993463529517",
+      "key": "order_metafield_definition_test",
+      "legacyResourceId": "41993463529517",
+      "metafields": [],
+      "namespace": "custom",
+      "ownerType": "ORDER",
+      "type": "number_integer",
+      "updatedAt": "2025-04-18T13:20:25Z",
+      "value": "5"
+    }
+  ],
+  [
+    "acmeCo/order_transactions",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-10T17:42:58Z",
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "transactions": [],
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/order_refunds",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-10T17:42:58Z",
+      "displayFinancialStatus": "PENDING",
+      "displayFulfillmentStatus": "UNFULFILLED",
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "refunds": [],
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/order_risks",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-04-10T17:42:58Z",
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
+      "risk": {
+        "assessments": [
+          {
+            "facts": [
+              {
+                "description": "Card Verification Value (CVV) isn't available",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "Billing address or credit card's address wasn't available",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "Billing address ZIP or postal code isn't available to match with credit card's registered address",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "There were no payment attempts",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "A payment method other than a credit card was used",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "Location of IP address used to place the order is Starkville, Mississippi, United States",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "Distance between shipping address and location of IP address isn't available",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "The billing country or the country of the IP used to place the order isn't available",
+                "sentiment": "NEUTRAL"
+              },
+              {
+                "description": "The IP address used to place the order isn't a high risk internet connection (web proxy)",
+                "sentiment": "POSITIVE"
+              }
+            ],
+            "provider": null,
+            "riskLevel": "NONE"
+          }
+        ],
+        "recommendation": "NONE"
+      },
+      "updatedAt": "2025-04-10T17:54:23Z"
+    }
+  ],
+  [
+    "acmeCo/inventory_items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "countryCodeOfOrigin": null,
+      "createdAt": "2025-01-14T15:10:14Z",
+      "harmonizedSystemCode": null,
+      "id": "gid://shopify/InventoryItem/45258934976557",
+      "inventoryHistoryUrl": null,
+      "legacyResourceId": "45258934976557",
+      "provinceCodeOfOrigin": null,
+      "requiresShipping": false,
+      "sku": null,
+      "tracked": false,
+      "unitCost": null,
+      "updatedAt": "2025-01-14T15:10:14Z",
+      "variant": {
+        "id": "gid://shopify/ProductVariant/43217823334445",
+        "legacyResourceId": "43217823334445",
+        "product": {
+          "id": "gid://shopify/Product/8086707830829",
+          "legacyResourceId": "8086707830829",
+          "title": "Gift Card"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/inventory_levels",
+    {
+      "__parentId": "gid://shopify/InventoryItem/45258934976557",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "canDeactivate": false,
+      "createdAt": "2025-01-14T15:10:14Z",
+      "deactivationAlert": "Can't unstock from this location because it has committed inventory.",
+      "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258934976557",
+      "item": {
+        "id": "gid://shopify/InventoryItem/45258934976557",
+        "legacyResourceId": "45258934976557"
+      },
+      "location": {
+        "id": "gid://shopify/Location/73871392813",
+        "legacyResourceId": "73871392813"
+      },
+      "quantities": [
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=available",
+          "name": "available",
+          "quantity": 0,
+          "updatedAt": "2025-01-14T15:10:14Z"
+        },
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=incoming",
+          "name": "incoming",
+          "quantity": 0,
+          "updatedAt": null
+        },
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=committed",
+          "name": "committed",
+          "quantity": 0,
+          "updatedAt": null
+        },
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=damaged",
+          "name": "damaged",
+          "quantity": 0,
+          "updatedAt": null
+        },
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=on_hand",
+          "name": "on_hand",
+          "quantity": 0,
+          "updatedAt": null
+        },
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=quality_control",
+          "name": "quality_control",
+          "quantity": 0,
+          "updatedAt": null
+        },
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=reserved",
+          "name": "reserved",
+          "quantity": 0,
+          "updatedAt": null
+        },
+        {
+          "id": "gid://shopify/InventoryQuantity/108219858989?inventory_item_id=45258934976557&name=safety_stock",
+          "name": "safety_stock",
+          "quantity": 0,
+          "updatedAt": null
+        }
+      ],
+      "scheduledChanges": [],
+      "updatedAt": "2025-01-14T15:10:14Z"
+    }
+  ],
+  [
+    "acmeCo/custom_collections",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "description": "",
+      "descriptionHtml": "",
+      "handle": "frontpage",
+      "id": "gid://shopify/Collection/295442513965",
+      "legacyResourceId": "295442513965",
+      "products": [
+        {
+          "__parentId": "gid://shopify/Collection/295442513965",
+          "id": "gid://shopify/Product/8086707830829",
+          "legacyResourceId": "8086707830829"
+        }
+      ],
+      "productsCount": {
+        "count": 1,
+        "precision": "EXACT"
+      },
+      "publications": [
+        {
+          "__parentId": "gid://shopify/Collection/295442513965",
+          "publication": {
+            "id": "gid://shopify/Publication/148054310957",
+            "name": "Online Store"
+          },
+          "publishDate": "2025-01-14T15:09:39Z"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442513965",
+          "publication": {
+            "id": "gid://shopify/Publication/148054376493",
+            "name": "Shop"
+          },
+          "publishDate": "2025-01-14T15:09:43Z"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442513965",
+          "publication": {
+            "id": "gid://shopify/Publication/148054409261",
+            "name": "Point of Sale"
+          },
+          "publishDate": "2025-01-14T15:09:43Z"
+        }
+      ],
+      "sortOrder": "BEST_SELLING",
+      "templateSuffix": null,
+      "title": "Home page",
+      "updatedAt": "2025-04-10T17:45:43Z"
+    }
+  ],
+  [
+    "acmeCo/smart_collections",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "description": "",
+      "descriptionHtml": "",
+      "handle": "automated-collection",
+      "id": "gid://shopify/Collection/295442612269",
+      "legacyResourceId": "295442612269",
+      "products": [
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086707994669",
+          "legacyResourceId": "8086707994669"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086708125741",
+          "legacyResourceId": "8086708125741"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086708355117",
+          "legacyResourceId": "8086708355117"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086708322349",
+          "legacyResourceId": "8086708322349"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086708256813",
+          "legacyResourceId": "8086708256813"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086708191277",
+          "legacyResourceId": "8086708191277"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086708092973",
+          "legacyResourceId": "8086708092973"
+        },
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "id": "gid://shopify/Product/8086707929133",
+          "legacyResourceId": "8086707929133"
+        }
+      ],
+      "productsCount": {
+        "count": 8,
+        "precision": "EXACT"
+      },
+      "publications": [
+        {
+          "__parentId": "gid://shopify/Collection/295442612269",
+          "publication": {
+            "id": "gid://shopify/Publication/148054310957",
+            "name": "Online Store"
+          },
+          "publishDate": "2025-01-14T15:10:14Z"
+        }
+      ],
+      "sortOrder": "BEST_SELLING",
+      "templateSuffix": null,
+      "title": "Automated Collection",
+      "updatedAt": "2025-04-24T20:25:42Z"
+    }
+  ],
+  [
+    "acmeCo/custom_collection_metafields",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "gid://shopify/Collection/295442513965",
+      "legacyResourceId": "295442513965",
+      "metafields": [],
+      "updatedAt": "2025-04-10T17:45:43Z"
+    }
+  ],
+  [
+    "acmeCo/smart_collection_metafields",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "gid://shopify/Collection/295442612269",
+      "legacyResourceId": "295442612269",
+      "metafields": [],
+      "updatedAt": "2025-04-24T20:25:42Z"
+    }
+  ],
+  [
+    "acmeCo/locations",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "activatable": true,
+      "address": {
+        "address1": null,
+        "address2": null,
+        "city": null,
+        "country": "United States",
+        "countryCode": "US",
+        "phone": null,
+        "province": null,
+        "provinceCode": null,
+        "zip": null
+      },
+      "addressVerified": true,
+      "createdAt": "2025-01-14T15:09:43Z",
+      "deactivatable": false,
+      "deactivatedAt": null,
+      "deletable": false,
+      "fulfillmentService": null,
+      "fulfillsOnlineOrders": true,
+      "hasActiveInventory": true,
+      "hasUnfulfilledOrders": true,
+      "id": "gid://shopify/Location/73871392813",
+      "isActive": true,
+      "legacyResourceId": "73871392813",
+      "name": "Shop location",
+      "shipsInventory": true,
+      "updatedAt": "2025-01-14T15:09:43Z"
+    }
+  ],
+  [
+    "acmeCo/location_metafields",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-01-14T15:09:43Z",
+      "id": "gid://shopify/Location/73871392813",
+      "legacyResourceId": "73871392813",
+      "metafields": [],
+      "updatedAt": "2025-01-14T15:09:43Z"
+    }
   ]
 ]
