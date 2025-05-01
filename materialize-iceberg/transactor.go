@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"math"
 	"path"
 	"slices"
 	"strconv"
@@ -365,6 +366,7 @@ func (t *transactor) loadWorker(ctx context.Context, loaded func(binding int, do
 		}
 
 		scanner := bufio.NewScanner(gzr)
+		scanner.Buffer(make([]byte, 0, 64*1024), math.MaxInt64)
 		for scanner.Scan() {
 			line := scanner.Bytes()
 			if commaIdx := bytes.IndexByte(line, '\u0000'); commaIdx == -1 {
