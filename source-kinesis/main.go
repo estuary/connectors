@@ -136,6 +136,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		client:      client,
 		stream:      stream,
 		updateState: make(map[boilerplate.StateKey]map[string]*string),
+		stats:       make(map[string]map[string]shardStats),
 	}
 
 	if err := stream.Ready(false); err != nil {
@@ -166,6 +167,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			return c.readStream(groupCtx, streams[streamIdx], sk, i, maps.Clone(state.Streams[sk]))
 		})
 	}
+	group.Go(func() error { return c.statsLogger(groupCtx) })
 
 	return group.Wait()
 }
