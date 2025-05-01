@@ -12,7 +12,7 @@ import (
 	"unicode/utf8"
 	"unsafe"
 
-	"github.com/klauspost/compress/gzip"
+	"github.com/klauspost/pgzip"
 )
 
 const csvCompressionlevel = flate.BestSpeed
@@ -27,7 +27,7 @@ type CsvEncoder struct {
 	fields []string
 	csv    *csvWriter
 	cwc    *countingWriteCloser
-	gz     *gzip.Writer
+	gz     *pgzip.Writer
 }
 
 type CsvOption func(*csvConfig)
@@ -51,7 +51,7 @@ func NewCsvEncoder(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvEnc
 	}
 
 	cwc := &countingWriteCloser{w: w}
-	gz, err := gzip.NewWriterLevel(cwc, csvCompressionlevel)
+	gz, err := pgzip.NewWriterLevel(cwc, csvCompressionlevel)
 	if err != nil {
 		// Only possible if compressionLevel is not valid.
 		panic("invalid compression level for gzip.NewWriterLevel")
