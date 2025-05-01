@@ -31,7 +31,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 242
+            "Size": 247
           }
         ],
         "Version": "ffffffffffffffff"
@@ -45,7 +45,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 242
+            "Size": 247
           }
         ],
         "Version": "ffffffffffffffff"
@@ -59,7 +59,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 119
+            "Size": 124
           }
         ],
         "Version": "ffffffffffffffff"
@@ -153,7 +153,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 240
+            "Size": 245
           }
         ],
         "Version": "ffffffffffffffff"
@@ -167,7 +167,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 240
+            "Size": 245
           }
         ],
         "Version": "ffffffffffffffff"
@@ -181,7 +181,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 116
+            "Size": 122
           }
         ],
         "Version": "ffffffffffffffff"
@@ -248,7 +248,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 238
+            "Size": 243
           }
         ],
         "Version": "ffffffffffffffff"
@@ -262,7 +262,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 238
+            "Size": 243
           }
         ],
         "Version": "ffffffffffffffff"
@@ -276,7 +276,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 116
+            "Size": 121
           }
         ],
         "Version": "ffffffffffffffff"
@@ -302,7 +302,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 238
+            "Size": 243
           }
         ],
         "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_4_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS___WITH_SPACES_69560B841F9AAA81",
@@ -315,7 +315,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 238
+            "Size": 243
           }
         ],
         "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_004B23684AF8F596",
@@ -328,7 +328,7 @@
         "PipeFiles": [
           {
             "Path": "<uuid>",
-            "Size": 116
+            "Size": 121
           }
         ],
         "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_EXCLUDE_FLO_355992F22E69242D",
