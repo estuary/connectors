@@ -143,7 +143,7 @@ class FulfillmentOrders(ShopifyGraphQLResource):
                 current_fulfillment_order["lineItems"] = []
                 current_order["fulfillmentOrders"].append(current_fulfillment_order)
 
-            elif "gid://shopify/MerchantRequest/" in id:
+            elif "gid://shopify/FulfillmentOrderMerchantRequest/" in id:
                 if not current_fulfillment_order:
                     log.error(
                         "Found a merchant request before finding a fulfillment order."
