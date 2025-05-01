@@ -49,6 +49,7 @@ require (
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/klauspost/compress v1.18.0
+	github.com/klauspost/pgzip v1.2.6
 	github.com/marcboeker/go-duckdb/v2 v2.1.0
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/microsoft/go-mssqldb v1.8.0

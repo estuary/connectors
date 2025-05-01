@@ -6,7 +6,7 @@ import (
 	"io"
 
 	"github.com/estuary/connectors/go/encrow"
-	"github.com/klauspost/compress/gzip"
+	"github.com/klauspost/pgzip"
 	"github.com/segmentio/encoding/json"
 )
 
@@ -46,7 +46,7 @@ func WithJsonSkipNulls() JsonOption {
 type JsonEncoder struct {
 	w     io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
 	cwc   *countingWriteCloser
-	gz    *gzip.Writer
+	gz    *pgzip.Writer
 	shape *encrow.Shape
 	buf   []byte
 }
@@ -64,7 +64,7 @@ func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *Json
 	}
 
 	if !cfg.disableCompression {
-		gz, err := gzip.NewWriterLevel(enc.cwc, jsonCompressionlevel)
+		gz, err := pgzip.NewWriterLevel(enc.cwc, jsonCompressionlevel)
 		if err != nil {
 			// Only possible if compressionLevel is not valid.
 			panic("invalid compression level for gzip.NewWriterLevel")
