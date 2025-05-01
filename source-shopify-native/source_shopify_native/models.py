@@ -151,10 +151,9 @@ class BulkOperationDetails(BaseModel, extra="allow"):
     errorCode: BulkOperationErrorCodes | None
 
 
-class UserErrors(BaseModel, extra="forbid"):
+class UserErrors(BaseModel, extra="allow"):
     field: str | list[str] | None
     message: str
-    code: BulkOperationUserErrorCodes
 
 
 class BulkJobCancelResponse(BaseModel, extra="allow"):
@@ -182,11 +181,15 @@ class BulkSpecificJobResponse(BaseModel, extra="allow"):
     data: Data
 
 
+class BulkOperationUserErrors(UserErrors):
+    code: BulkOperationUserErrorCodes
+
+
 class BulkJobSubmitResponse(BaseModel, extra="allow"):
     class Data(BaseModel, extra="forbid"):
         class BulkOperationRunQuery(BaseModel, extra="forbid"):
             bulkOperation: BulkOperationDetails | None
-            userErrors: list[UserErrors]
+            userErrors: list[BulkOperationUserErrors]
 
         bulkOperationRunQuery: BulkOperationRunQuery
 
