@@ -1,8 +1,8 @@
-aws_key_id: AKIA3PYBORRDH4TGOSGZ
+aws_key_id: AKIARDPHKYWUGCKC5QOC
 aws_region: us-east-1
-aws_secret_key_sops: ENC[AES256_GCM,data:mT6FhTurGGpFwCPQDoy0iB17X/lw4T+7pHtbYUnVsKwMcj3eUOQ/mQ==,iv:acQd2UByITJ+5nZss4tXPo16Mj97YWnF7smEJwr6pSY=,tag:aj/HaEgwwf+lpmNeRAXYRA==,type:str]
-s3_bucket: estuary-flow-firebolt
-s3_prefix: /estuary
+aws_secret_key_sops: ENC[AES256_GCM,data:OAFFHA966PGLDaxYKgk8SjKo3AIFl8kVfY4KCP6q3GsYdEI8U4EXjA==,iv:zSkwwGxwa1nLeTRfAVkgjNexG4Ts5FzTwdUEFnjcedY=,tag:KEAUDY0yoG9w64quBSM+vA==,type:str]
+s3_bucket: estuary-firebolt-test
+s3_prefix: /firebolt
 database: estuary_database
 engine_name: estuary_engine
 account_name: estuary
@@ -17,8 +17,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-11-25T16:30:17Z"
-    mac: ENC[AES256_GCM,data:kftCJXhByhWekwRBm2FZvbnK5C9yUb+KnAl/vSnzrwl0GE3xD/8yq3QjKe8FkSsYgGHUPek/mTmvHvfLUW3huV5pTS9DeLC8540fnxj1Lzw5oTA2gbY1sdTUyDOz4/gnvvCw6gNG6aySh9Lf5jcBM7JpzoTwo7eCBZBBkkQrxkw=,iv:zbl5yYoVvapkbc3cMA+E9whfBhRYEbDj7XXGKgFUDFA=,tag:SOrqd420aWrJJJCBrcsAQg==,type:str]
+    lastmodified: "2025-05-01T16:37:54Z"
+    mac: ENC[AES256_GCM,data:x36rwsvXOGNsUkM5RRKvMci8cAxCyLCMhD7fdHCSgzu+HTTwt4briXzBuppa8h72DYNpYZz25U2uK8zcHTm9Y8Ci+hEJBdoeSf/LEwIlY22HTLQNFFtAsKfw1CQ81k+9y3cay2Ej9R+uR3leRjg5a1RMSsOxMeLMziuhF15f58Q=,iv:B6QMCeo+RO9xBougg2lD+EqJNrWsm6RcbmxlpYrcHYo=,tag:MrilhFMBUUfI6P5LvO/TBw==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.8.1
+    version: 3.9.4

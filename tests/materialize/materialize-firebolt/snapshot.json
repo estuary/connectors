@@ -110,6 +110,78 @@
     }
   }
 ]
+[
+  "connectorState",
+  {
+    "updated": {
+      "Files": [
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        }
+      ],
+      "Queries": [
+        "INSERT INTO simple (id,\"_meta/flow_truncated\",canary,flow_published_at,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",canary,flow_published_at,\"$source_file_name\" FROM simple_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM simple WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO duplicate_keys_standard (id,\"_meta/flow_truncated\",flow_published_at,\"int\",str,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",flow_published_at,\"int\",str,\"$source_file_name\" FROM duplicate_keys_standard_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM duplicate_keys_standard WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO formatted_strings (id,\"_meta/flow_truncated\",\"date\",\"datetime\",flow_published_at,int_str,num_str,\"time\",\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",\"date\",\"datetime\",flow_published_at,int_str,num_str,\"time\",\"$source_file_name\" FROM formatted_strings_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM formatted_strings WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO long_string (id,\"_meta/flow_truncated\",flow_published_at,str_field,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",flow_published_at,str_field,\"$source_file_name\" FROM long_string_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM long_string WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO deletions (id,\"_meta/flow_truncated\",\"_meta/op\",flow_published_at,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",\"_meta/op\",flow_published_at,\"$source_file_name\" FROM deletions_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM deletions WHERE $source_file_name IN ('<test_file>')) < 1);"
+      ]
+    }
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "Files": [
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        },
+        {
+          "Bucket": "<test_bucket>",
+          "Key": "<test_file>"
+        }
+      ],
+      "Queries": [
+        "INSERT INTO simple (id,\"_meta/flow_truncated\",canary,flow_published_at,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",canary,flow_published_at,\"$source_file_name\" FROM simple_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM simple WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO duplicate_keys_standard (id,\"_meta/flow_truncated\",flow_published_at,\"int\",str,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",flow_published_at,\"int\",str,\"$source_file_name\" FROM duplicate_keys_standard_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM duplicate_keys_standard WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO formatted_strings (id,\"_meta/flow_truncated\",\"date\",\"datetime\",flow_published_at,int_str,num_str,\"time\",\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",\"date\",\"datetime\",flow_published_at,int_str,num_str,\"time\",\"$source_file_name\" FROM formatted_strings_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM formatted_strings WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO long_string (id,\"_meta/flow_truncated\",flow_published_at,str_field,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",flow_published_at,str_field,\"$source_file_name\" FROM long_string_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM long_string WHERE $source_file_name IN ('<test_file>')) < 1);",
+        "INSERT INTO deletions (id,\"_meta/flow_truncated\",\"_meta/op\",flow_published_at,\"$source_file_name\") SELECT id,\"_meta/flow_truncated\",\"_meta/op\",flow_published_at,\"$source_file_name\" FROM deletions_external WHERE $source_file_name IN ('<test_file>') AND ((SELECT count(*) FROM deletions WHERE $source_file_name IN ('<test_file>')) < 1);"
+      ]
+    }
+  }
+]
 {
   "_table": "simple",
   "rows": [
@@ -117,70 +189,70 @@
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "amputation's",
-      "flow_published_at": "1970-01-01T00:00:00.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:00.000000000Z",
       "id": 1
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "armament's",
-      "flow_published_at": "1970-01-01T00:00:01.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:01.000000000Z",
       "id": 2
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "splatters",
-      "flow_published_at": "1970-01-01T00:00:02.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:02.000000000Z",
       "id": 3
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "strengthen",
-      "flow_published_at": "1970-01-01T00:00:03.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:03.000000000Z",
       "id": 4
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "Kringle's",
-      "flow_published_at": "1970-01-01T00:00:04.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:04.000000000Z",
       "id": 5
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "grosbeak's",
-      "flow_published_at": "1970-01-01T00:00:05.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:05.000000000Z",
       "id": 6
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "pieced",
-      "flow_published_at": "1970-01-01T01:00:00.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:00.000000000Z",
       "id": 7
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "roaches",
-      "flow_published_at": "1970-01-01T01:00:01.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:01.000000000Z",
       "id": 8
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "devilish",
-      "flow_published_at": "1970-01-01T01:00:02.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:02.000000000Z",
       "id": 9
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "canary": "glucose's",
-      "flow_published_at": "1970-01-01T01:00:03.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:03.000000000Z",
       "id": 10
     }
   ]
@@ -191,7 +263,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:06.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:06.000000000Z",
       "id": 1,
       "int": 1,
       "str": "str 1"
@@ -199,7 +271,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:04.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:04.000000000Z",
       "id": 1,
       "int": 6,
       "str": "str 6"
@@ -207,7 +279,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:07.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:07.000000000Z",
       "id": 2,
       "int": 2,
       "str": "str 2"
@@ -215,7 +287,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:05.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:05.000000000Z",
       "id": 2,
       "int": 7,
       "str": "str 7"
@@ -223,7 +295,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:08.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:08.000000000Z",
       "id": 3,
       "int": 3,
       "str": "str 3"
@@ -231,7 +303,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:06.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:06.000000000Z",
       "id": 3,
       "int": 8,
       "str": "str 8"
@@ -239,7 +311,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:09.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:09.000000000Z",
       "id": 4,
       "int": 4,
       "str": "str 4"
@@ -247,7 +319,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:07.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:07.000000000Z",
       "id": 4,
       "int": 9,
       "str": "str 9"
@@ -255,7 +327,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T00:00:10.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:10.000000000Z",
       "id": 5,
       "int": 5,
       "str": "str 5"
@@ -263,10 +335,50 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:08.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:08.000000000Z",
       "id": 5,
       "int": 10,
       "str": "str 10"
+    },
+    {
+      "$source_file_name": "<test_file>",
+      "_meta/flow_truncated": false,
+      "flow_published_at": "1970-01-01T03:00:00.000000000Z",
+      "id": 6,
+      "int": 11,
+      "str": "str 11"
+    },
+    {
+      "$source_file_name": "<test_file>",
+      "_meta/flow_truncated": false,
+      "flow_published_at": "1970-01-01T03:00:01.000000000Z",
+      "id": 7,
+      "int": 12,
+      "str": "str 12"
+    },
+    {
+      "$source_file_name": "<test_file>",
+      "_meta/flow_truncated": false,
+      "flow_published_at": "1970-01-01T03:00:02.000000000Z",
+      "id": 8,
+      "int": 13,
+      "str": "str 13"
+    },
+    {
+      "$source_file_name": "<test_file>",
+      "_meta/flow_truncated": false,
+      "flow_published_at": "1970-01-01T03:00:03.000000000Z",
+      "id": 9,
+      "int": 14,
+      "str": "str 14"
+    },
+    {
+      "$source_file_name": "<test_file>",
+      "_meta/flow_truncated": false,
+      "flow_published_at": "1970-01-01T03:00:04.000000000Z",
+      "id": 10,
+      "int": 15,
+      "str": "str 15"
     }
   ]
 }
@@ -278,7 +390,7 @@
       "_meta/flow_truncated": false,
       "date": "0000-01-01",
       "datetime": "0000-01-01T00:00:00Z",
-      "flow_published_at": "1970-01-01T01:00:13.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:13.000000000Z",
       "id": 1,
       "int_str": "10",
       "num_str": "10.1",
@@ -289,7 +401,7 @@
       "_meta/flow_truncated": false,
       "date": "1999-02-02",
       "datetime": "1999-02-02T14:20:12.33Z",
-      "flow_published_at": "1970-01-01T01:00:14.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:14.000000000Z",
       "id": 2,
       "int_str": "20",
       "num_str": "20.1",
@@ -300,7 +412,7 @@
       "_meta/flow_truncated": false,
       "date": "1000-03-03",
       "datetime": "1000-03-03T23:59:38.10Z",
-      "flow_published_at": "1970-01-01T00:00:11.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:11.000000000Z",
       "id": 3,
       "int_str": "30",
       "num_str": "30.1",
@@ -311,7 +423,7 @@
       "_meta/flow_truncated": false,
       "date": "2023-08-29",
       "datetime": "2023-08-29T23:59:38Z",
-      "flow_published_at": "1970-01-01T00:00:12.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:12.000000000Z",
       "id": 4,
       "int_str": "40",
       "num_str": "40.1",
@@ -322,7 +434,7 @@
       "_meta/flow_truncated": false,
       "date": "9999-12-31",
       "datetime": "9999-12-31T23:59:59Z",
-      "flow_published_at": "1970-01-01T01:00:15.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:15.000000000Z",
       "id": 5,
       "int_str": "50",
       "num_str": "50.1",
@@ -333,7 +445,7 @@
       "_meta/flow_truncated": false,
       "date": null,
       "datetime": null,
-      "flow_published_at": "1970-01-01T01:00:16.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:16.000000000Z",
       "id": 8,
       "int_str": null,
       "num_str": "NaN",
@@ -344,7 +456,7 @@
       "_meta/flow_truncated": false,
       "date": null,
       "datetime": null,
-      "flow_published_at": "1970-01-01T01:00:17.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:17.000000000Z",
       "id": 9,
       "int_str": null,
       "num_str": "Infinity",
@@ -355,7 +467,7 @@
       "_meta/flow_truncated": false,
       "date": null,
       "datetime": null,
-      "flow_published_at": "1970-01-01T01:00:18.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:18.000000000Z",
       "id": 10,
       "int_str": null,
       "num_str": "-Infinity",
@@ -369,7 +481,7 @@
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
-      "flow_published_at": "1970-01-01T01:00:24.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:24.000000000Z",
       "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.",
       "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."
     }
@@ -382,49 +494,49 @@
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "c",
-      "flow_published_at": "1970-01-01T00:00:29.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:29.000000000Z",
       "id": 1
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "d",
-      "flow_published_at": "1970-01-01T01:00:25.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:25.000000000Z",
       "id": 1
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "c",
-      "flow_published_at": "1970-01-01T00:00:30.000000000Z",
+      "flow_published_at": "1970-01-01T01:00:30.000000000Z",
       "id": 2
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "u",
-      "flow_published_at": "1970-01-01T01:00:26.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:26.000000000Z",
       "id": 2
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "c",
-      "flow_published_at": "1970-01-01T01:00:27.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:27.000000000Z",
       "id": 3
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "c",
-      "flow_published_at": "1970-01-01T01:00:28.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:28.000000000Z",
       "id": 4
     },
     {
       "$source_file_name": "<test_file>",
       "_meta/flow_truncated": false,
       "_meta/op": "d",
-      "flow_published_at": "1970-01-01T01:00:29.000000000Z",
+      "flow_published_at": "1970-01-01T02:00:29.000000000Z",
       "id": 4
     }
   ]
