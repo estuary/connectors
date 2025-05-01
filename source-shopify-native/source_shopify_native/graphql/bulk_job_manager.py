@@ -2,6 +2,8 @@ import asyncio
 from logging import Logger
 from typing import Any
 
+from pydantic import ValidationError
+
 from estuary_cdk.http import HTTPSession
 from source_shopify_native.models import (
     BulkJobCancelResponse,
@@ -165,11 +167,28 @@ class BulkJobManager:
         """
 
         self.log.debug(f"Trying to cancel job {job_id}.")
-        response = BulkJobCancelResponse.model_validate_json(
-            await self.http.request(
+
+        attempts = 0
+        while True:
+            attempts += 1
+            response_bytes = await self.http.request(
                 self.log, self.url, method="POST", json={"query": query}
             )
-        )
+            try:
+                response = BulkJobCancelResponse.model_validate_json(response_bytes)
+                break
+            except ValidationError as err:
+                if attempts <= 3:
+                    self.log.info("Error validating BulkJobCancelResponse.", {
+                        "attempts": attempts,
+                        "job_id": job_id,
+                        "err": err,
+                        "response_bytes": response_bytes,
+                    })
+                    # Sleep a couple seconds in case the error is a transient API issue.
+                    await asyncio.sleep(2)
+                else:
+                    raise
 
         status = response.data.bulkOperationCancel.bulkOperation.status
 
