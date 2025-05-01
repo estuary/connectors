@@ -29,10 +29,6 @@ RUN go build -tags nozstd -v -o ./connector ./materialize-bigquery/cmd/connector
 ################################################################################
 FROM ${BASE_IMAGE}
 
-RUN apt-get update -y \
-    && apt-get install --no-install-recommends -y ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
-
 # Avoid running the connector as root.
 USER nonroot:nonroot
 
