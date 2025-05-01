@@ -67,12 +67,11 @@ func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
 		}),
 	}
 
+	var clientOpts []func(*kinesis.Options)
 	if cfg.Advanced.Endpoint != "" {
-		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
-			return aws.Endpoint{URL: cfg.Advanced.Endpoint}, nil
+		clientOpts = append(clientOpts, func(o *kinesis.Options) {
+			o.BaseEndpoint = &cfg.Advanced.Endpoint
 		})
-
-		opts = append(opts, awsConfig.WithEndpointResolverWithOptions(customResolver))
 	}
 
 	awsCfg, err := awsConfig.LoadDefaultConfig(ctx, opts...)
@@ -80,7 +79,7 @@ func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	return kinesis.NewFromConfig(awsCfg), nil
+	return kinesis.NewFromConfig(awsCfg, clientOpts...), nil
 }
 
 type kinesisStream struct {

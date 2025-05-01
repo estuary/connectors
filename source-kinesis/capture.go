@@ -22,6 +22,71 @@ type capture struct {
 	stream *boilerplate.PullOutput
 
 	updateState map[boilerplate.StateKey]map[string]*string
+
+	stats map[string]map[string]shardStats
+}
+
+type shardStats struct {
+	docsThisRound int
+	millisBehind  int
+}
+
+func (c *capture) updateStats(stream string, shardID string, docs int, millisBehind int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.stats[stream] == nil {
+		c.stats[stream] = make(map[string]shardStats)
+	}
+
+	upd := c.stats[stream][shardID]
+	upd.docsThisRound += docs
+	upd.millisBehind = millisBehind
+	c.stats[stream][shardID] = upd
+}
+
+func (c *capture) statsLogger(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(5 * time.Minute):
+			if err := func() error {
+				c.mu.Lock()
+				defer c.mu.Unlock()
+
+				fields := make(map[string]any)
+				for streamName, shardStats := range c.stats {
+					for shardID, stats := range shardStats {
+						if stats.docsThisRound == 0 {
+							continue
+						}
+
+						if fields[streamName] == nil {
+							fields[streamName] = make(map[string]any)
+						}
+
+						lag := time.Duration(stats.millisBehind) * time.Millisecond
+						s := make(map[string]any)
+						s["docs"] = stats.docsThisRound
+						s["lag"] = lag.String()
+						fields[streamName].(map[string]any)[shardID] = s
+					}
+				}
+
+				if len(fields) == 0 {
+					log.Info("all kinesis streams idle")
+					return nil
+				}
+				log.WithFields(fields).Info("processed kinesis stream records")
+				maps.Clear(c.stats)
+
+				return nil
+			}(); err != nil {
+				return err
+			}
+		}
+	}
 }
 
 func (c *capture) emitDoc(
@@ -293,6 +358,7 @@ func (c *capture) readShard(
 		if err := c.processRecords(res.Records, stream, stateKey, bindingIndex, shard); err != nil {
 			return err
 		}
+		c.updateStats(stream.name, shard.shardId, len(res.Records), int(*res.MillisBehindLatest))
 
 		if res.NextShardIterator == nil {
 			ll.WithField("childShards", len(res.ChildShards)).Info("finished reading shard")
