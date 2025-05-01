@@ -21,7 +21,7 @@ VERSION = "2025-04"
 BULK_QUERY_ALREADY_EXISTS_ERROR = (
     r"A bulk query operation for this app and shop is already in progress"
 )
-INITIAL_SLEEP = 5
+INITIAL_SLEEP = 1
 MAX_SLEEP = 150
 
 bulk_job_lock = asyncio.Lock()
