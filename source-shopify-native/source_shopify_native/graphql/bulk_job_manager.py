@@ -15,7 +15,7 @@ from source_shopify_native.models import (
     BulkOperationErrorCodes,
     BulkOperationStatuses,
     BulkOperationTypes,
-    UserErrors,
+    BulkOperationUserErrors,
 )
 
 VERSION = "2025-04"
@@ -35,7 +35,7 @@ class BulkJobError(RuntimeError):
         self,
         message: str,
         query: str | None = None,
-        errors: list[UserErrors] | None = None,
+        errors: list[BulkOperationUserErrors] | None = None,
     ):
         self.message = message
         self.query = query
@@ -88,12 +88,25 @@ class BulkJobManager:
             )
             return
 
-        is_canceled = await self._cancel(current_job_details.id)
+        job_id = current_job_details.id
+        status = await self._cancel(job_id)
 
-        if is_canceled:
-            self.log.info(f"Canceled job {current_job_details.id}.")
-        else:
-            self.log.warning(f"Unabled to cancel job {current_job_details.id}.")
+        # Shopify doesn't let us submit any new jobs until the current job is completely canceled.
+        # We wait until the current job is canceled or completed to return, then the connector can
+        # successfully submit new jobs.
+        while True:
+            match status:
+                case BulkOperationStatuses.CANCELED | BulkOperationStatuses.COMPLETED:
+                    self.log.info(f"Previous bulk job {job_id} is {status}.")
+                    return
+                case BulkOperationStatuses.CANCELING:
+                    self.log.info(f"Waiting for bulk job {job_id} to be CANCELED.")
+                    await asyncio.sleep(5)
+
+                    details = await self._get_job(job_id)
+                    status = details.status
+                case _:
+                    raise BulkJobError(f"Unable to cancel bulk job {job_id}.")
 
     # Get currently running job
     async def _get_currently_running_job(self) -> BulkOperationDetails | None:
@@ -145,10 +158,10 @@ class BulkJobManager:
         return response.data.node
 
     # Cancel a running bulk job
-    async def _cancel(self, job_id: str) -> bool:
+    async def _cancel(self, job_id: str) -> BulkOperationStatuses:
         query = f"""
             mutation {{
-                bulkOperationCancel(id: {job_id}) {{
+                bulkOperationCancel(id: "{job_id}") {{
                     bulkOperation {{
                         type
                         id
@@ -161,7 +174,6 @@ class BulkJobManager:
                     userErrors {{
                         field
                         message
-                        code
                     }}
                 }}
             }}
@@ -169,27 +181,11 @@ class BulkJobManager:
 
         self.log.debug(f"Trying to cancel job {job_id}.")
 
-        attempts = 0
-        while True:
-            attempts += 1
-            response_bytes = await self.http.request(
+        response = BulkJobCancelResponse.model_validate_json(
+            await self.http.request(
                 self.log, self.url, method="POST", json={"query": query}
             )
-            try:
-                response = BulkJobCancelResponse.model_validate_json(response_bytes)
-                break
-            except ValidationError as err:
-                if attempts <= 3:
-                    self.log.info("Error validating BulkJobCancelResponse.", {
-                        "attempts": attempts,
-                        "job_id": job_id,
-                        "err": err,
-                        "response_bytes": json.loads(response_bytes.decode('utf-8')),
-                    })
-                    # Sleep a couple seconds in case the error is a transient API issue.
-                    await asyncio.sleep(2)
-                else:
-                    raise
+        )
 
         status = response.data.bulkOperationCancel.bulkOperation.status
 
@@ -207,7 +203,7 @@ class BulkJobManager:
                     },
                 )
 
-        return status == "CANCELED"
+        return status
 
     # Submits a bulk job & fetches the result URL
     async def execute(self, query: str) -> str | None:
