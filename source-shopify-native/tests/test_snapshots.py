@@ -31,7 +31,7 @@ def test_capture(request, snapshot):
             "--sessions",
             "1",
             "--delay",
-            "30s",
+            "250s",
         ],
         stdout=subprocess.PIPE,
         text=True,
