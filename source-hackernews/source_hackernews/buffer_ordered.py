@@ -20,11 +20,11 @@ async def managed_buffer_ordered(
 ) -> AsyncGenerator[AsyncGenerator[T, None], None]:
     """
     A context manager that ensures proper cleanup of resources when using buffer_ordered.
-    
+
     Args:
         aws: A stream of awaitables to run concurrently.
         concurrency: The maximum number of concurrent awaitables to run.
-        
+
     Yields:
         An async generator that yields results from the awaitables in order.
     """
@@ -83,7 +83,7 @@ async def managed_buffer_ordered(
                 # Create producer task
                 producer_task = tg.create_task(_producer(next_future))
                 tasks.append(producer_task)
-                
+
                 # Create worker tasks
                 for _ in range(concurrency):
                     worker_task = tg.create_task(_worker())
@@ -115,14 +115,14 @@ async def managed_buffer_ordered(
             for task in tasks:
                 if not task.done():
                     task.cancel()
-            
+
             # Wait for all tasks to complete
             if tasks:
                 try:
                     await asyncio.gather(*tasks, return_exceptions=True)
                 except Exception as e:
                     pass  # Ignore exceptions during cleanup
-            
+
             # Ensure all worker tasks are done
             for task in worker_tasks:
                 if not task.done():
@@ -130,14 +130,14 @@ async def managed_buffer_ordered(
                         await task
                     except Exception as e:
                         pass  # Ignore exceptions during cleanup
-            
+
             # Ensure producer task is done
             if producer_task and not producer_task.done():
                 try:
                     await producer_task
                 except Exception as e:
                     pass  # Ignore exceptions during cleanup
-            
+
             # Await any queued awaitables, discarding further errors.
             while not work.empty():
                 remaining_work = work.get_nowait()
@@ -158,14 +158,14 @@ async def managed_buffer_ordered(
         for task in tasks:
             if not task.done():
                 task.cancel()
-        
+
         # Wait for all tasks to complete
         if tasks:
             try:
                 await asyncio.gather(*tasks, return_exceptions=True)
             except Exception as e:
                 pass  # Ignore exceptions during cleanup
-        
+
         # Ensure all worker tasks are done
         for task in worker_tasks:
             if not task.done():
@@ -173,7 +173,7 @@ async def managed_buffer_ordered(
                     await task
                 except Exception as e:
                     pass  # Ignore exceptions during cleanup
-        
+
         # Ensure producer task is done
         if producer_task and not producer_task.done():
             try:
@@ -202,4 +202,4 @@ async def buffer_ordered(
     """
     async with managed_buffer_ordered(aws, concurrency) as gen:
         async for result in gen:
-            yield result 
+            yield result

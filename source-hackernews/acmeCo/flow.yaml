@@ -1,5 +1,4 @@
 ---
-# Hacker News Flow Configuration
 collections:
   acmeCo/items:
     schema: items.schema.yaml

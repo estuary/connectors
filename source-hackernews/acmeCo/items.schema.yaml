@@ -88,10 +88,7 @@ properties:
     type: array
   url:
     anyOf:
-      - format: uri
-        maxLength: 2083
-        minLength: 1
-        type: string
+      - type: string
       - type: "null"
     default: ~
     title: Url
