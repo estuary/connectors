@@ -71,29 +71,37 @@ async def fetch_recently_updated(
     So, if a subitem is updated, the parent item ID will be returned. If a parent item is updated,
     the parent item ID will be returned.
     """
-    data = await execute_query(
-        ActivityLogsResponse,
-        http,
-        log,
-        ACTIVITY_LOGS,
-        {"start": start},
-    )
-
-    if not data.data or not data.data.boards:
-        return
-
     ids: set[str] = set()
+    variables: dict[str, Any] = {
+        "start": start,
+        "limit": 5,
+        "page": 1,
+    }
 
-    for board in data.data.boards:
-        for activity_log in board.activity_logs:
-            id = activity_log.data.get(f"{resource}_id")
+    while True:
+        data = await execute_query(
+            ActivityLogsResponse,
+            http,
+            log,
+            ACTIVITY_LOGS,
+            variables,
+        )
 
-            if id is not None:
-                try:
-                    ids.add(str(id))
-                except (ValueError, TypeError) as e:
-                    log.error(f"Failed to convert ID to string: {id}, error: {e}")
-                    raise
+        if not data.data or not data.data.boards:
+            break
+
+        variables["page"] += 1
+
+        for board in data.data.boards:
+            for activity_log in board.activity_logs:
+                id = activity_log.data.get(f"{resource}_id")
+
+                if id is not None:
+                    try:
+                        ids.add(str(id))
+                    except (ValueError, TypeError) as e:
+                        log.error(f"Failed to convert ID to string: {id}, error: {e}")
+                        raise
 
     return list(ids)
 
@@ -204,12 +212,12 @@ async def _fetch_boards_chunk(
             "Boards query with workspace 'kind' field failed, switching to querying one board at a time."
         )
         for board_id in chunk:
+            variables = {
+                "limit": 1,
+                "page": 1,
+                "ids": [board_id],
+            }
             try:
-                variables = {
-                    "limit": 1,
-                    "page": 1,
-                    "ids": [board_id],
-                }
                 async for board in _fetch_boards(
                     http, log, BOARDS_WITH_KIND, variables
                 ):
@@ -402,8 +410,8 @@ async def fetch_items_by_boards(
 
 
 ACTIVITY_LOGS = """
-query GetActivityLogs($start: ISO8601DateTime!) {
-  boards {
+query GetActivityLogs($start: ISO8601DateTime!, $limit: Int = 5, $page: Int = 1) {
+  boards(limit: $limit, page: $page) {
     id
     activity_logs(from: $start) {
       id
