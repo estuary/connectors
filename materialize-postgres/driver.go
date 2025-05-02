@@ -375,17 +375,23 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	// Use a read-only "load" transaction, which will automatically
-	// truncate the temporary key staging tables on commit.
-	var txn, err = d.load.conn.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return fmt.Errorf("DB.BeginTx: %w", err)
-	}
-	defer txn.Rollback(ctx)
-
+	// A postgres transaction is not initialized unless there are keys to load
+	// for this Flow transaction.
+	var txn pgx.Tx
 	var batch pgx.Batch
 	batchBytes := 0
 	for it.Next() {
+		if txn == nil {
+			// Use a read-only "load" transaction, which will automatically
+			// truncate the temporary key staging tables on commit.
+			var err error
+			txn, err = d.load.conn.BeginTx(ctx, pgx.TxOptions{})
+			if err != nil {
+				return fmt.Errorf("DB.BeginTx: %w", err)
+			}
+			defer txn.Rollback(ctx)
+		}
+
 		// This assumes that the length of the packed key is at least proportional to the amount of
 		// memory it will occupy when populated buffered in a pgx.Batch.
 		batchBytes += len(it.PackedKey)
@@ -407,6 +413,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 	if it.Err() != nil {
 		return it.Err()
+	} else if txn == nil {
+		return nil // no keys to load
 	}
 
 	// Send any remaining keys for this load.
