@@ -146,6 +146,11 @@ class Task:
         """Write a SourcedSchema message for the given binding to the buffer.
         SourcedSchema messages won't be emitted until checkpoint() is called."""
 
+        # SourcedSchema messages must never allow additional properties, otherwise
+        # the schema is open and allows anything.
+        schema["additionalProperties"] = False
+        schema["type"] = "object"
+
         b = Response(
             sourcedSchema=response.SourcedSchema(binding=binding_index, schemaJson=schema)
         ).model_dump_json(by_alias=True, exclude_unset=True).encode()
