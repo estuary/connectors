@@ -24,7 +24,7 @@ from .models import (
 INITIAL_SLEEP = 0.2
 MAX_SLEEP = 300
 ATTEMPT_LOG_THRESHOLD = 10
-MAX_BULK_QUERY_SET_SIZE = 200_000
+MAX_BULK_QUERY_SET_SIZE = 100_000
 
 COUNT_HEADER = "Sforce-NumberOfRecords"
 CANNOT_FETCH_COMPOUND_DATA = r"Selecting compound data not supported in Bulk Query"
