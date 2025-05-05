@@ -26,15 +26,18 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 var crateDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER:        sql.MapStatic("NUMERIC(22, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer")),
+				sql.MapStatic("NUMERIC(20)", sql.AlsoCompatibleWith("numeric")),
+			),
 			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:         sql.MapStatic("OBJECT"),
 			sql.ARRAY:          sql.MapStatic("TEXT", sql.UsingConverter(jsonConverter)),
 			sql.BINARY:         sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
 			sql.MULTIPLE:       sql.MapStatic("OBJECT", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(22, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
-			sql.STRING_NUMBER:  sql.MapStatic("NUMERIC(22, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
+			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(18, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
+			sql.STRING_NUMBER:  sql.MapStatic("NUMERIC(18, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic(
 					"TEXT",
