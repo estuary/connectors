@@ -93,6 +93,8 @@ async def fetch_recently_updated(
         variables["page"] += 1
 
         for board in data.data.boards:
+            if not board.activity_logs:
+                continue
             for activity_log in board.activity_logs:
                 id = activity_log.data.get(f"{resource}_id")
 
