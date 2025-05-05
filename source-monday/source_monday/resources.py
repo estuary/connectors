@@ -42,6 +42,7 @@ INCREMENTAL_RESOURCES: list[
 ]
 
 
+# TODO: remove
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
