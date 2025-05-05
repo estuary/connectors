@@ -127,7 +127,7 @@ class ActivityLog(BaseModel, extra="allow"):
 
 
 class BoardActivityLogs(BaseModel, extra="allow"):
-    activity_logs: list[ActivityLog]
+    activity_logs: list[ActivityLog] | None
 
 
 class ActivityLogsResponse(BaseModel, extra="forbid"):
@@ -141,7 +141,7 @@ class Tag(BaseDocument, extra="allow"):
 class Board(BaseDocument, extra="allow"):
     class Workspace(BaseModel, extra="allow"):
         kind: str | None = None
-    
+
     updated_at: AwareDatetime
     workspace: Workspace
 
