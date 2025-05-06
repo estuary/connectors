@@ -108,7 +108,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	var sourceSchema = (&jsonschema.Reflector{
 		ExpandedStruct:            true,
 		DoNotReference:            true,
-		AllowAdditionalProperties: true,
+		AllowAdditionalProperties: fullWriteSchema, // TODO(wgd): Do we need /_meta/source to have additionalProperties: false?
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
@@ -212,6 +212,8 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	}
 	if fullWriteSchema {
 		metaPropertySchema.Extras["reduce"] = map[string]any{"strategy": "merge"}
+	} else {
+		metaPropertySchema.Extras["additionalProperties"] = false // TODO(wgd): Do we need /_meta to have additionalProperties: false?
 	}
 
 	var metadataSchema = &jsonschema.Schema{
@@ -274,10 +276,14 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 				Required: collectionKey,
 			},
 		},
-		AllOf: []*jsonschema.Schema{metadataSchema, {Ref: "#" + anchor}},
+		Extras: make(map[string]any),
+		AllOf:  []*jsonschema.Schema{metadataSchema, {Ref: "#" + anchor}},
 	}
 	if table.UseSchemaInference {
-		schema.Extras = map[string]any{"x-infer-schema": true}
+		schema.Extras["x-infer-schema"] = true
+	}
+	if !fullWriteSchema {
+		schema.Extras["additionalProperties"] = false
 	}
 
 	var documentSchema, err = schema.MarshalJSON()
