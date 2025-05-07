@@ -108,7 +108,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	var sourceSchema = (&jsonschema.Reflector{
 		ExpandedStruct:            true,
 		DoNotReference:            true,
-		AllowAdditionalProperties: fullWriteSchema, // TODO(wgd): Do we need /_meta/source to have additionalProperties: false?
+		AllowAdditionalProperties: fullWriteSchema,
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
@@ -189,11 +189,12 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	var beforeSchema = &jsonschema.Schema{
 		Ref:         "#" + anchor,
 		Description: "Record state immediately before this change was applied.",
+		Extras:      make(map[string]any),
 	}
 	if fullWriteSchema {
-		beforeSchema.Extras = map[string]any{
-			"reduce": map[string]any{"strategy": "firstWriteWins"},
-		}
+		beforeSchema.Extras["reduce"] = map[string]any{"strategy": "firstWriteWins"}
+	} else {
+		beforeSchema.Extras["additionalProperties"] = false
 	}
 
 	var metaPropertySchema = &jsonschema.Schema{
@@ -213,7 +214,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	if fullWriteSchema {
 		metaPropertySchema.Extras["reduce"] = map[string]any{"strategy": "merge"}
 	} else {
-		metaPropertySchema.Extras["additionalProperties"] = false // TODO(wgd): Do we need /_meta to have additionalProperties: false?
+		metaPropertySchema.Extras["additionalProperties"] = false
 	}
 
 	var metadataSchema = &jsonschema.Schema{
