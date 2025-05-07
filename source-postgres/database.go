@@ -61,17 +61,6 @@ func listPublishedTables(ctx context.Context, conn *pgx.Conn, publicationName st
 	return publicationStatus, nil
 }
 
-// createReplicationSlot attempts to create a new logical replication slot with the specified name.
-func createReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string) error {
-	var logEntry = logrus.WithField("slot", slotName)
-	logEntry.Info("attempting to create replication slot")
-	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
-		return fmt.Errorf("replication slot %q couldn't be created", slotName)
-	}
-	logEntry.Info("created replication slot")
-	return nil
-}
-
 // recreateReplicationSlot attempts to drop and then recreate a replication slot with the specified name.
 func recreateReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string) error {
 	var logEntry = logrus.WithField("slot", slotName)
@@ -81,7 +70,12 @@ func recreateReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName strin
 		// to prevent the subsequent attempt to create it.
 		logEntry.WithField("err", err).Debug("failed to drop replication slot")
 	}
-	return createReplicationSlot(ctx, conn, slotName)
+	logEntry.Info("attempting to create replication slot")
+	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_create_logical_replication_slot('%s', 'pgoutput');`, slotName)); err != nil {
+		return fmt.Errorf("replication slot %q couldn't be created", slotName)
+	}
+	logEntry.Info("created replication slot")
+	return nil
 }
 
 // queryLatestServerLSN returns the latest server WAL LSN.
