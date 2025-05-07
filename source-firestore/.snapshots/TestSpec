@@ -29,6 +29,11 @@
             "type": "boolean",
             "title": "Skip Automatic Discovery",
             "description": "When set the connector will skip automatic collection discovery. This generally only makes sense when the \"Extra Collections\" setting is used."
+          },
+          "min_backfill_interval": {
+            "type": "string",
+            "title": "Minimum Backfill Interval",
+            "description": "Controls how often a collection may be re-backfilled in the event of unrecoverable change stream failure. May be overridden by the per-resource setting."
           }
         },
         "additionalProperties": false,
@@ -72,6 +77,11 @@
         "pattern": "^(/([^/~]|~[01])+)*$",
         "title": "Restart Cursor Path",
         "description": "Optionally specifies a JSON pointer to some document property which increases monotonically and can be used as a restart cursor to optimize backfill behavior when streaming consistency is lost. Generally this only matters for collections with very high write volumes."
+      },
+      "min_backfill_interval": {
+        "type": "string",
+        "title": "Minimum Backfill Interval",
+        "description": "Controls how often a collection may be re-backfilled in the event of unrecoverable change stream failure. Overrides any other defaults for this particular resource."
       }
     },
     "type": "object",

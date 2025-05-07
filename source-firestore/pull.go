@@ -45,8 +45,6 @@ const progressLogInterval = 10000
 
 // A new backfill of a collection may only occur after at least this much time has
 // elapsed since the previous backfill was started.
-//
-// TODO(wgd): Consider making this user-configurable?
 const (
 	backfillRestartDelayNoRestartCursor   = 24 * time.Hour
 	backfillRestartDelayWithRestartCursor = 5 * time.Minute
@@ -81,7 +79,7 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 		}
 	}
 
-	updatedResourceStates, err := initResourceStates(prevState.Resources, open.Capture.Bindings, time.Now())
+	updatedResourceStates, err := initResourceStates(&cfg, prevState.Resources, open.Capture.Bindings, time.Now())
 	if err != nil {
 		return fmt.Errorf("error initializing resource states: %w", err)
 	}
@@ -173,7 +171,7 @@ func (s *backfillState) String() string {
 
 // Given the prior resource states from the last DriverCheckpoint along with
 // the current capture bindings, compute a new set of resource states.
-func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bindings []*pf.CaptureSpec_Binding, now time.Time) (map[boilerplate.StateKey]*resourceState, error) {
+func initResourceStates(cfg *config, prevStates map[boilerplate.StateKey]*resourceState, bindings []*pf.CaptureSpec_Binding, now time.Time) (map[boilerplate.StateKey]*resourceState, error) {
 	var states = make(map[boilerplate.StateKey]*resourceState)
 	for idx, binding := range bindings {
 		var res resource
@@ -241,6 +239,7 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 		} else if res.BackfillMode == backfillModeAsync {
 			state.Backfill = &backfillState{
 				StartAfter: computeBackfillStartTime(
+					cfg, &res,
 					prevState.Backfill, now,
 					len(prevState.restartCursorPath) != 0,
 				),
@@ -250,15 +249,25 @@ func initResourceStates(prevStates map[boilerplate.StateKey]*resourceState, bind
 	return states, nil
 }
 
-func computeBackfillStartTime(prevBackfill *backfillState, now time.Time, hasRestartCursor bool) time.Time {
+func computeBackfillStartTime(cfg *config, res *resource, prevBackfill *backfillState, now time.Time, hasRestartCursor bool) time.Time {
 	var startTime time.Time
 	if prevBackfill != nil {
 		startTime = prevBackfill.StartAfter
 	}
 
-	var delay = backfillRestartDelayNoRestartCursor
-	if hasRestartCursor {
+	// Minimum backfill interval priority:
+	// - Resource Config
+	// - Advanced Endpoint Config
+	// - Default to 24h if no cursor or 5m if there's a cursor
+	var delay time.Duration
+	if d, err := time.ParseDuration(res.MinBackfillInterval); err == nil && d > 0 {
+		delay = d
+	} else if d, err := time.ParseDuration(cfg.Advanced.MinBackfillInterval); err == nil && d > 0 {
+		delay = d
+	} else if hasRestartCursor {
 		delay = backfillRestartDelayWithRestartCursor
+	} else {
+		delay = backfillRestartDelayNoRestartCursor
 	}
 	startTime = startTime.Add(delay)
 
@@ -848,13 +857,11 @@ func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client
 					} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 						return err
 					}
-					// If all impacted bindings have a restart cursor, we don't need to wait nearly as long
-					// before triggering a connector restart.
-					//
-					// TODO(wgd): This is suboptimal. If another collection ID stream breaks shortly after
-					// this one and it _doesn't_ have a restart cursor available, we will still restart
-					// after the shorter delay here. The proper fix might be to eliminate restarting
-					// entirely.
+					// The logic to re-backfill an inconsistent stream only triggers at connector startup,
+					// so we need to eventually trigger a restart to ensure that it takes effect. This is
+					// a heuristic which tries to ensure that we restart at the right time, but doesn't
+					// need to be perfect. Note that the connector could restart at any time before this
+					// timer fires anyway.
 					var backfillRestartDelay = backfillRestartDelayNoRestartCursor
 					if allStreamsHaveRestartCursors {
 						backfillRestartDelay = backfillRestartDelayWithRestartCursor
