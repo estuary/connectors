@@ -150,10 +150,17 @@ func (db *postgresDatabase) prerequisiteReplicationSlot(ctx context.Context) err
 		)
 	}
 
-	// Slot does not exist in any database. Try to create it (note that it will probably be
-	// dropped and recreated before replication actually begins, but creating it here is the
-	// most reliable way to verify that we can do that).
-	return createReplicationSlot(ctx, db.conn, slotName)
+	// Slot does not exist in any database, and the 'no_create_replication_slot' flag is set.
+	// In this case we know that the slot won't be created automatically later on, so we ought
+	// to present the user with a nice validation error here.
+	if !db.featureFlags["create_replication_slot"] {
+		return fmt.Errorf("replication slot %q does not exist and the 'no_create_replication_slot' feature flag is set", slotName)
+	}
+
+	// Slot does not exist in any database. This is fine because we'll autocreate it when
+	// the actual replication process starts, and we've already verified that the user has
+	// the REPLICATION role which is all they need to be able to create the slot.
+	return nil
 }
 
 func (db *postgresDatabase) prerequisitePublication(ctx context.Context) error {

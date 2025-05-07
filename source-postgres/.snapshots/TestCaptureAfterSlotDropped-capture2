@@ -2,4 +2,8 @@
 # Final State Checkpoint
 # ================================
 {"bindingStateV1":{"test%2Fcaptureafterslotdropped_46115540":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+# ================================
+# Captures Terminated With Errors
+# ================================
+error creating replication stream: unable to start replication: ERROR: replication slot "flow_slot" does not exist (SQLSTATE 42704)
 
