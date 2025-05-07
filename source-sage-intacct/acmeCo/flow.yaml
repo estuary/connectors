@@ -1,0 +1,50 @@
+---
+collections:
+  acmeCo/APTERM:
+    schema: APTERM.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/CLASS:
+    schema: CLASS.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/CUSTOMER:
+    schema: CUSTOMER.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/DEPARTMENT:
+    schema: DEPARTMENT.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/EMPLOYEE:
+    schema: EMPLOYEE.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/GLACCOUNT:
+    schema: GLACCOUNT.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/GLJOURNAL:
+    schema: GLJOURNAL.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/LOCATION:
+    schema: LOCATION.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/PROJECT:
+    schema: PROJECT.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/TAXDETAIL:
+    schema: TAXDETAIL.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/TRXCURRENCIES:
+    schema: TRXCURRENCIES.schema.yaml
+    key:
+      - /RECORDNO
+  acmeCo/VENDOR:
+    schema: VENDOR.schema.yaml
+    key:
+      - /RECORDNO

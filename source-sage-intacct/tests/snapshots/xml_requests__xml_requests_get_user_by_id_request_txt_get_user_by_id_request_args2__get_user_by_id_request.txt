@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<request>
+  <control>
+    <senderid>sender_id</senderid>
+    <password>sender_password</password>
+    <controlid>CONTROLID_PLACEHOLDER</controlid>
+    <uniqueid>false</uniqueid>
+    <dtdversion>3.0</dtdversion>
+    <includewhitespace>false</includewhitespace>
+  </control>
+  <operation>
+    <authentication>
+      <sessionid>some_session_id</sessionid>
+    </authentication>
+    <content>
+      <function controlid="UUID_PLACEHOLDER">
+        <readByName>
+          <object>USERINFO</object>
+          <keys>user_id</keys>
+          <fields>RECORDNO</fields>
+        </readByName>
+      </function>
+    </content>
+  </operation>
+</request>

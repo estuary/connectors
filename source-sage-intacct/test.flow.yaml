@@ -1,0 +1,61 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-sage-intacct:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_sage_intacct
+        config: config.yaml
+    bindings:
+      - resource:
+          name: APTERM
+          interval: PT300S
+        target: acmeCo/APTERM
+      - resource:
+          name: TRXCURRENCIES
+          interval: PT300S
+        target: acmeCo/TRXCURRENCIES
+      - resource:
+          name: VENDOR
+          interval: PT300S
+        target: acmeCo/VENDOR
+      - resource:
+          name: TAXDETAIL
+          interval: PT300S
+        target: acmeCo/TAXDETAIL
+      - resource:
+          name: CLASS
+          interval: PT300S
+        target: acmeCo/CLASS
+      - resource:
+          name: GLJOURNAL
+          interval: PT300S
+        target: acmeCo/GLJOURNAL
+      - resource:
+          name: LOCATION
+          interval: PT300S
+        target: acmeCo/LOCATION
+      - resource:
+          name: EMPLOYEE
+          interval: PT300S
+        target: acmeCo/EMPLOYEE
+      - resource:
+          name: DEPARTMENT
+          interval: PT300S
+        target: acmeCo/DEPARTMENT
+      - resource:
+          name: CUSTOMER
+          interval: PT300S
+        target: acmeCo/CUSTOMER
+      - resource:
+          name: PROJECT
+          interval: PT300S
+        target: acmeCo/PROJECT
+      - resource:
+          name: GLACCOUNT
+          interval: PT300S
+        target: acmeCo/GLACCOUNT

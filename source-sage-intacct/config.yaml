@@ -1,0 +1,19 @@
+sender_id: Skyline-npuni
+sender_password_sops: ENC[AES256_GCM,data:o0LK43EP7Gss4Vcneso=,iv:gXlIk1XGBzqNOYmUiI9+3jDVXclhSutM328IJchRQUw=,tag:uIu/UFvsUAyP+Qy0ZdZzoQ==,type:str]
+company_id: SIG-LA-QA-NOTAX
+user_id: estuary
+password_sops: ENC[AES256_GCM,data:E+tK7+IsDq8zhRg=,iv:LaEmFEe2iwRAs+eJgGrdJbsyvX86RC3/pJu9jUIheLg=,tag:1bgOGspNm/hoCZOJPZ99kA==,type:str]
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2025-05-07T14:38:50Z"
+          enc: CiQAdmEdwlDSMWyNesrsIVTsat9h9tdj8exFB3iw4wUBF8USjXcSSQCXJHeeg4BqIbk6NtwJ6p6+MNA1s+cVnz/L8MahRvKI0bTdYbKmS+evX3hrxF9zvoBqcDbP8ApQYMWG/phzFALyHkjT27uHHAM=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-05-07T14:38:50Z"
+    mac: ENC[AES256_GCM,data:3uRxov6f6KQ/MRr+FKIztbjBRh3BIxSB+iBDFkei7OphbD0C/a/dDwB0MQyGS+tOCDK9PNkV4fJ+Tz/htmpFAV8jUN8Qj+gD/CixclDDlEzQhBfA0AebdoMpI91er0chXrNWoYf42W2wl0Aq+XtGov8XwpIOlRlU/OgJCXPuDh8=,iv:tqCe9fgltEI63xdvn5Xw4v58M7OUszOzJH4H4/MFyBc=,tag:m3oqQ3eOAfp29enymS7tBQ==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.4
