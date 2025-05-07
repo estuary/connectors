@@ -628,7 +628,7 @@ func TestInitResourceStates(t *testing.T) {
 			fmt.Fprintf(out, "\n")
 		}
 		fmt.Fprintf(out, "--- %s ---\n", tc.name)
-		var outputStates, err = initResourceStates(tc.states, tc.bindings, testNow)
+		var outputStates, err = initResourceStates(&config{}, tc.states, tc.bindings, testNow)
 		if err != nil {
 			fmt.Fprintf(out, "error: %v\n", err)
 			continue
