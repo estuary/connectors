@@ -73,6 +73,15 @@ ENTERPRISE_STREAMS = [
 ]
 
 
+HELP_DESK_STREAMS = [
+    "posts",
+    "post_comments",
+    "post_comment_votes",
+    "post_votes",
+    "topics",
+]
+
+
 async def _is_enterprise_account(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> bool:
@@ -80,6 +89,20 @@ async def _is_enterprise_account(
         await http.request(log, f"{url_base(config.subdomain)}/audit_logs")
     except HTTPError as err:
         if err.code == 403 and "You do not have access to this page." in err.message:
+            return False
+        else:
+            raise err
+
+    return True
+
+
+async def _is_account_with_help_desk(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> bool:
+    try:
+        await http.request(log, f"{url_base(config.subdomain)}/community/posts")
+    except HTTPError as err:
+        if err.code == 404 and "The page you were looking for doesn't exist" in err.message:
             return False
         else:
             raise err
@@ -844,5 +867,8 @@ async def all_resources(
 
     if not await _is_enterprise_account(log, http, config):
         resources = [r for r in resources if r.name not in ENTERPRISE_STREAMS]
+
+    if not await _is_account_with_help_desk(log, http, config):
+        resources = [r for r in resources if r.name not in HELP_DESK_STREAMS]
 
     return resources
