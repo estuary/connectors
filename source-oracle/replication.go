@@ -592,6 +592,10 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 					}
 				}
 			}
+
+			for xid, _ := range rollbackedXIDs {
+				delete(s.pendingTransactions, xid)
+			}
 		}
 
 		if err := s.receiveMessages(ctx, startSCN, endSCN, stmt, rollbackedXIDs); err != nil {
@@ -768,7 +772,7 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context, transacti
 		txPredicate = fmt.Sprintf("AND XID IN (%s)", strings.Join(txValues, ","))
 	}
 
-	// START and COMMIT operations do not seg_owner and have data_obj#=0 and data_objd#=0
+	// START and COMMIT operations do not have seg_owner and have data_obj#=0 and data_objd#=0
 	var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#, XID
     FROM V$LOGMNR_CONTENTS
     WHERE OPERATION_CODE IN (%s) AND SCN >= :startSCN AND SCN <= :endSCN AND 
