@@ -36,6 +36,12 @@ resources_json_template='[
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
   },
   {
+  "resource":{
+      "table": "underscore_column"
+    },
+    "source": "${TEST_COLLECTION_UNDERSCORE_COLUMN}"
+  },
+  {
     "resource": {
       "table": "duplicate_keys_delta",
       "delta_updates": true
