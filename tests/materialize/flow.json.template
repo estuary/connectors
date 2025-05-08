@@ -162,6 +162,17 @@
           "reduce": { "strategy": "merge" }
        },
        "key": ["/id"]
+    },
+    "tests/underscore-column": {
+       "schema": {
+       "properties": {
+           "_id": {"type": "integer"},
+           "__some_field": { "type": "string" }
+          },
+          "required": ["_id", "__some_field"],
+          "type": "object"
+       },
+       "key": ["/_id"]
     }
   },
 
