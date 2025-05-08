@@ -3,12 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"slices"
 	"strings"
-	"unicode/utf8"
-
-	sql "github.com/estuary/connectors/materialize-sql"
 )
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {
@@ -81,12 +79,12 @@ var crateDialect = func() sql.Dialect {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its empty the
 				// default postgres schema "public" will implicitly be used.
-				return sql.InfoTableLocation{TableSchema: "doc", TableName: truncatedIdentifier(path[0])}
+				return sql.InfoTableLocation{TableSchema: "doc", TableName: path[0]}
 			} else {
-				return sql.InfoTableLocation{TableSchema: truncatedIdentifier(path[0]), TableName: truncatedIdentifier(path[1])}
+				return sql.InfoTableLocation{TableSchema: path[0], TableName: path[1]}
 			}
 		}),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return truncatedIdentifier(field) }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				func(s string) bool {
@@ -100,7 +98,6 @@ var crateDialect = func() sql.Dialect {
 			return fmt.Sprintf("$%d", index+1)
 		}),
 		TypeMapper:             mapper,
-		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
 		CaseInsensitiveColumns: false,
 	}
 }()
@@ -316,26 +313,3 @@ UPDATE {{ Identifier $.TablePath }}
 	tplInstallFence      = tplAll.Lookup("installFence")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
-
-// truncatedIdentifier produces a truncated form of an identifier, in accordance with Postgres'
-// automatic truncation of identifiers that are over 63 bytes in length. For example, if a Flow
-// collection or field name is over 63 bytes in length, Postgres will let a table/column be created
-// with that as an identifier, but automatically truncates the identifier when interacting with it.
-// This means we have to be aware of this possible truncation when querying the information_schema
-// view.
-func truncatedIdentifier(in string) string {
-	maxByteLength := 63
-
-	if len(in) <= maxByteLength {
-		return in
-	}
-
-	bytes := []byte(in)
-	for maxByteLength >= 0 && !utf8.Valid(bytes[:maxByteLength]) {
-		// Don't mangle multi-byte characters; this seems to be consistent with Postgres truncation
-		// as well.
-		maxByteLength -= 1
-	}
-
-	return string(bytes[:maxByteLength])
-}
