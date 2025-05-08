@@ -58,6 +58,6 @@ class Connector(
         log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-        resources = await all_resources(log, self, open.capture.config)
+        resources = await all_resources(log, self, open.capture.config, should_cancel_ongoing_job=True)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)

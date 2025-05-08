@@ -116,7 +116,12 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError([msg])
 
 
-async def all_resources(log: Logger, http: HTTPMixin, config: EndpointConfig) -> list:
+async def all_resources(
+        log: Logger,
+        http: HTTPMixin,
+        config: EndpointConfig,
+        should_cancel_ongoing_job: bool = False
+) -> list[Resource]:
     http.token_source = TokenSource(
         oauth_spec=OAUTH2_SPEC,
         credentials=config.credentials,
@@ -124,8 +129,10 @@ async def all_resources(log: Logger, http: HTTPMixin, config: EndpointConfig) ->
     )
     bulk_job_manager = gql.bulk_job_manager.BulkJobManager(http, log, config.store)
 
-    # Cancel any ongoing bulk query jobs before the connector starts submitting its own bulk query jobs.
-    await bulk_job_manager.cancel_current()
+    # Before opening bindings, cancel any ongoing bulk query jobs before the 
+    # connector starts submitting its own bulk query jobs.
+    if should_cancel_ongoing_job:
+        await bulk_job_manager.cancel_current()
 
     return [
         *_incremental_resources(http, config, bulk_job_manager),
