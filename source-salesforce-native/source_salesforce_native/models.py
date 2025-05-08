@@ -2,7 +2,7 @@
 import abc
 from datetime import datetime, timedelta, UTC
 from enum import StrEnum
-from typing import Any, TYPE_CHECKING, Iterator, Annotated
+from typing import Any, Callable, TYPE_CHECKING, Iterator, Annotated
 
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 from estuary_cdk.capture.common import (
@@ -145,7 +145,22 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"advanced": True},
     )
 
-ConnectorState = GenericConnectorState[ResourceState]
+
+CheckpointBulkJobFn = Callable[[str | None], None]
+
+
+class SalesforceBackfillState(ResourceState.Backfill):
+    salesforce_bulk_job: str | None = None
+
+
+class SalesforceResourceState(ResourceState):
+    backfill: SalesforceBackfillState | None = Field(
+        default=None,
+        description="Backfill progress, or None if no backfill is occurring",
+    )
+
+
+ConnectorState = GenericConnectorState[SalesforceResourceState]
 
 
 class PartialSObject(BaseModel, extra="allow"):

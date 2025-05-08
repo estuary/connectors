@@ -21,6 +21,7 @@ from .models import (
     FullRefreshResource,
     SalesforceResource,
     CursorFields,
+    CheckpointBulkJobFn,
 )
 
 REST_CHECKPOINT_INTERVAL = 2_000
@@ -130,6 +131,8 @@ async def backfill_incremental_resources(
     name: str,
     fields: FieldDetailsDict,
     window_size: int,
+    previous_bulk_job: str | None,
+    checkpoint_bulk_job: CheckpointBulkJobFn,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -160,13 +163,24 @@ async def backfill_incremental_resources(
         manager: BulkJobManager | RestQueryManager, 
         checkpoint_interval: int
     ) -> AsyncGenerator[SalesforceResource | str, None]:
-        gen = manager.execute(
-            name,
-            fields,
-            cursor_field,
-            start,
-            end,
-        )
+        if isinstance(manager, BulkJobManager):
+            gen = manager.execute(
+                name,
+                fields,
+                cursor_field,
+                start,
+                end,
+                previous_bulk_job,
+                checkpoint_bulk_job,
+            )
+        else:
+            gen = manager.execute(
+                name,
+                fields,
+                cursor_field,
+                start,
+                end,
+            )
 
         async for record_or_dt in _execution_wrapper(gen, cursor_field, start, end, max_window_size, checkpoint_interval):
             if isinstance(record_or_dt, datetime):

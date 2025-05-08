@@ -19,6 +19,7 @@ from .models import (
     BulkJobStates,
     BulkJobSubmitResponse,
     BulkJobCheckStatusResponse,
+    CheckpointBulkJobFn,
 )
 
 INITIAL_SLEEP = 0.2
@@ -266,6 +267,8 @@ class BulkJobManager:
         cursor_field: CursorFields | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
+        previous_bulk_job: str | None = None,
+        checkpoint_bulk_job: CheckpointBulkJobFn | None = None,
     ) -> AsyncGenerator[dict[str, str], None]:
         job_id = await self._submit(object_name, list(fields.keys()), cursor_field, start, end)
 

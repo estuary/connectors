@@ -24,6 +24,9 @@ from .shared import dt_to_str, now, VERSION
 from .models import (
     EndpointConfig,
     SalesforceResourceConfigWithSchedule,
+    CheckpointBulkJobFn,
+    SalesforceBackfillState,
+    SalesforceResourceState,
     ResourceState,
     ConnectorState,
     SalesforceTokenSource,
@@ -81,6 +84,29 @@ async def _fetch_object_fields(log: Logger, http: HTTPMixin, instance_url: str, 
     return FieldDetailsDict.model_validate(fields)
 
 
+def create_checkpoint_bulk_job_fn(
+    binding: CaptureBinding[SalesforceResourceConfigWithSchedule],
+    state: ResourceState,
+    task: Task,
+) -> CheckpointBulkJobFn:
+    assert isinstance(state, SalesforceResourceState)
+
+    def checkpoint_bulk_job(bulk_job_id: str | None) -> None:
+        assert isinstance(state.backfill, ResourceState.Backfill)
+        task.checkpoint(ConnectorState(
+            bindingStateV1={
+                binding.stateKey: SalesforceResourceState(
+                    backfill=SalesforceBackfillState(
+                        salesforce_bulk_job=bulk_job_id,
+                        cutoff=state.backfill.cutoff,
+                    ),
+                ),
+            }
+        ))
+
+    return checkpoint_bulk_job
+
+
 def full_refresh_resource(
     log: Logger,
     http: HTTPMixin,
@@ -128,7 +154,7 @@ def full_refresh_resource(
         key=["/_meta/row_id"],
         model=FullRefreshResource,
         open=open,
-        initial_state=ResourceState(),
+        initial_state=SalesforceResourceState(),
         initial_config=SalesforceResourceConfigWithSchedule(
             name=name, interval=timedelta(minutes=5)
         ),
@@ -159,6 +185,9 @@ def incremental_resource(
         task: Task,
         all_bindings,
     ):
+        assert isinstance(state, SalesforceResourceState)
+        bulk_job_id = None if state.backfill is None else state.backfill.salesforce_bulk_job
+
         # When `open` is called, we need to ensure there are actually fields provided. This avoids
         # using API requests during discovery, but we need to make sure the fields are present when validating & opening.
         if fields is None:
@@ -181,7 +210,9 @@ def incremental_resource(
                 instance_url,
                 name,
                 fields,
-                config.advanced.window_size
+                config.advanced.window_size,
+                bulk_job_id,
+                create_checkpoint_bulk_job_fn(binding, state, task),
             ),
             fetch_changes=functools.partial(
                 fetch_incremental_resources,
@@ -203,9 +234,9 @@ def incremental_resource(
         key=["/Id"],
         model=SalesforceResource,
         open=open,
-        initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=cutoff),
-            backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
+        initial_state=SalesforceResourceState(
+            inc=SalesforceResourceState.Incremental(cursor=cutoff),
+            backfill=SalesforceBackfillState(next_page=dt_to_str(config.start_date), cutoff=cutoff)
         ),
         initial_config=SalesforceResourceConfigWithSchedule(
             name=name,
