@@ -76,19 +76,19 @@ var crateDialect = func() sql.Dialect {
 			if len(path) == 1 {
 				// A schema isn't required to be set on the endpoint or any resource, and if its empty the
 				// default postgres schema "public" will implicitly be used.
-				return sql.InfoTableLocation{TableSchema: "doc", TableName: path[0]}
+				return sql.InfoTableLocation{TableSchema: "doc", TableName: normalizeColumn(path[0])}
 			} else {
-				return sql.InfoTableLocation{TableSchema: path[0], TableName: path[1]}
+				return sql.InfoTableLocation{TableSchema: path[0], TableName: normalizeColumn(path[1])}
 			}
 		}),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return normalizeColumn(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
-			sql.PassThroughTransform(
+			identifierSanitizer(sql.PassThroughTransform(
 				func(s string) bool {
 					return sql.IsSimpleIdentifier(s) && !slices.Contains(PG_RESERVED_WORDS, strings.ToLower(s))
 				},
 				sql.QuoteTransform(`"`, `""`),
-			))),
+			)))),
 		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			// parameterIndex starts at 0, but postgres parameters start at $1
@@ -310,3 +310,33 @@ UPDATE {{ Identifier $.TablePath }}
 	tplInstallFence      = tplAll.Lookup("installFence")
 	tplUpdateFence       = tplAll.Lookup("updateFence")
 )
+
+// extendPrefixBy extends a `prefix` by `by` units if the `in` string starts with `prefix`.
+// Examples:
+//
+//	>>> extendPrefixBy("_mystring", "_", 1)
+//	'__mystring'
+//	>>> extendPrefixBy("sometring", "some", 2)
+//	'somesomesomestring'
+func extendPrefixBy(in string, prefix string, by int) string {
+	if strings.HasPrefix(in, prefix) {
+		return strings.Repeat(prefix, by) + in
+	}
+	return in
+}
+
+// normalizeColumn Returns a normalized column name valid in CrateDB.
+// Current normalizations applied:
+// underscore: columns that start with an underscore are added an extra underscore: https://github.com/crate/cratedb-estuary/issues/13
+func normalizeColumn(column string) string {
+	column = extendPrefixBy(column, "_", 1)
+	// Apply more normalizations as needed here.
+	return column
+}
+
+// Delegated function to apply normalizeColumn to sql.Dialect.Identifierer
+func identifierSanitizer(delegate func(string) string) func(string) string {
+	return func(text string) string {
+		return delegate(normalizeColumn(text))
+	}
+}
