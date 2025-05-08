@@ -813,7 +813,7 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 				"rollbacks": rollbacks,
 				"commits":   commits,
 				"count":     count,
-			}).Debug("skipping rolled-back transaction")
+			}).Trace("skipping rolled-back transaction")
 		} else if commits == 0 {
 			pendingTXs[xid] = startSCN
 			logrus.WithFields(logrus.Fields{
@@ -822,7 +822,7 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 				"commits":   commits,
 				"count":     count,
 				"startSCN":  startSCN,
-			}).Debug("found pending transaction")
+			}).Trace("found pending transaction")
 		} else {
 			// sanity check the query, this shouldn't happen
 			return nil, nil, fmt.Errorf("unexpected transaction with commit > 0, xid: %s, startSCN: %d, commits: %d, rollbacks: %d", xid, startSCN, commits, rollbacks)
