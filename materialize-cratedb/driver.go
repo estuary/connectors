@@ -167,9 +167,9 @@ func (r tableConfig) Validate() error {
 
 func (c tableConfig) Path() sql.TablePath {
 	if c.Schema != "" {
-		return []string{c.Schema, c.Table}
+		return []string{c.Schema, normalizeColumn(c.Table)}
 	}
-	return []string{c.Table}
+	return []string{normalizeColumn(c.Table)}
 }
 
 func (c tableConfig) DeltaUpdates() bool {
@@ -178,7 +178,7 @@ func (c tableConfig) DeltaUpdates() bool {
 
 func newPostgresDriver() *sql.Driver {
 	return &sql.Driver{
-		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
+		DocumentationURL: "https://go.estuary.dev/materialize-cratedb",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
 		StartTunnel: func(ctx context.Context, conf any) error {
@@ -358,6 +358,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	t.bindings = append(t.bindings, b)
 
 	var w strings.Builder
+
 	if err := tplCreateLoadTable.Execute(&w, &b.target); err != nil {
 		return fmt.Errorf("executing createLoadTable template: %w", err)
 	} else if _, err := t.load.conn.Exec(ctx, w.String()); err != nil {
