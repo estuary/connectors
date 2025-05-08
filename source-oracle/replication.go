@@ -603,6 +603,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			// We will switch back to Online mode afterwards
 			var dictionaryMismatch = strings.Contains(strings.ToLower(err.Error()), "dictionary mismatch")
 			if dictionaryMismatch && s.dictionaryMode == DictionaryModeOnline && s.smartMode {
+				logrus.WithField("error", err).Info("smart mode: encountered dictionary mismatch")
 				s.dictionaryMode = DictionaryModeExtract
 				if lastDDLSCN, err := s.maximumLastDDLSCN(ctx); err != nil {
 					return err
@@ -610,7 +611,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 					s.lastDDLSCN = lastDDLSCN
 				}
 
-				logrus.WithField("lastDDLSCN", s.lastDDLSCN).Info("smart mode: encountered dictionary mismatch, switching to extract mode")
+				logrus.WithField("lastDDLSCN", s.lastDDLSCN).Info("smart mode: switching to extract mode")
 				continue
 			}
 			return fmt.Errorf("receive messages: %w", err)
