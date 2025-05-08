@@ -194,7 +194,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	if fullWriteSchema {
 		beforeSchema.Extras["reduce"] = map[string]any{"strategy": "firstWriteWins"}
 	} else {
-		beforeSchema.Extras["additionalProperties"] = false
+		beforeSchema.Extras["unevaluatedProperties"] = false
 	}
 
 	var metaPropertySchema = &jsonschema.Schema{
@@ -284,7 +284,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 		schema.Extras["x-infer-schema"] = true
 	}
 	if !fullWriteSchema {
-		schema.Extras["additionalProperties"] = false
+		schema.Extras["unevaluatedProperties"] = false
 	}
 
 	var documentSchema, err = schema.MarshalJSON()
