@@ -103,7 +103,8 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
     XID,
     SUM(CASE WHEN OPERATION_CODE=36 THEN 1 ELSE 0 END) AS ROLLBACKS,
     SUM(CASE WHEN OPERATION_CODE=7 THEN 1 ELSE 0 END) AS COMMITS,
-    MIN(SCN) AS STARTSCN
+    MIN(SCN) AS STARTSCN,
+    COUNT(*) AS COUNT
   FROM V$LOGMNR_CONTENTS
   WHERE SCN >= :startSCN AND SCN <= :endSCN
   GROUP BY XID
@@ -799,7 +800,8 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 		var xidRaw []byte
 		var rollbacks, commits int
 		var startSCN SCN
-		if err := rows.Scan(&xidRaw, &rollbacks, &commits, &startSCN); err != nil {
+		var count int
+		if err := rows.Scan(&xidRaw, &rollbacks, &commits, &startSCN, &count); err != nil {
 			return nil, nil, fmt.Errorf("scanning transactions: %w", err)
 		}
 		var xid = base64.StdEncoding.EncodeToString(xidRaw)
@@ -807,14 +809,23 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 		if rollbacks > 0 {
 			excludeXIDs[xid] = struct{}{}
 			logrus.WithFields(logrus.Fields{
-				"xid": xid,
+				"xid":       xid,
+				"rollbacks": rollbacks,
+				"commits":   commits,
+				"count":     count,
 			}).Debug("skipping rolled-back transaction")
 		} else if commits == 0 {
 			pendingTXs[xid] = startSCN
 			logrus.WithFields(logrus.Fields{
-				"xid":      xid,
-				"startSCN": startSCN,
+				"xid":       xid,
+				"rollbacks": rollbacks,
+				"commits":   commits,
+				"count":     count,
+				"startSCN":  startSCN,
 			}).Debug("found pending transaction")
+		} else {
+			// sanity check the query, this shouldn't happen
+			return nil, nil, fmt.Errorf("unexpected transaction with commit > 0, xid: %s, startSCN: %d, commits: %d, rollbacks: %d", xid, startSCN, commits, rollbacks)
 		}
 	}
 
