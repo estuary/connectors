@@ -141,11 +141,16 @@ class IterableStream(HttpStream, ABC):
 class IterableExportStream(IterableStream, IncrementalMixin, ABC):
     """
     This stream utilize "export" Iterable api for getting large amount of data.
-    It can return data in form of new line separater strings each of each
-    representing json object.
-    Data could be windowed by date ranges by applying startDateTime and
-    endDateTime parameters.  Single request could return large volumes of data
-    and request rate is limited by 4 requests per minute.
+    It returns results in JSONL format. Data can be split up into date ranges
+    by applying startDateTime and endDateTime parameters. A single request 
+    could return a large volume of data, and the endpoint's rate limit is 4
+    requests per minute.
+
+    Returned results are not sorted per their cursor fields, so cursors cannot be checkpointed
+    by inspecting each result's cursor field value & checkpointing the max value found so far.
+    That strategy causes the connector's cursor to skip ahead before processing all results in
+    a date window. Instead, the state is updated to the end of the date window after all results
+    in a date window are processed.
 
     Details: https://api.iterable.com/api/docs#export_exportDataJson
     """
@@ -181,31 +186,6 @@ class IterableExportStream(IterableStream, IncrementalMixin, ABC):
             raise ValueError(f"Unsupported type of datetime field {type(value)}")
         return value
 
-    def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
-        for record in super().read_records(**kwargs):
-            self.state = self._get_updated_state(self.state, record)
-            yield record
-
-    def _get_updated_state(
-        self,
-        current_stream_state: MutableMapping[str, Any],
-        latest_record: Mapping[str, Any],
-    ) -> Mapping[str, Any]:
-        """
-        Return the latest state by comparing the cursor value in the latest record with the stream's most recent state object
-        and returning an updated state object.
-        """
-        latest_benchmark = latest_record[self.cursor_field]
-        if current_stream_state.get(self.cursor_field):
-            return {
-                self.cursor_field: str(
-                    max(
-                        latest_benchmark,
-                        self._field_to_datetime(current_stream_state[self.cursor_field]),
-                    )
-                )
-            }
-        return {self.cursor_field: str(latest_benchmark)}
 
     def request_params(
         self,
@@ -224,11 +204,13 @@ class IterableExportStream(IterableStream, IncrementalMixin, ABC):
         )
         return params
 
-    def parse_response(self, response: requests.Response, **kwargs) -> Iterable[Mapping]:
+    def parse_response(self, response: requests.Response, stream_slice: StreamSlice = None, **kwargs) -> Iterable[Mapping]:
         for obj in response.iter_lines():
             record = json.loads(obj)
             record[self.cursor_field] = self._field_to_datetime(record[self.cursor_field])
             yield record
+
+        self.state = {self.cursor_field: stream_slice.end_date}
 
     def request_kwargs(
         self,
@@ -805,7 +787,7 @@ class Users(IterableExportStreamRanged):
 
     def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
         for record in super().read_records(**kwargs):
-            self.state = self._get_updated_state(self.state, record)
+
             if record.get("signupDate"):
                 record["signupDate"] = datetime.strptime(record["signupDate"], "%Y-%m-%d %H:%M:%S %z")
             yield record
