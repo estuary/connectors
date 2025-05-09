@@ -1,4 +1,5 @@
 import json
+import asyncio
 from logging import Logger
 from typing import Any, AsyncGenerator, Dict, Literal, Callable
 
@@ -33,27 +34,50 @@ async def execute_query(
     query: str,
     variables: Dict[str, Any] | None = None,
 ) -> GraphQLResponse[ResponseObject]:
-    res: dict[str, Any] = json.loads(
-        await http.request(
-            log,
-            API,
-            method="POST",
-            json=(
-                {"query": query, "variables": variables}
-                if variables
-                else {"query": query}
-            ),
-        )
-    )
-    if "errors" in res:
-        raise GraphQLQueryError([GraphQLError.model_validate(e) for e in res["errors"]])
+    log.debug(f"Executing query {query} with variables: {variables}")
 
-    response = GraphQLResponse[cls].model_validate(res)
+    attempt = 1
+    while True:
+        try:
+            res: dict[str, Any] = json.loads(
+                await http.request(
+                    log,
+                    API,
+                    method="POST",
+                    json=(
+                        {"query": query, "variables": variables}
+                        if variables
+                        else {"query": query}
+                    ),
+                )
+            )
 
-    if response.errors:
-        raise GraphQLQueryError(response.errors)
+            if "errors" in res:
+                raise GraphQLQueryError(
+                    [GraphQLError.model_validate(e) for e in res["errors"]]
+                )
 
-    return response
+            response = GraphQLResponse[cls].model_validate(res)
+
+            if response.errors:
+                raise GraphQLQueryError(response.errors)
+
+            return response
+        except Exception as e:
+            if attempt == 5:
+                raise
+
+            log.warning(
+                "failed to execute query (will retry)",
+                {
+                    "error": str(e),
+                    "attempt": attempt,
+                    "query": query,
+                    "variables": variables,
+                },
+            )
+            await asyncio.sleep(attempt * 2)
+            attempt += 1
 
 
 async def fetch_recently_updated(
@@ -79,7 +103,7 @@ async def fetch_recently_updated(
     }
 
     while True:
-        data = await execute_query(
+        response = await execute_query(
             ActivityLogsResponse,
             http,
             log,
@@ -87,12 +111,12 @@ async def fetch_recently_updated(
             variables,
         )
 
-        if not data.data or not data.data.boards:
+        if not response.data or not response.data.boards:
             break
 
         variables["page"] += 1
 
-        for board in data.data.boards:
+        for board in response.data.boards:
             if not board.activity_logs:
                 continue
             for activity_log in board.activity_logs:
@@ -186,7 +210,7 @@ async def _fetch_items_chunk(
         if not response.data or not response.data.items:
             break
 
-        async for item in _filter_parent_items(response.data.items):
+        for item in response.data.items:
             yield item
 
         if limit is not None and len(response.data.items) < limit:
@@ -317,20 +341,6 @@ async def fetch_boards(
         current_page += 1
 
 
-async def _filter_parent_items(
-    items: list[Item],
-    processed_parent_items: set[str] | None = None,
-) -> AsyncGenerator[Item, None]:
-    for item in items:
-        item_id = str(item.id)
-        if processed_parent_items is not None:
-            if not item.parent_item and item_id not in processed_parent_items:
-                processed_parent_items.add(item_id)
-                yield item
-        else:
-            yield item
-
-
 async def fetch_items_by_ids(
     http: HTTPSession,
     log: Logger,
@@ -346,9 +356,9 @@ async def fetch_items_by_ids(
 async def fetch_items_by_boards(
     http: HTTPSession,
     log: Logger,
-    limit: int | None = None,
-    board_ids: list[str] | None = None,
-) -> AsyncGenerator[Item, None]:
+    page: int,
+    itemsLimit: int,
+) -> AsyncGenerator[Item | str, None]:
     """
     Note: If `board_ids` is not provided, items from all boards will be fetched.
     """
@@ -358,32 +368,40 @@ async def fetch_items_by_boards(
         log,
         ITEMS,
         {
-            "limit": limit,
-            "boardIds": board_ids,
+            "boardsPage": page,
+            "boardsLimit": 1,
+            "itemsLimit": itemsLimit,
         },
     )
     if not response.data or not response.data.boards:
+        log.debug(
+            f"Received empty response for page {page} with itemsLimit {itemsLimit}"
+        )
         return
 
-    processed_parent_items: set[str] = set()
     board_cursors: dict[str, str] = {}
+    board_id = None
 
-    for board in response.data.boards:
-        items_page = board.items_page
-        if items_page.cursor:
-            board_cursors[board.id] = items_page.cursor
+    board = response.data.boards[0]
+    items_page = board.items_page
+    if items_page.cursor:
+        board_cursors[board.id] = items_page.cursor
+    else:
+        log.debug(f"Board {board.id} has no cursor.")
 
-        async for item in _filter_parent_items(
-            items_page.items, processed_parent_items
-        ):
-            yield item
+    for item in items_page.items:
+        log.debug(f"Yielding item {item.id} from board {board.id}")
+        board_id = board.id
+        yield item
 
     # Monday returns a cursor for each board's items_page. We use this cursor to fetch next items.
     # Note that the cursor will expire in 60 minutes.
     while board_cursors:
+        log.debug(f"Fetching next items for boards: {board_cursors.keys()}")
         for b_id, cur in list(board_cursors.items()):
+            log.debug(f"Board {b_id} has cursor: {cur}")
             variables = {
-                "limit": limit,
+                "limit": itemsLimit,
                 "cursor": cur,
                 "boardId": b_id,
             }
@@ -396,19 +414,34 @@ async def fetch_items_by_boards(
                 variables,
             )
             if not response.data or not response.data.next_items_page:
-                return
+                log.debug(f"Received empty response for board {b_id}")
+                board_cursors.pop(b_id)
+                continue
 
-            async for item in _filter_parent_items(
-                response.data.next_items_page.items,
-                processed_parent_items,
-            ):
+            items_page = response.data.next_items_page
+            if not items_page.items:
+                log.debug(f"Board {b_id} has no items in next page.")
+                board_cursors.pop(b_id)
+                continue
+
+            for item in items_page.items:
+                board_id = b_id
                 yield item
 
             next_cursor = response.data.next_items_page.cursor
             if not next_cursor:
+                log.debug(f"Board {b_id} has no next cursor.")
                 board_cursors.pop(b_id)
             else:
                 board_cursors[b_id] = next_cursor
+
+    log.debug(
+        f"Finished fetching items for board {board_id}. Remaining cursors: {board_cursors.keys()}"
+    )
+    if board_id is not None:
+        # This indicates that there was a board for this page, but no items were found.
+        # We should still yield the board ID so that the caller can continue pagination of the boards to get items.
+        yield board_id
 
 
 ACTIVITY_LOGS = """
@@ -608,10 +641,10 @@ fragment ItemFields on Item {
 """
 
 ITEMS = f"""
-query GetBoardItems($boardIds: [ID!], $limit: Int = 20) {{
-  boards(ids: $boardIds) {{
+query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 20) {{
+  boards(limit: $boardsLimit, page: $boardsPage) {{
     id
-    items_page(limit: $limit) {{
+    items_page(limit: $itemsLimit) {{
       cursor
       items {{
         ...ItemFields

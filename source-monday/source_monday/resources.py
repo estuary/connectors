@@ -57,7 +57,7 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         raise ValidationError([msg])
 
 
-def full_refresh_resouces(log: Logger, http: HTTPMixin, config: EndpointConfig):
+def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     def open(
         fetch_snapshot_fn: FullRefreshResourceFetchFn,
         limit: int,
@@ -137,6 +137,6 @@ async def all_resources(
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
     return [
-        *full_refresh_resouces(log, http, config),
+        *full_refresh_resources(log, http, config),
         *incremental_resources(log, http, config),
     ]
