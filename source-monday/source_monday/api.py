@@ -64,11 +64,13 @@ async def fetch_boards_page(
     http: HTTPSession,
     limit: int,
     log: Logger,
-    page: PageCursor | None,
+    page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Board | PageCursor, None]:
     assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
+
+    log.debug(f"Backfilling boards page {page} with cutoff {cutoff}")
 
     doc_count = 0
     async for board in fetch_boards(http, log, page=page, limit=limit):
@@ -78,6 +80,8 @@ async def fetch_boards_page(
 
     if doc_count > 0:
         yield page + 1
+    else:
+        log.debug("Completed backfilling boards.")
 
 
 async def fetch_items_changes(
@@ -116,21 +120,39 @@ async def fetch_items_page(
     http: HTTPSession,
     limit: int,
     log: Logger,
-    _: PageCursor,
+    page: PageCursor,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Item | PageCursor, None]:
     """
-    Note: This function does not use the `page` parameter due to how items need to be queried.
+    Note: The `page` parameter is used for paginating the boards, not the items.
     """
+    assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
+    log.debug(f"Backfilling items - board {page} with cutoff {cutoff}")
+
+    should_yield_page = False
     async for item in fetch_items_by_boards(
         http,
         log,
-        limit=limit,
+        page=page,
+        itemsLimit=limit,
     ):
+        if isinstance(item, str):
+            # This indicates that there was a board for this page, but no items were found.
+            # We should still yield the page number to continue pagination.
+            log.debug(f"No items found for page {page} (board {item}).")
+            should_yield_page = True
+            continue
+
         if item.updated_at < cutoff:
             yield item
+            should_yield_page = True
+
+    if should_yield_page:
+        yield page + 1
+    else:
+        log.debug(f"Completed backfilling items after {page} boards.")
 
 
 async def snapshot_teams(
