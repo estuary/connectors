@@ -1,5 +1,4 @@
 from logging import Logger
-from datetime import datetime, UTC
 from typing import (
     TYPE_CHECKING,
     Annotated,
@@ -7,7 +6,6 @@ from typing import (
     AsyncGenerator,
     Callable,
     Generic,
-    Literal,
     TypeVar,
 )
 import json

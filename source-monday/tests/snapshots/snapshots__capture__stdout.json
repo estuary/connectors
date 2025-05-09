@@ -437,6 +437,110 @@
       },
       "assets": [],
       "board": {
+        "id": "8483610893",
+        "name": "Subitems of Estuary"
+      },
+      "column_values": [
+        {
+          "id": "person",
+          "text": "",
+          "type": "people",
+          "value": null
+        },
+        {
+          "id": "status",
+          "text": null,
+          "type": "status",
+          "value": null
+        },
+        {
+          "id": "date0",
+          "text": "",
+          "type": "date",
+          "value": null
+        }
+      ],
+      "created_at": "2025-02-20T19:03:22Z",
+      "creator_id": "71985416",
+      "group": {
+        "id": "topics"
+      },
+      "id": "8531539316",
+      "name": "SubItem Number One",
+      "parent_item": {
+        "id": "8531390039"
+      },
+      "state": "active",
+      "subitems": [],
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "updated_at": "redacted",
+      "updates": []
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assets": [],
+      "board": {
+        "id": "8483610893",
+        "name": "Subitems of Estuary"
+      },
+      "column_values": [
+        {
+          "id": "person",
+          "text": "",
+          "type": "people",
+          "value": null
+        },
+        {
+          "id": "status",
+          "text": null,
+          "type": "status",
+          "value": null
+        },
+        {
+          "id": "date0",
+          "text": "",
+          "type": "date",
+          "value": null
+        }
+      ],
+      "created_at": "2025-02-20T19:15:53Z",
+      "creator_id": "71985416",
+      "group": {
+        "id": "topics"
+      },
+      "id": "8531684828",
+      "name": "Second SubItem",
+      "parent_item": {
+        "id": "8531390039"
+      },
+      "state": "active",
+      "subitems": [],
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "updated_at": "redacted",
+      "updates": []
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assets": [],
+      "board": {
         "id": "8431289505",
         "name": "Estuary"
       },
@@ -528,6 +632,58 @@
           "updates": []
         }
       ],
+      "subscribers": [
+        {
+          "id": "71985416"
+        }
+      ],
+      "updated_at": "redacted",
+      "updates": []
+    }
+  ],
+  [
+    "acmeCo/items",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "assets": [],
+      "board": {
+        "id": "8483610893",
+        "name": "Subitems of Estuary"
+      },
+      "column_values": [
+        {
+          "id": "person",
+          "text": "",
+          "type": "people",
+          "value": null
+        },
+        {
+          "id": "status",
+          "text": null,
+          "type": "status",
+          "value": null
+        },
+        {
+          "id": "date0",
+          "text": "",
+          "type": "date",
+          "value": null
+        }
+      ],
+      "created_at": "2025-02-24T17:14:40Z",
+      "creator_id": "71985416",
+      "group": {
+        "id": "topics"
+      },
+      "id": "8553814342",
+      "name": "test",
+      "parent_item": {
+        "id": "8547821762"
+      },
+      "state": "active",
+      "subitems": [],
       "subscribers": [
         {
           "id": "71985416"
