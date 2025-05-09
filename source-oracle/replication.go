@@ -1036,6 +1036,18 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (SCN, error) 
 
 	var maximumDDLSCN SCN
 	if err := row.Scan(&maximumDDLSCN); err != nil {
+		// ORA-08180: no snapshot found based on specified time
+		// this is usually because the time is so recent a snapshot for that time has not
+		// materialized into a SCN, in these scenarios we use current SCN
+		if strings.Contains(err.Error(), "ORA-08180") {
+			var currentSCN SCN
+			var row = s.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
+			if err := row.Scan(&currentSCN); err != nil {
+				return 0, fmt.Errorf("fetching current SCN: %w", err)
+			}
+			return currentSCN, nil
+		}
+
 		return 0, fmt.Errorf("fetching maximum last DDL SCN: %w", err)
 	}
 
