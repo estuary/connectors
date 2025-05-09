@@ -35,7 +35,7 @@ var crateDialect = func() sql.Dialect {
 			sql.BINARY:         sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
 			sql.MULTIPLE:       sql.MapStatic("OBJECT", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC(18, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
-			sql.STRING_NUMBER:  sql.MapStatic("NUMERIC(18, 0)", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
+			sql.STRING_NUMBER:  sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("numeric"), sql.AlsoCompatibleWith("integer")),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic(
 					"TEXT",
