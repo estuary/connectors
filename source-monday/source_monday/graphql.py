@@ -34,11 +34,10 @@ async def execute_query(
     query: str,
     variables: Dict[str, Any] | None = None,
 ) -> GraphQLResponse[ResponseObject]:
-    log.debug(f"Executing query {query} with variables: {variables}")
-
     attempt = 1
     while True:
         try:
+            log.debug(f"Executing query {query} with variables: {variables}")
             res: dict[str, Any] = json.loads(
                 await http.request(
                     log,
