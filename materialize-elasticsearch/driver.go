@@ -257,7 +257,7 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 			APIKey:              c.Credentials.ApiKey,
 			RetryOnStatus:       []int{429, 502, 503, 504},
 			RetryBackoff: func(i int) time.Duration {
-				d := time.Duration(1<<i) * time.Second
+				d := min(time.Duration(1<<i)*time.Second, 5*time.Second)
 				log.WithFields(log.Fields{
 					"attempt": i,
 					"delay":   d.String(),
