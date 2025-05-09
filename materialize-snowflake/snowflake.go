@@ -1019,7 +1019,7 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 		// a string value to discard all the columns we don't want from SHOW PIPES
 		var x stdsql.NullString
 		var created time.Time
-		if err := rows.Scan(&created, &name, &db, &schema, &x, &x, &x, &x, &x, &x, &x, &x, &x, &x, &x); err != nil {
+		if err := rows.Scan(&created, &name, &db, &schema, &x, &x, &x, &x, &x, &x, &x, &x, &x, &x); err != nil {
 			return fmt.Errorf("scanning pipe: %w", err)
 		}
 
