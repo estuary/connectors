@@ -179,6 +179,11 @@ var featureFlagDefaults = map[string]bool{
 	// When true (and so long as 'multidimensional_arrays' isn't also set) array columns are
 	// captured as a flat array of values in the JSON output.
 	"flatten_arrays": true,
+
+	// When true, the connector will manage replication slot creation and deletion automatically.
+	// This is the default, but advanced users could set `no_create_replication_slot` if they want
+	// to manage their replication slots manually instead.
+	"create_replication_slot": true,
 }
 
 // Validate checks that the configuration possesses all required properties.

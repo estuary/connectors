@@ -529,9 +529,8 @@ func TestCaptureAfterSlotDropped(t *testing.T) {
 	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
 	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
-	// Drop the replication slot while the task is offline, and it should recreate
-	// the replication slot and then start failing because its saved position isn't
-	// valid any longer.
+	// Drop the replication slot while the task is offline. At startup it should
+	// fail because it has a non-empty resume cursor but the slot no longer exists.
 	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
 	tb.Query(ctx, t, "SELECT pg_drop_replication_slot('flow_slot');")
 	tb.Insert(ctx, t, tableName, [][]any{{4, "four"}, {5, "five"}})
