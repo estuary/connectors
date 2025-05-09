@@ -786,10 +786,14 @@ class Users(IterableExportStreamRanged):
 
 
     def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
-        for record in super().read_records(**kwargs):
+        # These datetime fields are not ISO 8601 compliant, so we re-format them so they comply
+        # with their schematized format: datetime annotation.
+        DATETIME_FIELDS_TO_FORMAT = ["signupDate", "shopify_created_at", "shopify_updated_at"]
 
-            if record.get("signupDate"):
-                record["signupDate"] = datetime.strptime(record["signupDate"], "%Y-%m-%d %H:%M:%S %z")
+        for record in super().read_records(**kwargs):
+            for field in DATETIME_FIELDS_TO_FORMAT:
+                if record.get(field):
+                    record[field] = datetime.strptime(record[field], "%Y-%m-%d %H:%M:%S %z")
             yield record
 
 
