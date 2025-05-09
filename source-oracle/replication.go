@@ -694,7 +694,7 @@ func (s *replicationStream) capturePendingTransaction(ctx context.Context, tx tr
 func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logminerMessage) error {
 	var event, err = s.decodeMessage(msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("decode message: %w", err)
 	}
 
 	select {
@@ -840,7 +840,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		var info sql.NullString
 		var xidRaw []byte
 		if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &redoSql, &undoSql, &tableName, &owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID, &xidRaw); err != nil {
-			return err
+			return fmt.Errorf("row scan: %w", err)
 		}
 
 		msg.XID = base64.StdEncoding.EncodeToString(xidRaw)
@@ -920,7 +920,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 			// last message was CSF, this one is not. This is the end of the continuation chain
 			if msg.CSF == 0 {
 				if err := s.handleTransactionBoundaries(ctx, *lastMsg); err != nil {
-					return err
+					return fmt.Errorf("handle transaction boundaries: %w", err)
 				}
 				fullMessages++
 			}
@@ -934,15 +934,15 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		}
 
 		if err := s.handleTransactionBoundaries(ctx, msg); err != nil {
-			return err
+			return fmt.Errorf("handle transaction boundaries: %w", err)
 		}
 		fullMessages++
 	}
 
 	if err := rows.Err(); err != nil {
-		return err
+		return fmt.Errorf("rows error: %w", err)
 	} else if err := rows.Close(); err != nil {
-		return err
+		return fmt.Errorf("rows close: %w", err)
 	}
 
 	var finalSCN SCN
