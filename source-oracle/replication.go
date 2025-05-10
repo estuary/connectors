@@ -103,7 +103,8 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
     XID,
     SUM(CASE WHEN OPERATION_CODE=36 THEN 1 ELSE 0 END) AS ROLLBACKS,
     SUM(CASE WHEN OPERATION_CODE=7 THEN 1 ELSE 0 END) AS COMMITS,
-    MIN(SCN) AS STARTSCN
+    MIN(SCN) AS STARTSCN,
+    COUNT(*) AS COUNT
   FROM V$LOGMNR_CONTENTS
   WHERE SCN >= :startSCN AND SCN <= :endSCN
   GROUP BY XID
@@ -592,6 +593,10 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 					}
 				}
 			}
+
+			for xid, _ := range rollbackedXIDs {
+				delete(s.pendingTransactions, xid)
+			}
 		}
 
 		if err := s.receiveMessages(ctx, startSCN, endSCN, stmt, rollbackedXIDs); err != nil {
@@ -599,6 +604,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			// We will switch back to Online mode afterwards
 			var dictionaryMismatch = strings.Contains(strings.ToLower(err.Error()), "dictionary mismatch")
 			if dictionaryMismatch && s.dictionaryMode == DictionaryModeOnline && s.smartMode {
+				logrus.WithField("error", err).Info("smart mode: encountered dictionary mismatch")
 				s.dictionaryMode = DictionaryModeExtract
 				if lastDDLSCN, err := s.maximumLastDDLSCN(ctx); err != nil {
 					return err
@@ -606,7 +612,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 					s.lastDDLSCN = lastDDLSCN
 				}
 
-				logrus.WithField("lastDDLSCN", s.lastDDLSCN).Info("smart mode: encountered dictionary mismatch, switching to extract mode")
+				logrus.WithField("lastDDLSCN", s.lastDDLSCN).Info("smart mode: switching to extract mode")
 				continue
 			}
 			return fmt.Errorf("receive messages: %w", err)
@@ -694,7 +700,7 @@ func (s *replicationStream) capturePendingTransaction(ctx context.Context, tx tr
 func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logminerMessage) error {
 	var event, err = s.decodeMessage(msg)
 	if err != nil {
-		return err
+		return fmt.Errorf("decode message: %w", err)
 	}
 
 	select {
@@ -768,7 +774,7 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context, transacti
 		txPredicate = fmt.Sprintf("AND XID IN (%s)", strings.Join(txValues, ","))
 	}
 
-	// START and COMMIT operations do not seg_owner and have data_obj#=0 and data_objd#=0
+	// START and COMMIT operations do not have seg_owner and have data_obj#=0 and data_objd#=0
 	var query = fmt.Sprintf(`SELECT SCN, TIMESTAMP, OPERATION_CODE, SQL_REDO, SQL_UNDO, TABLE_NAME, SEG_OWNER, STATUS, INFO, RS_ID, SSN, CSF, DATA_OBJ#, DATA_OBJD#, XID
     FROM V$LOGMNR_CONTENTS
     WHERE OPERATION_CODE IN (%s) AND SCN >= :startSCN AND SCN <= :endSCN AND 
@@ -794,7 +800,8 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 		var xidRaw []byte
 		var rollbacks, commits int
 		var startSCN SCN
-		if err := rows.Scan(&xidRaw, &rollbacks, &commits, &startSCN); err != nil {
+		var count int
+		if err := rows.Scan(&xidRaw, &rollbacks, &commits, &startSCN, &count); err != nil {
 			return nil, nil, fmt.Errorf("scanning transactions: %w", err)
 		}
 		var xid = base64.StdEncoding.EncodeToString(xidRaw)
@@ -802,14 +809,23 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 		if rollbacks > 0 {
 			excludeXIDs[xid] = struct{}{}
 			logrus.WithFields(logrus.Fields{
-				"xid": xid,
-			}).Debug("skipping rolled-back transaction")
+				"xid":       xid,
+				"rollbacks": rollbacks,
+				"commits":   commits,
+				"count":     count,
+			}).Trace("skipping rolled-back transaction")
 		} else if commits == 0 {
 			pendingTXs[xid] = startSCN
 			logrus.WithFields(logrus.Fields{
-				"xid":      xid,
-				"startSCN": startSCN,
-			}).Debug("found pending transaction")
+				"xid":       xid,
+				"rollbacks": rollbacks,
+				"commits":   commits,
+				"count":     count,
+				"startSCN":  startSCN,
+			}).Trace("found pending transaction")
+		} else {
+			// sanity check the query, this shouldn't happen
+			return nil, nil, fmt.Errorf("unexpected transaction with commit > 0, xid: %s, startSCN: %d, commits: %d, rollbacks: %d", xid, startSCN, commits, rollbacks)
 		}
 	}
 
@@ -840,7 +856,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		var info sql.NullString
 		var xidRaw []byte
 		if err := rows.Scan(&msg.SCN, &ts, &msg.Op, &redoSql, &undoSql, &tableName, &owner, &msg.Status, &info, &msg.RSID, &msg.SSN, &msg.CSF, &msg.ObjectID, &msg.DataObjectID, &xidRaw); err != nil {
-			return err
+			return fmt.Errorf("row scan: %w", err)
 		}
 
 		msg.XID = base64.StdEncoding.EncodeToString(xidRaw)
@@ -920,7 +936,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 			// last message was CSF, this one is not. This is the end of the continuation chain
 			if msg.CSF == 0 {
 				if err := s.handleTransactionBoundaries(ctx, *lastMsg); err != nil {
-					return err
+					return fmt.Errorf("handle transaction boundaries: %w", err)
 				}
 				fullMessages++
 			}
@@ -934,15 +950,15 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		}
 
 		if err := s.handleTransactionBoundaries(ctx, msg); err != nil {
-			return err
+			return fmt.Errorf("handle transaction boundaries: %w", err)
 		}
 		fullMessages++
 	}
 
 	if err := rows.Err(); err != nil {
-		return err
+		return fmt.Errorf("rows error: %w", err)
 	} else if err := rows.Close(); err != nil {
-		return err
+		return fmt.Errorf("rows close: %w", err)
 	}
 
 	var finalSCN SCN
@@ -1036,6 +1052,18 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (SCN, error) 
 
 	var maximumDDLSCN SCN
 	if err := row.Scan(&maximumDDLSCN); err != nil {
+		// ORA-08180: no snapshot found based on specified time
+		// this is usually because the time is so recent a snapshot for that time has not
+		// materialized into a SCN, in these scenarios we use current SCN
+		if strings.Contains(err.Error(), "ORA-08180") {
+			var currentSCN SCN
+			var row = s.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
+			if err := row.Scan(&currentSCN); err != nil {
+				return 0, fmt.Errorf("fetching current SCN: %w", err)
+			}
+			return currentSCN, nil
+		}
+
 		return 0, fmt.Errorf("fetching maximum last DDL SCN: %w", err)
 	}
 
