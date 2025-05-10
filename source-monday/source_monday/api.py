@@ -138,6 +138,7 @@ async def fetch_items_page(
         page=page,
         itemsLimit=limit,
     ):
+        # Indicates that the item is a board ID with no items found.
         if isinstance(item, str):
             # This indicates that there was a board for this page, but no items were found.
             # We should still yield the page number to continue pagination.

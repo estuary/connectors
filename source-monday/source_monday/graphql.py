@@ -361,6 +361,9 @@ async def fetch_items_by_boards(
     """
     Note: If `board_ids` is not provided, items from all boards will be fetched.
     """
+    board_cursors: dict[str, str] = {}
+    has_board = False
+
     response = await execute_query(
         ItemsByBoardResponse,
         http,
@@ -372,17 +375,18 @@ async def fetch_items_by_boards(
             "itemsLimit": itemsLimit,
         },
     )
+
     if not response.data or not response.data.boards:
         log.debug(
             f"Received empty response for page {page} with itemsLimit {itemsLimit}"
         )
         return
 
-    board_cursors: dict[str, str] = {}
-    board_id = None
-
     board = response.data.boards[0]
     items_page = board.items_page
+    has_board = True
+    board_id = board.id
+
     if items_page.cursor:
         board_cursors[board.id] = items_page.cursor
     else:
@@ -390,7 +394,6 @@ async def fetch_items_by_boards(
 
     for item in items_page.items:
         log.debug(f"Yielding item {item.id} from board {board.id}")
-        board_id = board.id
         yield item
 
     # Monday returns a cursor for each board's items_page. We use this cursor to fetch next items.
@@ -424,7 +427,6 @@ async def fetch_items_by_boards(
                 continue
 
             for item in items_page.items:
-                board_id = b_id
                 yield item
 
             next_cursor = response.data.next_items_page.cursor
@@ -437,7 +439,7 @@ async def fetch_items_by_boards(
     log.debug(
         f"Finished fetching items for board {board_id}. Remaining cursors: {board_cursors.keys()}"
     )
-    if board_id is not None:
+    if has_board:
         # This indicates that there was a board for this page, but no items were found.
         # We should still yield the board ID so that the caller can continue pagination of the boards to get items.
         yield board_id
