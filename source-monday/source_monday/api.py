@@ -129,9 +129,11 @@ async def fetch_items_page(
     assert isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
-    log.debug(f"Backfilling items - board {page} with cutoff {cutoff}")
+    log.debug("Backfilling board items.", {"page": page, "cutoff": cutoff})
 
-    should_yield_page = False
+    has_board = False
+    board_id = None
+    items_count = 0
     async for item in fetch_items_by_boards(
         http,
         log,
@@ -139,17 +141,16 @@ async def fetch_items_page(
         itemsLimit=limit,
     ):
         if isinstance(item, str):
-            # This indicates that there was a board for this page, but no items were found.
-            # We should still yield the page number to continue pagination.
-            log.debug(f"No items found for page {page} (board {item}).")
-            should_yield_page = True
+            has_board = True
+            board_id = item
             continue
 
         if item.updated_at < cutoff:
             yield item
-            should_yield_page = True
+            items_count += 1
 
-    if should_yield_page:
+    if has_board:
+        log.debug(f"Backfilled {items_count} items for board {board_id}.")
         yield page + 1
     else:
         log.debug(f"Completed backfilling items after {page} boards.")
