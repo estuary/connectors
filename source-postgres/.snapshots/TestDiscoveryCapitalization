@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/discoverycapitalization_aaaaa",
+    "recommended_name": "test/DiscoveryCapitalization_AaAaA",
     "resource_config_json": {
       "namespace": "test",
       "stream": "DiscoveryCapitalization_AaAaA"

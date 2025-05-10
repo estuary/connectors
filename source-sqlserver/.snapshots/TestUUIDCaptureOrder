@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_uuidcaptureorder_1794630882": 16 Documents
+# Collection "acmeCo/test/dbo/test_UUIDCaptureOrder_1794630882": 16 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":"ffffffff-ffff-ffff-ffff-00ffffffffff"}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_UUIDCaptureOrder_1794630882","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"two","id":"ffffffff-ffff-ffff-ffff-ff00ffffffff"}

@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/enumdecodingfix_32314857": 5 Documents
+# Collection "acmeCo/test/test/EnumDecodingFix_32314857": 5 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumDecodingFix_32314857","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"A","id":11}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"EnumDecodingFix_32314857","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"category":"B","id":12}

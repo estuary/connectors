@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_filegroupandrole_93932362": 6 Documents
+# Collection "acmeCo/test/dbo/test_FilegroupAndRole_93932362": 6 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_FilegroupAndRole_93932362","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_FilegroupAndRole_93932362","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}

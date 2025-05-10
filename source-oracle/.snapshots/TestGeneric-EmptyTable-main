@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t91431165": 3 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T91431165": 3 Documents
 # ================================
 {"DATA":"more","ID":"1000","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T91431165","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"rows","ID":"1001","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T91431165","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}

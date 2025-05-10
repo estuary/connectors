@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/datetimenormalization_24528211": 4 Documents
+# Collection "acmeCo/test/test/DatetimeNormalization_24528211": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DatetimeNormalization_24528211","cursor":"backfill:0"}},"id":100,"x":"1991-08-31T17:34:57Z"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DatetimeNormalization_24528211","cursor":"backfill:1"}},"id":101,"x":"0001-01-01T00:00:00Z"}

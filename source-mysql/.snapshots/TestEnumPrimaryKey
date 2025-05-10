@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/enumprimarykey_18676708": 20 Documents
+# Collection "acmeCo/test/test/EnumPrimaryKey_18676708": 20 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:0"}},"category":"","data":"E1","id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EnumPrimaryKey_18676708","cursor":"backfill:1"}},"category":"","data":"E2","id":2}

@@ -170,7 +170,6 @@ func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[
 	return json.RawMessage(bs), nil
 }
 
-
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	resourceSchema, err := schemagen.GenerateSchema("BigQuery Batch Resource Spec", &Resource{}).MarshalJSON()
@@ -408,7 +407,7 @@ var databaseTypeToJSON = map[string]*jsonschema.Schema{
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
 
 func recommendedCatalogName(table string) string {
-	return catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(table), "_")
+	return catalogNameSanitizerRe.ReplaceAllString(table, "_")
 }
 
 // Validate checks that the configuration appears correct and that we can connect

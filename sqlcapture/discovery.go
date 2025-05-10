@@ -303,9 +303,8 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
 
 func recommendedCatalogName(schema, table string) string {
-	var sanitizedSchema = catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(schema), "_")
-	var sanitizedTable = catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(table), "_")
-
+	var sanitizedSchema = catalogNameSanitizerRe.ReplaceAllString(schema, "_")
+	var sanitizedTable = catalogNameSanitizerRe.ReplaceAllString(table, "_")
 	return sanitizedSchema + "/" + sanitizedTable
 }
 

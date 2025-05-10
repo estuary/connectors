@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/addbinarycolumn_58901622": 6 Documents
+# Collection "acmeCo/test/test/AddBinaryColumn_58901622": 6 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddBinaryColumn_58901622","cursor":"backfill:0"}},"id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddBinaryColumn_58901622","cursor":"backfill:1"}},"id":2}

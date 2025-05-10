@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/enumdecodingfix_32314857",
+    "recommended_name": "test/EnumDecodingFix_32314857",
     "resource_config_json": {
       "namespace": "test",
       "stream": "EnumDecodingFix_32314857"

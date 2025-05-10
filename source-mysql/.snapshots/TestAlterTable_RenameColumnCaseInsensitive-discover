@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/altertable_renamecolumncaseinsensitive_41432361",
+    "recommended_name": "test/AlterTable_RenameColumnCaseInsensitive_41432361",
     "resource_config_json": {
       "namespace": "test",
       "stream": "AlterTable_RenameColumnCaseInsensitive_41432361"

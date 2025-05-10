@@ -441,7 +441,7 @@ var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
 
 func recommendedCatalogName(schema, table string) string {
 	var catalogName = schema + "_" + table
-	return catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(catalogName), "_")
+	return catalogNameSanitizerRe.ReplaceAllString(catalogName, "_")
 }
 
 // Validate checks that the configuration appears correct and that we can connect

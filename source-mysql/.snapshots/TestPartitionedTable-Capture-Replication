@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/partitionedtable_83812828": 100 Documents
+# Collection "acmeCo/test/test/PartitionedTable_83812828": 100 Documents
 # ================================
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"PartitionedTable_83812828","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Group #0 Value #10","grp":0,"id":10}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"PartitionedTable_83812828","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"data":"Group #0 Value #11","grp":0,"id":11}

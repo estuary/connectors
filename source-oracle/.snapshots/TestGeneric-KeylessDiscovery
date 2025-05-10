@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "c__flow_test_logminer/tt32386",
+    "recommended_name": "C__FLOW_TEST_LOGMINER/TT32386",
     "resource_config_json": {
       "mode": "Without Primary Key",
       "namespace": "C##FLOW_TEST_LOGMINER",

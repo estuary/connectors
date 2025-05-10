@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_collatedcapture_nchar_0091303402": 200 Documents
+# Collection "acmeCo/test/dbo/test_CollatedCapture_NChar_0091303402": 200 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_CollatedCapture_NChar_0091303402","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"Row A034","id":"a a 034                         "}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_CollatedCapture_NChar_0091303402","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"Row B034","id":"a b 034                         "}

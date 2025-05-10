@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "dbo/test_computedcolumn_18851564",
+    "recommended_name": "dbo/test_ComputedColumn_18851564",
     "resource_config_json": {
       "namespace": "dbo",
       "stream": "test_ComputedColumn_18851564"

@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/partitionedtable_83812828": 100 Documents
+# Collection "acmeCo/test/test/PartitionedTable_83812828": 100 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PartitionedTable_83812828","cursor":"backfill:0"}},"data":"Group #0 Value #0","grp":0,"id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PartitionedTable_83812828","cursor":"backfill:1"}},"data":"Group #0 Value #1","grp":0,"id":1}

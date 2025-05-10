@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_bool_754161260000": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_Bool_754161260000": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool_754161260000","cursor":"backfill:0"}},"data":"Data 1","k":0}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "FA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_bool_754161260000": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_Bool_754161260000": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_Bool_754161260000","cursor":"backfill:1"}},"data":"Data 0","k":1}
 # ================================

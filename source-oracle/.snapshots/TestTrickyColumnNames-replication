@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t39256824": 2 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T39256824": 2 Documents
 # ================================
 {"DATA":"eee","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T39256824","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}},"`Meta/'wtf'~ID`":"5"}
 {"DATA":"fff","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T39256824","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}},"`Meta/'wtf'~ID`":"6"}
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t42531495": 2 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T42531495": 2 Documents
 # ================================
 {"DATA":"ggg","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T42531495","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}},"table":"7"}
 {"DATA":"hhh","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T42531495","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}},"table":"8"}

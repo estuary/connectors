@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/emptyblobs_11214558": 3 Documents
+# Collection "acmeCo/test/test/EmptyBlobs_11214558": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:0"}},"a_varbinary":"qqqqqg==","a_varchar":"A","id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"EmptyBlobs_11214558","cursor":"backfill:1"}},"a_varbinary":"","a_varchar":"B","id":2}

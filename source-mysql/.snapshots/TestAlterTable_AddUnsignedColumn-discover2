@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/altertable_addunsignedcolumn_57413089",
+    "recommended_name": "test/AlterTable_AddUnsignedColumn_57413089",
     "resource_config_json": {
       "namespace": "test",
       "stream": "AlterTable_AddUnsignedColumn_57413089"

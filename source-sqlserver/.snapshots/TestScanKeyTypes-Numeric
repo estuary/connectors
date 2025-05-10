@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"-1234.00000","v":"Data 0"}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "Ai0xMjM0LjAwMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"-3.00000","v":"Data 2"}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "Ai0zLjAwMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"0.00000","v":"Data 1"}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "AjAuMDAwMDAA"
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"2.00000","v":"Data 3"}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "AjIuMDAwMDAA"
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"12345.12000","v":"Data 4"}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "AjEyMzQ1LjEyMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"12345.12050","v":"Data 6"}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "AjEyMzQ1LjEyMDUwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"12345.12059","v":"Data 7"}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "AjEyMzQ1LjEyMDU5AA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"12345.12100","v":"Data 5"}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "AjEyMzQ1LjEyMTAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_numeric_889298060003": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_Numeric_889298060003": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_Numeric_889298060003","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"12346.00000","v":"Data 8"}
 # ================================

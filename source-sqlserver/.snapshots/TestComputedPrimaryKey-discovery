@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "dbo/test_computedprimarykey_10118243",
+    "recommended_name": "dbo/test_ComputedPrimaryKey_10118243",
     "resource_config_json": {
       "mode": "Without Primary Key",
       "namespace": "dbo",

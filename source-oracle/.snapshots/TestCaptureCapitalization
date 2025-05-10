@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/test_aaaaa_69943814": 2 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/TEST_AAAAA_69943814": 2 Documents
 # ================================
 {"DATA":"asdf","ID":"1","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"test_AaAaA_69943814","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"hello","ID":"0","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"test_AaAaA_69943814","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/test_bbbbb_73423348": 2 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/TEST_BBBBB_73423348": 2 Documents
 # ================================
 {"DATA":"fdsa","ID":"3","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"TEST_BBBBB_73423348","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"world","ID":"2","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"TEST_BBBBB_73423348","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}

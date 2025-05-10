@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"3","DATA":"gboj","EPOCH":"   ","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AiAgIAACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDMA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"-1","DATA":"kvxr","EPOCH":".","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "Ai4AAi0wMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"0","DATA":"xakg","EPOCH":".","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "Ai4AAjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"1","DATA":"bvzf","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "AmFhYQACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"2","DATA":"ukwh","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "AmFhYQACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"3","DATA":"lntg","EPOCH":"aaa","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "AmFhYQACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDMA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"-100","DATA":"bycz","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "AmJiYgACLTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxMDAA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"2","DATA":"ajgp","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDIA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"333","DATA":"zljj","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -119,7 +119,7 @@
 ### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAzMzMA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"4096","DATA":"lhnw","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -132,7 +132,7 @@
 ### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDQwOTYA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"800000","DATA":"iask","EPOCH":"bbb","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -145,7 +145,7 @@
 ### Capture from Key "AmJiYgACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDA4MDAwMDAA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"1234","DATA":"bikh","EPOCH":"ccc","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -158,7 +158,7 @@
 ### Capture from Key "AmNjYwACMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDEyMzQA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"-10000","DATA":"dhqc","EPOCH":"ddd","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -171,7 +171,7 @@
 ### Capture from Key "AmRkZAACLTAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMTAwMDAA"
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"1","DATA":"djsf","EPOCH":"x","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -184,7 +184,7 @@
 ### Capture from Key "AngAAjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"1","DATA":"iwnx","EPOCH":"y","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
@@ -197,7 +197,7 @@
 ### Capture from Key "AnkAAjAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAxAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t95911555": 1 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T95911555": 1 Documents
 # ================================
 {"COUNT":"1","DATA":"qmjp","EPOCH":"z","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T95911555","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================

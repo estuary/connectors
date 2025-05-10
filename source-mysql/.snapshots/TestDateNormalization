@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/datenormalization_44310403": 8 Documents
+# Collection "acmeCo/test/test/DateNormalization_44310403": 8 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DateNormalization_44310403","cursor":"backfill:0"}},"id":100,"x":"1991-08-31"}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"DateNormalization_44310403","cursor":"backfill:1"}},"id":101,"x":"0001-01-01"}

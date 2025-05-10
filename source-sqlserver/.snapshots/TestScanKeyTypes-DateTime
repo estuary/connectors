@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_datetime_889298060005": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_DateTime_889298060005": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 0"}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTEwAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_datetime_889298060005": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_DateTime_889298060005": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 1"}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMzMzAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_datetime_889298060005": 1 Documents
+# Collection "acmeCo/test/dbo/test_ScanKeyTypes_DateTime_889298060005": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 2"}
 # ================================

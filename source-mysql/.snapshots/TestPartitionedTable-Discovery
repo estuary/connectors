@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/partitionedtable_83812828",
+    "recommended_name": "test/PartitionedTable_83812828",
     "resource_config_json": {
       "namespace": "test",
       "stream": "PartitionedTable_83812828"

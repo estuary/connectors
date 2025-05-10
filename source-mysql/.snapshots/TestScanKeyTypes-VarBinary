@@ -2,7 +2,7 @@
 ### Capture from Start
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:0"}},"data":"Data 0","k":""}
 # ================================
@@ -15,7 +15,7 @@
 ### Capture from Key "AQA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:1"}},"data":"Data 8","k":"AAAARA=="}
 # ================================
@@ -28,7 +28,7 @@
 ### Capture from Key "AQD/AP8A/0QA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:2"}},"data":"Data 7","k":"AABDRA=="}
 # ================================
@@ -41,7 +41,7 @@
 ### Capture from Key "AQD/AP9DRAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:3"}},"data":"Data 6","k":"AEIARA=="}
 # ================================
@@ -54,7 +54,7 @@
 ### Capture from Key "AQD/QgD/RAA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:4"}},"data":"Data 5","k":"AEJDRA=="}
 # ================================
@@ -67,7 +67,7 @@
 ### Capture from Key "AQD/QkNEAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:5"}},"data":"Data 1","k":"QQ=="}
 # ================================
@@ -80,7 +80,7 @@
 ### Capture from Key "AUEA"
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:6"}},"data":"Data 2","k":"QUI="}
 # ================================
@@ -93,7 +93,7 @@
 ### Capture from Key "AUFCAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:7"}},"data":"Data 3","k":"QUJD"}
 # ================================
@@ -106,7 +106,7 @@
 ### Capture from Key "AUFCQwA="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/scankeytypes_varbinary_754161260012": 1 Documents
+# Collection "acmeCo/test/test/ScanKeyTypes_VarBinary_754161260012": 1 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ScanKeyTypes_VarBinary_754161260012","cursor":"backfill:8"}},"data":"Data 4","k":"QUJDRA=="}
 # ================================

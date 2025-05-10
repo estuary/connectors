@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_capturewithcompoundtextandintegerkey_50810729": 400 Documents
+# Collection "acmeCo/test/dbo/test_CaptureWithCompoundTextAndIntegerKey_50810729": 400 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_CaptureWithCompoundTextAndIntegerKey_50810729","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"data","k1":"aaa","k2":100,"k3":"b","k4":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_CaptureWithCompoundTextAndIntegerKey_50810729","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"data","k1":"aaa","k2":100,"k3":"b","k4":1}

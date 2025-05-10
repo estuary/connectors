@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/addlegacytextcolumn_30621561": 9 Documents
+# Collection "acmeCo/test/test/AddLegacyTextColumn_30621561": 9 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:0"}},"id":1}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"AddLegacyTextColumn_30621561","cursor":"backfill:1"}},"id":2}

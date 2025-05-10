@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/unsignedintegers_45511171",
+    "recommended_name": "test/UnsignedIntegers_45511171",
     "resource_config_json": {
       "namespace": "test",
       "stream": "UnsignedIntegers_45511171"

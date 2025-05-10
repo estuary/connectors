@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/secondaryindexdiscovery_nullable_index_g31990",
+    "recommended_name": "test/SecondaryIndexDiscovery_nullable_index_g31990",
     "resource_config_json": {
       "mode": "Without Primary Key",
       "namespace": "test",

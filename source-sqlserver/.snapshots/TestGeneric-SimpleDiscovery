@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "dbo/test_generic_simplediscovery_49210954",
+    "recommended_name": "dbo/test_Generic_SimpleDiscovery_49210954",
     "resource_config_json": {
       "namespace": "dbo",
       "stream": "test_Generic_SimpleDiscovery_49210954"

@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/enumemptystring_29144777",
+    "recommended_name": "test/EnumEmptyString_29144777",
     "resource_config_json": {
       "namespace": "test",
       "stream": "EnumEmptyString_29144777"
