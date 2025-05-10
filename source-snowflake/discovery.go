@@ -6,15 +6,18 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
+	"sync"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 	"github.com/jmoiron/sqlx"
-	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 func (snowflakeDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
@@ -71,6 +74,11 @@ type snowflakeDiscoveryColumn struct {
 	IsNullable       string  `db:"IS_NULLABLE"`
 	NumericScale     *int    `db:"NUMERIC_SCALE"`
 	NumericPrecision *int    `db:"NUMERIC_PRECISION"`
+
+	// Non-standard values that can only be populated with a DESCRIBE TABLE
+	// query.
+	vectorType      string // INT or FLOAT
+	vectorDimension int
 }
 
 type snowflakeDiscoveryPrimaryKey struct {
@@ -110,6 +118,8 @@ func performSnowflakeDiscovery(ctx context.Context, cfg *config, db *sql.DB) (*s
 	var columns []*snowflakeDiscoveryColumn
 	if err := xdb.Select(&columns, "SELECT * FROM information_schema.columns;"); err != nil {
 		return nil, fmt.Errorf("error listing columns: %w", err)
+	} else if columns, err = resolveVectorColumns(ctx, xdb, columns); err != nil {
+		return nil, fmt.Errorf("error resolving VECTOR columns: %w", err)
 	}
 	var primaryKeysQuery = fmt.Sprintf("SHOW PRIMARY KEYS IN DATABASE %s;", quoteSnowflakeIdentifier(cfg.Database))
 	var primaryKeys []*snowflakeDiscoveryPrimaryKey
@@ -266,7 +276,7 @@ func schemaFromDiscovery(info *snowflakeDiscoveryInfo) (json.RawMessage, error) 
 	for _, column := range info.Columns {
 		var jsonType, err = translateDBToJSONType(column)
 		if err != nil {
-			logrus.WithFields(logrus.Fields{
+			log.WithFields(log.Fields{
 				"error": err,
 				"type":  column.DataType,
 			}).Warn("error translating column type to JSON schema")
@@ -380,6 +390,23 @@ func translateDBToJSONType(column *snowflakeDiscoveryColumn) (*jsonschema.Schema
 		} else {
 			schema = columnSchema{jsonType: "number"}
 		}
+	case "VECTOR":
+		schema = columnSchema{
+			jsonType: "array",
+			extras: map[string]any{
+				// There will always be exactly the number of items in the array
+				// as the vector dimension.
+				"minItems": column.vectorDimension,
+				"maxItems": column.vectorDimension,
+			},
+		}
+		if column.vectorType == "INT" {
+			schema.extras["items"] = &jsonschema.Schema{Type: "integer"}
+		} else if column.vectorType == "FLOAT" {
+			schema.extras["items"] = &jsonschema.Schema{Type: "number"}
+		} else {
+			return nil, fmt.Errorf("internal error: unknown vector type %q (found on column %q of table %q)", column.vectorType, column.Name, column.Table)
+		}
 	default:
 		if s, ok := snowflakeTypeToJSON[column.DataType]; ok {
 			schema = s
@@ -444,4 +471,79 @@ var snowflakeTypeToJSON = map[string]columnSchema{
 	"VARIANT": {},
 	"OBJECT":  {jsonType: "object"},
 	"ARRAY":   {jsonType: "array"},
+}
+
+var vectorRegexp = regexp.MustCompile(`(?i)^VECTOR\((FLOAT|INT),\s*(\d+)\)$`)
+
+type describeTableColumn struct {
+	Name  string `db:"name"`
+	Type_ string `db:"type"`
+}
+
+// resolveVectorColumns populates all VECTOR columns' value type (either FLOAT
+// or INT), and the dimension of the vector. This information is only available
+// from parsing the response of a DESCRIBE TABLE query, since it isn't in the
+// standard INFORMATION_SCHEMA.COLUMNS view.
+func resolveVectorColumns(ctx context.Context, xdb *sqlx.DB, discoveredColumns []*snowflakeDiscoveryColumn) ([]*snowflakeDiscoveryColumn, error) {
+	var tablesWithVectors = make(map[string]bool)
+	for _, column := range discoveredColumns {
+		if column.DataType == "VECTOR" {
+			tablesWithVectors[column.Table] = true
+		}
+	}
+
+	if len(tablesWithVectors) == 0 {
+		return discoveredColumns, nil
+	}
+	log.WithField("count", len(tablesWithVectors)).Debug("describing tables to discover VECTOR columns")
+
+	var mu sync.Mutex
+	group, groupCtx := errgroup.WithContext(ctx)
+
+	// I'm not aware of any real rate limits for DESCRIBE TABLE, and there
+	// probably won't be many tables with VECTOR columns, so we might as well
+	// run all these concurrently.
+	for table := range tablesWithVectors {
+		group.Go(func() (err error) {
+			var describeTableQuery = fmt.Sprintf("DESCRIBE TABLE %s;", quoteSnowflakeIdentifier(table))
+			var describedColumns []*describeTableColumn
+			if err = xdb.SelectContext(groupCtx, &describedColumns, describeTableQuery); err != nil {
+				return err
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+
+			for _, describedColumn := range describedColumns {
+				if matches := vectorRegexp.FindStringSubmatch(describedColumn.Type_); matches != nil {
+					// This looks like a VECTOR(something, n) column. Find the
+					// appropriate discovered column and add its information
+					// there.
+					for _, col := range discoveredColumns {
+						if col.Table == table && col.Name == describedColumn.Name {
+							col.vectorType = matches[1]
+							if col.vectorDimension, err = strconv.Atoi(matches[2]); err != nil {
+								return fmt.Errorf(
+									"parsing VECTOR column %q (%q) for table %q: %w",
+									col.Name,
+									describedColumn.Type_,
+									table,
+									err,
+								)
+							}
+							break
+						}
+					}
+				}
+			}
+
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
+	}
+
+	return discoveredColumns, nil
 }
