@@ -1,7 +1,7 @@
 
 
 from datetime import datetime, timedelta
-import source_hubspot_native.emitted_changes_cache as cache
+import estuary_cdk.emitted_changes_cache as cache
 
 
 def test_emitted_changes_cache():
@@ -19,6 +19,9 @@ def test_emitted_changes_cache():
     assert not cache.has_as_recent_as("first", "id1", base_dt)
     cache.add_recent("first", "id1", base_dt)
     assert not cache.has_as_recent_as("second", "id1", base_dt)
+
+    assert cache.should_yield("third", "id1", base_dt)
+    assert not cache.should_yield("third", "id1", base_dt)
 
     for object_name, id, dt in test_entries:
         cache.add_recent(object_name, id, dt)
