@@ -220,6 +220,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 				return fmt.Errorf("error discovering database tables: %w", err)
 			} else if err := c.emitSourcedSchemas(discovery); err != nil {
 				return err
+			} else if err := c.emitState(); err != nil { // Emit state so any SourcedSchema changes commit immediately.
+				return err
 			}
 			// If any streams are currently pending, initialize them so they can start backfilling.
 			if err := c.activatePendingStreams(ctx, discovery, replStream); err != nil {
