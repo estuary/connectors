@@ -255,6 +255,8 @@ class FilterParam(StrEnum):
     START_TIME = "start_time"
     SINCE = "since"
 
+class ArticleResponse(IncrementalCursorPaginatedResponse):
+    resources: list[ZendeskResource] = Field(alias="articles")
 
 # Incremental resources that can be filtered by a start_time query param.
 # Tuples contain the name, path, filter param name, cursor field, and response model for each resource. 
@@ -262,6 +264,7 @@ INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, t
     ("ticket_skips", "skips", FilterParam.START_TIME, "updated_at", TicketSkipsResponse),
     ("ticket_metric_events", "incremental/ticket_metric_events", FilterParam.START_TIME, "time", TicketMetricEventsResponse),
     ("ticket_activities", "activities", FilterParam.START_TIME, "updated_at", TicketActivitiesResponse),
+    ("articles", "help_center/articles", FilterParam.START_TIME, "updated_at", ArticleResponse),
 ]
 
 
