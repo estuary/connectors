@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<request>
+  <control>
+    <senderid>sender_id</senderid>
+    <password>sender_password</password>
+    <controlid>CONTROLID_PLACEHOLDER</controlid>
+    <uniqueid>false</uniqueid>
+    <dtdversion>3.0</dtdversion>
+    <includewhitespace>false</includewhitespace>
+  </control>
+  <operation>
+    <authentication>
+      <login>
+        <userid>user_id</userid>
+        <companyid>company_id</companyid>
+        <password>password</password>
+      </login>
+    </authentication>
+    <content>
+      <function controlid="UUID_PLACEHOLDER">
+        <getAPISession />
+      </function>
+    </content>
+  </operation>
+</request>
