@@ -49,7 +49,7 @@ from .models import (
     Ticket,
 )
 
-import source_hubspot_native.emitted_changes_cache as cache
+import estuary_cdk.emitted_changes_cache as cache
 from source_hubspot_native.buffer_ordered import buffer_ordered
 
 HUB = "https://api.hubapi.com"
