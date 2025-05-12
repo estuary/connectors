@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<request>
+  <control>
+    <senderid>sender_id</senderid>
+    <password>sender_password</password>
+    <controlid>CONTROLID_PLACEHOLDER</controlid>
+    <uniqueid>false</uniqueid>
+    <dtdversion>3.0</dtdversion>
+    <includewhitespace>false</includewhitespace>
+  </control>
+  <operation>
+    <authentication>
+      <sessionid>some_session_id</sessionid>
+    </authentication>
+    <content>
+      <function controlid="UUID_PLACEHOLDER">
+        <query>
+          <object>OBJECT_NAME</object>
+          <select>
+            <field>FIRST_FIELD</field>
+            <field>SECOND_FIELD</field>
+            <field>THIRD_FIELD</field>
+          </select>
+          <orderby>
+            <order>
+                <field>RECORDNO</field>
+                <ascending/>
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>2000</pagesize>
+        </query>
+      </function>
+    </content>
+  </operation>
+</request>
