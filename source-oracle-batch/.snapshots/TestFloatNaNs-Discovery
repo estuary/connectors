@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "c__flow_test_logminer_float_nans_10511",
-      "owner": "C##FLOW_TEST_LOGMINER",
+      "name": "c__flow_test_batch_float_nans_10511",
+      "owner": "C##FLOW_TEST_BATCH",
       "table": "FLOAT_NANS_10511",
       "cursor": [
         "TXID"
       ]
     },
     "resource_path": [
-      "c__flow_test_logminer_float_nans_10511"
+      "c__flow_test_batch_float_nans_10511"
     ],
     "collection": {
-      "name": "acmeCo/test/c__flow_test_logminer_float_nans_10511",
+      "name": "acmeCo/test/c__flow_test_batch_float_nans_10511",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -54,6 +54,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "c__flow_test_logminer_float_nans_10511"
+    "state_key": "c__flow_test_batch_float_nans_10511"
   }
 

@@ -1,9 +1,9 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer_basic_datatypes_13111208": 1 Documents
+# Collection "acmeCo/test/c__flow_test_batch_basic_datatypes_13111208": 1 Documents
 # ================================
 {"A_BOOL":"1","A_DATE":"2024-02-26T00:00:00Z","A_INT":"-12","A_TS":"2024-02-26T12:34:56Z","A_TSTZ":"2024-02-26T12:34:56Z","ID":"100","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"c__flow_test_logminer_basic_datatypes_13111208":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"c__flow_test_batch_basic_datatypes_13111208":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
 

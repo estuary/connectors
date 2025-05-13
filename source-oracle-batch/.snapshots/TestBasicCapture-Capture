@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer_basic_capture_826935": 250 Documents
+# Collection "acmeCo/test/c__flow_test_batch_basic_capture_826935": 250 Documents
 # ================================
 {"DATA":"Value for row 0","ID":"0","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
 {"DATA":"Value for row 1","ID":"1","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
@@ -254,5 +254,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"c__flow_test_logminer_basic_capture_826935":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"c__flow_test_batch_basic_capture_826935":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
 
