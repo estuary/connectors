@@ -101,14 +101,14 @@ class GraphQLErrorLocation(BaseModel, extra="forbid"):
     column: int
 
 
-class GraphQLError(BaseModel, extra="forbid"):
+class GraphQLError(BaseModel, extra="allow"):
     message: str
     locations: list[GraphQLErrorLocation] | None = None
     path: list[Any] | None = None
     extensions: dict[str, Any] | None = None
 
 
-class GraphQLResponse(BaseModel, Generic[ResponseObject], extra="forbid"):
+class GraphQLResponse(BaseModel, Generic[ResponseObject], extra="allow"):
     data: ResponseObject | None = None
     errors: list[GraphQLError] | None = None
 
@@ -148,7 +148,7 @@ class BoardsResponse(BaseModel, extra="forbid"):
     boards: list[Board]
 
 
-class ParentItemRef(BaseModel, extra="forbid"):
+class ParentItemRef(BaseModel, extra="allow"):
     id: str
 
 
@@ -158,25 +158,25 @@ class Item(BaseDocument, extra="allow"):
     updated_at: AwareDatetime
 
 
-class ItemsPage(BaseModel, extra="forbid"):
+class ItemsPage(BaseModel, extra="allow"):
     cursor: str | None = None
     items: list[Item]
 
 
-class BoardItems(BaseModel, extra="forbid"):
+class BoardItems(BaseModel, extra="allow"):
     id: str
     items_page: ItemsPage
 
 
-class ItemsByBoardResponse(BaseModel, extra="forbid"):
+class ItemsByBoardResponse(BaseModel, extra="allow"):
     boards: list[BoardItems] | None = Field(default_factory=list)
 
 
-class ItemsByBoardPageResponse(BaseModel, extra="forbid"):
+class ItemsByBoardPageResponse(BaseModel, extra="allow"):
     next_items_page: ItemsPage
 
 
-class ItemsByIdResponse(BaseModel, extra="forbid"):
+class ItemsByIdResponse(BaseModel, extra="allow"):
     items: list[Item] | None = Field(default_factory=list)
 
 
@@ -184,7 +184,7 @@ class Team(BaseDocument, extra="allow"):
     pass
 
 
-class TeamsResponse(BaseModel, extra="forbid"):
+class TeamsResponse(BaseModel, extra="allow"):
     teams: list[Team]
 
 
@@ -193,11 +193,11 @@ class User(BaseDocument, extra="allow"):
     pass
 
 
-class UsersResponse(BaseModel, extra="forbid"):
+class UsersResponse(BaseModel, extra="allow"):
     users: list[User]
 
 
-class TagsResponse(BaseModel, extra="forbid"):
+class TagsResponse(BaseModel, extra="allow"):
     tags: list[Tag]
 
 
