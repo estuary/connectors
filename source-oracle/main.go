@@ -92,9 +92,11 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 			ForwardPort: port,
 			LocalPort:   "1521",
 		}
-		db.tunnel = sshConfig.CreateTunnel()
+		tunnel := sshConfig.CreateTunnel()
 
-		if err := db.tunnel.Start(); err != nil {
+		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+		if err := tunnel.Start(); err != nil {
 			return nil, err
 		}
 	}
@@ -247,7 +249,6 @@ func configSchema() json.RawMessage {
 type oracleDatabase struct {
 	config             *Config
 	conn               *sql.DB
-	tunnel             *networkTunnel.SshTunnel
 	pdbName            string                           // name of the Pluggable Database we are in, if this is a container Oracle instance
 	explained          map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
@@ -306,8 +307,6 @@ func (db *oracleDatabase) connect(_ context.Context) error {
 }
 
 func (db *oracleDatabase) Close(ctx context.Context) error {
-	defer db.tunnel.Stop()
-
 	if err := db.conn.Close(); err != nil {
 		return fmt.Errorf("error closing database connection: %w", err)
 	}
