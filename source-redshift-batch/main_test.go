@@ -677,3 +677,31 @@ func TestCaptureFromView(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestFeatureFlagEmitSourcedSchemas runs a capture with the `emit_sourced_schemas` feature flag set.
+func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
+	var ctx, control = context.Background(), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(id INTEGER PRIMARY KEY, data TEXT)`)
+
+	executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (1, 'hello'), (2, 'world')", tableName))
+
+	for _, tc := range []struct {
+		name string
+		flag string
+	}{
+		{"Default", ""},
+		{"Enabled", "emit_sourced_schemas"},
+		{"Disabled", "no_emit_sourced_schemas"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cs = testCaptureSpec(t)
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flag
+			cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+			setShutdownAfterQuery(t, true)
+
+			cs.Capture(ctx, t, nil)
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
+}
