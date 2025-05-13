@@ -11,5 +11,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT39256824":{"backfilled":2,"key_columns":["`Meta/'wtf'~ID`"],"mode":"Active"},"C%23%23FLOW_TEST_LOGMINER%2FT42531495":{"backfilled":2,"key_columns":["table"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT39256824":{"backfilled":2,"key_columns":["`Meta/'wtf'~ID`"],"mode":"Active"},"C%23%23FLOW_TEST_LOGMINER%2FT42531495":{"backfilled":2,"key_columns":["table"],"mode":"Active"}},"cursor":{"PendingTransactions":{"AAAAAAA=":{"MessageCount":0,"StartSCN":111111111"},"AAAAAAA=":{"MessageCount":0,"StartSCN":111111111"}},"SCN":111111111"}}
 
