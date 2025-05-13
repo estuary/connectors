@@ -502,12 +502,17 @@ class PaymentIntent(BaseStripeObjectWithEvents):
     }
 
 
-# Despite listing various payout.* event types, Stripe does not generate
-# these events. It seems like most payouts are not updated after creation,
-# so treating them as a no event stream should work well enough most of the time.
-class Payouts(BaseStripeObjectNoEvents):
+class Payouts(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Payouts"
     SEARCH_NAME: ClassVar[str] = "payouts"
+    EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
+        "payout.created": "c",
+        "payout.canceled": "u",
+        "payout.failed": "u",
+        "payout.paid": "u",
+        "payout.reconciliation_completed": "u",
+        "payout.updated": "u",
+    }
 
 
 class Plans(BaseStripeObjectWithEvents):
