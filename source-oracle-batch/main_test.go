@@ -48,7 +48,7 @@ func TestBasicCapture(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "826935"
-	var tableName = fmt.Sprintf("c##flow_test_logminer.basic_capture_%s", uniqueID)
+	var tableName = fmt.Sprintf("c##flow_test_batch.basic_capture_%s", uniqueID)
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
@@ -102,7 +102,7 @@ func TestCaptureCheckpointSCN(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "216995"
-	var tableName = fmt.Sprintf("c##flow_test_logminer.check_scn_%s", uniqueID)
+	var tableName = fmt.Sprintf("c##flow_test_batch.check_scn_%s", uniqueID)
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
@@ -164,7 +164,7 @@ func TestBasicDatatypes(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "13111208"
-	var tableName = fmt.Sprintf("c##flow_test_logminer.basic_datatypes_%s", uniqueID)
+	var tableName = fmt.Sprintf("c##flow_test_batch.basic_datatypes_%s", uniqueID)
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
@@ -189,7 +189,7 @@ func TestDecimals(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "75319739"
-	var tableName = fmt.Sprintf("c##flow_test_logminer.decimals_%s", uniqueID)
+	var tableName = fmt.Sprintf("c##flow_test_batch.decimals_%s", uniqueID)
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
@@ -212,7 +212,7 @@ func TestFloatNaNs(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "10511"
-	var tableName = fmt.Sprintf("c##flow_test_logminer.float_nans_%s", uniqueID)
+	var tableName = fmt.Sprintf("c##flow_test_batch.float_nans_%s", uniqueID)
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
@@ -239,7 +239,7 @@ func TestSchemaFilter(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "22492"
-	var tableName = fmt.Sprintf("c##flow_test_logminer.schema_filtering_%s", uniqueID)
+	var tableName = fmt.Sprintf("c##flow_test_batch.schema_filtering_%s", uniqueID)
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
@@ -255,7 +255,7 @@ func TestSchemaFilter(t *testing.T) {
 		snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
 	})
 	t.Run("FilteredIn", func(t *testing.T) {
-		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", "C##FLOW_TEST_LOGMINER"}
+		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"foo", "C##FLOW_TEST_BATCH"}
 		snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
 	})
 }
@@ -264,13 +264,13 @@ func TestKeyDiscovery(t *testing.T) {
 	var ctx, cs = context.Background(), testCaptureSpec(t)
 	var control = testControlClient(ctx, t)
 	var uniqueID = "329932"
-	var tableName = fmt.Sprintf("c##flow_test_logminer.key_discovery_%s", uniqueID)
+	var tableName = fmt.Sprintf("c##flow_test_batch.key_discovery_%s", uniqueID)
 
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
 	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(k_smallint SMALLINT, k_int INTEGER, k_bool NUMBER(1), k_str VARCHAR(8), data VARCHAR(200), PRIMARY KEY (k_smallint, k_bool, k_int, k_str))", tableName))
 
-	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"C##FLOW_TEST_LOGMINER"}
+	cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"C##FLOW_TEST_BATCH"}
 	snapshotBindings(t, discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID)))
 }
 
@@ -316,7 +316,7 @@ func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 
 func executeControlQuery(ctx context.Context, t testing.TB, client *sql.DB, query string, args ...interface{}) {
 	t.Helper()
-	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing setup query")
+	log.WithFields(log.Fields{"query": query, "args": args}).Info("executing setup query")
 	var _, err = client.ExecContext(ctx, query, args...)
 	if err != nil && strings.Contains(err.Error(), "ORA-00942") {
 		// table or view does not exist error, ignore

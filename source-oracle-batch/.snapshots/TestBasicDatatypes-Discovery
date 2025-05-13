@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "c__flow_test_logminer_basic_datatypes_13111208",
-      "owner": "C##FLOW_TEST_LOGMINER",
+      "name": "c__flow_test_batch_basic_datatypes_13111208",
+      "owner": "C##FLOW_TEST_BATCH",
       "table": "BASIC_DATATYPES_13111208",
       "cursor": [
         "TXID"
       ]
     },
     "resource_path": [
-      "c__flow_test_logminer_basic_datatypes_13111208"
+      "c__flow_test_batch_basic_datatypes_13111208"
     ],
     "collection": {
-      "name": "acmeCo/test/c__flow_test_logminer_basic_datatypes_13111208",
+      "name": "acmeCo/test/c__flow_test_batch_basic_datatypes_13111208",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -54,6 +54,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "c__flow_test_logminer_basic_datatypes_13111208"
+    "state_key": "c__flow_test_batch_basic_datatypes_13111208"
   }
 
