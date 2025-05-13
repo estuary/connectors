@@ -443,15 +443,19 @@ func formatRFC3339(t time.Time) (any, error) {
 
 func (db *postgresDatabase) translateArray(column *sqlcapture.ColumnInfo, isPrimaryKey bool, x pgtype.Array[any]) (any, error) {
 	// Construct a ColumnInfo representing a theoretical scalar version of the array column
-	var scalarColumn = *column
-	if str, ok := scalarColumn.DataType.(string); ok {
-		scalarColumn.DataType = strings.TrimLeft(str, "_")
+	var scalarColumn *sqlcapture.ColumnInfo
+	if column != nil {
+		var copyColumn = *column
+		scalarColumn = &copyColumn
+		if str, ok := scalarColumn.DataType.(string); ok {
+			scalarColumn.DataType = strings.TrimLeft(str, "_")
+		}
 	}
 
 	// Translate the values of x.Elements in place (since we're discarding the original
 	// pgtype.Array value after this).
 	for idx := range x.Elements {
-		var translated, err = db.translateRecordField(&scalarColumn, isPrimaryKey, x.Elements[idx])
+		var translated, err = db.translateRecordField(scalarColumn, isPrimaryKey, x.Elements[idx])
 		if err != nil {
 			return nil, err
 		}
