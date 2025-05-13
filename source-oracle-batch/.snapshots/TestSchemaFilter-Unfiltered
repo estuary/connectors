@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "c__flow_test_logminer_schema_filtering_22492",
-      "owner": "C##FLOW_TEST_LOGMINER",
+      "name": "c__flow_test_batch_schema_filtering_22492",
+      "owner": "C##FLOW_TEST_BATCH",
       "table": "SCHEMA_FILTERING_22492",
       "cursor": [
         "TXID"
       ]
     },
     "resource_path": [
-      "c__flow_test_logminer_schema_filtering_22492"
+      "c__flow_test_batch_schema_filtering_22492"
     ],
     "collection": {
-      "name": "acmeCo/test/c__flow_test_logminer_schema_filtering_22492",
+      "name": "acmeCo/test/c__flow_test_batch_schema_filtering_22492",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -54,6 +54,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "c__flow_test_logminer_schema_filtering_22492"
+    "state_key": "c__flow_test_batch_schema_filtering_22492"
   }
 

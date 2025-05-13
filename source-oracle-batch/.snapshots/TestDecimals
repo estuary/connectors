@@ -1,10 +1,10 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer_decimals_75319739": 2 Documents
+# Collection "acmeCo/test/c__flow_test_batch_decimals_75319739": 2 Documents
 # ================================
 {"ID":"1","TXID":"999999","X":"98.7654","Y":"123456789101112.123456789101112","_meta":{"polled":"<TIMESTAMP>","index":999}}
 {"ID":"0","TXID":"999999","X":"12.3456","Y":"1234567890","_meta":{"polled":"<TIMESTAMP>","index":999}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"c__flow_test_logminer_decimals_75319739":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+{"bindingStateV1":{"c__flow_test_batch_decimals_75319739":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
 
