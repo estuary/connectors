@@ -92,9 +92,8 @@
     ["tests/duplicated-keys", { "id": 7, "int": 12, "str": "str 12"}],
     ["tests/duplicated-keys", { "id": 8, "int": 13, "str": "str 13"}],
     ["tests/duplicated-keys", { "id": 9, "int": 14, "str": "str 14"}],
-    ["tests/duplicated-keys", { "id": 10, "int": 15, "str": "str 15"}]
-  ],
-  [
+    ["tests/duplicated-keys", { "id": 10, "int": 15, "str": "str 15"}],
+
     ["tests/underscore-column", { "_id":  1, "__some_field":  "str1"}],
     ["tests/underscore-column", { "_id":  2, "__some_field":  "str2"}]
   ]
