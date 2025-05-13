@@ -98,6 +98,10 @@ class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
 
     PATH_POINTERS: ClassVar[list[str]]
 
+    meta_: dict | None = Field(
+        default=None, alias="_meta", title="Meta",
+    )
+
     @abc.abstractmethod
     def path(self) -> list[str]:
         raise NotImplementedError()
