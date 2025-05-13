@@ -89,6 +89,7 @@
       },
       "configuration": {
         "assign_agent_statuses": false,
+        "assign_tickets_to_any_brand": false,
         "assign_tickets_to_any_group": false,
         "chat_access": false,
         "custom_objects": {},

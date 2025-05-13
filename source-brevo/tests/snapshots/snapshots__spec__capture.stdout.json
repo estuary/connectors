@@ -29,6 +29,18 @@
       "additionalProperties": false,
       "description": "ResourceConfig encodes a configured resource stream",
       "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
         "stream": {
           "description": "Name of this stream",
           "title": "Stream",
