@@ -149,7 +149,7 @@ var (
 	fallbackKeyOld = []string{}
 )
 
-func generateCollectionSchema(cfg *Config, table *discoveredTable, includeNullability bool) (json.RawMessage, []string, error) {
+func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSchema bool) (json.RawMessage, []string, error) {
 	// Extract useful key and column type information
 	var keyColumns []string
 	for _, key := range table.keys {
@@ -162,15 +162,23 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, includeNullab
 
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
-		ExpandedStruct: true,
-		DoNotReference: true,
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: fullWriteSchema,
 	}
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
 	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
 		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
 	}
 	metadataSchema.Definitions = nil
-	metadataSchema.AdditionalProperties = nil
+	if metadataSchema.Extras == nil {
+		metadataSchema.Extras = make(map[string]any)
+	}
+	if fullWriteSchema {
+		metadataSchema.AdditionalProperties = nil
+	} else {
+		metadataSchema.Extras["additionalProperties"] = false
+	}
 
 	var required = append([]string{"_meta"}, keyColumns...)
 	var properties = map[string]*jsonschema.Schema{
@@ -178,7 +186,7 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, includeNullab
 	}
 	for colName, colType := range columnTypes {
 		var colSchema = colType.JSONSchema()
-		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !includeNullability {
+		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !fullWriteSchema {
 			// Remove null as an option when there are multiple type options and we don't want nullability
 			colSchema.Extras["type"] = slices.DeleteFunc(types, func(t string) bool { return t == "null" })
 		}
@@ -192,10 +200,12 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, includeNullab
 		extras["x-infer-schema"] = true
 	}
 	var schema = &jsonschema.Schema{
-		Type:                 "object",
-		Required:             required,
-		AdditionalProperties: nil,
-		Extras:               extras,
+		Type:     "object",
+		Required: required,
+		Extras:   extras,
+	}
+	if !fullWriteSchema {
+		schema.Extras["additionalProperties"] = false
 	}
 
 	// Marshal schema to JSON
