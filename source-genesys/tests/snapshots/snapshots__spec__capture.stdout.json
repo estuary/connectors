@@ -87,6 +87,18 @@
       "additionalProperties": false,
       "description": "ResourceConfig is a common resource configuration shape.",
       "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
         "name": {
           "description": "Name of this resource",
           "title": "Name",
