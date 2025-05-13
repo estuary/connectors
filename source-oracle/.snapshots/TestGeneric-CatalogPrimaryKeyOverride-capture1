@@ -104,5 +104,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT83617880":{"backfilled":100,"key_columns":["FULLNAME","YEAR"],"mode":"Active"}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT83617880":{"backfilled":100,"key_columns":["FULLNAME","YEAR"],"mode":"Active"}},"cursor":{"PendingTransactions":{},"SCN":111111111"}}
 

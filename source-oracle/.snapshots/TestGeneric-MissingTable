@@ -1,7 +1,7 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT18865235":{"backfilled":0,"key_columns":null,"mode":"Pending","scanned":null},"C%23%23FLOW_TEST_LOGMINER%2FT27607177":{"backfilled":0,"key_columns":null,"mode":"Pending","scanned":null}},"cursor":"11111111"}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT18865235":{"backfilled":0,"key_columns":null,"mode":"Pending","scanned":null},"C%23%23FLOW_TEST_LOGMINER%2FT27607177":{"backfilled":0,"key_columns":null,"mode":"Pending","scanned":null}},"cursor":{"PendingTransactions":{},"SCN":111111111"}}
 # ================================
 # Captures Terminated With Errors
 # ================================
