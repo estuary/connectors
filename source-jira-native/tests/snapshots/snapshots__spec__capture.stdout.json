@@ -118,6 +118,10 @@
       "additionalProperties": false,
       "description": "ResourceConfig encodes a configured resource stream",
       "properties": {
+        "_meta": {
+          "title": "Meta",
+          "type": "object"
+        },
         "cursorField": {
           "items": {
             "type": "string"

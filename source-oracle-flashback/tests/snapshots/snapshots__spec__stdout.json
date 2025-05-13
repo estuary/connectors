@@ -211,6 +211,18 @@
     "resourceConfigSchema": {
       "additionalProperties": false,
       "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
         "name": {
           "description": "Name of this resource",
           "title": "Name",

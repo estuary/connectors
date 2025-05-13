@@ -431,6 +431,10 @@
       "description": "ResourceConfig encodes a configured resource stream",
       "type": "object",
       "properties": {
+        "_meta": {
+          "title": "Meta",
+          "type": "object"
+        },
         "stream": {
           "title": "Stream",
           "description": "Name of this stream",
