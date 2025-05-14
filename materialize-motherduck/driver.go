@@ -110,15 +110,21 @@ func newTransactor(
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
 		t.storeFiles.AddBinding(idx, target.ColumnNames())
-		t.bindings = append(t.bindings, &binding{target: target})
+		t.bindings = append(t.bindings, &binding{
+			target:           target,
+			loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, duckDialect.Literal),
+			storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, duckDialect.Literal),
+		})
 	}
 
 	return t, nil, nil
 }
 
 type binding struct {
-	target    sql.Table
-	mustMerge bool
+	target           sql.Table
+	mustMerge        bool
+	loadMergeBounds  *sql.MergeBoundsBuilder
+	storeMergeBounds *sql.MergeBoundsBuilder
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -134,6 +140,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		} else if err = d.loadFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("encoding Load key to scratch file: %w", err)
+		} else {
+			b.loadMergeBounds.NextKey(converted)
 		}
 	}
 	if it.Err() != nil {
@@ -151,8 +159,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if uris, err := d.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
 		} else if err := tplLoadQuery.Execute(&loadQuery, &queryParams{
-			Table: b.target,
-			Files: uris,
+			Table:  b.target,
+			Bounds: b.loadMergeBounds.Build(),
+			Files:  uris,
 		}); err != nil {
 			return fmt.Errorf("rendering load query: %w", err)
 		}
@@ -270,6 +279,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		} else if err := d.storeFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return nil, fmt.Errorf("encoding row for store: %w", err)
+		} else {
+			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
 	}
 	if it.Err() != nil {
@@ -306,7 +317,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					return fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 				}
 
-				params := &queryParams{Table: b.target, Files: uris}
+				params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
 
 				d.be.StartedResourceCommit(b.target.Path)
 				if b.mustMerge {

@@ -87,7 +87,8 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 
 type queryParams struct {
 	sql.Table
-	Files []string
+	Bounds []sql.MergeBound
+	Files  []string
 }
 
 var (
@@ -116,15 +117,16 @@ JOIN read_json(
 	format='newline_delimited',
 	compression='gzip',
 	columns={
-	{{- range $ind, $key := $.Keys }}
+	{{- range $ind, $bound := $.Bounds }}
 		{{- if $ind }},{{ end }}
-		{{$key.Identifier}}: '{{$key.DDL}}'
+		{{$bound.Identifier}}: '{{$bound.DDL}}'
 	{{- end }}
 	}
 ) AS r
-{{- range $ind, $key := $.Keys }}
+{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end -}}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
@@ -150,9 +152,10 @@ USING read_json(
 	{{- end }}
 	}
 ) AS r
-{{- range $ind, $key := $.Keys }}
+{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} WHERE {{ end -}}
-	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }};
 {{ end }}
 
