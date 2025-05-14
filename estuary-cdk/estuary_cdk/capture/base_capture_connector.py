@@ -1,3 +1,4 @@
+from estuary_cdk.capture.connector_status import ConnectorStatus
 from pydantic import BaseModel
 from typing import Generic, Awaitable, Any, BinaryIO, Callable
 from logging import Logger
@@ -109,11 +110,13 @@ class BaseCaptureConnector(
 
                 task = Task(
                     log.getChild("capture"),
+                    ConnectorStatus(log, stopping, tg),
                     "capture",
                     self.output,
                     stopping,
                     tg,
                 )
+                log.event.status("Capture started")
                 await capture(task)
 
             # When capture() completes, the connector exits.
