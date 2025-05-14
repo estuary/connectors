@@ -22,10 +22,6 @@ captures:
           interval: PT1H
         target: acmeCo/site_migration_details
       - resource:
-          name: quote_line_groups
-          interval: PT2M
-        target: acmeCo/quote_line_groups
-      - resource:
           name: gifts
           interval: PT1H
         target: acmeCo/gifts
@@ -73,10 +69,6 @@ captures:
           name: promotional_credits
           interval: PT2M
         target: acmeCo/promotional_credits
-      - resource:
-          name: quotes
-          interval: PT2M
-        target: acmeCo/quotes
       - resource:
           name: subscriptions
           interval: PT2M

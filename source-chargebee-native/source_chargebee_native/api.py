@@ -3,6 +3,7 @@ from logging import Logger
 from typing import AsyncGenerator, TypeVar
 
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from estuary_cdk.capture.common import (
     PageCursor,
     LogCursor,
@@ -14,8 +15,6 @@ from source_chargebee_native.models import (
     AssociationConfig,
 )
 
-
-MAX_PAGE_LIMIT = 100
 
 ChargebeeResourceType = TypeVar("ChargebeeResourceType", bound=ChargebeeResource)
 
@@ -33,6 +32,7 @@ async def _fetch_resource_data(
     log: Logger,
     site: str,
     resource_name: str,
+    limit: int,
     start_date: datetime | None = None,
     end_date: datetime | None = None,
     offset: str | None = None,
@@ -46,7 +46,7 @@ async def _fetch_resource_data(
     params: dict[str, int | str | list[int]] = {}
 
     if returns_list:
-        params["limit"] = MAX_PAGE_LIMIT
+        params["limit"] = limit
         if offset is not None:
             params["offset"] = offset
 
@@ -62,26 +62,34 @@ async def _fetch_resource_data(
         elif end_date:
             params[f"{cursor_field}[before]"] = int(end_date.timestamp())
 
+    if start_date and end_date and start_date == end_date:
+        raise ValueError("Start and end dates cannot be the same", {"start_date": start_date, "end_date": end_date})
+
     if include_deleted:
         params["include_deleted"] = "true"
 
     if filter_params:
         params.update(filter_params)
 
-    response = APIResponse[resource_type].model_validate_json(
-        await http.request(log, url, params=params)
-    )
+    _, body = await http.request_stream(log, url, params=params)
+    async for record in IncrementalJsonProcessor(
+        body(),
+        "",
+        APIResponse[resource_type],
+    ):
+        if not record.list:
+            return [], record.next_offset
 
-    if not response.list:
-        return [], response.next_offset
+        return record.list, record.next_offset
 
-    return response.list, response.next_offset
+    return [], None
 
 
 async def snapshot_resource(
     http: HTTPSession,
     site: str,
     resource_name: str,
+    limit: int,
     log: Logger,
     filter_params: dict[str, str] | None = None,
 ) -> AsyncGenerator[ChargebeeResource, None]:
@@ -89,11 +97,12 @@ async def snapshot_resource(
 
     while True:
         resource_data, next_offset = await _fetch_resource_data(
-            http,
-            log,
-            site,
-            resource_name,
+            http=http,
+            log=log,
+            site=site,
+            resource_name=resource_name,
             offset=offset,
+            limit=limit,
             filter_params=filter_params,
         )
 
@@ -115,6 +124,7 @@ async def fetch_resource_page(
     resource_name: str,
     resource_type: type[IncrementalChargebeeResource],
     start_date: datetime,
+    limit: int,
     log: Logger,
     offset: PageCursor | None,
     cutoff: LogCursor,
@@ -123,15 +133,16 @@ async def fetch_resource_page(
     assert isinstance(offset, str | None)
 
     resource_data, next_offset = await _fetch_resource_data(
-        http,
-        log,
-        site,
-        resource_name,
-        start_date,
-        cutoff,
-        offset,
-        False,
-        resource_type,
+        http=http,
+        log=log,
+        site=site,
+        resource_name=resource_name,
+        start_date=start_date,
+        end_date=cutoff,
+        offset=offset,
+        limit=limit,
+        include_deleted=False,
+        resource_type=resource_type,
     )
 
     if not resource_data:
@@ -149,6 +160,7 @@ async def fetch_resource_changes(
     site: str,
     resource_name: str,
     resource_type: type[IncrementalChargebeeResource],
+    limit: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ChargebeeResource | LogCursor, None]:
@@ -162,15 +174,16 @@ async def fetch_resource_changes(
 
     while True:
         resource_data, next_offset = await _fetch_resource_data(
-            http,
-            log,
-            site,
-            resource_name,
-            start_date,
-            end_date,
-            offset,
-            True,
-            resource_type,
+            http=http,
+            log=log,
+            site=site,
+            resource_name=resource_name,
+            start_date=start_date,
+            end_date=end_date,
+            offset=offset,
+            limit=limit,
+            include_deleted=True,
+            resource_type=resource_type,
         )
 
         if not resource_data:
@@ -202,19 +215,23 @@ async def _get_parent_ids(
     http: HTTPSession,
     site: str,
     association_config: AssociationConfig,
+    limit: int,
     log: Logger,
 ) -> list[str]:
     parent_ids = []
     async for parent in snapshot_resource(
-        http,
-        site,
-        association_config.parent_resource,
-        log,
+        http=http,
+        site=site,
+        resource_name=association_config.parent_resource,
+        limit=limit,
+        log=log,
         filter_params=association_config.parent_filter_params,
     ):
         parent_data = parent.model_dump()
         parent_ids.append(
-            parent_data[association_config.parent_response_key][association_config.parent_key_field]
+            parent_data[association_config.parent_response_key][
+                association_config.parent_key_field
+            ]
         )
 
     return parent_ids
@@ -224,13 +241,15 @@ async def snapshot_associated_resource(
     http: HTTPSession,
     site: str,
     association_config: AssociationConfig,
+    limit: int,
     log: Logger,
 ) -> AsyncGenerator[ChargebeeResource, None]:
     parent_ids = await _get_parent_ids(
-        http,
-        site,
-        association_config,
-        log,
+        http=http,
+        site=site,
+        association_config=association_config,
+        limit=limit,
+        log=log,
     )
 
     for parent_id in parent_ids:
@@ -241,11 +260,12 @@ async def snapshot_associated_resource(
         offset = None
         while True:
             resource_data, next_offset = await _fetch_resource_data(
-                http,
-                log,
-                site,
-                endpoint,
+                http=http,
+                log=log,
+                site=site,
+                resource_name=endpoint,
                 offset=offset,
+                limit=limit,
                 returns_list=association_config.returns_list,
             )
 
@@ -267,6 +287,7 @@ async def fetch_associated_resource_page(
     association_config: AssociationConfig,
     resource_type: type[IncrementalChargebeeResource],
     start_date: datetime,
+    limit: int,
     log: Logger,
     offset: PageCursor | None,
     cutoff: LogCursor,
@@ -275,10 +296,11 @@ async def fetch_associated_resource_page(
     assert isinstance(offset, str | None)
 
     parent_ids = await _get_parent_ids(
-        http,
-        site,
-        association_config,
-        log,
+        http=http,
+        site=site,
+        association_config=association_config,
+        limit=limit,
+        log=log,
     )
 
     for parent_id in parent_ids:
@@ -287,15 +309,16 @@ async def fetch_associated_resource_page(
         )
 
         child_data, next_offset = await _fetch_resource_data(
-            http,
-            log,
-            site,
-            endpoint,
-            start_date,
-            cutoff,
-            offset,
-            False,
-            resource_type,
+            http=http,
+            log=log,
+            site=site,
+            resource_name=endpoint,
+            start_date=start_date,
+            end_date=cutoff,
+            limit=limit,
+            offset=offset,
+            include_deleted=False,
+            resource_type=resource_type,
         )
 
         if not child_data:
@@ -313,6 +336,7 @@ async def fetch_associated_resource_changes(
     site: str,
     association_config: AssociationConfig,
     resource_type: type[IncrementalChargebeeResource],
+    limit: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ChargebeeResource | LogCursor, None]:
@@ -324,10 +348,11 @@ async def fetch_associated_resource_changes(
     has_results = False
 
     parent_ids = await _get_parent_ids(
-        http,
-        site,
-        association_config,
-        log,
+        http=http,
+        site=site,
+        association_config=association_config,
+        limit=limit,
+        log=log,
     )
 
     for parent_id in parent_ids:
@@ -338,15 +363,16 @@ async def fetch_associated_resource_changes(
 
         while True:
             child_data, next_offset = await _fetch_resource_data(
-                http,
-                log,
-                site,
-                endpoint,
-                start_date,
-                end_date,
-                offset,
-                True,
-                resource_type,
+                http=http,
+                log=log,
+                site=site,
+                resource_name=endpoint,
+                start_date=start_date,
+                end_date=end_date,
+                offset=offset,
+                limit=limit,
+                include_deleted=True,
+                resource_type=resource_type,
             )
 
             if not child_data:
@@ -357,7 +383,7 @@ async def fetch_associated_resource_changes(
             for doc in child_data:
                 if doc.cursor_value > log_cursor:
                     continue
-                
+
                 max_updated_at = max(max_updated_at, _ts_to_dt(doc.cursor_value))
 
                 if doc.deleted:
