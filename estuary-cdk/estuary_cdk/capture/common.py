@@ -632,6 +632,7 @@ def open_binding(
     the state for each subtask in state.inc, state.backfill, or state.snapshot.
     """
 
+    task.connector_status.inc_binding_count()
     prefix = ".".join(binding.resourceConfig.path())
 
     if fetch_changes:
@@ -687,6 +688,7 @@ def open_binding(
             subtask_id: str | None = None,
         ):
             assert state and not isinstance(state, dict)
+            task.connector_status.inc_backfilling(binding_index)
             await _binding_backfill_task(
                 binding,
                 binding_index,
@@ -697,6 +699,7 @@ def open_binding(
                 task,
                 subtask_id,
             )
+            task.connector_status.dec_backfilling(binding_index)
 
         if isinstance(fetch_page, dict):
             assert resource_state.backfill and isinstance(resource_state.backfill, dict)

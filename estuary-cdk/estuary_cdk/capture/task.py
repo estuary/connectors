@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import decimal
+from estuary_cdk.capture.connector_status import ConnectorStatus
 from pydantic import Field
 from typing import Generic, Awaitable, Any, BinaryIO, Callable
 import orjson
@@ -72,6 +73,9 @@ class Task:
     log: Logger
     """Attached Logger of this Task instance, to use for scoped logging."""
 
+    connector_status: ConnectorStatus
+    """Shared ConnectorStatus instance of the entire capture."""
+
     @dataclass
     class Stopping:
         """
@@ -102,6 +106,7 @@ class Task:
     def __init__(
         self,
         log: Logger,
+        connector_status: ConnectorStatus,
         name: str,
         output: BinaryIO,
         stopping: Stopping,
@@ -113,6 +118,7 @@ class Task:
         self._output = output
         self._tg = tg
         self.log = log
+        self.connector_status = connector_status
         self.stopping = stopping
 
     def captured(self, binding: int, document: Any):
@@ -186,6 +192,7 @@ class Task:
                 try:
                     t = Task(
                         child_log,
+                        parent.connector_status,
                         child_name,
                         parent._output,
                         parent.stopping,
