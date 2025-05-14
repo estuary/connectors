@@ -55,9 +55,9 @@ JOIN read_json(
 		"key!binary": 'VARCHAR NOT NULL'
 	}
 ) AS r
-	 ON  l.key1 = r.key1
+	 ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = r."key!binary"
+	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
 --- End ""."a-schema".key_value loadQuery ---
 
 --- Begin ""."a-schema".key_value storeDeleteQuery ---
@@ -89,9 +89,9 @@ USING read_json(
 		flow_document: 'JSON NOT NULL'
 	}
 ) AS r
-	 WHERE l.key1 = r.key1
+	 WHERE l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = r."key!binary";
+	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo=';
 --- End ""."a-schema".key_value storeDeleteQuery ---
 
 --- Begin ""."a-schema".key_value storeQuery ---
@@ -124,25 +124,6 @@ SELECT * FROM read_json(
 	}
 ) WHERE flow_document != '"delete"';
 --- End ""."a-schema".key_value storeQuery ---
-
---- Begin ""."a-schema".delta_updates loadQuery ---
-SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
---- End ""."a-schema".delta_updates loadQuery ---
-
---- Begin ""."a-schema".delta_updates storeDeleteQuery ---
-DELETE FROM ""."a-schema".delta_updates AS l
-USING read_json(
-	['s3://bucket/file1', 's3://bucket/file2'],
-	format='newline_delimited',
-	compression='gzip',
-	columns={
-		"theKey": 'VARCHAR NOT NULL',
-		"aValue": 'BIGINT',
-		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL'
-	}
-) AS r
-	 WHERE l."theKey" = r."theKey";
---- End ""."a-schema".delta_updates storeDeleteQuery ---
 
 --- Begin ""."a-schema".delta_updates storeQuery ---
 INSERT INTO ""."a-schema".delta_updates BY NAME
