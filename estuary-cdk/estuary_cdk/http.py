@@ -26,6 +26,7 @@ DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 
 StreamedObject = TypeVar("StreamedObject", bound=BaseModel)
 
+
 class Headers(dict[str, Any]):
     pass
 
@@ -100,7 +101,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         delim: bytes = b"\n",
-        headers: dict[str, Any] = {}
+        headers: dict[str, Any] = {},
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and return its response as streaming lines, as they arrive"""
 
@@ -133,7 +134,9 @@ class HTTPSession(abc.ABC):
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
-        headers, body = await self._request_stream(log, url, method, params, json, form, True, headers)
+        headers, body = await self._request_stream(
+            log, url, method, params, json, form, True, headers
+        )
         return (headers, body)
 
     @abc.abstractmethod
@@ -226,7 +229,9 @@ class TokenSource:
 
         self._fetched_at = int(time.time())
         response = await self._fetch_oauth2_token(
-            log, session, self.credentials,
+            log,
+            session,
+            self.credentials,
         )
         self._access_token = response
         return response
@@ -332,7 +337,11 @@ class HTTPMixin(Mixin, HTTPSession):
     token_source: TokenSource | None = None
 
     async def _mixin_enter(self, _: Logger):
-        self.inner = aiohttp.ClientSession()
+        self.inner = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(
+                total=30 * 60,  # 30-minutes - default is 5-minutes
+            ),
+        )
         self.rate_limiter = RateLimiter()
         return self
 
