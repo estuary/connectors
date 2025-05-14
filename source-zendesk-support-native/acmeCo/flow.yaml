@@ -4,6 +4,10 @@ collections:
     schema: account_attributes.schema.yaml
     key:
       - /_meta/row_id
+  acmeCo/articles:
+    schema: articles.schema.yaml
+    key:
+      - /id
   acmeCo/audit_logs:
     schema: audit_logs.schema.yaml
     key:

@@ -80,6 +80,10 @@ captures:
           interval: PT15M
         target: acmeCo/topics
       - resource:
+          name: articles
+          interval: PT15M
+        target: acmeCo/articles
+      - resource:
           name: satisfaction_ratings
           interval: PT5M
         target: acmeCo/satisfaction_ratings
