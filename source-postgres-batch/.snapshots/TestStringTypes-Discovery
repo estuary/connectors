@@ -60,27 +60,32 @@ Binding 0:
             ]
           },
           "bpchar_col": {
+            "description": "(source type: bpchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "char_col": {
+            "description": "(source type: bpchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "text_col": {
+            "description": "(source type: text)",
             "type": [
               "string",
               "null"
             ]
           },
           "varchar_col": {
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"

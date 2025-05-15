@@ -60,36 +60,42 @@ Binding 0:
             ]
           },
           "bit3_col": {
+            "description": "(source type: bit)",
             "type": [
               "string",
               "null"
             ]
           },
           "bit_col": {
+            "description": "(source type: bit)",
             "type": [
               "string",
               "null"
             ]
           },
           "bitvar5_col": {
+            "description": "(source type: varbit)",
             "type": [
               "string",
               "null"
             ]
           },
           "bitvar_col": {
+            "description": "(source type: varbit)",
             "type": [
               "string",
               "null"
             ]
           },
           "bool_col": {
+            "description": "(source type: bool)",
             "type": [
               "boolean",
               "null"
             ]
           },
           "bytea_col": {
+            "description": "(source type: bytea)",
             "contentEncoding": "base64",
             "type": [
               "string",
@@ -97,7 +103,8 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           }
         },
         "x-infer-schema": true

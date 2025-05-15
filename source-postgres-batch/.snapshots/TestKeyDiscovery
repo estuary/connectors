@@ -64,25 +64,31 @@ Binding 0:
             ]
           },
           "data": {
+            "description": "(source type: text)",
             "type": [
               "string",
               "null"
             ]
           },
           "k_bigint": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int8)"
           },
           "k_bool": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "(source type: non-nullable bool)"
           },
           "k_int": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "k_smallint": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int2)"
           },
           "k_str": {
-            "type": "string"
+            "type": "string",
+            "description": "(source type: non-nullable varchar)"
           }
         },
         "x-infer-schema": true

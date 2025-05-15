@@ -56,12 +56,14 @@ Binding 0:
             ]
           },
           "data": {
+            "description": "(source type: text)",
             "type": [
               "string",
               "null"
             ]
           },
           "value": {
+            "description": "(source type: int4)",
             "type": [
               "integer",
               "null"

@@ -61,21 +61,25 @@ Binding 0:
           },
           "date_col": {
             "format": "date-time",
+            "description": "(source type: date)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "interval_col": {
+            "description": "(source type: interval)",
             "type": [
               "string",
               "null"
             ]
           },
           "time_col": {
+            "description": "(source type: time)",
             "type": [
               "integer",
               "null"
@@ -83,6 +87,7 @@ Binding 0:
           },
           "timetz_col": {
             "format": "time",
+            "description": "(source type: timetz)",
             "type": [
               "string",
               "null"
@@ -90,6 +95,7 @@ Binding 0:
           },
           "ts_col": {
             "format": "date-time",
+            "description": "(source type: timestamp)",
             "type": [
               "string",
               "null"
@@ -97,6 +103,7 @@ Binding 0:
           },
           "tstz_col": {
             "format": "date-time",
+            "description": "(source type: timestamptz)",
             "type": [
               "string",
               "null"
