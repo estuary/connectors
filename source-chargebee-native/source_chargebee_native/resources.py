@@ -235,6 +235,7 @@ async def full_refresh_resources(
                 http,
                 config.site,
                 resource_name,
+                config.advanced.limit,
             ),
             tombstone=ChargebeeResource(_meta=ChargebeeResource.Meta(op="d")),
         )
@@ -286,6 +287,7 @@ async def incremental_resources(
                 resource_name,
                 resource_type,
                 config.start_date,
+                config.advanced.limit,
             ),
             fetch_changes=functools.partial(
                 fetch_resource_changes,
@@ -293,6 +295,7 @@ async def incremental_resources(
                 config.site,
                 resource_name,
                 resource_type,
+                config.advanced.limit,
             ),
         )
 
@@ -345,6 +348,7 @@ async def associated_full_refresh_resources(
                 http,
                 config.site,
                 association_config,
+                config.advanced.limit,
             ),
             tombstone=ChargebeeResource(_meta=ChargebeeResource.Meta(op="d")),
         )
@@ -398,6 +402,7 @@ async def associated_incremental_resources(
                 association_config,
                 resource_type,
                 config.start_date,
+                config.advanced.limit,
             ),
             fetch_changes=functools.partial(
                 fetch_associated_resource_changes,
@@ -405,6 +410,7 @@ async def associated_incremental_resources(
                 config.site,
                 association_config,
                 resource_type,
+                config.advanced.limit,
             ),
         )
 

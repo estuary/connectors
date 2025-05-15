@@ -1,5 +1,5 @@
 from datetime import datetime, UTC, timedelta
-from typing import Generic, TypeVar, Literal, List, ClassVar
+from typing import Annotated, Generic, TypeVar, Literal, List, ClassVar
 from pydantic import (
     AwareDatetime,
     BaseModel,
@@ -59,6 +59,24 @@ class EndpointConfig(BaseModel):
         description="The product catalog version to use.",
         title="Product Catalog",
         default="1.0",
+    )
+
+    class Advanced(BaseModel, extra="forbid"):
+        limit: Annotated[
+            int,
+            Field(
+                description="Limit used in queries to Chargebee API. This should be left as the default value unless connector errors indicate a smaller limit is required.",
+                title="Limit",
+                default=100,
+                gt=0,
+            ),
+        ]
+
+    advanced: Advanced = Field(
+        default_factory=Advanced,  # type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
     )
 
 
