@@ -60,9 +60,11 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "name": {
+            "description": "(source type: text)",
             "type": [
               "string",
               "null"
@@ -70,12 +72,14 @@ Binding 0:
           },
           "updated_at": {
             "format": "date-time",
+            "description": "(source type: timestamp)",
             "type": [
               "string",
               "null"
             ]
           },
           "visible": {
+            "description": "(source type: bool)",
             "type": [
               "boolean",
               "null"
@@ -149,12 +153,14 @@ Binding 1:
             ]
           },
           "id": {
+            "description": "(source type: int4)",
             "type": [
               "integer",
               "null"
             ]
           },
           "name": {
+            "description": "(source type: text)",
             "type": [
               "string",
               "null"
@@ -162,6 +168,7 @@ Binding 1:
           },
           "updated_at": {
             "format": "date-time",
+            "description": "(source type: timestamp)",
             "type": [
               "string",
               "null"

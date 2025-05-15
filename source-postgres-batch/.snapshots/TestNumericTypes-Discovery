@@ -61,6 +61,7 @@ Binding 0:
           },
           "decimal_col": {
             "format": "number",
+            "description": "(source type: numeric)",
             "type": [
               "string",
               "null"
@@ -68,6 +69,7 @@ Binding 0:
           },
           "double_col": {
             "format": "number",
+            "description": "(source type: float8)",
             "type": [
               "number",
               "string",
@@ -75,9 +77,11 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "money_col": {
+            "description": "(source type: money)",
             "type": [
               "string",
               "null"
@@ -85,6 +89,7 @@ Binding 0:
           },
           "numeric_col": {
             "format": "number",
+            "description": "(source type: numeric)",
             "type": [
               "string",
               "null"
@@ -92,6 +97,7 @@ Binding 0:
           },
           "numeric_large_col": {
             "format": "number",
+            "description": "(source type: numeric)",
             "type": [
               "string",
               "null"
@@ -99,6 +105,7 @@ Binding 0:
           },
           "real_col": {
             "format": "number",
+            "description": "(source type: float4)",
             "type": [
               "number",
               "string",

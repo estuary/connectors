@@ -60,12 +60,21 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
-          "int_array": {},
-          "real_array": {},
-          "text_array": {},
-          "uuid_array": {}
+          "int_array": {
+            "description": "using catch-all schema (unknown type \"_int4\") (source type: _int4)"
+          },
+          "real_array": {
+            "description": "using catch-all schema (unknown type \"_float4\") (source type: _float4)"
+          },
+          "text_array": {
+            "description": "using catch-all schema (unknown type \"_text\") (source type: _text)"
+          },
+          "uuid_array": {
+            "description": "using catch-all schema (unknown type \"_uuid\") (source type: _uuid)"
+          }
         },
         "x-infer-schema": true
       },
