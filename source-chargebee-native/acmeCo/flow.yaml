@@ -56,14 +56,6 @@ collections:
     schema: promotional_credits.schema.yaml
     key:
       - /promotional_credit/id
-  acmeCo/quote_line_groups:
-    schema: quote_line_groups.schema.yaml
-    key:
-      - /_meta/row_id
-  acmeCo/quotes:
-    schema: quotes.schema.yaml
-    key:
-      - /quote/id
   acmeCo/site_migration_details:
     schema: site_migration_details.schema.yaml
     key:
