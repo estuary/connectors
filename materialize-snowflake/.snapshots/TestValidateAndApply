@@ -87,7 +87,7 @@ Big Schema Changed Types Constraints:
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"numField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'numField' is already being materialized as endpoint type 'FLOAT' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
-{"Field":"objField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'objField' is already being materialized as endpoint type 'VARIANT' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"objField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'objField' is already being materialized as endpoint type 'VARIANT' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
 {"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}

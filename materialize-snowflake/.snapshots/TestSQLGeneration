@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	key1 INTEGER NOT NULL,
 	key2 BOOLEAN NOT NULL,
-	"key!binary" TEXT NOT NULL,
+	"key!binary" VARCHAR NOT NULL,
 	array VARIANT,
-	binary TEXT,
+	binary VARCHAR,
 	boolean BOOLEAN,
 	flow_published_at TIMESTAMP_LTZ NOT NULL,
 	integer INTEGER,
@@ -13,12 +13,12 @@ CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	integerWithUserDDL DECIMAL(20),
 	multiple VARIANT,
 	number FLOAT,
-	numberCastToString TEXT,
+	numberCastToString VARCHAR,
 	object VARIANT,
-	string TEXT,
+	string VARCHAR,
 	stringInteger INTEGER,
-	stringInteger39Chars TEXT,
-	stringInteger66Chars TEXT,
+	stringInteger39Chars VARCHAR,
+	stringInteger66Chars VARCHAR,
 	stringNumber FLOAT,
 	flow_document VARIANT NOT NULL,
 
@@ -53,7 +53,7 @@ COMMENT ON COLUMN "a-schema".key_value.flow_document IS 'auto-generated projecti
 --- Begin "a-schema".delta_updates createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS "a-schema".delta_updates (
-	theKey TEXT NOT NULL,
+	theKey VARCHAR NOT NULL,
 	aValue INTEGER,
 	flow_published_at TIMESTAMP_LTZ NOT NULL
 );
