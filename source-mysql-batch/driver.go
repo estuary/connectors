@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -20,7 +19,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -118,61 +116,6 @@ type documentMetadata struct {
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
 	RowID  int64     `json:"row_id" jsonschema:"title=Row ID,description=Row ID of the Document, counting up from zero."`
 	Op     string    `json:"op,omitempty" jsonschema:"title=Change Operation,description=Operation type (c: Create / u: Update / d: Delete),enum=c,enum=u,enum=d,default=u"`
-}
-
-var (
-	// The fallback key of discovered collections when the source table has no primary key.
-	fallbackKey = []string{"/_meta/row_id"}
-
-	// Old captures used a different fallback key which included a value identifying
-	// the specific polling iteration which produced the document. This proved less
-	// than ideal for full-refresh bindings on keyless tables.
-	fallbackKeyOld = []string{"/_meta/polled", "/_meta/index"}
-)
-
-func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
-	// Generate schema for the metadata via reflection
-	var reflector = jsonschema.Reflector{
-		ExpandedStruct: true,
-		DoNotReference: true,
-	}
-	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
-	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
-		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
-	}
-	metadataSchema.Definitions = nil
-	metadataSchema.AdditionalProperties = nil
-
-	var required = []string{"_meta"}
-	var properties = map[string]*jsonschema.Schema{
-		"_meta": metadataSchema,
-	}
-
-	for _, colName := range keyColumns {
-		var columnType = columnTypes[colName]
-		if columnType == nil {
-			return nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
-		}
-		properties[colName] = columnType
-		required = append(required, colName)
-	}
-
-	var schema = &jsonschema.Schema{
-		Type:                 "object",
-		Required:             required,
-		AdditionalProperties: nil,
-		Extras: map[string]interface{}{
-			"properties":     properties,
-			"x-infer-schema": true,
-		},
-	}
-
-	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("error serializing schema: %w", err)
-	}
-	return json.RawMessage(bs), nil
 }
 
 // Spec returns metadata about the capture connector.
