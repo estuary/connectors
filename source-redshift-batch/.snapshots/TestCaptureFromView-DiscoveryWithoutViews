@@ -57,9 +57,11 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "name": {
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
@@ -67,12 +69,14 @@ Binding 0:
           },
           "updated_at": {
             "format": "date-time",
+            "description": "(source type: timestamp)",
             "type": [
               "string",
               "null"
             ]
           },
           "visible": {
+            "description": "(source type: bool)",
             "type": [
               "boolean",
               "null"

@@ -56,49 +56,58 @@ Binding 0:
             ]
           },
           "v_bigint": {
+            "description": "(source type: int8)",
             "type": [
               "integer",
               "null"
             ]
           },
           "v_bool": {
+            "description": "(source type: bool)",
             "type": [
               "boolean",
               "null"
             ]
           },
           "v_int": {
+            "description": "(source type: int4)",
             "type": [
               "integer",
               "null"
             ]
           },
           "v_int_notnull": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "v_smallint": {
+            "description": "(source type: int2)",
             "type": [
               "integer",
               "null"
             ]
           },
           "v_str": {
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "v_text": {
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "v_text_notnull": {
-            "type": "string"
+            "type": "string",
+            "description": "(source type: non-nullable varchar)"
           },
           "v_ts": {
             "format": "date-time",
+            "description": "(source type: timestamp)",
             "type": [
               "string",
               "null"
@@ -106,6 +115,7 @@ Binding 0:
           },
           "v_tstz": {
             "format": "date-time",
+            "description": "(source type: timestamptz)",
             "type": [
               "string",
               "null"
