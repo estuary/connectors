@@ -88,6 +88,37 @@ class EndpointConfig(BaseModel):
         default=False,
     )
 
+    # In order to publish this connector in the HubSpot marketplace, HubSpot requires
+    # that "setup documentation [and] in platform experience should not include an app that
+    # requires API keys in order to be installed". Essentially, users should only be presented
+    # the option to authenticate with OAuth in the UI.
+    # 
+    # There are already existing captures authenticating with access tokens, so we can't
+    # simply strip out support for access token authentication. Patching model_json_schema to remove
+    # AccessToken makes OAuth2 the only authentication option in the UI, and effectively
+    # "hides" the capability to use access tokens. This should satify HubSpot's requirement
+    # while retaining support for access token authentication for already created captures.
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs) -> dict:
+        schema = super().model_json_schema(*args, **kwargs)
+
+        creds = schema.get("properties", {}).get("credentials", {})
+        one_of = creds.get("oneOf", [])
+        filtered_one_of = []
+
+        for option in one_of:
+            if "$ref" in option:
+                ref = option["$ref"]
+                def_name = ref.split("/")[-1]
+                # Do not include AccessToken as an authentication option.
+                if "AccessToken" in def_name:
+                    continue
+
+            filtered_one_of.append(option)
+
+        creds["oneOf"] = filtered_one_of
+        return schema
+
 
 # We use ResourceState directly, without extending it.
 ConnectorState = GenericConnectorState[ResourceState]

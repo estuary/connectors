@@ -69,9 +69,6 @@
           "oneOf": [
             {
               "$ref": "#/$defs/_OAuth2Credentials"
-            },
-            {
-              "$ref": "#/$defs/AccessToken"
             }
           ],
           "title": "Authentication"
