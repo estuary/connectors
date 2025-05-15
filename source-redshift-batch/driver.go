@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -42,6 +43,11 @@ const (
 	// This timeout can be less generous, because after the first row is received we
 	// ought to be getting a consistent stream of results until the query completes.
 	pollingWatchdogTimeout = 5 * time.Minute
+
+	// The minimum time between schema discovery operations. This avoids situations
+	// where we have a ton of bindings all coming due for polling around the same
+	// time and just keep running discovery over and over.
+	minDiscoveryInterval = 5 * time.Minute
 )
 
 var (
@@ -249,6 +255,11 @@ type capture struct {
 	Bindings       []bindingInfo
 	Output         *boilerplate.PullOutput
 	TranslateValue func(val any, databaseTypeName string) (any, error)
+
+	shared struct {
+		sync.RWMutex
+		lastDiscoveryTime time.Time // The last time we ran schema discovery.
+	}
 }
 
 type bindingInfo struct {
@@ -274,6 +285,7 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	// Always discover and output SourcedSchemas once at startup.
 	if err := c.emitSourcedSchemas(ctx); err != nil {
 		return err
 	}
@@ -296,6 +308,14 @@ func (c *capture) Run(ctx context.Context) error {
 }
 
 func (c *capture) emitSourcedSchemas(ctx context.Context) error {
+	c.shared.Lock()
+	defer c.shared.Unlock()
+
+	// Skip re-running discovery and emitting schemas if we just did it.
+	if time.Since(c.shared.lastDiscoveryTime) < minDiscoveryInterval {
+		return nil
+	}
+
 	// Discover tables and emit SourcedSchema updates
 	if c.Config.Advanced.parsedFeatureFlags["emit_sourced_schemas"] {
 		var tableInfo, err = c.Driver.discoverTables(ctx, c.DB, c.Config)
@@ -351,6 +371,11 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 }
 
 func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template.Template) error {
+	// Trigger rediscovery and output new SourcedSchemas before each polling operation.
+	if err := c.emitSourcedSchemas(ctx); err != nil {
+		return err
+	}
+
 	var res = binding.resource
 	var stateKey = binding.stateKey
 	var state, ok = c.State.Streams[stateKey]
