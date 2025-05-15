@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -30,32 +31,17 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	defer db.Close()
 
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	tableInfo, err := drv.discoverTables(ctx, db, &cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error listing tables: %w", err)
-	}
-	keys, err := discoverPrimaryKeys(ctx, db)
-	if err != nil {
-		return nil, fmt.Errorf("error listing primary keys: %w", err)
-	}
-
-	// We rebuild this map even though `discoverPrimaryKeys` already built and
-	// discarded it, in order to keep the `discoverTables` / `discoverPrimaryKeys`
-	// interface as stupidly simple as possible, which ought to make it just that
-	// little bit easier to do this generically for multiple databases.
-	var keysByTable = make(map[string]*discoveredPrimaryKey)
-	for _, key := range keys {
-		keysByTable[key.Schema+"."+key.Table] = key
+		return nil, fmt.Errorf("error discovering tables: %w", err)
 	}
 
 	var bindings []*pc.Response_Discovered_Binding
-	for _, table := range tables {
+	for tableID, table := range tableInfo {
 		// Exclude tables in "system schemas" such as information_schema or pg_catalog.
 		if slices.Contains(drv.ExcludedSystemSchemas, table.Schema) {
 			continue
 		}
-
-		var tableID = table.Schema + "." + table.Name
 
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
 		var res, err = drv.GenerateResource(&cfg, recommendedName, table.Schema, table.Name, table.Type)
@@ -72,27 +58,9 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		// Start with a minimal schema and a fallback collection key, which will be
-		// replaced with more useful versions if we have sufficient information.
-		collectionSchema, err := generateCollectionSchema(&cfg, nil, nil)
+		collectionSchema, collectionKey, err := generateCollectionSchema(&cfg, table, true)
 		if err != nil {
-			return nil, fmt.Errorf("error generating minimal collection schema: %w", err)
-		}
-		var collectionKey = fallbackKey
-		if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
-			collectionKey = fallbackKeyOld
-		}
-
-		if tableKey, ok := keysByTable[tableID]; ok {
-			if generatedSchema, err := generateCollectionSchema(&cfg, tableKey.Columns, tableKey.ColumnTypes); err == nil {
-				collectionSchema = generatedSchema
-				collectionKey = nil
-				for _, colName := range tableKey.Columns {
-					collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
-				}
-			} else {
-				log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
-			}
+			return nil, fmt.Errorf("error generating %q collection schema: %w", tableID, err)
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
@@ -105,6 +73,132 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 
 	return &pc.Response_Discovered{Bindings: bindings}, nil
+}
+
+func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *client.Conn, cfg *Config) (map[string]*discoveredTable, error) {
+	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	// TODO(wgd): add when implementing full column discovery
+	// columns, err := discoverColumns(ctx, db)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("error listing columns: %w", err)
+	// }
+	keys, err := discoverPrimaryKeys(ctx, db)
+	if err != nil {
+		return nil, fmt.Errorf("error listing primary keys: %w", err)
+	}
+
+	var tableInfo = make(map[string]*discoveredTable)
+	for _, table := range tables {
+		var tableID = table.Schema + "." + table.Name
+		tableInfo[tableID] = table
+	}
+	// TODO(wgd): add when implementing full column discovery
+	//for _, column := range columns {
+	//	var tableID = column.Schema + "." + column.Table
+	//	if table, ok := tableInfo[tableID]; ok {
+	//		table.columns = append(table.columns, column)
+	//	}
+	//}
+
+	for _, key := range keys {
+		var tableID = key.Schema + "." + key.Table
+		if table, ok := tableInfo[tableID]; ok {
+			table.key = key
+		}
+	}
+	return tableInfo, nil
+}
+
+var (
+	// The fallback key of discovered collections when the source table has no primary key.
+	fallbackKey = []string{"/_meta/row_id"}
+
+	// Old captures used a different fallback key which included a value identifying
+	// the specific polling iteration which produced the document. This proved less
+	// than ideal for full-refresh bindings on keyless tables.
+	fallbackKeyOld = []string{"/_meta/polled", "/_meta/index"}
+)
+
+func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSchema bool) (json.RawMessage, []string, error) {
+	// Extract useful key and column type information
+	var keyColumns []string
+	if table.key != nil {
+		keyColumns = table.key.Columns
+	}
+	// TODO(wgd): implement full column type discovery soon
+	var columnTypes = make(map[string]*jsonschema.Schema)
+	if table.key != nil {
+		columnTypes = table.key.ColumnTypes
+	}
+
+	// Generate schema for the metadata via reflection
+	var reflector = jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
+		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
+	}
+	metadataSchema.Definitions = nil
+	if metadataSchema.Extras == nil {
+		metadataSchema.Extras = make(map[string]any)
+	}
+	if fullWriteSchema {
+		metadataSchema.AdditionalProperties = nil
+	} else {
+		metadataSchema.Extras["additionalProperties"] = false
+	}
+
+	var required = []string{"_meta"}
+	var properties = map[string]*jsonschema.Schema{
+		"_meta": metadataSchema,
+	}
+
+	// TODO(wgd): change after implementing full column discovery
+	for _, colName := range keyColumns {
+		var columnType = columnTypes[colName]
+		if columnType == nil {
+			return nil, nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
+		}
+		properties[colName] = columnType
+		required = append(required, colName)
+	}
+
+	var schema = &jsonschema.Schema{
+		Type:     "object",
+		Required: required,
+		Extras: map[string]interface{}{
+			"properties":     properties,
+			"x-infer-schema": true,
+		},
+	}
+	if !fullWriteSchema {
+		schema.Extras["additionalProperties"] = false
+	}
+
+	// Marshal schema to JSON
+	bs, err := json.Marshal(schema)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error serializing schema: %w", err)
+	}
+
+	// If the table has a primary key then convert it to a collection key, otherwise
+	// recommend an appropriate fallback collection key.
+	var collectionKey []string
+	if keyColumns != nil {
+		for _, colName := range keyColumns {
+			collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+		}
+	} else if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
+		collectionKey = fallbackKeyOld
+	} else {
+		collectionKey = fallbackKey
+	}
+	return json.RawMessage(bs), collectionKey, nil
 }
 
 // primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key
@@ -123,6 +217,9 @@ type discoveredTable struct {
 	Schema string
 	Name   string
 	Type   string // Usually 'BASE TABLE' or 'VIEW'
+
+	// columns []*discoveredColumn // TODO(wgd): add when implementing full column discovery
+	key *discoveredPrimaryKey
 }
 
 func discoverTables(ctx context.Context, db *client.Conn, discoverSchemas []string) ([]*discoveredTable, error) {
