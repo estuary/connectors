@@ -332,7 +332,11 @@ class HTTPMixin(Mixin, HTTPSession):
     token_source: TokenSource | None = None
 
     async def _mixin_enter(self, _: Logger):
-        self.inner = aiohttp.ClientSession()
+        self.inner = aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(
+                total=30 * 60,  # 30-minutes - default is 5-minutes
+            ),
+        )
         self.rate_limiter = RateLimiter()
         return self
 
