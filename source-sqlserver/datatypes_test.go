@@ -154,3 +154,47 @@ func TestOversizedFields(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestBitNotNullDeletion exercises deletions from a table with BIT NOT NULL columns, because
+// we have seen multiple cases where production captures have observed "impossible" null values
+// in deletion events containing BIT NOT NULLs. This test at least demonstrates that it isn't
+// normal or expected for that to happen.
+func TestBitNotNullDeletion(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	var uniqueID = "32831599"
+	var tableDef = "(id INTEGER PRIMARY KEY, v_a BIT, v_b BIT NOT NULL, v_c BIT NOT NULL DEFAULT 0, v_d BIT NOT NULL DEFAULT 1)"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = new(st.OrderedCaptureValidator)
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	// Backfill
+	tb.Insert(ctx, t, tableName, [][]any{
+		{100, true, true, true, true},
+		{101, false, false, false, false},
+		{102, nil, true, true, true},
+		{103, nil, false, false, false},
+	})
+	cs.Capture(ctx, t, nil)
+
+	// Replication
+	tb.Delete(ctx, t, tableName, "id", 100)
+	tb.Delete(ctx, t, tableName, "id", 101)
+	tb.Delete(ctx, t, tableName, "id", 102)
+	tb.Delete(ctx, t, tableName, "id", 103)
+	tb.Insert(ctx, t, tableName, [][]any{
+		{200, true, true, true, true},
+		{201, false, false, false, false},
+		{202, nil, true, true, true},
+		{203, nil, false, false, false},
+	})
+	tb.Delete(ctx, t, tableName, "id", 200)
+	tb.Delete(ctx, t, tableName, "id", 201)
+	tb.Delete(ctx, t, tableName, "id", 202)
+	tb.Delete(ctx, t, tableName, "id", 203)
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
