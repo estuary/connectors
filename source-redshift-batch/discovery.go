@@ -318,8 +318,9 @@ type basicColumnType struct {
 
 func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
 	var sch = &jsonschema.Schema{
-		Format: ct.format,
-		Extras: make(map[string]interface{}),
+		Format:      ct.format,
+		Extras:      make(map[string]interface{}),
+		Description: ct.description,
 	}
 
 	if ct.contentEncoding != "" {
@@ -394,10 +395,20 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 			var ok bool
 			dataType, ok = databaseTypeToJSON[typeName]
 			if !ok {
-				dataType = basicColumnType{description: fmt.Sprintf("using catch-all schema for unknown type %q", typeName)}
+				dataType = basicColumnType{description: fmt.Sprintf("using catch-all schema (unknown type %q)", typeName)}
 			}
 		}
 		dataType.nullable = isNullable
+
+		// Append source type information to the description
+		if dataType.description != "" {
+			dataType.description += " "
+		}
+		var nullabilityDescription = ""
+		if !isNullable {
+			nullabilityDescription = "non-nullable "
+		}
+		dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, typeName)
 
 		columns = append(columns, &discoveredColumn{
 			Schema:     tableSchema,
