@@ -60,27 +60,32 @@ Binding 0:
             ]
           },
           "cidr_col": {
+            "description": "(source type: cidr)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "inet_col": {
+            "description": "(source type: inet)",
             "type": [
               "string",
               "null"
             ]
           },
           "macaddr8_col": {
+            "description": "(source type: macaddr8)",
             "type": [
               "string",
               "null"
             ]
           },
           "macaddr_col": {
+            "description": "(source type: macaddr)",
             "type": [
               "string",
               "null"

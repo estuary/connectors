@@ -60,35 +60,44 @@ Binding 0:
             ]
           },
           "bigint_col": {
+            "description": "(source type: int8)",
             "type": [
               "integer",
               "null"
             ]
           },
           "bigserial_col": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int8)"
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "int_col": {
+            "description": "(source type: int4)",
             "type": [
               "integer",
               "null"
             ]
           },
-          "oid_col": {},
+          "oid_col": {
+            "description": "using catch-all schema (unknown type \"oid\") (source type: oid)"
+          },
           "serial_col": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "smallint_col": {
+            "description": "(source type: int2)",
             "type": [
               "integer",
               "null"
             ]
           },
           "smallserial_col": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int2)"
           }
         },
         "x-infer-schema": true

@@ -60,9 +60,11 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "xml_col": {
+            "description": "(source type: xml)",
             "type": [
               "string",
               "null"

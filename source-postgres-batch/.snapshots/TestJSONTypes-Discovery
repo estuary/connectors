@@ -60,11 +60,17 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
-          "json_col": {},
-          "jsonb_col": {},
+          "json_col": {
+            "description": "(source type: json)"
+          },
+          "jsonb_col": {
+            "description": "(source type: jsonb)"
+          },
           "jsonpath_col": {
+            "description": "(source type: jsonpath)",
             "type": [
               "string",
               "null"

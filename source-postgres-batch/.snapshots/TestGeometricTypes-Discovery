@@ -60,45 +60,53 @@ Binding 0:
             ]
           },
           "box_col": {
+            "description": "(source type: box)",
             "type": [
               "string",
               "null"
             ]
           },
           "circle_col": {
+            "description": "(source type: circle)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           },
           "line_col": {
+            "description": "(source type: line)",
             "type": [
               "string",
               "null"
             ]
           },
           "lseg_col": {
+            "description": "(source type: lseg)",
             "type": [
               "string",
               "null"
             ]
           },
           "path_col": {
+            "description": "(source type: path)",
             "type": [
               "string",
               "null"
             ]
           },
           "point_col": {
+            "description": "(source type: point)",
             "type": [
               "string",
               "null"
             ]
           },
           "polygon_col": {
+            "description": "(source type: polygon)",
             "type": [
               "string",
               "null"
