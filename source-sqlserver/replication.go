@@ -140,6 +140,7 @@ type sqlserverReplicationStream struct {
 
 type tableReplicationInfo struct {
 	KeyColumns      []string
+	Columns         map[string]sqlcapture.ColumnInfo
 	ColumnTypes     map[string]any
 	ComputedColumns []string // List of the names of computed columns in this table, in no particular order.
 }
@@ -186,6 +187,7 @@ func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamI
 	rs.tables.Lock()
 	rs.tables.info[streamID] = &tableReplicationInfo{
 		KeyColumns:      keyColumns,
+		Columns:         discovery.Columns,
 		ColumnTypes:     columnTypes,
 		ComputedColumns: computedColumns,
 	}
@@ -848,6 +850,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 			TableName:       instance.TableName,
 			InstanceName:    instance.Name,
 			KeyColumns:      info.KeyColumns,
+			Columns:         info.Columns,
 			ColumnTypes:     info.ColumnTypes,
 			ComputedColumns: info.ComputedColumns,
 			FromLSN:         rs.fromLSN,
@@ -1076,6 +1079,7 @@ type tablePollInfo struct {
 	TableName       string
 	InstanceName    string
 	KeyColumns      []string
+	Columns         map[string]sqlcapture.ColumnInfo
 	ColumnTypes     map[string]any
 	ComputedColumns []string // List of the names of computed columns in this table, in no particular order.
 	FromLSN         LSN
@@ -1188,22 +1192,29 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		case sqlcapture.InsertOp, sqlcapture.UpdateOp:
 			after = fields
 		case sqlcapture.DeleteOp:
-			// According to https://learn.microsoft.com/en-us/sql/relational-databases/system-tables/cdc-capture-instance-ct-transact-sql#large-object-data-types
-			//
-			//     Columns of data type image, text, and ntext are always assigned a NULL value when __$operation = 1 or __$operation = 3.
-			//
-			// If we didn't do anything here, these nulls would be emitted as explicitly null properties, which
-			// for a non-nullable column would produce an invalid JSON document. Since we can't tell whether a
-			// null value of a text/image/ntext column here is real or just omitted, the only reasonable fix is
-			// to always omit null values of these column types when capturing a deletion.
-			//
-			// As an added safety check we also make sure this logic doesn't apply to key columns.
+			// Sometimes SQL Server column nullability is screwy for deletions. In generaly we should get values
+			// for all columns on deletes, with a few exceptions. Since SQL Server CDC stores change events in a
+			// table, missing values are represented as nulls in the change table, and since the corresponding
+			// source table might have a non-nullable column type we need to ensure that we don't emit those as
+			// a literal null value which would fail validation.
 			for colName, val := range fields {
+				// As an added safety check we also make sure this logic doesn't apply to key columns.
 				if val == nil && !slices.Contains(info.KeyColumns, colName) {
-					if colType, ok := info.ColumnTypes[colName]; ok {
-						if textType, ok := colType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
+					if colInfo, ok := info.Columns[colName]; ok {
+						if textType, ok := colInfo.DataType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
+							// According to MS documentation, text and ntext columns are always omitted (null) in delete events.
 							delete(fields, colName)
-						} else if colType == "image" {
+						} else if colInfo.DataType == "image" {
+							// According to MS documentation, image columns are always omitted (null) in delete events.
+							delete(fields, colName)
+						} else if !colInfo.IsNullable {
+							// Sometimes, in direct violation of the documented behavior, we have seen null values on
+							// other columns which should definitely be non-nullable. For some reason it seems to mostly
+							// happen on a specific BIT NOT NULL column of tables with multiple, and we suspect this is
+							// a SQL Server bug (possibly related to how bit fields are packed in WAL events?)
+							//
+							// Regardless of the reasons, this is a catch-all case which should protect us from emitting
+							// null values for non-nullable source columns if it happens again.
 							delete(fields, colName)
 						}
 					}
