@@ -16,7 +16,6 @@ on:
       - "source-notion/**"
       - "source-linkedin-pages/**"
       - "source-linkedin-ads-v2/**"
-      - "source-oracle-flashback/**"
       - "source-klaviyo/**"
       - "source-recharge/**"
       - "source-stripe-native/**"
@@ -56,7 +55,6 @@ on:
       - "source-notion/**"
       - "source-linkedin-pages/**"
       - "source-linkedin-ads-v2/**"
-      - "source-oracle-flashback/**"
       - "source-recharge/**"
       - "source-klaviyo/**"
       - "source-recharge/**"
@@ -132,10 +130,6 @@ jobs:
           - name: source-notion
             type: capture
             version: v2
-            usage_rate: "1.0"
-          - name: source-oracle-flashback
-            type: capture
-            version: v1
             usage_rate: "1.0"
           - name: source-linkedin-pages
             type: capture
