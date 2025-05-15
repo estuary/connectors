@@ -46,9 +46,11 @@ func (m timestampTypeMapping) valid() bool {
 	return m == timestampNTZ || m == timestampLTZ || m == timestampTZ
 }
 
-// VARCHAR also being compatible with "text" is a compatibility for Snowflake's
-// behavior change 2025_03/bcr-1960, which changes the DATA_TYPE of
-// INFORMATION_SCHEMA.COLUMNS from TEXT to VARCHAR for all string columns.
+// TODO(whb): VARCHAR also being compatible with "text" is a compatibility for
+// Snowflake's behavior change 2025_03/bcr-1960, which changes the DATA_TYPE of
+// INFORMATION_SCHEMA.COLUMNS from TEXT to VARCHAR for all string columns. We
+// can remove the "text" compatibility once this behavior change is enabled for
+// all accounts.
 var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{

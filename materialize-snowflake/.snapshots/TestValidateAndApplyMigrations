@@ -31,15 +31,15 @@ Migratable Changes Before Apply Schema:
 {"Name":"INT64TONUMBER","Nullable":"YES","Type":"NUMBER"}
 {"Name":"INTTONUMBER","Nullable":"YES","Type":"NUMBER"}
 {"Name":"INTWIDENEDTOJSON","Nullable":"YES","Type":"NUMBER"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
+{"Name":"KEY","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"MULTIPLE","Nullable":"YES","Type":"VARIANT"}
 {"Name":"NONSCALARVALUE","Nullable":"YES","Type":"VARIANT"}
 {"Name":"NUMERICSTRING","Nullable":"YES","Type":"NUMBER"}
 {"Name":"OPTIONAL","Nullable":"YES","Type":"VARIANT"}
 {"Name":"REQUIREDNUMERIC","Nullable":"NO","Type":"NUMBER"}
-{"Name":"SCALARVALUE","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGWIDENEDTOJSON","Nullable":"YES","Type":"TEXT"}
-{"Name":"TIMEVALUE","Nullable":"YES","Type":"TEXT"}
+{"Name":"SCALARVALUE","Nullable":"NO","Type":"VARCHAR"}
+{"Name":"STRINGWIDENEDTOJSON","Nullable":"YES","Type":"VARCHAR"}
+{"Name":"TIMEVALUE","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
 
 
@@ -72,23 +72,23 @@ Migratable Changes Constraints:
 
 Migratable Changes Applied Schema:
 {"Name":"BOOLWIDENEDTOJSON","Nullable":"YES","Type":"VARIANT"}
-{"Name":"DATETIMEVALUE","Nullable":"YES","Type":"TEXT"}
-{"Name":"DATEVALUE","Nullable":"YES","Type":"TEXT"}
+{"Name":"DATETIMEVALUE","Nullable":"YES","Type":"VARCHAR"}
+{"Name":"DATEVALUE","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
 {"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
 {"Name":"INT64","Nullable":"YES","Type":"NUMBER"}
 {"Name":"INT64TONUMBER","Nullable":"YES","Type":"FLOAT"}
 {"Name":"INTTONUMBER","Nullable":"YES","Type":"FLOAT"}
 {"Name":"INTWIDENEDTOJSON","Nullable":"YES","Type":"VARIANT"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
+{"Name":"KEY","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"MULTIPLE","Nullable":"YES","Type":"VARIANT"}
 {"Name":"NONSCALARVALUE","Nullable":"YES","Type":"VARIANT"}
-{"Name":"NUMERICSTRING","Nullable":"YES","Type":"TEXT"}
+{"Name":"NUMERICSTRING","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"OPTIONAL","Nullable":"YES","Type":"VARIANT"}
-{"Name":"REQUIREDNUMERIC","Nullable":"NO","Type":"TEXT"}
-{"Name":"SCALARVALUE","Nullable":"NO","Type":"TEXT"}
+{"Name":"REQUIREDNUMERIC","Nullable":"NO","Type":"VARCHAR"}
+{"Name":"SCALARVALUE","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"STRINGWIDENEDTOJSON","Nullable":"YES","Type":"VARIANT"}
-{"Name":"TIMEVALUE","Nullable":"YES","Type":"TEXT"}
+{"Name":"TIMEVALUE","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
 
 
