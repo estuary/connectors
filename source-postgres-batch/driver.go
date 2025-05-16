@@ -392,6 +392,10 @@ func (c *capture) Run(ctx context.Context) error {
 }
 
 func (c *capture) emitSourcedSchemas(ctx context.Context) error {
+	if !c.Config.Advanced.parsedFeatureFlags["emit_sourced_schemas"] {
+		return nil
+	}
+
 	c.shared.Lock()
 	defer c.shared.Unlock()
 
@@ -401,25 +405,23 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 	}
 
 	// Discover tables and emit SourcedSchema updates
-	if c.Config.Advanced.parsedFeatureFlags["emit_sourced_schemas"] {
-		var tableInfo, err = c.Driver.discoverTables(ctx, c.DB, c.Config)
-		if err != nil {
-			return fmt.Errorf("error discovering tables: %w", err)
+	var tableInfo, err = c.Driver.discoverTables(ctx, c.DB, c.Config)
+	if err != nil {
+		return fmt.Errorf("error discovering tables: %w", err)
+	}
+	for _, binding := range c.Bindings {
+		if binding.resource.SchemaName == "" || binding.resource.TableName == "" || binding.resource.Template != "" {
+			continue // Skip bindings with no schema/table or a custom query because we can't know what their schema will look like just from discovery info
 		}
-		for _, binding := range c.Bindings {
-			if binding.resource.SchemaName == "" || binding.resource.TableName == "" || binding.resource.Template != "" {
-				continue // Skip bindings with no schema/table or a custom query because we can't know what their schema will look like just from discovery info
-			}
-			var tableID = binding.resource.SchemaName + "." + binding.resource.TableName
-			var table, ok = tableInfo[tableID]
-			if !ok {
-				continue // Skip bindings for which we don't have any corresponding discovery information
-			}
-			if schema, _, err := generateCollectionSchema(c.Config, table, false); err != nil {
-				return fmt.Errorf("error generating schema for table %q: %w", tableID, err)
-			} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {
-				return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
-			}
+		var tableID = binding.resource.SchemaName + "." + binding.resource.TableName
+		var table, ok = tableInfo[tableID]
+		if !ok {
+			continue // Skip bindings for which we don't have any corresponding discovery information
+		}
+		if schema, _, err := generateCollectionSchema(c.Config, table, false); err != nil {
+			return fmt.Errorf("error generating schema for table %q: %w", tableID, err)
+		} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {
+			return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
 		}
 	}
 	return nil
