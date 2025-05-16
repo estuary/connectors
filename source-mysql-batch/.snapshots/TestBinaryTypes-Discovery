@@ -59,8 +59,51 @@ Binding 0:
               "row_id"
             ]
           },
+          "binary_col": {
+            "description": "(source type: binary)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blob_col": {
+            "description": "(source type: blob)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "longblob_col": {
+            "description": "(source type: longblob)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mediumblob_col": {
+            "description": "(source type: mediumblob)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tinyblob_col": {
+            "description": "(source type: tinyblob)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varbinary_col": {
+            "description": "(source type: varbinary)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
