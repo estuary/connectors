@@ -854,9 +854,20 @@ func (s StreamID) String() string {
 	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
 }
 
+// This is a temporary hack to allow us to plumb through a feature flag setting for
+// the gradual rollout of the "no longer lowercase stream IDs" behavior. This will
+// eventually be the standard for all connectors if we can do it without breaking
+// anything, but for now we want to be cautious and make it an opt-in.
+//
+// In an abstract sense we shouldn't be using a global variable for this, but as a
+// practical matter there's only ever one capture running at a time so this is fine.
+var LowercaseStreamIDs = true
+
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
 func JoinStreamID(namespace, stream string) StreamID {
-	namespace = strings.ToLower(namespace)
-	stream = strings.ToLower(stream)
+	if LowercaseStreamIDs {
+		namespace = strings.ToLower(namespace)
+		stream = strings.ToLower(stream)
+	}
 	return StreamID{Schema: namespace, Table: stream}
 }
