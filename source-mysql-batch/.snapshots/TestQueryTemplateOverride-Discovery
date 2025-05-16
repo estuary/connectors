@@ -58,8 +58,23 @@ Binding 0:
               "row_id"
             ]
           },
+          "data": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "updated_at": {
+            "description": "(source type: timestamp)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

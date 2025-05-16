@@ -59,8 +59,45 @@ Binding 0:
               "row_id"
             ]
           },
+          "bit_col": {
+            "description": "(source type: bit)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "boolean_col": {
+            "description": "(source type: tinyint)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "decimal_col": {
+            "format": "number",
+            "description": "(source type: decimal)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "double_col": {
+            "description": "(source type: double)",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "float_col": {
+            "description": "(source type: float)",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           }
         },
         "x-infer-schema": true

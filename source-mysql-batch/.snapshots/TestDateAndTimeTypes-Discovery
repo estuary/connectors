@@ -59,8 +59,45 @@ Binding 0:
               "row_id"
             ]
           },
+          "date_col": {
+            "format": "date",
+            "description": "(source type: date)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datetime_col": {
+            "description": "(source type: datetime)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "time_col": {
+            "description": "(source type: time)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timestamp_col": {
+            "description": "(source type: timestamp)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "year_col": {
+            "description": "(source type: year)",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

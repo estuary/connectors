@@ -59,8 +59,51 @@ Binding 0:
               "row_id"
             ]
           },
+          "char_col": {
+            "description": "(source type: char)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "longtext_col": {
+            "description": "(source type: longtext)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mediumtext_col": {
+            "description": "(source type: mediumtext)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text_col": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tinytext_col": {
+            "description": "(source type: tinytext)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_col": {
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

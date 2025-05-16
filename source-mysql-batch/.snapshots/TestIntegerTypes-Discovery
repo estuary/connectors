@@ -59,8 +59,44 @@ Binding 0:
               "row_id"
             ]
           },
+          "bigint_col": {
+            "description": "(source type: bigint)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "integer_col": {
+            "description": "(source type: int)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "mediumint_col": {
+            "description": "(source type: mediumint)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "smallint_col": {
+            "description": "(source type: smallint)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "tinyint_col": {
+            "description": "(source type: tinyint)",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
