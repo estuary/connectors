@@ -197,10 +197,10 @@ func quoteColumnName(name string) string {
 	return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 }
 
-func (db *mysqlDatabase) explainQuery(streamID, query string, args []interface{}) {
+func (db *mysqlDatabase) explainQuery(streamID sqlcapture.StreamID, query string, args []interface{}) {
 	// Only EXPLAIN the backfill query once per connector invocation
 	if db.explained == nil {
-		db.explained = make(map[string]struct{})
+		db.explained = make(map[sqlcapture.StreamID]struct{})
 	}
 	if _, ok := db.explained[streamID]; ok {
 		return

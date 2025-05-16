@@ -52,7 +52,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 			// also probably don't warrant a fatal error.
 			logrus.WithError(err).Warn("unable to list database generated columns")
 		}
-		generatedColumns = make(map[string][]string) // Empty map makes downstream logic simpler
+		generatedColumns = make(map[sqlcapture.StreamID][]string) // Empty map makes downstream logic simpler
 	}
 
 	// Column descriptions just add a bit of user-friendliness. They're so unimportant
@@ -65,7 +65,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 	// Aggregate column and primary key information into DiscoveryInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
 	// the corresponding DiscoveryInfo.
-	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
 		if streamID == db.WatermarksTable() {
@@ -600,9 +600,9 @@ const queryDiscoverPrimaryKeys = `
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[string][]string, error) {
+func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[sqlcapture.StreamID][]string, error) {
 	logrus.Debug("listing all primary-key columns in the database")
-	var keys = make(map[string][]string)
+	var keys = make(map[sqlcapture.StreamID][]string)
 	var rows, err = conn.Query(ctx, queryDiscoverPrimaryKeys)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
@@ -645,11 +645,11 @@ WHERE r.column_number = (r.index_keys).x
 ORDER BY r.table_schema, r.table_name, r.index_name, (r.index_keys).n
 `
 
-func getSecondaryIndexes(ctx context.Context, conn *pgx.Conn) (map[string]map[string][]string, error) {
+func getSecondaryIndexes(ctx context.Context, conn *pgx.Conn) (map[sqlcapture.StreamID]map[string][]string, error) {
 	logrus.Debug("listing secondary indexes")
 	// Run the 'list secondary indexes' query and aggregate results into
 	// a `map[StreamID]map[IndexName][]ColumnName`
-	var streamIndexColumns = make(map[string]map[string][]string)
+	var streamIndexColumns = make(map[sqlcapture.StreamID]map[string][]string)
 	var rows, err = conn.Query(ctx, queryDiscoverSecondaryIndices)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)

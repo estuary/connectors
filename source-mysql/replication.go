@@ -139,11 +139,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		startPosition: pos,
 		fencePosition: pos,
 	}
-	stream.tables.active = make(map[string]struct{})
-	stream.tables.discovery = make(map[string]sqlcapture.DiscoveryInfo)
-	stream.tables.metadata = make(map[string]*mysqlTableMetadata)
-	stream.tables.keyColumns = make(map[string][]string)
-	stream.tables.nonTransactional = make(map[string]bool)
+	stream.tables.active = make(map[sqlcapture.StreamID]struct{})
+	stream.tables.discovery = make(map[sqlcapture.StreamID]sqlcapture.DiscoveryInfo)
+	stream.tables.metadata = make(map[sqlcapture.StreamID]*mysqlTableMetadata)
+	stream.tables.keyColumns = make(map[sqlcapture.StreamID][]string)
+	stream.tables.nonTransactional = make(map[sqlcapture.StreamID]bool)
 	return stream, nil
 }
 
@@ -649,7 +649,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 // decodeRow takes a list of column names, a parallel list of column values, and a list of indices
 // of columns which should be omitted from the decoded row state, and returns a map from colum names
 // to the corresponding values.
-func decodeRow(streamID string, colNames []string, row []any, skips []int) (map[string]any, error) {
+func decodeRow(streamID sqlcapture.StreamID, colNames []string, row []any, skips []int) (map[string]any, error) {
 	// If we have more or fewer values than expected, something has gone wrong
 	// with our metadata tracking and it's best to die immediately. The fix in
 	// this case is almost always going to be deleting and recreating the
@@ -816,7 +816,7 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 	return nil
 }
 
-func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sqlparser.AlterTable, query string, streamID string) error {
+func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sqlparser.AlterTable, query string, streamID sqlcapture.StreamID) error {
 	// This lock and assignment to `meta` isn't actually needed unless we are able to handle the
 	// alteration. But if we can't handle the alteration the connector is probably going to crash,
 	// so any performance implication is negligible at that point and it makes things a little
@@ -1013,7 +1013,7 @@ func unquoteEnumValues(values []string) []string {
 	return unquoted
 }
 
-func resolveTableName(defaultSchema string, name sqlparser.TableName) string {
+func resolveTableName(defaultSchema string, name sqlparser.TableName) sqlcapture.StreamID {
 	var schema, table = name.Qualifier.String(), name.Name.String()
 	if schema == "" {
 		schema = defaultSchema
@@ -1021,14 +1021,14 @@ func resolveTableName(defaultSchema string, name sqlparser.TableName) string {
 	return sqlcapture.JoinStreamID(schema, table)
 }
 
-func (rs *mysqlReplicationStream) tableMetadata(streamID string) (*mysqlTableMetadata, bool) {
+func (rs *mysqlReplicationStream) tableMetadata(streamID sqlcapture.StreamID) (*mysqlTableMetadata, bool) {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
 	var meta, ok = rs.tables.metadata[streamID]
 	return meta, ok
 }
 
-func (rs *mysqlReplicationStream) tableActive(streamID string) bool {
+func (rs *mysqlReplicationStream) tableActive(streamID sqlcapture.StreamID) bool {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
 	var _, ok = rs.tables.active[streamID]
@@ -1039,8 +1039,7 @@ func (rs *mysqlReplicationStream) schemaActive(schema string) bool {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
 	for streamID := range rs.tables.active {
-		var schemaName, _ = splitStreamID(streamID)
-		if strings.EqualFold(schemaName, schema) {
+		if strings.EqualFold(streamID.Schema, schema) {
 			return true
 		}
 	}
@@ -1051,7 +1050,7 @@ func (rs *mysqlReplicationStream) schemaActive(schema string) bool {
 // uses a storage engine such as MyISAM which doesn't support transactions.
 // Changes to non-transactional tables are never followed by a commit event,
 // so we have to take care of that for ourselves.
-func (rs *mysqlReplicationStream) isNonTransactional(streamID string) bool {
+func (rs *mysqlReplicationStream) isNonTransactional(streamID sqlcapture.StreamID) bool {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
 	return rs.tables.nonTransactional[streamID]
@@ -1066,14 +1065,14 @@ func splitStreamID(streamID string) (string, string) {
 	return bits[0], bits[1]
 }
 
-func (rs *mysqlReplicationStream) keyColumns(streamID string) ([]string, bool) {
+func (rs *mysqlReplicationStream) keyColumns(streamID sqlcapture.StreamID) ([]string, bool) {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
 	var keyColumns, ok = rs.tables.keyColumns[streamID]
 	return keyColumns, ok
 }
 
-func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sqlcapture.StreamID, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
 
@@ -1169,7 +1168,7 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID st
 	return nil
 }
 
-func (rs *mysqlReplicationStream) deactivateTable(streamID string) error {
+func (rs *mysqlReplicationStream) deactivateTable(streamID sqlcapture.StreamID) error {
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
 
