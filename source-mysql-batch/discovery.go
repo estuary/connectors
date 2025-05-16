@@ -154,11 +154,7 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	var properties = map[string]*jsonschema.Schema{
 		"_meta": metadataSchema,
 	}
-	for _, colName := range keyColumns { // TODO(wgd): iterate over columnTypes to get full column discovery
-		var colType = columnTypes[colName]
-		if colType == nil {
-			return nil, nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
-		}
+	for colName, colType := range columnTypes {
 		var colSchema = colType.JSONSchema()
 		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !fullWriteSchema {
 			// Remove null as an option when there are multiple type options and we don't want nullability
@@ -323,15 +319,14 @@ func discoverColumns(ctx context.Context, db *client.Conn) ([]*discoveredColumn,
 		dataType.nullable = isNullable
 
 		// Append source type information to the description
-		// TODO(wgd): Enable source type descriptions
-		// if dataType.description != "" {
-		// 	dataType.description += " "
-		// }
-		// var nullabilityDescription = ""
-		// if !isNullable {
-		// 	nullabilityDescription = "non-nullable "
-		// }
-		// dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, typeName)
+		if dataType.description != "" {
+			dataType.description += " "
+		}
+		var nullabilityDescription = ""
+		if !isNullable {
+			nullabilityDescription = "non-nullable "
+		}
+		dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, typeName)
 
 		var column = &discoveredColumn{
 			Schema:     tableSchema,

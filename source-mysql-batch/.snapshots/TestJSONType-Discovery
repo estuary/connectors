@@ -60,7 +60,11 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "json_col": {
+            "description": "(source type: json)"
           }
         },
         "x-infer-schema": true
