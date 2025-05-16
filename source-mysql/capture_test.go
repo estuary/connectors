@@ -619,6 +619,8 @@ func TestTableNamesIdenticalUnderCapitalization(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableB))
 	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data TEXT NOT NULL)", tableA))
 	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, x INTEGER, y INTEGER)", tableB))
+	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableA)) })
+	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableB)) })
 
 	var cs = tb.CaptureSpec(ctx, t)
 	cs.EndpointSpec.(*Config).Advanced.FeatureFlags = "case_sensitive_table_names"
