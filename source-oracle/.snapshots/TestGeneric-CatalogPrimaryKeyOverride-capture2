@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t83617880": 3 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T83617880": 3 Documents
 # ================================
 {"FULLNAME":"No Such State","POPULATION":"1234","STATE":"XX","YEAR":"1930","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T83617880","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"FULLNAME":"No Such State","POPULATION":"12345","STATE":"XX","YEAR":"1970","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T83617880","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}

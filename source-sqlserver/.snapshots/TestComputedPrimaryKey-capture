@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_computedprimarykey_10118243": 6 Documents
+# Collection "acmeCo/test/dbo/test_ComputedPrimaryKey_10118243": 6 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ComputedPrimaryKey_10118243","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"actual_id":0,"data":"zero"}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ComputedPrimaryKey_10118243","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"actual_id":1,"data":"one"}

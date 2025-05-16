@@ -423,5 +423,5 @@ func recommendedCatalogName(schema, table string) string {
 	} else {
 		catalogName = schema + "_" + table
 	}
-	return catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(catalogName), "_")
+	return catalogNameSanitizerRe.ReplaceAllString(catalogName, "_")
 }

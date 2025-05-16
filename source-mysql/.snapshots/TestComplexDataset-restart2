@@ -2,7 +2,7 @@
 ### Capture from Key "Fge8AU5IAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 16 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 16 Documents
 # ================================
 {"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset_56015963","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"fullname":"No Such State","population":1234,"state":"XX","year":1930}
 {"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"ComplexDataset_56015963","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"fullname":"No Such State","population":12345,"state":"XX","year":1970}
@@ -30,7 +30,7 @@
 ### Capture from Key "Fge8AVNDAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:240"}},"fullname":"South Dakota","population":690851,"state":"SD","year":1980}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:241"}},"fullname":"Tennessee","population":4600252,"state":"TN","year":1980}
@@ -52,7 +52,7 @@
 ### Capture from Key "Fge8AVdZAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:250"}},"fullname":"No Such State","population":123456,"state":"XX","year":1990}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:251"}},"fullname":"Alaska","population":627963,"state":"AK","year":2000}
@@ -74,7 +74,7 @@
 ### Capture from Key "FgfQAURFAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:260"}},"fullname":"Florida","population":16047515,"state":"FL","year":2000}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:261"}},"fullname":"Georgia","population":8227303,"state":"GA","year":2000}
@@ -96,7 +96,7 @@
 ### Capture from Key "FgfQAUxBAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:270"}},"fullname":"Massachusetts","population":6361104,"state":"MA","year":2000}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:271"}},"fullname":"Maryland","population":5311034,"state":"MD","year":2000}
@@ -118,7 +118,7 @@
 ### Capture from Key "FgfQAU5EAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:280"}},"fullname":"Nebraska","population":1713820,"state":"NE","year":2000}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:281"}},"fullname":"New Hampshire","population":1239882,"state":"NH","year":2000}
@@ -140,7 +140,7 @@
 ### Capture from Key "FgfQAVBBAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:290"}},"fullname":"Rhode Island","population":1050268,"state":"RI","year":2000}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:291"}},"fullname":"South Carolina","population":4024223,"state":"SC","year":2000}
@@ -162,7 +162,7 @@
 ### Capture from Key "FgfQAVdJAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:300"}},"fullname":"West Virginia","population":1807021,"state":"WV","year":2000}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:301"}},"fullname":"Wyoming","population":494300,"state":"WY","year":2000}
@@ -184,7 +184,7 @@
 ### Capture from Key "FgfkAURDAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:310"}},"fullname":"Delaware","population":986809,"state":"DE","year":2020}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:311"}},"fullname":"Florida","population":21733312,"state":"FL","year":2020}
@@ -206,7 +206,7 @@
 ### Capture from Key "FgfkAUtZAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:320"}},"fullname":"Louisiana","population":4645318,"state":"LA","year":2020}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:321"}},"fullname":"Massachusetts","population":6893574,"state":"MA","year":2020}
@@ -228,7 +228,7 @@
 ### Capture from Key "FgfkAU5DAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:330"}},"fullname":"North Dakota","population":765309,"state":"ND","year":2020}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:331"}},"fullname":"Nebraska","population":1937552,"state":"NE","year":2020}
@@ -250,7 +250,7 @@
 ### Capture from Key "FgfkAU9SAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 10 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:340"}},"fullname":"Pennsylvania","population":12783254,"state":"PA","year":2020}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:341"}},"fullname":"Rhode Island","population":1057125,"state":"RI","year":2020}
@@ -272,7 +272,7 @@
 ### Capture from Key "FgfkAVdBAA=="
 ####################################
 # ================================
-# Collection "acmeCo/test/test/complexdataset_56015963": 3 Documents
+# Collection "acmeCo/test/test/ComplexDataset_56015963": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:350"}},"fullname":"Wisconsin","population":5832655,"state":"WI","year":2020}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"ComplexDataset_56015963","cursor":"backfill:351"}},"fullname":"West Virginia","population":1784787,"state":"WV","year":2020}

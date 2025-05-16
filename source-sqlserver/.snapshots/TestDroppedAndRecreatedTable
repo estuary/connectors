@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_droppedandrecreatedtable_37815596": 15 Documents
+# Collection "acmeCo/test/dbo/test_DroppedAndRecreatedTable_37815596": 15 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_DroppedAndRecreatedTable_37815596","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_DroppedAndRecreatedTable_37815596","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}

@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t91511186": 500 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T91511186": 500 Documents
 # ================================
 {"DATA":"Row Number 0","ID":"0","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T91511186","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"Row Number 1","ID":"1","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T91511186","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}

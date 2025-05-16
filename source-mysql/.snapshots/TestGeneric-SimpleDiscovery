@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/generic_simplediscovery_49210954",
+    "recommended_name": "test/Generic_SimpleDiscovery_49210954",
     "resource_config_json": {
       "namespace": "test",
       "stream": "Generic_SimpleDiscovery_49210954"

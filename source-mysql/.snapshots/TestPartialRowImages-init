@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/partialrowimages_16824726": 3 Documents
+# Collection "acmeCo/test/test/PartialRowImages_16824726": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PartialRowImages_16824726","cursor":"backfill:0"}},"a":0,"b":0,"c":0,"id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PartialRowImages_16824726","cursor":"backfill:1"}},"a":1,"b":1,"c":1,"id":1}

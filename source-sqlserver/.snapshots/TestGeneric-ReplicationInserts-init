@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_generic_replicationinserts_58418982": 5 Documents
+# Collection "acmeCo/test/dbo/test_Generic_ReplicationInserts_58418982": 5 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationInserts_58418982","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"A","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_ReplicationInserts_58418982","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"bbb","id":1}

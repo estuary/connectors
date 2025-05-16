@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_textcollation_89620867": 4 Documents
+# Collection "acmeCo/test/dbo/test_TextCollation_89620867": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation_89620867","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"3","id":"-J C"}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_TextCollation_89620867","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"1","id":"AAA"}

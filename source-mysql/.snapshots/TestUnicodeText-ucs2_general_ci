@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/unicodetext_ucs2_general_ci_78412948_04": 18 Documents
+# Collection "acmeCo/test/test/UnicodeText_ucs2_general_ci_78412948_04": 18 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_ucs2_general_ci_78412948_04","cursor":"backfill:0"}},"data":"Sphinx of black quartz, judge my vow","id":100}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"UnicodeText_ucs2_general_ci_78412948_04","cursor":"backfill:1"}},"data":"Le cœur déçu mais l'âme plutôt naïve","id":101}

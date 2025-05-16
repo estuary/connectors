@@ -171,7 +171,6 @@ func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[
 	return json.RawMessage(bs), nil
 }
 
-
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
 	resourceSchema, err := schemagen.GenerateSchema("Batch SQL Resource Spec", &Resource{}).MarshalJSON()
@@ -418,7 +417,7 @@ func recommendedCatalogName(schema, table string) string {
 	} else {
 		catalogName = schema + "_" + table
 	}
-	return catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(catalogName), "_")
+	return catalogNameSanitizerRe.ReplaceAllString(catalogName, "_")
 }
 
 // Validate checks that the configuration appears correct and that we can connect

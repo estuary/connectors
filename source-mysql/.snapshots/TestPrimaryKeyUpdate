@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/primarykeyupdate_63510878": 10 Documents
+# Collection "acmeCo/test/test/PrimaryKeyUpdate_63510878": 10 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PrimaryKeyUpdate_63510878","cursor":"backfill:0"}},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"PrimaryKeyUpdate_63510878","cursor":"backfill:1"}},"data":"one","id":1}

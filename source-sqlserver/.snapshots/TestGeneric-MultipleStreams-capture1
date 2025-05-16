@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_generic_multiplestreams_14930049": 3 Documents
+# Collection "acmeCo/test/dbo/test_Generic_MultipleStreams_14930049": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_14930049","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
 {"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_Generic_MultipleStreams_14930049","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}

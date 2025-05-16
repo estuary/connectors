@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "dbo/test_varcharkeydiscovery_42325208",
+    "recommended_name": "dbo/test_VarcharKeyDiscovery_42325208",
     "resource_config_json": {
       "namespace": "dbo",
       "stream": "test_VarcharKeyDiscovery_42325208"

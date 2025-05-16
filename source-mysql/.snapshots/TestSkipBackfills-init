@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/skipbackfills_20812231": 3 Documents
+# Collection "acmeCo/test/test/SkipBackfills_20812231": 3 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_20812231","cursor":"backfill:0"}},"data":"four","id":4}
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SkipBackfills_20812231","cursor":"backfill:1"}},"data":"five","id":5}

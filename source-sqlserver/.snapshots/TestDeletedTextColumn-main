@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/dbo/test_deletedtextcolumn_41823101": 4 Documents
+# Collection "acmeCo/test/dbo/test_DeletedTextColumn_41823101": 4 Documents
 # ================================
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_DeletedTextColumn_41823101","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Dw=="}},"id":2,"v_int":102,"v_text":"two","v_varchar":"two"}
 {"_meta":{"op":"c","source":{"schema":"dbo","table":"test_DeletedTextColumn_41823101","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Dw=="}},"id":3,"v_int":103,"v_text":"three","v_varchar":"three"}

@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test/partialrowimages_16824726": 1 Documents
+# Collection "acmeCo/test/test/PartialRowImages_16824726": 1 Documents
 # ================================
 {"_meta":{"op":"d","source":{"ts_ms":1111111111111,"schema":"test","table":"PartialRowImages_16824726","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":2}
 # ================================

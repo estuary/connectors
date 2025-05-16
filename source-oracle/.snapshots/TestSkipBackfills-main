@@ -1,17 +1,17 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t18110541": 3 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T18110541": 3 Documents
 # ================================
 {"DATA":"eleven","ID":"11","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"ten","ID":"10","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"twelve","ID":"12","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t24310805": 3 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T24310805": 3 Documents
 # ================================
 {"DATA":"fifteen","ID":"15","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T24310805","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"fourteen","ID":"14","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T24310805","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"thirteen","ID":"13","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T24310805","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t38410024": 3 Documents
+# Collection "acmeCo/test/C__FLOW_TEST_LOGMINER/T38410024": 3 Documents
 # ================================
 {"DATA":"eighteen","ID":"18","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T38410024","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"DATA":"seventeen","ID":"17","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T38410024","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}

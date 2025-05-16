@@ -1,6 +1,6 @@
 Binding 0:
 {
-    "recommended_name": "test/emptyblobs_11214558",
+    "recommended_name": "test/EmptyBlobs_11214558",
     "resource_config_json": {
       "namespace": "test",
       "stream": "EmptyBlobs_11214558"
