@@ -14,10 +14,11 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // Discover enumerates tables and views from `information_schema.tables` and generates
-// placeholder capture queries for thos tables.
+// placeholder capture queries for those tables.
 func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
 	var cfg Config
 	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
@@ -36,6 +37,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		return nil, fmt.Errorf("error discovering tables: %w", err)
 	}
 
+	// Generate discovery resource and collection schema for this table
 	var bindings []*pc.Response_Discovered_Binding
 	for tableID, table := range tableInfo {
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
@@ -53,15 +55,17 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		collectionSchema, collectionKey, err := generateCollectionSchema(&cfg, table, true)
+		// Generate a collection schema from the column types and key column names of this table.
+		generatedSchema, collectionKey, err := generateCollectionSchema(&cfg, table, true)
 		if err != nil {
-			return nil, fmt.Errorf("error generating %q collection schema: %w", tableID, err)
+			log.WithFields(log.Fields{"table": tableID, "err": err}).Warn("unable to generate collection schema")
+			continue
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
 			RecommendedName:    recommendedName,
 			ResourceConfigJson: resourceConfigJSON,
-			DocumentSchemaJson: collectionSchema,
+			DocumentSchemaJson: generatedSchema,
 			Key:                collectionKey,
 			ResourcePath:       []string{res.Name},
 		})
@@ -71,19 +75,45 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 }
 
 func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *Config) (map[string]*discoveredTable, error) {
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing tables: %w", err)
+	// Run discovery queries in parallel for lower discovery latency on large databases.
+	// TODO(wgd): See if there's a nice context-and-errors-aware promise library we could use
+	// here instead of just doing the same copy-paste channels-and-errgroup pattern thrice.
+	var tablesCh = make(chan []*discoveredTable, 1)
+	var columnsCh = make(chan []*discoveredColumn, 1)
+	var keysCh = make(chan []*discoveredPrimaryKey, 1)
+	var workerGroup, workerCtx = errgroup.WithContext(ctx)
+	workerGroup.Go(func() error {
+		tables, err := discoverTables(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		if err != nil {
+			return fmt.Errorf("error listing tables: %w", err)
+		}
+		tablesCh <- tables
+		return nil
+	})
+	workerGroup.Go(func() error {
+		columns, err := discoverColumns(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		if err != nil {
+			return fmt.Errorf("error listing columns: %w", err)
+		}
+		columnsCh <- columns
+		return nil
+	})
+	workerGroup.Go(func() error {
+		keys, err := discoverPrimaryKeys(workerCtx, db, cfg.Advanced.DiscoverSchemas)
+		if err != nil {
+			return fmt.Errorf("error listing primary keys: %w", err)
+		}
+		keysCh <- keys
+		return nil
+	})
+	if err := workerGroup.Wait(); err != nil {
+		return nil, err
 	}
-	columns, err := discoverColumns(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing columns: %w", err)
-	}
-	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing primary keys: %w", err)
-	}
+	var tables = <-tablesCh
+	var columns = <-columnsCh
+	var keys = <-keysCh
 
+	// Aggregate information by table
 	var tableInfo = make(map[string]*discoveredTable)
 	for _, table := range tables {
 		var tableID = table.Schema + "." + table.Name
@@ -93,13 +123,18 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *
 		var tableID = column.Schema + "." + column.Table
 		if table, ok := tableInfo[tableID]; ok {
 			table.columns = append(table.columns, column)
+			if column.Index != len(table.columns) {
+				return nil, fmt.Errorf("internal error: column %q of table %q appears out of order", column.Name, tableID)
+			}
 		}
 	}
-
 	for _, key := range keys {
 		var tableID = key.Schema + "." + key.Table
 		if table, ok := tableInfo[tableID]; ok {
-			table.key = key
+			table.keys = append(table.keys, key)
+			if key.Index != len(table.keys) {
+				return nil, fmt.Errorf("internal error: primary key column %q of table %q appears out of order", key.Column, tableID)
+			}
 		}
 	}
 	return tableInfo, nil
@@ -109,17 +144,16 @@ var (
 	// The fallback key of discovered collections when the source table has no primary key.
 	fallbackKey = []string{"/_meta/row_id"}
 
-	// Old captures used a different fallback key which included a value identifying
-	// the specific polling iteration which produced the document. This proved less
-	// than ideal for full-refresh bindings on keyless tables.
-	fallbackKeyOld = []string{"/_meta/polled", "/_meta/index"}
+	// Before the /_meta/row_id property was added, captures left the collection key empty
+	// for tables without a source PK, forcing users to pick one themselves.
+	fallbackKeyOld = []string{}
 )
 
 func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSchema bool) (json.RawMessage, []string, error) {
 	// Extract useful key and column type information
 	var keyColumns []string
-	if table.key != nil {
-		keyColumns = table.key.Columns
+	for _, key := range table.keys {
+		keyColumns = append(keyColumns, key.Column)
 	}
 	var columnTypes = make(map[string]columnType)
 	for _, column := range table.columns {
@@ -128,8 +162,9 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
-		ExpandedStruct: true,
-		DoNotReference: true,
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: fullWriteSchema,
 	}
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
 	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
@@ -158,13 +193,16 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 		properties[colName] = colSchema
 	}
 
+	var extras = map[string]any{
+		"properties": properties,
+	}
+	if cfg.Advanced.parsedFeatureFlags["use_schema_inference"] {
+		extras["x-infer-schema"] = true
+	}
 	var schema = &jsonschema.Schema{
 		Type:     "object",
 		Required: required,
-		Extras: map[string]interface{}{
-			"properties":     properties,
-			"x-infer-schema": true,
-		},
+		Extras:   extras,
 	}
 	if !fullWriteSchema {
 		schema.Extras["additionalProperties"] = false
@@ -183,11 +221,13 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 		for _, colName := range keyColumns {
 			collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
 		}
-	} else if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
-		collectionKey = fallbackKeyOld
 	} else {
 		collectionKey = fallbackKey
+		if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] {
+			collectionKey = fallbackKeyOld
+		}
 	}
+
 	return json.RawMessage(bs), collectionKey, nil
 }
 
@@ -207,31 +247,31 @@ type discoveredTable struct {
 	Type   string // Usually 'BASE TABLE' or 'VIEW'
 
 	columns []*discoveredColumn
-	key     *discoveredPrimaryKey
+	keys    []*discoveredPrimaryKey
 }
 
 func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredTable, error) {
 	var query = new(strings.Builder)
 	var args []any
 
-	fmt.Fprintf(query, "SELECT n.nspname AS table_schema,")
+	fmt.Fprintf(query, "SELECT nc.nspname AS table_schema,")
 	fmt.Fprintf(query, "       c.relname AS table_name,")
 	fmt.Fprintf(query, "       CASE")
-	fmt.Fprintf(query, "         WHEN n.oid = pg_my_temp_schema() THEN 'LOCAL TEMPORARY'::text")
 	fmt.Fprintf(query, "         WHEN c.relkind = ANY (ARRAY['r'::\"char\", 'p'::\"char\"]) THEN 'BASE TABLE'::text")
 	fmt.Fprintf(query, "         WHEN c.relkind = 'v'::\"char\" THEN 'VIEW'::text")
 	fmt.Fprintf(query, "         WHEN c.relkind = 'f'::\"char\" THEN 'FOREIGN'::text")
 	fmt.Fprintf(query, "         ELSE ''::text")
 	fmt.Fprintf(query, "       END::information_schema.character_data AS table_type")
 	fmt.Fprintf(query, " FROM pg_catalog.pg_class c")
-	fmt.Fprintf(query, " JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)")
-	fmt.Fprintf(query, " WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
-	fmt.Fprintf(query, "  AND c.relkind IN ('r', 'p', 'v', 'f')")
+	fmt.Fprintf(query, " JOIN pg_catalog.pg_namespace nc ON (nc.oid = c.relnamespace)")
+	fmt.Fprintf(query, " WHERE c.relkind IN ('r', 'p', 'v', 'f')")
 	if len(discoverSchemas) > 0 {
-		fmt.Fprintf(query, "  AND n.nspname = ANY ($1)")
+		fmt.Fprintf(query, "  AND nc.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
+	} else {
+		fmt.Fprintf(query, "  AND nc.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
 	}
-	fmt.Fprintf(query, "  AND NOT c.relispartition;") // Exclude subpartitions of a partitioned table from discovery
+	fmt.Fprintf(query, ";")
 
 	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
@@ -383,36 +423,39 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 }
 
 type discoveredPrimaryKey struct {
-	Schema  string
-	Table   string
-	Columns []string
+	Schema string
+	Table  string
+	Column string
+	Index  int
 }
 
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
 	var query = new(strings.Builder)
 	var args []any
 
-	fmt.Fprintf(query, "SELECT result.TABLE_SCHEM, result.TABLE_NAME, result.COLUMN_NAME, result.KEY_SEQ, result.TYPE_NAME")
-	fmt.Fprintf(query, " FROM (")
-	fmt.Fprintf(query, "  SELECT n.nspname AS TABLE_SCHEM,")
-	fmt.Fprintf(query, "   ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,")
-	fmt.Fprintf(query, "   (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, ci.relname AS PK_NAME,")
-	fmt.Fprintf(query, "   information_schema._pg_expandarray(i.indkey) AS KEYS, a.attnum AS A_ATTNUM,")
-	fmt.Fprintf(query, "   t.typname AS TYPE_NAME")
-	fmt.Fprintf(query, "  FROM pg_catalog.pg_class ct")
-	fmt.Fprintf(query, "   JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)")
-	fmt.Fprintf(query, "   JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)")
-	fmt.Fprintf(query, "   JOIN pg_catalog.pg_index i ON (a.attrelid = i.indrelid)")
-	fmt.Fprintf(query, "   JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)")
-	fmt.Fprintf(query, "   JOIN pg_catalog.pg_type t ON (a.atttypid = t.oid)")
-	fmt.Fprintf(query, "  WHERE i.indisprimary")
+	fmt.Fprintf(query, "SELECT nr.nspname::information_schema.sql_identifier AS table_schema,")
+	fmt.Fprintf(query, "       r.relname::information_schema.sql_identifier AS table_name,")
+	fmt.Fprintf(query, "       a.attname::information_schema.sql_identifier AS column_name,")
+	fmt.Fprintf(query, "       pos.n::information_schema.cardinal_number AS ordinal_position")
+	fmt.Fprintf(query, "  FROM pg_namespace nr,")
+	fmt.Fprintf(query, "       pg_class r,")
+	fmt.Fprintf(query, "       pg_attribute a,")
+	fmt.Fprintf(query, "       pg_constraint c,")
+	fmt.Fprintf(query, "       generate_series(1,100,1) pos(n)")
+	fmt.Fprintf(query, "  WHERE nr.oid = r.relnamespace")
+	fmt.Fprintf(query, "    AND r.oid = a.attrelid")
+	fmt.Fprintf(query, "    AND r.oid = c.conrelid")
+	fmt.Fprintf(query, "    AND c.conkey[pos.n] = a.attnum")
+	fmt.Fprintf(query, "    AND NOT a.attisdropped")
+	fmt.Fprintf(query, "    AND c.contype = 'p'::\"char\"")
+	fmt.Fprintf(query, "    AND r.relkind = 'r'::\"char\"")
 	if len(discoverSchemas) > 0 {
-		fmt.Fprintf(query, "   AND n.nspname = ANY ($1)")
+		fmt.Fprintf(query, "    AND nr.nspname = ANY ($1)")
 		args = append(args, discoverSchemas)
+	} else {
+		fmt.Fprintf(query, "    AND nr.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron')")
 	}
-	fmt.Fprintf(query, " ) result")
-	fmt.Fprintf(query, " WHERE result.A_ATTNUM = (result.KEYS).x")
-	fmt.Fprintf(query, " ORDER BY result.table_name, result.pk_name, result.key_seq;")
+	fmt.Fprintf(query, "  ORDER BY r.relname, pos.n;")
 
 	rows, err := db.QueryContext(ctx, query.String(), args...)
 	if err != nil {
@@ -420,32 +463,20 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 	}
 	defer rows.Close()
 
-	var keysByTable = make(map[string]*discoveredPrimaryKey)
+	var keys []*discoveredPrimaryKey
 	for rows.Next() {
-		var tableSchema, tableName, columnName, dataType string
+		var tableSchema, tableName, columnName string
 		var ordinalPosition int
-		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition, &dataType); err != nil {
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &ordinalPosition); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
-		var tableID = tableSchema + "." + tableName
-		var keyInfo = keysByTable[tableID]
-		if keyInfo == nil {
-			keyInfo = &discoveredPrimaryKey{
-				Schema: tableSchema,
-				Table:  tableName,
-			}
-			keysByTable[tableID] = keyInfo
-		}
-		keyInfo.Columns = append(keyInfo.Columns, columnName)
-		if ordinalPosition != len(keyInfo.Columns) {
-			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
-		}
-	}
-
-	var keys []*discoveredPrimaryKey
-	for _, key := range keysByTable {
-		keys = append(keys, key)
+		keys = append(keys, &discoveredPrimaryKey{
+			Schema: tableSchema,
+			Table:  tableName,
+			Column: columnName,
+			Index:  ordinalPosition,
+		})
 	}
 	return keys, nil
 }

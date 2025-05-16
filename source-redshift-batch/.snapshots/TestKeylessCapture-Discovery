@@ -59,6 +59,7 @@ Binding 0:
             ]
           },
           "data": {
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
@@ -66,12 +67,14 @@ Binding 0:
           },
           "updated_at": {
             "format": "date-time",
+            "description": "(source type: timestamp)",
             "type": [
               "string",
               "null"
             ]
           },
           "value": {
+            "description": "(source type: int4)",
             "type": [
               "integer",
               "null"

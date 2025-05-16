@@ -60,7 +60,30 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
+          },
+          "name": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "description": "(source type: timestamp)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visible": {
+            "description": "(source type: bool)",
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
@@ -127,6 +150,28 @@ Binding 1:
               "polled",
               "index",
               "row_id"
+            ]
+          },
+          "id": {
+            "description": "(source type: int4)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "description": "(source type: timestamp)",
+            "type": [
+              "string",
+              "null"
             ]
           }
         },

@@ -57,6 +57,7 @@ Binding 0:
             ]
           },
           "a_bool": {
+            "description": "(source type: bool)",
             "type": [
               "boolean",
               "null"
@@ -64,6 +65,7 @@ Binding 0:
           },
           "a_date": {
             "format": "date-time",
+            "description": "(source type: date)",
             "type": [
               "string",
               "null"
@@ -71,6 +73,7 @@ Binding 0:
           },
           "a_real": {
             "format": "number",
+            "description": "(source type: float4)",
             "type": [
               "number",
               "string",
@@ -79,6 +82,7 @@ Binding 0:
           },
           "a_ts": {
             "format": "date-time",
+            "description": "(source type: timestamp)",
             "type": [
               "string",
               "null"
@@ -86,13 +90,15 @@ Binding 0:
           },
           "a_tstz": {
             "format": "date-time",
+            "description": "(source type: timestamptz)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           }
         }
       },

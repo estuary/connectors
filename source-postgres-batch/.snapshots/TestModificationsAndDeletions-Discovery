@@ -59,8 +59,23 @@ Binding 0:
               "row_id"
             ]
           },
+          "description": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
+          },
+          "version": {
+            "description": "(source type: int4)",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

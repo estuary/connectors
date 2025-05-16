@@ -58,6 +58,7 @@ Binding 0:
           },
           "a_double": {
             "format": "number",
+            "description": "(source type: float8)",
             "type": [
               "number",
               "string",
@@ -66,6 +67,7 @@ Binding 0:
           },
           "a_real": {
             "format": "number",
+            "description": "(source type: float4)",
             "type": [
               "number",
               "string",
@@ -73,7 +75,8 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           }
         }
       },
