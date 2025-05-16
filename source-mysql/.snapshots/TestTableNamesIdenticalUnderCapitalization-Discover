@@ -1,0 +1,267 @@
+Binding 0:
+{
+    "recommended_name": "test/TABLE_WITH_DIFFERENT_CASING",
+    "resource_config_json": {
+      "namespace": "test",
+      "stream": "TABLE_WITH_DIFFERENT_CASING"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "TestTABLE_WITH_DIFFERENT_CASING": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "$anchor": "TestTABLE_WITH_DIFFERENT_CASING",
+          "properties": {
+            "id": {
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
+            },
+            "x": {
+              "description": "(source type: int)",
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "y": {
+              "description": "(source type: int)",
+              "type": [
+                "integer",
+                "null"
+              ]
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#TestTABLE_WITH_DIFFERENT_CASING",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-mysql/mysql-source-info",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "description": "Cursor value representing the current position in the binlog."
+                    },
+                    "txid": {
+                      "type": "string",
+                      "description": "The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table",
+                    "cursor"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#TestTABLE_WITH_DIFFERENT_CASING"
+        }
+      ]
+    },
+    "key": [
+      "/id"
+    ]
+  }
+Binding 1:
+{
+    "recommended_name": "test/table_with_different_casing",
+    "resource_config_json": {
+      "namespace": "test",
+      "stream": "table_with_different_casing"
+    },
+    "document_schema_json": {
+      "$defs": {
+        "TestTable_with_different_casing": {
+          "type": "object",
+          "required": [
+            "id"
+          ],
+          "$anchor": "TestTable_with_different_casing",
+          "properties": {
+            "data": {
+              "type": "string",
+              "description": "(source type: non-nullable text)"
+            },
+            "id": {
+              "type": "integer",
+              "description": "(source type: non-nullable int)"
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "_meta": {
+                "properties": {
+                  "op": {
+                    "const": "d"
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "reduce": {
+              "delete": true,
+              "strategy": "merge"
+            }
+          },
+          "else": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "required": [
+                "op",
+                "source"
+              ],
+              "properties": {
+                "before": {
+                  "$ref": "#TestTable_with_different_casing",
+                  "description": "Record state immediately before this change was applied.",
+                  "reduce": {
+                    "strategy": "firstWriteWins"
+                  }
+                },
+                "op": {
+                  "enum": [
+                    "c",
+                    "d",
+                    "u"
+                  ],
+                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+                },
+                "source": {
+                  "$id": "https://github.com/estuary/connectors/source-mysql/mysql-source-info",
+                  "properties": {
+                    "ts_ms": {
+                      "type": "integer",
+                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                    },
+                    "schema": {
+                      "type": "string",
+                      "description": "Database schema (namespace) of the event."
+                    },
+                    "snapshot": {
+                      "type": "boolean",
+                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                    },
+                    "table": {
+                      "type": "string",
+                      "description": "Database table of the event."
+                    },
+                    "cursor": {
+                      "type": "string",
+                      "description": "Cursor value representing the current position in the binlog."
+                    },
+                    "txid": {
+                      "type": "string",
+                      "description": "The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."
+                    }
+                  },
+                  "type": "object",
+                  "required": [
+                    "schema",
+                    "table",
+                    "cursor"
+                  ]
+                }
+              },
+              "reduce": {
+                "strategy": "merge"
+              }
+            }
+          }
+        },
+        {
+          "$ref": "#TestTable_with_different_casing"
+        }
+      ]
+    },
+    "key": [
+      "/id"
+    ]
+  }
+

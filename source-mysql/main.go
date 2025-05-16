@@ -44,6 +44,12 @@ var featureFlagDefaults = map[string]bool{
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
 	"emit_sourced_schemas": false,
+
+	// When set, schema/table names will no longer be normalized to lowercase. This applies
+	// in two specific circumstances:
+	//   - Recommended Collection Names
+	//   - Internal StreamIDs
+	"case_sensitive_table_names": false,
 }
 
 type sshForwarding struct {
@@ -115,6 +121,10 @@ func connectMySQL(ctx context.Context, name string, cfg json.RawMessage) (sqlcap
 			forceResetCursor = strings.TrimPrefix(flag, "force_reset_cursor=")
 		}
 	}
+
+	// This is a bit hacky but it works fine since there's only ever one capture running at a time.
+	sqlcapture.LowercaseStreamIDs = !featureFlags["case_sensitive_table_names"]
+	sqlcapture.LowercaseRecommendedNames = !featureFlags["case_sensitive_table_names"]
 
 	var db = &mysqlDatabase{
 		config:                &config,
