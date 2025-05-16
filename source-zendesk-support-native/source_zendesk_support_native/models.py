@@ -256,6 +256,7 @@ class FilterParam(StrEnum):
     SINCE = "since"
 
 
+
 # Incremental resources that can be filtered by a start_time query param.
 # Tuples contain the name, path, filter param name, cursor field, and response model for each resource. 
 INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, type[IncrementalCursorPaginatedResponse]]] = [
@@ -338,7 +339,12 @@ class MacrosResponse(ClientSideIncrementalCursorPaginatedResponse):
 class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="organization_memberships")
 
+class Article(TimestampedResource):
+    pass
 
+class ArticleResponse(IncrementalCursorPaginatedResponse):
+    resources: list[Article] = Field(alias="articles")
+    
 class Post(TimestampedResource):
     comment_count: int
     vote_count: int
@@ -364,6 +370,7 @@ CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, 
     ("posts", "community/posts", None, PostsResponse),
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),
     ("topics", "community/topics", None, TopicsResponse),
+    ("articles", "help_center/articles", None, ArticleResponse),
 ]
 
 
