@@ -39,7 +39,7 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 
 	// Aggregate column information into DiscoveryInfo structs using a map
 	// from fully-qualified table names to the corresponding info.
-	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
 		if streamID == db.WatermarksTable() {
@@ -327,7 +327,7 @@ SELECT KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.COLUMN_NAME, KCU.ORDINAL_POSITION
   WHERE TCS.CONSTRAINT_TYPE = 'PRIMARY KEY'
   ORDER BY KCU.TABLE_SCHEMA, KCU.TABLE_NAME, KCU.ORDINAL_POSITION;`
 
-func getPrimaryKeys(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map[string][]string, error) {
+func getPrimaryKeys(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map[sqlcapture.StreamID][]string, error) {
 	var queryDiscoverPrimaryKeys = queryDiscoverPrimaryKeysLowercase
 	if uppercaseQuery {
 		queryDiscoverPrimaryKeys = queryDiscoverPrimaryKeysUppercase
@@ -338,7 +338,7 @@ func getPrimaryKeys(ctx context.Context, conn *sql.DB, uppercaseQuery bool) (map
 	}
 	defer rows.Close()
 
-	var keys = make(map[string][]string)
+	var keys = make(map[sqlcapture.StreamID][]string)
 	for rows.Next() {
 		var tableSchema, tableName, columnName string
 		var index int
@@ -363,7 +363,7 @@ FROM sys.indexes idx
 WHERE ic.key_ordinal != 0 AND idx.is_unique = 1 AND sch.name NOT IN ('cdc')
 ORDER BY sch.name, tbl.name, idx.name, ic.key_ordinal;`
 
-func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[string][]string, error) {
+func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamID]map[string][]string, error) {
 	var rows, err = conn.QueryContext(ctx, queryDiscoverSecondaryIndices)
 	if err != nil {
 		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
@@ -372,7 +372,7 @@ func getSecondaryIndexes(ctx context.Context, conn *sql.DB) (map[string]map[stri
 
 	// Run the 'list secondary indexes' query and aggregate results into
 	// a `map[StreamID]map[IndexName][]ColumnName`
-	var streamIndexColumns = make(map[string]map[string][]string)
+	var streamIndexColumns = make(map[sqlcapture.StreamID]map[string][]string)
 	for rows.Next() {
 		var tableSchema, tableName, indexName, columnName string
 		var keySequence int

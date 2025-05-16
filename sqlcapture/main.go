@@ -81,7 +81,7 @@ func (r *Resource) SetDefaults() {}
 // Binding represents a capture binding.
 type Binding struct {
 	Index         uint32
-	StreamID      string
+	StreamID      StreamID
 	StateKey      boilerplate.StateKey
 	Resource      Resource
 	CollectionKey []string // JSON pointers
@@ -338,7 +338,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	var errs = db.SetupPrerequisites(ctx)
 
 	// Build a mapping from stream IDs to capture binding information
-	var bindings = make(map[string]*Binding)
+	var bindings = make(map[StreamID]*Binding)
 	for idx, binding := range open.Capture.Bindings {
 		var res Resource
 		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {

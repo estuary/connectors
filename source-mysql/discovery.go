@@ -26,7 +26,7 @@ const (
 
 // DiscoverTables queries the database for information about tables available for capture.
 func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
-	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
 	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering tables: %w", err)
@@ -43,7 +43,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 		// We filter out both the name from the configuration and the hard-coded default name, so
 		// that even if configuration updates cause the deprecated property to be lost we'll still
 		// keep filtering out the table in the common cases.
-		if streamID == db.config.Advanced.WatermarksTable || streamID == "flow.watermarks" {
+		if streamID.String() == db.config.Advanced.WatermarksTable || streamID.String() == "flow.watermarks" {
 			table.OmitBinding = true
 		}
 		table.UseSchemaInference = db.featureFlags["use_schema_inference"]
@@ -900,14 +900,14 @@ SELECT table_schema, table_name, column_name, seq_in_index
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(_ context.Context, conn mysqlClient) (map[string][]string, error) {
+func getPrimaryKeys(_ context.Context, conn mysqlClient) (map[sqlcapture.StreamID][]string, error) {
 	var results, err = conn.Execute(queryDiscoverPrimaryKeys)
 	if err != nil {
 		return nil, fmt.Errorf("error querying primary keys: %w", err)
 	}
 	defer results.Close()
 
-	var keys = make(map[string][]string)
+	var keys = make(map[sqlcapture.StreamID][]string)
 	for _, row := range results.Values {
 		var streamID = sqlcapture.JoinStreamID(string(row[0].AsString()), string(row[1].AsString()))
 		var columnName, index = string(row[2].AsString()), int(row[3].AsInt64())
@@ -933,7 +933,7 @@ SELECT stat.table_schema, stat.table_name, stat.index_name, stat.column_name, st
   ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index
 `
 
-func getSecondaryIndexes(_ context.Context, conn mysqlClient) (map[string]map[string][]string, error) {
+func getSecondaryIndexes(_ context.Context, conn mysqlClient) (map[sqlcapture.StreamID]map[string][]string, error) {
 	var results, err = conn.Execute(queryDiscoverSecondaryIndices)
 	if err != nil {
 		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
@@ -942,7 +942,7 @@ func getSecondaryIndexes(_ context.Context, conn mysqlClient) (map[string]map[st
 
 	// Run the 'list secondary indexes' query and aggregate results into
 	// a `map[StreamID]map[IndexName][]ColumnName`
-	var streamIndexColumns = make(map[string]map[string][]string)
+	var streamIndexColumns = make(map[sqlcapture.StreamID]map[string][]string)
 	for _, row := range results.Values {
 		var streamID = sqlcapture.JoinStreamID(string(row[0].AsString()), string(row[1].AsString()))
 		var indexName, columnName = string(row[2].AsString()), string(row[3].AsString())

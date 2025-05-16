@@ -129,7 +129,7 @@ type sqlserverReplicationStream struct {
 
 	tables struct {
 		sync.RWMutex
-		info map[string]*tableReplicationInfo
+		info map[sqlcapture.StreamID]*tableReplicationInfo
 	}
 
 	cleanup struct {
@@ -167,11 +167,11 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 
 	rs.errCh = make(chan error)
 	rs.events = make(chan sqlcapture.DatabaseEvent)
-	rs.tables.info = make(map[string]*tableReplicationInfo)
+	rs.tables.info = make(map[sqlcapture.StreamID]*tableReplicationInfo)
 	return nil
 }
 
-func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamID sqlcapture.StreamID, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	log.WithField("table", streamID).Trace("activate table")
 
 	var columnTypes = make(map[string]any)
@@ -196,7 +196,7 @@ func (rs *sqlserverReplicationStream) ActivateTable(ctx context.Context, streamI
 	return nil
 }
 
-func (rs *sqlserverReplicationStream) deactivateTable(streamID string) error {
+func (rs *sqlserverReplicationStream) deactivateTable(streamID sqlcapture.StreamID) error {
 	rs.tables.Lock()
 	defer rs.tables.Unlock()
 	delete(rs.tables.info, streamID)
@@ -206,13 +206,13 @@ func (rs *sqlserverReplicationStream) deactivateTable(streamID string) error {
 func (rs *sqlserverReplicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
 	// Activate replication for the watermarks table (if this isn't a read-only capture).
 	if !rs.db.featureFlags["read_only"] {
-		var watermarks = rs.db.config.Advanced.WatermarksTable
-		var watermarksInfo = discovery[watermarks]
+		var watermarkStreamID = rs.db.WatermarksTable()
+		var watermarksInfo = discovery[watermarkStreamID]
 		if watermarksInfo == nil {
-			return fmt.Errorf("error activating replication for watermarks table %q: table missing from latest autodiscovery", watermarks)
+			return fmt.Errorf("error activating replication for watermarks table %q: table missing from latest autodiscovery", watermarkStreamID)
 		}
-		if err := rs.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
-			return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+		if err := rs.ActivateTable(ctx, watermarkStreamID, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
+			return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarkStreamID, err)
 		}
 	}
 
@@ -1340,7 +1340,7 @@ func cdcGetDDLHistory(ctx context.Context, conn *sql.DB) (map[sqlcapture.StreamI
 	}
 	defer rows.Close()
 
-	var ddlHistory = make(map[string][]*ddlHistoryEntry)
+	var ddlHistory = make(map[sqlcapture.StreamID][]*ddlHistoryEntry)
 	for rows.Next() {
 		var entry ddlHistoryEntry
 		if err := rows.Scan(&entry.TableSchema, &entry.TableName, &entry.RequiredColumnUpdate, &entry.Command, &entry.LSN, &entry.Time); err != nil {

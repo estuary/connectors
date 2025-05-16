@@ -56,7 +56,7 @@ func (c *Capture) BindingsInState(modes ...BackfillMode) []*Binding {
 			bindings = append(bindings, binding)
 		}
 	}
-	slices.SortFunc(bindings, func(a, b *Binding) int { return strings.Compare(a.StreamID, b.StreamID) })
+	slices.SortFunc(bindings, func(a, b *Binding) int { return strings.Compare(a.StreamID.String(), b.StreamID.String()) })
 	return bindings
 }
 
@@ -129,7 +129,7 @@ const (
 // via replication, backfilling preexisting table contents, and emitting records/state
 // updates. It uses the `Database` interface to interact with a specific database.
 type Capture struct {
-	Bindings map[string]*Binding     // Map from fully-qualified stream IDs to the corresponding binding information
+	Bindings map[StreamID]*Binding   // Map from fully-qualified stream IDs to the corresponding binding information
 	State    *PersistentState        // State read from `state.json` and emitted as updates
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
@@ -627,7 +627,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 
 func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
 	var bindings = c.BindingsCurrentlyBackfilling()
-	var streams = make([]string, 0, len(bindings))
+	var streams = make([]StreamID, 0, len(bindings))
 	for _, b := range bindings {
 		streams = append(streams, b.StreamID)
 	}
@@ -651,7 +651,7 @@ func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*D
 	return nil
 }
 
-func (c *Capture) backfillStream(ctx context.Context, streamID string, discoveryInfo *DiscoveryInfo) error {
+func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discoveryInfo *DiscoveryInfo) error {
 	var stateKey = c.Bindings[streamID].StateKey
 	var streamState = c.State.Streams[stateKey]
 
@@ -845,9 +845,18 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 	return replStream.Acknowledge(ctx, cursor)
 }
 
-type StreamID = string
+type StreamID struct {
+	Schema string
+	Table  string
+}
+
+func (s StreamID) String() string {
+	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
+}
 
 // JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
 func JoinStreamID(namespace, stream string) StreamID {
-	return strings.ToLower(namespace + "." + stream)
+	namespace = strings.ToLower(namespace)
+	stream = strings.ToLower(stream)
+	return StreamID{Schema: namespace, Table: stream}
 }

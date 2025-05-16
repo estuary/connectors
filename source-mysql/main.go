@@ -432,7 +432,7 @@ func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 	return t, nil
 }
 
-func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
+func (db *mysqlDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 	// As a special case, the solitary value '*.*' means that nothing should be
 	// backfilled. This makes certain sorts of operation which would otherwise
 	// require listing every single table in the database easier.
@@ -449,7 +449,7 @@ func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
 		for _, skipStreamID := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
-			if strings.EqualFold(streamID, skipStreamID) {
+			if strings.EqualFold(streamID.String(), skipStreamID) {
 				return false
 			}
 		}
@@ -459,7 +459,7 @@ func (db *mysqlDatabase) ShouldBackfill(streamID string) bool {
 
 func (db *mysqlDatabase) RequestTxIDs(schema, table string) {
 	if db.includeTxIDs == nil {
-		db.includeTxIDs = make(map[string]bool)
+		db.includeTxIDs = make(map[sqlcapture.StreamID]bool)
 	}
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }

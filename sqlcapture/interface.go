@@ -57,7 +57,7 @@ type SourceCommon struct {
 }
 
 // StreamID combines the Schema and Table properties using JoinStreamID()
-func (sc SourceCommon) StreamID() string {
+func (sc SourceCommon) StreamID() StreamID {
 	return JoinStreamID(sc.Schema, sc.Table)
 }
 
@@ -85,7 +85,7 @@ type FlushEvent struct {
 // MetadataEvent informs the generic sqlcapture logic about changes to
 // the per-table metadata JSON.
 type MetadataEvent struct {
-	StreamID string
+	StreamID StreamID
 	Metadata json.RawMessage
 }
 
@@ -148,7 +148,7 @@ type Database interface {
 	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
 	EmptySourceMetadata() SourceMetadata
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
-	ShouldBackfill(streamID string) bool
+	ShouldBackfill(streamID StreamID) bool
 	// HistoryMode returns whether history mode (non-associative reduction of events) is enabled
 	HistoryMode() bool
 
@@ -187,7 +187,7 @@ type Database interface {
 // received for that table. It is permitted and necessary to activate some
 // tables before starting replication.
 type ReplicationStream interface {
-	ActivateTable(ctx context.Context, streamID string, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
+	ActivateTable(ctx context.Context, streamID StreamID, keyColumns []string, info *DiscoveryInfo, metadata json.RawMessage) error
 	StartReplication(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error
 
 	// StreamToFence yields via the provided callback all change events between the

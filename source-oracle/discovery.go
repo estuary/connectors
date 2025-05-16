@@ -35,7 +35,7 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.St
 	// Aggregate column and primary key information into DiscoveryInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
 	// the corresponding DiscoveryInfo.
-	var tableMap = make(map[string]*sqlcapture.DiscoveryInfo)
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
 		if streamID == db.WatermarksTable() {
@@ -211,7 +211,7 @@ func getTables(ctx context.Context, conn *sql.DB, selectedSchemas []string) ([]*
 const queryTableObjectIdentifiers = `SELECT OWNER, OBJECT_NAME, OBJECT_ID, DATA_OBJECT_ID FROM ALL_OBJECTS WHERE OBJECT_TYPE='TABLE'`
 
 type tableObject struct {
-	streamID     string
+	streamID     sqlcapture.StreamID
 	objectID     int
 	dataObjectID int
 }
@@ -287,8 +287,8 @@ func (ct oracleColumnType) String() string {
 // SMALLINT, INT and INTEGER have a default precision 38 which is not included in the column information
 const defaultNumericPrecision = 38
 
-func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[string][]string, error) {
-	var pks = make(map[string][]string)
+func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) ([]sqlcapture.ColumnInfo, map[sqlcapture.StreamID][]string, error) {
+	var pks = make(map[sqlcapture.StreamID][]string)
 	var columns []sqlcapture.ColumnInfo
 
 	var ownersMap = make(map[string]bool)
