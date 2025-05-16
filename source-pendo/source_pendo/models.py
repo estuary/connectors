@@ -1,3 +1,4 @@
+from typing import Generic, TypeVar
 import pendulum
 from pydantic import AwareDatetime, BaseModel, Field
 
@@ -80,6 +81,14 @@ class PollEvent(BaseDocument, extra="allow"):
     pollId: str
 
 
+class Visitor(BaseDocument, extra="allow"):
+    visitorId: str
+
+
+class TrackType(BaseDocument, extra="allow"):
+    id: str
+
+
 class EventResponse(BaseDocument, extra="forbid"):
     startTime: int
     results: list[GuideEvent | PollEvent]
@@ -90,8 +99,21 @@ class AggregatedEventResponse(BaseDocument, extra="forbid"):
     results: list[PageEvent | FeatureEvent | TrackEvent]
 
 
-# Supported resource types and their corresponding name.
-RESOURCE_TYPES: list[tuple[str, str]] = [
+_ResourceType = TypeVar('_ResourceType', bound=BaseDocument)
+
+class ResourceResponse(BaseModel, Generic[_ResourceType]):
+    results: list[_ResourceType]
+
+
+
+# Supported snapshot resource types and their corresponding name.
+# Most, if not all, of these snapshot resources could be moved over
+# to be incremental resources listed in INCREMENTAL_RESOURCE_TYPES.
+# Doing so would change the primary key for already created collections,
+# so I'm holding off doing that until later. We'll likely want to increment
+# the connector version to let existing users migrate to the newer version
+# at their convenience.
+FULL_REFRESH_RESOURCE_TYPES: list[tuple[str, str]] = [
     ("feature", "Feature"),
     ("guide", "Guide"),
     ("page", "Page"),
@@ -118,4 +140,11 @@ AGGREGATED_EVENT_TYPES: list[tuple[str, str, str, type[BaseDocument]]] = [
     ("pageEvents", "PageEvents", "pageId", PageEvent),
     ("featureEvents", "FeatureEvents", "featureId", FeatureEvent),
     ("trackEvents", "TrackEvents", "trackTypeId", TrackEvent),
+]
+
+
+# Supported incremental resource types, their corresponding resource name, their key, their updated_at field, and their model.
+INCREMENTAL_RESOURCE_TYPES: list[tuple[str, str, str, str, type[BaseDocument]]] = [
+    ("visitors", "Visitor", "visitorId", "metadata.auto.lastupdated", Visitor),
+    ("trackTypes", "TrackType", "id", "lastUpdatedAt", TrackType),
 ]
