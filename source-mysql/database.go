@@ -90,9 +90,9 @@ type mysqlDatabase struct {
 	config *Config
 	conn   mysqlClient
 
-	explained        map[string]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
-	datetimeLocation *time.Location      // The location in which to interpret DATETIME column values as timestamps.
-	includeTxIDs     map[string]bool     // Tracks which tables should have XID properties in their replication metadata.
+	explained        map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation.
+	datetimeLocation *time.Location                   // The location in which to interpret DATETIME column values as timestamps.
+	includeTxIDs     map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata.
 
 	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor

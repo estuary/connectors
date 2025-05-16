@@ -178,8 +178,9 @@ func (db *oracleDatabase) WriteWatermark(ctx context.Context, watermark string) 
 }
 
 // WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
-func (db *oracleDatabase) WatermarksTable() string {
-	return strings.ToLower(db.config.Advanced.WatermarksTable)
+func (db *oracleDatabase) WatermarksTable() sqlcapture.StreamID {
+	var bits = strings.SplitN(db.config.Advanced.WatermarksTable, ".", 2)
+	return sqlcapture.JoinStreamID(bits[0], bits[1])
 }
 
 // The set of column types for which we need to specify `COLLATE BINARY` to get
@@ -299,7 +300,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	return query.String()
 }
 
-func (db *oracleDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
+func (db *oracleDatabase) explainQuery(ctx context.Context, streamID sqlcapture.StreamID, query string, args []interface{}) {
 	// Only EXPLAIN the backfill query once per connector invocation
 	if db.explained == nil {
 		db.explained = make(map[sqlcapture.StreamID]struct{})

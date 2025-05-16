@@ -239,8 +239,9 @@ func (db *postgresDatabase) WriteWatermark(ctx context.Context, watermark string
 }
 
 // WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
-func (db *postgresDatabase) WatermarksTable() string {
-	return db.config.Advanced.WatermarksTable
+func (db *postgresDatabase) WatermarksTable() sqlcapture.StreamID {
+	var bits = strings.SplitN(db.config.Advanced.WatermarksTable, ".", 2)
+	return sqlcapture.JoinStreamID(bits[0], bits[1])
 }
 
 // The set of column types for which we need to specify `COLLATE "C"` to get
@@ -345,7 +346,7 @@ func quoteColumnName(name string) string {
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
-func (db *postgresDatabase) explainQuery(ctx context.Context, streamID, query string, args []interface{}) {
+func (db *postgresDatabase) explainQuery(ctx context.Context, streamID sqlcapture.StreamID, query string, args []interface{}) {
 	// Only EXPLAIN the backfill query once per connector invocation
 	if db.explained == nil {
 		db.explained = make(map[sqlcapture.StreamID]struct{})

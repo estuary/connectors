@@ -138,9 +138,9 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 		transactionsStmt: transactionsStmt,
 	}
 
-	stream.tables.active = make(map[string]struct{})
-	stream.tables.keyColumns = make(map[string][]string)
-	stream.tables.discovery = make(map[string]*sqlcapture.DiscoveryInfo)
+	stream.tables.active = make(map[sqlcapture.StreamID]struct{})
+	stream.tables.keyColumns = make(map[sqlcapture.StreamID][]string)
+	stream.tables.discovery = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
 	return stream, nil
 }
 
@@ -361,9 +361,9 @@ type replicationStream struct {
 	// the main goroutine while it's read by the replication goroutine.
 	tables struct {
 		sync.RWMutex
-		active     map[string]struct{}
-		keyColumns map[string][]string
-		discovery  map[string]*sqlcapture.DiscoveryInfo
+		active     map[sqlcapture.StreamID]struct{}
+		keyColumns map[sqlcapture.StreamID][]string
+		discovery  map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo
 	}
 }
 
@@ -976,21 +976,21 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 	return nil
 }
 
-func (s *replicationStream) tableActive(streamID string) bool {
+func (s *replicationStream) tableActive(streamID sqlcapture.StreamID) bool {
 	s.tables.RLock()
 	defer s.tables.RUnlock()
 	var _, ok = s.tables.active[streamID]
 	return ok
 }
 
-func (s *replicationStream) keyColumns(streamID string) ([]string, bool) {
+func (s *replicationStream) keyColumns(streamID sqlcapture.StreamID) ([]string, bool) {
 	s.tables.RLock()
 	defer s.tables.RUnlock()
 	var keyColumns, ok = s.tables.keyColumns[streamID]
 	return keyColumns, ok
 }
 
-func (s *replicationStream) ActivateTable(ctx context.Context, streamID string, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+func (s *replicationStream) ActivateTable(ctx context.Context, streamID sqlcapture.StreamID, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
 	s.tables.Lock()
 	defer s.tables.Unlock()
 	s.tables.active[streamID] = struct{}{}

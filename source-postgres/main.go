@@ -382,7 +382,7 @@ func (db *postgresDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/loc/0", "/_meta/source/loc/1", "/_meta/source/loc/2"}
 }
 
-func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
+func (db *postgresDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 	// Allow the setting "*.*" to skip backfilling any tables.
 	if db.config.Advanced.SkipBackfills == "*.*" {
 		return false
@@ -392,7 +392,7 @@ func (db *postgresDatabase) ShouldBackfill(streamID string) bool {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
 		for _, skipStreamID := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
-			if streamID == strings.ToLower(skipStreamID) {
+			if strings.EqualFold(streamID.String(), skipStreamID) {
 				return false
 			}
 		}

@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
 )
 
 // WatermarksTable returns the name of the table to which WriteWatermarks writes UUIDs.
-func (db *sqlserverDatabase) WatermarksTable() string {
-	return db.config.Advanced.WatermarksTable
+func (db *sqlserverDatabase) WatermarksTable() sqlcapture.StreamID {
+	var bits = strings.SplitN(db.config.Advanced.WatermarksTable, ".", 2)
+	return sqlcapture.JoinStreamID(bits[0], bits[1])
 }
 
 func (db *sqlserverDatabase) createWatermarksTable(ctx context.Context) error {

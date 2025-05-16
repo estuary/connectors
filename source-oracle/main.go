@@ -358,7 +358,7 @@ func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 	return t, nil
 }
 
-func (db *oracleDatabase) ShouldBackfill(streamID string) bool {
+func (db *oracleDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 	// Allow the setting "*.*" to skip backfilling any tables.
 	if db.config.Advanced.SkipBackfills == "*.*" {
 		return false
@@ -368,7 +368,7 @@ func (db *oracleDatabase) ShouldBackfill(streamID string) bool {
 		// This repeated splitting is a little inefficient, but this check is done at
 		// most once per table during connector startup and isn't really worth caching.
 		for _, skipTableName := range strings.Split(db.config.Advanced.SkipBackfills, ",") {
-			if strings.EqualFold(streamID, skipTableName) {
+			if strings.EqualFold(streamID.String(), skipTableName) {
 				return false
 			}
 		}
