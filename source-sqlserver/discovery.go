@@ -57,15 +57,6 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 			continue
 		}
 
-		// The 'Stream IDs' used for table info lookup are case insensitive, so we
-		// need to double-check that there isn't a collision between two case variants
-		// of the same name.
-		if info.Schema != column.TableSchema || info.Name != column.TableName {
-			var nameA = fmt.Sprintf("%s.%s", info.Schema, info.Name)
-			var nameB = fmt.Sprintf("%s.%s", column.TableSchema, column.TableName)
-			return nil, fmt.Errorf("table name collision between %q and %q", nameA, nameB)
-		}
-
 		if info.Columns == nil {
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
 		}
