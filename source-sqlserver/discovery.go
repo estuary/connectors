@@ -92,7 +92,10 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 			details.ComputedColumns = computedColumns[streamID]
 		}
 		for _, columnName := range computedColumns[streamID] {
-			var info = table.Columns[columnName]
+			var info, ok = table.Columns[columnName]
+			if !ok {
+				continue
+			}
 			info.OmitColumn = true
 			table.Columns[columnName] = info
 		}
