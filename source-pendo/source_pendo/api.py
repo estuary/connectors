@@ -6,7 +6,7 @@ from pydantic import TypeAdapter
 from estuary_cdk.capture.common import BaseDocument, LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 
-from .models import PageEvent, FeatureEvent, TrackEvent, GuideEvent, PollEvent, AggregatedEventResponse,EventResponse, Resource, Metadata
+from .models import PageEvent, FeatureEvent, TrackEvent, GuideEvent, PollEvent, AggregatedEventResponse, EventResponse, Resource, Metadata, ResourceResponse
 
 API = "https://app.pendo.io/api/v1"
 RESPONSE_LIMIT = 50000
@@ -160,7 +160,71 @@ def generate_event_aggregates_body(
     return body
 
 
-async def fetch_resources(
+def generate_resources_body(
+        entity: str,
+        updated_at_field: str,
+        identifying_field: str,
+        lower_bound: int,
+        upper_bound: int | None = None,
+        last_seen_id: str | None = None,
+):
+    """
+    Builds the request body to retrieve resources from the Pendo API.
+
+    Pendo's resource aggregation endpoints require a JSON body with various fields.
+    See https://engageapi.pendo.io/#3f5fdb6d-02da-4441-b4d1-75f795ba248c. We use
+    their filtering and sorting capabilities to paginate through documents in 
+    ascending order. Each document returned represents a single resource.
+    """
+
+    # If we have an ID that we saw last, get the remaining resources for that specific timestamp. 
+    # Otherwise, get as many resources as we can since the last timestamp.
+    #
+    # The filter condition uses:
+    #  updated_at_field: the last time the resource was updated
+    # identifying_field: the unique ID for the associated Pendo resource. Used as a second filter when
+    #                    there are more resources in Pendo with the same updated_at_field than we can retrieve in
+    #                    a single API query.
+    if last_seen_id:
+        filter_condition = f"{updated_at_field} == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
+    else:
+        filter_condition = f"{updated_at_field} >= {lower_bound}"
+        if upper_bound:
+            filter_condition += f" && {updated_at_field} <= {upper_bound}"
+
+    body = {
+        "response": {
+            "mimeType": "application/json"
+        },
+        "request": {
+            "pipeline": [
+                {
+                    "source": {
+                        entity: {
+                            # Capture resources for all applications within this Pendo subscription.
+                            "appId": "expandAppIds(\"*\")",
+                        },
+                    }
+                },
+                {
+                    "filter": filter_condition
+                },
+                # Resources are sorted first by their updated_at_field, then by their
+                # identifying_field if they have the same updated_at_field value.
+                {
+                    "sort": [f"{updated_at_field}", f"{identifying_field}"]
+                },
+                {
+                    "limit": RESPONSE_LIMIT
+                }
+            ]
+        }
+    }
+
+    return body
+
+
+async def snapshot_resources(
         http: HTTPSession,
         entity: str,
         log: Logger,
@@ -179,7 +243,7 @@ async def fetch_resources(
         yield resource
 
 
-async def fetch_metadata(
+async def snapshot_metadata(
         http: HTTPSession,
         entity: str,
         log: Logger,
@@ -483,6 +547,174 @@ async def backfill_aggregated_events(
 
                 aggregate.meta_ = model.Meta(op="c")
                 yield aggregate
+
+            if doc_count < RESPONSE_LIMIT:
+                break
+
+        yield _dt_to_ms(last_dt + timedelta(milliseconds=1))
+
+
+# _get_field extracts a field from a document. The field could be
+# nested somewhere within document. ex: metadata.auto.lastupdated
+def _get_field(doc: BaseDocument, field: str, log: Logger,):
+    keys = field.split('.')
+    value = doc.model_dump()
+    for key in keys:
+        value = value.get(key)
+        if value is None:
+            raise RuntimeError(f"No field \"{field}\" present in document.")
+
+    return value
+
+
+def _extract_updated_at(doc: BaseDocument, updated_at_field: str, log: Logger) -> datetime:
+    ms = _get_field(doc, updated_at_field, log)
+    assert isinstance(ms, int)
+    return _ms_to_dt(ms)
+
+
+async def fetch_resources(
+        http: HTTPSession,
+        entity: str,
+        model: type[BaseDocument],
+        updated_at_field: str,
+        identifying_field: str,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[BaseDocument | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    url = f"{API}/aggregation"
+    last_dt = log_cursor
+    last_ts = _dt_to_ms(last_dt)
+
+    body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts)
+
+    response_model = TypeAdapter(ResourceResponse[model])
+    response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
+
+    doc_count = 0
+    last_seen_id = ""
+    for resource in response.results:
+        updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
+        # Due to how we're querying the API with the "sort" and "filter" operators, 
+        # we don't expect to receive documents out of order.
+        if updated_at_dt < last_dt:
+            raise RuntimeError(
+                f"Received events out of time order: Current event timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
+            )
+
+        doc_count += 1
+        last_dt = updated_at_dt
+        last_seen_id = getattr(resource, identifying_field)
+
+        yield resource
+
+    if doc_count == 0:
+        # If there were no documents, don't update the cursor.
+        return
+    elif last_dt > log_cursor:
+        # If there was at least one document and the last document's timestamp is
+        # later than the cursor, update the cursor.
+        yield last_dt
+    elif last_dt == log_cursor:
+        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
+        # this timestamp & increment the cursor by 1 afterwards.
+        while True:
+            body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts, last_seen_id=last_seen_id)
+            response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
+
+            doc_count = 0
+            for resource in response.results:
+                updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
+                if updated_at_dt < last_dt:
+                    raise RuntimeError(
+                        f"Received events out of time order: Current event timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
+                    )
+
+                doc_count += 1
+                last_seen_id = getattr(resource, identifying_field)
+
+                yield resource
+
+            if doc_count < RESPONSE_LIMIT:
+                break
+
+        yield last_dt + timedelta(milliseconds=1)
+
+
+async def backfill_resources(
+        http: HTTPSession,
+        entity: str,
+        model: type[BaseDocument],
+        updated_at_field: str,
+        identifying_field: str,
+        log: Logger,
+        page_cursor: PageCursor | None,
+        cutoff: LogCursor,
+) -> AsyncGenerator[BaseDocument | PageCursor, None]:
+    assert isinstance(page_cursor, int)
+    assert isinstance(cutoff, datetime)
+    url = f"{API}/aggregation"
+    last_dt = _ms_to_dt(page_cursor)
+    upper_bound_dt = last_dt + timedelta(days=DATE_WINDOW_SIZE_IN_DAYS)
+
+    # If we've reached or exceeded the cutoff date, stop backfilling.
+    if last_dt >= cutoff:
+        return
+
+    last_ts = _dt_to_ms(last_dt)
+    upper_bound_ts = _dt_to_ms(upper_bound_dt)
+
+    body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
+    response_model = TypeAdapter(ResourceResponse[model])
+    response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
+
+    doc_count = 0
+    last_seen_id = ""
+    for resource in response.results:
+        updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
+        # Due to how we're querying the API with the "sort" and "filter" operators, 
+        # we don't expect to receive documents out of order.
+        if updated_at_dt < last_dt:
+            raise RuntimeError(
+                f"Received events out of time order: Current event timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
+            )
+
+        if updated_at_dt >= cutoff:
+            return
+
+        doc_count += 1
+        last_dt = updated_at_dt
+        last_seen_id = getattr(resource, identifying_field)
+
+        yield resource
+
+    if doc_count == 0:
+        # If there were no documents, we need to move the cursor forward to slide forward our date window.
+        yield _dt_to_ms(last_dt + timedelta(days=DATE_WINDOW_SIZE_IN_DAYS))
+    elif last_dt > _ms_to_dt(page_cursor):
+        # If there were documents and the last one has a later timestamp than our cursor, then update
+        # the cursor to the later timestamp.
+        yield _dt_to_ms(last_dt)
+    elif last_dt == _ms_to_dt(page_cursor):
+        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
+        # this timestamp & increment the cursor by 1 afterwards.
+        while True:
+            body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts, last_seen_id=last_seen_id)
+            response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
+
+            doc_count = 0
+            for resource in response.results:
+                updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
+                if updated_at_dt < last_dt:
+                    raise RuntimeError(
+                        f"Received events out of time order: Current event timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
+                    )
+
+                doc_count += 1
+                last_seen_id = getattr(resource, identifying_field)
+
+                yield resource
 
             if doc_count < RESPONSE_LIMIT:
                 break
