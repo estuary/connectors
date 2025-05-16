@@ -59,8 +59,23 @@ Binding 0:
               "row_id"
             ]
           },
+          "enum_col": {
+            "description": "(source type: enum)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "set_col": {
+            "description": "(source type: set)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
