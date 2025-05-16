@@ -42,6 +42,17 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
 	for _, table := range tables {
 		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+
+		// Depending on feature flag settings, we may normalize multiple table names
+		// to the same StreamID. This is a problem and other parts of discovery won't
+		// be able to handle it gracefully, so it's a fatal error.
+		if other, ok := tableMap[streamID]; ok {
+			return nil, fmt.Errorf("table name collision between %q and %q",
+				fmt.Sprintf("%s.%s", table.Schema, table.Name),
+				fmt.Sprintf("%s.%s", other.Schema, other.Name),
+			)
+		}
+
 		if streamID == db.WatermarksTable() {
 			// We want to exclude the watermarks table from the output bindings, but we still discover it
 			table.OmitBinding = true
