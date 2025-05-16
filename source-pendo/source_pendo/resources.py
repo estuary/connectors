@@ -13,18 +13,21 @@ from .models import (
     ResourceState,
     Resource,
     Metadata,
-    RESOURCE_TYPES,
+    FULL_REFRESH_RESOURCE_TYPES,
+    INCREMENTAL_RESOURCE_TYPES,
     EVENT_TYPES,
     AGGREGATED_EVENT_TYPES,
     METADATA_TYPES,
 )
 from .api import (
+    snapshot_resources,
+    backfill_resources,
     fetch_resources,
     backfill_events,
     fetch_events,
     backfill_aggregated_events,
     fetch_aggregated_events,
-    fetch_metadata,
+    snapshot_metadata,
     _dt_to_ms,
     API,
 )
@@ -54,7 +57,7 @@ async def validate_api_key(
             raise err
 
 
-def resources(
+def full_refresh_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
@@ -72,7 +75,7 @@ def resources(
             state,
             task,
             fetch_snapshot=functools.partial(
-                fetch_resources,
+                snapshot_resources,
                 http,
                 entity,
             ),
@@ -91,7 +94,68 @@ def resources(
             ),
             schema_inference=True,
         )
-        for (entity, resource_name) in RESOURCE_TYPES
+        for (entity, resource_name) in FULL_REFRESH_RESOURCE_TYPES
+    ]
+
+    return resources
+
+
+def incremental_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+    def open(
+        entity: str,
+        model: type[common.BaseDocument],
+        updated_at_field: str,
+        identifying_field: str,
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_resources,
+                http,
+                entity,
+                model,
+                updated_at_field,
+                identifying_field,
+            ),
+            fetch_page=functools.partial(
+                backfill_resources,
+                http,
+                entity,
+                model,
+                updated_at_field,
+                identifying_field,
+            )
+        )
+
+    backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
+    cutoff = datetime.now(tz=UTC) - timedelta(hours=API_EVENT_LAG) 
+
+    resources = [
+        common.Resource(
+            name=resource_name,
+            key=[f"/{primary_key}"],
+            model=model,
+            open=functools.partial(open, entity, model, updated_at_field, primary_key),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
+            ),
+            initial_config=ResourceConfig(
+                name=resource_name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (entity, resource_name, primary_key, updated_at_field, model) in INCREMENTAL_RESOURCE_TYPES
     ]
 
     return resources
@@ -115,7 +179,7 @@ def metadata(
             state,
             task,
             fetch_snapshot=functools.partial(
-                fetch_metadata,
+                snapshot_metadata,
                 http,
                 entity,
             ),
@@ -262,7 +326,8 @@ async def all_resources(
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials, authorization_header=AUTHORIZATION_HEADER)
 
     return [
-        *resources(log, http, config), 
+        *full_refresh_resources(log, http, config),
+        *incremental_resources(log, http, config),
         *metadata(log, http, config), 
         *events(log, http, config),
         *aggregated_events(log, http, config),
