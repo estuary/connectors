@@ -56,12 +56,15 @@ def generate_events_body(
             "pipeline": [
                 {
                     "source": {
-                        entity: None,
+                        entity: {
+                            # Capture events for all applications within this Pendo subscription.
+                            "appId": "expandAppIds(\"*\")",
+                        },
                         "timeSeries": {
                             "period": "hourRange",
                             "first": f"{lower_bound}",
                             # If an upper bound isn't specified, retrieve all events up to the present.
-                            "last": f"{upper_bound or "now()"}"
+                            "last": f"{upper_bound or 'now()'}"
                         }
                     }
                 },
@@ -127,12 +130,15 @@ def generate_event_aggregates_body(
             "pipeline": [
                 {
                     "source": {
-                        entity: None,
+                        entity: {
+                            # Capture events for all applications within this Pendo subscription.
+                            "appId": "expandAppIds(\"*\")",
+                        },
                         "timeSeries": {
                             "period": "hourRange",
                             "first": f"{lower_bound}",
                             # If an upper bound isn't specified, retrieve all events up to the present.
-                            "last": f"{upper_bound or "now()"}"
+                            "last": f"{upper_bound or 'now()'}"
                         }
                     }
                 },
@@ -161,7 +167,13 @@ async def fetch_resources(
 ) -> AsyncGenerator[Resource, None]:
     url = f"{API}/{entity}"
 
-    resources = TypeAdapter(list[Resource]).validate_json(await http.request(log, url))
+    params = {
+        # The expand query parameter tells Pendo to return data for all
+        # applications associated with the Pendo subscription.
+        "expand": "*",
+    }
+
+    resources = TypeAdapter(list[Resource]).validate_json(await http.request(log, url, params=params))
 
     for resource in resources:
         yield resource
