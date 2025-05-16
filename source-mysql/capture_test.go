@@ -601,3 +601,44 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 		})
 	}
 }
+
+// TestTableNamesIdenticalUnderCapitalization tests that we can correctly capture
+// from a pair of tables whose names are identical except for capitalization. The
+// two tables have different columns/types just to make extra sure we don't get
+// them mixed up anywhere.
+func TestTableNamesIdenticalUnderCapitalization(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+
+	var tableA = fmt.Sprintf("`%s`.`table_with_different_casing`", testSchemaName)
+	var tableB = fmt.Sprintf("`%s`.`TABLE_WITH_DIFFERENT_CASING`", testSchemaName)
+	var tableRegexps = []*regexp.Regexp{
+		regexp.MustCompile(`table_with_different_casing`),
+		regexp.MustCompile(`TABLE_WITH_DIFFERENT_CASING`),
+	}
+	tb.Query(ctx, t, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableA))
+	tb.Query(ctx, t, fmt.Sprintf("DROP TABLE IF EXISTS %s", tableB))
+	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data TEXT NOT NULL)", tableA))
+	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, x INTEGER, y INTEGER)", tableB))
+
+	var cs = tb.CaptureSpec(ctx, t)
+	cs.EndpointSpec.(*Config).Advanced.FeatureFlags = "case_sensitive_table_names"
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	t.Run("Discover", func(t *testing.T) { cs.VerifyDiscover(ctx, t, tableRegexps...) })
+
+	t.Run("Capture", func(t *testing.T) {
+		cs.Bindings = tests.ConvertBindings(t, cs.Discover(ctx, t, tableRegexps...))
+
+		tb.Insert(ctx, t, tableA, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+		tb.Insert(ctx, t, tableB, [][]any{{1, 101, 102}, {2, 201, 202}, {3, 301, 302}})
+		cs.Capture(ctx, t, nil) // Backfill
+
+		tb.Insert(ctx, t, tableA, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+		tb.Insert(ctx, t, tableB, [][]any{{4, 401, 402}, {5, 501, 502}, {6, 601, 602}})
+		cs.Capture(ctx, t, nil) // Replication
+
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
