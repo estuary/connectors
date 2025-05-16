@@ -630,7 +630,8 @@ async def fetch_search_objects(
                 continue
 
             if this_mod_time < max_updated:
-                raise Exception(f"last modified date {this_mod_time} is before {max_updated} for {r.id}")
+                log.error("search query input", input)
+                raise Exception(f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}")
             
             max_updated = this_mod_time
             output_items.add((this_mod_time, str(r.id)))
