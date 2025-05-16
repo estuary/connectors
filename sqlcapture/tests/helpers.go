@@ -16,6 +16,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -109,8 +110,13 @@ func DiscoverBindings(ctx context.Context, t testing.TB, tb TestBackend, streamM
 	}
 
 	// Translate discovery bindings into capture bindings.
+	return ConvertBindings(t, discovery)
+}
+
+func ConvertBindings(t testing.TB, discovered []*capture.Response_Discovered_Binding) []*pf.CaptureSpec_Binding {
+	t.Helper()
 	var bindings []*pf.CaptureSpec_Binding
-	for _, b := range discovery {
+	for _, b := range discovered {
 		var res sqlcapture.Resource
 		require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &res))
 		var path = []string{res.Namespace, res.Stream}
