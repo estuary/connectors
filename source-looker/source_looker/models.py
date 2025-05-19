@@ -48,8 +48,8 @@ OAUTH2_SPEC = OAuth2TokenFlowSpec(
 )
 
 
-# The class name appears in the UI's Authentication section, so we wrap the non-user friendly name in a slighly better name.
-# TODO(alex): figure out why the class name is appearing in the UI & determine if there's some property to set that overrides it.
+# The class name appears in the UI's Authentication section, so
+# we wrap the non-user friendly name in a slighly better name.
 class OAuth2(ResourceOwnerPasswordOAuth2Credentials):
     pass
 
@@ -104,6 +104,7 @@ class DashboardElements(LookerChildStream):
     name: ClassVar[str] = "dashboards_elements"
     path: ClassVar[str] = "dashboard_elements"
     parent: ClassVar[type[LookerStream]] = Dashboards
+    required_can_permission: ClassVar[str] = "show"
 
 
 class Folders(LookerStream):
