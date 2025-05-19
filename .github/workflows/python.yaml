@@ -42,6 +42,7 @@ on:
       - "source-sage-intacct/**"
       - "source-outreach/**"
       - "source-jira-native/**"
+      - "source-looker/**"
 
   pull_request:
     branches: [main]
@@ -85,6 +86,7 @@ on:
       - "source-sage-intacct/**"
       - "source-outreach/**"
       - "source-jira-native/**"
+      - "source-looker/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -247,6 +249,10 @@ jobs:
           - name: source-jira-native
             type: capture
             version: v3
+            usage_rate: "1.0"
+          - name: source-looker
+            type: capture
+            version: v1
             usage_rate: "1.0"
 
     steps:
