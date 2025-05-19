@@ -1,5 +1,4 @@
 import asyncio
-from asyncio import TaskGroup
 from collections import defaultdict
 import typing
 
@@ -21,7 +20,7 @@ class ConnectorStatus:
     counts will be logged as connectorStatus's.
     """
 
-    def __init__(self, log: FlowLogger, stopping: StoppingType, tg: TaskGroup):
+    def __init__(self, log: FlowLogger, stopping: StoppingType):
         async def periodic_log():
             # Allow some initial setup time for bindings to be registered before
             # starting to poll for status changes every second.
@@ -30,7 +29,10 @@ class ConnectorStatus:
                 self._log_status()
                 await asyncio.sleep(1)
 
-        tg.create_task(periodic_log())
+        # Periodically log connector statuses.
+        # We don't do this within a TaskGroup because we don't
+        # want to block on it.
+        asyncio.create_task(periodic_log())
 
         self.log = log
         self.binding_count = 0

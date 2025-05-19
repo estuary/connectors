@@ -110,7 +110,7 @@ class BaseCaptureConnector(
 
                 task = Task(
                     log.getChild("capture"),
-                    ConnectorStatus(log, stopping, tg),
+                    ConnectorStatus(log, stopping),
                     "capture",
                     self.output,
                     stopping,
