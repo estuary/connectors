@@ -1,0 +1,104 @@
+from logging import Logger
+from typing import AsyncGenerator
+
+from estuary_cdk.http import HTTPSession
+from pydantic import TypeAdapter
+
+from .models import (
+    API_VERSION,
+    LookerStream,
+    LookerChildStream,
+    FullRefreshResource,
+    LookMLModel,
+)
+
+
+def url_base(subdomain: str) -> str:
+    return f"https://{subdomain}/api/{API_VERSION}"
+
+
+async def snapshot_resources(
+    http: HTTPSession,
+    subdomain: str,
+    stream: LookerStream,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(subdomain)}/{stream.path}"
+
+    resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url))
+
+    for resource in resources:
+        yield resource
+
+
+async def snapshot_child_resources(
+    http: HTTPSession,
+    subdomain: str,
+    stream: LookerChildStream,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    parent_url = f"{url_base(subdomain)}/{stream.parent.path}"
+
+    parent_resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, parent_url))
+
+    parent_ids: list[str] = []
+
+    for parent in parent_resources:
+        parent = parent.model_dump()
+        id = parent.get("id")
+        can_permissions: dict[str, bool] | None = parent.get("can")
+
+        assert isinstance(id, str)
+        should_be_accessible = True
+        # If the connector is restricted from accessing the child resource of
+        # this parent resource, don't waste an HTTP request trying to access it.
+        if (
+            can_permissions
+            and stream.required_can_permission
+            and not can_permissions.get(stream.required_can_permission, False)
+        ):
+            should_be_accessible = False
+
+        if should_be_accessible:
+            parent_ids.append(id)
+
+    for id in parent_ids:
+        child_url = f"{parent_url}/{id}/{stream.path}"
+        child_resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, child_url))
+
+        for resource in child_resources:
+            yield resource
+
+
+async def snapshot_lookml_model_explore(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    lookml_models_url = f"{url_base(subdomain)}/lookml_models"
+
+    lookml_models = TypeAdapter(list[LookMLModel]).validate_json(await http.request(log, lookml_models_url))
+
+    # lookml_model_info contains the information necessary to look up the explores
+    # associated for each LookML model.
+    # The first element is the LookML model name.
+    # The second element is a list of explore names for that LookML model.
+    lookml_models_info: list[tuple[str, list[str]]] = []
+
+    for lookml_model in lookml_models:
+        lookml_models_info.append(
+            (
+                lookml_model.name,
+                [explore.name for explore in lookml_model.explores ]
+            )
+        )
+
+    for model_name, explores in lookml_models_info:
+        for explore_name in explores:
+            explore_url = f"{lookml_models_url}/{model_name}/explores/{explore_name}"
+
+            explore = FullRefreshResource.model_validate_json(
+                await http.request(log, explore_url)
+            )
+
+            yield explore
