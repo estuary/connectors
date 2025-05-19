@@ -46,29 +46,24 @@ func (m timestampTypeMapping) valid() bool {
 	return m == timestampNTZ || m == timestampLTZ || m == timestampTZ
 }
 
-// TODO(whb): VARCHAR also being compatible with "text" is a compatibility for
-// Snowflake's behavior change 2025_03/bcr-1960, which changes the DATA_TYPE of
-// INFORMATION_SCHEMA.COLUMNS from TEXT to VARCHAR for all string columns. We
-// can remove the "text" compatibility once this behavior change is enabled for
-// all accounts.
 var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:    sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.BINARY:   sql.MapStatic("VARCHAR", sql.AlsoCompatibleWith("text")),
+			sql.BINARY:   sql.MapStatic("TEXT"),
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
-			sql.INTEGER:  sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("number")), // INTEGER DDL is actually an alias for NUMBER
-			sql.NUMBER:   sql.MapStatic("FLOAT"),
+			sql.INTEGER:  sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("fixed")),
+			sql.NUMBER:   sql.MapStatic("FLOAT", sql.AlsoCompatibleWith("real")),
 			sql.OBJECT:   sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.MULTIPLE: sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
-				sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("number"), sql.UsingConverter(sql.StrToInt)), // Equivalent to NUMBER(38,0)
-				sql.MapStatic("VARCHAR", sql.UsingConverter(sql.ToStr), sql.AlsoCompatibleWith("text")),
+				sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("fixed"), sql.UsingConverter(sql.StrToInt)), // Equivalent to NUMBER(38,0)
+				sql.MapStatic("TEXT", sql.UsingConverter(sql.ToStr)),
 				38,
 			),
-			sql.STRING_NUMBER: sql.MapStatic("FLOAT", sql.UsingConverter(sql.StrToFloat("NaN", "inf", "-inf"))),
+			sql.STRING_NUMBER: sql.MapStatic("FLOAT", sql.AlsoCompatibleWith("real"), sql.UsingConverter(sql.StrToFloat("NaN", "inf", "-inf"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("VARCHAR", sql.AlsoCompatibleWith("text")),
+				Fallback: sql.MapStatic("TEXT"),
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date": sql.MapStatic("DATE"),
 					"date-time": sql.MapStatic(
@@ -92,12 +87,12 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"number":        {sql.NewMigrationSpec([]string{"float", "varchar"})},
-			"float":         {sql.NewMigrationSpec([]string{"varchar"})},
-			"date":          {sql.NewMigrationSpec([]string{"varchar"})},
-			"timestamp_ntz": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeNoTzToStringCast))},
-			"timestamp_tz":  {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeToStringCast))},
-			"timestamp_ltz": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeToStringCast))},
+			"fixed":         {sql.NewMigrationSpec([]string{"float", "text"})},
+			"real":          {sql.NewMigrationSpec([]string{"text"})},
+			"date":          {sql.NewMigrationSpec([]string{"text"})},
+			"timestamp_ntz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeNoTzToStringCast))},
+			"timestamp_tz":  {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
+			"timestamp_ltz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 			"*":             {sql.NewMigrationSpec([]string{"variant"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
