@@ -232,7 +232,8 @@ fn binding_info(binding: &Binding) -> Result<ComputedBinding> {
         })
         .collect::<Vec<Pointer>>();
 
-    let (key_schema, schema) = avro::shape_to_avro(shape, &key_ptr);
+    let key_schema = avro::key_to_avro(&key_ptr, shape.clone());
+    let schema = avro::shape_to_avro(shape);
 
     Ok(ComputedBinding {
         topic: binding.resource_path[0].to_string(),
