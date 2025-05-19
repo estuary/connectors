@@ -51,6 +51,7 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
         let res = Response {
             applied: Some(Applied {
                 action_description: do_apply(apply).await?,
+                state: None,
             }),
             ..Default::default()
         };

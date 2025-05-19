@@ -78,36 +78,12 @@ checksum = "4c95c10ba0b00a02636238b814946408b1322d5ac4760326e6fb8ec956d85775"
 
 [[package]]
 name = "apache-avro"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ceb7c683b2f8f40970b70e39ff8be514c95b96fcb9c4af87e1ed2cb2e10801a0"
-dependencies = [
- "crc32fast",
- "digest",
- "lazy_static",
- "libflate",
- "log",
- "num-bigint",
- "quad-rand",
- "rand",
- "regex-lite",
- "serde",
- "serde_json",
- "snap",
- "strum 0.25.0",
- "strum_macros 0.25.3",
- "thiserror",
- "typed-builder 0.16.2",
- "uuid",
-]
-
-[[package]]
-name = "apache-avro"
 version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1aef82843a0ec9f8b19567445ad2421ceeb1d711514384bdd3d49fe37102ee13"
 dependencies = [
  "bigdecimal 0.4.6",
+ "crc32fast",
  "digest",
  "libflate",
  "log",
@@ -118,10 +94,11 @@ dependencies = [
  "serde",
  "serde_bytes",
  "serde_json",
- "strum 0.26.3",
- "strum_macros 0.26.4",
+ "snap",
+ "strum",
+ "strum_macros",
  "thiserror",
- "typed-builder 0.19.1",
+ "typed-builder",
  "uuid",
 ]
 
@@ -140,9 +117,9 @@ checksum = "ace50bade8e6234aa140d9a2f552bbee1db4d353f69b8217bc503490fc1a9f26"
 [[package]]
 name = "avro"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#552f6c0ee269326fd3016e11e5e102fb60bbc062"
+source = "git+https://github.com/estuary/flow#be7a697bebea55b96e91c5b3ae0bd4a8c2d714a2"
 dependencies = [
- "apache-avro 0.16.0",
+ "apache-avro",
  "doc",
  "json",
  "lazy_static",
@@ -436,7 +413,7 @@ dependencies = [
 [[package]]
 name = "doc"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#552f6c0ee269326fd3016e11e5e102fb60bbc062"
+source = "git+https://github.com/estuary/flow#be7a697bebea55b96e91c5b3ae0bd4a8c2d714a2"
 dependencies = [
  "base64 0.13.1",
  "bigdecimal 0.3.1",
@@ -447,7 +424,6 @@ dependencies = [
  "fxhash",
  "itertools 0.10.5",
  "json",
- "lz4",
  "proto-gazette",
  "rkyv",
  "schemars",
@@ -749,12 +725,6 @@ name = "hashbrown"
 version = "0.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a9bfc1af68b1726ea47d3d5109de126281def866b33970e10fbab11b5dafab3"
-
-[[package]]
-name = "heck"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95505c38b4572b2d910cecb0281560f54b440a19336cbbcb27bf6ce6adc6f5a8"
 
 [[package]]
 name = "heck"
@@ -1103,7 +1073,7 @@ dependencies = [
 [[package]]
 name = "json"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#552f6c0ee269326fd3016e11e5e102fb60bbc062"
+source = "git+https://github.com/estuary/flow#be7a697bebea55b96e91c5b3ae0bd4a8c2d714a2"
 dependencies = [
  "addr",
  "bigdecimal 0.3.1",
@@ -1212,25 +1182,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a7a70ba024b9dc04c27ea2f0c0548feb474ec5c54bba33a7f72f873a39d07b24"
 
 [[package]]
-name = "lz4"
-version = "1.28.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d1febb2b4a79ddd1980eede06a8f7902197960aa0383ffcfdd62fe723036725"
-dependencies = [
- "lz4-sys",
-]
-
-[[package]]
-name = "lz4-sys"
-version = "1.11.1+lz4-1.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bd8c0d6c6ed0cd30b3652886bb8711dc4bb01d637a68105a3d5158039b418e6"
-dependencies = [
- "cc",
- "libc",
-]
-
-[[package]]
 name = "matchers"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1244,7 +1195,7 @@ name = "materialize-kafka"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "apache-avro 0.17.0",
+ "apache-avro",
  "avro",
  "base64 0.22.1",
  "bigdecimal 0.4.6",
@@ -1504,7 +1455,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6eea3058763d6e656105d1403cb04e0a41b7bbac6362d413e7c33be0c32279c9"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "itertools 0.13.0",
  "prost",
  "prost-types",
@@ -1620,7 +1571,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0c1318b19085f08681016926435853bbf7858f9c082d0999b80550ff5d9abe15"
 dependencies = [
  "bytes",
- "heck 0.5.0",
+ "heck",
  "itertools 0.13.0",
  "log",
  "multimap",
@@ -1659,7 +1610,7 @@ dependencies = [
 [[package]]
 name = "proto-flow"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#552f6c0ee269326fd3016e11e5e102fb60bbc062"
+source = "git+https://github.com/estuary/flow#be7a697bebea55b96e91c5b3ae0bd4a8c2d714a2"
 dependencies = [
  "bytes",
  "pbjson",
@@ -1674,7 +1625,7 @@ dependencies = [
 [[package]]
 name = "proto-gazette"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#552f6c0ee269326fd3016e11e5e102fb60bbc062"
+source = "git+https://github.com/estuary/flow#be7a697bebea55b96e91c5b3ae0bd4a8c2d714a2"
 dependencies = [
  "bytes",
  "pbjson",
@@ -2261,28 +2212,9 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "strum"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "290d54ea6f91c969195bdbcd7442c8c2a2ba87da8bf60a7ee86a235d4bc1e125"
-
-[[package]]
-name = "strum"
 version = "0.26.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8fec0f0aef304996cf250b31b5a10dee7980c85da9d759361292b8bca5a18f06"
-
-[[package]]
-name = "strum_macros"
-version = "0.25.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23dc1fa9ac9c169a78ba62f0b841814b7abae11bdd047b9c58f893439e309ea0"
-dependencies = [
- "heck 0.4.1",
- "proc-macro2",
- "quote",
- "rustversion",
- "syn 2.0.87",
-]
 
 [[package]]
 name = "strum_macros"
@@ -2290,7 +2222,7 @@ version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4c6bee85a5a24955dc440386795aa378cd9cf82acd5f764469152d2270e581be"
 dependencies = [
- "heck 0.5.0",
+ "heck",
  "proc-macro2",
  "quote",
  "rustversion",
@@ -2641,19 +2573,10 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 [[package]]
 name = "tuple"
 version = "0.0.0"
-source = "git+https://github.com/estuary/flow#552f6c0ee269326fd3016e11e5e102fb60bbc062"
+source = "git+https://github.com/estuary/flow#be7a697bebea55b96e91c5b3ae0bd4a8c2d714a2"
 dependencies = [
  "memchr",
  "serde_json",
-]
-
-[[package]]
-name = "typed-builder"
-version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34085c17941e36627a879208083e25d357243812c30e7d7387c3b954f30ade16"
-dependencies = [
- "typed-builder-macro 0.16.2",
 ]
 
 [[package]]
@@ -2662,18 +2585,7 @@ version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a06fbd5b8de54c5f7c91f6fe4cebb949be2125d7758e630bb58b1d831dbce600"
 dependencies = [
- "typed-builder-macro 0.19.1",
-]
-
-[[package]]
-name = "typed-builder-macro"
-version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f03ca4cb38206e2bef0700092660bb74d696f808514dae47fa1467cbfe26e96e"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
+ "typed-builder-macro",
 ]
 
 [[package]]
