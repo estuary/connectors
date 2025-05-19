@@ -66,7 +66,7 @@ class Checkpoint(BaseModel):
     ackIntents: dict[str, str]
 
 
-class ClientCredentialsOAuth2Spec(BaseModel):
+class OAuth2TokenFlowSpec(BaseModel):
     accessTokenResponseMap: dict[str, str]
     accessTokenUrlTemplate: str
 
@@ -125,6 +125,21 @@ class ValidationError(Exception):
     ValidationError is caught and pretty-printed without a traceback."""
 
     errors: list[str]
+
+
+class ResourceOwnerPasswordOAuth2Credentials(abc.ABC, BaseModel):
+    credentials_title: Literal["OAuth Credentials"] = Field(
+        default="OAuth Credentials",
+        json_schema_extra={"type": "string"}
+    )
+    client_id: str = Field(
+        title="Client Id",
+        json_schema_extra={"secret": True},
+    )
+    client_secret: str = Field(
+        title="Client Secret",
+        json_schema_extra={"secret": True},
+    )
 
 
 class ClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):

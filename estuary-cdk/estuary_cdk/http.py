@@ -16,8 +16,9 @@ from .flow import (
     BaseOAuth2Credentials,
     AuthorizationCodeFlowOAuth2Credentials,
     ClientCredentialsOAuth2Credentials,
-    ClientCredentialsOAuth2Spec,
+    OAuth2TokenFlowSpec,
     LongLivedClientCredentialsOAuth2Credentials,
+    ResourceOwnerPasswordOAuth2Credentials,
     RotatingOAuth2Credentials,
     OAuth2Spec,
 )
@@ -163,9 +164,10 @@ class TokenSource:
         refresh_token: str = ""
         scope: str = ""
 
-    oauth_spec: OAuth2Spec | ClientCredentialsOAuth2Spec | None
+    oauth_spec: OAuth2Spec | OAuth2TokenFlowSpec | None
     credentials: (
         BaseOAuth2Credentials
+        | ResourceOwnerPasswordOAuth2Credentials
         | ClientCredentialsOAuth2Credentials
         | AuthorizationCodeFlowOAuth2Credentials
         | LongLivedClientCredentialsOAuth2Credentials
@@ -193,6 +195,7 @@ class TokenSource:
             isinstance(self.credentials, BaseOAuth2Credentials)
             or isinstance(self.credentials, ClientCredentialsOAuth2Credentials)
             or isinstance(self.credentials, AuthorizationCodeFlowOAuth2Credentials)
+            or isinstance(self.credentials, ResourceOwnerPasswordOAuth2Credentials)
         )
         current_time = time.time()
 
@@ -236,6 +239,7 @@ class TokenSource:
         log: Logger,
         session: HTTPSession,
         credentials: BaseOAuth2Credentials
+        | ResourceOwnerPasswordOAuth2Credentials
         | ClientCredentialsOAuth2Credentials
         | AuthorizationCodeFlowOAuth2Credentials
         | RotatingOAuth2Credentials,
@@ -266,6 +270,12 @@ class TokenSource:
             case AuthorizationCodeFlowOAuth2Credentials():
                 form = {
                     "grant_type": "authorization_code",
+                    "client_id": credentials.client_id,
+                    "client_secret": credentials.client_secret,
+                }
+            case ResourceOwnerPasswordOAuth2Credentials():
+                form = {
+                    "grant_type": "password",
                     "client_id": credentials.client_id,
                     "client_secret": credentials.client_secret,
                 }
