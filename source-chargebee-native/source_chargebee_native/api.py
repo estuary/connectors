@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator, TypeVar
 
+import asyncio
+
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.capture.common import (
     PageCursor,
@@ -62,7 +64,10 @@ async def _fetch_resource_data(
             params[f"{cursor_field}[before]"] = int(end_date.timestamp())
 
     if start_date and end_date and start_date == end_date:
-        raise ValueError("Start and end dates cannot be the same", {"start_date": start_date, "end_date": end_date})
+        raise ValueError(
+            "Start and end dates cannot be the same",
+            {"start_date": start_date, "end_date": end_date},
+        )
 
     if include_deleted:
         params["include_deleted"] = "true"
@@ -70,14 +75,52 @@ async def _fetch_resource_data(
     if filter_params:
         params.update(filter_params)
 
-    response = APIResponse[resource_type].model_validate_json(
-        await http.request(log, url, params=params)
-    )
-    
-    if not response.list:
-        return [], response.next_offset
+    async def _fetch_data(
+        http: HTTPSession,
+        log: Logger,
+        url: str,
+        params: dict[str, int | str | list[int]],
+        resource_type: type[ChargebeeResourceType],
+    ) -> tuple[list[ChargebeeResourceType], str | None]:
+        response = APIResponse[resource_type].model_validate_json(
+            await http.request(log, url, params=params)
+        )
 
-    return response.list, response.next_offset
+        if not response.list:
+            return [], response.next_offset
+
+        return response.list, response.next_offset
+
+    max_retries = 10
+    retry_count = 0
+
+    while True:
+        request_start_time = datetime.now(tz=UTC)
+        try:
+            return await _fetch_data(
+                http=http,
+                log=log,
+                url=url,
+                params=params,
+                resource_type=resource_type,
+            )
+        except asyncio.TimeoutError as e:
+            request_end_time = datetime.now(tz=UTC)
+            request_duration = (request_end_time - request_start_time).total_seconds()
+            retry_count += 1
+            if retry_count >= max_retries:
+                raise
+            log.warning(
+                "Timeout occurred while fetching resource data",
+                {
+                    "resource": resource_name,
+                    "params": params,
+                    "retry_count": retry_count,
+                    "max_retries": max_retries,
+                    "request_duration_seconds": request_duration,
+                    "error": str(e),
+                },
+            )
 
 
 async def snapshot_resource(
