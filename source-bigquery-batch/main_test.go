@@ -81,13 +81,15 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	}
 
 	var sanitizers = make(map[string]*regexp.Regexp)
+	sanitizers[`"index":99`] = regexp.MustCompile(`"index":\d+`)
+	sanitizers[`"row_id":99`] = regexp.MustCompile(`"row_id":\d+`)
 	sanitizers[`"polled":"<TIMESTAMP>"`] = regexp.MustCompile(`"polled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 	sanitizers[`"LastPolled":"<TIMESTAMP>"`] = regexp.MustCompile(`"LastPolled":"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
 
 	return &st.CaptureSpec{
 		Driver:       bigqueryDriver,
 		EndpointSpec: endpointSpec,
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.SortedCaptureValidator{},
 		Sanitizers:   sanitizers,
 	}
 }

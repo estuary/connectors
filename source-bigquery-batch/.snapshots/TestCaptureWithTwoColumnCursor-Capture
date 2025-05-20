@@ -1,18 +1,18 @@
 # ================================
 # Collection "acmeCo/test/capturewithtwocolumncursor_321285": 12 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"col1":1,"col2":1,"data":"Value for row 0","id":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"col1":1,"col2":2,"data":"Value for row 1","id":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"col1":1,"col2":3,"data":"Value for row 2","id":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"col1":2,"col2":1,"data":"Value for row 3","id":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"col1":2,"col2":2,"data":"Value for row 4","id":4}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5},"col1":2,"col2":3,"data":"Value for row 5","id":5}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":6},"col1":3,"col2":1,"data":"Value for row 8","id":8}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":7},"col1":3,"col2":2,"data":"Value for row 9","id":9}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":8},"col1":3,"col2":3,"data":"Value for row 10","id":10}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":9},"col1":4,"col2":1,"data":"Value for row 11","id":11}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":10},"col1":4,"col2":2,"data":"Value for row 12","id":12}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":11},"col1":4,"col2":3,"data":"Value for row 13","id":13}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":1,"col2":1,"data":"Value for row 0","id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":1,"col2":2,"data":"Value for row 1","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":1,"col2":3,"data":"Value for row 2","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":2,"col2":1,"data":"Value for row 3","id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":2,"col2":2,"data":"Value for row 4","id":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":2,"col2":3,"data":"Value for row 5","id":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":3,"col2":1,"data":"Value for row 8","id":8}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":3,"col2":2,"data":"Value for row 9","id":9}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":3,"col2":3,"data":"Value for row 10","id":10}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":4,"col2":1,"data":"Value for row 11","id":11}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":4,"col2":2,"data":"Value for row 12","id":12}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"col1":4,"col2":3,"data":"Value for row 13","id":13}
 # ================================
 # Final State Checkpoint
 # ================================

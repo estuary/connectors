@@ -1,41 +1,28 @@
 # ================================
-# Collection "acmeCo/test/keylessfullrefreshcapture_941246": 35 Documents
+# Collection "acmeCo/test/keylessfullrefreshcapture_941246": 22 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"op":"c"},"data":"Initial row 4","value":4}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"op":"c"},"data":"Initial row 2","value":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"op":"c"},"data":"Initial row 3","value":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"op":"c"},"data":"Initial row 0","value":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"op":"c"},"data":"Initial row 1","value":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"op":"u"},"data":"Additional row 5","value":5}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"op":"u"},"data":"Initial row 1","value":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"op":"u"},"data":"Additional row 7","value":7}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"op":"u"},"data":"Additional row 6","value":6}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"op":"u"},"data":"Initial row 0","value":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"op":"c"},"data":"Additional row 9","value":9}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"op":"c"},"data":"Initial row 2","value":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"op":"c"},"data":"Additional row 8","value":8}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"op":"c"},"data":"Initial row 4","value":4}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"op":"c"},"data":"Initial row 3","value":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"op":"u"},"data":"Additional row 8","value":8}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"op":"u"},"data":"Initial row 2","value":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"op":"u"},"data":"Initial row 1","value":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"op":"u"},"data":"Additional row 7 (updated)","value":7}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"op":"u"},"data":"Initial row 0","value":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"op":"u"},"data":"Initial row 3 (updated)","value":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"op":"u"},"data":"Additional row 5 (updated)","value":5}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"op":"u"},"data":"Initial row 4 (updated)","value":4}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"op":"u"},"data":"Additional row 6 (updated)","value":6}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"op":"u"},"data":"Additional row 9","value":9}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"op":"u"},"data":"New row B","value":21}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"op":"u"},"data":"Initial row 3 (updated)","value":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"op":"u"},"data":"Additional row 8","value":8}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"op":"u"},"data":"Initial row 2","value":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"op":"u"},"data":"Additional row 5 (updated)","value":5}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"op":"u"},"data":"Initial row 1","value":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"op":"u"},"data":"Initial row 0","value":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"op":"u"},"data":"Additional row 9","value":9}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"op":"u"},"data":"New row A","value":20}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"op":"u"},"data":"Additional row 7 (updated)","value":7}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Additional row 6","value":6}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Additional row 7","value":7}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Additional row 9","value":9}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Initial row 0","value":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Initial row 1","value":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Initial row 2","value":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Initial row 3","value":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"c"},"data":"Initial row 4","value":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Additional row 5 (updated)","value":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Additional row 5","value":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Additional row 6 (updated)","value":6}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Additional row 7 (updated)","value":7}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Additional row 8","value":8}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Additional row 9","value":9}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Initial row 0","value":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Initial row 1","value":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Initial row 2","value":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Initial row 3 (updated)","value":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Initial row 4 (updated)","value":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"Initial row 4","value":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"New row A","value":20}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"op":"u"},"data":"New row B","value":21}
 # ================================
 # Final State Checkpoint
 # ================================
