@@ -260,10 +260,10 @@ func computeBackfillStartTime(cfg *config, res *resource, prevBackfill *backfill
 	// - Advanced Endpoint Config
 	// - Default to 24h if no cursor or 5m if there's a cursor
 	var delay time.Duration
-	if d, err := time.ParseDuration(res.MinBackfillInterval); err == nil && d > 0 {
-		delay = d
-	} else if d, err := time.ParseDuration(cfg.Advanced.MinBackfillInterval); err == nil && d > 0 {
-		delay = d
+	if res.MinBackfillInterval != "" {
+		delay, _ = time.ParseDuration(res.MinBackfillInterval) // Cannot fail, already validated
+	} else if cfg.Advanced.MinBackfillInterval != "" {
+		delay, _ = time.ParseDuration(cfg.Advanced.MinBackfillInterval) // Cannot fail, already validated
 	} else if hasRestartCursor {
 		delay = backfillRestartDelayWithRestartCursor
 	} else {

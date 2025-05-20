@@ -27,7 +27,7 @@ type resource struct {
 	InitTimestamp     string       `json:"initTimestamp,omitempty" jsonschema:"title=Initial Replication Timestamp,description=Optionally overrides the initial replication timestamp (which is either Zero or Now depending on the backfill mode). Has no effect if changed after a binding is added."`
 	RestartCursorPath string       `json:"restartCursorPath,omitempty" jsonschema:"title=Restart Cursor Path,description=Optionally specifies a JSON pointer to some document property which increases monotonically and can be used as a restart cursor to optimize backfill behavior when streaming consistency is lost. Generally this only matters for collections with very high write volumes.,pattern=^(/([^/~]|~[01])+)*$"`
 
-	MinBackfillInterval string `json:"min_backfill_interval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=Controls how often a collection may be re-backfilled in the event of unrecoverable change stream failure. Overrides any other defaults for this particular resource."`
+	MinBackfillInterval string `json:"minBackfillInterval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=Controls how often a collection may be re-backfilled in the event of unrecoverable change stream failure. Overrides any other defaults for this particular resource." jsonschema_extras:"pattern=^([0-9]+([.][0-9]+)?(h|m|s|ms))+$"`
 }
 
 var jsonPointerRegexp = regexp.MustCompile(`^(/([^/~]|~[01])+)*$`)
@@ -47,6 +47,11 @@ func (r resource) Validate() error {
 	if r.RestartCursorPath != "" {
 		if !jsonPointerRegexp.MatchString(r.RestartCursorPath) {
 			return fmt.Errorf("invalid restart cursor path %q: path must be a JSON pointer", r.RestartCursorPath)
+		}
+	}
+	if r.MinBackfillInterval != "" {
+		if _, err := time.ParseDuration(r.MinBackfillInterval); err != nil {
+			return fmt.Errorf("invalid minBackfillInterval value %q on resource %q: %w", r.MinBackfillInterval, r.Path, err)
 		}
 	}
 	return nil
@@ -76,7 +81,7 @@ type advancedConfig struct {
 
 	SkipDiscovery bool `json:"skip_discovery,omitempty" jsonschema:"title=Skip Automatic Discovery,description=When set the connector will skip automatic collection discovery. This generally only makes sense when the \"Extra Collections\" setting is used."`
 
-	MinBackfillInterval string `json:"min_backfill_interval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=Controls how often a collection may be re-backfilled in the event of unrecoverable change stream failure. May be overridden by the per-resource setting."`
+	MinBackfillInterval string `json:"minBackfillInterval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=Controls how often a collection may be re-backfilled in the event of unrecoverable change stream failure. May be overridden by the per-resource setting."  jsonschema_extras:"pattern=^([0-9]+([.][0-9]+)?(h|m|s|ms))+$"`
 }
 
 var databasePathRe = regexp.MustCompile(`^projects/[^/]+/databases/[^/]+$`)
@@ -87,6 +92,11 @@ func (c *config) Validate() error {
 	}
 	if c.DatabasePath != "" && !databasePathRe.MatchString(c.DatabasePath) {
 		return fmt.Errorf("invalid database path %q", c.DatabasePath)
+	}
+	if c.Advanced.MinBackfillInterval != "" {
+		if _, err := time.ParseDuration(c.Advanced.MinBackfillInterval); err != nil {
+			return fmt.Errorf("invalid minBackfillInterval value %q: %w", c.Advanced.MinBackfillInterval, err)
+		}
 	}
 	return nil
 }
