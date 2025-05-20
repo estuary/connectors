@@ -15,46 +15,6 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-// The fallback key of discovered collections when the source table has no primary key.
-var fallbackKey = []string{"/_meta/row_id"}
-
-func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
-	// Generate schema for the metadata via reflection
-	var reflector = jsonschema.Reflector{
-		ExpandedStruct: true,
-		DoNotReference: true,
-	}
-	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
-	metadataSchema.Definitions = nil
-	metadataSchema.AdditionalProperties = nil
-
-	var required = []string{"_meta"}
-	var properties = map[string]*jsonschema.Schema{
-		"_meta": metadataSchema,
-	}
-	for colName, colType := range columnTypes {
-		properties[colName] = colType
-	}
-	required = append(required, keyColumns...)
-
-	var schema = &jsonschema.Schema{
-		Type:                 "object",
-		Required:             required,
-		AdditionalProperties: nil,
-		Extras: map[string]interface{}{
-			"properties":     properties,
-			"x-infer-schema": true,
-		},
-	}
-
-	// Marshal schema to JSON
-	bs, err := json.Marshal(schema)
-	if err != nil {
-		return nil, fmt.Errorf("error serializing schema: %w", err)
-	}
-	return json.RawMessage(bs), nil
-}
-
 // Discover enumerates tables and views from `information_schema.tables` and generates
 // placeholder capture queries for thos tables.
 func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
@@ -134,6 +94,46 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 
 	return &pc.Response_Discovered{Bindings: bindings}, nil
+}
+
+// The fallback key of discovered collections when the source table has no primary key.
+var fallbackKey = []string{"/_meta/row_id"}
+
+func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
+	// Generate schema for the metadata via reflection
+	var reflector = jsonschema.Reflector{
+		ExpandedStruct: true,
+		DoNotReference: true,
+	}
+	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	metadataSchema.Definitions = nil
+	metadataSchema.AdditionalProperties = nil
+
+	var required = []string{"_meta"}
+	var properties = map[string]*jsonschema.Schema{
+		"_meta": metadataSchema,
+	}
+	for colName, colType := range columnTypes {
+		properties[colName] = colType
+	}
+	required = append(required, keyColumns...)
+
+	var schema = &jsonschema.Schema{
+		Type:                 "object",
+		Required:             required,
+		AdditionalProperties: nil,
+		Extras: map[string]interface{}{
+			"properties":     properties,
+			"x-infer-schema": true,
+		},
+	}
+
+	// Marshal schema to JSON
+	bs, err := json.Marshal(schema)
+	if err != nil {
+		return nil, fmt.Errorf("error serializing schema: %w", err)
+	}
+	return json.RawMessage(bs), nil
 }
 
 // primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key
