@@ -7,5 +7,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"compositetypes_483529":{"CursorNames":["id"],"CursorValues":[3],"LastPolled":"<TIMESTAMP>","DocumentCount":3}}}
+{"bindingStateV1":{"compositetypes_483529":{"CursorNames":["id"],"CursorValues":[3],"DocumentCount":3,"LastPolled":"<TIMESTAMP>"}}}
 

@@ -37,7 +37,7 @@ var (
 	)
 	projectID = flag.String(
 		"project_id",
-		"pivotal-base-360421",
+		"estuary-theatre",
 		"The project ID to use for tests",
 	)
 	testDataset = flag.String(
