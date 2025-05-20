@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"reflect"
 	"regexp"
+	"slices"
 	"strings"
 
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -30,23 +31,13 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	}
 	defer db.Close()
 
-	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	tableInfo, err := drv.discoverTables(ctx, db, &cfg)
 	if err != nil {
-		return nil, fmt.Errorf("error listing tables: %w", err)
-	}
-	columns, err := discoverColumns(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing columns: %w", err)
-	}
-	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
-	if err != nil {
-		return nil, fmt.Errorf("error listing primary keys: %w", err)
+		return nil, fmt.Errorf("error discovering tables: %w", err)
 	}
 
 	var bindings []*pc.Response_Discovered_Binding
-	for _, table := range tables {
-		var tableID = table.Schema + "." + table.Name
-
+	for tableID, table := range tableInfo {
 		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
 		var res, err = drv.GenerateResource(&cfg, recommendedName, table.Schema, table.Name, table.Type)
 		if err != nil {
@@ -62,26 +53,9 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 			return nil, fmt.Errorf("error serializing resource spec: %w", err)
 		}
 
-		// Figure out column types and collection key, if any
-		var columnTypes = make(map[string]*jsonschema.Schema)
-		for _, col := range columns[tableID] {
-			columnTypes[col.Name] = col.DataType.JSONSchema()
-		}
-		var keyColumns []string    // Names of primary-key columns in the source table. Empty if no primary key.
-		var collectionKey []string // JSON pointers of the collection key
-		if tableKey, ok := keys[tableID]; ok {
-			keyColumns = tableKey.Columns
-			for _, colName := range tableKey.Columns {
-				collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
-			}
-		} else {
-			collectionKey = fallbackKey
-		}
-
-		// Generate schema for the collection.
-		collectionSchema, err := generateCollectionSchema(&cfg, keyColumns, columnTypes)
+		collectionSchema, collectionKey, err := generateCollectionSchema(&cfg, table, true)
 		if err != nil {
-			return nil, fmt.Errorf("error generating minimal collection schema: %w", err)
+			return nil, fmt.Errorf("error generating %q collection schema: %w", tableID, err)
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
@@ -96,10 +70,54 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	return &pc.Response_Discovered{Bindings: bindings}, nil
 }
 
+func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *Config) (map[string]*discoveredTable, error) {
+	tables, err := discoverTables(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing tables: %w", err)
+	}
+	columns, err := discoverColumns(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing columns: %w", err)
+	}
+	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing primary keys: %w", err)
+	}
+
+	var tableInfo = make(map[string]*discoveredTable)
+	for _, table := range tables {
+		var tableID = table.Schema + "." + table.Name
+		tableInfo[tableID] = table
+	}
+	for _, column := range columns {
+		var tableID = column.Schema + "." + column.Table
+		if table, ok := tableInfo[tableID]; ok {
+			table.columns = append(table.columns, column)
+		}
+	}
+	for _, key := range keys {
+		var tableID = key.Schema + "." + key.Table
+		if table, ok := tableInfo[tableID]; ok {
+			table.key = key
+		}
+	}
+	return tableInfo, nil
+}
+
 // The fallback key of discovered collections when the source table has no primary key.
 var fallbackKey = []string{"/_meta/row_id"}
 
-func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[string]*jsonschema.Schema) (json.RawMessage, error) {
+func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSchema bool) (json.RawMessage, []string, error) {
+	// Extract useful key and column type information
+	var keyColumns []string
+	if table.key != nil {
+		keyColumns = table.key.Columns
+	}
+	var columnTypes = make(map[string]columnType)
+	for _, column := range table.columns {
+		columnTypes[column.Name] = column.DataType
+	}
+
 	// Generate schema for the metadata via reflection
 	var reflector = jsonschema.Reflector{
 		ExpandedStruct: true,
@@ -107,33 +125,55 @@ func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[
 	}
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
 	metadataSchema.Definitions = nil
-	metadataSchema.AdditionalProperties = nil
+	if metadataSchema.Extras == nil {
+		metadataSchema.Extras = make(map[string]any)
+	}
+	if fullWriteSchema {
+		metadataSchema.AdditionalProperties = nil
+	} else {
+		metadataSchema.Extras["additionalProperties"] = false
+	}
 
-	var required = []string{"_meta"}
+	var required = append([]string{"_meta"}, keyColumns...)
 	var properties = map[string]*jsonschema.Schema{
 		"_meta": metadataSchema,
 	}
 	for colName, colType := range columnTypes {
-		properties[colName] = colType
+		var colSchema = colType.JSONSchema()
+		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !fullWriteSchema {
+			// Remove null as an option when there are multiple type options and we don't want nullability
+			colSchema.Extras["type"] = slices.DeleteFunc(types, func(t string) bool { return t == "null" })
+		}
+		properties[colName] = colSchema
 	}
-	required = append(required, keyColumns...)
 
 	var schema = &jsonschema.Schema{
-		Type:                 "object",
-		Required:             required,
-		AdditionalProperties: nil,
+		Type:     "object",
+		Required: required,
 		Extras: map[string]interface{}{
 			"properties":     properties,
 			"x-infer-schema": true,
 		},
 	}
+	if !fullWriteSchema {
+		schema.Extras["additionalProperties"] = false
+	}
 
 	// Marshal schema to JSON
 	bs, err := json.Marshal(schema)
 	if err != nil {
-		return nil, fmt.Errorf("error serializing schema: %w", err)
+		return nil, nil, fmt.Errorf("error serializing schema: %w", err)
 	}
-	return json.RawMessage(bs), nil
+
+	// If the table has a primary key then convert it to a collection key, otherwise
+	// recommend an appropriate fallback collection key.
+	var collectionKey = fallbackKey
+	if keyColumns != nil {
+		for _, colName := range keyColumns {
+			collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
+		}
+	}
+	return json.RawMessage(bs), collectionKey, nil
 }
 
 // primaryKeyToCollectionKey converts a database primary key column name into a Flow collection key
@@ -150,6 +190,9 @@ type discoveredTable struct {
 	Schema string
 	Name   string
 	Type   string // Usually 'BASE TABLE' or 'VIEW'
+
+	columns []*discoveredColumn
+	key     *discoveredPrimaryKey
 }
 
 func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredTable, error) {
@@ -244,7 +287,7 @@ func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
 	return sch
 }
 
-func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) (map[string][]*discoveredColumn, error) {
+func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredColumn, error) {
 	var query = new(strings.Builder)
 	var args []any
 
@@ -277,7 +320,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 	}
 	defer rows.Close()
 
-	var columnsByTable = make(map[string][]*discoveredColumn)
+	var columns []*discoveredColumn
 	for rows.Next() {
 		var tableSchema, tableName, columnName string
 		var columnIndex int
@@ -293,7 +336,6 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		}
 		dataType.nullable = isNullable
 
-		var tableID = tableSchema + "." + tableName
 		var column = &discoveredColumn{
 			Schema:     tableSchema,
 			Table:      tableName,
@@ -302,9 +344,9 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 			IsNullable: isNullable,
 			DataType:   &dataType,
 		}
-		columnsByTable[tableID] = append(columnsByTable[tableID], column)
+		columns = append(columns, column)
 	}
-	return columnsByTable, nil
+	return columns, nil
 }
 
 type discoveredPrimaryKey struct {
@@ -313,7 +355,7 @@ type discoveredPrimaryKey struct {
 	Columns []string
 }
 
-func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) (map[string]*discoveredPrimaryKey, error) {
+func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
 	var query = new(strings.Builder)
 	var args []any
 
@@ -371,7 +413,12 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
 		}
 	}
-	return keysByTable, nil
+
+	var keys []*discoveredPrimaryKey
+	for _, key := range keysByTable {
+		keys = append(keys, key)
+	}
+	return keys, nil
 }
 
 var databaseTypeToJSON = map[string]basicColumnType{
