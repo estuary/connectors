@@ -1,9 +1,9 @@
 # ================================
 # Collection "acmeCo/test/compositetypes_483529": 3 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"array_struct":[[1,"first"],[2,"second"]],"id":1,"int_array":[1,2,3],"string_array":["a","b","c"],"struct_val":["Alice",25,[90.5,85,92.3]]}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"array_struct":null,"id":2,"int_array":null,"string_array":null,"struct_val":["Bob",30,null]}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"array_struct":null,"id":3,"int_array":null,"string_array":null,"struct_val":null}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"array_struct":[[1,"first"],[2,"second"]],"id":1,"int_array":[1,2,3],"string_array":["a","b","c"],"struct_val":["Alice",25,[90.5,85,92.3]]}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"array_struct":null,"id":2,"int_array":null,"string_array":null,"struct_val":["Bob",30,null]}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"array_struct":null,"id":3,"int_array":null,"string_array":null,"struct_val":null}
 # ================================
 # Final State Checkpoint
 # ================================
