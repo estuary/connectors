@@ -20,9 +20,17 @@ Binding 0:
           "ID"
         ],
         "properties": {
+          "DATA": {
+            "description": "(source type: non-nullable VARCHAR2)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "ID": {
             "type": "string",
-            "format": "integer"
+            "format": "integer",
+            "description": "(source type: NUMBER)"
           },
           "_meta": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
