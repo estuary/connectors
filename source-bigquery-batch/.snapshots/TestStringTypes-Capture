@@ -10,5 +10,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"stringtypes_339419":{"CursorNames":["id"],"CursorValues":[6],"LastPolled":"<TIMESTAMP>","DocumentCount":6}}}
+{"bindingStateV1":{"stringtypes_339419":{"CursorNames":["id"],"CursorValues":[6],"DocumentCount":6,"LastPolled":"<TIMESTAMP>"}}}
 
