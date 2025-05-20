@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"slices"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -22,6 +21,7 @@ import (
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/sync/semaphore"
 	"google.golang.org/api/iterator"
 )
 
@@ -47,6 +47,10 @@ const (
 	// This timeout can be less generous, because after the first row is received we
 	// ought to be getting a consistent stream of results until the query completes.
 	pollingWatchdogTimeout = 5 * time.Minute
+
+	// Maximum number of concurrent polling operations to run at once. Might be
+	// worth making this configurable in the advanced endpoint settings.
+	maxConcurrentQueries = 1
 )
 
 var (
@@ -169,7 +173,6 @@ func generateCollectionSchema(cfg *Config, keyColumns []string, columnTypes map[
 	}
 	return json.RawMessage(bs), nil
 }
-
 
 // Spec returns metadata about the capture connector.
 func (drv *BatchSQLDriver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
@@ -487,12 +490,13 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 
 	var capture = &capture{
-		Driver:   drv,
-		Config:   &cfg,
-		State:    &state,
-		DB:       db,
-		Bindings: bindings,
-		Output:   stream,
+		Driver:    drv,
+		Config:    &cfg,
+		State:     &state,
+		DB:        db,
+		Bindings:  bindings,
+		Output:    stream,
+		Sempahore: semaphore.NewWeighted(maxConcurrentQueries),
 	}
 	return capture.Run(stream.Context())
 }
@@ -522,13 +526,13 @@ func updateResourceStates(prevState captureState, bindings []bindingInfo) (captu
 }
 
 type capture struct {
-	Driver   *BatchSQLDriver
-	Config   *Config
-	State    *captureState
-	DB       *bigquery.Client
-	Bindings []bindingInfo
-	Output   *boilerplate.PullOutput
-	Mutex    sync.Mutex
+	Driver    *BatchSQLDriver
+	Config    *Config
+	State     *captureState
+	DB        *bigquery.Client
+	Bindings  []bindingInfo
+	Output    *boilerplate.PullOutput
+	Sempahore *semaphore.Weighted
 }
 
 type bindingInfo struct {
@@ -567,26 +571,67 @@ func (c *capture) Run(ctx context.Context) error {
 
 func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	var res = binding.resource
+	var stateKey = binding.stateKey
+	var state, ok = c.State.Streams[stateKey]
+	if !ok {
+		return fmt.Errorf("internal error: no state for stream %q", res.Name)
+	}
+
+	// Polling schedule can be configured per binding. If unset, falls back to the connector default.
+	var pollScheduleStr = c.Config.Advanced.PollSchedule
+	if res.PollSchedule != "" {
+		pollScheduleStr = res.PollSchedule
+	}
+	var pollSchedule, err = schedule.Parse(pollScheduleStr)
+	if err != nil {
+		return fmt.Errorf("failed to parse polling schedule %q: %w", pollScheduleStr, err)
+	}
+
 	log.WithFields(log.Fields{
 		"name":   res.Name,
 		"tmpl":   res.Template,
 		"cursor": res.Cursor,
-		"poll":   res.PollSchedule,
+		"poll":   pollSchedule,
+		"last":   state.LastPolled.Format(time.RFC3339Nano),
 	}).Info("starting worker")
 
-	templateString, err := c.Driver.SelectQueryTemplate(res)
-	if err != nil {
-		return fmt.Errorf("error selecting query template: %w", err)
-	}
-	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(templateString)
-	if err != nil {
-		return fmt.Errorf("error parsing template: %w", err)
-	}
-
 	for ctx.Err() == nil {
-		if err := c.poll(ctx, binding, queryTemplate); err != nil {
-			return fmt.Errorf("error polling binding %q: %w", res.Name, err)
+		time.Sleep(100 * time.Millisecond) // Short delay to make startup logs tidier
+
+		// Wait for next scheduled polling cycle.
+		if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
+			return err
 		}
+		var pollTime = time.Now().UTC()
+		log.WithFields(log.Fields{
+			"name": res.Name,
+			"poll": pollScheduleStr,
+			"prev": state.LastPolled.Format(time.RFC3339Nano),
+		}).Info("ready to poll")
+
+		time.Sleep(100 * time.Millisecond) // Short delay to make startup logs tidier
+
+		// Acquire semaphore and execute polling operation.
+		if err := c.Sempahore.Acquire(ctx, 1); err != nil {
+			return fmt.Errorf("error acquiring semaphore: %w", err)
+		}
+		if err := func() error {
+			// Ensure that the semaphore is released when we finish polling.
+			defer c.Sempahore.Release(1)
+			log.WithFields(log.Fields{"name": res.Name}).Info("polling binding")
+			if err := c.poll(ctx, binding); err != nil {
+				return fmt.Errorf("error polling binding %q: %w", res.Name, err)
+			}
+			return nil
+		}(); err != nil {
+			return err
+		}
+
+		state.LastPolled = pollTime
+		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+			return err
+		}
+
 		if TestShutdownAfterQuery {
 			return nil // In tests, we want each worker to shut down after one poll
 		}
@@ -594,7 +639,7 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 	return ctx.Err()
 }
 
-func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template.Template) error {
+func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var res = binding.resource
 	var stateKey = binding.stateKey
 	var state, ok = c.State.Streams[stateKey]
@@ -615,6 +660,15 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	var isFullRefresh = len(cursorNames) == 0
 	var isInitialBackfill = len(cursorValues) == 0
 
+	templateString, err := c.Driver.SelectQueryTemplate(res)
+	if err != nil {
+		return fmt.Errorf("error selecting query template: %w", err)
+	}
+	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(templateString)
+	if err != nil {
+		return fmt.Errorf("error parsing template: %w", err)
+	}
+
 	var quotedCursorNames []string
 	for _, cursorName := range cursorNames {
 		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
@@ -626,35 +680,8 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 		"TableName":    res.TableName,
 	}
 
-	// Polling schedule can be configured per binding. If unset, falls back to the
-	// connector global polling schedule.
-	var pollScheduleStr = c.Config.Advanced.PollSchedule
-	if res.PollSchedule != "" {
-		pollScheduleStr = res.PollSchedule
-	}
-	var pollSchedule, err = schedule.Parse(pollScheduleStr)
-	if err != nil {
-		return fmt.Errorf("failed to parse polling schedule %q: %w", pollScheduleStr, err)
-	}
-	log.WithFields(log.Fields{
-		"name": res.Name,
-		"poll": pollScheduleStr,
-		"prev": state.LastPolled.Format(time.RFC3339Nano),
-	}).Info("waiting for next scheduled poll")
-	if err := schedule.WaitForNext(ctx, pollSchedule, state.LastPolled); err != nil {
-		return err
-	}
-	log.WithFields(log.Fields{
-		"name": res.Name,
-		"poll": pollScheduleStr,
-	}).Info("ready to poll")
-
-	// Acquire mutex so that only one worker at a time can be actively executing a query.
-	c.Mutex.Lock()
-	defer c.Mutex.Unlock()
-
 	var queryBuf = new(strings.Builder)
-	if err := tmpl.Execute(queryBuf, templateArg); err != nil {
+	if err := queryTemplate.Execute(queryBuf, templateArg); err != nil {
 		return fmt.Errorf("error generating query: %w", err)
 	}
 	var query = queryBuf.String()
