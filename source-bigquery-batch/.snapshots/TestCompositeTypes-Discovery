@@ -59,8 +59,24 @@ Binding 0:
               "row_id"
             ]
           },
+          "array_struct": {
+            "description": "using catch-all schema (source type: non-nullable ARRAY\u003cSTRUCT\u003cid INT64, label STRING\u003e\u003e)"
+          },
           "id": {
-            "type": "integer"
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "int_array": {
+            "description": "using catch-all schema (source type: non-nullable ARRAY\u003cINT64\u003e)"
+          },
+          "string_array": {
+            "description": "using catch-all schema (source type: non-nullable ARRAY\u003cSTRING\u003e)"
+          },
+          "struct_val": {
+            "description": "using catch-all schema (source type: STRUCT\u003cname STRING, age INT64, scores ARRAY\u003cFLOAT64\u003e\u003e)"
           }
         },
         "x-infer-schema": true

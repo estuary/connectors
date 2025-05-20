@@ -54,6 +54,32 @@ Binding 0:
               "index",
               "row_id"
             ]
+          },
+          "id": {
+            "type": "integer",
+            "description": "(source type: non-nullable INT64)"
+          },
+          "name": {
+            "description": "(source type: STRING)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "description": "(source type: TIMESTAMP)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "visible": {
+            "description": "(source type: BOOL)",
+            "type": [
+              "boolean",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
