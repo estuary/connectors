@@ -60,8 +60,33 @@ Binding 0:
               "row_id"
             ]
           },
+          "col1": {
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "col2": {
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "data": {
+            "description": "(source type: STRING)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

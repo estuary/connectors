@@ -59,8 +59,27 @@ Binding 0:
               "row_id"
             ]
           },
+          "bool_val": {
+            "description": "(source type: BOOL)",
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "bytes_val": {
+            "description": "(source type: BYTES)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

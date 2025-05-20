@@ -59,8 +59,53 @@ Binding 0:
               "row_id"
             ]
           },
+          "bigdecimal_val": {
+            "format": "number",
+            "description": "(source type: BIGNUMERIC)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bignumeric_val": {
+            "format": "number",
+            "description": "(source type: BIGNUMERIC)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decimal_val": {
+            "format": "number",
+            "description": "(source type: NUMERIC)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "float64_val": {
+            "format": "number",
+            "description": "(source type: FLOAT64)",
+            "type": [
+              "number",
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "numeric_val": {
+            "format": "number",
+            "description": "(source type: NUMERIC)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

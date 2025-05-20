@@ -53,6 +53,20 @@ Binding 0:
               "polled",
               "index"
             ]
+          },
+          "data": {
+            "description": "(source type: STRING)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
