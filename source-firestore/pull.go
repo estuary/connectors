@@ -237,19 +237,21 @@ func initResourceStates(cfg *config, prevStates map[boilerplate.StateKey]*resour
 			state.Backfill = prevState.Backfill
 			state.Inconsistent = true // Still inconsistent for later
 		} else if res.BackfillMode == backfillModeAsync {
-			state.Backfill = &backfillState{
-				StartAfter: computeBackfillStartTime(
-					cfg, &res,
-					prevState.Backfill, now,
-					len(prevState.restartCursorPath) != 0,
-				),
+			var startTime, err = computeBackfillStartTime(
+				cfg, &res,
+				prevState.Backfill, now,
+				len(prevState.restartCursorPath) != 0,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("error computing backfill start time for %q: %w", res.Path, err)
 			}
+			state.Backfill = &backfillState{StartAfter: startTime}
 		}
 	}
 	return states, nil
 }
 
-func computeBackfillStartTime(cfg *config, res *resource, prevBackfill *backfillState, now time.Time, hasRestartCursor bool) time.Time {
+func computeBackfillStartTime(cfg *config, res *resource, prevBackfill *backfillState, now time.Time, hasRestartCursor bool) (time.Time, error) {
 	var startTime time.Time
 	if prevBackfill != nil {
 		startTime = prevBackfill.StartAfter
@@ -259,11 +261,20 @@ func computeBackfillStartTime(cfg *config, res *resource, prevBackfill *backfill
 	// - Resource Config
 	// - Advanced Endpoint Config
 	// - Default to 24h if no cursor or 5m if there's a cursor
+	var err error
 	var delay time.Duration
 	if res.MinBackfillInterval != "" {
-		delay, _ = time.ParseDuration(res.MinBackfillInterval) // Cannot fail, already validated
+		delay, err = time.ParseDuration(res.MinBackfillInterval)
+		if err != nil {
+			// Should never happen since we already validated that it parses correctly in res.Validate()
+			return time.Time{}, fmt.Errorf("error parsing resource minBackfillInterval of %q: %w", res.MinBackfillInterval, err)
+		}
 	} else if cfg.Advanced.MinBackfillInterval != "" {
-		delay, _ = time.ParseDuration(cfg.Advanced.MinBackfillInterval) // Cannot fail, already validated
+		delay, err = time.ParseDuration(cfg.Advanced.MinBackfillInterval)
+		if err != nil {
+			// Should never happen since we already validated that it parses correctly in cfg.Validate()
+			return time.Time{}, fmt.Errorf("error parsing endpoint minBackfillInterval of %q: %w", cfg.Advanced.MinBackfillInterval, err)
+		}
 	} else if hasRestartCursor {
 		delay = backfillRestartDelayWithRestartCursor
 	} else {
@@ -274,7 +285,7 @@ func computeBackfillStartTime(cfg *config, res *resource, prevBackfill *backfill
 	if startTime.Before(now) {
 		startTime = now
 	}
-	return startTime
+	return startTime, nil
 }
 
 func (s *captureState) Validate() error {
