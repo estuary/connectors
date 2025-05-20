@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/temporaltypes_137023": 5 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"date_val":"2025-02-18","datetime_val":"2025-02-18T15:04:05.999999","id":1,"time_val":"15:04:05.999999000","timestamp_val":"2025-02-18T15:04:05.999999Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"date_val":"0001-01-01","datetime_val":"0001-01-01T00:00:00.000000","id":2,"time_val":"00:00:00","timestamp_val":"0001-01-01T00:00:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"date_val":null,"datetime_val":null,"id":3,"time_val":null,"timestamp_val":null}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"date_val":"9999-12-31","datetime_val":"9999-12-31T23:59:59.999999","id":4,"time_val":"23:59:59.999999000","timestamp_val":"9999-12-31T23:59:59.999999Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"date_val":"2025-02-18","datetime_val":"2025-02-18T15:04:05.000000","id":5,"time_val":"15:04:05","timestamp_val":"2025-02-18T23:04:05Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"date_val":"0001-01-01","datetime_val":"0001-01-01T00:00:00.000000","id":2,"time_val":"00:00:00","timestamp_val":"0001-01-01T00:00:00Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"date_val":"2025-02-18","datetime_val":"2025-02-18T15:04:05.000000","id":5,"time_val":"15:04:05","timestamp_val":"2025-02-18T23:04:05Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"date_val":"2025-02-18","datetime_val":"2025-02-18T15:04:05.999999","id":1,"time_val":"15:04:05.999999000","timestamp_val":"2025-02-18T15:04:05.999999Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"date_val":"9999-12-31","datetime_val":"9999-12-31T23:59:59.999999","id":4,"time_val":"23:59:59.999999000","timestamp_val":"9999-12-31T23:59:59.999999Z"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"date_val":null,"datetime_val":null,"id":3,"time_val":null,"timestamp_val":null}
 # ================================
 # Final State Checkpoint
 # ================================

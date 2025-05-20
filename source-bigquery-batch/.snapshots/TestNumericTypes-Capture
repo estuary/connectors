@@ -1,11 +1,11 @@
 # ================================
 # Collection "acmeCo/test/numerictypes_559424": 5 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"bigdecimal_val":"99999999999999999999999999999999999999/1000000000","bignumeric_val":"99999999999999999999999999999999999999/1000000000","decimal_val":"99999999999999999999999999999999999999/1000000000","float64_val":1.7976931348623157e+308,"id":1,"numeric_val":"99999999999999999999999999999999999999/1000000000"}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"bigdecimal_val":"-99999999999999999999999999999999999999/1000000000","bignumeric_val":"-99999999999999999999999999999999999999/1000000000","decimal_val":"-99999999999999999999999999999999999999/1000000000","float64_val":-1.7976931348623157e+308,"id":2,"numeric_val":"-99999999999999999999999999999999999999/1000000000"}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"bigdecimal_val":"0","bignumeric_val":"0","decimal_val":"0","float64_val":0,"id":3,"numeric_val":"0"}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"bigdecimal_val":"5632716/625","bignumeric_val":"6172839/5000","decimal_val":"197253/250","float64_val":3.14159,"id":4,"numeric_val":"15432/125"}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"bigdecimal_val":"10000","bignumeric_val":"1000","decimal_val":"100","float64_val":12345,"id":5,"numeric_val":"42"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"bigdecimal_val":"-99999999999999999999999999999999999999/1000000000","bignumeric_val":"-99999999999999999999999999999999999999/1000000000","decimal_val":"-99999999999999999999999999999999999999/1000000000","float64_val":-1.7976931348623157e+308,"id":2,"numeric_val":"-99999999999999999999999999999999999999/1000000000"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"bigdecimal_val":"0","bignumeric_val":"0","decimal_val":"0","float64_val":0,"id":3,"numeric_val":"0"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"bigdecimal_val":"10000","bignumeric_val":"1000","decimal_val":"100","float64_val":12345,"id":5,"numeric_val":"42"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"bigdecimal_val":"5632716/625","bignumeric_val":"6172839/5000","decimal_val":"197253/250","float64_val":3.14159,"id":4,"numeric_val":"15432/125"}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"bigdecimal_val":"99999999999999999999999999999999999999/1000000000","bignumeric_val":"99999999999999999999999999999999999999/1000000000","decimal_val":"99999999999999999999999999999999999999/1000000000","float64_val":1.7976931348623157e+308,"id":1,"numeric_val":"99999999999999999999999999999999999999/1000000000"}
 # ================================
 # Final State Checkpoint
 # ================================
