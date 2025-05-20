@@ -8,5 +8,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"fullrefresh_902536":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":4}}}
+{"bindingStateV1":{"fullrefresh_902536":{"DocumentCount":4,"LastPolled":"<TIMESTAMP>"}}}
 

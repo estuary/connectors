@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"capturewithnullcursor_662607":{"CursorNames":["sort_col"],"CursorValues":[20],"LastPolled":"<TIMESTAMP>","DocumentCount":5}}}
+{"bindingStateV1":{"capturewithnullcursor_662607":{"CursorNames":["sort_col"],"CursorValues":[20],"DocumentCount":5,"LastPolled":"<TIMESTAMP>"}}}
 
