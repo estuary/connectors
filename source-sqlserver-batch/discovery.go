@@ -246,13 +246,17 @@ type discoveredColumn struct {
 	Table       string     // The name of the table with this column
 	Name        string     // The name of the column
 	Index       int        // The ordinal position of the column within a row
-	IsNullable  bool       // Whether the column can be null
 	DataType    columnType // The datatype of the column
 	Description *string    // The description of the column, if present and known
 }
 
 type columnType interface {
+	IsNullable() bool
 	JSONSchema() *jsonschema.Schema
+}
+
+func (ct *basicColumnType) IsNullable() bool {
+	return ct.nullable
 }
 
 type basicColumnType struct {
@@ -337,12 +341,11 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		dataType.nullable = isNullable
 
 		var column = &discoveredColumn{
-			Schema:     tableSchema,
-			Table:      tableName,
-			Name:       columnName,
-			Index:      columnIndex,
-			IsNullable: isNullable,
-			DataType:   &dataType,
+			Schema:   tableSchema,
+			Table:    tableName,
+			Name:     columnName,
+			Index:    columnIndex,
+			DataType: &dataType,
 		}
 		columns = append(columns, column)
 	}
