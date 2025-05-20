@@ -321,6 +321,7 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 	if time.Since(c.shared.lastDiscoveryTime) < minDiscoveryInterval {
 		return nil
 	}
+	c.shared.lastDiscoveryTime = time.Now()
 
 	// Discover tables and emit SourcedSchema updates
 	var tableInfo, err = c.Driver.discoverTables(ctx, c.DB, c.Config)
