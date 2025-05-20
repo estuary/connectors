@@ -20,9 +20,16 @@ Binding 0:
           "ID"
         ],
         "properties": {
+          "A_DOUBLE": {
+            "description": "using catch-all schema (source type: non-nullable BINARY_DOUBLE)"
+          },
+          "A_FLOAT": {
+            "description": "using catch-all schema (source type: non-nullable BINARY_FLOAT)"
+          },
           "ID": {
             "type": "string",
-            "format": "integer"
+            "format": "integer",
+            "description": "(source type: NUMBER)"
           },
           "_meta": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
