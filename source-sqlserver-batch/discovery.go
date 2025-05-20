@@ -167,11 +167,13 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 
 	// If the table has a primary key then convert it to a collection key, otherwise
 	// recommend an appropriate fallback collection key.
-	var collectionKey = fallbackKey
+	var collectionKey []string
 	if keyColumns != nil {
 		for _, colName := range keyColumns {
 			collectionKey = append(collectionKey, primaryKeyToCollectionKey(colName))
 		}
+	} else {
+		collectionKey = fallbackKey
 	}
 	return json.RawMessage(bs), collectionKey, nil
 }
