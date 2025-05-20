@@ -74,6 +74,10 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
+	columns, err := discoverColumns(ctx, db, cfg.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("error listing columns: %w", err)
+	}
 	keys, err := discoverPrimaryKeys(ctx, db, cfg.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing primary keys: %w", err)
@@ -83,6 +87,12 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *sql.DB, cfg *
 	for _, table := range tables {
 		var tableID = table.Owner + "." + table.Name
 		tableInfo[tableID] = table
+	}
+	for _, column := range columns {
+		var tableID = column.Owner + "." + column.Table
+		if table, ok := tableInfo[tableID]; ok {
+			table.columns = append(table.columns, column)
+		}
 	}
 	for _, key := range keys {
 		var tableID = key.Owner + "." + key.Table
@@ -102,10 +112,9 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	if table.key != nil {
 		keyColumns = table.key.Columns
 	}
-	// TODO(wgd): Modify when adding full column type discovery
-	var columnTypes = make(map[string]*jsonschema.Schema)
-	if table.key != nil {
-		columnTypes = table.key.ColumnTypes
+	var columnTypes = make(map[string]columnType)
+	for _, column := range table.columns {
+		columnTypes[column.Name] = column.DataType
 	}
 
 	// Generate schema for the metadata via reflection
@@ -128,12 +137,13 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	var properties = map[string]*jsonschema.Schema{
 		"_meta": metadataSchema,
 	}
-	for _, colName := range keyColumns {
-		var columnType = columnTypes[colName]
-		if columnType == nil {
-			return nil, nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
+	for colName, colType := range columnTypes {
+		var colSchema = colType.JSONSchema()
+		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !fullWriteSchema {
+			// Remove null as an option when there are multiple type options and we don't want nullability
+			colSchema.Extras["type"] = slices.DeleteFunc(types, func(t string) bool { return t == "null" })
 		}
-		properties[colName] = columnType
+		properties[colName] = colSchema
 	}
 
 	var schema = &jsonschema.Schema{
@@ -179,7 +189,8 @@ type discoveredTable struct {
 	Owner string
 	Name  string
 
-	key *discoveredPrimaryKey
+	columns []*discoveredColumn
+	key     *discoveredPrimaryKey
 }
 
 func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredTable, error) {
@@ -216,11 +227,167 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 	return tables, nil
 }
 
-type discoveredPrimaryKey struct {
+type discoveredColumn struct {
 	Owner       string
-	Table       string
-	Columns     []string
-	ColumnTypes map[string]*jsonschema.Schema
+	Table       string     // The name of the table with this column
+	Name        string     // The name of the column
+	Index       int        // The ordinal position of the column within a row
+	DataType    columnType // The datatype of the column
+	Description *string    // The description of the column, if present and known
+}
+
+type columnType interface {
+	IsNullable() bool
+	JSONSchema() *jsonschema.Schema
+}
+
+type basicColumnType struct {
+	jsonTypes       []string
+	contentEncoding string
+	format          string
+	nullable        bool
+	description     string
+}
+
+func (ct *basicColumnType) IsNullable() bool {
+	return ct.nullable
+}
+
+func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
+	var sch = &jsonschema.Schema{
+		Format:      ct.format,
+		Extras:      make(map[string]interface{}),
+		Description: ct.description,
+	}
+
+	if ct.contentEncoding != "" {
+		sch.Extras["contentEncoding"] = ct.contentEncoding // New in 2019-09.
+	}
+
+	if ct.jsonTypes != nil {
+		var types = append([]string(nil), ct.jsonTypes...)
+		if ct.nullable {
+			types = append(types, "null")
+		}
+		if len(types) == 1 {
+			sch.Type = types[0]
+		} else {
+			sch.Extras["type"] = types
+		}
+	}
+	return sch
+}
+
+func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredColumn, error) {
+	var query = new(strings.Builder)
+
+	fmt.Fprintf(query, "SELECT t.owner, t.table_name, t.column_name, t.column_id,")
+	fmt.Fprintf(query, " t.nullable, t.data_type, t.data_precision, t.data_scale, t.data_length")
+	fmt.Fprintf(query, " FROM all_tab_columns t")
+	fmt.Fprintf(query, " WHERE t.owner NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'RDSADMIN', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS', 'GGS_ADMIN', 'GSMADMIN_INTERNAL')")
+	fmt.Fprintf(query, " AND t.table_name NOT IN ('DBTOOLS$EXECUTION_HISTORY')")
+	fmt.Fprintf(query, " ORDER BY t.table_name, t.column_id")
+
+	rows, err := db.QueryContext(ctx, query.String())
+	if err != nil {
+		return nil, fmt.Errorf("error executing discovery query %q: %w", query.String(), err)
+	}
+	defer rows.Close()
+
+	var columns []*discoveredColumn
+	for rows.Next() {
+		var tableOwner, tableName, columnName string
+		var columnID int
+		var isNullable string
+		var typeName string
+		var dataPrecision sql.NullInt16
+		var dataScale sql.NullInt16
+		var dataLength int
+
+		if err := rows.Scan(&tableOwner, &tableName, &columnName, &columnID, &isNullable, &typeName, &dataPrecision, &dataScale, &dataLength); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+
+		var dataType, err = databaseTypeToJSON(typeName, dataPrecision, dataScale, isNullable != "N")
+		if err != nil {
+			return nil, fmt.Errorf("error converting column type %q to JSON: %w", typeName, err)
+		}
+
+		var column = &discoveredColumn{
+			Owner:    tableOwner,
+			Table:    tableName,
+			Name:     columnName,
+			Index:    columnID,
+			DataType: dataType,
+		}
+		columns = append(columns, column)
+	}
+	return columns, nil
+}
+
+func databaseTypeToJSON(typeName string, dataPrecision, dataScale sql.NullInt16, isNullable bool) (columnType, error) {
+	var dataType basicColumnType
+
+	var precision int16
+	if dataPrecision.Valid {
+		precision = dataPrecision.Int16
+	} else {
+		precision = defaultNumericPrecision
+	}
+
+	var isInteger = dataScale.Int16 == 0
+	if typeName == "NUMBER" && !dataScale.Valid && !dataPrecision.Valid {
+		// when scale and precision are both null, both have the maximum value possible
+		// equivalent to NUMBER(38, 127)
+		dataType.format = "number"
+		dataType.jsonTypes = []string{"string"}
+	} else if typeName == "NUMBER" && isInteger {
+		// data_precision null defaults to precision 38
+		if precision > 18 || !dataPrecision.Valid {
+			dataType.format = "integer"
+			dataType.jsonTypes = []string{"string"}
+		} else {
+			dataType.jsonTypes = []string{"integer"}
+		}
+	} else if slices.Contains([]string{"FLOAT", "NUMBER"}, typeName) {
+		if precision > 18 || !dataPrecision.Valid {
+			dataType.format = "number"
+			dataType.jsonTypes = []string{"string"}
+		} else {
+			dataType.jsonTypes = []string{"number"}
+		}
+	} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, typeName) {
+		dataType.jsonTypes = []string{"string"}
+	} else if strings.Contains(typeName, "WITH TIME ZONE") {
+		dataType.jsonTypes = []string{"string"}
+		dataType.format = "date-time"
+	} else if typeName == "DATE" || strings.Contains(typeName, "TIMESTAMP") {
+		dataType.jsonTypes = []string{"string"}
+	} else if strings.Contains(typeName, "INTERVAL") {
+		dataType.jsonTypes = []string{"string"}
+	} else if slices.Contains([]string{"CLOB", "RAW"}, typeName) {
+		dataType.jsonTypes = []string{"string"}
+	} else {
+		dataType.description = "using catch-all schema"
+	}
+	dataType.nullable = isNullable
+
+	// Append source type information to the description
+	if dataType.description != "" {
+		dataType.description += " "
+	}
+	var nullabilityDescription = ""
+	if isNullable {
+		nullabilityDescription = "non-nullable "
+	}
+	dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, typeName)
+	return &dataType, nil
+}
+
+type discoveredPrimaryKey struct {
+	Owner   string
+	Table   string
+	Columns []string
 }
 
 // SMALLINT, INT and INTEGER have a default precision 38 which is not included in the column information
@@ -229,8 +396,7 @@ const defaultNumericPrecision = 38
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
 	var query = new(strings.Builder)
 
-	fmt.Fprintf(query, "SELECT t.owner, t.table_name, c.position, t.column_name,")
-	fmt.Fprintf(query, "t.data_type, t.data_precision, t.data_scale, t.data_length")
+	fmt.Fprintf(query, "SELECT t.owner, t.table_name, t.column_name, c.position")
 	fmt.Fprintf(query, " FROM all_tab_columns t")
 	fmt.Fprintf(query, " INNER JOIN (")
 	fmt.Fprintf(query, "   SELECT c.owner, c.table_name, c.constraint_type, ac.column_name, ac.position FROM all_constraints c")
@@ -254,82 +420,20 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 
 	var keysByTable = make(map[string]*discoveredPrimaryKey)
 	for rows.Next() {
-		var tableOwner, tableName, columnName, dataType string
-		var dataScale sql.NullInt16
-		var dataLength int
-		var dataPrecision sql.NullInt16
+		var tableOwner, tableName, columnName string
 		var ordinalPosition int
 
-		if err := rows.Scan(&tableOwner, &tableName, &ordinalPosition, &columnName, &dataType, &dataPrecision, &dataScale, &dataLength); err != nil {
+		if err := rows.Scan(&tableOwner, &tableName, &columnName, &ordinalPosition); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
-		}
-
-		var precision int16
-		if dataPrecision.Valid {
-			precision = dataPrecision.Int16
-		} else {
-			precision = defaultNumericPrecision
-		}
-
-		var format string
-		var jsonType string
-		var isInteger = dataScale.Int16 == 0
-		if dataType == "NUMBER" && !dataScale.Valid && !dataPrecision.Valid {
-			// when scale and precision are both null, both have the maximum value possible
-			// equivalent to NUMBER(38, 127)
-			format = "number"
-			jsonType = "string"
-		} else if dataType == "NUMBER" && isInteger {
-			// data_precision null defaults to precision 38
-			if precision > 18 || !dataPrecision.Valid {
-				format = "integer"
-				jsonType = "string"
-			} else {
-				jsonType = "integer"
-			}
-		} else if slices.Contains([]string{"FLOAT", "NUMBER"}, dataType) {
-			if precision > 18 || !dataPrecision.Valid {
-				format = "number"
-				jsonType = "string"
-			} else {
-				jsonType = "number"
-			}
-		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
-			jsonType = "string"
-		} else if strings.Contains(dataType, "WITH TIME ZONE") {
-			jsonType = "string"
-			format = "date-time"
-		} else if dataType == "DATE" || strings.Contains(dataType, "TIMESTAMP") {
-			jsonType = "string"
-		} else if strings.Contains(dataType, "INTERVAL") {
-			jsonType = "string"
-		} else if slices.Contains([]string{"CLOB", "RAW"}, dataType) {
-			jsonType = "string"
-		} else {
-			log.WithFields(log.Fields{
-				"owner":    tableOwner,
-				"table":    tableName,
-				"dataType": dataType,
-				"column":   columnName,
-			}).Warn("skipping column, data type is not supported")
-			continue
 		}
 
 		var tableID = tableOwner + "." + tableName
 		var keyInfo = keysByTable[tableID]
 		if keyInfo == nil {
-			keyInfo = &discoveredPrimaryKey{
-				Owner:       tableOwner,
-				Table:       tableName,
-				ColumnTypes: make(map[string]*jsonschema.Schema),
-			}
+			keyInfo = &discoveredPrimaryKey{Owner: tableOwner, Table: tableName}
 			keysByTable[tableID] = keyInfo
 		}
 		keyInfo.Columns = append(keyInfo.Columns, columnName)
-		keyInfo.ColumnTypes[columnName] = &jsonschema.Schema{
-			Type:   jsonType,
-			Format: format,
-		}
 		if ordinalPosition != len(keyInfo.Columns) {
 			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
 		}
