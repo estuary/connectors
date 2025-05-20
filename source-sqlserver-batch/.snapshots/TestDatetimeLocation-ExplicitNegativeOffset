@@ -12,5 +12,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"datetimelocation_967996":{"CursorNames":null,"CursorValues":null,"LastPolled":"<TIMESTAMP>","DocumentCount":8}}}
+{"bindingStateV1":{"datetimelocation_967996":{"DocumentCount":8,"LastPolled":"<TIMESTAMP>"}}}
 
