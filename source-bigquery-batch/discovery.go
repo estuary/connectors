@@ -80,6 +80,10 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *bigquery.Clie
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
+	columns, err := discoverColumns(ctx, db, cfg.Dataset)
+	if err != nil {
+		return nil, fmt.Errorf("error listing columns: %w", err)
+	}
 	keys, err := discoverPrimaryKeys(ctx, db, cfg.Dataset)
 	if err != nil {
 		return nil, fmt.Errorf("error listing primary keys: %w", err)
@@ -89,6 +93,12 @@ func (drv *BatchSQLDriver) discoverTables(ctx context.Context, db *bigquery.Clie
 	for _, table := range tables {
 		var tableID = table.Schema + "." + table.Name
 		tableInfo[tableID] = table
+	}
+	for _, column := range columns {
+		var tableID = column.Schema + "." + column.Table
+		if table, ok := tableInfo[tableID]; ok {
+			table.columns = append(table.columns, column)
+		}
 	}
 	for _, key := range keys {
 		var tableID = key.Schema + "." + key.Table
@@ -115,10 +125,9 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	if table.key != nil {
 		keyColumns = table.key.Columns
 	}
-	// TODO(wgd): Modify when adding full column type discovery
-	var columnTypes = make(map[string]*jsonschema.Schema)
-	if table.key != nil {
-		columnTypes = table.key.ColumnTypes
+	var columnTypes = make(map[string]columnType)
+	for _, column := range table.columns {
+		columnTypes[column.Name] = column.DataType
 	}
 
 	// Generate schema for the metadata via reflection
@@ -144,12 +153,13 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	var properties = map[string]*jsonschema.Schema{
 		"_meta": metadataSchema,
 	}
-	for _, colName := range keyColumns {
-		var columnType = columnTypes[colName]
-		if columnType == nil {
-			return nil, nil, fmt.Errorf("unable to add key column %q to schema: type unknown", colName)
+	for colName, colType := range columnTypes {
+		var colSchema = colType.JSONSchema()
+		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !fullWriteSchema {
+			// Remove null as an option when there are multiple type options and we don't want nullability
+			colSchema.Extras["type"] = slices.DeleteFunc(types, func(t string) bool { return t == "null" })
 		}
-		properties[colName] = columnType
+		properties[colName] = colSchema
 	}
 
 	var schema = &jsonschema.Schema{
@@ -202,7 +212,8 @@ type discoveredTable struct {
 	Name   string
 	Type   string // Usually 'BASE TABLE' or 'VIEW'
 
-	key *discoveredPrimaryKey
+	columns []*discoveredColumn
+	key     *discoveredPrimaryKey
 }
 
 func discoverTables(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredTable, error) {
@@ -228,11 +239,126 @@ func discoverTables(ctx context.Context, db *bigquery.Client, dataset string) ([
 	return tables, nil
 }
 
+type discoveredColumn struct {
+	Schema      string     // The schema in which the table resides
+	Table       string     // The name of the table with this column
+	Name        string     // The name of the column
+	Index       int        // The ordinal position of the column within a row
+	DataType    columnType // The datatype of the column
+	Description *string    // The description of the column, if present and known
+}
+
+type columnType interface {
+	IsNullable() bool
+	JSONSchema() *jsonschema.Schema
+}
+
+type basicColumnType struct {
+	jsonTypes       []string
+	contentEncoding string
+	format          string
+	nullable        bool
+	description     string
+}
+
+func (ct *basicColumnType) IsNullable() bool {
+	return ct.nullable
+}
+
+func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
+	var sch = &jsonschema.Schema{
+		Format:      ct.format,
+		Extras:      make(map[string]interface{}),
+		Description: ct.description,
+	}
+
+	if ct.contentEncoding != "" {
+		sch.Extras["contentEncoding"] = ct.contentEncoding // New in 2019-09.
+	}
+
+	if ct.jsonTypes != nil {
+		var types = append([]string(nil), ct.jsonTypes...)
+		if ct.nullable {
+			types = append(types, "null")
+		}
+		if len(types) == 1 {
+			sch.Type = types[0]
+		} else {
+			sch.Extras["type"] = types
+		}
+	}
+	return sch
+}
+
+const queryDiscoverColumns = `
+SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, data_type
+  FROM %[1]s.INFORMATION_SCHEMA.COLUMNS
+  ORDER BY table_schema, table_name, ordinal_position;`
+
+func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredColumn, error) {
+	var rows, err = db.Query(fmt.Sprintf(queryDiscoverColumns, quoteIdentifier(dataset))).Read(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error discovering columns: %w", err)
+	}
+
+	var columns []*discoveredColumn
+	for {
+		var row []bigquery.Value
+		if err := rows.Next(&row); err == iterator.Done {
+			break
+		} else if err != nil {
+			return nil, fmt.Errorf("error discovering primary keys: %w", err)
+		}
+
+		var tableSchema = row[0].(string)
+		var tableName = row[1].(string)
+		var columnName = row[2].(string)
+		var ordinalPosition = int(row[3].(int64))
+		var isNullable = row[4].(string) == "YES"
+		var fullType = row[5].(string)
+
+		// For parameterized types like STRING(50) we want to chop off the parameters
+		// and concern ourselves solely with the base type name for now. Eventually
+		// we might want to turn this into a proper parser which can handle various
+		// composite types in full.
+		var typeName = fullType
+		if strings.ContainsRune(typeName, '(') {
+			typeName = strings.Split(typeName, "(")[0]
+		}
+
+		var dataType, ok = databaseTypeToJSON[typeName]
+		if !ok {
+			dataType = basicColumnType{description: "using catch-all schema"}
+		}
+		dataType.nullable = isNullable
+
+		// Append source type information to the description
+		if dataType.description != "" {
+			dataType.description += " "
+		}
+		var nullabilityDescription = ""
+		if !isNullable {
+			nullabilityDescription = "non-nullable "
+		}
+		dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, fullType)
+
+		var column = &discoveredColumn{
+			Schema:   tableSchema,
+			Table:    tableName,
+			Name:     columnName,
+			Index:    ordinalPosition,
+			DataType: &dataType,
+		}
+		columns = append(columns, column)
+	}
+	return columns, nil
+}
+
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
 // overkill but shouldn't hurt, and helps to make absolutely sure that we're
 // matching up the constraint type with the column names/positions correctly.
 const queryDiscoverPrimaryKeys = `
-SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position, col.data_type
+SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position
   FROM %[1]s.INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
   JOIN %[1]s.INFORMATION_SCHEMA.TABLE_CONSTRAINTS tcs
     ON  tcs.constraint_catalog = kcu.constraint_catalog
@@ -240,13 +366,8 @@ SELECT kcu.table_schema, kcu.table_name, kcu.column_name, kcu.ordinal_position, 
     AND tcs.constraint_name = kcu.constraint_name
     AND tcs.table_schema = kcu.table_schema
     AND tcs.table_name = kcu.table_name
-  JOIN %[1]s.INFORMATION_SCHEMA.COLUMNS col
-    ON  col.table_schema = kcu.table_schema
-	AND col.table_name = kcu.table_name
-	AND col.column_name = kcu.column_name
   WHERE tcs.constraint_type = 'PRIMARY KEY'
-  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;
-`
+  ORDER BY kcu.table_schema, kcu.table_name, kcu.ordinal_position;`
 
 type discoveredPrimaryKey struct {
 	Schema      string
@@ -274,26 +395,14 @@ func discoverPrimaryKeys(ctx context.Context, db *bigquery.Client, dataset strin
 		var tableName = row[1].(string)
 		var columnName = row[2].(string)
 		var ordinalPosition = int(row[3].(int64))
-		var dataType = row[4].(string)
 
 		var tableID = tableSchema + "." + tableName
 		var keyInfo = keysByTable[tableID]
 		if keyInfo == nil {
-			keyInfo = &discoveredPrimaryKey{
-				Schema:      tableSchema,
-				Table:       tableName,
-				ColumnTypes: make(map[string]*jsonschema.Schema),
-			}
+			keyInfo = &discoveredPrimaryKey{Schema: tableSchema, Table: tableName}
 			keysByTable[tableID] = keyInfo
 		}
 		keyInfo.Columns = append(keyInfo.Columns, columnName)
-		if jsonSchema, ok := databaseTypeToJSON[dataType]; ok {
-			keyInfo.ColumnTypes[columnName] = jsonSchema
-		} else {
-			// Assume unknown types are strings, because it's almost always a string.
-			// (Or it's an object, but those can't be Flow collection keys anyway)
-			keyInfo.ColumnTypes[columnName] = &jsonschema.Schema{Type: "string"}
-		}
 		if ordinalPosition != len(keyInfo.Columns) {
 			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
 		}
@@ -306,8 +415,25 @@ func discoverPrimaryKeys(ctx context.Context, db *bigquery.Client, dataset strin
 	return keys, nil
 }
 
-var databaseTypeToJSON = map[string]*jsonschema.Schema{
-	"INT64": {Type: "integer"},
+var databaseTypeToJSON = map[string]basicColumnType{
+	"BOOL": {jsonTypes: []string{"boolean"}},
+
+	"INT64": {jsonTypes: []string{"integer"}},
+
+	"NUMERIC":    {jsonTypes: []string{"string"}, format: "number"},
+	"BIGNUMERIC": {jsonTypes: []string{"string"}, format: "number"},
+	"FLOAT64":    {jsonTypes: []string{"number", "string"}, format: "number"},
+
+	"STRING": {jsonTypes: []string{"string"}},
+
+	"BYTES": {jsonTypes: []string{"string"}, contentEncoding: "base64"},
+
+	"DATE":      {jsonTypes: []string{"string"}, format: "date"},
+	"DATETIME":  {jsonTypes: []string{"string"}}, // Not RFC3339 date-time because it lacks a timezone suffix
+	"TIME":      {jsonTypes: []string{"string"}}, // Not RFC3339 full-time because it lacks a timezone suffix
+	"TIMESTAMP": {jsonTypes: []string{"string"}, format: "date-time"},
+
+	"JSON": {},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
