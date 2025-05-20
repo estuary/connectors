@@ -57,6 +57,28 @@ Binding 0:
               "index",
               "row_id"
             ]
+          },
+          "data": {
+            "description": "(source type: STRING)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "format": "date-time",
+            "description": "(source type: TIMESTAMP)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "value": {
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

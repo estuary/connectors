@@ -60,7 +60,25 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "string_len_val": {
+            "description": "(source type: STRING(50))",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "string_val": {
+            "description": "(source type: STRING)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

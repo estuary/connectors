@@ -60,7 +60,14 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "json_val": {
+            "description": "(source type: JSON)"
           }
         },
         "x-infer-schema": true

@@ -59,8 +59,42 @@ Binding 0:
               "row_id"
             ]
           },
+          "date_val": {
+            "format": "date",
+            "description": "(source type: DATE)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "datetime_val": {
+            "description": "(source type: DATETIME)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
-            "type": "integer"
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "time_val": {
+            "description": "(source type: TIME)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "timestamp_val": {
+            "format": "date-time",
+            "description": "(source type: TIMESTAMP)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
