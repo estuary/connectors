@@ -23,19 +23,30 @@ Binding 0:
           "K_STR"
         ],
         "properties": {
+          "DATA": {
+            "description": "(source type: non-nullable VARCHAR2)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "K_BOOL": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: NUMBER)"
           },
           "K_INT": {
             "type": "string",
-            "format": "integer"
+            "format": "integer",
+            "description": "(source type: NUMBER)"
           },
           "K_SMALLINT": {
             "type": "string",
-            "format": "integer"
+            "format": "integer",
+            "description": "(source type: NUMBER)"
           },
           "K_STR": {
-            "type": "string"
+            "type": "string",
+            "description": "(source type: VARCHAR2)"
           },
           "_meta": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
