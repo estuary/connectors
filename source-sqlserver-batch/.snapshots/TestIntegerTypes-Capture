@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"integertypes_795898":{"CursorNames":["id"],"CursorValues":[4],"LastPolled":"<TIMESTAMP>","DocumentCount":5}}}
+{"bindingStateV1":{"integertypes_795898":{"CursorNames":["id"],"CursorValues":[4],"DocumentCount":5,"LastPolled":"<TIMESTAMP>"}}}
 
