@@ -1,0 +1,11 @@
+# ================================
+# Collection "acmeCo/test/c__flow_test_batch_featureflagemitsourcedschemas_960966": 3 Documents
+# ================================
+{"type":"object","required":["_meta","ID"],"additionalProperties":false,"properties":{"DATA":{"description":"(source type: non-nullable VARCHAR2)","type":["string"]},"ID":{"type":"string","format":"integer","description":"(source type: NUMBER)"},"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-oracle-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."}},"additionalProperties":false,"type":"object","required":["polled","index"],"additionalProperties":false}},"x-infer-schema":true}
+{"DATA":"world","ID":"2","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
+{"DATA":"hello","ID":"1","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"c__flow_test_batch_featureflagemitsourcedschemas_960966":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+
