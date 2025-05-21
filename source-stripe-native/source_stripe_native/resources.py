@@ -222,6 +222,21 @@ def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
     return initial_state
 
 
+def initialize_subtask_state(
+    log: Logger, current_state: ResourceState, subtask_id: str
+) -> ResourceState:
+    cutoff = datetime.now(tz=UTC)
+
+    if current_state.inc and isinstance(current_state.inc, dict):
+        current_state.inc[subtask_id] = ResourceState.Incremental(cursor=cutoff)
+    if current_state.backfill and isinstance(current_state.backfill, dict):
+        current_state.backfill[subtask_id] = ResourceState.Backfill(
+            next_page=None, cutoff=cutoff
+        )
+
+    return current_state
+
+
 def base_object(
     cls,
     http: HTTPSession,
@@ -287,6 +302,7 @@ def base_object(
             task,
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
+            initialize_subtask_state=initialize_subtask_state,
         )
 
     initial_state = _create_initial_state(
@@ -376,6 +392,7 @@ def child_object(
             task,
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
+            initialize_subtask_state=initialize_subtask_state,
         )
 
     initial_state = _create_initial_state(
@@ -466,6 +483,7 @@ def split_child_object(
             task,
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
+            initialize_subtask_state=initialize_subtask_state,
         )
 
     initial_state = _create_initial_state(
@@ -557,6 +575,7 @@ def usage_records(
             task,
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
+            initialize_subtask_state=initialize_subtask_state,
         )
 
     initial_state = _create_initial_state(
@@ -644,6 +663,7 @@ def no_events_object(
             task,
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
+            initialize_subtask_state=initialize_subtask_state,
         )
 
     initial_state = _create_initial_state(
