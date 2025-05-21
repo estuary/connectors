@@ -4,7 +4,7 @@ import estuary_cdk.requests_session_send_patch # Must be second.
 import asyncio
 import urllib
 from estuary_cdk import shim_airbyte_cdk, flow
-from source_jira_native import SourceJira
+from source_jira_legacy import SourceJira
 
 
 

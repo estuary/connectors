@@ -11,8 +11,8 @@ import responses
 from airbyte_cdk.models import SyncMode
 from requests.exceptions import HTTPError
 from responses import matchers
-from source_jira_native.source import SourceJira
-from source_jira_native.streams import (
+from source_jira_legacy.source import SourceJira
+from source_jira_legacy.streams import (
     ApplicationRoles,
     Avatars,
     BoardIssues,
@@ -61,7 +61,7 @@ from source_jira_native.streams import (
     WorkflowStatusCategories,
     WorkflowStatuses,
 )
-from source_jira_native.utils import read_full_refresh
+from source_jira_legacy.utils import read_full_refresh
 
 
 @responses.activate
