@@ -278,6 +278,9 @@ func TestKeyDiscovery(t *testing.T) {
 
 func testConfig(ctx context.Context, t testing.TB) *Config {
 	t.Helper()
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
+	}
 
 	var configFile = "config.pdb.yaml"
 	var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", configFile)
