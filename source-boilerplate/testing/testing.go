@@ -367,14 +367,23 @@ type CaptureValidator interface {
 // SortedCaptureValidator maintains a list of every document emitted to each output
 // collection, and returns the list in sorted order upon request.
 type SortedCaptureValidator struct {
-	documents map[string][]json.RawMessage // Map from collection name to list of documents
+	IncludeSourcedSchemas bool // When true, collection data includes sourced schema updates
+
+	sourcedSchemas map[string][]json.RawMessage // Map from collection name to list of sourced schemas
+	documents      map[string][]json.RawMessage // Map from collection name to list of documents
 }
 
 // Checkpoint ignores checkpoint events.
 func (v *SortedCaptureValidator) Checkpoint(data json.RawMessage) {}
 
-// SourcedSchema ignores sourced schema events.
-func (v *SortedCaptureValidator) SourcedSchema(collection string, schema json.RawMessage) {}
+func (v *SortedCaptureValidator) SourcedSchema(collection string, schema json.RawMessage) {
+	if v.IncludeSourcedSchemas {
+		if v.sourcedSchemas == nil {
+			v.sourcedSchemas = make(map[string][]json.RawMessage)
+		}
+		v.sourcedSchemas[collection] = append(v.sourcedSchemas[collection], schema)
+	}
+}
 
 // Output feeds a new document into the CaptureValidator.
 func (v *SortedCaptureValidator) Output(collection string, data json.RawMessage) {
@@ -409,6 +418,9 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 		fmt.Fprintf(w, "# ================================\n")
 		fmt.Fprintf(w, "# Collection %q: %d Documents\n", collection, len(sortedDocs))
 		fmt.Fprintf(w, "# ================================\n")
+		for _, schema := range v.sourcedSchemas[collection] {
+			fmt.Fprintf(w, "%s\n", schema)
+		}
 		for _, doc := range sortedDocs {
 			fmt.Fprintf(w, "%s\n", doc)
 		}
@@ -418,6 +430,7 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 
 // Reset clears the internal state of the CaptureValidator.
 func (v *SortedCaptureValidator) Reset() {
+	v.sourcedSchemas = nil
 	v.documents = nil
 }
 
