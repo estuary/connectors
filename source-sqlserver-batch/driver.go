@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
@@ -46,6 +47,11 @@ const (
 	// Maximum number of concurrent polling operations to run at once. Might be
 	// worth making this configurable in the advanced endpoint settings.
 	maxConcurrentQueries = 1
+
+	// The minimum time between schema discovery operations. This avoids situations
+	// where we have a ton of bindings all coming due for polling around the same
+	// time and just keep running discovery over and over.
+	minDiscoveryInterval = 5 * time.Minute
 )
 
 var (
@@ -289,6 +295,11 @@ type capture struct {
 	Output    *boilerplate.PullOutput
 	Sempahore *semaphore.Weighted
 
+	shared struct {
+		sync.RWMutex
+		lastDiscoveryTime time.Time // The last time we ran schema discovery.
+	}
+
 	TranslateValue func(cfg *Config, val any, databaseTypeName string) (any, error)
 }
 
@@ -315,6 +326,11 @@ func (s *captureState) Validate() error {
 }
 
 func (c *capture) Run(ctx context.Context) error {
+	// Always discover and output SourcedSchemas once at startup.
+	if err := c.emitSourcedSchemas(ctx); err != nil {
+		return err
+	}
+
 	var eg, workerCtx = errgroup.WithContext(ctx)
 	for _, binding := range c.Bindings {
 		var binding = binding // Copy for goroutine closure
@@ -322,6 +338,43 @@ func (c *capture) Run(ctx context.Context) error {
 	}
 	if err := eg.Wait(); err != nil {
 		return fmt.Errorf("capture terminated with error: %w", err)
+	}
+	return nil
+}
+
+func (c *capture) emitSourcedSchemas(ctx context.Context) error {
+	if !c.Config.Advanced.parsedFeatureFlags["emit_sourced_schemas"] {
+		return nil
+	}
+
+	c.shared.Lock()
+	defer c.shared.Unlock()
+
+	// Skip re-running discovery and emitting schemas if we just did it.
+	if time.Since(c.shared.lastDiscoveryTime) < minDiscoveryInterval {
+		return nil
+	}
+	c.shared.lastDiscoveryTime = time.Now()
+
+	// Discover tables and emit SourcedSchema updates
+	var tableInfo, err = c.Driver.discoverTables(ctx, c.DB, c.Config)
+	if err != nil {
+		return fmt.Errorf("error discovering tables: %w", err)
+	}
+	for _, binding := range c.Bindings {
+		if binding.resource.SchemaName == "" || binding.resource.TableName == "" || binding.resource.Template != "" {
+			continue // Skip bindings with no schema/table or a custom query because we can't know what their schema will look like just from discovery info
+		}
+		var tableID = binding.resource.SchemaName + "." + binding.resource.TableName
+		var table, ok = tableInfo[tableID]
+		if !ok {
+			continue // Skip bindings for which we don't have any corresponding discovery information
+		}
+		if schema, _, err := generateCollectionSchema(c.Config, table, false); err != nil {
+			return fmt.Errorf("error generating schema for table %q: %w", tableID, err)
+		} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {
+			return fmt.Errorf("error emitting schema for table %q: %w", tableID, err)
+		}
 	}
 	return nil
 }
@@ -397,6 +450,11 @@ func (c *capture) worker(ctx context.Context, binding *bindingInfo) error {
 }
 
 func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
+	// Trigger rediscovery and output new SourcedSchemas before each polling operation.
+	if err := c.emitSourcedSchemas(ctx); err != nil {
+		return err
+	}
+
 	var res = binding.resource
 	var stateKey = binding.stateKey
 	var state, ok = c.State.Streams[stateKey]
