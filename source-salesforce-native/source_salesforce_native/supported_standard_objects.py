@@ -1016,9 +1016,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "EntitlementTemplate": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
-    "EntityDefinition": {
-        "cursor_field": CursorFields.LAST_MODIFIED_DATE
-    },
     "EntityMilestone": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
