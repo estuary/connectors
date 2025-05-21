@@ -1945,9 +1945,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "RecordAction": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
-    "RecordActionHistory": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
     "RecordType": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
