@@ -222,7 +222,11 @@ class BulkJobManager:
             case SoapTypes.BOOLEAN:
                 transformed_value = self._bool_str_to_bool(value)
             case SoapTypes.INTEGER | SoapTypes.LONG:
-                transformed_value = int(value)
+                # Salesforce's Bulk API returns "0.0" for integer fields when their value is 0.
+                if value == "0.0":
+                    transformed_value = 0
+                else:
+                    transformed_value = int(value)
             case SoapTypes.DOUBLE:
                 transformed_value = float(value)
             case SoapTypes.ANY_TYPE:
