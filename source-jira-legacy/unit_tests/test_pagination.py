@@ -7,8 +7,8 @@ import json
 from http import HTTPStatus
 
 import responses
-from source_jira_native.streams import Issues, Projects, Users
-from source_jira_native.utils import read_full_refresh
+from source_jira_legacy.streams import Issues, Projects, Users
+from source_jira_legacy.utils import read_full_refresh
 
 
 @responses.activate

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 import responses
 from airbyte_cdk.utils.traced_exception import AirbyteTracedException
-from source_jira_native.source import SourceJira
+from source_jira_legacy.source import SourceJira
 
 
 @responses.activate

@@ -23,7 +23,7 @@ on:
       - "source-iterable/**"
       - "source-pendo/**"
       - "source-twilio/**"
-      - "source-jira-native/**"
+      - "source-jira-legacy/**"
       - "source-mixpanel-native/**"
       - "source-brevo/**"
       - "source-impact-native/**"
@@ -63,10 +63,9 @@ on:
       - "source-stripe-native/**"
       - "source-zendesk-support/**"
       - "source-iterable/**"
-      - "source-jira-native/**"
       - "source-pendo/**"
       - "source-twilio/**"
-      - "source-jira-native/**"
+      - "source-jira-legacy/**"
       - "source-mixpanel-native/**"
       - "source-brevo/**"
       - "source-impact-native/**"
@@ -171,7 +170,7 @@ jobs:
             type: capture
             version: v2
             usage_rate: "1.0"
-          - name: source-jira-native
+          - name: source-jira-legacy
             type: capture
             version: v2
             usage_rate: "1.0"

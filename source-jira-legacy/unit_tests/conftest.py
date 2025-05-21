@@ -8,7 +8,7 @@ import os
 import responses
 from pytest import fixture
 from responses import matchers
-from source_jira_native.streams import (
+from source_jira_legacy.streams import (
     ApplicationRoles,
     Avatars,
     BoardIssues,
