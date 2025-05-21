@@ -349,8 +349,24 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 (use `ResourceConfig.interval`).
 """
 
+InitializeSubtaskStatesFn = Callable[[Logger, ResourceState, str], ResourceState]
+"""
+InitializeSubtaskStatesFn is a function that initializes the state for a subtask.
 
-def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
+This is used to set up dynamic subtask states that are not initialized by the connector.
+
+This function takes a logger, a resource state, and a subtask name as arguments and returns an
+updated ResourceState object with the initialized subtask state.
+"""
+
+
+def is_recurring_fetch_page_fn(
+    fn: FetchPageFn | RecurringFetchPageFn,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+    is_connector_initiated: bool,
+) -> bool:
     """Check if the function signature accepts the arguments of a RecurringFetchPageFn."""
     try:
         inspect.signature(fn).bind(log, page, cutoff, is_connector_initiated)
@@ -602,10 +618,59 @@ def open(
     return (response.Opened(explicitAcknowledgements=False), _run)
 
 
+def handle_dynamic_subtask_state(
+    log: Logger,
+    resource_state: ResourceState,
+    fetch_changes: FetchChangesFn[_BaseDocument]
+    | dict[str, FetchChangesFn[_BaseDocument]]
+    | None = None,
+    fetch_page: FetchPageFn[_BaseDocument]
+    | RecurringFetchPageFn[_BaseDocument]
+    | dict[str, FetchPageFn[_BaseDocument]]
+    | None = None,
+    initialize_subtask_state: InitializeSubtaskStatesFn | None = None,
+) -> ResourceState:
+    subtask_ids = []
+    if fetch_changes and isinstance(fetch_changes, dict):
+        subtask_ids = list(fetch_changes.keys())
+    if fetch_page and isinstance(fetch_page, dict):
+        subtask_ids.extend(list(fetch_page.keys()))
+
+    if subtask_ids:
+        assert resource_state.inc and isinstance(resource_state.inc, dict)
+        assert resource_state.backfill and isinstance(resource_state.backfill, dict)
+        for subtask_id in subtask_ids:
+            inc_missing = (
+                isinstance(resource_state.inc, dict)
+                and subtask_id not in resource_state.inc
+            )
+            backfill_missing = (
+                isinstance(resource_state.backfill, dict)
+                and subtask_id not in resource_state.backfill
+            )
+            if inc_missing or backfill_missing:
+                log.warning(
+                    f"Subtask state missing for '{subtask_id}'. Attempting initialization."
+                )
+                if not initialize_subtask_state:
+                    log.error("No initialize_subtask_state callable provided.")
+                    raise ValueError(
+                        "Must provide initialize_subtask_state callable to dynamically create uninitialized states."
+                    )
+                resource_state = initialize_subtask_state(
+                    log, resource_state, subtask_id
+                )
+                log.debug(f"Initialized subtask state for '{subtask_id}'.")
+            else:
+                log.debug(f"Subtask state for '{subtask_id}' already initialized.")
+
+    return resource_state
+
+
 def open_binding(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
-    resource_state: _ResourceState,
+    resource_state: ResourceState,
     task: Task,
     fetch_changes: FetchChangesFn[_BaseDocument]
     | dict[str, FetchChangesFn[_BaseDocument]]
@@ -616,6 +681,7 @@ def open_binding(
     | None = None,
     fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
     tombstone: _BaseDocument | None = None,
+    initialize_subtask_state: InitializeSubtaskStatesFn | None = None,
 ):
     """
     open_binding() is intended to be called by closures set as Resource.open Callables.
@@ -629,6 +695,13 @@ def open_binding(
     """
 
     prefix = ".".join(binding.resourceConfig.path())
+    resource_state = handle_dynamic_subtask_state(
+        task.log,
+        resource_state,
+        fetch_changes,
+        fetch_page,
+        initialize_subtask_state,
+    )
 
     if fetch_changes:
 
