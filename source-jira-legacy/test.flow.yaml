@@ -2,13 +2,13 @@
 import:
   - acmeCo/flow.yaml
 captures:
-  acmeCo/source-jira:
+  acmeCo/source-jira-legacy:
     endpoint:
       local:
         command:
           - python
           - "-m"
-          - source_jira_native
+          - source_jira_legacy
         config: config.yaml
     bindings:
       - resource:

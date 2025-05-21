@@ -2,7 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
-from source_jira_native.utils import safe_max
+from source_jira_legacy.utils import safe_max
 
 
 def test_safe_max_arg1_none():
