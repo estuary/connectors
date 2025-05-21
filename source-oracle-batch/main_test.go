@@ -3,7 +3,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -314,6 +316,34 @@ func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 	return db
 }
 
+func testTableName(t *testing.T, uniqueID string) (name, id string) {
+	t.Helper()
+	var baseName = strings.ToLower(strings.TrimPrefix(t.Name(), "Test"))
+	for _, str := range []string{"/", "=", "(", ")"} {
+		baseName = strings.ReplaceAll(baseName, str, "_")
+	}
+	return fmt.Sprintf("c##flow_test_batch.%s_%s", baseName, uniqueID), uniqueID
+}
+
+func uniqueTableID(t testing.TB, extra ...string) string {
+	t.Helper()
+	var h = sha256.New()
+	h.Write([]byte(t.Name()))
+	for _, x := range extra {
+		h.Write([]byte{':'})
+		h.Write([]byte(x))
+	}
+	var x = binary.BigEndian.Uint32(h.Sum(nil)[0:4])
+	return fmt.Sprintf("%d", (x%900000)+100000)
+}
+
+func createTestTable(ctx context.Context, t testing.TB, control *sql.DB, tableName, definition string) {
+	t.Helper()
+	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
+	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s %s", tableName, definition))
+	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
+}
+
 func executeControlQuery(ctx context.Context, t testing.TB, client *sql.DB, query string, args ...interface{}) {
 	t.Helper()
 	log.WithFields(log.Fields{"query": query, "args": args}).Info("executing setup query")
@@ -323,6 +353,13 @@ func executeControlQuery(ctx context.Context, t testing.TB, client *sql.DB, quer
 		return
 	}
 	require.NoError(t, err)
+}
+
+func setShutdownAfterQuery(t testing.TB, setting bool) {
+	t.Helper()
+	var oldSetting = TestShutdownAfterQuery
+	TestShutdownAfterQuery = setting
+	t.Cleanup(func() { TestShutdownAfterQuery = oldSetting })
 }
 
 func testCaptureSpec(t testing.TB) *st.CaptureSpec {
@@ -347,7 +384,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       oracleDriver,
 		EndpointSpec: endpointSpec,
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{IncludeSourcedSchemas: true},
 		Sanitizers:   sanitizers,
 	}
 }
@@ -387,4 +424,34 @@ func snapshotBindings(t testing.TB, bindings []*pf.CaptureSpec_Binding) {
 		fmt.Fprintf(summary, "(no bindings)")
 	}
 	cupaloy.SnapshotT(t, summary.String())
+}
+
+// TestFeatureFlagEmitSourcedSchemas runs a capture with the `emit_sourced_schemas` feature flag set.
+func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
+	var ctx = context.Background()
+	var control = testControlClient(ctx, t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, `(id INTEGER PRIMARY KEY, data VARCHAR(32))`)
+
+	executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES (1, 'hello')", tableName))
+	executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES (2, 'world')", tableName))
+
+	for _, tc := range []struct {
+		name string
+		flag string
+	}{
+		{"Default", ""},
+		{"Enabled", "emit_sourced_schemas"},
+		{"Disabled", "no_emit_sourced_schemas"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cs = testCaptureSpec(t)
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flag
+			cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+			setShutdownAfterQuery(t, true)
+
+			cs.Capture(ctx, t, nil)
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
 }

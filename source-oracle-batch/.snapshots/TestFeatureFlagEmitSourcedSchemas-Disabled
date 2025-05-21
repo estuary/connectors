@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/c__flow_test_batch_featureflagemitsourcedschemas_960966": 2 Documents
+# ================================
+{"DATA":"world","ID":"2","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
+{"DATA":"hello","ID":"1","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"c__flow_test_batch_featureflagemitsourcedschemas_960966":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+
