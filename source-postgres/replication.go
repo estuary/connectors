@@ -689,6 +689,46 @@ func (s *replicationStream) decodeChangeEvent(
 		return nil, fmt.Errorf("'after' tuple: %w", err)
 	}
 
+	// This whole chunk of logic is debug logging for a situation which shouldn't be
+	// possible but which has clearly occurred in production. We can probably remove
+	// it in the future once we've figured out what's going on, but it also won't
+	// trigger unless something has gone badly wrong so it's not a big deal to leave
+	// it in place until it becomes a maintainance burden.
+	//
+	// The before tuple of a deletion should never be empty, since the tuple columns
+	// should always match the table's REPLICA IDENTITY which can't be empty if the
+	// table allows deletions.
+	if op == sqlcapture.DeleteOp && len(bf) == 0 {
+		if before == nil {
+			logrus.WithFields(logrus.Fields{
+				"streamID":  streamID,
+				"op":        op,
+				"tupleType": beforeType,
+			}).Error("nil before tuple for deletion")
+		} else {
+			logrus.WithFields(logrus.Fields{
+				"streamID":     streamID,
+				"op":           op,
+				"tupleType":    beforeType,
+				"tuple":        before,
+				"tupleColumns": len(before.Columns),
+				"relColumns":   len(rel.Columns),
+			}).Error("empty before tuple for deletion")
+			for idx, col := range before.Columns {
+				logrus.WithFields(logrus.Fields{
+					"streamID":    streamID,
+					"idx":         idx,
+					"colName":     rel.Columns[idx].Name,
+					"colType":     rel.Columns[idx].DataType,
+					"colFlags":    rel.Columns[idx].Flags,
+					"colData":     col.Data,
+					"colDataType": col.DataType,
+				}).Error("before tuple column")
+			}
+		}
+		return nil, fmt.Errorf("empty before tuple for %q deletion", streamID)
+	}
+
 	keyColumns, ok := s.keyColumns(streamID)
 	if !ok {
 		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
