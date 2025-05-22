@@ -1,0 +1,21 @@
+credentials:
+    credentials_title: Email & API Token
+    username: alexb@estuary.dev
+    password_sops: ENC[AES256_GCM,data:O5rJ/sJWpk8DxPQn4Q==,iv:OVelKHmeAE8GBVSr9JyQ8BUhfjQbMQhO9MrIyRXUq/E=,tag:nhNdx9dckVg3GM8M+AC1EQ==,type:str]
+start_date: "2025-05-22T00:00:00Z"
+domain: my.jira.domain
+projects: ""
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-07-26T15:53:37Z"
+          enc: CiQAdmEdwpmP0/Kcv6L1SnM3nPbsYLywIaUeOL1mz7cZjFUwWt0SSQD5lVw43Of1YI96anxUVo7d7ALi0DYnCNvxTHCgHX5ZeDBPlfXwLNpmYb6y3hJSsHG7NupwDQT/qIpUvlqQnq5IVkgJEFHPU1s=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-05-22T15:24:01Z"
+    mac: ENC[AES256_GCM,data:+0MtahWQCmxK/JF0HzVWGL5okXwuewCSzJZBhHVC7i+DpD9ShXTRWB1TmnspO9esNdY+ISkMMBOwiXtwJTdqsIjewqlhoRAWfTT8ngbZcsqNORkynR6UOUgjsxTeJKqwGzZubyGQW4gDVky/gMbrUlBNGi4V463CFJJSJlkLaC8=,iv:v5+pifoFb/xcznKUu4qUN5kyRMGZr0jj20qartCDOfo=,tag:X0aFapMxivnPbGVPoVoFOw==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.0
