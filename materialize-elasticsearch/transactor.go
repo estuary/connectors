@@ -176,8 +176,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// batch. We'll get the first item failure error we see via errCh and report that as the
 	// connector failure error.
 	onItemFailure := func(_ context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
+		log.WithFields(log.Fields{
+			"err":    err,
+			"reason": res.Error.Reason,
+		}).Error("item failure")
+
 		if err == nil {
-			// The err itself may be `nil` of the request was successful, but a failure is still
+			// The err itself may be `nil` if the request was successful, but a failure is still
 			// indicated by the error from the response body.
 			err = errors.New(res.Error.Reason)
 		}
