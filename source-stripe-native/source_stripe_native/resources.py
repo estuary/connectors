@@ -7,6 +7,7 @@ from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
     Resource,
     open_binding,
+    BaseDocument,
     ResourceConfig,
     ResourceState,
 )
@@ -239,7 +240,12 @@ def base_object(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings,
+        all_bindings: list[
+                tuple[
+                    CaptureBinding[ResourceConfig],
+                    "Resource[BaseDocument, ResourceConfig, ResourceState]",
+                ]
+            ],
     ):
         if not connected_account_ids:
             fetch_changes_fns = functools.partial(
@@ -258,18 +264,35 @@ def base_object(
                 http,
             )
         else:
-            fetch_changes_fns = {
-                account_id: functools.partial(
+            initial_state = None
+            for (idx, b) in enumerate(all_bindings):
+                if idx == binding_index:
+                    initial_state = b[1].initial_state
+                    break
+            
+            assert isinstance(initial_state, ResourceState)
+            assert isinstance(state.inc, dict)
+            assert isinstance(state.backfill, dict)
+            assert isinstance(initial_state.inc, dict)
+            assert isinstance(initial_state.backfill, dict)
+
+            fetch_changes_fns = {}
+            fetch_page_fns = {}
+
+            for account_id in all_account_ids:
+                if account_id not in state.inc:
+                    state.inc[account_id] = initial_state.inc[account_id]
+                if account_id not in state.backfill:
+                    state.backfill[account_id] = initial_state.backfill[account_id]
+                
+                fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental,
                     cls,
                     platform_account_id,
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
-            fetch_page_fns = {
-                account_id: functools.partial(
+                fetch_page_fns[account_id] = functools.partial(
                     fetch_backfill,
                     cls,
                     start_date,
@@ -277,8 +300,6 @@ def base_object(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
 
         open_binding(
             binding,
