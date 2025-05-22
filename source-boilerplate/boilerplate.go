@@ -73,7 +73,7 @@ func RunMain(connector Connector) {
 	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
 
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	var stream pc.Connector_CaptureServer
+	var stream streamCodec
 
 	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
 	case "proto":
@@ -95,7 +95,13 @@ func RunMain(connector Connector) {
 
 	var server = ConnectorServer{connector}
 
-	if err := server.Capture(stream); err != nil {
+	var err = server.Capture(stream)
+
+	// Ensure we flush any buffered output before exiting. Since we use os.Exit() to
+	// terminate the process we can't rely on defers for this.
+	stream.Close()
+
+	if err != nil {
 		cerrors.HandleFinalError(err)
 	}
 	os.Exit(0)
@@ -315,7 +321,15 @@ func (out *PullOutput) SourcedSchema(binding int, schema json.RawMessage) error 
 	return nil
 }
 
-func newProtoCodec(ctx context.Context) pc.Connector_CaptureServer {
+type streamCodec interface {
+	pc.Connector_CaptureServer
+
+	// Since we buffer our writes internally, we need to be able to close the codec
+	// during shutdown and guarantee that the buffers will be flushed properly.
+	Close() error
+}
+
+func newProtoCodec(ctx context.Context) streamCodec {
 	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
 	return &protoCodec{
 		ctx: ctx,
@@ -330,6 +344,10 @@ type protoCodec struct {
 	r   *bufio.Reader
 	bw  *bufio.Writer
 	pw  protoio.Writer
+}
+
+func (c *protoCodec) Close() error {
+	return c.bw.Flush()
 }
 
 func (c *protoCodec) Context() context.Context {
@@ -428,7 +446,7 @@ func (c *protoCodec) peekMessage(size int) ([]byte, error) {
 	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
-func newJsonCodec(ctx context.Context) pc.Connector_CaptureServer {
+func newJsonCodec(ctx context.Context) streamCodec {
 	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
 	return &jsonCodec{
 		ctx: ctx,
@@ -454,6 +472,10 @@ type jsonCodec struct {
 	unmarshaler jsonpb.Unmarshaler
 	decoder     *json.Decoder
 	bw          *bufio.Writer
+}
+
+func (c *jsonCodec) Close() error {
+	return c.bw.Flush()
 }
 
 func (c *jsonCodec) Context() context.Context {
