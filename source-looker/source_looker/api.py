@@ -1,6 +1,7 @@
 from logging import Logger
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Awaitable
 
+from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.http import HTTPSession
 from pydantic import TypeAdapter
 
@@ -62,11 +63,23 @@ async def snapshot_child_resources(
         if should_be_accessible:
             parent_ids.append(id)
 
-    for id in parent_ids:
-        child_url = f"{parent_url}/{id}/{stream.path}"
-        child_resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, child_url))
+    # There can be thousands of child resources we have to fetch. The buffered_ordered
+    # function is used to fetch multiple batches of child resources concurrently
+    # while maintaining the initial ordering. The ordering aspect is important since
+    # this is a snapshot function; the CDK relies on documents being yielded in the
+    # same order between snapshots to determine if the snapshot has changed between
+    # sweeps.
+    async def _fetch_child_resources(parent_id: str) -> list[FullRefreshResource]:
+        child_url = f"{parent_url}/{parent_id}/{stream.path}"
+        response = await http.request(log, child_url)
+        return TypeAdapter(list[FullRefreshResource]).validate_json(response)
 
-        for resource in child_resources:
+    async def _gen() -> AsyncGenerator[Awaitable[list[FullRefreshResource]], None]:
+        for id in parent_ids:
+            yield _fetch_child_resources(id)
+
+    async for child_batch in buffer_ordered(_gen(), concurrency=25):
+        for resource in child_batch:
             yield resource
 
 
