@@ -233,6 +233,9 @@ def base_object(
     It requires a single, parent stream with a valid Event API Type
     """
     all_account_ids = [platform_account_id, *connected_account_ids]
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -258,18 +261,31 @@ def base_object(
                 http,
             )
         else:
-            fetch_changes_fns = {
-                account_id: functools.partial(
+            fetch_changes_fns = {}
+            fetch_page_fns = {}
+
+            for account_id in all_account_ids:
+                # If there's persisted state and the connector found a new account id that's
+                # not present in that state, dynamically add that account id and that account id's
+                # initial state to it.
+                if (
+                    isinstance(state.inc, dict)
+                    and isinstance(state.backfill, dict)
+                    and isinstance(initial_state.inc, dict)
+                    and isinstance(initial_state.backfill, dict)
+                ):
+                    if account_id not in state.inc and account_id not in state.backfill:
+                        state.inc[account_id] = initial_state.inc[account_id]
+                        state.backfill[account_id] = initial_state.backfill[account_id]
+
+                fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental,
                     cls,
                     platform_account_id,
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
-            fetch_page_fns = {
-                account_id: functools.partial(
+                fetch_page_fns[account_id] = functools.partial(
                     fetch_backfill,
                     cls,
                     start_date,
@@ -277,8 +293,6 @@ def base_object(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
 
         open_binding(
             binding,
@@ -288,10 +302,6 @@ def base_object(
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
         )
-
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     return Resource(
         name=cls.NAME,
@@ -318,6 +328,9 @@ def child_object(
     """
 
     all_account_ids = [platform_account_id, *connected_account_ids]
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -345,8 +358,24 @@ def child_object(
                 http,
             )
         else:
-            fetch_changes_fns = {
-                account_id: functools.partial(
+            fetch_changes_fns = {}
+            fetch_page_fns = {}
+
+            for account_id in all_account_ids:
+                # If there's persisted state and the connector found a new account id that's
+                # not present in that state, dynamically add that account id and that account id's
+                # initial state to it.
+                if (
+                    isinstance(state.inc, dict)
+                    and isinstance(state.backfill, dict)
+                    and isinstance(initial_state.inc, dict)
+                    and isinstance(initial_state.backfill, dict)
+                ):
+                    if account_id not in state.inc and account_id not in state.backfill:
+                        state.inc[account_id] = initial_state.inc[account_id]
+                        state.backfill[account_id] = initial_state.backfill[account_id]
+
+                fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_substreams,
                     cls,
                     child_cls,
@@ -354,10 +383,7 @@ def child_object(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
-            fetch_page_fns = {
-                account_id: functools.partial(
+                fetch_page_fns[account_id] = functools.partial(
                     fetch_backfill_substreams,
                     cls,
                     child_cls,
@@ -366,8 +392,6 @@ def child_object(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
 
         open_binding(
             binding,
@@ -377,10 +401,6 @@ def child_object(
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
         )
-
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     return Resource(
         name=child_cls.NAME,
@@ -410,6 +430,9 @@ def split_child_object(
     """
 
     all_account_ids = [platform_account_id, *connected_account_ids]
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -436,18 +459,31 @@ def split_child_object(
                 http,
             )
         else:
-            fetch_changes_fns = {
-                account_id: functools.partial(
+            fetch_changes_fns = {}
+            fetch_page_fns = {}
+
+            for account_id in all_account_ids:
+                # If there's persisted state and the connector found a new account id that's
+                # not present in that state, dynamically add that account id and that account id's
+                # initial state to it.
+                if (
+                    isinstance(state.inc, dict)
+                    and isinstance(state.backfill, dict)
+                    and isinstance(initial_state.inc, dict)
+                    and isinstance(initial_state.backfill, dict)
+                ):
+                    if account_id not in state.inc and account_id not in state.backfill:
+                        state.inc[account_id] = initial_state.inc[account_id]
+                        state.backfill[account_id] = initial_state.backfill[account_id]
+
+                fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental,
                     child_cls,
                     platform_account_id,
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
-            fetch_page_fns = {
-                account_id: functools.partial(
+                fetch_page_fns[account_id] = functools.partial(
                     fetch_backfill_substreams,
                     cls,
                     child_cls,
@@ -456,8 +492,6 @@ def split_child_object(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
 
         open_binding(
             binding,
@@ -467,10 +501,6 @@ def split_child_object(
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
         )
-
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     return Resource(
         name=child_cls.NAME,
@@ -499,6 +529,9 @@ def usage_records(
     """
 
     all_account_ids = [platform_account_id, *connected_account_ids]
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -526,8 +559,24 @@ def usage_records(
                 http,
             )
         else:
-            fetch_changes_fns = {
-                account_id: functools.partial(
+            fetch_changes_fns = {}
+            fetch_page_fns = {}
+
+            for account_id in all_account_ids:
+                # If there's persisted state and the connector found a new account id that's
+                # not present in that state, dynamically add that account id and that account id's
+                # initial state to it.
+                if (
+                    isinstance(state.inc, dict)
+                    and isinstance(state.backfill, dict)
+                    and isinstance(initial_state.inc, dict)
+                    and isinstance(initial_state.backfill, dict)
+                ):
+                    if account_id not in state.inc and account_id not in state.backfill:
+                        state.inc[account_id] = initial_state.inc[account_id]
+                        state.backfill[account_id] = initial_state.backfill[account_id]
+
+                fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_usage_records,
                     cls,
                     child_cls,
@@ -535,10 +584,7 @@ def usage_records(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
-            fetch_page_fns = {
-                account_id: functools.partial(
+                fetch_page_fns[account_id] = functools.partial(
                     fetch_backfill_usage_records,
                     cls,
                     child_cls,
@@ -547,8 +593,6 @@ def usage_records(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
 
         open_binding(
             binding,
@@ -558,10 +602,6 @@ def usage_records(
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
         )
-
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     return Resource(
         name=child_cls.NAME,
@@ -590,6 +630,9 @@ def no_events_object(
     """
 
     all_account_ids = [platform_account_id, *connected_account_ids]
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -615,18 +658,31 @@ def no_events_object(
                 http,
             )
         else:
-            fetch_changes_fns = {
-                account_id: functools.partial(
+            fetch_changes_fns = {}
+            fetch_page_fns = {}
+
+            for account_id in all_account_ids:
+                # If there's persisted state and the connector found a new account id that's
+                # not present in that state, dynamically add that account id and that account id's
+                # initial state to it.
+                if (
+                    isinstance(state.inc, dict)
+                    and isinstance(state.backfill, dict)
+                    and isinstance(initial_state.inc, dict)
+                    and isinstance(initial_state.backfill, dict)
+                ):
+                    if account_id not in state.inc and account_id not in state.backfill:
+                        state.inc[account_id] = initial_state.inc[account_id]
+                        state.backfill[account_id] = initial_state.backfill[account_id]
+
+                fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_no_events,
                     cls,
                     platform_account_id,
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
-            fetch_page_fns = {
-                account_id: functools.partial(
+                fetch_page_fns[account_id] = functools.partial(
                     fetch_backfill,
                     cls,
                     start_date,
@@ -634,8 +690,6 @@ def no_events_object(
                     account_id,
                     http,
                 )
-                for account_id in all_account_ids
-            }
 
         open_binding(
             binding,
@@ -645,10 +699,6 @@ def no_events_object(
             fetch_changes=fetch_changes_fns,
             fetch_page=fetch_page_fns,
         )
-
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     return Resource(
         name=cls.NAME,
