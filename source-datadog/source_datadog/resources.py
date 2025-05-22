@@ -39,8 +39,8 @@ async def all_resources(
             ),
         )
 
-    # Start from 1 hour ago to ensure we don't miss any events
-    started_at = datetime.now(tz=UTC) - timedelta(hours=1)
+    # Use configured start_time if provided, otherwise default to 1 hour ago
+    started_at = config.start_time if config.start_time is not None else datetime.now(tz=UTC) - timedelta(hours=1)
 
     return [
         common.Resource(
@@ -53,7 +53,7 @@ async def all_resources(
             ),
             initial_config=ResourceConfig(
                 name=RUM_EVENTS_STREAM,
-                interval=timedelta(seconds=30)  # Poll every 30 seconds
+                interval=timedelta(seconds=30)  # Match the binding's PT5S interval
             ),
             schema_inference=True,
         )

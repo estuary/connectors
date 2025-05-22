@@ -13,6 +13,7 @@ captures:
           api_key: ""
           app_key: ""
           site: "us5.datadoghq.com"
+          start_time: "2025-05-22T00:00:00Z"
     bindings:
       - resource:
           name: RUMEvents

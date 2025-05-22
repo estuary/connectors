@@ -26,6 +26,11 @@ class EndpointConfig(BaseModel):
         description="Datadog site (e.g., datadoghq.com, datadoghq.eu)",
         title="Site",
     )
+    start_time: Optional[datetime] = Field(
+        default=None,
+        description="When to start collecting data from. If not specified, defaults to 1 hour ago. Use ISO format (e.g., '2024-03-01T00:00:00Z').",
+        title="Start Time",
+    )
 
     class Advanced(BaseModel):
         base_url: Optional[str] = Field(
