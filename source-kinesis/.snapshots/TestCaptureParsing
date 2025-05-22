@@ -1,9 +1,9 @@
 # ================================
 # Collection "": 3 Documents
 # ================================
-{"_meta":{"partition_key":"anyPartitionKey","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-parsing"}},"int1":-4974660706199429000,"int1AsStr":"-4974660706199429123","int2":9223372036854776000,"int2AsStr":"9223372036854775807"}
-{"_meta":{"source":{"userSourceField1":"clobbered"},"userMetaField1":"hello2","userMetaField2":"world2"},"other":"value"}
-{"_meta":{"userMetaField1":"hello1","userMetaField2":"world1"},"other":"value"}
+{"_meta":{"partition_key":"anyPartitionKey","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-parsing"},"userMetaField1":"hello1","userMetaField2":"world1"},"other":"value"}
+{"_meta":{"partition_key":"anyPartitionKey","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-parsing"},"userMetaField1":"hello2","userMetaField2":"world2"},"other":"value"}
+{"_meta":{"partition_key":"anyPartitionKey","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000001","stream":"test-stream-parsing"}},"int1":-4974660706199429123,"int1AsStr":"-4974660706199429123","int2":9223372036854775807,"int2AsStr":"9223372036854775807"}
 # ================================
 # Final State Checkpoint
 # ================================
