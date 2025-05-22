@@ -356,7 +356,7 @@ func (c *capture) readShard(
 		}
 
 		if err := c.processRecords(res.Records, stream, stateKey, bindingIndex, shard); err != nil {
-			return err
+			return fmt.Errorf("processing records for stream %s: %w", stream.name, err)
 		}
 		c.updateStats(stream.name, shard.shardId, len(res.Records), int(*res.MillisBehindLatest))
 
@@ -407,20 +407,54 @@ func (c *capture) processRecords(
 	for _, r := range records {
 		lastSequence = *r.SequenceNumber
 
-		doc := map[string]any{
-			metaProperty: map[string]any{
-				sequenceNumber: *r.SequenceNumber,
-				partitionKey:   *r.PartitionKey,
-				sourceProperty: map[string]any{
-					streamSource: stream.name,
-					shardSource:  shard.shardId,
-				},
+		doc := map[string]json.RawMessage{}
+		if err := json.Unmarshal(r.Data, &doc); err != nil {
+			return fmt.Errorf(
+				"unmarshalling record with sequenceNumber %q and partitionKey %q: %w",
+				*r.SequenceNumber, *r.PartitionKey, err,
+			)
+		}
+
+		meta := map[string]any{
+			sequenceNumber: *r.SequenceNumber,
+			partitionKey:   *r.PartitionKey,
+			sourceProperty: map[string]any{
+				streamSource: stream.name,
+				shardSource:  shard.shardId,
 			},
 		}
 
-		if err := json.Unmarshal(r.Data, &doc); err != nil {
-			return fmt.Errorf("unmarshalling record for stream %s: %w", stream.name, err)
-		} else if docBytes, err := json.Marshal(doc); err != nil {
+		// If the Kinesis record happens to already have a property called
+		// "_meta", merge it into our synthesized metadata.
+		if existingMeta, ok := doc[metaProperty]; ok {
+			existingMetaParsed := map[string]json.RawMessage{}
+			// A parsing error here is ignored, because it means that the
+			// existing "_meta" field isn't an object, and must be completely
+			// overwritten by the connector's "_meta" object.
+			_ = json.Unmarshal(existingMeta, &existingMetaParsed)
+
+			for k, v := range existingMetaParsed {
+				if _, ok := meta[k]; ok {
+					// Don't clobber our metadata fields if the Kinesis record
+					// has one with the same name. This is means we aren't
+					// necessarily doing a full merge patch on nested objects,
+					// but that seems unlikely to be a problem in practice.
+					continue
+				}
+				meta[k] = v
+			}
+		}
+
+		metaBytes, err := json.Marshal(meta)
+		if err != nil {
+			return fmt.Errorf(
+				"marshalling metadata for record with sequenceNumber %q and partitionKey %q: %w",
+				*r.SequenceNumber, *r.PartitionKey, err,
+			)
+		}
+
+		doc[metaProperty] = metaBytes
+		if docBytes, err := json.Marshal(doc); err != nil {
 			return err
 		} else if err := c.emitDoc(docBytes, stateKey, bindingIndex, shard.shardId, lastSequence); err != nil {
 			return err
