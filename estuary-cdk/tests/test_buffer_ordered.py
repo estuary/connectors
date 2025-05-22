@@ -3,7 +3,7 @@ import random
 from typing import AsyncGenerator, Awaitable
 
 import pytest
-import source_hubspot_native.buffer_ordered
+import estuary_cdk.buffer_ordered
 
 
 @pytest.mark.asyncio
@@ -16,7 +16,7 @@ async def test_buffer_ordered():
             yield asyncio.sleep(random.randint(1, 10) / 1000, result=i)
 
     output = []
-    async for result in source_hubspot_native.buffer_ordered.buffer_ordered(
+    async for result in estuary_cdk.buffer_ordered.buffer_ordered(
         _input(),
         20,
     ):
