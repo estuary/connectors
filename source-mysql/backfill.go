@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
 )
+
+var statementTimeoutRegexp = regexp.MustCompile(`maximum statement execution time exceeded`)
 
 func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
@@ -126,6 +129,18 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		rowOffset++
 		return nil
 	}); err != nil {
+		// As a special case, consider statement timeouts to be not an error so long as we got
+		// at least one row back (resultRows > 0). This allows us to make partial progress on
+		// slow databases with statement timeouts set, without adjusting the chunk size.
+		if statementTimeoutRegexp.MatchString(err.Error()) && resultRows > 0 {
+			logrus.WithFields(logrus.Fields{
+				"stream":     streamID,
+				"resultRows": resultRows,
+			}).Warn("backfill query interrupted by statement timeout; partial progress saved")
+
+			// Since we made progress, we don't return an error and we do return an updated cursor.
+			return false, nextRowKey, nil
+		}
 		return false, nil, fmt.Errorf("error executing backfill: %w", err)
 	}
 
