@@ -61,7 +61,7 @@ async def fetch_rum_events(
                     type=event_data["type"],
                     timestamp=datetime.fromisoformat(event_data["attributes"]["timestamp"].replace("Z", "+00:00")),
                     attributes=event_data["attributes"],
-                    relationships=event_data.get("relationships") or {}
+                    relationships=event_data.get("relationships")
                 )
 
                 if event.timestamp < last_ts:
@@ -74,12 +74,16 @@ async def fetch_rum_events(
                 event.meta_ = RUMEvent.Meta(op="c")
                 yield event
 
-            # Check if there are more pages
-            if not response_data.get("meta", {}).get("page", {}).get("has_more"):
+            # Check if there are more pages using the cursor from meta.page.after
+            meta = response_data.get("meta", {})
+            page = meta.get("page", {})
+            after_cursor = page.get("after")
+            
+            if not after_cursor:
                 break
 
             # Update the cursor for the next page
-            body["page"]["cursor"] = response_data["meta"]["page"]["next_cursor"]
+            body["page"]["cursor"] = after_cursor
 
         except Exception as e:
             log.error(f"Error fetching RUM events: {str(e)}")
