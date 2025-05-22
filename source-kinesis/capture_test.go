@@ -163,6 +163,66 @@ func TestCapture(t *testing.T) {
 	cupaloy.SnapshotT(t, capture.Summary())
 }
 
+func TestCaptureParsing(t *testing.T) {
+	ctx := context.Background()
+
+	conf := testConfig(t)
+	client, err := connect(ctx, &conf)
+	require.NoError(t, err)
+
+	testStream := "test-stream-parsing"
+	cleanup := func() {
+		_, _ = client.DeleteStream(ctx, &kinesis.DeleteStreamInput{StreamName: aws.String(testStream)})
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
+		StreamName: aws.String(testStream),
+		ShardCount: aws.Int32(2),
+	})
+	require.NoError(t, err, "failed to create stream")
+	awaitStreamActive(t, ctx, client, testStream)
+
+	resourceJson, err := json.Marshal(resource{
+		Stream: testStream,
+	})
+	binding := &pf.CaptureSpec_Binding{
+		ResourceConfigJson: resourceJson,
+		ResourcePath:       []string{testStream},
+		StateKey:           fmt.Sprintf("%s.v0", testStream),
+	}
+
+	capture := st.CaptureSpec{
+		Driver:       new(driver),
+		EndpointSpec: conf,
+		Bindings:     []*pf.CaptureSpec_Binding{binding},
+		Validator:    &st.SortedCaptureValidator{},
+		Sanitizers: map[string]*regexp.Regexp{
+			"<SEQUENCE_NUM>": regexp.MustCompile(`\d{56}`),
+		},
+	}
+
+	data := [][]byte{
+		[]byte(`{"int1":-4974660706199429123,"int1AsStr":"-4974660706199429123","int2":9223372036854775807,"int2AsStr":"9223372036854775807"}`),
+		[]byte(`{"_meta":{"userMetaField1":"hello1","userMetaField2":"world1"},"other":"value"}`),
+		[]byte(`{"_meta":{"userMetaField1":"hello2","userMetaField2":"world2","source":{"userSourceField1":"clobbered"}},"other":"value"}`),
+	}
+
+	for _, d := range data {
+		var input = kinesis.PutRecordInput{
+			StreamName:   aws.String(testStream),
+			Data:         d,
+			PartitionKey: aws.String(fmt.Sprintf("anyPartitionKey")),
+		}
+		_, err = client.PutRecord(ctx, &input)
+		require.NoError(t, err)
+	}
+
+	advanceCapture(t, &capture)
+	cupaloy.SnapshotT(t, capture.Summary())
+}
+
 func advanceCapture(t testing.TB, cs *st.CaptureSpec) {
 	t.Helper()
 
