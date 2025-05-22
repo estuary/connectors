@@ -1,0 +1,23 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-datadog:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_datadog
+        config:
+          api_key: ""
+          app_key: ""
+          site: "us5.datadoghq.com"
+    bindings:
+      - resource:
+          name: RUMEvents
+          interval: PT30S
+        target: acmeCo/RUMEvents
+    interval: 3m
+    shards:
+      logLevel: debug 

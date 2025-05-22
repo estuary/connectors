@@ -1,0 +1,6 @@
+---
+collections:
+  acmeCo/RUMEvents:
+    schema: RUMEvents.schema.yaml
+    key:
+      - /id 
