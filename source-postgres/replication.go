@@ -830,10 +830,9 @@ func (s *replicationStream) decodeTuple(
 
 	var fields = make(map[string]interface{})
 	for idx, col := range tuple.Columns {
-		if keyOnly && (rel.Columns[idx].Flags&1) == 0 {
-			// Skip non-key column because it may not be null-able,
-			// but will be null in this tuple encoding.
-			// Better to not emit it at all.
+		if keyOnly && (rel.Columns[idx].Flags&1) == 0 && col.DataType == 'n' {
+			// Skip null values of non-key columns in a key-only tuple because
+			// they aren't really null in the database.
 			continue
 		}
 		var colName = rel.Columns[idx].Name
