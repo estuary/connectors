@@ -60,7 +60,6 @@ Binding 0:
             ]
           },
           "date_col": {
-            "format": "date",
             "description": "(source type: date)",
             "type": [
               "string",
