@@ -1,0 +1,135 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "projects": {
+              "default": "",
+              "description": "Comma-separated list of project IDs from which to replicate issues. If left blank, issues from all projects wil be replicated.",
+              "title": "Projects",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ApiToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Email & API Token",
+              "default": "Email & API Token",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "description": "Email",
+              "order": 1,
+              "title": "Email",
+              "type": "string"
+            },
+            "password": {
+              "description": "API Token",
+              "order": 2,
+              "secret": true,
+              "title": "API Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ],
+          "title": "ApiToken",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "domain": {
+          "description": "This is the domain for your Jira account. Ex: estuary.atlassian.net, estuary.jira.com, jira.your-domain.com.",
+          "order": 0,
+          "pattern": "^([a-z0-9]+(-[a-z0-9]+)*\\.)+[a-z]{2,}$",
+          "title": "Domain",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "order": 1,
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Email & API Token": "#/$defs/ApiToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiToken"
+            }
+          ],
+          "order": 2,
+          "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "order": 3,
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "domain",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-jira-native",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
