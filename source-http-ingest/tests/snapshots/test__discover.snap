@@ -59,7 +59,10 @@ expression: result
           "idFromHeader": null,
           "path": "/webhook-data",
           "stream": "/webhook-data"
-        }
+        },
+        "resourcePath": [
+          "/webhook-data"
+        ]
       },
       {
         "documentSchema": {
@@ -128,7 +131,10 @@ expression: result
           "idFromHeader": null,
           "path": "/path/a/{paramA}/b/{paramB}",
           "stream": "/path/a/{paramA}/b/{paramB}"
-        }
+        },
+        "resourcePath": [
+          "/path/a/{paramA}/b/{paramB}"
+        ]
       }
     ]
   }
