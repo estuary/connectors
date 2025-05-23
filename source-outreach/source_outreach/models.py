@@ -104,9 +104,7 @@ OAUTH2_SPEC = OAuth2Spec(
     ),
     accessTokenUrlTemplate="https://api.outreach.io/oauth/token",
     accessTokenResponseMap={
-        "access_token": "/access_token",
         "refresh_token": "/refresh_token",
-        "expires_in": "/expires_in",
     },
     accessTokenHeaders={
         "Content-Type": "application/json",
