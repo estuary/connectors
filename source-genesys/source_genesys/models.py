@@ -7,13 +7,13 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     ConnectorState as GenericConnectorState,
     ClientCredentialsOAuth2Credentials,
-    ClientCredentialsOAuth2Spec,
+    OAuth2TokenFlowSpec,
     ResourceConfig,
     ResourceState,
 )
 
 
-OAUTH2_SPEC = ClientCredentialsOAuth2Spec(
+OAUTH2_SPEC = OAuth2TokenFlowSpec(
     # The access token URL requires a cloud region dependent domain. REGION_DEPENDENT_DOMAIN is replaced
     # at runtime with the genesys_cloud_domain configured by the user.
     accessTokenUrlTemplate=f"https://login.REGION_DEPENDENT_DOMAIN/oauth/token",

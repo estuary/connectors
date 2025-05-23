@@ -50,7 +50,7 @@ from .models import (
 )
 
 import estuary_cdk.emitted_changes_cache as cache
-from source_hubspot_native.buffer_ordered import buffer_ordered
+from estuary_cdk.buffer_ordered import buffer_ordered
 
 HUB = "https://api.hubapi.com"
 
