@@ -428,7 +428,7 @@ var databaseTypeToJSON = map[string]basicColumnType{
 	"enum": {jsonTypes: []string{"string"}},
 	"set":  {jsonTypes: []string{"string"}},
 
-	"date": {jsonTypes: []string{"string"}, format: "date"},
+	"date": {jsonTypes: []string{"string"}}, // Not valid for format: date until we sanitize values like '0000-00-00' to valid RFC3339 dates
 
 	"datetime":  {jsonTypes: []string{"string"}},
 	"timestamp": {jsonTypes: []string{"string"}},
