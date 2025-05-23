@@ -97,6 +97,7 @@ jobs:
           - source-sqlserver-batch
           - source-test
           - source-azure-blob-storage
+          - materialize-azure-blob-parquet
           - materialize-azure-fabric-warehouse
           - materialize-bigquery
           - materialize-databricks
