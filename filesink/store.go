@@ -14,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/estuary/connectors/go/blob"
 	"google.golang.org/api/option"
 )
 
@@ -180,4 +181,58 @@ func (s *GCSStore) PutStream(ctx context.Context, r io.Reader, key string) error
 	}
 
 	return nil
+}
+
+type AzureBlob struct {
+	bucket *blob.AzureBlobBucket
+}
+
+type AzureBlobConfig struct {
+	StorageAccountName string `json:"storageAccountName" jsonschema:"title=Storage Account Name,description=Name of the storage account that files will be written to." jsonschema_extras:"order=0"`
+	StorageAccountKey  string `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for the storage account that files will be written to." jsonschema_extras:"order=1,secret=true"`
+	ContainerName      string `json:"containerName" jsonschema:"title=Storage Account Container Name,description=Name of the container in the storage account where files will be written." jsonschema_extras:"order=2"`
+
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=3"`
+	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=4"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=5"`
+}
+
+func (c AzureBlobConfig) Validate() error {
+	var requiredProperties = [][]string{
+		{"containerName", c.ContainerName},
+		{"storageAccountName", c.StorageAccountName},
+		{"storageAccountKey", c.StorageAccountKey},
+	}
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+
+	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
+		return fmt.Errorf("parsing upload interval %q: %w", c.UploadInterval, err)
+	} else if c.Prefix != "" {
+		if strings.HasPrefix(c.Prefix, "/") {
+			return fmt.Errorf("prefix %q cannot start with /", c.Prefix)
+		}
+	} else if c.FileSizeLimit < 0 {
+		return fmt.Errorf("fileSizeLimit '%d' cannot be negative", c.FileSizeLimit)
+	}
+
+	return nil
+}
+
+func NewAzureBlob(ctx context.Context, cfg AzureBlobConfig) (*AzureBlob, error) {
+	bucket, err := blob.NewAzureBlobBucket(ctx, cfg.ContainerName, cfg.StorageAccountName, blob.WithAzureStorageAccountKey(cfg.StorageAccountKey))
+	if err != nil {
+		return nil, err
+	}
+
+	return &AzureBlob{
+		bucket: bucket,
+	}, nil
+}
+
+func (s *AzureBlob) PutStream(ctx context.Context, r io.Reader, key string) error {
+	return s.bucket.Upload(ctx, key, r)
 }
