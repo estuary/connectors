@@ -230,7 +230,10 @@ async def fetch_resource_changes(
         has_results = True
 
         for doc in resource_data:
-            if doc.cursor_value > log_cursor:
+            if doc.cursor_value < log_cursor or doc.cursor_value > end_date.timestamp():
+                log.debug(
+                    f"Skipping document with cursor value {doc.cursor_value}. It falls outside the range of {log_cursor} and {end_date.timestamp()}."
+                )
                 continue
 
             max_updated_at = max(max_updated_at, _ts_to_dt(doc.cursor_value))
@@ -419,7 +422,13 @@ async def fetch_associated_resource_changes(
             has_results = True
 
             for doc in child_data:
-                if doc.cursor_value > log_cursor:
+                if (
+                    doc.cursor_value < log_cursor
+                    or doc.cursor_value > end_date.timestamp()
+                ):
+                    log.debug(
+                        f"Skipping child document with cursor value {doc.cursor_value}. It falls outside the range of {log_cursor} and {end_date.timestamp()}."
+                    )
                     continue
 
                 max_updated_at = max(max_updated_at, _ts_to_dt(doc.cursor_value))
