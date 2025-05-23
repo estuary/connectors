@@ -465,7 +465,7 @@ fn discovered_webhook_collection(path: Option<&str>) -> DiscoveredBinding {
         }))
         .unwrap(),
         key: vec!["/_meta/webhookId".to_string()],
-        resource_path: Vec::new(), // deprecated field
+        resource_path: resource_config.resource_path(),
     }
 }
 
