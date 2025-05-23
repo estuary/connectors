@@ -713,6 +713,7 @@ func (s *replicationStream) decodeChangeEvent(
 				"tuple":        before,
 				"tupleColumns": len(before.Columns),
 				"relColumns":   len(rel.Columns),
+				"relReplIdent": rel.ReplicaIdentity,
 			}).Error("empty before tuple for deletion")
 			for idx, col := range before.Columns {
 				logrus.WithFields(logrus.Fields{
