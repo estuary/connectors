@@ -129,7 +129,8 @@ Binding 0:
         {
           "$ref": "#DboTest_VarcharKeyDiscovery_42325208"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
