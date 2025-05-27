@@ -205,7 +205,8 @@ Binding 0:
         {
           "$ref": "#TestFeatureflagflattenarrays_70143951"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

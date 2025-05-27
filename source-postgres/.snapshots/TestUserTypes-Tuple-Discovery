@@ -124,7 +124,8 @@ Binding 0:
         {
           "$ref": "#TestUsertypes_tuple_51424093"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

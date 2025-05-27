@@ -131,7 +131,8 @@ Binding 0:
         {
           "$ref": "#TestFloatkeydiscovery_46399195"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
