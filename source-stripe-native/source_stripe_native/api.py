@@ -86,6 +86,12 @@ async def fetch_incremental(
     """
     assert isinstance(log_cursor, datetime)
 
+    # We need to keep track of the IDs of documents we've seen and emitted
+    # to avoid emitting duplicate documents in the same fetch_incremental call.
+    # This is because Stripe's Events API will return the events in reverse-chronological order,
+    # and we may see the same document multiple times if it has been updated causing us
+    # to emit the updated document before the original document.
+    seen_ids = set()
     iterating = True
 
     url = f"{API}/events"
@@ -144,7 +150,13 @@ async def fetch_incremental(
                 elif cls.NAME == "ExternalBankAccount" and doc.object != "bank_account":
                     continue
 
+                if doc.id in seen_ids:
+                    log.debug(
+                        f"Skipping duplicate document with ID {doc.id} for stream {cls.NAME}."
+                    )
+                    continue
                 yield doc
+                seen_ids.add(doc.id)
             elif event_ts < log_cursor:
                 iterating = False
                 break
@@ -254,6 +266,13 @@ async def fetch_incremental_substreams(
     this method exclusively for the child stream.
     """
     assert isinstance(log_cursor, datetime)
+
+    # We need to keep track of the IDs of documents we've seen and emitted
+    # to avoid emitting duplicate documents in the same fetch_incremental call.
+    # This is because Stripe's Events API will return the events in reverse-chronological order,
+    # and we may see the same document multiple times if it has been updated causing us
+    # to emit the updated document before the original document.
+    seen_ids = set()
     iterating = True
 
     url = f"{API}/events"
@@ -307,7 +326,13 @@ async def fetch_incremental_substreams(
                     doc.meta_ = cls_child.Meta(op=cls.EVENT_TYPES[event.type])
                     if account_id:
                         doc.account_id = account_id
+                    if doc.id in seen_ids:
+                        log.debug(
+                            f"Skipping duplicate document with ID {doc.id} for stream {cls_child.NAME}."
+                        )
+                        continue
                     yield doc
+                    seen_ids.add(doc.id)
 
             elif event_ts < log_cursor:
                 iterating = False
@@ -600,6 +625,12 @@ async def fetch_incremental_usage_records(
     """
     assert isinstance(log_cursor, datetime)
 
+    # We need to keep track of the IDs of documents we've seen and emitted
+    # to avoid emitting duplicate documents in the same fetch_incremental call.
+    # This is because Stripe's Events API will return the events in reverse-chronological order,
+    # and we may see the same document multiple times if it has been updated causing us
+    # to emit the updated document before the original document.
+    seen_ids = set()
     iterating = True
 
     url = f"{API}/events"
@@ -652,7 +683,13 @@ async def fetch_incremental_usage_records(
                         pass  # move to next item
                     async for doc in child_data:
                         doc.meta_ = cls_child.Meta(op=cls.EVENT_TYPES[event.type])
+                        if doc.id in seen_ids:
+                            log.debug(
+                                f"Skipping duplicate document with ID {doc.id} for stream {cls_child.NAME}."
+                            )
+                            continue
                         yield doc
+                        seen_ids.add(doc.id)
 
             elif event_ts < log_cursor:
                 iterating = False
