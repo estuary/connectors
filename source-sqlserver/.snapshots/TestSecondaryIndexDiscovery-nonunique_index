@@ -138,7 +138,8 @@ Binding 0:
         {
           "$ref": "#DboTest_SecondaryIndexDiscovery_nonunique_index_g22906"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/lsn",

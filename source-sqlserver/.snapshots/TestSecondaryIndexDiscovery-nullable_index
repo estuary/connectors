@@ -144,7 +144,8 @@ Binding 0:
         {
           "$ref": "#DboTest_SecondaryIndexDiscovery_nullable_index_g31990"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/lsn",

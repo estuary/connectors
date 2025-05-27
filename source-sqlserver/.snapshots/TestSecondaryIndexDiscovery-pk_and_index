@@ -137,7 +137,8 @@ Binding 0:
         {
           "$ref": "#DboTest_SecondaryIndexDiscovery_pk_and_index_g14228"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/k1"

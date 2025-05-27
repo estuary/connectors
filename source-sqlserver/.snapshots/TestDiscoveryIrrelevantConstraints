@@ -136,7 +136,8 @@ Binding 0:
         {
           "$ref": "#DboTest_DiscoveryIrrelevantConstraints_44516719"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
