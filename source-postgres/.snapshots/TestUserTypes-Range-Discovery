@@ -128,7 +128,8 @@ Binding 0:
         {
           "$ref": "#TestUsertypes_range_91324557"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

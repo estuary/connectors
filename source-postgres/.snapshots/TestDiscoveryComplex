@@ -154,7 +154,8 @@ Binding 0:
         {
           "$ref": "#TestDiscoverycomplex_cheap_oxygenation"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/k2",

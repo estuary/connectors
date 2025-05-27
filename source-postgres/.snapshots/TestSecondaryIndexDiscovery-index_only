@@ -140,7 +140,8 @@ Binding 0:
         {
           "$ref": "#TestSecondaryindexdiscovery_index_only_g26313"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/k2",

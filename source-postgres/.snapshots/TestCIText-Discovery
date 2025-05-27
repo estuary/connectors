@@ -141,7 +141,8 @@ Binding 0:
         {
           "$ref": "#TestCitext_58810479"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

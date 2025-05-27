@@ -128,7 +128,8 @@ Binding 0:
         {
           "$ref": "#PublicDiscoverywithoutpermissions_117535"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
