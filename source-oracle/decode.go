@@ -159,11 +159,11 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	}
 	ast, err := parser.Parse(msg.SQL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing sql query %q: %w", msg.SQL, err)
+		return nil, fmt.Errorf("parsing sql query %v: %w", msg, err)
 	}
 	undoAST, err := parser.Parse(msg.UndoSQL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing undo sql query %q: %w", msg.UndoSQL, err)
+		return nil, fmt.Errorf("parsing undo sql query %v: %w", msg, err)
 	}
 	var after, before map[string]any
 
