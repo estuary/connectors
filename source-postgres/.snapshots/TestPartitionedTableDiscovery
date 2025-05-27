@@ -129,7 +129,8 @@ Binding 0:
         {
           "$ref": "#TestPartitionedtablediscovery_27339326"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/logdate"

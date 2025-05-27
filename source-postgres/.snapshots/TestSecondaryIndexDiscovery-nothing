@@ -137,7 +137,8 @@ Binding 0:
         {
           "$ref": "#TestSecondaryindexdiscovery_nothing_g14307"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/loc/0",

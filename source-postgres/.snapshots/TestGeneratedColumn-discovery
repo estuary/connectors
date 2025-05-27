@@ -135,7 +135,8 @@ Binding 0:
         {
           "$ref": "#TestGeneratedcolumn_91418628"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

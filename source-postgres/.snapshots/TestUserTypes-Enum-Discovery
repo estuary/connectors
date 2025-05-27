@@ -128,7 +128,8 @@ Binding 0:
         {
           "$ref": "#TestUsertypes_enum_64812435"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
