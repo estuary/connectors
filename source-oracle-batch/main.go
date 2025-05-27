@@ -23,7 +23,7 @@ import (
 var featureFlagDefaults = map[string]bool{
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
-	"emit_sourced_schemas": false,
+	"emit_sourced_schemas": true,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
