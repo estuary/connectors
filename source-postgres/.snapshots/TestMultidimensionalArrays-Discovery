@@ -128,7 +128,8 @@ Binding 0:
         {
           "$ref": "#TestMultidimensionalarrays_82375147"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
