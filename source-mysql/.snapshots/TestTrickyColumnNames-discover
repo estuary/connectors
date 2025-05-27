@@ -123,7 +123,8 @@ Binding 0:
         {
           "$ref": "#TestTrickyColumnNames_14055203"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/Meta~1`wtf`~0ID"
@@ -254,7 +255,8 @@ Binding 1:
         {
           "$ref": "#TestTrickyColumnNames_28395292"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/table"

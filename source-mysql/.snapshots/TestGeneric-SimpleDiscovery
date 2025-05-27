@@ -134,7 +134,8 @@ Binding 0:
         {
           "$ref": "#TestGeneric_SimpleDiscovery_49210954"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/a"

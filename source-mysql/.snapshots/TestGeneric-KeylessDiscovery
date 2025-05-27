@@ -135,7 +135,8 @@ Binding 0:
         {
           "$ref": "#TestGeneric_KeylessDiscovery_t32386"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/cursor"

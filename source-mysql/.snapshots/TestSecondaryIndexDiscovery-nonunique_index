@@ -132,7 +132,8 @@ Binding 0:
         {
           "$ref": "#TestSecondaryIndexDiscovery_nonunique_index_g22906"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/cursor"

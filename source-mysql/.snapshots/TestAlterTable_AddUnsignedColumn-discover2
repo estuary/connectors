@@ -130,7 +130,8 @@ Binding 0:
         {
           "$ref": "#TestAlterTable_AddUnsignedColumn_57413089"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

@@ -131,7 +131,8 @@ Binding 0:
         {
           "$ref": "#TestEnumDecodingFix_32314857"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

@@ -120,7 +120,8 @@ Binding 0:
         {
           "$ref": "#TestUsErS!@#$"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

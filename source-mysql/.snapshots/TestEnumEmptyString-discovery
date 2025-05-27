@@ -131,7 +131,8 @@ Binding 0:
         {
           "$ref": "#TestEnumEmptyString_29144777"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
