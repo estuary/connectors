@@ -305,6 +305,7 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *bo
 		return nil, nil, nil, fmt.Errorf("getting info schema: %w", err)
 	}
 
+	// Here in options we need the serpolicy
 	transactor, options, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open, is, be)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("building transactor: %w", err)
@@ -318,7 +319,10 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *bo
 		}
 	}
 
-	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, options, nil
+	return transactor, &pm.Response_Opened{
+		RuntimeCheckpoint: cp,
+		SerPolicy:         options.SerPolicy,
+	}, options, nil
 }
 
 func mustGetTenantNameFromTaskName(taskName string) string {

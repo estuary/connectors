@@ -75,6 +75,11 @@ type config struct {
 	Schedule           boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger      dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 	NetworkTunnel      *tunnelConfig              `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your Redshift cluster through an SSH server that acts as a bastion host for your network."`
+	Advanced           *advancedConfig            `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
+
+type advancedConfig struct {
+	SerPolicy *boilerplate.SerPolicyConfig `json:"serPolicy,omitempty" jsonschema:"title=Serialization Policy,description=Serialization policy overrides for materialzed fields."`
 }
 
 func (c *config) Validate() error {
@@ -317,6 +322,15 @@ func prepareNewTransactor(
 			}
 		}
 
+		serPolicy := &pf.SerPolicy{
+			StrTruncateAfter:       1 << 16,
+			NestedObjTruncateAfter: 1000,
+			ArrayTruncateAfter:     1000,
+		}
+		if cfg.Advanced != nil && cfg.Advanced.SerPolicy != nil {
+			serPolicy = boilerplate.ResolveSerPolicy(serPolicy, cfg.Advanced.SerPolicy)
+		}
+
 		opts := &boilerplate.MaterializeOptions{
 			ExtendedLogging: true,
 			AckSchedule: &boilerplate.AckScheduleOption{
@@ -324,6 +338,7 @@ func prepareNewTransactor(
 				Jitter: []byte(cfg.Address),
 			},
 			DBTJobTrigger: &cfg.DBTJobTrigger,
+			SerPolicy:     serPolicy,
 		}
 
 		return d, opts, nil

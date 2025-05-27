@@ -20,6 +20,7 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
 	"github.com/gogo/protobuf/jsonpb"
@@ -39,6 +40,8 @@ type MaterializeOptions struct {
 
 	// DBTJobTrigger is configuration for enabling DBT job triggers after commits
 	DBTJobTrigger *dbt.JobConfig
+
+	SerPolicy *pf.SerPolicy
 }
 
 // AckScheduleOption enables a schedule for acknowledgements of the
