@@ -126,7 +126,8 @@ Binding 0:
         {
           "$ref": "#C##FLOW_TEST_LOGMINERT12319541"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/NUM18"
