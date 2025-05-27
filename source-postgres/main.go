@@ -137,11 +137,11 @@ type advancedConfig struct {
 var featureFlagDefaults = map[string]bool{
 	// When set, discovered collection schemas will request that schema inference be
 	// used _in addition to_ the full column/types discovery we already do.
-	"use_schema_inference": false,
+	"use_schema_inference": true,
 
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
-	"emit_sourced_schemas": false,
+	"emit_sourced_schemas": true,
 
 	// When true, DATE columns are captured as YYYY-MM-DD dates. Historically these
 	// used to be captured as RFC3339 timestamps, which is usually not what users expect.
