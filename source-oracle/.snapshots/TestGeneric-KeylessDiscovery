@@ -147,7 +147,8 @@ Binding 0:
         {
           "$ref": "#C##FLOW_TEST_LOGMINERTT32386"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/rs_id",
