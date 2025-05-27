@@ -52,6 +52,10 @@ func TestBasicCapture(t *testing.T) {
 	var uniqueID = "826935"
 	var tableName = fmt.Sprintf("c##flow_test_batch.basic_capture_%s", uniqueID)
 
+	// Ignore SourcedSchema updates as their precise position in the change stream is
+	// unpredictable when we're restarting the capture in parallel with changes.
+	cs.Validator = &st.OrderedCaptureValidator{IncludeSourcedSchemas: false}
+
 	executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName))
 	t.Cleanup(func() { executeControlQuery(ctx, t, control, fmt.Sprintf("DROP TABLE %s", tableName)) })
 	executeControlQuery(ctx, t, control, fmt.Sprintf("CREATE TABLE %s(id INTEGER PRIMARY KEY, data VARCHAR(200)) ROWDEPENDENCIES", tableName))
