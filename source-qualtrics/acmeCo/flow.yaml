@@ -1,0 +1,6 @@
+---
+collections:
+  acmeCo/surveys:
+    schema: surveys.schema.yaml
+    key:
+      - id

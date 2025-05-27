@@ -1,0 +1,19 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-qualtrics:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_qualtrics
+        config:
+          api_key: "123"
+          data_center: "123"
+    bindings:
+      - resource:
+          name: surveys
+          interval: PT5M
+        target: acmeCo/surveys
