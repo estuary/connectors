@@ -130,7 +130,8 @@ Binding 0:
         {
           "$ref": "#TestTABLE_WITH_DIFFERENT_CASING"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
@@ -258,7 +259,8 @@ Binding 1:
         {
           "$ref": "#TestTable_with_different_casing"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

@@ -125,7 +125,8 @@ Binding 0:
         {
           "$ref": "#TestEmptyBlobs_11214558"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

@@ -130,7 +130,8 @@ Binding 0:
         {
           "$ref": "#TestFeatureFlagTinyintAsBool_21925183"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

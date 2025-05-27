@@ -123,7 +123,8 @@ Binding 0:
         {
           "$ref": "#TestSecondaryIndexDiscovery_index_and_fk_g16025"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
