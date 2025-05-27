@@ -1,6 +1,7 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_batch_decimals_75319739": 2 Documents
+# Collection "acmeCo/test/c__flow_test_batch_decimals_75319739": 3 Documents
 # ================================
+{"type":"object","required":["_meta","ID"],"additionalProperties":false,"properties":{"ID":{"type":"string","format":"integer","description":"(source type: NUMBER)"},"X":{"description":"(source type: non-nullable NUMBER)","type":["number"]},"Y":{"format":"number","description":"(source type: non-nullable NUMBER)","type":["string"]},"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-oracle-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."}},"additionalProperties":false,"type":"object","required":["polled","index"],"additionalProperties":false}},"x-infer-schema":true}
 {"ID":"1","TXID":"999999","X":"98.7654","Y":"123456789101112.123456789101112","_meta":{"polled":"<TIMESTAMP>","index":999}}
 {"ID":"0","TXID":"999999","X":"12.3456","Y":"1234567890","_meta":{"polled":"<TIMESTAMP>","index":999}}
 # ================================
