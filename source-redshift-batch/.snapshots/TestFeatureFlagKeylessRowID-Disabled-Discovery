@@ -68,7 +68,8 @@ Binding 0:
               "null"
             ]
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "projections": null
     },

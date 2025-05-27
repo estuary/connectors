@@ -100,7 +100,8 @@ Binding 0:
             "type": "integer",
             "description": "(source type: non-nullable int4)"
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "key": [
         "/id"
