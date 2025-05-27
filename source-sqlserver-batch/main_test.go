@@ -244,6 +244,10 @@ func TestAsyncCapture(t *testing.T) {
 	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
 	createTestTable(t, control, tableName, "(id INT PRIMARY KEY, data NVARCHAR(MAX))")
 
+	// Ignore SourcedSchema updates as their precise position in the change stream is
+	// unpredictable when we're restarting the capture in parallel with changes.
+	cs.Validator = &st.OrderedCaptureValidator{IncludeSourcedSchemas: false}
+
 	// Have to sanitize the index within the polling interval because we're running
 	// the capture in parallel with changes.
 	cs.Sanitizers[`"index":999`] = regexp.MustCompile(`"index":[0-9]+`)
