@@ -176,7 +176,8 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- end -}}
 )
 {{- end }}
-);
+)
+DEFAULT_DDL_COLLATION = '';
 
 COMMENT ON TABLE {{$.Identifier}} IS {{Literal $.Comment}};
 {{- range $col := .Columns }}
