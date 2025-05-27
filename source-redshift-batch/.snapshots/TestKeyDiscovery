@@ -87,7 +87,8 @@ Binding 0:
             "type": "string",
             "description": "(source type: non-nullable varchar)"
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "key": [
         "/k_smallint",

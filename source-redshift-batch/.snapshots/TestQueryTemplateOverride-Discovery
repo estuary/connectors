@@ -77,7 +77,8 @@ Binding 0:
               "null"
             ]
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "key": [
         "/id"

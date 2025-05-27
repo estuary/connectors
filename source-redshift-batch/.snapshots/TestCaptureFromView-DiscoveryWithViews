@@ -82,7 +82,8 @@ Binding 0:
               "null"
             ]
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "key": [
         "/id"
@@ -170,7 +171,8 @@ Binding 1:
               "null"
             ]
           }
-        }
+        },
+        "x-infer-schema": true
       },
       "key": [
         "/_meta/row_id"
