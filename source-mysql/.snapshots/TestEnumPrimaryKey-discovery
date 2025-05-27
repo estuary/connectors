@@ -135,7 +135,8 @@ Binding 0:
         {
           "$ref": "#TestEnumPrimaryKey_18676708"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/category",

@@ -138,7 +138,8 @@ Binding 0:
         {
           "$ref": "#TestSecondaryIndexDiscovery_nullable_index_g31990"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/cursor"

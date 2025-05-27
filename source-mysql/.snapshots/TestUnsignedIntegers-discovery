@@ -151,7 +151,8 @@ Binding 0:
         {
           "$ref": "#TestUnsignedIntegers_45511171"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"
