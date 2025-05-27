@@ -131,7 +131,8 @@ Binding 0:
         {
           "$ref": "#C##FLOW_TEST_LOGMINERUSERS"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/ID"

@@ -134,7 +134,8 @@ Binding 0:
         {
           "$ref": "#C##FLOW_TEST_LOGMINERT39256824"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/`Meta~1'wtf'~0ID`"
@@ -276,7 +277,8 @@ Binding 1:
         {
           "$ref": "#C##FLOW_TEST_LOGMINERT42531495"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/table"
