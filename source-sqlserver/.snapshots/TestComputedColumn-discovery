@@ -136,7 +136,8 @@ Binding 0:
         {
           "$ref": "#DboTest_ComputedColumn_18851564"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/id"

@@ -141,7 +141,8 @@ Binding 0:
         {
           "$ref": "#DboTest_IndexIncludedDiscovery_98476798"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/k2",

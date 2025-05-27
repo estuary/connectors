@@ -127,7 +127,8 @@ Binding 0:
         {
           "$ref": "#DboTest_ComputedPrimaryKey_10118243"
         }
-      ]
+      ],
+      "x-infer-schema": true
     },
     "key": [
       "/_meta/source/lsn",
