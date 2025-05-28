@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import functools
 from logging import Logger
-from typing import Any
 from zoneinfo import ZoneInfo
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
