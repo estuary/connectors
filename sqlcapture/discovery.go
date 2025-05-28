@@ -112,7 +112,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	}).Reflect(db.EmptySourceMetadata())
 	sourceSchema.Version = ""
 
-	if db.HistoryMode() {
+	if db.HistoryMode() && fullWriteSchema {
 		sourceSchema.Extras = map[string]interface{}{
 			"reduce": map[string]interface{}{
 				"strategy":    "lastWriteWins",
