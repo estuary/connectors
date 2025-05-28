@@ -95,7 +95,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 	var fields = make(map[string]any, len(cols)-1)
 	var rowid string
-	var backfillComplete bool
 
 	var rowOffset = state.BackfilledCount
 	for rows.Next() {
@@ -109,9 +108,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 			// Keyless backfills are not ordered, so we need to check every row to see if it includes the last ROWID known
 			// at the time of starting the backfill which is the last rowid in the backfill range slice
-			if !backfillComplete {
-				backfillComplete = rowid >= lastTableRowID
-			}
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
@@ -154,8 +150,14 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		return false, nil, err
 	}
 
-	if state.Mode == sqlcapture.TableStatePreciseBackfill || state.Mode == sqlcapture.TableStateUnfilteredBackfill {
+	var backfillComplete bool
+	switch state.Mode {
+	case sqlcapture.TableStateKeylessBackfill:
+		backfillComplete = rowidRangeEnd == lastTableRowID
+	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
+	default:
+		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
 	}
 
 	// for keyless backfill tables it is possible that we query a rowid range which does not have any rows,
