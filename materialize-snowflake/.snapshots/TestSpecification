@@ -224,6 +224,11 @@
       },
       "advanced": {
         "properties": {
+          "disableFieldTruncation": {
+            "type": "boolean",
+            "title": "Disable Field Truncation",
+            "description": "Disables truncation of materialized fields. May result in errors when loading data into Snowflake for documents with extremely large values or complex nested structures."
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
