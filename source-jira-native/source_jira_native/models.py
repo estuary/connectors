@@ -13,7 +13,7 @@ from estuary_cdk.capture.common import (
     Logger,
 )
 from estuary_cdk.http import HTTPSession
-from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
