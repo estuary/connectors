@@ -106,6 +106,12 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		var rowKey []byte
 		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			rowKey = []byte(rowid)
+
+			// Keyless backfills are not ordered, so we need to check every row to see if it includes the last ROWID known
+			// at the time of starting the backfill which is the last rowid in the backfill range slice
+			if !backfillComplete {
+				backfillComplete = rowid >= lastTableRowID
+			}
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
@@ -142,12 +148,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		}
 		resultRows++
 		rowOffset++
-
-		// Keyless backfills are not ordered, so we need to check every row to see if it includes the last ROWID known
-		// at the time of starting the backfill which is the last rowid in the backfill range slice
-		if state.Mode == sqlcapture.TableStateKeylessBackfill && !backfillComplete {
-			backfillComplete = rowid >= lastTableRowID
-		}
 	}
 
 	if err := rows.Err(); err != nil {
@@ -319,7 +319,7 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
 	logrus.WithFields(logrus.Fields{
 		"ranges":   fmt.Sprintf("%v", db.backfillRowIDRanges[streamID]),
 		"streamID": streamID,
-	}).Trace("backfill: rowid ranges")
+	}).Debug("backfill: rowid ranges")
 
 	return nil
 }
