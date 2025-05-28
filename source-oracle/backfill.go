@@ -4,12 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/sirupsen/logrus"
 )
+
+const StartingRowID = "AAAAAAAAAAAAAAAAAA"
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
@@ -31,13 +34,18 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 	switch state.Mode {
 	case sqlcapture.TableStateKeylessBackfill:
 		// A is the lexicographically smallest character in base64 encoding, so this is the smallest possible base64 encoded string
-		var afterRowID = "AAAAAAAAAAAAAAAAAA"
+		var afterRowID = StartingRowID
 		if resumeAfter != nil {
 			afterRowID = string(resumeAfter)
 		}
 		logEntry.WithField("rowid", afterRowID).Debug("backfill: scanning keyless table chunk")
-		query = db.keylessScanQuery(info, schema, table)
-		args = []any{afterRowID}
+
+		if err := db.fetchBackfillRowIDRange(ctx, schema, table); err != nil {
+			return false, nil, fmt.Errorf("error fetching backfill rowid range: %w", err)
+		}
+
+		query = db.keylessScanQuery(info, schema, table, afterRowID)
+		args = []any{}
 
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		if resumeAfter != nil {
@@ -138,7 +146,18 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		return false, nil, err
 	}
 
-	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
+	var backfillComplete bool
+
+	switch state.Mode {
+	case sqlcapture.TableStateKeylessBackfill:
+		var rowidRangeEnd = db.backfillRowIDRanges[streamID][len(db.backfillRowIDRanges[streamID])-1]
+		backfillComplete = rowid >= rowidRangeEnd
+	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
+		backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
+	default:
+		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
+	}
+
 	return backfillComplete, nextRowKey, nil
 }
 
@@ -181,6 +200,123 @@ func (db *oracleDatabase) WriteWatermark(ctx context.Context, watermark string) 
 func (db *oracleDatabase) WatermarksTable() sqlcapture.StreamID {
 	var bits = strings.SplitN(db.config.Advanced.WatermarksTable, ".", 2)
 	return sqlcapture.JoinStreamID(bits[0], bits[1])
+}
+
+func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaName string, tableName string) error {
+	var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
+	if _, ok := db.backfillRowIDRanges[streamID]; ok {
+		return nil
+	}
+
+	// This query starts by reading dba_extents which has information on data blocks of tables
+	// and splits those blocks into 1g buckets by calculating how many blocks are required to fill
+	// 1gb based on db_block_size, then dividing up the blocks into buckets using width_bucket,
+	// calculating the range begin end values necessary to construct rowids and
+	// finally generating ROWID ranges based on these buckets so we can do backfills 1gb at a time
+	var query = fmt.Sprintf(`
+    with extents_data as (
+      select o.data_object_id, e.file_id, e.block_id, e.blocks
+      from dba_extents e
+      join all_objects o
+      on (e.owner, e.segment_name, e.segment_type) = ((o.owner, o.object_name, o.object_type))
+        and decode(e.partition_name, o.subobject_name, 0, 1) = 0
+      where e.segment_type in ('TABLE', 'TABLE PARTITION', 'TABLE SUBPARTITION')
+        and e.owner = '%s'
+        and e.segment_name = '%s'
+    )
+    , extents_with_sums as (
+      select sum(blocks) over() total_blocks,
+        sum(blocks) over(order by data_object_id, file_id, block_id) - blocks cumul_prev_blocks,
+        sum(blocks) over(order by data_object_id, file_id, block_id) cumul_current_blocks,
+        greatest(1, sum(blocks) over()/(SELECT 1073741824 / TO_NUMBER(value) FROM v$parameter WHERE name='db_block_size')) num_buckets,
+        e.*
+      from extents_data e
+    )
+    , extents_with_buckets as (
+      select width_bucket(cumul_prev_blocks, 1, total_blocks + 1, num_buckets) prev_bucket,
+        width_bucket(cumul_prev_blocks+1, 1, total_blocks + 1, num_buckets) first_bucket,
+        width_bucket(cumul_current_blocks, 1, total_blocks + 1, num_buckets) last_bucket,
+        e.*
+      from extents_with_sums e
+    )
+    , selected_extents as (
+      select *
+      from extents_with_buckets
+      where cumul_current_blocks = round((last_bucket * total_blocks) / num_buckets)
+        or prev_bucket < last_bucket
+    )
+    , expanded_extents as (
+      select first_bucket + level - 1 bucket,
+        case level when 1 then cumul_prev_blocks
+          else round(((first_bucket + level - 2) * total_blocks) / num_buckets)
+        end start_blocks,
+        case first_bucket + level - 1 when last_bucket then cumul_current_blocks - 1
+          else round(((first_bucket + level - 1) * total_blocks) / num_buckets) - 1
+        end end_blocks,
+        e.*
+      from selected_extents e
+      connect by cumul_prev_blocks = prior cumul_prev_blocks
+        and first_bucket + level -1 <= last_bucket
+        and prior sys_guid() is not null
+    )
+    , answer as (
+      select bucket,
+        min(data_object_id)
+          keep (dense_rank first order by cumul_prev_blocks) first_data_object_id,
+        min(file_id)
+          keep (dense_rank first order by cumul_prev_blocks) first_file_id,
+        min(block_id + start_blocks - cumul_prev_blocks)
+          keep (dense_rank first order by cumul_prev_blocks) first_block_id,
+        max(data_object_id)
+          keep (dense_rank last order by cumul_prev_blocks) last_data_object_id,
+        max(file_id)
+          keep (dense_rank last order by cumul_prev_blocks) last_file_id,
+        max(block_id + end_blocks - cumul_prev_blocks)
+          keep (dense_rank last order by cumul_prev_blocks) last_block_id,
+        max(end_blocks) + 1 - min(start_blocks) blocks
+      from expanded_extents
+      group by bucket
+    ) select
+    dbms_rowid.rowid_create(
+      1, first_data_object_id, first_file_id, first_block_id, 0
+    ) rowid_start,
+    dbms_rowid.rowid_create(
+      1, last_data_object_id, last_file_id, last_block_id, 32767
+    ) rowid_end
+    from answer
+    order by bucket
+    `, schemaName, tableName)
+
+	var rows, err = db.conn.QueryContext(ctx, query)
+	if err != nil {
+		return fmt.Errorf("querying rowid range: %w", err)
+	}
+	defer rows.Close()
+
+	db.backfillRowIDRanges[streamID] = make([]string, 0)
+
+	var rowidStart, rowidEnd string
+	for rows.Next() {
+
+		if err := rows.Scan(&rowidStart, &rowidEnd); err != nil {
+			return fmt.Errorf("scanning rowid range: %w", err)
+		}
+
+		db.backfillRowIDRanges[streamID] = append(db.backfillRowIDRanges[streamID], rowidStart)
+	}
+
+	var row = db.conn.QueryRowContext(ctx, fmt.Sprintf(`SELECT MAX(ROWID) FROM "%s"."%s"`, schemaName, tableName))
+	if err != nil {
+		return fmt.Errorf("querying max ROWID: %w", err)
+	}
+	var lastRowID string
+	if err := row.Scan(&lastRowID); err != nil {
+		return fmt.Errorf("scanning max ROWID: %w", err)
+	}
+
+	db.backfillRowIDRanges[streamID] = append(db.backfillRowIDRanges[streamID], lastRowID)
+
+	return nil
 }
 
 // The set of column types for which we need to specify `COLLATE BINARY` to get
@@ -240,20 +376,35 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 // Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
 // since ROWIDs are not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
 // but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
-func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
+func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName, afterRowID string) string {
 	var query = new(strings.Builder)
 	var columnSelect []string
 	for _, col := range info.Columns {
 		columnSelect = append(columnSelect, castColumn(col))
 	}
 
+	var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
+	var rowidStart, rowidEnd string
+
+	if afterRowID == StartingRowID {
+		rowidStart = db.backfillRowIDRanges[streamID][0]
+		rowidEnd = db.backfillRowIDRanges[streamID][1]
+	} else {
+		rowidStart = afterRowID
+		var idx = slices.Index(db.backfillRowIDRanges[streamID], afterRowID)
+		if idx < len(db.backfillRowIDRanges[streamID])-1 {
+			rowidEnd = db.backfillRowIDRanges[streamID][idx+1]
+		} else {
+			// sanity check, this should not happen
+			panic(fmt.Sprintf("got unexpected keylessScanQuery after having finished backfilling, afterRowID=%s", afterRowID))
+		}
+	}
+
 	// It is faster to first find the smallest and the largest ROWIDs of the range we want to cover and then query
 	// all of the data in that range, instead of ordering all rows based on ROWID and then filtering the ROWID
 	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
-	fmt.Fprintf(query, ` WHERE ROWID >= (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC FETCH FIRST 1 ROW ONLY)`, schemaName, tableName)
-	fmt.Fprintf(query, ` AND ROWID <= (SELECT ROWID FROM "%s"."%s" WHERE ROWID > :1 ORDER BY ROWID ASC OFFSET`, schemaName, tableName)
-	fmt.Fprintf(query, ` (SELECT LEAST((SELECT COUNT(*) FROM "%s"."%s" WHERE ROWID > :1) -1, %d) FROM DUAL) ROWS FETCH FIRST 1 ROW ONLY)`, schemaName, tableName, db.config.Advanced.BackfillChunkSize)
-	fmt.Fprintf(query, ` ORDER BY ROWID ASC`)
+	fmt.Fprintf(query, ` WHERE ROWID >= '%s'`, rowidStart)
+	fmt.Fprintf(query, ` AND ROWID <= '%s'`, rowidEnd)
 	return query.String()
 }
 
