@@ -87,9 +87,9 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		relevantExistingSchemasAndTables[loc.TableSchema] = []string{}
 		tables, err := runShowPaginated(ctx, c.xdb, func(cursor *string) string {
 			if cursor != nil {
-				return fmt.Sprintf("SHOW TERSE TABLES IN %s LIMIT %d FROM '%s';", loc.TableSchema, showQueryLimit, *cursor)
+				return fmt.Sprintf("SHOW TERSE TABLES IN %q LIMIT %d FROM '%s';", loc.TableSchema, showQueryLimit, *cursor)
 			} else {
-				return fmt.Sprintf("SHOW TERSE TABLES IN %s LIMIT %d;", loc.TableSchema, showQueryLimit)
+				return fmt.Sprintf("SHOW TERSE TABLES IN %q LIMIT %d;", loc.TableSchema, showQueryLimit)
 			}
 		})
 		if err != nil {
