@@ -247,6 +247,13 @@ class InsightAsyncJob(AsyncJob):
         params.update(fields=[pk_name], level=level)
         params["time_range"].update(since=new_start.to_date_string())
         params.pop("time_increment")  # query all days
+        # The following call to `self._edge_object.get_insights` is used solely to retrieve unique primary keys,
+        # which are needed to create smaller asynchronous jobs. Including the `breakdowns` parameter would
+        # segment the results by the specified dimensions and increases the total number of rows returned
+        # (though not the number of unique primary keys). This leads to paging through more results.
+        # Since we only care about the unique primary keys — not the breakdowns — it's more efficient to exclude
+        # the `breakdowns` parameter here.
+        params.pop("breakdowns", None)
         result = self._edge_object.get_insights(params=params)
         ids = set(row[pk_name] for row in result)
         logger.info(f"Got {len(ids)} {pk_name}s for period {self._interval}: {ids}")
