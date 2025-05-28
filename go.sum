@@ -390,8 +390,8 @@ github.com/envoyproxy/go-control-plane/ratelimit v0.1.0/go.mod h1:Wk+tMFAFbCXaJP
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/envoyproxy/protoc-gen-validate v1.2.1 h1:DEo3O99U8j4hBFwbJfrz9VtgcDfUKS7KJ7spH3d86P8=
 github.com/envoyproxy/protoc-gen-validate v1.2.1/go.mod h1:d/C80l/jxXLdfEIhX1W2TmLfsJ31lvEjwamM4DxlWXU=
-github.com/estuary/flow v0.5.12-0.20250318185640-35c8aab61898 h1:BH8YvZzwk7kxp0vE+L8KiIQ9NHu23nBDve1VbevI4dw=
-github.com/estuary/flow v0.5.12-0.20250318185640-35c8aab61898/go.mod h1:+iUAI9gBvAe2woer9yhEsMFda/b4U6QA1a/36TFZ40w=
+github.com/estuary/flow v0.5.13 h1:O1UVJn0AnAUgXwyK2JR0eGTlbbo44vvwiCTLQzAG1TQ=
+github.com/estuary/flow v0.5.13/go.mod h1:JScLFw4Y8hTvxTsmKgfi7mKvmfcsb38YbU4ZDtRM8DY=
 github.com/estuary/vitess v0.15.10 h1:oXJgcG0HGZWuwjdvSp4pIFIAXtKLaR9Fl9VBynSszFA=
 github.com/estuary/vitess v0.15.10/go.mod h1:rSIE8UMfexjblBloleGw6BqQIKggGmU91TduCNIaJEA=
 github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0/FOJfg=
@@ -1034,8 +1034,8 @@ go.etcd.io/etcd/client/pkg/v3 v3.5.17 h1:XxnDXAWq2pnxqx76ljWwiQ9jylbpC4rvkAeRVOU
 go.etcd.io/etcd/client/pkg/v3 v3.5.17/go.mod h1:4DqK1TKacp/86nJk4FLQqo6Mn2vvQFBmruW3pP14H/w=
 go.etcd.io/etcd/client/v3 v3.5.17 h1:o48sINNeWz5+pjy/Z0+HKpj/xSnBkuVhVvXkjEXbqZY=
 go.etcd.io/etcd/client/v3 v3.5.17/go.mod h1:j2d4eXTHWkT2ClBgnnEPm/Wuu7jsqku41v9DZ3OtjQo=
-go.gazette.dev/core v0.100.1-0.20250302181532-7ffcbe33bb2d h1:5wp/gegowMRCuFXBH2uvvTfnj+0Fsj8LqNhwo63SmN0=
-go.gazette.dev/core v0.100.1-0.20250302181532-7ffcbe33bb2d/go.mod h1:sMIAhwRUE9i9kk1tUrifv/tDDEC3dqx3GtvAiaBeHu4=
+go.gazette.dev/core v0.100.1-0.20250509034818-0bfec5851754 h1:Lza9QSUrQtnaTldL0WEjkdT2uZfUgK3H8cCIS/eRfTM=
+go.gazette.dev/core v0.100.1-0.20250509034818-0bfec5851754/go.mod h1:WK/NPg8XSABEwrtlxcFx2t/jZYETIKjW0hywktRA5Z0=
 go.mongodb.org/mongo-driver v1.16.1 h1:rIVLL3q0IHM39dvE+z2ulZLp9ENZKThVfuvN/IiN4l8=
 go.mongodb.org/mongo-driver v1.16.1/go.mod h1:oB6AhJQvFQL4LEHyXi6aJzQJtBiTQHiAd83l0GdFaiw=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=

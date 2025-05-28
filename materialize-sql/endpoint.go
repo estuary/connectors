@@ -6,6 +6,7 @@ import (
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	"github.com/estuary/flow/go/protocols/flow"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
@@ -92,6 +93,8 @@ type Endpoint struct {
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
 	// It's optional, and won't be created or used if it's nil.
 	MetaCheckpoints *TableShape
+	// Serialization policy to use for all bindings of this materialization.
+	SerPolicy *flow.SerPolicy
 	// NewClient creates a client, which provides Endpoint-specific methods for performing
 	// operations with the Endpoint store.
 	NewClient func(context.Context, *Endpoint) (Client, error)
