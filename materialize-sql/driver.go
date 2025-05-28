@@ -149,6 +149,7 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 				Constraints:  constraints,
 				DeltaUpdates: res.DeltaUpdates(),
 				ResourcePath: res.Path(),
+				SerPolicy:    endpoint.SerPolicy,
 			})
 	}
 
