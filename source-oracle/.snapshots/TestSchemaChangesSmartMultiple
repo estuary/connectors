@@ -24,5 +24,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT47287013":{"backfilled":2,"key_columns":["YEAR","STATE"],"mode":"Active"},"C%23%23FLOW_TEST_LOGMINER%2FT94367083":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"}},"cursor":{"PendingTransactions":{"AAAAAAA=":{"MessageCount":0,"StartSCN":111111111"},"AAAAAAA=":{"MessageCount":3,"StartSCN":111111111"},"AAAAAAA=":{"MessageCount":0,"StartSCN":111111111"},"AAAAAAA=":{"MessageCount":0,"StartSCN":111111111"},"AAAAAAA=":{"MessageCount":0,"StartSCN":111111111"},"AAAAAAA=":{"MessageCount":0,"StartSCN":111111111"}},"SCN":111111111"}}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT47287013":{"backfilled":2,"key_columns":["YEAR","STATE"],"mode":"Active"},"C%23%23FLOW_TEST_LOGMINER%2FT94367083":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"}},"cursor":{"PendingTransactions":{},"SCN":111111111"}}
 
