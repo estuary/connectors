@@ -16,4 +16,8 @@ captures:
       - resource:
           name: surveys
           interval: PT5M
-        target: acmeCo/surveys
+        target: acmeCo/Surveys
+      - resource:
+          name: SurveyQuestions
+          interval: PT5M
+        target: acmeCo/SurveyQuestions
