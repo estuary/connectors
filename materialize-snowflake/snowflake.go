@@ -124,12 +124,15 @@ func newSnowflakeDriver() *sql.Driver {
 			var dialect = snowflakeDialect(parsed.Schema, timestampTypeMapping)
 			var templates = renderTemplates(dialect)
 
+			serPolicy := boilerplate.SerPolicyStd
+			if parsed.Advanced.DisableFieldTruncation {
+				serPolicy = boilerplate.SerPolicyDisabled
+			}
+
 			return &sql.Endpoint{
-				Config:  parsed,
-				Dialect: dialect,
-				// Snowflake does not use the checkpoint table, instead we use the recovery log
-				// as the authoritative checkpoint and idempotent apply pattern
-				MetaCheckpoints:     nil,
+				Config:              parsed,
+				Dialect:             dialect,
+				SerPolicy:           serPolicy,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewResource:         newTableConfig,
