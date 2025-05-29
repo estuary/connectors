@@ -800,10 +800,29 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 			return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
 		}
 	case *sqlparser.Update:
-		// TODO(wgd): It would be nice to only halt on UPDATE statements impacting
-		// active tables. Unfortunately UPDATE queries are complicated and it's not
-		// as simple to implement that check as for INSERT and DELETE.
-		return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
+		// Determine whether any of the table expressions in the UPDATE statement refer
+		// to an active table. The table expression grammar gets complicated, so if we
+		// can't tell then we'll assume that the table is active and return an error.
+		var possiblyActiveTables bool
+		for _, table := range stmt.TableExprs {
+			if tableExpr, ok := table.(*sqlparser.AliasedTableExpr); !ok {
+				logrus.WithField("query", query).Warnf("unsupported table expression type %T in UPDATE statement", table)
+				possiblyActiveTables = true
+			} else if table, err := tableExpr.TableName(); err != nil {
+				logrus.WithField("query", query).WithError(err).Warn("failed to resolve table name from UPDATE statement")
+				possiblyActiveTables = true
+			} else if streamID := resolveTableName(schema, table); rs.tableActive(streamID) {
+				logrus.WithField("streamID", streamID).WithField("query", query).Warn("UPDATE on active table")
+				possiblyActiveTables = true
+			} else {
+				logrus.WithField("streamID", streamID).WithField("query", query).Debug("ignoring UPDATE on inactive table")
+			}
+		}
+
+		// If any table(s) in the UPDATE statement are possibly active then it's a fatal error.
+		if possiblyActiveTables {
+			return fmt.Errorf("unsupported DML query (go.estuary.dev/IK5EVx): %s", query)
+		}
 	case *sqlparser.Delete:
 		for _, target := range stmt.Targets {
 			if streamID := resolveTableName(schema, target); rs.tableActive(streamID) {
