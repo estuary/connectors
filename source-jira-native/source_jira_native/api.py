@@ -215,7 +215,7 @@ async def _fetch_issues_between(
         params["fields"] = "id,updated"
     else:
         params["fields"] = "*all"
-        params["expand"] = "renderedFields,transitions,operations,editmeta,changelog"
+        params["expand"] = "renderedFields,transitions,operations,changelog"
 
     while True:
         _, body = await http.request_stream(
