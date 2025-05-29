@@ -12,6 +12,7 @@ import (
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/vitess/go/vt/sqlparser"
+	"github.com/sirupsen/logrus"
 )
 
 // decode SQL values extracted from the sql queries returned by logminer and parsed by sqlparser, into values
@@ -159,11 +160,14 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	}
 	ast, err := parser.Parse(msg.SQL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing sql query %v: %w", msg, err)
+		return nil, fmt.Errorf("parsing sql query %+v: %w", msg, err)
 	}
+
+	// Some UPDATE queries are known to not have UNDO_SQL, in that case we cannot construct a _before for those
+	// updates
 	undoAST, err := parser.Parse(msg.UndoSQL)
 	if err != nil {
-		return nil, fmt.Errorf("parsing undo sql query %v: %w", msg, err)
+		logrus.WithField("msg", fmt.Sprintf("%+v", msg)).Debug("unable to parse undo sql query")
 	}
 	var after, before map[string]any
 
@@ -220,7 +224,6 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			return nil, err
 		}
 	case opUpdate:
-		before = make(map[string]any)
 		after = make(map[string]any)
 		op = sqlcapture.UpdateOp
 		// construct `after` from the redo sql
@@ -256,36 +259,41 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			after[key] = value
 		}
 
-		// construct `before` from the undo sql
-		undo, ok := undoAST.(*sqlparser.Update)
-		if !ok {
-			return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
-		}
-		err = sqlparser.VisitExpr(undo.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
-			switch n := node.(type) {
-			case *sqlparser.ComparisonExpr:
-				var col = n.Left.(*sqlparser.ColName)
-				var key = unquote(sqlparser.String(col.Name))
-				value, err := decodeValue(n.Right)
-				if err != nil {
-					return false, fmt.Errorf("update sql undo statement where clause %q, key %q: %w", msg.UndoSQL, key, err)
+		if undoAST != nil {
+			before = make(map[string]any)
+			// construct `before` from the undo sql
+			undo, ok := undoAST.(*sqlparser.Update)
+			if !ok {
+				return nil, fmt.Errorf("expected UPDATE sql statement, instead got: %v", ast)
+			}
+			err = sqlparser.VisitExpr(undo.Where.Expr, func(node sqlparser.SQLNode) (kontinue bool, err error) {
+				switch n := node.(type) {
+				case *sqlparser.ComparisonExpr:
+					var col = n.Left.(*sqlparser.ColName)
+					var key = unquote(sqlparser.String(col.Name))
+					value, err := decodeValue(n.Right)
+					if err != nil {
+						return false, fmt.Errorf("update sql undo statement where clause %q, key %q: %w", msg.UndoSQL, key, err)
+					}
+					before[key] = value
 				}
-				before[key] = value
-			}
 
-			return true, nil
-		})
-		if err != nil {
-			return nil, err
-		}
-
-		for _, expr := range undo.Exprs {
-			var key = unquote(sqlparser.String(expr.Name.Name))
-			value, err := decodeValue(expr.Expr)
+				return true, nil
+			})
 			if err != nil {
-				return nil, fmt.Errorf("update sql undo statement %q, key %q: %w", msg.UndoSQL, key, err)
+				return nil, err
 			}
-			before[key] = value
+
+			for _, expr := range undo.Exprs {
+				var key = unquote(sqlparser.String(expr.Name.Name))
+				value, err := decodeValue(expr.Expr)
+				if err != nil {
+					return nil, fmt.Errorf("update sql undo statement %q, key %q: %w", msg.UndoSQL, key, err)
+				}
+				if value != nil {
+					before[key] = value
+				}
+			}
 		}
 	case opDelete:
 		before = make(map[string]any)
