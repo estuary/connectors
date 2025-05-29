@@ -152,18 +152,62 @@ async def snapshot_paginated_resources(
         params["startAt"] = count
 
 
-def _build_jql(
+def _is_within_dst_fallback_window(
+    dt: datetime,
+    tz: ZoneInfo,
+    window: timedelta = timedelta(hours=1),
+) -> bool:
+    """
+    Returns True if the datetime is within `window` of a fallback (DST end)
+    transition, and the fallback has not yet occurred (i.e., offset will decrease).
+    """
+    if dt.tzinfo is None:
+        raise ValueError("Datetime must be timezone-aware")
+
+    dt_now = dt.astimezone(tz)
+    dt_later = (dt + window).astimezone(tz)
+
+    offset_now = dt_now.utcoffset()
+    offset_later = dt_later.utcoffset()
+    assert isinstance(offset_later, timedelta) and isinstance(offset_now, timedelta)
+
+    # Return True if the offset will decrease (i.e., fallback *will* happen soon)
+    return offset_later < offset_now
+
+
+def _determine_bounds(
     start: datetime,
     end: datetime,
-    projects: str | None,
-) -> str:
+    timezone: ZoneInfo,
+) -> tuple[str, str]:
     # There are a couple quirks with filtering issues by their updated field.
     # - Top level timestamps are in the system default user timezone, not UTC.
     # - Jira filters issues with minute-level granularity.
+    # - Jira's timestamps' offsets change during daylight savings time transitions
+    #   but Jira does not support timezone offsets in JQL queries.
     JQL_DATETIME_FORMAT = "%Y-%m-%d %H:%M"
+
+    # If the start time is within the hour before a DST fallback transition,
+    # adjust it to *just* before that hour begins (e.g., 00:59).
+    # This avoids missing results during the "fall back" DST transition hour
+    # when clock times repeat. Duplicate results may be returned by the API,
+    # but these are filtered out downstream.
+    if _is_within_dst_fallback_window(start, timezone):
+        start = (start - timedelta(hours=1)).replace(minute=59)
 
     lower_bound = start.strftime(JQL_DATETIME_FORMAT)
     upper_bound = end.strftime(JQL_DATETIME_FORMAT)
+
+    return (lower_bound, upper_bound)
+
+
+def _build_jql(
+    start: datetime,
+    end: datetime,
+    timezone: ZoneInfo,
+    projects: str | None,
+) -> str:
+    lower_bound, upper_bound = _determine_bounds(start, end, timezone)
 
     lower_bound_jql = f"updated >= '{lower_bound}'"
     upper_bound_jql = f"updated <= '{upper_bound}'"
@@ -208,7 +252,7 @@ async def _fetch_issues_between(
 
     params: dict[str, str | int] = {
         "maxResults": 250,
-        "jql": _build_jql(start, end, projects)
+        "jql": _build_jql(start, end, timezone, projects)
     }
 
     if should_fetch_minimal_fields:
