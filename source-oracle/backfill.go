@@ -46,7 +46,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 		logEntry.WithField("rowid", afterRowID).Debug("backfill: scanning keyless table chunk")
 
-		query, rowidRangeEnd = db.keylessScanQuery(info, schema, table, afterRowID)
+		query, rowidRangeEnd = db.keylessScanQuery(info, streamID, afterRowID, db.backfillRowIDRanges[streamID])
 
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		if resumeAfter != nil {
@@ -383,33 +383,41 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 // Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
 // since ROWIDs are not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
 // but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
-func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName, afterRowID string) (string, string) {
+func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, streamID sqlcapture.StreamID, afterRowID string, rowidRanges []string) (string, string) {
 	var query = new(strings.Builder)
 	var columnSelect []string
 	for _, col := range info.Columns {
 		columnSelect = append(columnSelect, castColumn(col))
 	}
 
-	var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
-
-	var idx = slices.IndexFunc(db.backfillRowIDRanges[streamID], func(rowid string) bool {
-		return afterRowID == rowid || base64LessThan(afterRowID, rowid)
-	})
-
+	var idx = slices.Index(rowidRanges, afterRowID)
+	// It is possible for rowidRanges to change across restarts, and thus afterRowID will not match
+	// the same ranges. In this case we re-backfill the last range
 	if idx == -1 {
-		panic(fmt.Sprintf("expected to find ROWID range for %s in %v", afterRowID, db.backfillRowIDRanges[streamID]))
+		var nextIdx = slices.IndexFunc(rowidRanges, func(rowid string) bool {
+			return afterRowID == rowid || base64LessThan(afterRowID, rowid)
+		})
+
+		if nextIdx == -1 {
+			panic(fmt.Sprintf("expected to find ROWID range for %s in %v", afterRowID, rowidRanges))
+		}
+
+		idx = nextIdx - 1
+		if idx < 0 {
+			idx = 0
+		}
 	}
 
-	if idx == len(db.backfillRowIDRanges[streamID])-1 {
-		panic(fmt.Sprintf("unexpected keylessScanQuery with last ROWID as afterRowID: %s, %v", afterRowID, db.backfillRowIDRanges[streamID]))
+	if idx == len(rowidRanges)-1 {
+		panic(fmt.Sprintf("unexpected keylessScanQuery with last ROWID as afterRowID: %s, %v", afterRowID, rowidRanges))
 	}
 
-	var rowidStart = db.backfillRowIDRanges[streamID][idx]
-	var rowidEnd = db.backfillRowIDRanges[streamID][idx+1]
+	var rowidStart = rowidRanges[idx]
+	var rowidEnd = rowidRanges[idx+1]
 
 	// It is faster to first find the smallest and the largest ROWIDs of the range we want to cover and then query
 	// all of the data in that range, instead of ordering all rows based on ROWID and then filtering the ROWID
-	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
+	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), streamID.Schema, streamID.Table)
 	fmt.Fprintf(query, ` WHERE ROWID >= '%s'`, rowidStart)
 	fmt.Fprintf(query, ` AND ROWID <= '%s'`, rowidEnd)
 	return query.String(), rowidEnd
