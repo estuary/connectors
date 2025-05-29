@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use proto_flow::{
-    flow::{MaterializationSpec, Projection},
+    flow::{MaterializationSpec, Projection, SerPolicy},
     materialize::{
         request::Validate,
         response::validated::{constraint, Binding, Constraint},
@@ -61,6 +61,11 @@ pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
                     .collect(),
                 resource_path: vec![res.topic],
                 delta_updates: true,
+                ser_policy: Some(SerPolicy {
+                    str_truncate_after: 1 << 16,
+                    nested_obj_truncate_after: 1000,
+                    array_truncate_after: 1000,
+                }),
             })
         })
         .collect::<Result<Vec<Binding>>>()
