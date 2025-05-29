@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"slices"
 	"strconv"
@@ -11,8 +13,6 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/sirupsen/logrus"
 )
-
-const StartingRowID = "AAAAAAAAAAAAAAAAAA"
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
@@ -46,7 +46,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 		logEntry.WithField("rowid", afterRowID).Debug("backfill: scanning keyless table chunk")
 
-		query, rowidRangeEnd = db.keylessScanQuery(info, schema, table, afterRowID)
+		query, rowidRangeEnd = db.keylessScanQuery(info, schema, table, afterRowID, db.backfillRowIDRanges[streamID])
 
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		if resumeAfter != nil {
@@ -377,30 +377,52 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 	return out
 }
 
+func base64cmp(a, b string) int {
+	decodedA, err := base64.RawStdEncoding.DecodeString(a)
+	if err != nil {
+		panic(err)
+	}
+	decodedB, err := base64.RawStdEncoding.DecodeString(b)
+	if err != nil {
+		panic(err)
+	}
+	return bytes.Compare(decodedA, decodedB)
+}
+
 // Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
 // since ROWIDs are not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
 // but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
-func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName, afterRowID string) (string, string) {
+func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName, afterRowID string, rowidRanges []string) (string, string) {
 	var query = new(strings.Builder)
 	var columnSelect []string
 	for _, col := range info.Columns {
 		columnSelect = append(columnSelect, castColumn(col))
 	}
 
-	var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
-
-	var idx = slices.Index(db.backfillRowIDRanges[streamID], afterRowID)
-
+	var idx = slices.Index(rowidRanges, afterRowID)
+	// It is possible for rowidRanges to change across restarts, and thus afterRowID will not match
+	// the same ranges. In this case we re-backfill the last range
 	if idx == -1 {
-		panic(fmt.Sprintf("expected to find ROWID range for %s in %v", afterRowID, db.backfillRowIDRanges[streamID]))
+		var nextIdx = slices.IndexFunc(rowidRanges, func(rowid string) bool {
+			return afterRowID == rowid || base64cmp(afterRowID, rowid) < 0
+		})
+
+		if nextIdx == -1 {
+			panic(fmt.Sprintf("expected to find ROWID range for %s in %v", afterRowID, rowidRanges))
+		}
+
+		idx = nextIdx - 1
+		if idx < 0 {
+			idx = 0
+		}
 	}
 
-	if idx == len(db.backfillRowIDRanges[streamID])-1 {
-		panic(fmt.Sprintf("unexpected keylessScanQuery with last ROWID as afterRowID: %s, %v", afterRowID, db.backfillRowIDRanges[streamID]))
+	if idx == len(rowidRanges)-1 {
+		panic(fmt.Sprintf("unexpected keylessScanQuery with last ROWID as afterRowID: %s, %v", afterRowID, rowidRanges))
 	}
 
-	var rowidStart = db.backfillRowIDRanges[streamID][idx]
-	var rowidEnd = db.backfillRowIDRanges[streamID][idx+1]
+	var rowidStart = rowidRanges[idx]
+	var rowidEnd = rowidRanges[idx+1]
 
 	// It is faster to first find the smallest and the largest ROWIDs of the range we want to cover and then query
 	// all of the data in that range, instead of ordering all rows based on ROWID and then filtering the ROWID
