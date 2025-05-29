@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import TypeAdapter
 
 from .models import (
@@ -217,25 +218,31 @@ async def _fetch_issues_between(
         params["expand"] = "renderedFields,transitions,operations,editmeta,changelog"
 
     while True:
-        response = IssuesResponse.model_validate_json(
-            await http.request(
-                log,
-                url,
-                # Jira has a similar POST endpoint that should be used if
-                # the JQL query param becomes too large to be encoded.
-                # The only way that can happen here is if the user provides an
-                # enormous number of projects. If we encounter that, we
-                # can add support to use the POST endpoint instead.
-                method="GET",
-                params=params
-            )
+        _, body = await http.request_stream(
+            log,
+            url,
+            # Jira has a similar POST endpoint that should be used if
+            # the JQL query param becomes too large to be encoded.
+            # The only way that can happen here is if the user provides an
+            # enormous number of projects. If we encounter that, we
+            # can add support to use the POST endpoint instead.
+            method="GET",
+            params=params
+        )
+        processor = IncrementalJsonProcessor(
+            body(),
+            "issues.item",
+            Issue,
+            IssuesResponse,
         )
 
-        for issue in response.issues:
+        async for issue in processor:
             yield issue
 
-        if response.nextPageToken:
-            params["nextPageToken"] = response.nextPageToken
+        remainder = processor.get_remainder()
+
+        if remainder.nextPageToken:
+            params["nextPageToken"] = remainder.nextPageToken
         else:
             break
 
