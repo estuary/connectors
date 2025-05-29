@@ -224,7 +224,6 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 			return nil, err
 		}
 	case opUpdate:
-		before = make(map[string]any)
 		after = make(map[string]any)
 		op = sqlcapture.UpdateOp
 		// construct `after` from the redo sql
@@ -261,6 +260,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		}
 
 		if undoAST != nil {
+			before = make(map[string]any)
 			// construct `before` from the undo sql
 			undo, ok := undoAST.(*sqlparser.Update)
 			if !ok {
