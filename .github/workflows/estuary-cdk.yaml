@@ -1,0 +1,40 @@
+name: estuary-cdk Tests
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "estuary-cdk/**"
+
+  pull_request:
+    branches: [main]
+    paths:
+      - "estuary-cdk/**"
+
+concurrency:
+  group: estuary-cdk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-estuary-cdk:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Poetry
+        uses: snok/install-poetry@v1
+
+      - name: Install dependencies and run tests
+        run: |
+          cd estuary-cdk
+          poetry install
+          source $(poetry env info --path)/bin/activate
+          pytest
