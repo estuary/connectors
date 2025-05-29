@@ -628,6 +628,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		case *replication.RowsQueryEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("query", string(data.Query)).Debug("ignoring Rows Query Event")
+		case *replication.IntVarEvent:
+			implicitFlush = true // Implicit FlushEvent conversion permitted
+			logrus.WithField("type", data.Type).WithField("value", data.Value).Debug("ignoring IntVar Event")
 		default:
 			return fmt.Errorf("unhandled event type: %q", event.Header.EventType)
 		}
