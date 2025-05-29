@@ -12,8 +12,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-const StartingRowID = "AAAAAAAAAAAAAAAAAA"
-
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
 func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	logrus.WithField("state", state).Debug("backfill: ScanChunk")
@@ -46,7 +44,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 
 		logEntry.WithField("rowid", afterRowID).Debug("backfill: scanning keyless table chunk")
 
-		query, rowidRangeEnd = db.keylessScanQuery(info, streamID, afterRowID, db.backfillRowIDRanges[streamID])
+		query, rowidRangeEnd = db.keylessScanQuery(info, schema, table, afterRowID, db.backfillRowIDRanges[streamID])
 
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		if resumeAfter != nil {
@@ -383,7 +381,7 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 // Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
 // since ROWIDs are not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
 // but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
-func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, streamID sqlcapture.StreamID, afterRowID string, rowidRanges []string) (string, string) {
+func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schemaName, tableName, afterRowID string, rowidRanges []string) (string, string) {
 	var query = new(strings.Builder)
 	var columnSelect []string
 	for _, col := range info.Columns {
@@ -417,7 +415,7 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, strea
 
 	// It is faster to first find the smallest and the largest ROWIDs of the range we want to cover and then query
 	// all of the data in that range, instead of ordering all rows based on ROWID and then filtering the ROWID
-	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), streamID.Schema, streamID.Table)
+	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
 	fmt.Fprintf(query, ` WHERE ROWID >= '%s'`, rowidStart)
 	fmt.Fprintf(query, ` AND ROWID <= '%s'`, rowidEnd)
 	return query.String(), rowidEnd
