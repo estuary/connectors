@@ -392,7 +392,9 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 
 	var streamID = sqlcapture.JoinStreamID(schemaName, tableName)
 
-	var idx = slices.Index(db.backfillRowIDRanges[streamID], afterRowID)
+	var idx = slices.IndexFunc(db.backfillRowIDRanges[streamID], func(rowid string) bool {
+		return afterRowID == rowid || base64LessThan(afterRowID, rowid)
+	})
 
 	if idx == -1 {
 		panic(fmt.Sprintf("expected to find ROWID range for %s in %v", afterRowID, db.backfillRowIDRanges[streamID]))
