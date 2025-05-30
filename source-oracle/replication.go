@@ -15,8 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -161,15 +159,17 @@ type redoFile struct {
 	Name        string
 	Sequence    int
 	FirstChange SCN
+	NextChange  SCN
 	DictStart   string
 	DictEnd     string
+	Bytes       int
 }
 
-func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SCN) (int, error) {
+var MaxReplicationLogFilesSize = 2 * 1024 * 1024 * 1024
+
+func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SCN) (SCN, error) {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
-		"endSCN":   endSCN,
-		"sequence": s.redoSequence,
 	}).Debug("adding log files")
 
 	// See DBMS_LOGMNR_D.BUILD reference:
@@ -209,12 +209,12 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SC
 		"minArchiveSCN": minArchiveSCN,
 	}).Debug("starting SCN for log files based on dictionary starting point")
 
-	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#,'NO' as DICT_START, 'NO' as DICT_END FROM V$LOGFILE LF, V$LOG L
+	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#, CASE WHEN L.STATUS = 'CURRENT' THEN 0 ELSE L.NEXT_CHANGE# END as NEXT_CHANGE#, 'NO' as DICT_START, 'NO' as DICT_END, MAX(L.BYTES) FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
     WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED'
 		GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#`
 
-	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END FROM V$ARCHIVED_LOG A
+	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.NEXT_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END, A.BLOCKS*A.BLOCK_SIZE as BYTES FROM V$ARCHIVED_LOG A
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
@@ -225,12 +225,14 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SC
 	}
 	defer rows.Close()
 
+	var totalSizeBytes int
+	var endSCN SCN
 	var redoSequence int
 	var redoFiles []redoFile
 	for rows.Next() {
 		var f redoFile
 
-		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.DictStart, &f.DictEnd); err != nil {
+		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.NextChange, &f.DictStart, &f.DictEnd, &f.Bytes); err != nil {
 			return 0, fmt.Errorf("scanning log file record: %w", err)
 		}
 
@@ -263,14 +265,18 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SC
 
 		redoFiles = append(redoFiles, f)
 
-		if f.FirstChange >= endSCN {
+		totalSizeBytes += f.Bytes
+
+		if totalSizeBytes >= MaxReplicationLogFilesSize || f.NextChange >= maxSCN {
 			if s.dictionaryMode == DictionaryModeOnline {
+				endSCN = f.NextChange
 				break
 			}
 
 			// If we don't include a dictionary end file, we risk having an incomplete
 			// dictionary in extract mode
 			if f.DictEnd == "YES" {
+				endSCN = f.NextChange
 				break
 			}
 		}
@@ -286,7 +292,13 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SC
 		}
 	}
 
-	return redoSequence, nil
+	// We set NextChange to 0 when encountering Oracle's maximum SCN value which is too large to fit in our int64 type
+	// so we rectify that by setting endSCN to maxSCN here
+	if endSCN == 0 {
+		endSCN = maxSCN
+	}
+
+	return endSCN, nil
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN SCN) error {
@@ -345,9 +357,6 @@ type replicationStream struct {
 
 	// maximum last DDL SCN of all active tables, we need to stay on extract mode until this SCN has passed
 	lastDDLSCN SCN
-
-	// sequence# of the last redo log file read, used to check if new log files have appeared
-	redoSequence int
 
 	lastTxnEndSCN SCN // End SCN (record + 1) of the last completed transaction.
 
@@ -463,28 +472,22 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
 	}
 
-	var eg, egCtx = errgroup.WithContext(ctx)
-	var streamCtx, streamCancel = context.WithCancel(egCtx)
+	var streamCtx, streamCancel = context.WithCancel(ctx)
 	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	s.errCh = make(chan error)
 	s.cancel = streamCancel
 
-	eg.Go(func() error {
-		return s.run(streamCtx)
-	})
-
 	go func() {
-		if err := eg.Wait(); err != nil {
-			// Context cancellation typically occurs only in tests, and for test stability
-			// it should be considered a clean shutdown and not necessarily an error.
-			if errors.Is(err, context.Canceled) {
-				err = nil
-			}
-			close(s.events)
-			s.transactionsStmt.Close()
-			s.conn.Close()
-			s.errCh <- err
+		err := s.run(streamCtx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
 		}
+		// Context cancellation typically occurs only in tests, and for test stability
+		// it should be considered a clean shutdown and not necessarily an error.
+		close(s.events)
+		s.transactionsStmt.Close()
+		s.conn.Close()
+		s.errCh <- err
 	}()
 
 	return nil
@@ -536,42 +539,25 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 		if err := row.Scan(&currentSCN); err != nil {
 			return fmt.Errorf("fetching current SCN: %w", err)
 		}
-		// TODO: this value should adapt to the number of log files we find: if we find
-		// too many log files, we need to reduce this value automatically to avoid a timeout
-		// if we receive too few log files, we can try a larger value to progress faster.
-		// One challenge that makes this task more difficult is the need to have dictionary boundaries
-		// around a SCN range that we capture. Sometimes it is hard to find a dictionary bound range
-		// that is small enough to not exceed the limit of files we need
-		var endSCN = startSCN + int64(s.db.config.Advanced.IncrementalSCNRange)
 
-		if maxSCN < endSCN {
-			endSCN = maxSCN + 1
+		var endSCN SCN
+
+		var iterationMaxSCN = maxSCN + 1
+		if currentSCN < maxSCN {
+			iterationMaxSCN = currentSCN
 		}
 
-		if currentSCN < endSCN {
-			endSCN = currentSCN
-		}
-
-		// If redo files have switched, we need to restart and add log files
-		// over again, otherwise we just start a new session with a different SCN range
-		var redoSequence int
-		if switched, err := s.redoFileSwitched(ctx); err != nil {
+		if err := s.endLogminer(ctx); err != nil {
 			return err
-		} else if switched {
-			if err := s.endLogminer(ctx); err != nil {
-				return err
-			} else if redoSequence, err = s.addLogFiles(ctx, startSCN, endSCN); err != nil {
-				return err
-			} else if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
-				return err
-			}
-		} else {
-			if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
-				return err
-			}
+		} else if endSCN, err = s.addLogFiles(ctx, startSCN, iterationMaxSCN); err != nil {
+			return err
 		}
 
-		var stmt, err = s.generateLogminerQuery(ctx, transactions)
+		if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
+			return err
+		}
+
+		var stmt, debugQuery, err = s.generateLogminerQuery(ctx, transactions)
 		if err != nil {
 			return err
 		}
@@ -594,7 +580,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 				}
 			}
 
-			for xid, _ := range rollbackedXIDs {
+			for xid := range rollbackedXIDs {
 				delete(s.pendingTransactions, xid)
 			}
 		}
@@ -614,6 +600,11 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 
 				logrus.WithField("lastDDLSCN", s.lastDDLSCN).Info("smart mode: switching to extract mode")
 				continue
+			}
+
+			// TODO: remove this once we have found out what is going on with bad connection errors
+			if strings.Contains(err.Error(), "bad connection") {
+				logrus.WithField("query", debugQuery).Warn("the query that caused bad connection")
 			}
 			return fmt.Errorf("receive messages: %w", err)
 		}
@@ -645,8 +636,6 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 				"endSCN":     endSCN,
 			}).Info("smart mode: switching back to online mode")
 		}
-
-		s.redoSequence = redoSequence
 
 		startSCN = endSCN
 	}
@@ -752,7 +741,7 @@ type transaction struct {
 	StartSCN SCN
 }
 
-func (s *replicationStream) generateLogminerQuery(ctx context.Context, transactions []string) (*sql.Stmt, error) {
+func (s *replicationStream) generateLogminerQuery(ctx context.Context, transactions []string) (*sql.Stmt, string, error) {
 	var tableObjectMapping = s.db.tableObjectMapping
 
 	var conditions []string
@@ -782,7 +771,11 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context, transacti
     SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS'))
     AND ((DATA_OBJ#=0 AND DATA_OBJD#=0) OR %s) %s`, opPredicate, strings.Join(conditions, " OR "), txPredicate)
 
-	return s.conn.PrepareContext(ctx, query)
+	logrus.Debug("generated logminer query")
+
+	stmt, err := s.conn.PrepareContext(ctx, query)
+
+	return stmt, query, err
 }
 
 func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context, startSCN, endSCN SCN) (map[XID]SCN, map[XID]struct{}, error) {
@@ -828,6 +821,11 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 			return nil, nil, fmt.Errorf("unexpected transaction with commit > 0, xid: %s, startSCN: %d, commits: %d, rollbacks: %d", xid, startSCN, commits, rollbacks)
 		}
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"pending":   len(pendingTXs),
+		"rollbacks": len(excludeXIDs),
+	}).Debug("transactions")
 
 	return pendingTXs, excludeXIDs, nil
 }
@@ -1086,17 +1084,6 @@ func (s *replicationStream) Close(ctx context.Context) error {
 	s.conn.Close()
 	s.cancel()
 	return <-s.errCh
-}
-
-func (s *replicationStream) redoFileSwitched(ctx context.Context) (bool, error) {
-	row := s.conn.QueryRowContext(ctx, "SELECT SEQUENCE# FROM V$LOG WHERE STATUS = 'CURRENT' ORDER BY SEQUENCE# FETCH NEXT 1 ROW ONLY")
-
-	var newSequence int
-	if err := row.Scan(&newSequence); err != nil {
-		return false, fmt.Errorf("fetching latest redo log sequence number: %w", err)
-	}
-
-	return newSequence > s.redoSequence, nil
 }
 
 func (db *oracleDatabase) ReplicationDiagnostics(ctx context.Context) error {
