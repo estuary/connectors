@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 import functools
 from logging import Logger
+from typing import AsyncGenerator, Callable
 from zoneinfo import ZoneInfo
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
@@ -13,10 +14,12 @@ from .models import (
     ResourceConfig,
     ResourceState,
     JiraResource,
-    FULL_REFRESH_ARRAYED_RESOURCES,
-    FULL_REFRESH_PAGINATED_ARRAYED_RESOURCES,
-    FULL_REFRESH_PAGINATED_RESOURCES,
-    FullRefreshFn,
+    FullRefreshStream,
+    FullRefreshArrayedStream,
+    FullRefreshPaginatedArrayedStream,
+    FullRefreshPaginatedStream,
+    Projects,
+    FULL_REFRESH_STREAMS,
 )
 from .api import (
     fetch_timezone,
@@ -40,10 +43,7 @@ async def validate_projects(
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     valid_project_ids_and_keys: set[str] = set()
 
-    path = "project/search"
-    extra_params = {"status": "live,archived,deleted"}
-
-    async for project in snapshot_paginated_resources(http, config.domain, path, extra_params, log):
+    async for project in snapshot_paginated_resources(http, config.domain, Projects.path, Projects.extra_params, log):
         d = project.model_dump()
         id = d.get("id", None)
         key = d.get("key", None)
@@ -81,14 +81,47 @@ async def validate_credentials(
         raise ValidationError([msg])
 
 
+def _get_partial_snapshot_fn(
+    stream: type[FullRefreshStream],
+    http: HTTPMixin,
+    config: EndpointConfig,
+) -> Callable[[Logger], AsyncGenerator[FullRefreshResource, None]]:
+    if issubclass(stream, FullRefreshArrayedStream):
+        snapshot_fn = functools.partial(
+            snapshot_non_paginated_arrayed_resources,
+            http,
+            config.domain,
+            stream.path,
+            stream.extra_params
+        )
+    elif issubclass(stream, FullRefreshPaginatedArrayedStream):
+        snapshot_fn = functools.partial(
+            snapshot_paginated_arrayed_resources,
+            http,
+            config.domain,
+            stream.path,
+            stream.extra_params
+        )
+    elif issubclass(stream, FullRefreshPaginatedStream):
+        snapshot_fn = functools.partial(
+            snapshot_paginated_resources,
+            http,
+            config.domain,
+            stream.path,
+            stream.extra_params
+        )
+    else:
+        raise RuntimeError(f"Unknown full refresh stream type {stream.__name__} for stream {stream.name}")
+
+    return snapshot_fn
+
+
 def full_refresh_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
 
     def open(
-            snapshot_fn: FullRefreshFn,
-            path: str,
-            params: dict[str, str] | None,
+            stream: type[FullRefreshStream],
             binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
@@ -100,37 +133,26 @@ def full_refresh_resources(
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(
-                snapshot_fn,
-                http,
-                config.domain,
-                path,
-                params,
-            ),
+            fetch_snapshot=_get_partial_snapshot_fn(stream, http, config),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
     resources: list[common.Resource] = []
 
-    for resources_list, snapshot_fn in [
-        (FULL_REFRESH_ARRAYED_RESOURCES, snapshot_non_paginated_arrayed_resources),
-        (FULL_REFRESH_PAGINATED_ARRAYED_RESOURCES, snapshot_paginated_arrayed_resources),
-        (FULL_REFRESH_PAGINATED_RESOURCES, snapshot_paginated_resources),
-    ]:
-        for name, path, params in resources_list:
-            resources.append(
-                common.Resource(
-                    name=name,
-                    key=["/_meta/row_id"],
-                    model=FullRefreshResource,
-                    open=functools.partial(open, snapshot_fn, path, params),
-                    initial_state=ResourceState(),
-                    initial_config=ResourceConfig(
-                        name=name, interval=timedelta(minutes=60)
-                    ),
-                    schema_inference=True,
-                )
+    for stream in FULL_REFRESH_STREAMS:
+        resources.append(
+            common.Resource(
+                name=stream.name,
+                key=["/_meta/row_id"],
+                model=FullRefreshResource,
+                open=functools.partial(open, stream),
+                initial_state=ResourceState(),
+                initial_config=ResourceConfig(
+                    name=stream.name, interval=timedelta(minutes=60)
+                ),
+                schema_inference=True,
             )
+        )
 
     return resources
 

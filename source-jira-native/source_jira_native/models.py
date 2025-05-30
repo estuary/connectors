@@ -1,5 +1,5 @@
 from datetime import datetime, UTC, timedelta
-from typing import AsyncGenerator, Callable, Literal, Optional
+from typing import AsyncGenerator, Callable, ClassVar, Literal, Optional
 
 from estuary_cdk.capture.common import (
     BasicAuth,
@@ -118,51 +118,169 @@ class MyselfResponse(BaseModel, extra="allow"):
     timeZone: str
 
 
+class FullRefreshStream():
+    name: ClassVar[str]
+    path: ClassVar[str]
+    extra_params: ClassVar[Optional[dict[str, str]]] = None
+
+
 # Full refresh resources whose API response is an array containing all results.
-# Tuples contain the resource name, path, and any additional query params.
-# issue_types
-FULL_REFRESH_ARRAYED_RESOURCES: list[tuple[str, str, Optional[dict[str, str]]]] = [
-    ("application_roles", "applicationrole", None),
-    ("issue_fields", "field", None),
-    ("issue_navigator_settings", "settings/columns", None),
-    ("issue_types", "issuetype", None),
-    ("project_categories", "projectCategory", None),
-    ("project_types", "project/type", None),
-    ("project_roles", "role", None),
-    ("workflow_status_categories", "statuscategory", None),
-    ("workflow_statuses", "status", None),
-    ("permission_schemes", "permissionscheme", None),
-]
+class FullRefreshArrayedStream(FullRefreshStream):
+    pass
 
 
-# Full refresh resources whose API response is an array containing a subset of results.
-# The response does not contain any pagination information but results _are_ paginated
-# with a `startAt` parameter.
-# Tuples contain the resource name, path, and any additional query params.
-FULL_REFRESH_PAGINATED_ARRAYED_RESOURCES: list[tuple[str, str, Optional[dict[str, str]]]] = [
-    ("users", "users/search", None)
-]
+class ApplicationRoles(FullRefreshArrayedStream):
+    name: ClassVar[str] = "application_roles"
+    path: ClassVar[str] = "applicationrole"
+
+
+class IssueFields(FullRefreshArrayedStream):
+    name: ClassVar[str] = "issue_fields"
+    path: ClassVar[str] = "field"
+
+
+class IssueNavigatorSettings(FullRefreshArrayedStream):
+    name: ClassVar[str] = "issue_navigator_settings"
+    path: ClassVar[str] = "settings/columns"
+
+
+class IssueTypes(FullRefreshArrayedStream):
+    name: ClassVar[str] = "issue_types"
+    path: ClassVar[str] = "issuetype"
+
+
+class ProjectCategories(FullRefreshArrayedStream):
+    name: ClassVar[str] = "project_categories"
+    path: ClassVar[str] = "projectCategory"
+
+
+class ProjectTypes(FullRefreshArrayedStream):
+    name: ClassVar[str] = "project_types"
+    path: ClassVar[str] = "project/type"
+
+
+class ProjectRoles(FullRefreshArrayedStream):
+    name: ClassVar[str] = "project_roles"
+    path: ClassVar[str] = "role"
+
+
+class WorkflowStatusCategories(FullRefreshArrayedStream):
+    name: ClassVar[str] = "workflow_status_categories"
+    path: ClassVar[str] = "statuscategory"
+
+
+class WorkflowStatuses(FullRefreshArrayedStream):
+    name: ClassVar[str] = "workflow_statuses"
+    path: ClassVar[str] = "status"
+
+
+class PermissionSchemes(FullRefreshArrayedStream):
+    name: ClassVar[str] = "permission_schemes"
+    path: ClassVar[str] = "permissionscheme"
+
+
+# Full refresh resources whose API response is an array containing a subset of results,
+# and are paginated with a `startAt` parameter but lack pagination metadata.
+class FullRefreshPaginatedArrayedStream(FullRefreshStream):
+    pass
+
+
+class Users(FullRefreshPaginatedArrayedStream):
+    name: ClassVar[str] = "users"
+    path: ClassVar[str] = "users/search"
 
 
 # Full refresh resources whose API response contains pagination information.
-# Tuples contain the resource name, path, and any additional query params.
-FULL_REFRESH_PAGINATED_RESOURCES: list[tuple[str, str, Optional[dict[str, str]]]] = [
-    ("dashboards", "dashboard", None),
-    ("issue_field_configurations", "fieldconfiguration", None),
-    ("issue_resolutions", "resolution/search", None),
-    ("issue_type_screen_schemes", "issuetypescreenscheme", None),
-    ("issue_type_schemes", "issuetypescheme", None),
-    ("filters", "filter/search", None),
-    ("screens", "screens", None),
-    ("screen_tabs", "screens/tabs", None),
-    ("screen_schemes", "screenscheme", None),
-    ("groups", "group/bulk", None),
-    ("workflow_schemes", "workflowscheme", None),
-    ("projects", "project/search", {"status": "live,archived,deleted", "expand": "description,lead,projectKeys,url,issueTypes"})
-]
+class FullRefreshPaginatedStream(FullRefreshStream):
+    pass
 
 
-FullRefreshFn = Callable[
-    [HTTPSession, str, str, dict[str, str] | None, Logger],
-    AsyncGenerator[FullRefreshResource, None],
+class Dashboards(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "dashboards"
+    path: ClassVar[str] = "dashboard"
+
+
+class IssueFieldConfigurations(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "issue_field_configurations"
+    path: ClassVar[str] = "fieldconfiguration"
+
+
+class IssueResolutions(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "issue_resolutions"
+    path: ClassVar[str] = "resolution/search"
+
+
+class IssueTypeScreenSchemes(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "issue_type_screen_schemes"
+    path: ClassVar[str] = "issuetypescreenscheme"
+
+
+class IssueTypeSchemes(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "issue_type_schemes"
+    path: ClassVar[str] = "issuetypescheme"
+
+
+class Filters(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "filters"
+    path: ClassVar[str] = "filter/search"
+
+
+class Screens(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "screens"
+    path: ClassVar[str] = "screens"
+
+
+class ScreenTabs(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "screen_tabs"
+    path: ClassVar[str] = "screens/tabs"
+
+
+class ScreenSchemes(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "screen_schemes"
+    path: ClassVar[str] = "screenscheme"
+
+
+class Groups(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "groups"
+    path: ClassVar[str] = "group/bulk"
+
+
+class WorkflowSchemes(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "workflow_schemes"
+    path: ClassVar[str] = "workflowscheme"
+
+
+class Projects(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "projects"
+    path: ClassVar[str] = "project/search"
+    extra_params: ClassVar[dict[str, str]] = {
+        "status": "live,archived,deleted",
+        "expand": "description,lead,projectKeys,url,issueTypes"
+    }
+
+
+FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
+    ApplicationRoles,
+    Dashboards,
+    Filters,
+    Groups,
+    IssueFieldConfigurations,
+    IssueFields,
+    IssueNavigatorSettings,
+    IssueResolutions,
+    IssueTypeSchemes,
+    IssueTypeScreenSchemes,
+    IssueTypes,
+    PermissionSchemes,
+    ProjectCategories,
+    ProjectRoles,
+    ProjectTypes,
+    Projects,
+    Screens,
+    ScreenSchemes,
+    ScreenTabs,
+    Users,
+    WorkflowSchemes,
+    WorkflowStatusCategories,
+    WorkflowStatuses,
 ]
