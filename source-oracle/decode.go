@@ -275,7 +275,12 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 					if err != nil {
 						return false, fmt.Errorf("update sql undo statement where clause %q, key %q: %w", msg.UndoSQL, key, err)
 					}
-					before[key] = value
+
+					// Do not set explicit nulls in _meta/before
+					// it seems sometimes this happens with Oracle and causes document validation errors
+					if value != nil {
+						before[key] = value
+					}
 				}
 
 				return true, nil
