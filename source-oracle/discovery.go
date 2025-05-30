@@ -74,15 +74,6 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.St
 		tableMap[streamID] = info
 	}
 
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		for id, info := range tableMap {
-			logrus.WithFields(logrus.Fields{
-				"stream":     id,
-				"keyColumns": info.PrimaryKey,
-			}).Debug("discovered table")
-		}
-	}
-
 	return tableMap, nil
 }
 

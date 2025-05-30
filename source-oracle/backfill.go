@@ -233,7 +233,7 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
       select sum(blocks) over() total_blocks,
         sum(blocks) over(order by data_object_id, file_id, block_id) - blocks cumul_prev_blocks,
         sum(blocks) over(order by data_object_id, file_id, block_id) cumul_current_blocks,
-        greatest(1, FLOOR((sum(blocks) over())/(SELECT (1024*1024*1024) / TO_NUMBER(value) FROM v$parameter WHERE name='db_block_size'))) num_buckets,
+        greatest(1, FLOOR((sum(blocks) over())/(SELECT (1024*1024*256) / TO_NUMBER(value) FROM v$parameter WHERE name='db_block_size'))) num_buckets,
         e.*
       from extents_data e
     )
