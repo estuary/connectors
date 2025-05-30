@@ -21,9 +21,10 @@ Binding 0:
         ],
         "properties": {
           "A_BOOL": {
+            "format": "integer",
             "description": "(source type: non-nullable NUMBER)",
             "type": [
-              "integer",
+              "string",
               "null"
             ]
           },

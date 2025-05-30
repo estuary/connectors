@@ -31,7 +31,8 @@ Binding 0:
             ]
           },
           "K_BOOL": {
-            "type": "integer",
+            "type": "string",
+            "format": "integer",
             "description": "(source type: NUMBER)"
           },
           "K_INT": {
