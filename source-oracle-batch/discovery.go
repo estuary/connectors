@@ -330,13 +330,6 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 func databaseTypeToJSON(typeName string, dataPrecision, dataScale sql.NullInt16, isNullable bool) (columnType, error) {
 	var dataType basicColumnType
 
-	var precision int16
-	if dataPrecision.Valid {
-		precision = dataPrecision.Int16
-	} else {
-		precision = defaultNumericPrecision
-	}
-
 	var isInteger = dataScale.Int16 == 0
 	if typeName == "NUMBER" && !dataScale.Valid && !dataPrecision.Valid {
 		// when scale and precision are both null, both have the maximum value possible
@@ -345,19 +338,11 @@ func databaseTypeToJSON(typeName string, dataPrecision, dataScale sql.NullInt16,
 		dataType.jsonTypes = []string{"string"}
 	} else if typeName == "NUMBER" && isInteger {
 		// data_precision null defaults to precision 38
-		if precision > 18 || !dataPrecision.Valid {
-			dataType.format = "integer"
-			dataType.jsonTypes = []string{"string"}
-		} else {
-			dataType.jsonTypes = []string{"integer"}
-		}
+		dataType.format = "integer"
+		dataType.jsonTypes = []string{"string"}
 	} else if slices.Contains([]string{"FLOAT", "NUMBER"}, typeName) {
-		if precision > 18 || !dataPrecision.Valid {
-			dataType.format = "number"
-			dataType.jsonTypes = []string{"string"}
-		} else {
-			dataType.jsonTypes = []string{"number"}
-		}
+		dataType.format = "number"
+		dataType.jsonTypes = []string{"string"}
 	} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, typeName) {
 		dataType.jsonTypes = []string{"string"}
 	} else if strings.Contains(typeName, "WITH TIME ZONE") {
@@ -391,9 +376,6 @@ type discoveredPrimaryKey struct {
 	Table   string
 	Columns []string
 }
-
-// SMALLINT, INT and INTEGER have a default precision 38 which is not included in the column information
-const defaultNumericPrecision = 38
 
 func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []string) ([]*discoveredPrimaryKey, error) {
 	var query = new(strings.Builder)
