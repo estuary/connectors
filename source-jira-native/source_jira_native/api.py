@@ -15,6 +15,9 @@ from .models import (
     Issue,
     IssuesResponse,
     MyselfResponse,
+    LabelsResponse,
+    PermissionsResponse,
+    SystemAvatarsResponse,
 )
 
 # Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
@@ -67,6 +70,27 @@ async def fetch_timezone(
     log.info(f"Using timezone {response.timeZone} ({_format_utc_offset(timezone)}).")
 
     return timezone
+
+
+async def snapshot_nested_arrayed_resources(
+    http: HTTPSession,
+    domain: str,
+    path: str,
+    extra_params: dict[str, str] | None,
+    response_field: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(domain)}/{path}"
+
+    _, body = await http.request_stream(log, url, params=extra_params)
+    processor = IncrementalJsonProcessor(
+        body(),
+        f"{response_field}.item",
+        FullRefreshResource,
+    )
+
+    async for resource in processor:
+        yield resource
 
 
 async def snapshot_non_paginated_arrayed_resources(
@@ -150,6 +174,78 @@ async def snapshot_paginated_resources(
             break
 
         params["startAt"] = count
+
+
+async def snapshot_labels(
+    http: HTTPSession,
+    domain: str,
+    path: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(domain)}/{path}"
+
+    count = 0
+
+    params: dict[str, str | int] = {
+        "startAt": count,
+        "maxResults": 1000,
+    }
+
+    while True:
+        response = LabelsResponse.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        for label in response.values:
+            doc = FullRefreshResource.model_validate({
+                "label": label,
+            })
+            yield doc
+            count += 1
+
+        if response.isLast:
+            break
+
+        params["startAt"] = count
+
+
+async def snapshot_system_avatars(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    SYSTEM_AVATAR_TYPES = [
+        "project",
+        "user",
+        "issuetype",
+        "priority",
+    ]
+
+    for avatar_type in SYSTEM_AVATAR_TYPES:
+        url = f"{url_base(domain)}/avatar/{avatar_type}/system"
+
+        response = SystemAvatarsResponse.model_validate_json(
+            await http.request(log, url)
+        )
+
+        for avatar in response.system:
+            yield avatar
+
+
+async def snapshot_permissions(
+    http: HTTPSession,
+    domain: str,
+    path: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(domain)}/{path}"
+
+    response = PermissionsResponse.model_validate_json(
+        await http.request(log, url)
+    )
+
+    for permission in response.permissions.values():
+        yield FullRefreshResource.model_validate(permission)
 
 
 def _is_within_dst_fallback_window(
