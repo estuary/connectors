@@ -17,7 +17,8 @@ expression: result
       ],
       "resourcePath": [
         "webhook-data"
-      ]
+      ],
+      "isFallbackKey": true
     }
   ]
 }

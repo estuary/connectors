@@ -465,6 +465,7 @@ fn discovered_webhook_collection(path: Option<&str>) -> DiscoveredBinding {
         }))
         .unwrap(),
         key: vec!["/_meta/webhookId".to_string()],
+        is_fallback_key: true,
         resource_path: resource_config.resource_path(),
     }
 }
