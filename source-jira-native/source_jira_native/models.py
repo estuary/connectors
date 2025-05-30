@@ -259,11 +259,62 @@ class Projects(FullRefreshPaginatedStream):
     }
 
 
+# Full refresh resources whose API response contains an array of results at some top level field.
+class FullRefreshNestedArrayStream(FullRefreshStream):
+    response_field: ClassVar[str]
+
+
+class IssueSecuritySchemes(FullRefreshNestedArrayStream):
+    name: ClassVar[str] = "issue_security_schemes"
+    path: ClassVar[str] = "issuesecurityschemes"
+    response_field: ClassVar[str] = "issueSecuritySchemes"
+
+
+class IssueLinkTypes(FullRefreshNestedArrayStream):
+    name: ClassVar[str] = "issue_link_types"
+    path: ClassVar[str] = "issueLinkType"
+    response_field: ClassVar[str] = "issueLinkTypes"
+
+
+# One of a kind full refresh streams whose request and/or response don't align
+# with other endpoints & require special handling.
+class SystemAvatars(FullRefreshStream):
+    name: ClassVar[str] = "system_avatars"
+    path: ClassVar[str] = "avatar/TYPE/system"
+
+
+class SystemAvatarsResponse(BaseModel, extra="allow"):
+    system: list[FullRefreshResource]
+
+
+class Permissions(FullRefreshStream):
+    name: ClassVar[str] = "permissions"
+    path: ClassVar[str] = "permissions"
+
+
+class PermissionsResponse(BaseModel, extra="allow"):
+    permissions: dict[str, dict[str, str]]
+
+
+class Labels(FullRefreshStream):
+    name: ClassVar[str] = "labels"
+    path: ClassVar[str] = "label"
+
+
+class LabelsResponse(PaginatedResponse):
+    values: list[str]
+
+
 FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ApplicationRoles,
     Dashboards,
     Filters,
     Groups,
+    Labels,
+    Permissions,
+    SystemAvatars,
+    IssueSecuritySchemes,
+    IssueLinkTypes,
     IssueFieldConfigurations,
     IssueFields,
     IssueNavigatorSettings,
