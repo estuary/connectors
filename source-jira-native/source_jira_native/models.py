@@ -122,7 +122,16 @@ class MyselfResponse(BaseModel, extra="allow"):
 # Tuples contain the resource name, path, and any additional query params.
 # issue_types
 FULL_REFRESH_ARRAYED_RESOURCES: list[tuple[str, str, Optional[dict[str, str]]]] = [
-    ("issue_types", "issuetype", None)
+    ("application_roles", "applicationrole", None),
+    ("issue_fields", "field", None),
+    ("issue_navigator_settings", "settings/columns", None),
+    ("issue_types", "issuetype", None),
+    ("project_categories", "projectCategory", None),
+    ("project_types", "project/type", None),
+    ("project_roles", "role", None),
+    ("workflow_status_categories", "statuscategory", None),
+    ("workflow_statuses", "status", None),
+    ("permission_schemes", "permissionscheme", None),
 ]
 
 
