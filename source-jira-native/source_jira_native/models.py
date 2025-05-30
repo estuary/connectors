@@ -147,6 +147,17 @@ FULL_REFRESH_PAGINATED_ARRAYED_RESOURCES: list[tuple[str, str, Optional[dict[str
 # Full refresh resources whose API response contains pagination information.
 # Tuples contain the resource name, path, and any additional query params.
 FULL_REFRESH_PAGINATED_RESOURCES: list[tuple[str, str, Optional[dict[str, str]]]] = [
+    ("dashboards", "dashboard", None),
+    ("issue_field_configurations", "fieldconfiguration", None),
+    ("issue_resolutions", "resolution/search", None),
+    ("issue_type_screen_schemes", "issuetypescreenscheme", None),
+    ("issue_type_schemes", "issuetypescheme", None),
+    ("filters", "filter/search", None),
+    ("screens", "screens", None),
+    ("screen_tabs", "screens/tabs", None),
+    ("screen_schemes", "screenscheme", None),
+    ("groups", "group/bulk", None),
+    ("workflow_schemes", "workflowscheme", None),
     ("projects", "project/search", {"status": "live,archived,deleted", "expand": "description,lead,projectKeys,url,issueTypes"})
 ]
 
