@@ -68,8 +68,11 @@ async def fetch_rows(
         if headers_from_frozen:
             assert row.values is not None
             for ind, column in enumerate(row.values):
-                if (ev := column.effectiveValue) and ev.stringValue:
-                    headers[ind] = ev.stringValue
+                if (ev := column.effectiveValue):
+                    if ev.stringValue:
+                        headers[ind] = ev.stringValue
+                    elif ev.numberValue:
+                        headers[ind] = str(ev.numberValue)
             headers_from_frozen = False
             continue
 
