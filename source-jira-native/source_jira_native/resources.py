@@ -16,8 +16,12 @@ from .models import (
     JiraResource,
     FullRefreshStream,
     FullRefreshArrayedStream,
+    FullRefreshNestedArrayStream,
     FullRefreshPaginatedArrayedStream,
     FullRefreshPaginatedStream,
+    Labels,
+    Permissions,
+    SystemAvatars,
     Projects,
     FULL_REFRESH_STREAMS,
 )
@@ -25,9 +29,13 @@ from .api import (
     fetch_timezone,
     fetch_issues,
     backfill_issues,
+    snapshot_nested_arrayed_resources,
     snapshot_non_paginated_arrayed_resources,
     snapshot_paginated_arrayed_resources,
     snapshot_paginated_resources,
+    snapshot_labels,
+    snapshot_system_avatars,
+    snapshot_permissions,
     url_base,
     dt_to_str,
     ISSUE_JQL_SEARCH_LAG,
@@ -94,6 +102,15 @@ def _get_partial_snapshot_fn(
             stream.path,
             stream.extra_params
         )
+    elif issubclass(stream, FullRefreshNestedArrayStream):
+        snapshot_fn = functools.partial(
+            snapshot_nested_arrayed_resources,
+            http,
+            config.domain,
+            stream.path,
+            stream.extra_params,
+            stream.response_field,
+        )
     elif issubclass(stream, FullRefreshPaginatedArrayedStream):
         snapshot_fn = functools.partial(
             snapshot_paginated_arrayed_resources,
@@ -109,6 +126,26 @@ def _get_partial_snapshot_fn(
             config.domain,
             stream.path,
             stream.extra_params
+        )
+    elif issubclass(stream, Labels):
+        snapshot_fn = functools.partial(
+            snapshot_labels,
+            http,
+            config.domain,
+            stream.path,
+        )
+    elif issubclass(stream, Permissions):
+        snapshot_fn = functools.partial(
+            snapshot_permissions,
+            http,
+            config.domain,
+            stream.path,
+        )
+    elif issubclass(stream, SystemAvatars):
+        snapshot_fn = functools.partial(
+            snapshot_system_avatars,
+            http,
+            config.domain,
         )
     else:
         raise RuntimeError(f"Unknown full refresh stream type {stream.__name__} for stream {stream.name}")
