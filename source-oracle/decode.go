@@ -299,10 +299,6 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 					before[key] = value
 				}
 			}
-
-			if v, ok := before["ACC_SALES_TAX_METHOD_CD"]; ok && v == "<nil>" {
-				logrus.WithField("v", fmt.Sprintf("%+v", msg)).Debug("got value for before/ACC_SALES_TAX_METHOD_CD")
-			}
 		}
 	case opDelete:
 		before = make(map[string]any)
