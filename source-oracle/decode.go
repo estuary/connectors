@@ -295,7 +295,9 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 				if err != nil {
 					return nil, fmt.Errorf("update sql undo statement %q, key %q: %w", msg.UndoSQL, key, err)
 				}
-				before[key] = value
+				if value != nil {
+					before[key] = value
+				}
 			}
 
 			if v, ok := before["ACC_SALES_TAX_METHOD_CD"]; ok && v == "<nil>" {
