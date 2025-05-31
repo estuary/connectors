@@ -36,19 +36,52 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	}
 
 	// Compute backfill query and arguments list
-	var disableParallelWorkers bool
 	var query string
 	var args []any
+
+	var usingCTID bool                  // True when we're running a CTID-ordered backfill
+	var afterCTID, untilCTID pgtype.TID // When using CTID, these are the lower and upper bounds for the backfill query
+	var tableMaximumPageID int64        // When using CTID, this is a conservative (over)estimate of the maximum page ID for the table, used to determine when backfill is complete
+
 	switch state.Mode {
 	case sqlcapture.TableStateKeylessBackfill:
-		var afterCTID = "(0,0)"
-		if resumeAfter != nil {
-			afterCTID = string(resumeAfter)
+		var stats, err = db.queryTableStatistics(ctx, schema, table)
+		if err != nil {
+			return false, nil, err
 		}
-		logEntry.WithField("ctid", afterCTID).Debug("scanning keyless table chunk")
+		logEntry.WithFields(logrus.Fields{
+			"relPages":  stats.RelPages,
+			"relTuples": stats.RelTuples,
+			"maxPageID": stats.MaxPageID,
+		}).Debug("queried table statistics for keyless backfill")
+		tableMaximumPageID = stats.MaxPageID
+
+		if resumeAfter == nil {
+			resumeAfter = []byte("(0,0)")
+		}
+		if err := afterCTID.Scan(string(resumeAfter)); err != nil {
+			return false, nil, fmt.Errorf("error parsing resume CTID for %q: %w", streamID, err)
+		} else if !afterCTID.Valid {
+			return false, nil, fmt.Errorf("internal error: invalid resume CTID value %q for %q", resumeAfter, streamID)
+		}
+
+		// This is a really stupid heuristic, but it's one that's probably good enough that we
+		// will never need to change it. We just assume that each page holds 100 rows (average
+		// row size of 82 bytes), which is an overestimate for most real tables. But that just
+		// means that a table with especially large rows will get fewer rows per chunk, which
+		// is entirely fine and works out to reasonable chunk sizes for any plausible table.
+		//
+		// Also it's nice that we're just dividing by 100 because that means the default 50k
+		// chunk size works out to 500 pages, and it's obvious how to adjust that if need be.
+		var pagesPerChunk = (db.config.Advanced.BackfillChunkSize + 99) / 100 // +99 so we always round up to the next page
+		untilCTID = afterCTID
+		untilCTID.BlockNumber += uint32(pagesPerChunk)
+		untilCTID.OffsetNumber = 0
+
+		logEntry.WithField("after", afterCTID).WithField("until", untilCTID).Debug("scanning keyless table chunk")
 		query = db.keylessScanQuery(info, schema, table)
-		args = []any{afterCTID}
-		disableParallelWorkers = true
+		args = []any{afterCTID, untilCTID}
+		usingCTID = true
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		var isPrecise = (state.Mode == sqlcapture.TableStatePreciseBackfill)
 		if resumeAfter != nil {
@@ -71,23 +104,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		}
 	default:
 		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
-	}
-
-	// Keyless backfill queries need to return results in CTID order, but we can't ask
-	// for that because `ORDER BY ctid` forces a sort, so we rely on it being true as an
-	// implementation detail of how `WHERE ctid > $1` queries execute in practice. But
-	// parallel query execution breaks that assumption, so we need to force the query
-	// planner to not use parallel workers in such cases.
-	if disableParallelWorkers {
-		if _, err := db.conn.Exec(ctx, "SET max_parallel_workers_per_gather TO 0"); err != nil {
-			logrus.WithField("err", err).Warn("error attempting to disable parallel workers")
-		} else {
-			defer func() {
-				if _, err := db.conn.Exec(ctx, "SET max_parallel_workers_per_gather TO DEFAULT"); err != nil {
-					logrus.WithField("err", err).Warn("error resetting max_parallel_workers to default")
-				}
-			}()
-		}
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
@@ -124,7 +140,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		// Compute row key and update 'nextRowKey' before XID filtering, so that we can resume
 		// correctly when doing an XMIN-filtered backfill even if no result rows satisfy the filter.
 		var rowKey []byte
-		if state.Mode == sqlcapture.TableStateKeylessBackfill {
+		if usingCTID {
 			var ctid = fields["ctid"].(pgtype.TID)
 			delete(fields, "ctid")
 
@@ -198,10 +214,16 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	}
 
 	if err := rows.Err(); err != nil {
-		// As a special case, consider statement timeouts to be not an error so long as we got
-		// at least one row back (totalRows > 0). This allows us to make partial progress on slow databases with
-		// statement timeouts set, without having to fine-tune the backfill chunk size.
-		if pgErr, ok := err.(*pgconn.PgError); ok && statementTimeoutRegexp.MatchString(pgErr.Message) && totalRows > 0 {
+		// As a special case, consider statement timeouts to be not an error so long as we got at least
+		// one row back (resultRows > 0) and we're using a keyed backfill (usingCTID == false), where we
+		// expect to receive rows in ascending key order and can resume from the last row received.
+		//
+		// This allows us to make partial progress on slow databases with statement timeouts set, without
+		// having to fine-tune the backfill chunk size.
+		//
+		// Because of the CTID related caveat, we might want to eventually implement logic to automatically
+		// lower the chunk size when we see a statement timeout.
+		if pgErr, ok := err.(*pgconn.PgError); ok && statementTimeoutRegexp.MatchString(pgErr.Message) && totalRows > 0 && !usingCTID {
 			logrus.WithFields(logrus.Fields{
 				"stream":     streamID,
 				"totalRows":  totalRows,
@@ -215,8 +237,23 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		return false, nil, err
 	}
 
-	// Backfill is complete if the *total* number of rows returned by the DB was less than the requested chunk size.
-	// This correctly handles cases where the last chunk might be filtered down to zero rows by XMIN.
+	// In CTID mode, the backfill is complete when the upper bound CTID of our query is >= our estimated
+	// maximum page ID for the table, and the resume cursor is always the upper-bound CTID of the query.
+	if usingCTID {
+		var backfillComplete = int64(untilCTID.BlockNumber) >= tableMaximumPageID
+		var resumeCursor = []byte(fmt.Sprintf("(%d,%d)", untilCTID.BlockNumber, untilCTID.OffsetNumber))
+		logEntry.WithFields(logrus.Fields{
+			"totalRows":  totalRows,
+			"resultRows": resultRows,
+			"chunkSize":  db.config.Advanced.BackfillChunkSize,
+			"complete":   backfillComplete,
+		}).Debug("finished processing table chunk")
+		return backfillComplete, resumeCursor, nil
+	}
+
+	// In keyed mode, the backfill is complete if the *total* number of rows returned by the DB was less
+	// than the requested chunk size. This correctly handles cases where the last chunk might be filtered
+	// down to zero rows by XMIN.
 	var backfillComplete = totalRows < db.config.Advanced.BackfillChunkSize
 	logEntry.WithFields(logrus.Fields{
 		"totalRows":  totalRows,
@@ -287,11 +324,10 @@ func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schema
 		fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
 	}
 
-	fmt.Fprintf(query, ` WHERE ctid > $1`)
+	fmt.Fprintf(query, ` WHERE ctid > $1 AND ctid <= $2`)
 	if xidFiltered {
 		fmt.Fprintf(query, ` AND %s`, db.backfillQueryFilterXMIN())
 	}
-	fmt.Fprintf(query, ` LIMIT %d;`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
 
@@ -446,4 +482,34 @@ func compareXID32(a, b uint32) int {
 		return -1 // a < b
 	}
 	return 1 // a > b
+}
+
+type postgresTableStatistics struct {
+	RelPages  int64 // Approximate number of pages in the table
+	RelTuples int64 // Approximate number of live tuples in the table
+	MaxPageID int64 // Conservative upper bound for the maximum page ID
+}
+
+const queryTableStatistics = `
+SELECT c.relpages, c.reltuples,
+  CEIL(1.1 * (pg_relation_size(c.oid) / current_setting('block_size')::int)) AS max_page_id
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = $1 AND c.relname = $2;`
+
+func (db *postgresDatabase) queryTableStatistics(ctx context.Context, schema, table string) (*postgresTableStatistics, error) {
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+	if db.tableStatistics == nil {
+		db.tableStatistics = make(map[sqlcapture.StreamID]*postgresTableStatistics)
+	}
+	if db.tableStatistics[streamID] != nil {
+		return db.tableStatistics[streamID], nil
+	}
+
+	var stats = &postgresTableStatistics{}
+	if err := db.conn.QueryRow(ctx, queryTableStatistics, schema, table).Scan(&stats.RelPages, &stats.RelTuples, &stats.MaxPageID); err != nil {
+		return nil, fmt.Errorf("error querying table statistics for %q: %w", streamID, err)
+	}
+	db.tableStatistics[streamID] = stats
+	return stats, nil
 }

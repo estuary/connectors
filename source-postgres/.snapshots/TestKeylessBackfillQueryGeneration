@@ -1,7 +1,7 @@
 --- no_xid_filtering ---
-SELECT ctid, * FROM "public"."users" WHERE ctid > $1 LIMIT 100;
+SELECT ctid, * FROM "public"."users" WHERE ctid > $1 AND ctid <= $2
 
 --- with_xid_filtering ---
-SELECT ctid, xmin::text AS xmin, * FROM "public"."users" WHERE ctid > $1 AND ((RANDOM() < 0.001) OR ((xmin::text::bigint >= 3) AND ((((xmin::text::bigint - 12345::bigint)<<32)>>32) >= 0) AND ((((txid_snapshot_xmax(txid_current_snapshot()) - xmin::text::bigint)<<32)>>32) >= 0))) LIMIT 100;
+SELECT ctid, xmin::text AS xmin, * FROM "public"."users" WHERE ctid > $1 AND ctid <= $2 AND ((RANDOM() < 0.001) OR ((xmin::text::bigint >= 3) AND ((((xmin::text::bigint - 12345::bigint)<<32)>>32) >= 0) AND ((((txid_snapshot_xmax(txid_current_snapshot()) - xmin::text::bigint)<<32)>>32) >= 0)))
 
 

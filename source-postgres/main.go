@@ -305,6 +305,8 @@ type postgresDatabase struct {
 	includeTxIDs    map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
 
+	tableStatistics map[sqlcapture.StreamID]*postgresTableStatistics // Tracks table statistics for the current connector invocation
+
 	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
