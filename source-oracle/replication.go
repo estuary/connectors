@@ -163,6 +163,7 @@ type redoFile struct {
 	FirstChange SCN
 	DictStart   string
 	DictEnd     string
+	Bytes       int
 }
 
 func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SCN) (int, error) {
@@ -209,12 +210,12 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SC
 		"minArchiveSCN": minArchiveSCN,
 	}).Debug("starting SCN for log files based on dictionary starting point")
 
-	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#,'NO' as DICT_START, 'NO' as DICT_END FROM V$LOGFILE LF, V$LOG L
+	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#,'NO' as DICT_START, 'NO' as DICT_END, MAX(L.BYTES) FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
     WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED'
 		GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#`
 
-	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END FROM V$ARCHIVED_LOG A
+	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END, A.BLOCKS*A.BLOCK_SIZE as BYTES FROM V$ARCHIVED_LOG A
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
@@ -230,7 +231,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, endSCN SC
 	for rows.Next() {
 		var f redoFile
 
-		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.DictStart, &f.DictEnd); err != nil {
+		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.DictStart, &f.DictEnd, &f.Bytes); err != nil {
 			return 0, fmt.Errorf("scanning log file record: %w", err)
 		}
 
