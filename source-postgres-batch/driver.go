@@ -626,7 +626,11 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 	}
 	var cursorIndices []int
 	for _, cursorName := range cursorNames {
-		cursorIndices = append(cursorIndices, columnIndices[cursorName])
+		if columnIndex, ok := columnIndices[cursorName]; ok {
+			cursorIndices = append(cursorIndices, columnIndex)
+		} else {
+			return fmt.Errorf("cursor column %q not found in query result", cursorName)
+		}
 	}
 
 	var columnValues = make([]any, len(columnNames))
