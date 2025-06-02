@@ -491,7 +491,11 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 	}
 	var cursorIndices []int
 	for _, cursorName := range cursorNames {
-		cursorIndices = append(cursorIndices, columnIndices[cursorName])
+		if columnIndex, ok := columnIndices[cursorName]; ok {
+			cursorIndices = append(cursorIndices, columnIndex)
+		} else {
+			return fmt.Errorf("cursor column %q not found in query result", cursorName)
+		}
 	}
 
 	var columnValues = make([]any, len(columnNames))
