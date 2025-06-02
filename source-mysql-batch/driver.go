@@ -582,7 +582,11 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 				fieldIndices[name] = idx
 			}
 			for _, cursorName := range cursorNames {
-				cursorIndices = append(cursorIndices, fieldIndices[cursorName])
+				if fieldIndex, ok := fieldIndices[cursorName]; ok {
+					cursorIndices = append(cursorIndices, fieldIndex)
+				} else {
+					return fmt.Errorf("cursor column %q not found in query result", cursorName)
+				}
 			}
 		}
 

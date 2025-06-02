@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+capture terminated with error: error polling binding "test_nonexistentcursor_140869": error preparing query "SELECT * FROM `test`.`nonexistentcursor_140869` ORDER BY `updated_at`;": ERROR 1054 (42S22): Unknown column 'updated_at' in 'order clause'
+
