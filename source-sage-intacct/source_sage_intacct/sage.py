@@ -12,6 +12,7 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import AwareDatetime, BaseModel, create_model, model_validator
 
 from .models import (
+    COMPANY_ID_FIELD,
     ApiResponse,
     EndpointConfig,
     GenerateApiSessionResponse,
@@ -72,10 +73,15 @@ class SageRecord(BaseModel):
     tz_dt: ClassVar[datetime]
     field_names: ClassVar[list[str]]
     field_datatypes: ClassVar[list[str]]
+    company_id: ClassVar[str | None] = None
 
     def model_dump(self, **kwargs):
         kwargs.setdefault("exclude_none", True)
-        return super().model_dump(**kwargs)
+        res = super().model_dump(**kwargs)
+        if self.company_id:
+            res[COMPANY_ID_FIELD] = self.company_id
+
+        return res
 
     @model_validator(mode="before")
     @classmethod
@@ -166,6 +172,10 @@ class SageRecord(BaseModel):
 
             schema["properties"][field] = field_schema
             schema["required"].append(field)
+
+        if cls.company_id:
+            schema["properties"][COMPANY_ID_FIELD] = {"type": "string"}
+            schema["required"].append(COMPANY_ID_FIELD)
 
         return schema
 
@@ -375,6 +385,8 @@ class Sage:
         m.tz_dt = self.tz_dt
         m.field_names = [field[0] for field in field_info]
         m.field_datatypes = [field[1] for field in field_info]
+        if self.config.advanced.include_company_id_in_documents:
+            m.company_id = self.config.company_id
 
         return m
 
