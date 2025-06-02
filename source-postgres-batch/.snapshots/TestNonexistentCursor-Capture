@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+capture terminated with error: error polling binding "test_nonexistentcursor_140869": error executing query: ERROR: column "updated_at" does not exist (SQLSTATE 42703)
+
