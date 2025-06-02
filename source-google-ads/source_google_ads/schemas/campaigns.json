@@ -45,12 +45,6 @@
     "campaign.dynamic_search_ads_setting.domain_name": {
       "type": ["null", "string"]
     },
-    "campaign.dynamic_search_ads_setting.feeds": {
-      "type": ["null", "array"],
-      "items": {
-        "type": "string"
-      }
-    },
     "campaign.dynamic_search_ads_setting.language_code": {
       "type": ["null", "string"]
     },
