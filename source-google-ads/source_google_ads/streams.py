@@ -11,9 +11,9 @@ from airbyte_cdk.models import SyncMode
 from airbyte_cdk.sources.streams import IncrementalMixin, Stream
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from google.ads.googleads.errors import GoogleAdsException
-from google.ads.googleads.v17.errors.types.authorization_error import AuthorizationErrorEnum
-from google.ads.googleads.v17.errors.types.request_error import RequestErrorEnum
-from google.ads.googleads.v17.services.services.google_ads_service.pagers import SearchPager
+from google.ads.googleads.v19.errors.types.authorization_error import AuthorizationErrorEnum
+from google.ads.googleads.v19.errors.types.request_error import RequestErrorEnum
+from google.ads.googleads.v19.services.services.google_ads_service.pagers import SearchPager
 
 from .google_ads import GoogleAds
 from .models import Customer
@@ -275,7 +275,7 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
 
 class Accounts(IncrementalGoogleAdsStream):
     """
-    Accounts stream: https://developers.google.com/google-ads/api/fields/v11/customer
+    Accounts stream: https://developers.google.com/google-ads/api/fields/v19/customer
     """
 
     primary_key = ["customer.id", "segments.date"]
@@ -292,7 +292,7 @@ class ServiceAccounts(GoogleAdsStream):
 
 class Campaigns(IncrementalGoogleAdsStream):
     """
-    Campaigns stream: https://developers.google.com/google-ads/api/fields/v11/campaign
+    Campaigns stream: https://developers.google.com/google-ads/api/fields/v19/campaign
     """
 
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
@@ -301,7 +301,7 @@ class Campaigns(IncrementalGoogleAdsStream):
 
 class CampaignLabels(GoogleAdsStream):
     """
-    Campaign labels stream: https://developers.google.com/google-ads/api/fields/v11/campaign_label
+    Campaign labels stream: https://developers.google.com/google-ads/api/fields/v19/campaign_label
     """
 
     # Note that this is a string type. Google doesn't return a more convenient identifier.
@@ -310,7 +310,7 @@ class CampaignLabels(GoogleAdsStream):
 
 class AdGroups(IncrementalGoogleAdsStream):
     """
-    AdGroups stream: https://developers.google.com/google-ads/api/fields/v11/ad_group
+    AdGroups stream: https://developers.google.com/google-ads/api/fields/v19/ad_group
     """
 
     primary_key = ["ad_group.id", "segments.date"]
@@ -318,7 +318,7 @@ class AdGroups(IncrementalGoogleAdsStream):
 
 class AdGroupLabels(GoogleAdsStream):
     """
-    Ad Group Labels stream: https://developers.google.com/google-ads/api/fields/v11/ad_group_label
+    Ad Group Labels stream: https://developers.google.com/google-ads/api/fields/v19/ad_group_label
     """
 
     # Note that this is a string type. Google doesn't return a more convenient identifier.
@@ -327,7 +327,7 @@ class AdGroupLabels(GoogleAdsStream):
 
 class AdGroupAds(IncrementalGoogleAdsStream):
     """
-    AdGroups stream: https://developers.google.com/google-ads/api/fields/v11/ad_group_ad
+    AdGroups stream: https://developers.google.com/google-ads/api/fields/v19/ad_group_ad
     """
 
     primary_key = ["ad_group_ad.ad.id", "segments.date"]
@@ -335,7 +335,7 @@ class AdGroupAds(IncrementalGoogleAdsStream):
 
 class AdGroupAdLabels(GoogleAdsStream):
     """
-    Ad Group Ad Labels stream: https://developers.google.com/google-ads/api/fields/v11/ad_group_ad_label
+    Ad Group Ad Labels stream: https://developers.google.com/google-ads/api/fields/v19/ad_group_ad_label
     """
 
     # Note that this is a string type. Google doesn't return a more convenient identifier.
@@ -344,7 +344,7 @@ class AdGroupAdLabels(GoogleAdsStream):
 
 class AccountPerformanceReport(IncrementalGoogleAdsStream):
     """
-    AccountPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/customer
+    AccountPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v19/customer
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#account_performance
     """
     primary_key = [
@@ -357,7 +357,7 @@ class AccountPerformanceReport(IncrementalGoogleAdsStream):
 
 class AdGroupAdReport(IncrementalGoogleAdsStream):
     """
-    AdGroupAdReport stream: https://developers.google.com/google-ads/api/fields/v11/ad_group_ad
+    AdGroupAdReport stream: https://developers.google.com/google-ads/api/fields/v19/ad_group_ad
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#ad_performance
     """
     primary_key = [
@@ -372,7 +372,7 @@ class AdGroupAdReport(IncrementalGoogleAdsStream):
 
 class DisplayKeywordPerformanceReport(IncrementalGoogleAdsStream):
     """
-    DisplayKeywordPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/display_keyword_view
+    DisplayKeywordPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v19/display_keyword_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#display_keyword_performance
     """
     primary_key = [
@@ -388,7 +388,7 @@ class DisplayKeywordPerformanceReport(IncrementalGoogleAdsStream):
 
 class DisplayTopicsPerformanceReport(IncrementalGoogleAdsStream):
     """
-    DisplayTopicsPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/topic_view
+    DisplayTopicsPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v19/topic_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#display_topics_performance
     """
     primary_key = [
@@ -404,7 +404,7 @@ class DisplayTopicsPerformanceReport(IncrementalGoogleAdsStream):
 
 class ShoppingPerformanceReport(IncrementalGoogleAdsStream):
     """
-    ShoppingPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v11/shopping_performance_view
+    ShoppingPerformanceReport stream: https://developers.google.com/google-ads/api/fields/v19/shopping_performance_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#shopping_performance
     """
     primary_key = [
@@ -420,7 +420,7 @@ class ShoppingPerformanceReport(IncrementalGoogleAdsStream):
 
 class UserLocationReport(IncrementalGoogleAdsStream):
     """
-    UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/user_location_view
+    UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v19/user_location_view
     Google Ads API field mapping: https://developers.google.com/google-ads/api/docs/migration/mapping#geo_performance
     """
     primary_key = [
@@ -434,7 +434,7 @@ class UserLocationReport(IncrementalGoogleAdsStream):
 
 class GeographicReport(IncrementalGoogleAdsStream):
     """
-    UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/geographic_view
+    UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v19/geographic_view
     """
     primary_key = [
         "segments.date",
@@ -446,7 +446,7 @@ class GeographicReport(IncrementalGoogleAdsStream):
 
 class KeywordReport(IncrementalGoogleAdsStream):
     """
-    UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v11/keyword_view
+    UserLocationReport stream: https://developers.google.com/google-ads/api/fields/v19/keyword_view
     """
     primary_key = [
         "segments.date",
@@ -457,7 +457,7 @@ class KeywordReport(IncrementalGoogleAdsStream):
 
 class ClickView(IncrementalGoogleAdsStream):
     """
-    ClickView stream: https://developers.google.com/google-ads/api/reference/rpc/v11/ClickView
+    ClickView stream: https://developers.google.com/google-ads/api/reference/rpc/v19/ClickView
     """
 
     primary_key = ["click_view.gclid", "segments.date", "segments.ad_network_type"]
