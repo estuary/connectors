@@ -327,6 +327,7 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, 
 						Items: colSchema.toType(),
 					},
 				},
+				"additionalProperties": false,
 			},
 			Required: []string{"dimensions", "elements"},
 		}

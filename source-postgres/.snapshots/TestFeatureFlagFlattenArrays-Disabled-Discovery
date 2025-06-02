@@ -24,6 +24,7 @@ Binding 0:
                 "elements"
               ],
               "description": "(source type: _int4)",
+              "additionalProperties": false,
               "properties": {
                 "dimensions": {
                   "items": {
@@ -52,6 +53,7 @@ Binding 0:
                 "elements"
               ],
               "description": "(source type: _int4)",
+              "additionalProperties": false,
               "properties": {
                 "dimensions": {
                   "items": {
@@ -80,6 +82,7 @@ Binding 0:
                 "elements"
               ],
               "description": "(source type: _text)",
+              "additionalProperties": false,
               "properties": {
                 "dimensions": {
                   "items": {
