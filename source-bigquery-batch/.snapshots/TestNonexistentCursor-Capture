@@ -1,0 +1,9 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+capture terminated with error: error polling binding "nonexistentcursor_140869": error executing query: googleapi: Error 400: Unrecognized name: updated_at at [2:12], invalidQuery
+
