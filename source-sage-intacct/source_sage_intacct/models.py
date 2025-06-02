@@ -19,6 +19,8 @@ from pydantic import (
     Field,
 )
 
+COMPANY_ID_FIELD = "COMPANY_ID"
+
 
 class EndpointConfig(BaseModel):
     sender_id: str = Field(
@@ -42,6 +44,20 @@ class EndpointConfig(BaseModel):
         description="Sage Intacct Password",
         title="Password",
         json_schema_extra={"secret": True},
+    )
+
+    class Advanced(BaseModel):
+        include_company_id_in_documents: bool = Field(
+            description=f"Include the configured Sage Intacct Company ID in captured documents, with the field name '{COMPANY_ID_FIELD}'. Every captured document will have the same value for this field, equal to the configured Sage Intacct Company ID.",
+            title="Include Company ID in Documents",
+            default=False,
+        )
+
+    advanced: Advanced = Field(
+        default_factory=Advanced,
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
     )
 
 
