@@ -102,6 +102,57 @@
     ]
   },
   {
+    "recommendedName": "filter_sharing",
+    "resourceConfig": {
+      "name": "filter_sharing",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
     "recommendedName": "filters",
     "resourceConfig": {
       "name": "filters",
@@ -156,6 +207,108 @@
     "recommendedName": "groups",
     "resourceConfig": {
       "name": "groups",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "issue_custom_field_contexts",
+    "resourceConfig": {
+      "name": "issue_custom_field_contexts",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "issue_custom_field_options",
+    "resourceConfig": {
+      "name": "issue_custom_field_options",
       "interval": "PT1H"
     },
     "documentSchema": {
@@ -874,9 +1027,162 @@
     ]
   },
   {
+    "recommendedName": "project_avatars",
+    "resourceConfig": {
+      "name": "project_avatars",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
     "recommendedName": "project_categories",
     "resourceConfig": {
       "name": "project_categories",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "project_components",
+    "resourceConfig": {
+      "name": "project_components",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "project_emails",
+    "resourceConfig": {
+      "name": "project_emails",
       "interval": "PT1H"
     },
     "documentSchema": {
@@ -1027,6 +1333,57 @@
     ]
   },
   {
+    "recommendedName": "project_versions",
+    "resourceConfig": {
+      "name": "project_versions",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
     "recommendedName": "projects",
     "resourceConfig": {
       "name": "projects",
@@ -1081,6 +1438,57 @@
     "recommendedName": "screen_schemes",
     "resourceConfig": {
       "name": "screen_schemes",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        }
+      },
+      "title": "FullRefreshResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "screen_tab_fields",
+    "resourceConfig": {
+      "name": "screen_tab_fields",
       "interval": "PT1H"
     },
     "documentSchema": {

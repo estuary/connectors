@@ -23,6 +23,11 @@ from .models import (
     Permissions,
     SystemAvatars,
     Projects,
+    FilterSharing,
+    IssueCustomFieldContexts,
+    IssueCustomFieldOptions,
+    ScreenTabFields,
+    ProjectChildStream,
     FULL_REFRESH_STREAMS,
 )
 from .api import (
@@ -36,6 +41,11 @@ from .api import (
     snapshot_labels,
     snapshot_system_avatars,
     snapshot_permissions,
+    snapshot_filter_sharing,
+    snapshot_issue_custom_field_contexts,
+    snapshot_issue_custom_field_options,
+    snapshot_project_child_resources,
+    snapshot_screen_tab_fields,
     url_base,
     dt_to_str,
     ISSUE_JQL_SEARCH_LAG,
@@ -146,6 +156,37 @@ def _get_partial_snapshot_fn(
             snapshot_system_avatars,
             http,
             config.domain,
+        )
+    elif issubclass(stream, FilterSharing):
+        snapshot_fn = functools.partial(
+            snapshot_filter_sharing,
+            http,
+            config.domain,
+        )
+    elif issubclass(stream, IssueCustomFieldContexts):
+        snapshot_fn = functools.partial(
+            snapshot_issue_custom_field_contexts,
+            http,
+            config.domain,
+        )
+    elif issubclass(stream, IssueCustomFieldOptions):
+        snapshot_fn = functools.partial(
+            snapshot_issue_custom_field_options,
+            http,
+            config.domain,
+        )
+    elif issubclass(stream, ScreenTabFields):
+        snapshot_fn = functools.partial(
+            snapshot_screen_tab_fields,
+            http,
+            config.domain
+        )
+    elif issubclass(stream, ProjectChildStream):
+        snapshot_fn = functools.partial(
+            snapshot_project_child_resources,
+            http,
+            config.domain,
+            stream,
         )
     else:
         raise RuntimeError(f"Unknown full refresh stream type {stream.__name__} for stream {stream.name}")

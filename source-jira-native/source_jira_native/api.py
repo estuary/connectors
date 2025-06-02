@@ -1,10 +1,10 @@
 from datetime import datetime, timedelta
 from logging import Logger
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 from zoneinfo import ZoneInfo
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import TypeAdapter
 
@@ -17,7 +17,17 @@ from .models import (
     MyselfResponse,
     LabelsResponse,
     PermissionsResponse,
+    ProjectAvatarsResponse,
+    ScreenTabs,
     SystemAvatarsResponse,
+    Filters,
+    IssueFields,
+    Projects,
+    ProjectChildStream,
+    ProjectAvatars,
+    ProjectComponents,
+    ProjectEmails,
+    ProjectVersions,
 )
 
 # Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
@@ -29,6 +39,9 @@ from .models import (
 # issues updated in the most recent 5 minutes.
 ISSUE_JQL_SEARCH_LAG = timedelta(minutes=5)
 MIN_CHECKPOINT_INTERVAL = 200
+
+MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
+CUSTOM_FIELD_NOT_FOUND = r"The custom field was not found."
 
 def dt_to_str(dt: datetime) -> str:
     return dt.isoformat()
@@ -246,6 +259,196 @@ async def snapshot_permissions(
 
     for permission in response.permissions.values():
         yield FullRefreshResource.model_validate(permission)
+
+
+async def snapshot_filter_sharing(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    filter_ids: list[str] = []
+    async for filter in snapshot_paginated_resources(http, domain, Filters.path, Filters.extra_params, log):
+        if filter_id := filter.model_dump().get("id", None):
+            assert isinstance(filter_id, str)
+            filter_ids.append(filter_id)
+
+    for id in filter_ids:
+        path = f"{Filters.path}/{id}/permission"
+        try:
+            async for doc in snapshot_non_paginated_arrayed_resources(http, domain, path, None, log):
+                record = doc.model_dump()
+                record["filterId"] = id
+                yield FullRefreshResource.model_validate(record)
+        except HTTPError as err:
+            # If we request filter sharing permissions we don't have access to, Jira will return a 404 page.
+            # TODO(bair): is there a way we can determine which filter sharing permissions we have access to before making the request?
+            if err.code == 404 and MISSING_RESOURCE_TITLE in err.message:
+                continue
+            else:
+                raise
+
+
+async def snapshot_issue_custom_field_contexts(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    issue_field_ids: list[str] = []
+    async for issue_field in snapshot_non_paginated_arrayed_resources(http, domain, IssueFields.path, IssueFields.extra_params, log):
+        record = issue_field.model_dump()
+        is_custom_field: bool | None = record.get("custom", None)
+        issue_field_id: str | None = record.get("id", None)
+        if is_custom_field and issue_field_id:
+            assert isinstance(issue_field_id, str)
+            issue_field_ids.append(issue_field_id)
+
+    for id in issue_field_ids:
+        path = f"{IssueFields.path}/{id}/context"
+        try:
+            async for doc in snapshot_paginated_resources(http, domain, path, None, log):
+                record = doc.model_dump()
+                record["issueFieldId"] = id
+                yield FullRefreshResource.model_validate(record)
+        except HTTPError as err:
+            # Requesting custom fields for "classic" style projects returns a 404.
+            # https://community.developer.atlassian.com/t/get-custom-field-contexts-not-found-returned/48408
+            # There's not an efficient way to figure out if a field is for a "classic" project.
+            if err.code == 404 and CUSTOM_FIELD_NOT_FOUND in err.message:
+                continue
+            else:
+                raise
+
+
+async def snapshot_issue_custom_field_options(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    # In each tuple, the first element is the field id and the second element is the context id.
+    field_and_context_ids: list[tuple[str, str]] = []
+    async for context in snapshot_issue_custom_field_contexts(http, domain, log):
+        record = context.model_dump()
+        field_id = record.get("issueFieldId", None)
+        context_id = record.get("id", None)
+        if field_id and context_id:
+            assert (isinstance(field_id, str) and isinstance(context_id, str))
+            field_and_context_ids.append((field_id, context_id))
+
+    for field_id, context_id in field_and_context_ids:
+        path = f"{IssueFields.path}/{field_id}/context/{context_id}/option"
+        async for doc in snapshot_paginated_resources(http, domain, path, None, log):
+            record = doc.model_dump()
+            record["issueFieldId"] = field_id
+            record["fieldContextId"] = context_id
+            yield FullRefreshResource.model_validate(record)
+
+
+async def snapshot_screen_tab_fields(
+    http: HTTPSession,
+    domain: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    # In each tuple, the first element is the screen id and the second element is the tab id.
+    screen_and_tab_ids: list[tuple[int, int]] = []
+    async for tab in snapshot_paginated_resources(http, domain, ScreenTabs.path, ScreenTabs.extra_params, log):
+        record = tab.model_dump()
+        screen_id = record.get("screenId", None)
+        tab_id = record.get("tabId", None)
+        if screen_id is not None and tab_id is not None:
+            assert (isinstance(screen_id, int) and isinstance(tab_id, int))
+            screen_and_tab_ids.append((screen_id, tab_id))
+
+    for screen_id, tab_id in screen_and_tab_ids:
+        path = f"screens/{screen_id}/tabs/{tab_id}/fields"
+        async for doc in snapshot_non_paginated_arrayed_resources(http, domain, path, None, log):
+            record = doc.model_dump()
+            record["screenId"] = screen_id
+            record["tabId"] = tab_id
+            yield FullRefreshResource.model_validate(record)
+
+
+async def _fetch_project_avatars(
+    http: HTTPSession,
+    domain: str,
+    project_id: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(domain)}/project/{project_id}/avatars"
+
+    response = ProjectAvatarsResponse.model_validate_json(
+        await http.request(log, url)
+    )
+
+    for avatar in response.system:
+        yield avatar
+
+    for avatar in response.custom:
+        yield avatar
+
+
+async def _fetch_project_email(
+    http: HTTPSession,
+    domain: str,
+    project_id: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(domain)}/project/{project_id}/email"
+
+    yield FullRefreshResource.model_validate_json(
+        await http.request(log, url)
+    )
+
+
+async def _fetch_project_child_resources(
+    http: HTTPSession,
+    domain: str,
+    project_id: str,
+    stream: type[ProjectChildStream],
+    log: Logger
+) -> AsyncGenerator[FullRefreshResource, None]:
+    if issubclass(stream, ProjectAvatars):
+        gen = _fetch_project_avatars(http, domain, project_id, log)
+    elif (issubclass(stream, ProjectComponents) or issubclass(stream, ProjectVersions)):
+        path = f"project/{project_id}/{stream.path}"
+        gen = snapshot_paginated_resources(http, domain, path, None, log)
+    elif issubclass(stream, ProjectEmails):
+        gen = _fetch_project_email(http, domain, project_id, log)
+    else:
+        raise RuntimeError(f"Unknown project child stream {stream.name}.")
+
+    async for doc in gen:
+        if stream.add_parent_id_to_documents:
+            record = doc.model_dump()
+            record["projectId"] = project_id
+            doc = FullRefreshResource.model_validate(record)
+
+        yield doc
+
+
+async def snapshot_project_child_resources(
+    http: HTTPSession,
+    domain: str,
+    stream: type[ProjectChildStream],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    # Trying to fetch child resources of an archived or deleted project fails, so we only use ids
+    # of live projects when snapshotting project child resources.
+    extra_params = {
+        "status": "live",
+    }
+
+    # In each tuple, the first element is the project id and the second element is the project key.
+    project_ids: list[str] = []
+    async for project in snapshot_paginated_resources(http, domain, Projects.path, extra_params, log):
+        record = project.model_dump()
+        id = record.get("id", None)
+        if id:
+            assert (isinstance(id, str))
+            project_ids.append(id)
+
+    for id in project_ids:
+        async for doc in _fetch_project_child_resources(http, domain, id, stream, log):
+            yield doc
 
 
 def _is_within_dst_fallback_window(

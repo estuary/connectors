@@ -305,6 +305,58 @@ class LabelsResponse(PaginatedResponse):
     values: list[str]
 
 
+# Child streams
+class FilterSharing(FullRefreshStream):
+    name: ClassVar[str] = "filter_sharing"
+    path: ClassVar[str] = "permission"
+
+
+class IssueCustomFieldContexts(FullRefreshStream):
+    name: ClassVar[str] = "issue_custom_field_contexts"
+    path: ClassVar[str] = "context"
+
+
+class IssueCustomFieldOptions(FullRefreshStream):
+    name: ClassVar[str] = "issue_custom_field_options"
+    path: ClassVar[str] = "option"
+
+
+class ScreenTabFields(FullRefreshStream):
+    name: ClassVar[str] = "screen_tab_fields"
+    path: ClassVar[str] = "fields"
+
+
+class ProjectChildStream(FullRefreshStream):
+    add_parent_id_to_documents: ClassVar[bool] = True
+
+
+class ProjectAvatars(ProjectChildStream):
+    name: ClassVar[str] = "project_avatars"
+    path: ClassVar[str] = "avatars"
+
+
+class ProjectAvatarsResponse(BaseModel):
+    custom: list[FullRefreshResource]
+    system: list[FullRefreshResource]
+
+
+class ProjectComponents(ProjectChildStream):
+    name: ClassVar[str] = "project_components"
+    path: ClassVar[str] = "component"
+    add_parent_id_to_documents: ClassVar[bool] = False
+
+
+class ProjectEmails(ProjectChildStream):
+    name: ClassVar[str] = "project_emails"
+    path: ClassVar[str] = "email"
+
+
+class ProjectVersions(ProjectChildStream):
+    name: ClassVar[str] = "project_versions"
+    path: ClassVar[str] = "version"
+    add_parent_id_to_documents: ClassVar[bool] = False
+
+
 FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ApplicationRoles,
     Dashboards,
@@ -334,4 +386,12 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     WorkflowSchemes,
     WorkflowStatusCategories,
     WorkflowStatuses,
+    FilterSharing,
+    IssueCustomFieldContexts,
+    IssueCustomFieldOptions,
+    ScreenTabFields,
+    ProjectAvatars,
+    ProjectComponents,
+    ProjectEmails,
+    ProjectVersions,
 ]
