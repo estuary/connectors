@@ -49,11 +49,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		if err != nil {
 			return false, nil, err
 		}
-		logEntry.WithFields(logrus.Fields{
-			"relPages":  stats.RelPages,
-			"relTuples": stats.RelTuples,
-			"maxPageID": stats.MaxPageID,
-		}).Debug("queried table statistics for keyless backfill")
 		tableMaximumPageID = stats.MaxPageID
 
 		if resumeAfter == nil {
@@ -65,15 +60,19 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			return false, nil, fmt.Errorf("internal error: invalid resume CTID value %q for %q", resumeAfter, streamID)
 		}
 
-		// This is a really stupid heuristic, but it's one that's probably good enough that we
-		// will never need to change it. We just assume that each page holds 100 rows (average
-		// row size of 82 bytes), which is an overestimate for most real tables. But that just
-		// means that a table with especially large rows will get fewer rows per chunk, which
-		// is entirely fine and works out to reasonable chunk sizes for any plausible table.
+		// This is a fairly simple heuristic, but it should work well enough in practice. We
+		// assume that each page holds at most 100 rows (average row size of 82 bytes). This
+		// is an overestimate for most real tables, but that just means we usually get fewer
+		// than <chunkSize> rows per query, which is fine and the numbers are still reasonable
+		// for any plausible table.
 		//
-		// Also it's nice that we're just dividing by 100 because that means the default 50k
-		// chunk size works out to 500 pages, and it's obvious how to adjust that if need be.
-		var pagesPerChunk = (db.config.Advanced.BackfillChunkSize + 99) / 100 // +99 so we always round up to the next page
+		// Since the CTID / Page ID spaces are independent for each partition of a partitioned
+		// table, we also divide the pages-per-query count by the number of partitions, again
+		// so that we get approximately <chunkSize> rows per query regardless of partitioning.
+		//
+		// Then we just add 1 so that we always request at least one full page no matter what.
+		var pagesPerChunk = (db.config.Advanced.BackfillChunkSize / (100 * stats.PartitionCount)) + 1
+
 		untilCTID = afterCTID
 		untilCTID.BlockNumber += uint32(pagesPerChunk)
 		untilCTID.OffsetNumber = 0
@@ -478,14 +477,26 @@ func compareXID32(a, b uint32) int {
 }
 
 type postgresTableStatistics struct {
-	RelPages  int64 // Approximate number of pages in the table
-	RelTuples int64 // Approximate number of live tuples in the table
-	MaxPageID int64 // Conservative upper bound for the maximum page ID
+	RelPages       int64 // Approximate number of pages in the table
+	RelTuples      int64 // Approximate number of live tuples in the table
+	MaxPageID      int64 // Conservative upper bound for the maximum page ID
+	PartitionCount int   // Number of partitions for the table, including the parent table itself
 }
 
 const queryTableStatistics = `
 SELECT c.relpages, c.reltuples,
-  CEIL(1.1 * (pg_relation_size(c.oid) / current_setting('block_size')::int)) AS max_page_id
+  -- Maximum page ID across all partitions and the parent table. Each partition is a
+  -- separate table with its own page numbering. We multiply by a 1.05 fudge factor just
+  -- to make extra sure the result will be greater than any possible live row's page ID.
+  CEIL(1.05*GREATEST(
+    (pg_relation_size(c.oid) / current_setting('block_size')::int),
+    COALESCE((
+      SELECT MAX(pg_relation_size(inhrelid) / current_setting('block_size')::int)
+      FROM pg_inherits WHERE inhparent = c.oid
+    ), 0)
+  )) AS max_page_id,
+  -- Partition count, plus one for the parent table itself
+  (SELECT COUNT(inhrelid)::int + 1 FROM pg_inherits WHERE inhparent = c.oid) AS partition_count
 FROM pg_class c
 JOIN pg_namespace n ON n.oid = c.relnamespace
 WHERE n.nspname = $1 AND c.relname = $2;`
@@ -500,9 +511,16 @@ func (db *postgresDatabase) queryTableStatistics(ctx context.Context, schema, ta
 	}
 
 	var stats = &postgresTableStatistics{}
-	if err := db.conn.QueryRow(ctx, queryTableStatistics, schema, table).Scan(&stats.RelPages, &stats.RelTuples, &stats.MaxPageID); err != nil {
+	if err := db.conn.QueryRow(ctx, queryTableStatistics, schema, table).Scan(&stats.RelPages, &stats.RelTuples, &stats.MaxPageID, &stats.PartitionCount); err != nil {
 		return nil, fmt.Errorf("error querying table statistics for %q: %w", streamID, err)
 	}
+	logrus.WithFields(logrus.Fields{
+		"stream":     streamID,
+		"relPages":   stats.RelPages,
+		"relTuples":  stats.RelTuples,
+		"maxPageID":  stats.MaxPageID,
+		"partitions": stats.PartitionCount,
+	}).Info("queried table statistics")
 	db.tableStatistics[streamID] = stats
 	return stats, nil
 }
