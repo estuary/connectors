@@ -829,3 +829,24 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 		})
 	}
 }
+
+// TestPartitionedCTIDBackfill tests the handling of partitioned tables with CTID-based backfill.
+func TestPartitionedCTIDBackfill(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT) PARTITION BY RANGE (id)")
+
+	// Create partitions and insert a bunch of test rows spanning all three
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_1 PARTITION OF %[1]s FOR VALUES FROM (0) TO (1000000);`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2 PARTITION OF %[1]s FOR VALUES FROM (1000000) TO (2000000);`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_3 PARTITION OF %[1]s FOR VALUES FROM (2000000) TO (3000000);`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s SELECT count.n, 'data value ' || count.n FROM generate_series(1,2999999,1) count(n)`, tableName))
+
+	// Run a CTID backfill of the root table
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.ChecksumValidator{}
+	setShutdownAfterCaughtUp(t, true)
+	setResourceBackfillMode(t, cs.Bindings[0], sqlcapture.BackfillModeWithoutKey)
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
