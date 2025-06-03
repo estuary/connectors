@@ -174,11 +174,6 @@ class WorkflowStatuses(FullRefreshArrayedStream):
     path: ClassVar[str] = "status"
 
 
-class PermissionSchemes(FullRefreshArrayedStream):
-    name: ClassVar[str] = "permission_schemes"
-    path: ClassVar[str] = "permissionscheme"
-
-
 # Full refresh resources whose API response is an array containing a subset of results,
 # and are paginated with a `startAt` parameter but lack pagination metadata.
 class FullRefreshPaginatedArrayedStream(FullRefreshStream):
@@ -279,6 +274,12 @@ class IssueLinkTypes(FullRefreshNestedArrayStream):
     name: ClassVar[str] = "issue_link_types"
     path: ClassVar[str] = "issueLinkType"
     response_field: ClassVar[str] = "issueLinkTypes"
+
+
+class PermissionSchemes(FullRefreshNestedArrayStream):
+    name: ClassVar[str] = "permission_schemes"
+    path: ClassVar[str] = "permissionscheme"
+    response_field: ClassVar[str] = "permissionSchemes"
 
 
 # One of a kind full refresh streams whose request and/or response don't align
