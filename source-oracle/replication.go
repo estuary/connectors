@@ -167,7 +167,7 @@ type redoFile struct {
 	Bytes       int
 }
 
-var MaxReplicationLogFilesSize = 3 * 1024 * 1024 * 1024
+var MaxReplicationLogFilesSize = 2 * 1024 * 1024 * 1024
 
 func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SCN) (SCN, error) {
 	logrus.WithFields(logrus.Fields{
@@ -776,6 +776,8 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context, transacti
     SEG_OWNER NOT IN ('SYS', 'SYSTEM', 'AUDSYS', 'CTXSYS', 'DVSYS', 'DBSFWUSER', 'DBSNMP', 'QSMADMIN_INTERNAL', 'LBACSYS', 'MDSYS', 'OJVMSYS', 'OLAPSYS', 'ORDDATA', 'ORDSYS', 'OUTLN', 'WMSYS', 'XDB', 'RMAN$CATALOG', 'MTSSYS', 'OML$METADATA', 'ODI_REPO_USER', 'RQSYS', 'PYQSYS'))
     AND ((DATA_OBJ#=0 AND DATA_OBJD#=0) OR %s) %s`, opPredicate, strings.Join(conditions, " OR "), txPredicate)
 
+	logrus.Debug("generated logminer query")
+
 	return s.conn.PrepareContext(ctx, query)
 }
 
@@ -822,6 +824,11 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 			return nil, nil, fmt.Errorf("unexpected transaction with commit > 0, xid: %s, startSCN: %d, commits: %d, rollbacks: %d", xid, startSCN, commits, rollbacks)
 		}
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"pending":   len(pendingTXs),
+		"rollbacks": len(excludeXIDs),
+	}).Debug("transactions")
 
 	return pendingTXs, excludeXIDs, nil
 }
