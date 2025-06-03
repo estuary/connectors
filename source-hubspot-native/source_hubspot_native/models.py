@@ -27,11 +27,6 @@ scopes = [
     "crm.schemas.contacts.read",
     "crm.schemas.deals.read",
     "e-commerce",
-    "files",
-    "files.ui_hidden.read",
-    "forms",
-    "forms-uploaded-files",
-    "sales-email-read",
     "tickets",
 ]
 
