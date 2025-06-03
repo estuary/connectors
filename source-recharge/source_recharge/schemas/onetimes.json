@@ -17,8 +17,7 @@
       "type": ["null", "string"]
     },
     "next_charge_scheduled_at": {
-      "type": ["null", "string"],
-      "format": "date-time"
+      "type": ["null", "string"]
     },
     "price": {
       "type": ["null", "string"]
