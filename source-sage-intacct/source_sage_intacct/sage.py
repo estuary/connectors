@@ -193,6 +193,7 @@ class Sage:
     session_id: str
     user_id: str
     tz_dt: datetime
+    deletion_model: type[SageRecord] | None = None
 
     def __init__(self, log: Logger, http: HTTPSession, config: EndpointConfig):
         self.log = log
@@ -277,6 +278,33 @@ class Sage:
         async for rec in self._req_json(model, data):
             yield rec
 
+    async def fetch_deleted(
+        self, obj: str, since: AwareDatetime
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = self.get_deletion_model()
+        formatted_since = since.astimezone(model.tz_dt.tzinfo).strftime(
+            "%m/%d/%Y %H:%M:%S"
+        )
+        data = get_deletions_since_request(
+            self.config, self.session_id, obj, formatted_since
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
+    async def fetch_deleted_at(
+        self,
+        obj: str,
+        at: AwareDatetime,
+        after: str | None,
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = self.get_deletion_model()
+        formatted_at = at.astimezone(model.tz_dt.tzinfo).strftime("%m/%d/%Y %H:%M:%S")
+        data = get_deletions_at_request(
+            self.config, self.session_id, obj, formatted_at, after
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
     async def get_model(self, obj: str) -> type[SageRecord]:
         if obj in self.model_cache:
             expires = self.model_cache[obj][0]
@@ -286,6 +314,28 @@ class Sage:
         expires = datetime.now(tz=UTC) + timedelta(minutes=30)
         model = await self._build_model(obj)
         self.model_cache[obj] = (expires, model)
+        return model
+
+    def get_deletion_model(self) -> type[SageRecord]:
+        if self.deletion_model:
+            return self.deletion_model
+
+        field_defs: dict[str, Any] = {
+            "OBJECTTYPE": (str, None),
+            "ACCESSMODE": (str, None),
+            "OBJECTKEY": (str, None),
+            "ACCESSTIME": (str, None),
+        }
+        model = create_model(
+            "DELETIONS",
+            __base__=SageRecord,
+            **field_defs,
+        )
+        model.tz_dt = self.tz_dt
+        model.field_names = ["OBJECTTYPE", "ACCESSMODE", "OBJECTKEY", "ACCESSTIME"]
+        model.field_datatypes = ["TEXT", "TEXT", "TEXT", "TIMESTAMP"]
+        self.deletion_model = model
+
         return model
 
     async def _req_xml(
@@ -588,6 +638,108 @@ def get_all_records_request(
             <order>
                 <field>RECORDNO</field>
                 <ascending/>
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_deletions_since_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    since: str,  # ex: 12/08/202 10:46:26
+) -> str:
+    exec = f"""
+        <query>
+          <object>AUDITHISTORY</object>
+          <select>
+            <field>OBJECTKEY</field>
+            <field>ACCESSTIME</field>
+            <field>ID</field>
+          </select>
+          <filter>
+            <and>
+              <equalto>
+                <field>OBJECTTYPE</field>
+                <value>{object.lower()}</value>
+              </equalto>
+              <equalto>
+                <field>ACCESSMODE</field>
+                <value>D</value>
+              </equalto>
+              <greaterthan>
+                <field>ACCESSTIME</field>
+                <value>{since}</value>
+              </greaterthan>
+            </and>
+          </filter>
+          <orderby>
+            <order>
+              <field>ACCESSTIME</field>
+              <ascending />
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_deletions_at_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    at: str,  # ex: 12/08/202 10:46:26
+    after: str | None,
+) -> str:
+    def filter() -> str:
+        if after is None:
+            return ""
+        return f"""
+              <greaterthan>
+                <field>ID</field>
+                <value>{after}</value>
+              </greaterthan>"""
+
+    exec = f"""
+        <query>
+          <object>AUDITHISTORY</object>
+          <select>
+            <field>OBJECTKEY</field>
+            <field>ACCESSTIME</field>
+            <field>ID</field>
+          </select>
+          <filter>
+            <and>
+              <equalto>
+                <field>OBJECTTYPE</field>
+                <value>{object.lower()}</value>
+              </equalto>
+              <equalto>
+                <field>ACCESSMODE</field>
+                <value>D</value>
+              </equalto>
+              <equalto>
+                <field>ACCESSTIME</field>
+                <value>{at}</value>
+              </equalto>{filter()}
+            </and>
+          </filter>
+          <orderby>
+            <order>
+              <field>ID</field>
+              <ascending />
             </order>
           </orderby>
           <options>
