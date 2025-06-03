@@ -61,7 +61,7 @@ async def validate_projects(
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     valid_project_ids_and_keys: set[str] = set()
 
-    async for project in snapshot_paginated_resources(http, config.domain, Projects.path, Projects.extra_params, log):
+    async for project in snapshot_paginated_resources(http, config.domain, Projects.path, Projects.extra_params, Projects.response_model, log):
         d = project.model_dump()
         id = d.get("id", None)
         key = d.get("key", None)
@@ -135,7 +135,8 @@ def _get_partial_snapshot_fn(
             http,
             config.domain,
             stream.path,
-            stream.extra_params
+            stream.extra_params,
+            stream.response_model,
         )
     elif issubclass(stream, Labels):
         snapshot_fn = functools.partial(
