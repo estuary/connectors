@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"os"
@@ -11,7 +14,9 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
+	"github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
@@ -214,6 +219,36 @@ func argsTuple(argc int) string {
 		tuple += fmt.Sprintf(",$%d", idx+1)
 	}
 	return tuple + ")"
+}
+
+func uniqueTableID(t testing.TB, extra ...string) string {
+	t.Helper()
+	var h = sha256.New()
+	h.Write([]byte(t.Name()))
+	for _, x := range extra {
+		h.Write([]byte{':'})
+		h.Write([]byte(x))
+	}
+	var x = binary.BigEndian.Uint32(h.Sum(nil)[0:4])
+	return fmt.Sprintf("%d", (x%900000)+100000)
+}
+
+func setShutdownAfterCaughtUp(t testing.TB, setting bool) {
+	t.Helper()
+	var prevSetting = sqlcapture.TestShutdownAfterCaughtUp
+	sqlcapture.TestShutdownAfterCaughtUp = setting
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = prevSetting })
+}
+
+func setResourceBackfillMode(t *testing.T, binding *flow.CaptureSpec_Binding, mode sqlcapture.BackfillMode) {
+	t.Helper()
+	require.NotNil(t, binding)
+	var res sqlcapture.Resource
+	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
+	res.Mode = mode
+	var bs, err = json.Marshal(&res)
+	require.NoError(t, err)
+	binding.ResourceConfigJson = bs
 }
 
 // TestGeneric runs the generic sqlcapture test suite.

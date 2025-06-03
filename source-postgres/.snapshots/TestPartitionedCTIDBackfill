@@ -1,0 +1,10 @@
+# ================================
+# Collection "acmeCo/test/test/partitionedctidbackfill_254933": 471 Documents
+# ================================
+Checksum: faef88466476b2c8474821a1e3c8cecc9fa8efbfd4ec67a89db3df49a993ab6e
+Total Bytes: 83308
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2Fpartitionedctidbackfill_254933":{"backfilled":471,"mode":"Active"}},"cursor":"0/1111111"}
+
