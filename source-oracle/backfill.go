@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"slices"
 	"strconv"
@@ -378,6 +380,18 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 	return out
 }
 
+func base64cmp(a, b string) int {
+	decodedA, err := base64.StdEncoding.DecodeString(a)
+	if err != nil {
+		panic(err)
+	}
+	decodedB, err := base64.StdEncoding.DecodeString(b)
+	if err != nil {
+		panic(err)
+	}
+	return bytes.Compare(decodedA, decodedB)
+}
+
 // Keyless scan uses ROWID to order the rows. Note that this only ensures eventual consistency
 // since ROWIDs are not always increasing (new rows can use smaller ROWIDs if space is available in an earlier block)
 // but since we will capture changes since the start of the backfill using SCN tracking, we will eventually be consistent
@@ -393,7 +407,7 @@ func (db *oracleDatabase) keylessScanQuery(info *sqlcapture.DiscoveryInfo, schem
 	// the same ranges. In this case we re-backfill the last range
 	if idx == -1 {
 		var nextIdx = slices.IndexFunc(rowidRanges, func(rowid string) bool {
-			return afterRowID == rowid || base64LessThan(afterRowID, rowid)
+			return afterRowID == rowid || base64cmp(afterRowID, rowid) < 0
 		})
 
 		if nextIdx == -1 {

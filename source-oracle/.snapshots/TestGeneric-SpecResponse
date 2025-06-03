@@ -57,12 +57,6 @@
             "description": "The number of rows which should be fetched from the database in a single incremental query.",
             "default": 10000
           },
-          "incremental_scn_range": {
-            "type": "integer",
-            "title": "Incremental SCN Range",
-            "description": "The SCN range captured at every iteration.",
-            "default": 50000
-          },
           "discover_schemas": {
             "items": {
               "type": "string"
