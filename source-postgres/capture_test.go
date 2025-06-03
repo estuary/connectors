@@ -845,6 +845,7 @@ func TestPartitionedCTIDBackfill(t *testing.T) {
 	// Run a CTID backfill of the root table
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 	cs.Validator = &st.ChecksumValidator{}
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 50000 // Default prod chunk size since this table has millions of rows
 	setShutdownAfterCaughtUp(t, true)
 	setResourceBackfillMode(t, cs.Bindings[0], sqlcapture.BackfillModeWithoutKey)
 	cs.Capture(ctx, t, nil)
