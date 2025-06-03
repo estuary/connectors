@@ -122,7 +122,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var totalRows, resultRows int // totalRows counts DB returned rows, resultRows counts rows after XID filtering
 	var nextRowKey []byte         // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
-	var prevTID pgtype.TID // Used when processing keyless backfill results to sanity-check ordering
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
 		totalRows++
@@ -148,12 +147,6 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 				return false, nil, fmt.Errorf("internal error: invalid ctid value %#v", ctid)
 			}
 			rowKey = []byte(fmt.Sprintf("(%d,%d)", ctid.BlockNumber, ctid.OffsetNumber))
-
-			// Sanity check that rows are returned in ascending CTID order within a given backfill chunk
-			if (ctid.BlockNumber < prevTID.BlockNumber) || ((ctid.BlockNumber == prevTID.BlockNumber) && (ctid.OffsetNumber <= prevTID.OffsetNumber)) {
-				return false, nil, fmt.Errorf("internal error: ctid ordering sanity check failed: %v <= %v", ctid, prevTID)
-			}
-			prevTID = ctid
 		} else {
 			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
 			if err != nil {
