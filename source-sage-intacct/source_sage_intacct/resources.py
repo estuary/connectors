@@ -9,6 +9,7 @@ from estuary_cdk.http import HTTPMixin
 
 from .api import (
     fetch_changes,
+    fetch_deletions,
     fetch_page,
     snapshot,
 )
@@ -70,11 +71,33 @@ async def incremental_resource(
             state,
             task,
             fetch_changes={
+                # There are 4 separate subtasks for an incremental resource: 2
+                # for capturing created & updated documents, and 2 for capturing
+                # deletions. It is known that the Sage Intacct API is eventually
+                # consistent, so it is likely that the "realtime" subtasks will
+                # occasionally miss change events, and the "lookback" subtasks
+                # will follow behind to true-up the collection.
+                #
+                # Capturing deletions is done in a separate subtask than creates
+                # & updates, since it requires using a different API for polling
+                # the audit history object. Note that the "horizon" for the
+                # deletions lookback subtask is 2.5 hours instead of 2 hours -
+                # this is to mitigate races where a record is created or updated
+                # and then immediately deleted, which could otherwise cause the
+                # deletion document to get captured before the create/update
+                # document. Delaying the deletions lookback by an additional
+                # amount of time should prevent such an out-of-order scenario.
                 "realtime": functools.partial(
                     fetch_changes, obj, sage, None, PAGE_SIZE
                 ),
                 "lookback": functools.partial(
                     fetch_changes, obj, sage, timedelta(hours=2), PAGE_SIZE
+                ),
+                "realtime_deletions": functools.partial(
+                    fetch_deletions, obj, sage, None, PAGE_SIZE
+                ),
+                "lookback_deletions": functools.partial(
+                    fetch_deletions, obj, sage, timedelta(hours=2.5), PAGE_SIZE
                 ),
             },
             fetch_page=functools.partial(fetch_page, obj, sage, PAGE_SIZE),
@@ -89,6 +112,8 @@ async def incremental_resource(
             inc={
                 "realtime": ResourceState.Incremental(cursor=started_at),
                 "lookback": ResourceState.Incremental(cursor=started_at),
+                "realtime_deletions": ResourceState.Incremental(cursor=started_at),
+                "lookback_deletions": ResourceState.Incremental(cursor=started_at),
             },
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),

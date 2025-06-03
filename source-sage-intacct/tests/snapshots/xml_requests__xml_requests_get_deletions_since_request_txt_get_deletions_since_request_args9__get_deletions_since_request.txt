@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<request>
+  <control>
+    <senderid>sender_id</senderid>
+    <password>sender_password</password>
+    <controlid>CONTROLID_PLACEHOLDER</controlid>
+    <uniqueid>false</uniqueid>
+    <dtdversion>3.0</dtdversion>
+    <includewhitespace>false</includewhitespace>
+  </control>
+  <operation>
+    <authentication>
+      <sessionid>some_session_id</sessionid>
+    </authentication>
+    <content>
+      <function controlid="UUID_PLACEHOLDER">
+        <query>
+          <object>AUDITHISTORY</object>
+          <select>
+            <field>OBJECTKEY</field>
+            <field>ACCESSTIME</field>
+            <field>ID</field>
+          </select>
+          <filter>
+            <and>
+              <equalto>
+                <field>OBJECTTYPE</field>
+                <value>object_name</value>
+              </equalto>
+              <equalto>
+                <field>ACCESSMODE</field>
+                <value>D</value>
+              </equalto>
+              <greaterthan>
+                <field>ACCESSTIME</field>
+                <value>2023-01-02 03:04:56</value>
+              </greaterthan>
+            </and>
+          </filter>
+          <orderby>
+            <order>
+              <field>ACCESSTIME</field>
+              <ascending />
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>2000</pagesize>
+        </query>
+      </function>
+    </content>
+  </operation>
+</request>
