@@ -336,16 +336,8 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 	var rowid string
 	if after != nil {
 		rowid = after["ROWID"].(string)
-		if err := translateRecordFields(discovery, after); err != nil {
-			return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
-		}
-	}
-
-	if before != nil {
+	} else if before != nil {
 		rowid = before["ROWID"].(string)
-		if err := translateRecordFields(discovery, before); err != nil {
-			return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
-		}
 	}
 
 	keyColumns, ok := s.keyColumns(streamID)

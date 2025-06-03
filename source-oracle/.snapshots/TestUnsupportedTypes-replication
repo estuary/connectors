@@ -1,7 +1,7 @@
 # ================================
 # Collection "acmeCo/test/c__flow_test_logminer/t18110541": 1 Documents
 # ================================
-{"NVCHAR2":"nvarchar2 value with unicode characters ❤️ \\ 🔥️')","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111},"before":{"NVCHAR2":"nvarchar2 value with unicode characters ❤️ \\ 🔥️')"}}}
+{"ANYCOL":null,"NVCHAR2":"nvarchar2 value with unicode characters ❤️ \\ 🔥️')","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T18110541","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111},"before":{"NVCHAR2":"nvarchar2 value with unicode characters ❤️ \\ 🔥️')"}}}
 # ================================
 # Final State Checkpoint
 # ================================
