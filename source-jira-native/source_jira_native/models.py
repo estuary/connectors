@@ -144,6 +144,11 @@ class IssueNavigatorSettings(FullRefreshArrayedStream):
     path: ClassVar[str] = "settings/columns"
 
 
+class IssuePriorities(FullRefreshArrayedStream):
+    name: ClassVar[str] = "issue_priorities"
+    path: ClassVar[str] = "priority"
+
+
 class IssueTypes(FullRefreshArrayedStream):
     name: ClassVar[str] = "issue_types"
     path: ClassVar[str] = "issuetype"
@@ -248,6 +253,12 @@ class Groups(FullRefreshPaginatedStream):
 class WorkflowSchemes(FullRefreshPaginatedStream):
     name: ClassVar[str] = "workflow_schemes"
     path: ClassVar[str] = "workflowscheme"
+
+
+class Workflows(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "workflows"
+    path: ClassVar[str] = "workflows/search"
+    extra_params: ClassVar[dict[str, str]] = {"orderBy": "created"}
 
 
 class Projects(FullRefreshPaginatedStream):
@@ -392,6 +403,8 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     WorkflowSchemes,
     WorkflowStatusCategories,
     WorkflowStatuses,
+    Workflows,
+    IssuePriorities,
     FilterSharing,
     IssueCustomFieldContexts,
     IssueCustomFieldOptions,
