@@ -15,7 +15,8 @@ Binding 0:
           "$anchor": "C##FLOW_TEST_LOGMINERT12319541",
           "properties": {
             "NUM18": {
-              "type": "integer",
+              "type": "string",
+              "format": "integer",
               "description": "(source type: non-nullable NUMBER)"
             }
           }

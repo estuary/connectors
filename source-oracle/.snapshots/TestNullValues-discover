@@ -73,9 +73,10 @@ Binding 0:
               ]
             },
             "NUM15": {
+              "format": "integer",
               "description": "(source type: NUMBER)",
               "type": [
-                "integer",
+                "string",
                 "null"
               ]
             },
@@ -89,13 +90,6 @@ Binding 0:
             },
             "NVCHAR2": {
               "description": "(source type: NVARCHAR2)",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "R": {
-              "description": "(source type: RAW)",
               "type": [
                 "string",
                 "null"

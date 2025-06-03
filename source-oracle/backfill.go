@@ -113,10 +113,6 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		}
 		nextRowKey = rowKey
 
-		if err := translateRecordFields(info, fields); err != nil {
-			return false, nil, fmt.Errorf("error backfilling table %q: %w", table, err)
-		}
-
 		var event = &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,

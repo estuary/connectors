@@ -4,9 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"reflect"
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/estuary/connectors/sqlcapture"
@@ -90,36 +88,6 @@ func (db *oracleDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, is
 	return jsonType, nil
 }
 
-func translateRecordField(column *sqlcapture.ColumnInfo, val interface{}) (interface{}, error) {
-	var dataType oracleColumnType
-	if column != nil {
-		dataType = column.DataType.(oracleColumnType)
-	} else {
-		return val, nil
-	}
-
-	switch v := val.(type) {
-	case nil:
-		return nil, nil
-	case string:
-		if dataType.JsonType == "integer" {
-			return strconv.Atoi(v)
-		} else if dataType.JsonType == "number" {
-			return strconv.ParseFloat(v, 64)
-		} else {
-			return val, nil
-		}
-	default:
-	}
-
-	var rv = reflect.ValueOf(val)
-	if rv.CanConvert(dataType.T) {
-		return rv.Convert(dataType.T).Interface(), nil
-	}
-
-	return val, nil
-}
-
 func (ct *oracleColumnType) toJSONSchemaType() *jsonschema.Schema {
 	var out = &jsonschema.Schema{
 		Format: ct.Format,
@@ -134,32 +102,6 @@ func (ct *oracleColumnType) toJSONSchemaType() *jsonschema.Schema {
 		out.Type = ct.JsonType
 	}
 	return out
-}
-
-func translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
-	if f == nil {
-		return nil
-	}
-	for id, val := range f {
-		var columnInfo *sqlcapture.ColumnInfo
-		if table != nil {
-			if info, ok := table.Columns[id]; ok {
-				columnInfo = &info
-			}
-		}
-
-		if columnInfo == nil {
-			delete(f, id)
-			continue
-		}
-
-		var translated, err = translateRecordField(columnInfo, val)
-		if err != nil {
-			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
-		}
-		f[id] = translated
-	}
-	return nil
 }
 
 const queryDiscoverTables = `
@@ -265,7 +207,6 @@ type oracleColumnType struct {
 	Length    int
 	Scale     int16
 	Precision int16
-	T         reflect.Type
 	Format    string
 	JsonType  string
 	Nullable  bool
@@ -317,6 +258,10 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 
 		sc.IsNullable = isNullableStr == "Y"
 
+		if keyOrdinalPosition.Valid {
+			sc.Index = int(keyOrdinalPosition.Int16)
+		}
+
 		var precision int16
 		if dataPrecision.Valid {
 			precision = dataPrecision.Int16
@@ -324,54 +269,28 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 			precision = defaultNumericPrecision
 		}
 
-		if keyOrdinalPosition.Valid {
-			sc.Index = int(keyOrdinalPosition.Int16)
-		}
-
-		var t reflect.Type
 		var format string
 		var jsonType string
 		var isInteger = dataScale.Int16 == 0
 		if dataType == "NUMBER" && !dataScale.Valid && !dataPrecision.Valid {
 			// when scale and precision are both null, both have the maximum value possible
 			// equivalent to NUMBER(38, 127)
-			t = reflect.TypeFor[string]()
 			format = "number"
 			jsonType = "string"
 		} else if dataType == "NUMBER" && isInteger {
-			// data_precision null defaults to precision 38
-			if precision > 18 || !dataPrecision.Valid {
-				t = reflect.TypeFor[string]()
-				format = "integer"
-				jsonType = "string"
-			} else {
-				t = reflect.TypeFor[int64]()
-				jsonType = "integer"
-			}
+			format = "integer"
+			jsonType = "string"
 		} else if slices.Contains([]string{"FLOAT", "NUMBER"}, dataType) {
-			if precision > 18 || !dataPrecision.Valid {
-				t = reflect.TypeFor[string]()
-				format = "number"
-				jsonType = "string"
-			} else {
-				t = reflect.TypeFor[float64]()
-				jsonType = "number"
-			}
+			format = "number"
+			jsonType = "string"
 		} else if slices.Contains([]string{"CHAR", "VARCHAR", "VARCHAR2", "NCHAR", "NVARCHAR2"}, dataType) {
-			t = reflect.TypeFor[string]()
 			jsonType = "string"
 		} else if strings.Contains(dataType, "WITH TIME ZONE") {
-			t = reflect.TypeFor[string]()
 			jsonType = "string"
 			format = "date-time"
 		} else if dataType == "DATE" || strings.Contains(dataType, "TIMESTAMP") {
-			t = reflect.TypeFor[string]()
 			jsonType = "string"
 		} else if strings.Contains(dataType, "INTERVAL") {
-			t = reflect.TypeFor[string]()
-			jsonType = "string"
-		} else if slices.Contains([]string{"CLOB", "RAW"}, dataType) {
-			t = reflect.TypeFor[[]byte]()
 			jsonType = "string"
 		} else {
 			logrus.WithFields(logrus.Fields{
@@ -386,9 +305,8 @@ func getColumns(ctx context.Context, conn *sql.DB, tables []*sqlcapture.Discover
 		sc.DataType = oracleColumnType{
 			Original:  dataType,
 			Scale:     dataScale.Int16,
-			Precision: precision,
 			Length:    dataLength,
-			T:         t,
+			Precision: precision,
 			Format:    format,
 			JsonType:  jsonType,
 			Nullable:  sc.IsNullable,
