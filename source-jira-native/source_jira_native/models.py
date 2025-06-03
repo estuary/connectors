@@ -103,7 +103,7 @@ class PaginatedResponse(BaseModel, extra="allow"):
     maxResults: int
     startAt: int
     total: int
-    isLast: bool
+    isLast: bool | None = None
     values: list[FullRefreshResource]
 
 
@@ -192,12 +192,17 @@ class Users(FullRefreshPaginatedArrayedStream):
 
 # Full refresh resources whose API response contains pagination information.
 class FullRefreshPaginatedStream(FullRefreshStream):
-    pass
+    response_model: ClassVar[type[PaginatedResponse]] = PaginatedResponse
+
+
+class DashboardsResponse(PaginatedResponse):
+    values: list[FullRefreshResource] = Field(alias="dashboards")
 
 
 class Dashboards(FullRefreshPaginatedStream):
     name: ClassVar[str] = "dashboards"
     path: ClassVar[str] = "dashboard"
+    response_model: ClassVar[type[PaginatedResponse]] = DashboardsResponse
 
 
 class IssueFieldConfigurations(FullRefreshPaginatedStream):

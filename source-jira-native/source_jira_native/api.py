@@ -159,6 +159,7 @@ async def snapshot_paginated_resources(
     domain: str,
     path: str,
     extra_params: dict[str, str] | None,
+    response_model: type[PaginatedResponse],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     url = f"{url_base(domain)}/{path}"
@@ -175,15 +176,18 @@ async def snapshot_paginated_resources(
         params.update(extra_params)
 
     while True:
-        response = PaginatedResponse.model_validate_json(
+        response = response_model.model_validate_json(
             await http.request(log, url, params=params)
         )
+
+        if not response.values:
+            break
 
         for resource in response.values:
             yield resource
             count += 1
 
-        if response.isLast:
+        if response.isLast or count >= response.total:
             break
 
         params["startAt"] = count
@@ -267,7 +271,7 @@ async def snapshot_filter_sharing(
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     filter_ids: list[str] = []
-    async for filter in snapshot_paginated_resources(http, domain, Filters.path, Filters.extra_params, log):
+    async for filter in snapshot_paginated_resources(http, domain, Filters.path, Filters.extra_params, Filters.response_model, log):
         if filter_id := filter.model_dump().get("id", None):
             assert isinstance(filter_id, str)
             filter_ids.append(filter_id)
@@ -305,7 +309,7 @@ async def snapshot_issue_custom_field_contexts(
     for id in issue_field_ids:
         path = f"{IssueFields.path}/{id}/context"
         try:
-            async for doc in snapshot_paginated_resources(http, domain, path, None, log):
+            async for doc in snapshot_paginated_resources(http, domain, path, None, PaginatedResponse, log):
                 record = doc.model_dump()
                 record["issueFieldId"] = id
                 yield FullRefreshResource.model_validate(record)
@@ -336,7 +340,7 @@ async def snapshot_issue_custom_field_options(
 
     for field_id, context_id in field_and_context_ids:
         path = f"{IssueFields.path}/{field_id}/context/{context_id}/option"
-        async for doc in snapshot_paginated_resources(http, domain, path, None, log):
+        async for doc in snapshot_paginated_resources(http, domain, path, None, PaginatedResponse, log):
             record = doc.model_dump()
             record["issueFieldId"] = field_id
             record["fieldContextId"] = context_id
@@ -350,7 +354,7 @@ async def snapshot_screen_tab_fields(
 ) -> AsyncGenerator[FullRefreshResource, None]:
     # In each tuple, the first element is the screen id and the second element is the tab id.
     screen_and_tab_ids: list[tuple[int, int]] = []
-    async for tab in snapshot_paginated_resources(http, domain, ScreenTabs.path, ScreenTabs.extra_params, log):
+    async for tab in snapshot_paginated_resources(http, domain, ScreenTabs.path, ScreenTabs.extra_params, PaginatedResponse, log):
         record = tab.model_dump()
         screen_id = record.get("screenId", None)
         tab_id = record.get("tabId", None)
@@ -410,7 +414,7 @@ async def _fetch_project_child_resources(
         gen = _fetch_project_avatars(http, domain, project_id, log)
     elif (issubclass(stream, ProjectComponents) or issubclass(stream, ProjectVersions)):
         path = f"project/{project_id}/{stream.path}"
-        gen = snapshot_paginated_resources(http, domain, path, None, log)
+        gen = snapshot_paginated_resources(http, domain, path, None, PaginatedResponse, log)
     elif issubclass(stream, ProjectEmails):
         gen = _fetch_project_email(http, domain, project_id, log)
     else:
@@ -439,7 +443,7 @@ async def snapshot_project_child_resources(
 
     # In each tuple, the first element is the project id and the second element is the project key.
     project_ids: list[str] = []
-    async for project in snapshot_paginated_resources(http, domain, Projects.path, extra_params, log):
+    async for project in snapshot_paginated_resources(http, domain, Projects.path, extra_params, Projects.response_model, log):
         record = project.model_dump()
         id = record.get("id", None)
         if id:
