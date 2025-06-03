@@ -17,6 +17,7 @@ from pydantic import (
     AwareDatetime,
     BaseModel,
     Field,
+    field_validator,
 )
 
 COMPANY_ID_FIELD = "COMPANY_ID"
@@ -170,3 +171,39 @@ class SnapshotResource(BaseDocument, extra="allow"):
 class IncrementalResource(BaseDocument, extra="allow"):
     RECORDNO: int
     WHENMODIFIED: AwareDatetime
+
+
+class DeletionRecord(BaseDocument, extra="forbid"):
+    RECORDNO: int = Field(alias="OBJECTKEY")
+    WHENMODIFIED: AwareDatetime = Field(alias="ACCESSTIME")
+    ID: str = Field(exclude=True)
+
+    meta_: "DeletionRecord.Meta" = Field(
+        default_factory=lambda: DeletionRecord.Meta(op="d")
+    )
+
+    @field_validator("RECORDNO", mode="before")
+    @classmethod
+    def parse_object_key(cls, value: str) -> int:
+        assert isinstance(value, str)
+
+        parts = value.split("--")
+        if len(parts) != 2:
+            raise ValueError(
+                f"OBJECTKEY must be in format 'RECORDNO--REC', got {value}"
+            )
+
+        if parts[1] != "REC":
+            raise ValueError(f"OBJECTKEY suffix must be 'REC', got {parts[1]}")
+
+        try:
+            record_no = int(parts[0])
+            if record_no <= 0:
+                raise ValueError(
+                    f"RECORDNO in OBJECTKEY must be positive, got {record_no}"
+                )
+            return record_no
+        except ValueError:
+            raise ValueError(
+                f"RECORDNO in OBJECTKEY must be an integer, got {parts[0]}"
+            )
