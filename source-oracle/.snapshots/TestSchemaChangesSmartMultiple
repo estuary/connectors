@@ -1,7 +1,6 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_logminer/t47287013": 9 Documents
+# Collection "acmeCo/test/c__flow_test_logminer/t47287013": 8 Documents
 # ================================
-{"FULLNAME":"No Such State","POPULATION":"10000","STATE":"BB","YEAR":"1920","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T47287013","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"FULLNAME":"No Such State","POPULATION":"10000","STATE":"BB","YEAR":"1920","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T47287013","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
 {"FULLNAME":"No Such State","POPULATION":"10000","STATE":"BB","YEAR":"1940","_meta":{"op":"u","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T47287013","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111},"before":{"FULLNAME":"No Such State","POPULATION":"10000","STATE":"BB","YEAR":"1920"}}}
 {"FULLNAME":"No Such State","POPULATION":"20000","STATE":"AA","YEAR":"1900","_meta":{"op":"c","source":{"schema":"C##FLOW_TEST_LOGMINER","snapshot":true,"table":"T47287013","row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
@@ -24,5 +23,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT47287013":{"backfilled":2,"key_columns":["YEAR","STATE"],"mode":"Active"},"C%23%23FLOW_TEST_LOGMINER%2FT94367083":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"}},"cursor":{"PendingTransactions":{},"SCN":111111111"}}
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT47287013":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"},"C%23%23FLOW_TEST_LOGMINER%2FT94367083":{"backfilled":1,"key_columns":["YEAR","STATE"],"mode":"Active"}},"cursor":{"PendingTransactions":{},"SCN":111111111"}}
 
