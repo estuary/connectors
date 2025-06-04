@@ -1,4 +1,5 @@
 from datetime import datetime, UTC, timedelta
+from enum import auto, StrEnum
 from typing import Any, AsyncGenerator, Callable, ClassVar, Literal, Optional
 
 from estuary_cdk.capture.common import (
@@ -136,7 +137,7 @@ class Issue(JiraResource):
 class PaginatedResponse(BaseModel, extra="allow"):
     maxResults: int
     startAt: int
-    total: int
+    total: int | None =  None
     isLast: bool | None = None
     values: list[APIRecord]
 
@@ -152,10 +153,22 @@ class MyselfResponse(BaseModel, extra="allow"):
     timeZone: str
 
 
+# The different Jira APIs.
+class JiraAPI(StrEnum):
+    # Platform API docs - https://developer.atlassian.com/cloud/jira/platform/rest/v3/intro/
+    PLATFORM = auto()
+    # Service Management API docs - https://developer.atlassian.com/cloud/jira/service-desk/rest/intro/
+    SERVICE_MANAGEMENT = auto()
+    # Software API docs - https://developer.atlassian.com/cloud/jira/software/rest/intro/
+    SOFTWARE = auto()
+
+
 class FullRefreshStream():
     name: ClassVar[str]
     path: ClassVar[str]
     extra_params: ClassVar[Optional[dict[str, str]]] = None
+    # Unless overwritten by a subclass, FullRefreshStreams use the Platform API.
+    api: ClassVar[JiraAPI] = JiraAPI.PLATFORM
 
 
 # Full refresh resources whose API response is an array containing all results.
@@ -424,6 +437,7 @@ class IssueWorklogsResponse(PaginatedResponse):
 class IssueChildStream():
     name: ClassVar[str]
     path: ClassVar[str]
+    api: ClassVar[JiraAPI] = JiraAPI.PLATFORM
     fields: ClassVar[str] = ""
     expand: ClassVar[str] = ""
     response_model: ClassVar[type[PaginatedResponse] | None] = None
@@ -453,6 +467,34 @@ class IssueWorklogs(IssueChildStream):
     path: ClassVar[str] = "worklog"
     fields: ClassVar[str] = "worklog"
     response_model: ClassVar[type[IssueWorklogsResponse]] = IssueWorklogsResponse
+
+
+# Software API Streams
+class Boards(FullRefreshPaginatedStream):
+    name: ClassVar[str] = "boards"
+    path: ClassVar[str] = "board"
+    extra_params: ClassVar[dict[str, str]] = {
+        "includePrivate": "true",
+        "orderBy": "name"
+    }
+    api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
+
+
+# Software API Child Streams
+class BoardChildStream(FullRefreshStream):
+    add_parent_id_to_documents: ClassVar[bool] = True
+    api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
+
+
+class Epics(BoardChildStream):
+    name: ClassVar[str] = "epics"
+    path: ClassVar[str] = "epic"
+
+
+class Sprints(BoardChildStream):
+    name: ClassVar[str] = "sprints"
+    path: ClassVar[str] = "sprint"
+    add_parent_id_to_documents: ClassVar[bool] = False
 
 
 FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
@@ -494,6 +536,9 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ProjectComponents,
     ProjectEmails,
     ProjectVersions,
+    Boards,
+    Epics,
+    Sprints,
 ]
 
 
