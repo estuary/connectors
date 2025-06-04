@@ -234,7 +234,7 @@ func (c *Config) ToURI(prefetchRows int) string {
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
-	uri.RawQuery = fmt.Sprintf("PREFETCH_ROWS=%d", prefetchRows)
+	uri.RawQuery = fmt.Sprintf("PREFETCH_ROWS=%d&TIMEOUT=600", prefetchRows)
 	return uri.String()
 }
 
