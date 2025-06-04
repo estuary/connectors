@@ -255,6 +255,134 @@
     ]
   },
   {
+    "recommendedName": "issue_changelogs",
+    "resourceConfig": {
+      "name": "issue_changelogs",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "issueId": {
+          "title": "Issueid",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "issueId"
+      ],
+      "title": "IssueChildResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id",
+      "/issueId"
+    ]
+  },
+  {
+    "recommendedName": "issue_comments",
+    "resourceConfig": {
+      "name": "issue_comments",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "issueId": {
+          "title": "Issueid",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "issueId"
+      ],
+      "title": "IssueChildResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id",
+      "/issueId"
+    ]
+  },
+  {
     "recommendedName": "issue_custom_field_contexts",
     "resourceConfig": {
       "name": "issue_custom_field_contexts",
@@ -714,6 +842,70 @@
     ]
   },
   {
+    "recommendedName": "issue_transitions",
+    "resourceConfig": {
+      "name": "issue_transitions",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "issueId": {
+          "title": "Issueid",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "issueId"
+      ],
+      "title": "IssueChildResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id",
+      "/issueId"
+    ]
+  },
+  {
     "recommendedName": "issue_type_schemes",
     "resourceConfig": {
       "name": "issue_type_schemes",
@@ -864,6 +1056,70 @@
     },
     "key": [
       "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "issue_worklogs",
+    "resourceConfig": {
+      "name": "issue_worklogs",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "issueId": {
+          "title": "Issueid",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id",
+        "issueId"
+      ],
+      "title": "IssueChildResource",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id",
+      "/issueId"
     ]
   },
   {
