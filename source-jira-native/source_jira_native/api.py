@@ -28,6 +28,13 @@ from .models import (
     ProjectComponents,
     ProjectEmails,
     ProjectVersions,
+    IssueChildResource,
+    IssueChildStream,
+    IssueComments,
+    IssueChangelogs,
+    IssueTransitions,
+    IssueWorklogs,
+    APIRecord,
 )
 
 # Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
@@ -42,6 +49,10 @@ MIN_CHECKPOINT_INTERVAL = 200
 
 MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
 CUSTOM_FIELD_NOT_FOUND = r"The custom field was not found."
+
+ALL_ISSUE_FIELDS = "*all"
+MINIMAL_ISSUE_FIELDS = "id,updated"
+
 
 def dt_to_str(dt: datetime) -> str:
     return dt.isoformat()
@@ -154,14 +165,14 @@ async def snapshot_paginated_arrayed_resources(
         params["startAt"] = count
 
 
-async def snapshot_paginated_resources(
+async def _paginate_through_resources(
     http: HTTPSession,
     domain: str,
     path: str,
     extra_params: dict[str, str] | None,
     response_model: type[PaginatedResponse],
     log: Logger,
-) -> AsyncGenerator[FullRefreshResource, None]:
+) -> AsyncGenerator[APIRecord, None]:
     url = f"{url_base(domain)}/{path}"
 
     count = 0
@@ -183,14 +194,34 @@ async def snapshot_paginated_resources(
         if not response.values:
             break
 
-        for resource in response.values:
-            yield resource
+        for record in response.values:
+            yield record
             count += 1
 
         if response.isLast or count >= response.total:
             break
 
         params["startAt"] = count
+
+
+
+async def snapshot_paginated_resources(
+    http: HTTPSession,
+    domain: str,
+    path: str,
+    extra_params: dict[str, str] | None,
+    response_model: type[PaginatedResponse],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    async for record in _paginate_through_resources(
+        http,
+        domain,
+        path,
+        extra_params,
+        response_model,
+        log
+    ):
+        yield FullRefreshResource.model_validate(record)
 
 
 async def snapshot_labels(
@@ -538,7 +569,14 @@ async def _fetch_issues_between(
     projects: str | None,
     start: datetime,
     end: datetime | None = None,
-    should_fetch_minimal_fields: bool = False,
+    # Fetch only the minimal fields by default.
+    fields: str = "",
+    # Expand nothing by default.
+    expand: str = "",
+    # Do not yield issues incrementally by default. should_yield_incrementally is used
+    # to avoid holding open (and potentially timing out) the issues
+    # API response as we send separate API requests to fetch child resources.
+    should_yield_incrementally: bool = False,
 ) -> AsyncGenerator[Issue, None]:
     url = f"{url_base(domain)}/search/jql"
 
@@ -553,16 +591,21 @@ async def _fetch_issues_between(
     if end <= start:
         return
 
+    # Ensure the MINIMAL_ISSUE_FIELDS (id and updated) required for incremental
+    # replication are always included.
+    if fields and fields != "*all":
+        fields = f"{MINIMAL_ISSUE_FIELDS},{fields}"
+    else:
+        fields = MINIMAL_ISSUE_FIELDS
+
     params: dict[str, str | int] = {
         "maxResults": 250,
-        "jql": _build_jql(start, end, timezone, projects)
+        "jql": _build_jql(start, end, timezone, projects),
+        "fields": fields,
     }
 
-    if should_fetch_minimal_fields:
-        params["fields"] = "id,updated"
-    else:
-        params["fields"] = "*all"
-        params["expand"] = "renderedFields,transitions,operations,changelog"
+    if expand:
+        params["expand"] = expand
 
     while True:
         _, body = await http.request_stream(
@@ -583,8 +626,16 @@ async def _fetch_issues_between(
             IssuesResponse,
         )
 
-        async for issue in processor:
-            yield issue
+        if should_yield_incrementally:
+            async for issue in processor:
+                yield issue
+        else:
+            issues: list[Issue] = []
+            async for issue in processor:
+                issues.append(issue)
+
+            for issue in issues:
+                yield issue
 
         remainder = processor.get_remainder()
 
@@ -614,6 +665,9 @@ async def fetch_issues(
         timezone,
         projects,
         log_cursor,
+        fields=ALL_ISSUE_FIELDS,
+        expand="renderedFields,transitions,operations,changelog",
+        should_yield_incrementally=True,
     ):
         # Checkpoint previously yielded documents if the
         # current document moves forward in time.
@@ -663,6 +717,9 @@ async def backfill_issues(
         # Jira filters issues with minute-level granularity, so we add one minute
         # to include all issues updated during the cutoff minute.
         cutoff + timedelta(minutes=1),
+        fields=ALL_ISSUE_FIELDS,
+        expand="renderedFields,transitions,operations,changelog",
+        should_yield_incrementally=True,
     ):
         if issue.fields.updated > cutoff:
             return
@@ -680,6 +737,204 @@ async def backfill_issues(
         if issue.fields.updated > start:
             count += 1
             yield issue
+
+        if issue.fields.updated > last_seen:
+            last_seen = issue.fields.updated
+
+
+async def _fetch_comments_or_worklogs_for_issue(
+    http: HTTPSession,
+    domain: str,
+    stream: type[IssueChildStream],
+    issue_id: int,
+    nested_resources: Issue.Fields.Comment | Issue.Fields.Worklog,
+    log: Logger,
+) -> AsyncGenerator[APIRecord, None]:
+    assert stream.response_model is not None
+    if nested_resources.total == 0:
+        return
+
+    # If all of the issue's child resources were returned in the issue, then yield them.
+    if nested_resources.maxResults >= nested_resources.total:
+        for child_resource in nested_resources.resources:
+            yield child_resource
+    # Otherwise if there are more child resources for this issue than were returned with it,
+    # fetch and yield all of them.
+    else:
+        path = f"issue/{issue_id}/{stream.path}"
+        async for child_resource in _paginate_through_resources(
+            http,
+            domain,
+            path,
+            None,
+            stream.response_model,
+            log,
+        ):
+            yield child_resource
+
+
+async def _fetch_changelogs_for_issue(
+    http: HTTPSession,
+    domain: str,
+    issue_id: int,
+    changelog: Issue.ChangeLog,
+    log: Logger,
+) -> AsyncGenerator[APIRecord, None]:
+    if changelog.total == 0:
+        return
+
+    # If all of the issue's changelogs were returned with the issue, then yield them.
+    if changelog.maxResults >= changelog.total:
+        for record in changelog.histories:
+            yield record
+    # Otherwise if there are more changlogs for this issue than were returned with it,
+    # fetch and yield all of them.
+    else:
+        path = f"issue/{issue_id}/changelog"
+        async for record in _paginate_through_resources(
+            http,
+            domain,
+            path,
+            None,
+            PaginatedResponse,
+            log,
+        ):
+            yield record
+
+
+async def _fetch_transitions_for_issue(
+    transitions: list[APIRecord],
+) -> AsyncGenerator[APIRecord, None]:
+    if len(transitions) == 0:
+        return
+
+    for transition in transitions:
+        yield transition
+
+
+async def _fetch_child_resources_for_issue(
+    http: HTTPSession,
+    domain: str,
+    stream: type[IssueChildStream],
+    issue: Issue,
+    log: Logger,
+) -> AsyncGenerator[IssueChildResource, None]:
+    if issubclass(stream, IssueComments):
+        assert issue.fields.comment is not None
+        gen = _fetch_comments_or_worklogs_for_issue(http, domain, stream, issue.id, issue.fields.comment, log)
+    elif issubclass(stream, IssueWorklogs):
+        assert issue.fields.worklog is not None
+        gen = _fetch_comments_or_worklogs_for_issue(http, domain, stream, issue.id, issue.fields.worklog, log)
+    elif issubclass(stream, IssueChangelogs):
+        assert issue.changelog is not None
+        gen = _fetch_changelogs_for_issue(http, domain, issue.id, issue.changelog, log)
+    elif issubclass(stream, IssueTransitions):
+        assert issue.transitions is not None
+        gen = _fetch_transitions_for_issue(issue.transitions)
+    else:
+        raise RuntimeError(f"Unknown issues child stream type {stream.__name__} for stream {stream.name}")
+
+    async for record in gen:
+        record["issueId"] = issue.id
+        yield IssueChildResource.model_validate(record)
+
+
+async def fetch_issues_child_resources(
+    http: HTTPSession,
+    domain: str,
+    timezone: ZoneInfo,
+    projects: str | None,
+    stream: type[IssueChildStream],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[IssueChildResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    last_seen = log_cursor
+
+    count = 0
+    async for issue in _fetch_issues_between(
+        http,
+        domain,
+        log,
+        timezone,
+        projects,
+        log_cursor,
+        fields=stream.fields,
+        expand=stream.expand,
+    ):
+        # Checkpoint previously yielded documents if the
+        # current document moves forward in time.
+        if (
+            last_seen > log_cursor
+            and issue.fields.updated > last_seen
+            and count >= MIN_CHECKPOINT_INTERVAL
+        ):
+            yield last_seen
+            count = 0
+
+        if issue.fields.updated > log_cursor:
+            count += 1
+            async for child_resource in _fetch_child_resources_for_issue(http, domain, stream, issue, log):
+                yield child_resource
+
+        if issue.fields.updated > last_seen:
+            last_seen = issue.fields.updated
+
+    # Emit a final checkpoint if we saw any new documents.
+    if last_seen > log_cursor:
+        yield last_seen
+
+
+# NEED TO ADD A BACKFILL FUNCTION FOR CHILD RESOURCES!!!!!!!!!!!!!
+
+async def backfill_issues_child_resources(
+    http: HTTPSession,
+    domain: str,
+    timezone: ZoneInfo,
+    projects: str | None,
+    stream: type[IssueChildStream],
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[IssueChildResource | PageCursor, None]:
+    assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    start = str_to_dt(page)
+    last_seen = start
+
+    count = 0
+    async for issue in _fetch_issues_between(
+        http,
+        domain,
+        log,
+        timezone,
+        projects,
+        start,
+        # Jira filters issues with minute-level granularity, so we add one minute
+        # to include all issues updated during the cutoff minute.
+        cutoff + timedelta(minutes=1),
+        fields=stream.fields,
+        expand=stream.expand,
+    ):
+        if issue.fields.updated > cutoff:
+            return
+
+        # Checkpoint previously yielded documents if the
+        # current document moves forward in time.
+        if (
+            last_seen > start
+            and issue.fields.updated > last_seen
+            and count >= MIN_CHECKPOINT_INTERVAL
+        ):
+            yield dt_to_str(last_seen)
+            count = 0
+
+        if issue.fields.updated > start:
+            count += 1
+            async for child_resource in _fetch_child_resources_for_issue(http, domain, stream, issue, log):
+                yield child_resource
 
         if issue.fields.updated > last_seen:
             last_seen = issue.fields.updated

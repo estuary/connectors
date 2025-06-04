@@ -14,6 +14,8 @@ from .models import (
     ResourceConfig,
     ResourceState,
     JiraResource,
+    IssueChildResource,
+    IssueChildStream,
     FullRefreshStream,
     FullRefreshArrayedStream,
     FullRefreshNestedArrayStream,
@@ -29,11 +31,14 @@ from .models import (
     ScreenTabFields,
     ProjectChildStream,
     FULL_REFRESH_STREAMS,
+    ISSUE_CHILD_STREAMS,
 )
 from .api import (
     fetch_timezone,
     fetch_issues,
     backfill_issues,
+    fetch_issues_child_resources,
+    backfill_issues_child_resources,
     snapshot_nested_arrayed_resources,
     snapshot_non_paginated_arrayed_resources,
     snapshot_paginated_arrayed_resources,
@@ -289,6 +294,70 @@ def issues(
     )
 
 
+def issue_child_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig, timezone: ZoneInfo
+) -> list[common.Resource]:
+
+    def open(
+        stream: type[IssueChildStream],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_issues_child_resources,
+                http,
+                config.domain,
+                timezone,
+                config.advanced.projects,
+                stream,
+            ),
+            fetch_page=functools.partial(
+                backfill_issues_child_resources,
+                http,
+                config.domain,
+                timezone,
+                config.advanced.projects,
+                stream,
+            )
+        )
+
+    # Shift the cutoff back ISSUE_JQL_SEARCH_LAG duration to ensure backfills
+    # always cover ranges where Jira's API returns consistent results.
+    cutoff = datetime.now(tz=timezone) - ISSUE_JQL_SEARCH_LAG
+    start = config.start_date.astimezone(timezone)
+
+    resources: list[common.Resource] = []
+
+    for stream in ISSUE_CHILD_STREAMS:
+        resources.append(
+            common.Resource(
+                name=stream.name,
+                key=["/id", "/issueId"],
+                model=IssueChildResource,
+                open=functools.partial(open, stream),
+                initial_state=ResourceState(
+                    inc=ResourceState.Incremental(cursor=cutoff),
+                    backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
+                ),
+                initial_config=ResourceConfig(
+                    name=stream.name, interval=timedelta(minutes=5)
+                ),
+                schema_inference=True,
+            )
+        )
+
+
+    return resources
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig, should_fetch_timezone: bool = True
 ) -> list[common.Resource]:
@@ -298,6 +367,7 @@ async def all_resources(
     resources = [
         *full_refresh_resources(log, http, config),
         issues(log, http, config, timezone),
+        *issue_child_resources(log, http, config, timezone)
     ]
 
     return resources
