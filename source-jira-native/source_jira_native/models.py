@@ -1,5 +1,5 @@
 from datetime import datetime, UTC, timedelta
-from typing import AsyncGenerator, Callable, ClassVar, Literal, Optional
+from typing import Any, AsyncGenerator, Callable, ClassVar, Literal, Optional
 
 from estuary_cdk.capture.common import (
     BasicAuth,
@@ -83,6 +83,9 @@ class EndpointConfig(BaseModel):
 
 ConnectorState = GenericConnectorState[ResourceState]
 
+# APIRecord is a convenience type.
+APIRecord = dict[str, Any]
+
 
 class FullRefreshResource(BaseDocument, extra="allow"):
     pass
@@ -94,9 +97,40 @@ class JiraResource(FullRefreshResource):
 
 class Issue(JiraResource):
     class Fields(BaseModel, extra="allow"):
+        class NestedResources(BaseModel, extra="allow"):
+            maxResults: int
+            total: int
+
+        class Comment(NestedResources):
+            comments: list[APIRecord]
+
+            @property
+            def resources(self) -> list[APIRecord]:
+                return self.comments
+
+        class Worklog(NestedResources):
+            worklogs: list[APIRecord]
+
+            @property
+            def resources(self) -> list[APIRecord]:
+                return self.worklogs
+
         updated: AwareDatetime
+        # The following fields only default to None when fetching
+        # child resources of a specific issue. These fields are
+        # always present when an issue is yielded.
+        comment: Comment | None = None
+        worklog: Worklog | None = None
+
+    class ChangeLog(Fields.NestedResources):
+        histories: list[APIRecord]
 
     fields: Fields
+    # The following fields only default to None when fetching
+    # child resources of a specific issue. These fields are
+    # always present when an issue is yielded.
+    transitions: list[APIRecord] | None = None
+    changelog: ChangeLog | None = None
 
 
 class PaginatedResponse(BaseModel, extra="allow"):
@@ -104,7 +138,7 @@ class PaginatedResponse(BaseModel, extra="allow"):
     startAt: int
     total: int
     isLast: bool | None = None
-    values: list[FullRefreshResource]
+    values: list[APIRecord]
 
 
 class IssuesResponse(BaseModel, extra="allow"):
@@ -374,6 +408,53 @@ class ProjectVersions(ProjectChildStream):
     add_parent_id_to_documents: ClassVar[bool] = False
 
 
+class IssueChildResource(JiraResource):
+    # The connector adds issueId into the document.
+    issueId: int
+
+
+class IssueCommentsResponse(PaginatedResponse):
+    values: list[APIRecord] = Field(alias="comments")
+
+
+class IssueWorklogsResponse(PaginatedResponse):
+    values: list[APIRecord] = Field(alias="worklogs")
+
+
+class IssueChildStream():
+    name: ClassVar[str]
+    path: ClassVar[str]
+    fields: ClassVar[str] = ""
+    expand: ClassVar[str] = ""
+    response_model: ClassVar[type[PaginatedResponse] | None] = None
+
+
+class IssueComments(IssueChildStream):
+    name: ClassVar[str] = "issue_comments"
+    path: ClassVar[str] = "comment"
+    fields: ClassVar[str] = "comment"
+    response_model: ClassVar[type[IssueCommentsResponse]] = IssueCommentsResponse
+
+
+class IssueChangelogs(IssueChildStream):
+    name: ClassVar[str] = "issue_changelogs"
+    path: ClassVar[str] = "changelog"
+    expand: ClassVar[str] = "changelog"
+
+
+class IssueTransitions(IssueChildStream):
+    name: ClassVar[str] = "issue_transitions"
+    path: ClassVar[str] = "transitions"
+    expand: ClassVar[str] = "transitions"
+
+
+class IssueWorklogs(IssueChildStream):
+    name: ClassVar[str] = "issue_worklogs"
+    path: ClassVar[str] = "worklog"
+    fields: ClassVar[str] = "worklog"
+    response_model: ClassVar[type[IssueWorklogsResponse]] = IssueWorklogsResponse
+
+
 FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ApplicationRoles,
     Dashboards,
@@ -413,4 +494,12 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ProjectComponents,
     ProjectEmails,
     ProjectVersions,
+]
+
+
+ISSUE_CHILD_STREAMS: list[type[IssueChildStream]] = [
+    IssueComments,
+    IssueChangelogs,
+    IssueTransitions,
+    IssueWorklogs,
 ]
