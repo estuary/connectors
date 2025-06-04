@@ -377,11 +377,11 @@ func castColumn(col sqlcapture.ColumnInfo) string {
 }
 
 func base64cmp(a, b string) int {
-	decodedA, err := base64.StdEncoding.DecodeString(a)
+	decodedA, err := base64.RawStdEncoding.DecodeString(a)
 	if err != nil {
 		panic(err)
 	}
-	decodedB, err := base64.StdEncoding.DecodeString(b)
+	decodedB, err := base64.RawStdEncoding.DecodeString(b)
 	if err != nil {
 		panic(err)
 	}
