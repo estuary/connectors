@@ -167,6 +167,7 @@ class FullRefreshStream():
     name: ClassVar[str]
     path: ClassVar[str]
     extra_params: ClassVar[Optional[dict[str, str]]] = None
+    extra_headers: ClassVar[Optional[dict[str, str]]] = None
     # Unless overwritten by a subclass, FullRefreshStreams use the Platform API.
     api: ClassVar[JiraAPI] = JiraAPI.PLATFORM
 
@@ -237,9 +238,28 @@ class Users(FullRefreshPaginatedArrayedStream):
     path: ClassVar[str] = "users/search"
 
 
+# The various Jira APIs use different parameter names for the
+# exact same purpose of paginating through results. And also
+# for specifying how many results to return in a single response.
+class PaginationParameter(StrEnum):
+    # startAt is used by the Platform and Software APIs.
+    START_AT = "startAt"
+    # start is used by the Service Management API.
+    START = "start"
+
+
+class ResponseSizeParameter(StrEnum):
+    # maxResults is used by the Platform and Software APIs.
+    MAX_RESULTS = "maxResults"
+    # limit is used by the Service Management API.
+    LIMIT = "limit"
+
+
 # Full refresh resources whose API response contains pagination information.
 class FullRefreshPaginatedStream(FullRefreshStream):
     response_model: ClassVar[type[PaginatedResponse]] = PaginatedResponse
+    pagination_param: ClassVar[PaginationParameter] = PaginationParameter.START_AT
+    response_size_param: ClassVar[ResponseSizeParameter] = ResponseSizeParameter.MAX_RESULTS
 
 
 class DashboardsResponse(PaginatedResponse):
@@ -497,6 +517,35 @@ class Sprints(BoardChildStream):
     add_parent_id_to_documents: ClassVar[bool] = False
 
 
+# Service Managmement API Streams
+class ServiceManagementPaginatedResponse(PaginatedResponse):
+    maxResults: int = Field(alias="limit")
+    startAt: int = Field(alias="start")
+    isLast: bool | None = Field(default=None, alias="isLastPage")
+
+
+class ServiceManagementFullRefreshPaginatedStream(FullRefreshPaginatedStream):
+    api: ClassVar[JiraAPI] = JiraAPI.SERVICE_MANAGEMENT
+    pagination_param: ClassVar[PaginationParameter] = PaginationParameter.START
+    response_size_param: ClassVar[ResponseSizeParameter] = ResponseSizeParameter.LIMIT
+    response_model: ClassVar[type[PaginatedResponse]] = ServiceManagementPaginatedResponse
+
+
+class ServiceDesks(ServiceManagementFullRefreshPaginatedStream):
+    name: ClassVar[str] = "service_desks"
+    path: ClassVar[str] = "servicedesk"
+
+
+class RequestTypes(ServiceManagementFullRefreshPaginatedStream):
+    name: ClassVar[str] = "request_types"
+    path: ClassVar[str] = "requesttype"
+    # Jira classifies this endpoint as experimental & requires us to "opt-in"
+    # to use it with the X-ExperimentalApi header.
+    extra_headers: ClassVar[dict[str, str]] = {
+        "X-ExperimentalApi": "opt-in"
+    }
+
+
 FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ApplicationRoles,
     Dashboards,
@@ -539,6 +588,8 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     Boards,
     Epics,
     Sprints,
+    ServiceDesks,
+    RequestTypes,
 ]
 
 

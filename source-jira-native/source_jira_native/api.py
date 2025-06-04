@@ -46,6 +46,8 @@ from .models import (
     IssueCustomFieldContexts,
     IssueCustomFieldOptions,
     ScreenTabFields,
+    PaginationParameter,
+    ResponseSizeParameter,
 )
 
 # Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
@@ -124,8 +126,9 @@ async def snapshot_nested_arrayed_resources(
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     url = f"{url_base(domain, stream.api)}/{stream.path}"
+    headers = stream.extra_headers or {}
 
-    _, body = await http.request_stream(log, url, params=stream.extra_params)
+    _, body = await http.request_stream(log, url, params=stream.extra_params, headers=headers)
     processor = IncrementalJsonProcessor(
         body(),
         f"{stream.response_field}.item",
@@ -141,12 +144,13 @@ async def _fetch_non_paginated_arrayed_resources(
     domain: str,
     api: JiraAPI,
     path: str,
+    extra_headers: dict[str, str] | None,
     extra_params: dict[str, Any] | None,
     log: Logger,
 ) -> AsyncGenerator[APIRecord, None]:
     url = f"{url_base(domain, api)}/{path}"
-
-    records = TypeAdapter(list[APIRecord]).validate_json(await http.request(log, url, params=extra_params))
+    headers = extra_headers or {}
+    records = TypeAdapter(list[APIRecord]).validate_json(await http.request(log, url, params=extra_params, headers=headers))
 
     for record in records:
         yield record
@@ -159,7 +163,7 @@ async def snapshot_non_paginated_arrayed_resources(
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     async for record in _fetch_non_paginated_arrayed_resources(
-        http, domain, stream.api, stream.path, stream.extra_params, log,
+        http, domain, stream.api, stream.path, stream.extra_headers, stream.extra_params, log,
     ):
         yield FullRefreshResource.model_validate(record)
 
@@ -174,6 +178,7 @@ async def snapshot_paginated_arrayed_resources(
 
     count = 0
 
+    headers = stream.extra_headers or {}
     params: dict[str, str | int] = {
         "startAt": count,
         # maxResults is more of a suggested maximum - Jira sometimes sends fewer 
@@ -184,7 +189,7 @@ async def snapshot_paginated_arrayed_resources(
         params.update(stream.extra_params)
 
     while True:
-        resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url, params=params))
+        resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url, params=params, headers=headers))
 
         if len(resources) == 0:
             break
@@ -201,6 +206,7 @@ async def _paginate_through_resources(
     domain: str,
     api: JiraAPI,
     path: str,
+    extra_headers: dict[str, str] | None,
     extra_params: dict[str, str] | None,
     response_model: type[PaginatedResponse],
     log: Logger,
@@ -209,18 +215,30 @@ async def _paginate_through_resources(
 
     count = 0
 
+    match api:
+        case JiraAPI.SERVICE_MANAGEMENT:
+            pagination_param = PaginationParameter.START
+            response_size_param = ResponseSizeParameter.LIMIT
+        case JiraAPI.PLATFORM | JiraAPI.SOFTWARE:
+            pagination_param = PaginationParameter.START_AT
+            response_size_param = ResponseSizeParameter.MAX_RESULTS
+        case _:
+            raise RuntimeError(f"Unknown JiraAPI {api}.")
+
+    headers = extra_headers or {}
     params: dict[str, str | int] = {
-        "startAt": count,
-        # maxResults is more of a suggested maximum - Jira sometimes sends fewer 
-        # than maxResults results in a response depending on the size of the results.
-        "maxResults": 100,
+        pagination_param: count,
+        # The reponse_size_param is more of a suggested maximum - Jira sometimes sends fewer 
+        # results in a response depending on the total result set size.
+        response_size_param: 100,
     }
+
     if extra_params:
         params.update(extra_params)
 
     while True:
         response = response_model.model_validate_json(
-            await http.request(log, url, params=params)
+            await http.request(log, url, params=params, headers=headers)
         )
 
         if not response.values:
@@ -234,7 +252,7 @@ async def _paginate_through_resources(
         if response.isLast or has_yielded_all_records:
             break
 
-        params["startAt"] = count
+        params[pagination_param] = count
 
 
 
@@ -249,6 +267,7 @@ async def snapshot_paginated_resources(
         domain,
         stream.api,
         stream.path,
+        stream.extra_headers,
         stream.extra_params,
         stream.response_model,
         log
@@ -336,7 +355,7 @@ async def snapshot_filter_sharing(
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     filter_ids: list[str] = []
-    async for filter in _paginate_through_resources(http, domain, Filters.api, Filters.path, Filters.extra_params, Filters.response_model, log):
+    async for filter in _paginate_through_resources(http, domain, Filters.api, Filters.path, Filters.extra_headers, Filters.extra_params, Filters.response_model, log):
         if filter_id := filter.get("id", None):
             assert isinstance(filter_id, str)
             filter_ids.append(filter_id)
@@ -344,7 +363,7 @@ async def snapshot_filter_sharing(
     for id in filter_ids:
         path = f"{Filters.path}/{id}/{stream.path}"
         try:
-            async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_params, log):
+            async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, log):
                 record["filterId"] = id
                 yield FullRefreshResource.model_validate(record)
         except HTTPError as err:
@@ -363,7 +382,7 @@ async def snapshot_issue_custom_field_contexts(
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     issue_field_ids: list[str] = []
-    async for record in _fetch_non_paginated_arrayed_resources(http, domain, IssueFields.api, IssueFields.path, IssueFields.extra_params, log):
+    async for record in _fetch_non_paginated_arrayed_resources(http, domain, IssueFields.api, IssueFields.path, stream.extra_headers, IssueFields.extra_params, log):
         is_custom_field: bool | None = record.get("custom", None)
         issue_field_id: str | None = record.get("id", None)
         if is_custom_field and issue_field_id:
@@ -373,7 +392,7 @@ async def snapshot_issue_custom_field_contexts(
     for id in issue_field_ids:
         path = f"{IssueFields.path}/{id}/{stream.path}"
         try:
-            async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log):
+            async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log):
                 record["issueFieldId"] = id
                 yield FullRefreshResource.model_validate(record)
         except HTTPError as err:
@@ -404,7 +423,7 @@ async def snapshot_issue_custom_field_options(
 
     for field_id, context_id in field_and_context_ids:
         path = f"{IssueFields.path}/{field_id}/{IssueCustomFieldContexts.path}/{context_id}/{stream.path}"
-        async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log):
+        async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log):
             record["issueFieldId"] = field_id
             record["fieldContextId"] = context_id
             yield FullRefreshResource.model_validate(record)
@@ -418,7 +437,7 @@ async def snapshot_screen_tab_fields(
 ) -> AsyncGenerator[FullRefreshResource, None]:
     # In each tuple, the first element is the screen id and the second element is the tab id.
     screen_and_tab_ids: list[tuple[int, int]] = []
-    async for record in _paginate_through_resources(http, domain, ScreenTabs.api, ScreenTabs.path, ScreenTabs.extra_params, PaginatedResponse, log):
+    async for record in _paginate_through_resources(http, domain, ScreenTabs.api, ScreenTabs.path, ScreenTabs.extra_headers, ScreenTabs.extra_params, PaginatedResponse, log):
         screen_id = record.get("screenId", None)
         tab_id = record.get("tabId", None)
         if screen_id is not None and tab_id is not None:
@@ -427,7 +446,7 @@ async def snapshot_screen_tab_fields(
 
     for screen_id, tab_id in screen_and_tab_ids:
         path = f"screens/{screen_id}/tabs/{tab_id}/fields"
-        async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_params, log):
+        async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, log):
             record["screenId"] = screen_id
             record["tabId"] = tab_id
             yield FullRefreshResource.model_validate(record)
@@ -476,7 +495,7 @@ async def _fetch_project_child_resources(
         gen = _fetch_project_avatars(http, domain, project_id, log)
     elif (issubclass(stream, ProjectComponents) or issubclass(stream, ProjectVersions)):
         path = f"project/{project_id}/{stream.path}"
-        gen = _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log)
+        gen = _paginate_through_resources(http, domain, stream.api, path, stream. extra_headers, stream.extra_params, PaginatedResponse, log)
     elif issubclass(stream, ProjectEmails):
         gen = _fetch_project_email(http, domain, project_id, log)
     else:
@@ -507,7 +526,7 @@ async def snapshot_project_child_resources(
 
     # In each tuple, the first element is the project id and the second element is the project key.
     project_ids: list[str] = []
-    async for record in _paginate_through_resources(http, domain, Projects.api, Projects.path, extra_params,Projects.response_model, log):
+    async for record in _paginate_through_resources(http, domain, Projects.api, Projects.path, Projects.extra_headers, extra_params,Projects.response_model, log):
         id = record.get("id", None)
         if id:
             assert isinstance(id, str)
@@ -525,7 +544,7 @@ async def snapshot_board_child_resources(
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     board_ids: list[int] = []
-    async for board in _paginate_through_resources(http, domain, Boards.api, Boards.path, Boards.extra_params, Boards.response_model, log):
+    async for board in _paginate_through_resources(http, domain, Boards.api, Boards.path, Boards.extra_headers, Boards.extra_params, Boards.response_model, log):
         id = board.get("id", None)
         # Attempting to fetch child resources of private boards returns a 404.
         isPrivate: bool | None = board.get("isPrivate", None)
@@ -536,7 +555,7 @@ async def snapshot_board_child_resources(
     for id in board_ids:
         path = f"{Boards.path}/{id}/{stream.path}"
         try:
-            async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log):
+            async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log):
                 if stream.add_parent_id_to_documents:
                     record["boardId"] = id
                 yield FullRefreshResource.model_validate(record)
@@ -829,6 +848,7 @@ async def _fetch_comments_or_worklogs_for_issue(
             stream.api,
             path,
             None,
+            None,
             stream.response_model,
             log,
         ):
@@ -858,6 +878,7 @@ async def _fetch_changelogs_for_issue(
             domain,
             JiraAPI.PLATFORM,
             path,
+            None,
             None,
             PaginatedResponse,
             log,
