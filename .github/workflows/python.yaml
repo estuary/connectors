@@ -43,6 +43,7 @@ on:
       - "source-outreach/**"
       - "source-jira-native/**"
       - "source-looker/**"
+      - "source-qualtrics/**"
 
   pull_request:
     branches: [main]
@@ -87,6 +88,7 @@ on:
       - "source-outreach/**"
       - "source-jira-native/**"
       - "source-looker/**"
+      - "source-qualtrics/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -251,6 +253,10 @@ jobs:
             version: v3
             usage_rate: "1.0"
           - name: source-looker
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-qualtrics
             type: capture
             version: v1
             usage_rate: "1.0"
