@@ -1,0 +1,108 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Auth": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "description": "Found in Account Settings > Qualtrics IDs under 'API' section.",
+              "secret": true,
+              "title": "API Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "Auth",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Private App Credentials": "#/$defs/Auth"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Auth"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "data_center": {
+          "description": "Your Qualtrics data center ID (e.g., 'fra1', 'syd1'). Found in Account Settings > Qualtrics IDs.",
+          "examples": [
+            "fra1",
+            "syd1",
+            "dub1"
+          ],
+          "title": "Data Center ID",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "Start date for fetching survey responses (ISO format). Defaults to 6 months ago.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "credentials",
+        "data_center"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-qualtrics",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

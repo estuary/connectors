@@ -1,0 +1,55 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  surveyId:
+    title: Surveyid
+    type: string
+  responseId:
+    title: Responseid
+    type: string
+  recordedDate:
+    format: date-time
+    title: Recordeddate
+    type: string
+  startDate:
+    format: date-time
+    title: Startdate
+    type: string
+  endDate:
+    format: date-time
+    title: Enddate
+    type: string
+required:
+  - surveyId
+  - responseId
+  - recordedDate
+  - startDate
+  - endDate
+title: SurveyResponse
+type: object
+x-infer-schema: true
