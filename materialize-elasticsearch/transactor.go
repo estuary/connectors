@@ -5,10 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync"
 
+	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -22,8 +22,7 @@ const (
 	loadBatchSize = 1 * 1024 * 1024 // Bytes
 	loadWorkers   = 5
 
-	// These parameters are used for the BulkIndexer that the Elasticsearch SDK provides.
-	storeBatchSize = 512 * 1024 // Bytes
+	storeBatchSize = 5 * 1024 * 1024 // Bytes
 	storeWorkers   = 5
 )
 
@@ -78,18 +77,16 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	batchCh := make(chan []getDoc)
 	group, groupCtx := errgroup.WithContext(ctx)
-	for idx := 0; idx < loadWorkers; idx++ {
+	for range loadWorkers {
 		group.Go(func() error {
 			for {
 				select {
 				case <-groupCtx.Done():
 					return groupCtx.Err()
-				case batch := <-batchCh:
-					if batch == nil { // Channel was closed
+				case batch, ok := <-batchCh:
+					if !ok {
 						return nil
-					}
-
-					if err := t.loadDocs(ctx, batch, loadFn); err != nil {
+					} else if err := t.loadDocs(ctx, batch, loadFn); err != nil {
 						return err
 					}
 				}
@@ -138,159 +135,117 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
-	errCh := make(chan error, 1)
 
-	config := esutil.BulkIndexerConfig{
-		NumWorkers: storeWorkers,
-		FlushBytes: storeBatchSize,
-		Client:     t.client.es,
-		OnError: func(_ context.Context, err error) {
-			log.WithField("error", err.Error()).Error("bulk indexer error")
+	type storeBatch struct {
+		buf   []byte
+		index string
+	}
 
-			select {
-			case errCh <- err:
-			default:
+	batchCh := make(chan storeBatch)
+	group, groupCtx := errgroup.WithContext(ctx)
+	for range storeWorkers {
+		group.Go(func() error {
+			for {
+				select {
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				case batch, ok := <-batchCh:
+					if !ok {
+						return nil
+					} else if err := t.doStore(groupCtx, batch.buf, batch.index); err != nil {
+						return err
+					}
+				}
 			}
-		},
-		// Makes sure the changes are propagated to all replica shards.
-		// TODO(whb): I'm not totally convinced we need to always be requiring this. It may only
-		// really be applicable to case where there is a single replica shard and Elasticsearch
-		// considers a quorum to be possible by writing only to the primary shard, which could
-		// result in data loss if there is then a hardware failure on that single primary shard. At
-		// the very least we could consider making this an advanced configuration option in the
-		// future if it is problematic.
-		WaitForActiveShards: "all",
+		})
 	}
 
-	if t.isServerless {
-		// Serverless does not support WaitForActiveShards.
-		config.WaitForActiveShards = ""
-	}
-
-	indexer, err := esutil.NewBulkIndexer(config)
-	if err != nil {
-		return nil, fmt.Errorf("creating bulk indexer: %w", err)
-	}
-
-	// If a single item fails from a batch, it's common for _all_ of the items to fail from that
-	// batch. We'll get the first item failure error we see via errCh and report that as the
-	// connector failure error.
-	onItemFailure := func(_ context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
-		if err == nil {
-			// The err itself may be `nil` of the request was successful, but a failure is still
-			// indicated by the error from the response body.
-			err = errors.New(res.Error.Reason)
-		}
-
+	sendBatch := func(batch []byte, index string) error {
 		select {
-		case errCh <- err:
-		default:
+		case <-groupCtx.Done():
+			return group.Wait()
+		case batchCh <- storeBatch{buf: batch, index: index}:
+			return nil
 		}
 	}
 
-	var ignoredDocuments = 0
+	var batch []byte
+	var lastIndex string
 	for it.Next() {
-		select {
-		case err := <-errCh:
-			// Fail fast on errors with the bulk indexer or any items it has tried to process.
-			return nil, fmt.Errorf("storing document: %w", err)
-		default:
-		}
-
 		b := t.bindings[it.Binding]
 
-		doc := make(map[string]any)
-
-		var id string
-		if !b.deltaUpdates {
-			// Leave ID blank for delta updates so that ES will automatically generate one.
-			id = base64.RawStdEncoding.EncodeToString(it.PackedKey)
-		}
-
-		var action string
-		var bodyReader *bytes.Reader = bytes.NewReader([]byte{})
-		if it.Delete && t.cfg.HardDelete {
-			if it.Exists {
-				action = "delete"
-			} else {
-				// Ignore items which do not exist and are already deleted
-				ignoredDocuments++
-				continue
-			}
-		} else {
-			for idx, v := range append(it.Key, it.Values...) {
-				if b, ok := v.([]byte); ok {
-					v = json.RawMessage(b)
-				}
-				if s, ok := v.(string); b.floatFields[idx] && ok {
-					// ElasticSearch does not supporting indexing these special Float values.
-					if s == "Infinity" || s == "-Infinity" || s == "NaN" {
-						v = nil
-					}
-				} else if b.wrapFields[idx] {
-					v = map[string]any{"json": v}
-				}
-
-				doc[b.fields[idx]] = v
-			}
-			if b.docField != "" {
-				doc[b.docField] = it.RawJSON
-			}
-
-			// The "create" action will fail if an item by the provided ID already exists, and "index"
-			// is like a PUT where it will create or replace. We could just use "index" all the time,
-			// but using "create" when we believe the item does not already exist provides a bit of
-			// extra consistency checking.
-			action = "create"
-			if it.Exists {
-				action = "index"
-			}
-
-			// This needs to be a ReadSeeker - a streaming reader can't be used in
-			// esutil.BulkIndexerItem.
-			body, err := json.Marshal(doc)
-			if err != nil {
+		if len(batch) > storeBatchSize || (lastIndex != b.index && lastIndex != "") {
+			if err := sendBatch(batch, lastIndex); err != nil {
 				return nil, err
 			}
-			bodyReader = bytes.NewReader(body)
+			batch = nil
+		}
+		lastIndex = b.index
+
+		id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
+		if it.Delete && t.cfg.HardDelete {
+			// Ignore items which do not exist and are already deleted.
+			if it.Exists {
+				batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"}}`)...)
+				batch = append(batch, '\n')
+			}
+			continue
 		}
 
-		if err := indexer.Add(it.Context(), esutil.BulkIndexerItem{
-			Index:      b.index,
-			Action:     action,
-			DocumentID: id,
-			Body:       bodyReader,
-			OnFailure:  onItemFailure,
-		}); err != nil {
-			return nil, fmt.Errorf("adding item to bulk indexer: %w", err)
+		// The "create" action will fail if an item by the provided ID already exists, and "index"
+		// is like a PUT where it will create or replace. We could just use "index" all the time,
+		// but using "create" when we believe the item does not already exist provides a bit of
+		// extra consistency checking.
+		if it.Exists {
+			batch = append(batch, []byte(`{"index":{"_id":"`+id+`"}}`)...)
+		} else if !b.deltaUpdates {
+			batch = append(batch, []byte(`{"create":{"_id":"`+id+`"}}`)...)
+		} else {
+			// Leaving the ID blank will cause Elasticsearch to generate one automatically for
+			// delta updates, where we otherwise could not insert multiple rows with the same ID.
+			batch = append(batch, []byte(`{"create":{}}`)...)
+		}
+		batch = append(batch, '\n')
+
+		doc := make(map[string]any)
+		for idx, v := range append(it.Key, it.Values...) {
+			if b, ok := v.([]byte); ok {
+				v = json.RawMessage(b)
+			}
+			if s, ok := v.(string); b.floatFields[idx] && ok {
+				// ElasticSearch does not supporting indexing these special Float values.
+				if s == "Infinity" || s == "-Infinity" || s == "NaN" {
+					v = nil
+				}
+			} else if b.wrapFields[idx] {
+				v = map[string]any{"json": v}
+			}
+
+			doc[b.fields[idx]] = v
+		}
+		if b.docField != "" {
+			doc[b.docField] = it.RawJSON
+		}
+
+		bodyData, err := json.Marshal(doc)
+		if err != nil {
+			return nil, err
+		}
+		batch = append(batch, bodyData...)
+		batch = append(batch, '\n')
+	}
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(batch) > 0 {
+		if err := sendBatch(batch, lastIndex); err != nil {
+			return nil, err
 		}
 	}
 
-	if err := indexer.Close(ctx); err != nil {
-		return nil, fmt.Errorf("closing bulk indexer: %w", err)
-	}
-
-	select {
-	case err := <-errCh:
-		return nil, fmt.Errorf("storing document after indexer close: %w", err)
-	default:
-	}
-
-	// Sanity checks that everything went as expected.
-	stats := indexer.Stats()
-	if stats.NumFailed != 0 || stats.NumAdded != uint64(it.Total-ignoredDocuments) || (stats.NumIndexed+stats.NumCreated+stats.NumDeleted) != uint64(it.Total-ignoredDocuments) {
-		log.WithFields(log.Fields{
-			"stored":     it.Total,
-			"numFailed":  stats.NumFailed,
-			"numAdded":   stats.NumAdded,
-			"numIndex":   stats.NumIndexed,
-			"numCreated": stats.NumCreated,
-			"numDeleted": stats.NumDeleted,
-		}).Info("indexer stats")
-		return nil, fmt.Errorf("indexer stats did not report successful completion of all %d stored documents", it.Total)
-	}
-
-	return nil, nil
+	close(batchCh)
+	return nil, group.Wait()
 }
 
 func (t *transactor) Destroy() {}
@@ -392,6 +347,68 @@ func (t *transactor) loadDocs(ctx context.Context, getDocs []getDoc, loaded func
 	// wasn't found.
 	if len(getDocs) != gotCount {
 		return fmt.Errorf("invalid Mget response: expected %d response docs but got %d", len(getDocs), gotCount)
+	}
+
+	return nil
+}
+
+type bulkResponse struct {
+	Items []map[string]struct {
+		Error struct {
+			Type   string `json:"type"`
+			Reason string `json:"reason"`
+		} `json:"error"`
+	} `json:"items"`
+}
+
+func (b bulkResponse) firstError() error {
+	for _, item := range b.Items {
+		for action, err := range item {
+			return fmt.Errorf("(%s) %s: %s", action, err.Error.Type, err.Error.Reason)
+		}
+	}
+
+	return nil
+}
+
+func (t *transactor) doStore(ctx context.Context, body []byte, index string) error {
+	opts := []func(*esapi.BulkRequest){
+		t.client.es.Bulk.WithContext(ctx),
+		// Request bodies are structured so that all documents belong to the
+		// same index, which is set in the request path as a query parameter
+		// rather than on each individual document.
+		t.client.es.Bulk.WithIndex(index),
+		// Without this filter, the response body will contain a bit of metadata
+		// for every single item in the bulk request. We only care if errors
+		// occurred, so this filter reduces the response size drastically in the
+		// most common case of no or few errors.
+		t.client.es.Bulk.WithFilterPath("items.*.error"),
+	}
+
+	if !t.isServerless {
+		// Makes sure the changes are propagated to all replica shards.
+		// TODO(whb): I'm not totally convinced we need to always be requiring this. It may only
+		// really be applicable to case where there is a single replica shard and Elasticsearch
+		// considers a quorum to be possible by writing only to the primary shard, which could
+		// result in data loss if there is then a hardware failure on that single primary shard. At
+		// the very least we could consider making this an advanced configuration option in the
+		// future if it is problematic.
+		opts = append(opts, t.client.es.Bulk.WithWaitForActiveShards("all"))
+	}
+
+	res, err := t.client.es.Bulk(bytes.NewReader(body), opts...)
+	if err != nil {
+		return fmt.Errorf("bulk request submission failed: %w", err)
+	}
+	defer res.Body.Close()
+
+	var parsed bulkResponse
+	if res.IsError() {
+		return fmt.Errorf("bulk request to index %q failed with status %d: %s", index, res.StatusCode, res.String())
+	} else if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return fmt.Errorf("failed to decode bulk response: %w", err)
+	} else if err := parsed.firstError(); err != nil {
+		return fmt.Errorf("bulk request to index %q failed: %w", index, err)
 	}
 
 	return nil
