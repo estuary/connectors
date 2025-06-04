@@ -15,8 +15,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/errgroup"
-
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
@@ -474,28 +472,22 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
 	}
 
-	var eg, egCtx = errgroup.WithContext(ctx)
-	var streamCtx, streamCancel = context.WithCancel(egCtx)
+	var streamCtx, streamCancel = context.WithCancel(ctx)
 	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
 	s.errCh = make(chan error)
 	s.cancel = streamCancel
 
-	eg.Go(func() error {
-		return s.run(streamCtx)
-	})
-
 	go func() {
-		if err := eg.Wait(); err != nil {
-			// Context cancellation typically occurs only in tests, and for test stability
-			// it should be considered a clean shutdown and not necessarily an error.
-			if errors.Is(err, context.Canceled) {
-				err = nil
-			}
-			close(s.events)
-			s.transactionsStmt.Close()
-			s.conn.Close()
-			s.errCh <- err
+		err := s.run(streamCtx)
+		if errors.Is(err, context.Canceled) {
+			err = nil
 		}
+		// Context cancellation typically occurs only in tests, and for test stability
+		// it should be considered a clean shutdown and not necessarily an error.
+		close(s.events)
+		s.transactionsStmt.Close()
+		s.conn.Close()
+		s.errCh <- err
 	}()
 
 	return nil
@@ -567,7 +559,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			return err
 		}
 
-		var stmt, err = s.generateLogminerQuery(ctx, transactions)
+		var stmt, debugQuery, err = s.generateLogminerQuery(ctx, transactions)
 		if err != nil {
 			return err
 		}
@@ -590,7 +582,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 				}
 			}
 
-			for xid, _ := range rollbackedXIDs {
+			for xid := range rollbackedXIDs {
 				delete(s.pendingTransactions, xid)
 			}
 		}
@@ -610,6 +602,10 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 
 				logrus.WithField("lastDDLSCN", s.lastDDLSCN).Info("smart mode: switching to extract mode")
 				continue
+			}
+
+			if strings.Contains(err.Error(), "bad connection") {
+				logrus.WithField("query", debugQuery).Warn("the query that caused bad connection")
 			}
 			return fmt.Errorf("receive messages: %w", err)
 		}
@@ -746,7 +742,7 @@ type transaction struct {
 	StartSCN SCN
 }
 
-func (s *replicationStream) generateLogminerQuery(ctx context.Context, transactions []string) (*sql.Stmt, error) {
+func (s *replicationStream) generateLogminerQuery(ctx context.Context, transactions []string) (*sql.Stmt, string, error) {
 	var tableObjectMapping = s.db.tableObjectMapping
 
 	var conditions []string
@@ -778,7 +774,9 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context, transacti
 
 	logrus.Debug("generated logminer query")
 
-	return s.conn.PrepareContext(ctx, query)
+	stmt, err := s.conn.PrepareContext(ctx, query)
+
+	return stmt, query, err
 }
 
 func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context, startSCN, endSCN SCN) (map[XID]SCN, map[XID]struct{}, error) {
