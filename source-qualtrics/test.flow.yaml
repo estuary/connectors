@@ -1,0 +1,30 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-qualtrics:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_qualtrics
+        config:
+          credentials:
+            credentials_title: Private App Credentials
+            access_token: your_api_token_here
+          data_center: "123"
+          start_date: "2023-01-01T00:00:00Z"
+    bindings:
+      - resource:
+          name: surveys
+          interval: PT15M
+        target: acmeCo/surveys
+      - resource:
+          name: survey_questions
+          interval: PT15M
+        target: acmeCo/survey_questions
+      - resource:
+          name: survey_responses
+          interval: PT5M
+        target: acmeCo/survey_responses
