@@ -14,6 +14,7 @@ from .models import (
     ResourceConfig,
     ResourceState,
     JiraResource,
+    JiraAPI,
     IssueChildResource,
     IssueChildStream,
     FullRefreshStream,
@@ -30,6 +31,7 @@ from .models import (
     IssueCustomFieldOptions,
     ScreenTabFields,
     ProjectChildStream,
+    BoardChildStream,
     FULL_REFRESH_STREAMS,
     ISSUE_CHILD_STREAMS,
 )
@@ -51,6 +53,7 @@ from .api import (
     snapshot_issue_custom_field_options,
     snapshot_project_child_resources,
     snapshot_screen_tab_fields,
+    snapshot_board_child_resources,
     url_base,
     dt_to_str,
     ISSUE_JQL_SEARCH_LAG,
@@ -66,7 +69,7 @@ async def validate_projects(
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     valid_project_ids_and_keys: set[str] = set()
 
-    async for project in snapshot_paginated_resources(http, config.domain, Projects.path, Projects.extra_params, Projects.response_model, log):
+    async for project in snapshot_paginated_resources(http, config.domain, Projects, log):
         d = project.model_dump()
         id = d.get("id", None)
         key = d.get("key", None)
@@ -90,7 +93,7 @@ async def validate_credentials(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ):
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
-    url = f"{url_base(config.domain)}/myself"
+    url = f"{url_base(config.domain, JiraAPI.PLATFORM)}/myself"
 
     try:
         await http.request(log, url)
@@ -114,82 +117,88 @@ def _get_partial_snapshot_fn(
             snapshot_non_paginated_arrayed_resources,
             http,
             config.domain,
-            stream.path,
-            stream.extra_params
+            stream,
         )
     elif issubclass(stream, FullRefreshNestedArrayStream):
         snapshot_fn = functools.partial(
             snapshot_nested_arrayed_resources,
             http,
             config.domain,
-            stream.path,
-            stream.extra_params,
-            stream.response_field,
+            stream,
         )
     elif issubclass(stream, FullRefreshPaginatedArrayedStream):
         snapshot_fn = functools.partial(
             snapshot_paginated_arrayed_resources,
             http,
             config.domain,
-            stream.path,
-            stream.extra_params
+            stream,
         )
     elif issubclass(stream, FullRefreshPaginatedStream):
         snapshot_fn = functools.partial(
             snapshot_paginated_resources,
             http,
             config.domain,
-            stream.path,
-            stream.extra_params,
-            stream.response_model,
+            stream,
         )
     elif issubclass(stream, Labels):
         snapshot_fn = functools.partial(
             snapshot_labels,
             http,
             config.domain,
-            stream.path,
+            stream,
         )
     elif issubclass(stream, Permissions):
         snapshot_fn = functools.partial(
             snapshot_permissions,
             http,
             config.domain,
-            stream.path,
+            stream,
         )
     elif issubclass(stream, SystemAvatars):
         snapshot_fn = functools.partial(
             snapshot_system_avatars,
             http,
             config.domain,
+            stream,
         )
     elif issubclass(stream, FilterSharing):
         snapshot_fn = functools.partial(
             snapshot_filter_sharing,
             http,
             config.domain,
+            stream,
         )
     elif issubclass(stream, IssueCustomFieldContexts):
         snapshot_fn = functools.partial(
             snapshot_issue_custom_field_contexts,
             http,
             config.domain,
+            stream,
         )
     elif issubclass(stream, IssueCustomFieldOptions):
         snapshot_fn = functools.partial(
             snapshot_issue_custom_field_options,
             http,
             config.domain,
+            stream,
         )
     elif issubclass(stream, ScreenTabFields):
         snapshot_fn = functools.partial(
             snapshot_screen_tab_fields,
             http,
-            config.domain
+            config.domain,
+            stream,
         )
     elif issubclass(stream, ProjectChildStream):
         snapshot_fn = functools.partial(
             snapshot_project_child_resources,
+            http,
+            config.domain,
+            stream,
+        )
+    elif issubclass(stream, BoardChildStream):
+        snapshot_fn = functools.partial(
+            snapshot_board_child_resources,
             http,
             config.domain,
             stream,

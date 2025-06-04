@@ -34,7 +34,18 @@ from .models import (
     IssueChangelogs,
     IssueTransitions,
     IssueWorklogs,
+    Boards,
+    BoardChildStream,
     APIRecord,
+    JiraAPI,
+    FullRefreshStream,
+    FullRefreshArrayedStream,
+    FullRefreshNestedArrayStream,
+    FullRefreshPaginatedStream,
+    FullRefreshPaginatedArrayedStream,
+    IssueCustomFieldContexts,
+    IssueCustomFieldOptions,
+    ScreenTabFields,
 )
 
 # Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
@@ -49,6 +60,7 @@ MIN_CHECKPOINT_INTERVAL = 200
 
 MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
 CUSTOM_FIELD_NOT_FOUND = r"The custom field was not found."
+BOARD_DOES_NOT_SUPPORT_SPRINTS = r"The board does not support sprints"
 
 ALL_ISSUE_FIELDS = "*all"
 MINIMAL_ISSUE_FIELDS = "id,updated"
@@ -62,8 +74,17 @@ def str_to_dt(s: str) -> datetime:
     return datetime.fromisoformat(s)
 
 
-def url_base(domain: str) -> str:
-    return f"https://{domain}/rest/api/3"
+def url_base(domain: str, api: JiraAPI) -> str:
+    common = f"https://{domain}/rest"
+    match api:
+        case JiraAPI.PLATFORM:
+            return f"{common}/api/3"
+        case JiraAPI.SOFTWARE:
+            return f"{common}/agile/1.0"
+        case JiraAPI.SERVICE_MANAGEMENT:
+            return f"{common}/servicedeskapi"
+        case _:
+            raise RuntimeError(f"Unknown JiraAPI {api}.")
 
 
 def _format_utc_offset(tz: ZoneInfo) -> str:
@@ -83,7 +104,7 @@ async def fetch_timezone(
     domain: str,
     log: Logger,
 ) -> ZoneInfo:
-    url = f"{url_base(domain)}/myself"
+    url = f"{url_base(domain, JiraAPI.PLATFORM)}/myself"
 
     response = MyselfResponse.model_validate_json(
         await http.request(log, url)
@@ -99,17 +120,15 @@ async def fetch_timezone(
 async def snapshot_nested_arrayed_resources(
     http: HTTPSession,
     domain: str,
-    path: str,
-    extra_params: dict[str, str] | None,
-    response_field: str,
+    stream: type[FullRefreshNestedArrayStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain)}/{path}"
+    url = f"{url_base(domain, stream.api)}/{stream.path}"
 
-    _, body = await http.request_stream(log, url, params=extra_params)
+    _, body = await http.request_stream(log, url, params=stream.extra_params)
     processor = IncrementalJsonProcessor(
         body(),
-        f"{response_field}.item",
+        f"{stream.response_field}.item",
         FullRefreshResource,
     )
 
@@ -117,29 +136,41 @@ async def snapshot_nested_arrayed_resources(
         yield resource
 
 
+async def _fetch_non_paginated_arrayed_resources(
+    http: HTTPSession,
+    domain: str,
+    api: JiraAPI,
+    path: str,
+    extra_params: dict[str, Any] | None,
+    log: Logger,
+) -> AsyncGenerator[APIRecord, None]:
+    url = f"{url_base(domain, api)}/{path}"
+
+    records = TypeAdapter(list[APIRecord]).validate_json(await http.request(log, url, params=extra_params))
+
+    for record in records:
+        yield record
+
+
 async def snapshot_non_paginated_arrayed_resources(
     http: HTTPSession,
     domain: str,
-    path: str,
-    extra_params: dict[str, str] | None,
+    stream: type[FullRefreshArrayedStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain)}/{path}"
-
-    resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url, params=extra_params))
-
-    for resource in resources:
-        yield resource
+    async for record in _fetch_non_paginated_arrayed_resources(
+        http, domain, stream.api, stream.path, stream.extra_params, log,
+    ):
+        yield FullRefreshResource.model_validate(record)
 
 
 async def snapshot_paginated_arrayed_resources(
     http: HTTPSession,
     domain: str,
-    path: str,
-    extra_params: dict[str, str] | None,
+    stream: type[FullRefreshPaginatedArrayedStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain)}/{path}"
+    url = f"{url_base(domain, stream.api)}/{stream.path}"
 
     count = 0
 
@@ -149,8 +180,8 @@ async def snapshot_paginated_arrayed_resources(
         # than maxResults results in a response depending on the size of the results.
         "maxResults": 100,
     }
-    if extra_params:
-        params.update(extra_params)
+    if stream.extra_params:
+        params.update(stream.extra_params)
 
     while True:
         resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url, params=params))
@@ -168,12 +199,13 @@ async def snapshot_paginated_arrayed_resources(
 async def _paginate_through_resources(
     http: HTTPSession,
     domain: str,
+    api: JiraAPI,
     path: str,
     extra_params: dict[str, str] | None,
     response_model: type[PaginatedResponse],
     log: Logger,
 ) -> AsyncGenerator[APIRecord, None]:
-    url = f"{url_base(domain)}/{path}"
+    url = f"{url_base(domain, api)}/{path}"
 
     count = 0
 
@@ -198,7 +230,8 @@ async def _paginate_through_resources(
             yield record
             count += 1
 
-        if response.isLast or count >= response.total:
+        has_yielded_all_records = response.total is not None and count >= response.total
+        if response.isLast or has_yielded_all_records:
             break
 
         params["startAt"] = count
@@ -208,17 +241,16 @@ async def _paginate_through_resources(
 async def snapshot_paginated_resources(
     http: HTTPSession,
     domain: str,
-    path: str,
-    extra_params: dict[str, str] | None,
-    response_model: type[PaginatedResponse],
+    stream: type[FullRefreshPaginatedStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     async for record in _paginate_through_resources(
         http,
         domain,
-        path,
-        extra_params,
-        response_model,
+        stream.api,
+        stream.path,
+        stream.extra_params,
+        stream.response_model,
         log
     ):
         yield FullRefreshResource.model_validate(record)
@@ -227,10 +259,10 @@ async def snapshot_paginated_resources(
 async def snapshot_labels(
     http: HTTPSession,
     domain: str,
-    path: str,
+    stream: type[FullRefreshStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain)}/{path}"
+    url = f"{url_base(domain, stream.api)}/{stream.path}"
 
     count = 0
 
@@ -260,6 +292,7 @@ async def snapshot_labels(
 async def snapshot_system_avatars(
     http: HTTPSession,
     domain: str,
+    stream: type[FullRefreshStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     SYSTEM_AVATAR_TYPES = [
@@ -270,7 +303,7 @@ async def snapshot_system_avatars(
     ]
 
     for avatar_type in SYSTEM_AVATAR_TYPES:
-        url = f"{url_base(domain)}/avatar/{avatar_type}/system"
+        url = f"{url_base(domain, stream.api)}/avatar/{avatar_type}/system"
 
         response = SystemAvatarsResponse.model_validate_json(
             await http.request(log, url)
@@ -283,10 +316,10 @@ async def snapshot_system_avatars(
 async def snapshot_permissions(
     http: HTTPSession,
     domain: str,
-    path: str,
+    stream: type[FullRefreshStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain)}/{path}"
+    url = f"{url_base(domain, stream.api)}/{stream.path}"
 
     response = PermissionsResponse.model_validate_json(
         await http.request(log, url)
@@ -299,19 +332,19 @@ async def snapshot_permissions(
 async def snapshot_filter_sharing(
     http: HTTPSession,
     domain: str,
+    stream: type[FullRefreshStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     filter_ids: list[str] = []
-    async for filter in snapshot_paginated_resources(http, domain, Filters.path, Filters.extra_params, Filters.response_model, log):
-        if filter_id := filter.model_dump().get("id", None):
+    async for filter in _paginate_through_resources(http, domain, Filters.api, Filters.path, Filters.extra_params, Filters.response_model, log):
+        if filter_id := filter.get("id", None):
             assert isinstance(filter_id, str)
             filter_ids.append(filter_id)
 
     for id in filter_ids:
-        path = f"{Filters.path}/{id}/permission"
+        path = f"{Filters.path}/{id}/{stream.path}"
         try:
-            async for doc in snapshot_non_paginated_arrayed_resources(http, domain, path, None, log):
-                record = doc.model_dump()
+            async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_params, log):
                 record["filterId"] = id
                 yield FullRefreshResource.model_validate(record)
         except HTTPError as err:
@@ -326,11 +359,11 @@ async def snapshot_filter_sharing(
 async def snapshot_issue_custom_field_contexts(
     http: HTTPSession,
     domain: str,
+    stream: type[IssueCustomFieldContexts],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     issue_field_ids: list[str] = []
-    async for issue_field in snapshot_non_paginated_arrayed_resources(http, domain, IssueFields.path, IssueFields.extra_params, log):
-        record = issue_field.model_dump()
+    async for record in _fetch_non_paginated_arrayed_resources(http, domain, IssueFields.api, IssueFields.path, IssueFields.extra_params, log):
         is_custom_field: bool | None = record.get("custom", None)
         issue_field_id: str | None = record.get("id", None)
         if is_custom_field and issue_field_id:
@@ -338,10 +371,9 @@ async def snapshot_issue_custom_field_contexts(
             issue_field_ids.append(issue_field_id)
 
     for id in issue_field_ids:
-        path = f"{IssueFields.path}/{id}/context"
+        path = f"{IssueFields.path}/{id}/{stream.path}"
         try:
-            async for doc in snapshot_paginated_resources(http, domain, path, None, PaginatedResponse, log):
-                record = doc.model_dump()
+            async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log):
                 record["issueFieldId"] = id
                 yield FullRefreshResource.model_validate(record)
         except HTTPError as err:
@@ -357,11 +389,12 @@ async def snapshot_issue_custom_field_contexts(
 async def snapshot_issue_custom_field_options(
     http: HTTPSession,
     domain: str,
+    stream: type[IssueCustomFieldOptions],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     # In each tuple, the first element is the field id and the second element is the context id.
     field_and_context_ids: list[tuple[str, str]] = []
-    async for context in snapshot_issue_custom_field_contexts(http, domain, log):
+    async for context in snapshot_issue_custom_field_contexts(http, domain, IssueCustomFieldContexts, log):
         record = context.model_dump()
         field_id = record.get("issueFieldId", None)
         context_id = record.get("id", None)
@@ -370,9 +403,8 @@ async def snapshot_issue_custom_field_options(
             field_and_context_ids.append((field_id, context_id))
 
     for field_id, context_id in field_and_context_ids:
-        path = f"{IssueFields.path}/{field_id}/context/{context_id}/option"
-        async for doc in snapshot_paginated_resources(http, domain, path, None, PaginatedResponse, log):
-            record = doc.model_dump()
+        path = f"{IssueFields.path}/{field_id}/{IssueCustomFieldContexts.path}/{context_id}/{stream.path}"
+        async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log):
             record["issueFieldId"] = field_id
             record["fieldContextId"] = context_id
             yield FullRefreshResource.model_validate(record)
@@ -381,12 +413,12 @@ async def snapshot_issue_custom_field_options(
 async def snapshot_screen_tab_fields(
     http: HTTPSession,
     domain: str,
+    stream: type[ScreenTabFields],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     # In each tuple, the first element is the screen id and the second element is the tab id.
     screen_and_tab_ids: list[tuple[int, int]] = []
-    async for tab in snapshot_paginated_resources(http, domain, ScreenTabs.path, ScreenTabs.extra_params, PaginatedResponse, log):
-        record = tab.model_dump()
+    async for record in _paginate_through_resources(http, domain, ScreenTabs.api, ScreenTabs.path, ScreenTabs.extra_params, PaginatedResponse, log):
         screen_id = record.get("screenId", None)
         tab_id = record.get("tabId", None)
         if screen_id is not None and tab_id is not None:
@@ -395,8 +427,7 @@ async def snapshot_screen_tab_fields(
 
     for screen_id, tab_id in screen_and_tab_ids:
         path = f"screens/{screen_id}/tabs/{tab_id}/fields"
-        async for doc in snapshot_non_paginated_arrayed_resources(http, domain, path, None, log):
-            record = doc.model_dump()
+        async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_params, log):
             record["screenId"] = screen_id
             record["tabId"] = tab_id
             yield FullRefreshResource.model_validate(record)
@@ -408,7 +439,7 @@ async def _fetch_project_avatars(
     project_id: str,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain)}/project/{project_id}/avatars"
+    url = f"{url_base(domain, ProjectAvatars.api)}/project/{project_id}/avatars"
 
     response = ProjectAvatarsResponse.model_validate_json(
         await http.request(log, url)
@@ -427,7 +458,7 @@ async def _fetch_project_email(
     project_id: str,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain)}/project/{project_id}/email"
+    url = f"{url_base(domain, ProjectEmails.api)}/project/{project_id}/email"
 
     yield FullRefreshResource.model_validate_json(
         await http.request(log, url)
@@ -445,13 +476,15 @@ async def _fetch_project_child_resources(
         gen = _fetch_project_avatars(http, domain, project_id, log)
     elif (issubclass(stream, ProjectComponents) or issubclass(stream, ProjectVersions)):
         path = f"project/{project_id}/{stream.path}"
-        gen = snapshot_paginated_resources(http, domain, path, None, PaginatedResponse, log)
+        gen = _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log)
     elif issubclass(stream, ProjectEmails):
         gen = _fetch_project_email(http, domain, project_id, log)
     else:
         raise RuntimeError(f"Unknown project child stream {stream.name}.")
 
     async for doc in gen:
+        if not isinstance(doc, FullRefreshResource):
+            doc = FullRefreshResource.model_validate(doc)
         if stream.add_parent_id_to_documents:
             record = doc.model_dump()
             record["projectId"] = project_id
@@ -474,16 +507,44 @@ async def snapshot_project_child_resources(
 
     # In each tuple, the first element is the project id and the second element is the project key.
     project_ids: list[str] = []
-    async for project in snapshot_paginated_resources(http, domain, Projects.path, extra_params, Projects.response_model, log):
-        record = project.model_dump()
+    async for record in _paginate_through_resources(http, domain, Projects.api, Projects.path, extra_params,Projects.response_model, log):
         id = record.get("id", None)
         if id:
-            assert (isinstance(id, str))
+            assert isinstance(id, str)
             project_ids.append(id)
 
     for id in project_ids:
         async for doc in _fetch_project_child_resources(http, domain, id, stream, log):
             yield doc
+
+
+async def snapshot_board_child_resources(
+    http: HTTPSession,
+    domain: str,
+    stream: type[BoardChildStream],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    board_ids: list[int] = []
+    async for board in _paginate_through_resources(http, domain, Boards.api, Boards.path, Boards.extra_params, Boards.response_model, log):
+        id = board.get("id", None)
+        # Attempting to fetch child resources of private boards returns a 404.
+        isPrivate: bool | None = board.get("isPrivate", None)
+        if id and not isPrivate:
+            assert isinstance(id, int)
+            board_ids.append(id)
+
+    for id in board_ids:
+        path = f"{Boards.path}/{id}/{stream.path}"
+        try:
+            async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_params, PaginatedResponse, log):
+                if stream.add_parent_id_to_documents:
+                    record["boardId"] = id
+                yield FullRefreshResource.model_validate(record)
+        except HTTPError as err:
+            if err.code == 400 and BOARD_DOES_NOT_SUPPORT_SPRINTS in err.message:
+                continue
+            else:
+                raise
 
 
 def _is_within_dst_fallback_window(
@@ -578,7 +639,7 @@ async def _fetch_issues_between(
     # API response as we send separate API requests to fetch child resources.
     should_yield_incrementally: bool = False,
 ) -> AsyncGenerator[Issue, None]:
-    url = f"{url_base(domain)}/search/jql"
+    url = f"{url_base(domain, JiraAPI.PLATFORM)}/search/jql"
 
     now = datetime.now(tz=timezone)
 
@@ -765,6 +826,7 @@ async def _fetch_comments_or_worklogs_for_issue(
         async for child_resource in _paginate_through_resources(
             http,
             domain,
+            stream.api,
             path,
             None,
             stream.response_model,
@@ -794,6 +856,7 @@ async def _fetch_changelogs_for_issue(
         async for record in _paginate_through_resources(
             http,
             domain,
+            JiraAPI.PLATFORM,
             path,
             None,
             PaginatedResponse,
