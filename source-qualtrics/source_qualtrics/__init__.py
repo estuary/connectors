@@ -12,12 +12,12 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.capture.common import ResourceConfig
 
-from .resources import all_resources
+from .resources import all_resources, validate_credentials
 from .models import (
-    ConnectorState,
     EndpointConfig,
-    ResourceConfig,
+    ConnectorState,
 )
 
 
@@ -30,8 +30,7 @@ class Connector(
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
-            oauth2=OAUTH2_SPEC,
-            documentationUrl="https://go.estuary.dev/source-outreach",
+            documentationUrl="https://go.estuary.dev/source-qualtrics",
             resourceConfigSchema=ResourceConfig.model_json_schema(),
             resourcePathPointers=ResourceConfig.PATH_POINTERS,
         )
@@ -47,6 +46,7 @@ class Connector(
         log: Logger,
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
+        await validate_credentials(log, self, validate.config)
         resources = await all_resources(log, self, validate.config)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)

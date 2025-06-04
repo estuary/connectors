@@ -2,10 +2,13 @@
 name = "source-qualtrics"
 version = "0.1.0"
 description = ""
-authors = ["Jonathan Wihl <jonathan@estuary.dev>"]
+authors = [
+    "Jonathan Wihl <jonathan@estuary.dev>",
+    "Justin Smith <justin@estuary.dev>",
+]
 
 [tool.poetry.dependencies]
-estuary-cdk = {path="../estuary-cdk", develop = true}
+estuary-cdk = { path = "../estuary-cdk", develop = true }
 python = "^3.11"
 pydantic = "^2"
 

@@ -26,11 +26,34 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  id:
-    title: Id
+  surveyId:
+    title: Surveyid
     type: string
+  responseId:
+    title: Responseid
+    type: string
+  recordedDate:
+    format: date-time
+    title: Recordeddate
+    type: string
+  startDate:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    default: ~
+    title: Startdate
+  endDate:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    default: ~
+    title: Enddate
 required:
-  - id
-title: Survey
+  - surveyId
+  - responseId
+  - recordedDate
+title: SurveyResponse
 type: object
 x-infer-schema: true

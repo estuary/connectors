@@ -26,11 +26,15 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  id:
-    title: Id
+  surveyId:
+    title: Surveyid
+    type: string
+  questionId:
+    title: Questionid
     type: string
 required:
-  - id
-title: Survey
+  - surveyId
+  - questionId
+title: SurveyQuestion
 type: object
 x-infer-schema: true
