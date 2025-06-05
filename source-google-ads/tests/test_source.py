@@ -3,6 +3,7 @@
 #
 
 import re
+import logging
 from collections import namedtuple
 from unittest.mock import Mock
 
@@ -112,7 +113,7 @@ def test_chunk_date_range_without_end_date():
     conversion_window = 0
     field = "date"
     response = chunk_date_range(
-        start_date=start_date_str, conversion_window=conversion_window, field=field, end_date=None, days_of_data_storage=None, range_days=1
+        logger=logging.Logger(name="test_logger"), start_date=start_date_str, conversion_window=conversion_window, field=field, end_date=None, days_of_data_storage=None, range_days=1
     )
     expected_response = [
         {"start_date": "2022-01-25", "end_date": "2022-01-26"},
@@ -130,7 +131,7 @@ def test_chunk_date_range():
     end_date = "2021-05-04"
     conversion_window = 14
     field = "date"
-    response = chunk_date_range(start_date, conversion_window, field, end_date, range_days=10)
+    response = chunk_date_range(logging.Logger(name="test_logger"), start_date, conversion_window, field, end_date, range_days=10)
     assert [
         {"start_date": "2021-02-19", "end_date": "2021-02-28"},
         {"start_date": "2021-03-01", "end_date": "2021-03-10"},
