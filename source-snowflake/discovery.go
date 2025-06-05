@@ -103,7 +103,7 @@ func performSnowflakeDiscovery(ctx context.Context, cfg *config, db *sql.DB) (*s
 	if err := xdb.Select(&tables, "SHOW TABLES;"); err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
-	var dynamicTables, err = listDynamicTables(ctx, db)
+	var dynamicTables, err = listDynamicTables(ctx, cfg, db)
 	if err != nil {
 		return nil, fmt.Errorf("error listing dynamic tables: %w", err)
 	}
@@ -156,7 +156,7 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 			// Ignore objects in the 'Flow' schema so we don't accidentally discover staging tables.
 			continue
 		}
-		var tableID = snowflakeObject{discoveredTable.Schema, discoveredTable.Name}
+		var tableID = snowflakeObject{discoveredTable.Database, discoveredTable.Schema, discoveredTable.Name}
 		if !strings.EqualFold(discoveredTable.Kind, "TABLE") {
 			log.WithFields(log.Fields{"table": tableID.String(), "kind": discoveredTable.Kind}).Trace("ignoring non-table entity")
 			continue
@@ -179,7 +179,7 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 		if discoveredColumn.Database != cfg.Database {
 			return nil, fmt.Errorf("internal error: discovery results from other databases (this should never happen)")
 		}
-		var tableID = snowflakeObject{discoveredColumn.Schema, discoveredColumn.Table}
+		var tableID = snowflakeObject{discoveredColumn.Database, discoveredColumn.Schema, discoveredColumn.Table}
 		if streams[tableID] == nil {
 			continue
 		}
@@ -189,7 +189,7 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 		if discoveredPK.Database != cfg.Database {
 			return nil, fmt.Errorf("internal error: discovery results from other databases (this should never happen)")
 		}
-		var tableID = snowflakeObject{discoveredPK.Schema, discoveredPK.Table}
+		var tableID = snowflakeObject{discoveredPK.Database, discoveredPK.Schema, discoveredPK.Table}
 		if streams[tableID] == nil {
 			continue
 		}
