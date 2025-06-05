@@ -64,6 +64,7 @@ def get_date_params(start_date: str, time_zone=None, range_days: int = None, end
 
 
 def chunk_date_range(
+    logger: logging.Logger,
     start_date: str,
     conversion_window: int,
     field: str,
@@ -77,6 +78,7 @@ def chunk_date_range(
     Returns a list of the beginning and ending timestamps of each `range_days` between the start date and now.
     The return value is a list of dicts {'date': str} which can be used directly with the Slack API
     """
+    logger.info("Entering chunk_date_range.")
     intervals = []
     end_date = pendulum.parse(end_date) if end_date else pendulum.now()
     start_date = pendulum.parse(start_date)
@@ -87,12 +89,17 @@ def chunk_date_range(
 
     # As in to return some state when state in abnormal
     if start_date > end_date:
+        logger.info("Exiting chunk_date_range - returned [None]")
         return [None]
 
     # applying conversion window
     start_date = start_date.subtract(days=conversion_window)
 
     while start_date < end_date:
+        logger.info("In 'while start_date < end_date' loop", {
+            "start_date": start_date,
+            "end_date": end_date,
+        })
         start, end = get_date_params(start_date.to_date_string(), time_zone=time_zone, range_days=range_days, end_date=end_date)
         intervals.append(
             {
@@ -101,6 +108,10 @@ def chunk_date_range(
             }
         )
         start_date = start_date.add(days=range_days)
+
+    logger.info("Exiting chunk date range.", {
+        "intervals": intervals,
+    })
     return intervals
 
 
@@ -113,7 +124,11 @@ class GoogleAdsStream(Stream, ABC):
         self.base_sieve_logger = cyclic_sieve(self.logger, 10)
 
     def get_query(self, stream_slice: Mapping[str, Any]) -> str:
+        self.logger.info("Entering GoogleAdsStream.get_query")
         query = GoogleAds.convert_schema_into_query(schema=self.get_json_schema(), report_name=self.name)
+        self.logger.info("Exiting GoogleAdsStream.get_query", {
+            "query": query,
+        })
         return query
 
     def parse_response(self, response: SearchPager) -> Iterable[Mapping]:
@@ -125,26 +140,39 @@ class GoogleAdsStream(Stream, ABC):
             yield {"customer_id": customer.id}
 
     def read_records(self, sync_mode, stream_slice: Optional[Mapping[str, Any]] = None, **kwargs) -> Iterable[Mapping[str, Any]]:
+        self.logger.info("Entering GoogleAdsStream.read_records")
         self.base_sieve_logger.bump()
         self.base_sieve_logger.info(f"Read records using g-ads client. Stream slice is {stream_slice}")
         if stream_slice is None:
+            self.logger.info("No slice - Exiting GoogleAdsStream.read_records.")
             return []
 
         customer_id = stream_slice["customer_id"]
         try:
+            self.logger.info("Sending request.")
             response_records = self.google_ads_client.send_request(self.get_query(stream_slice), customer_id=customer_id)
+            self.logger.info("Received response. Parsing response")
             for response in response_records:
                 yield from self.parse_response(response)
         except GoogleAdsException as exc:
+            self.logger.info("Received exception", {
+                "exc": exc,
+                "customer_id": customer_id,
+            })
             exc.customer_id = customer_id
             if not self.CATCH_API_ERRORS:
                 raise
             for error in exc.failure.errors:
                 if error.error_code.authorization_error == AuthorizationErrorEnum.AuthorizationError.CUSTOMER_NOT_ENABLED:
-                    self.base_sieve_logger.error(error.message)
+                    self.logger.error("Ignoring CUSTOMER_NOT_ENABLED error", {
+                        "error.message": error.message
+                        }
+                    )
                     continue
                 # log and ignore only CUSTOMER_NOT_ENABLED error, otherwise - raise further
                 raise
+
+        self.logger.info("Exiting GoogleAdsStream.read_records.")
 
 
 class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
@@ -176,6 +204,7 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
         return self.state.get(customer_id, {}).get(self.cursor_field) or default
 
     def stream_slices(self, stream_state: Mapping[str, Any] = None, **kwargs) -> Iterable[Optional[MutableMapping[str, any]]]:
+        self.logger.info("Entering stream slices.")
         for customer in self.customers:
             logger = cyclic_sieve(self.logger, 10)
             stream_state = stream_state or {}
@@ -192,6 +221,7 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
             logger.info(f"Generating slices for customer {customer.id}. Start date is {start_date}, end date is {end_date}")
 
             for chunk in chunk_date_range(
+                logger=self.logger,
                 start_date=start_date,
                 end_date=end_date,
                 conversion_window=self.conversion_window_days,
@@ -206,6 +236,8 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
                 logger.bump()
                 yield chunk
 
+        self.logger.info("Exiting stream slices.")
+
     def read_records(
         self, sync_mode: SyncMode, cursor_field: List[str] = None, stream_slice: MutableMapping[str, Any] = None, **kwargs
     ) -> Iterable[Mapping[str, Any]]:
@@ -213,9 +245,10 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
         This method is overridden to handle GoogleAdsException with EXPIRED_PAGE_TOKEN error code,
         and update `start_date` key in the `stream_slice` with the latest read record's cursor value, then retry the sync.
         """
+        self.logger.info("Entering IncrementalGooglAdsStream.read_records")
         self.incremental_sieve_logger.bump()
         while True:
-            self.incremental_sieve_logger.info("Starting a while loop iteration")
+            self.logger.info("Starting a while loop iteration")
             customer_id = stream_slice and stream_slice["customer_id"]
             try:
                 records = super().read_records(sync_mode, stream_slice=stream_slice)
@@ -226,43 +259,44 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
                         date_in_latest_record = pendulum.parse(record[self.cursor_field])
                         cursor_value = (max(date_in_current_stream, date_in_latest_record)).to_date_string()
                         self.state = {customer_id: {self.cursor_field: cursor_value}}
-                        self.incremental_sieve_logger.info(f"Updated state for customer {customer_id}. Full state is {self.state}.")
+                        self.logger.info(f"Updated state for customer {customer_id}. Full state is {self.state}.")
                         yield record
                         continue
                     self.state = {customer_id: {self.cursor_field: record[self.cursor_field]}}
-                    self.incremental_sieve_logger.info(f"Initialized state for customer {customer_id}. Full state is {self.state}.")
+                    self.logger.info(f"Initialized state for customer {customer_id}. Full state is {self.state}.")
                     yield record
                     continue
             except GoogleAdsException as exception:
-                self.incremental_sieve_logger.info(f"Caught a GoogleAdsException: {str(exception)}")
+                self.logger.info(f"Caught a GoogleAdsException: {str(exception)}")
                 error = next(iter(exception.failure.errors))
                 if error.error_code.request_error == RequestErrorEnum.RequestError.EXPIRED_PAGE_TOKEN:
                     start_date, end_date = parse_dates(stream_slice)
                     current_state = self.current_state(customer_id)
-                    self.incremental_sieve_logger.info(
+                    self.logger.info(
                         f"Start date is {start_date}. End date is {end_date}. Current state is {current_state}"
                     )
                     if (end_date - start_date).days == 1:
                         # If range days is 1, no need in retry, because it's the minimum date range
-                        self.incremental_sieve_logger.error("Page token has expired.")
+                        self.logger.error("Page token has expired.")
                         raise exception
                     elif current_state == stream_slice["start_date"]:
                         # It couldn't read all the records within one day, it will enter an infinite loop,
                         # so raise the error
-                        self.incremental_sieve_logger.error("Page token has expired.")
+                        self.logger.error("Page token has expired.")
                         raise exception
                     # Retry reading records from where it crushed
                     stream_slice["start_date"] = self.current_state(customer_id, default=stream_slice["start_date"])
-                    self.incremental_sieve_logger.info(f"Retry reading records from where it crushed with a modified slice: {stream_slice}")
+                    self.logger.info(f"Retry reading records from where it crushed with a modified slice: {stream_slice}")
                 else:
                     # raise caught error for other error statuses
                     raise exception
             else:
                 # return the control if no exception is raised
-                self.incremental_sieve_logger.info("Current slice has been read. Exiting read_records()")
+                self.logger.info("Current slice has been read. Exiting IncrementalGoogleAdsStream.read_records()")
                 return
 
     def get_query(self, stream_slice: Mapping[str, Any] = None) -> str:
+        self.logger.info("Entering IncrementalGoogleAdsStream.get_query")
         query = GoogleAds.convert_schema_into_query(
             schema=self.get_json_schema(),
             report_name=self.name,
@@ -270,6 +304,7 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
             to_date=stream_slice.get("end_date"),
             cursor_field=self.cursor_field,
         )
+        self.logger.info("Exiting IncrementalGoogleAdsStream.get_query")
         return query
 
 
