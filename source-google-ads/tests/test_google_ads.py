@@ -3,6 +3,7 @@
 #
 
 from datetime import date
+import logging
 
 import pendulum
 import pytest
@@ -94,7 +95,7 @@ def test_interval_chunking():
         {"start_date": "2021-07-28", "end_date": "2021-08-06"},
         {"start_date": "2021-08-07", "end_date": "2021-08-15"},
     ]
-    intervals = chunk_date_range("2021-07-01", 14, "segments.date", "2021-08-15", range_days=10)
+    intervals = chunk_date_range(logging.Logger(name="test_logger"), "2021-07-01", 14, "segments.date", "2021-08-15", range_days=10)
 
     assert mock_intervals == intervals
 
