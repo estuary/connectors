@@ -824,6 +824,7 @@
       "display_name": "Default Ticket Form",
       "end_user_conditions": [],
       "end_user_visible": true,
+      "form_type": "standard",
       "id": 28835740693908,
       "in_all_brands": true,
       "name": "Default Ticket Form",

@@ -523,6 +523,7 @@
       "reason_description": null,
       "received_date": "2024-11-26",
       "reference_number": null,
+      "remaining_file_evidence_storage": 524267928,
       "reply_by_date": "2024-12-02",
       "response_deadline": "2024-12-01T05:59:59Z",
       "status": "lost",
