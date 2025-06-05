@@ -308,9 +308,12 @@ class RateLimiter:
     It initially uses quadratic decrease of `delay` until a first failure is
     encountered. Additional failures result in quadratic increase, while
     successes apply a linear decay.
+
+    To avoid excessively long delays, `delay` cannot grow larger than `MAX_DELAY`.
     """
 
     delay: float = 1.0
+    MAX_DELAY: float = 300.0 # 5 minutes
     gain: float = 0.01
 
     failed: int = 0
@@ -329,6 +332,7 @@ class RateLimiter:
             update = cur_delay * (1 - self.gain)
 
         self.delay = (1 - self.gain) * self.delay + self.gain * update
+        self.delay = min(self.delay, self.MAX_DELAY)
 
     @property
     def error_ratio(self) -> float:
