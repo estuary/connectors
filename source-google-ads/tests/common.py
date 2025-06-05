@@ -6,7 +6,7 @@ import json
 
 from google.ads.googleads.errors import GoogleAdsException
 from google.ads.googleads.v19.errors.types.errors import GoogleAdsFailure
-
+from source_google_ads.google_ads import GRCP_TIMEOUT
 
 class MockSearchRequest:
     customer_id = "12345"
@@ -17,7 +17,7 @@ class MockSearchRequest:
 
 # Mocking Classes
 class MockGoogleAdsService:
-    def search(self, search_request):
+    def search(self, search_request, timeout=GRCP_TIMEOUT):
         return search_request
 
 

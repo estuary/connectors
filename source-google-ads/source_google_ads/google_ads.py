@@ -2,7 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
-
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 import logging
 from enum import Enum
 from typing import Any, Iterator, List, Mapping, MutableMapping
@@ -37,6 +37,8 @@ REPORT_MAPPING = {
     "keyword_report": "keyword_view",
 }
 API_VERSION = "v19"
+GRCP_TIMEOUT = 120.0
+REQUEST_TIMEOUT = 300.0
 logger = logging.getLogger("airbyte")
 
 
@@ -71,7 +73,25 @@ class GoogleAds:
         search_request = client.get_type("SearchGoogleAdsRequest")
         search_request.query = query
         search_request.customer_id = customer_id
-        return [self.ga_service.search(search_request)]
+
+        # Requests are made via the Google Ads client/service. We've seen captures hang for multiple hours,
+        # and I'm suspecting the Google API is silently dropping the connection intermittently. The timeout
+        # logic wired in below isn't the most elegant, but it should prevent connectors from hanging
+        # indefinitely if Google _is_ dropping connections silently.
+        #
+        # We can set a GRCP_TIMEOUT on the actual GoogleAds client search grcp, too. I've stil observed
+        # a connector hanging locally with just the GRCP_TIMEOUT though, so hopefully the combination of both
+        # timeouts will mitigate the issue.
+        def do_request():
+            return [self.ga_service.search(search_request, timeout=GRCP_TIMEOUT)]
+
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(do_request)
+            try:
+                return future.result(timeout=REQUEST_TIMEOUT)
+            except FutureTimeout:
+                raise TimeoutError(f"Request timed out after {REQUEST_TIMEOUT} seconds")
+
 
     def get_fields_metadata(self, fields: List[str]) -> Mapping[str, Any]:
         """
