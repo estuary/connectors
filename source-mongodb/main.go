@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/event"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readconcern"
@@ -264,6 +265,21 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		return nil, fmt.Errorf("the provided address %q appears to be for Amazon DocumentDB, which requires an SSH tunnel configuration", cfg.Address)
 	}
 
+	poolMonitor := &event.PoolMonitor{
+		Event: func(evt *event.PoolEvent) {
+			switch evt.Type {
+			case event.GetStarted, event.GetSucceeded, event.ConnectionReturned:
+				// These are for connection checkout start, connection checked
+				// out, and connection checked in, which will happen frequently
+				// during the course of normal connector operation as
+				// connections are checked out and returned to the pool.
+				return
+			}
+
+			log.WithField("event", evt).Debug("mongodb connection pool event")
+		},
+	}
+
 	// Create a new client and connect to the server. "Majority" read concern is set to avoid
 	// reading data during backfills that may be rolled back in uncommon situations. This matches
 	// the behavior of change streams, which only represent data that has been majority committed.
@@ -274,7 +290,7 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// much memory as "zlib" or "snappy", but generally shouldn't OOM the connector so it isn't
 	// being completely disabled. We could re-evaluate this priority after
 	// https://github.com/mongodb/mongo-go-driver/pull/1577 is merged and released.
-	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zlib", "snappy", "zstd"}).SetReadConcern(readconcern.Majority())
+	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zlib", "snappy", "zstd"}).SetReadConcern(readconcern.Majority()).SetPoolMonitor(poolMonitor)
 	if isDocDB {
 		tlsConfig, err := documentDBTLSConfig()
 		if err != nil {
