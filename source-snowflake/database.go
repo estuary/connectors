@@ -36,18 +36,22 @@ func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
 // snowflakeObject represents the (schema, name) tuple identifying a Snowflake object
 // such as a table, stream, or view.
 type snowflakeObject struct {
+	DB     string `json:"db"`
 	Schema string `json:"schema"`
 	Name   string `json:"name"`
 }
 
 func (t snowflakeObject) String() string {
-	return t.Schema + "." + t.Name
+	if t.DB == "" {
+		return t.Schema + "." + t.Name
+	}
+	return t.DB + "." + t.Schema + "." + t.Name
 }
 
 // QuotedName returns a quoted and fully-qualified version of the table name which
 // can be directly interpolated into a Snowflake SQL query.
 func (t snowflakeObject) QuotedName() string {
-	return quoteSnowflakeIdentifier(t.Schema) + "." + quoteSnowflakeIdentifier(t.Name)
+	return quoteSnowflakeIdentifier(t.DB) + "." + quoteSnowflakeIdentifier(t.Schema) + "." + quoteSnowflakeIdentifier(t.Name)
 }
 
 func (t snowflakeObject) MarshalText() ([]byte, error) {
@@ -122,18 +126,18 @@ func createChangeStream(ctx context.Context, cfg *config, db *sql.DB, sourceTabl
 // the desired sequence number already exists then this does nothing.
 func createInitialCloneTable(ctx context.Context, cfg *config, db *sql.DB, sourceTable snowflakeObject, isDynamic bool, uniqueID string, seqno int) (snowflakeObject, error) {
 	var stagingTable = stagingTableName(cfg, uniqueID, seqno)
-	var createStagingTableQuery = fmt.Sprintf(
-		`CREATE TRANSIENT TABLE IF NOT EXISTS %s CLONE %s;`,
-		stagingTable.QuotedName(),
-		sourceTable.QuotedName(),
-	)
-	if isDynamic {
-		createStagingTableQuery = fmt.Sprintf(
-			`CREATE TRANSIENT DYNAMIC TABLE IF NOT EXISTS %s CLONE %s;`,
-			stagingTable.QuotedName(),
-			sourceTable.QuotedName(),
-		)
+
+	var queryTemplate string
+	switch {
+	case cfg.Advanced.FullCopySnapshots:
+		queryTemplate = `CREATE TRANSIENT TABLE IF NOT EXISTS %s AS SELECT * FROM %s;`
+	case isDynamic:
+		queryTemplate = `CREATE TRANSIENT DYNAMIC TABLE IF NOT EXISTS %s CLONE %s;`
+	default:
+		queryTemplate = `CREATE TRANSIENT TABLE IF NOT EXISTS %s CLONE %s;`
 	}
+
+	var createStagingTableQuery = fmt.Sprintf(queryTemplate, stagingTable.QuotedName(), sourceTable.QuotedName())
 	if _, err := db.ExecContext(ctx, createStagingTableQuery); err != nil {
 		return stagingTable, fmt.Errorf("error cloning source table %q into staging table %q: %w", sourceTable, stagingTable, err)
 	}
@@ -147,7 +151,7 @@ type snowflakeDynamicTable struct {
 	RefreshMode string `db:"refresh_mode"`
 }
 
-func listDynamicTables(ctx context.Context, db *sql.DB) (map[snowflakeObject]*snowflakeDynamicTable, error) {
+func listDynamicTables(ctx context.Context, cfg *config, db *sql.DB) (map[snowflakeObject]*snowflakeDynamicTable, error) {
 	var xdb = sqlx.NewDb(db, "snowflake").Unsafe()
 	var tables []*snowflakeDynamicTable
 	if err := xdb.SelectContext(ctx, &tables, "SHOW DYNAMIC TABLES IN ACCOUNT;"); err != nil {
@@ -156,7 +160,7 @@ func listDynamicTables(ctx context.Context, db *sql.DB) (map[snowflakeObject]*sn
 
 	var result = make(map[snowflakeObject]*snowflakeDynamicTable)
 	for _, table := range tables {
-		var tableID = snowflakeObject{table.Schema, table.Name}
+		var tableID = snowflakeObject{cfg.Database, table.Schema, table.Name}
 		result[tableID] = table
 	}
 	return result, nil
@@ -166,6 +170,7 @@ func listDynamicTables(ctx context.Context, db *sql.DB) (map[snowflakeObject]*sn
 // specific binding's unique identifier.
 func changeStreamName(cfg *config, uniqueID string) snowflakeObject {
 	return snowflakeObject{
+		DB:     cfg.Advanced.FlowDB,
 		Schema: cfg.Advanced.FlowSchema,
 		Name:   fmt.Sprintf("flow_stream_%s", uniqueID),
 	}
@@ -175,9 +180,17 @@ func changeStreamName(cfg *config, uniqueID string) snowflakeObject {
 // sequence number corresponding to a specific binding's unique identifier.
 func stagingTableName(cfg *config, uniqueID string, seqno int) snowflakeObject {
 	return snowflakeObject{
+		DB:     cfg.Advanced.FlowDB,
 		Schema: cfg.Advanced.FlowSchema,
 		Name:   fmt.Sprintf("flow_staging_%012d_%s", seqno, uniqueID),
 	}
+}
+
+func quoteSnowflakeSchema(db, schema string) string {
+	if db == "" {
+		return quoteSnowflakeIdentifier(schema)
+	}
+	return quoteSnowflakeIdentifier(db) + "." + quoteSnowflakeIdentifier(schema)
 }
 
 // quoteSnowflakeIdentifier quotes an identifier so that it may be interpolated into
