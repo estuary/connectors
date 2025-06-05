@@ -180,7 +180,7 @@ func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix str
 	for _, str := range []string{"/", "=", "(", ")"} {
 		tableName = strings.ReplaceAll(tableName, str, "_")
 	}
-	var fullTableName = snowflakeObject{*dbSchema, tableName}.QuotedName()
+	var fullTableName = snowflakeObject{*dbName, *dbSchema, tableName}.QuotedName()
 
 	log.WithFields(log.Fields{"table": fullTableName, "cols": tableDef}).Debug("creating test table")
 

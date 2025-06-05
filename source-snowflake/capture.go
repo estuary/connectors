@@ -86,7 +86,7 @@ func (snowflakeDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutpu
 			orderColumns = append(orderColumns, unescapeTildes(keyElem))
 		}
 
-		var table = snowflakeObject{res.Schema, res.Table}
+		var table = snowflakeObject{cfg.Database, res.Schema, res.Table}
 		log.WithField("table", table.String()).Info("configured binding")
 		if err := setupTablePrerequisites(ctx, cfg, db, table); err != nil {
 			prerequisiteErrs = append(prerequisiteErrs, err)
@@ -229,7 +229,7 @@ func (c *capture) updateState(ctx context.Context) error {
 		}
 	}
 
-	dynamicTables, err := listDynamicTables(ctx, c.DB)
+	dynamicTables, err := listDynamicTables(ctx, c.Config, c.DB)
 	if err != nil {
 		return fmt.Errorf("error listing dynamic tables: %w", err)
 	}
@@ -294,7 +294,7 @@ func (c *capture) pruneDeletedStreams(ctx context.Context) error {
 		Schema string `db:"schema_name"`
 		Name   string `db:"name"`
 	}
-	var changeStreamsQuery = fmt.Sprintf("SHOW STREAMS IN SCHEMA %s STARTS WITH 'flow_stream_';", c.Config.Advanced.FlowSchema)
+	var changeStreamsQuery = fmt.Sprintf("SHOW STREAMS IN SCHEMA %s STARTS WITH 'flow_stream_';", quoteSnowflakeSchema(c.Config.Advanced.FlowDB, c.Config.Advanced.FlowSchema))
 	if err := xdb.Select(&changeStreams, changeStreamsQuery); err != nil {
 		return fmt.Errorf("error listing change streams: %w", err)
 	}
@@ -321,7 +321,7 @@ func (c *capture) pruneDeletedStreams(ctx context.Context) error {
 	// Actually perform deletion of no-longer-needed streams.
 	for _, deleteStream := range needsDeletion {
 		log.WithField("stream", deleteStream).Info("pruning change stream")
-		var dropStreamQuery = fmt.Sprintf("DROP STREAM IF EXISTS %s;", snowflakeObject{c.Config.Advanced.FlowSchema, deleteStream}.QuotedName())
+		var dropStreamQuery = fmt.Sprintf("DROP STREAM IF EXISTS %s;", snowflakeObject{c.Config.Advanced.FlowDB, c.Config.Advanced.FlowSchema, deleteStream}.QuotedName())
 		if _, err := c.DB.ExecContext(ctx, dropStreamQuery); err != nil {
 			return fmt.Errorf("error dropping change stream %q: %w", deleteStream, err)
 		}
@@ -355,7 +355,7 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[boilerplate.State
 	// Enumerate staging tables in the appropriate schema
 	var xdb = sqlx.NewDb(c.DB, "snowflake").Unsafe()
 	var stagingTables []*snowflakeDiscoveryTable
-	var stagingTablesQuery = fmt.Sprintf("SHOW TABLES IN SCHEMA %s STARTS WITH 'flow_staging_';", c.Config.Advanced.FlowSchema)
+	var stagingTablesQuery = fmt.Sprintf("SHOW TABLES IN SCHEMA %s STARTS WITH 'flow_staging_';", quoteSnowflakeSchema(c.Config.Advanced.FlowDB, c.Config.Advanced.FlowSchema))
 	if err := xdb.Select(&stagingTables, stagingTablesQuery); err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
@@ -408,7 +408,7 @@ func (c *capture) pruneStagingTables(ctx context.Context) (map[boilerplate.State
 	// Actually perform deletion of no-longer-needed staging tables.
 	for _, deleteTable := range needsDeletion {
 		log.WithField("table", deleteTable).Info("pruning staging table")
-		var dropTableQuery = fmt.Sprintf("DROP TABLE IF EXISTS %s;", snowflakeObject{c.Config.Advanced.FlowSchema, deleteTable}.QuotedName())
+		var dropTableQuery = fmt.Sprintf("DROP TABLE IF EXISTS %s;", snowflakeObject{c.Config.Advanced.FlowDB, c.Config.Advanced.FlowSchema, deleteTable}.QuotedName())
 		if _, err := c.DB.ExecContext(ctx, dropTableQuery); err != nil {
 			return nil, fmt.Errorf("error dropping staging table %q: %w", deleteTable, err)
 		}
