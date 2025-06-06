@@ -27,6 +27,8 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
 
     let config: EndpointConfig = serde_json::from_str(&spec.config_json)?;
     let producer = config.to_producer()?;
+    let producer_context = producer.context();
+    let mut txn_docs_counter: usize = 0;
 
     output.send(Response {
         opened: Some(Opened {
@@ -87,8 +89,21 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
                     },
                 }
             }
+
+            txn_docs_counter += 1;
         } else if request.start_commit.is_some() {
             producer.flush(Timeout::Never)?;
+            producer_context.get_error().context("flushing producer")?;
+            let sent = producer_context.get_and_reset_count();
+            if sent != txn_docs_counter {
+                anyhow::bail!(
+                    "successfully delivered {} messages vs. {} expected",
+                    sent,
+                    txn_docs_counter,
+                )
+            }
+            txn_docs_counter = 0;
+
             output.send(Response {
                 started_commit: Some(StartedCommit { state: None }),
                 ..Default::default()

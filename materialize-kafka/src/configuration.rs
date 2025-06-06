@@ -1,9 +1,15 @@
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
+
 use anyhow::Result;
 use rdkafka::{
     admin::AdminClient,
     client::DefaultClientContext,
-    producer::{DefaultProducerContext, ThreadedProducer},
-    ClientConfig,
+    error::KafkaError,
+    producer::{ProducerContext, ThreadedProducer},
+    ClientConfig, ClientContext,
 };
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -211,6 +217,54 @@ impl JsonSchema for EndpointConfig {
     }
 }
 
+#[derive(Clone)]
+pub struct FlowProducerContext {
+    success_count: Arc<AtomicUsize>,
+    first_error: Arc<Mutex<Result<(), KafkaError>>>,
+}
+
+impl FlowProducerContext {
+    fn new() -> Self {
+        FlowProducerContext {
+            success_count: Arc::new(AtomicUsize::new(0)),
+            first_error: Arc::new(Mutex::new(Ok(()))),
+        }
+    }
+
+    pub fn get_error(&self) -> Result<(), KafkaError> {
+        self.first_error.lock().unwrap().clone()
+    }
+
+    pub fn get_and_reset_count(&self) -> usize {
+        self.success_count.swap(0, Ordering::Relaxed)
+    }
+}
+
+impl ClientContext for FlowProducerContext {}
+
+impl ProducerContext for FlowProducerContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(
+        &self,
+        delivery_result: &rdkafka::message::DeliveryResult<'_>,
+        _: Self::DeliveryOpaque,
+    ) {
+        if let Err((error, _)) = delivery_result {
+            let mut res = self.first_error.lock().unwrap();
+            if res.is_ok() {
+                *res = Err(error.clone());
+            }
+        } else {
+            self.success_count.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn get_custom_partitioner(&self) -> Option<&rdkafka::producer::NoCustomPartitioner> {
+        None
+    }
+}
+
 impl EndpointConfig {
     pub fn validate(&self) -> Result<()> {
         if matches!(self.message_format, MessageFormat::Avro) && self.schema_registry.is_none() {
@@ -220,10 +274,10 @@ impl EndpointConfig {
         Ok(())
     }
 
-    pub fn to_producer(&self) -> Result<ThreadedProducer<DefaultProducerContext>> {
+    pub fn to_producer(&self) -> Result<ThreadedProducer<FlowProducerContext>> {
         let mut config = self.common_config()?;
         config.set("compression.type", "lz4");
-        Ok(config.create()?)
+        Ok(config.create_with_context(FlowProducerContext::new())?)
     }
 
     pub fn to_admin(&self) -> Result<AdminClient<DefaultClientContext>> {
