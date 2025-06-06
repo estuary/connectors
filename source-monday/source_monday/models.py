@@ -7,6 +7,7 @@ from typing import (
     Callable,
     Generic,
     TypeVar,
+    Literal,
 )
 import json
 
@@ -114,7 +115,11 @@ class GraphQLResponse(BaseModel, Generic[ResponseObject], extra="allow"):
 
 
 class ActivityLog(BaseModel, extra="allow"):
+    id: str
+    entity: str
+    event: str
     data: dict[str, Any] = Field(default_factory=dict)
+    created_at: str
 
     @field_validator("data", mode="before")
     @classmethod
@@ -140,8 +145,10 @@ class Board(BaseDocument, extra="allow"):
     class Workspace(BaseModel, extra="allow"):
         kind: str | None = None
 
+    id: str
     updated_at: AwareDatetime
     workspace: Workspace
+    state: Literal["all", "active", "archived", "deleted"]
 
 
 class BoardsResponse(BaseModel, extra="forbid"):
@@ -154,6 +161,7 @@ class ParentItemRef(BaseModel, extra="allow"):
 
 class Item(BaseDocument, extra="allow"):
     id: str
+    state: Literal["all", "active", "archived", "deleted"]
     parent_item: ParentItemRef | None = None
     updated_at: AwareDatetime
 
@@ -165,6 +173,7 @@ class ItemsPage(BaseModel, extra="allow"):
 
 class BoardItems(BaseModel, extra="allow"):
     id: str
+    state: str | None = None
     items_page: ItemsPage
 
 

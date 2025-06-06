@@ -10,7 +10,7 @@ from source_monday.graphql import (
     TEAMS,
     USERS,
     execute_query,
-    fetch_recently_updated,
+    fetch_activity_log_ids,
     fetch_boards,
     fetch_items_by_boards,
     fetch_items_by_ids,
@@ -38,7 +38,7 @@ async def fetch_boards_changes(
 
     max_updated_at = log_cursor
 
-    updated_ids = await fetch_recently_updated(
+    updated_ids = await fetch_activity_log_ids(
         "board",
         http,
         log,
@@ -74,7 +74,7 @@ async def fetch_boards_page(
 
     doc_count = 0
     async for board in fetch_boards(http, log, page=page, limit=limit):
-        if board.updated_at < cutoff:
+        if board.updated_at < cutoff and board.state != "deleted":
             yield board
             doc_count += 1
 
@@ -94,7 +94,7 @@ async def fetch_items_changes(
 
     max_updated_at = log_cursor
 
-    item_ids = await fetch_recently_updated(
+    item_ids = await fetch_activity_log_ids(
         "pulse",
         http,
         log,
@@ -145,7 +145,7 @@ async def fetch_items_page(
             board_id = item
             continue
 
-        if item.updated_at < cutoff:
+        if item.updated_at < cutoff and item.state != "deleted":
             yield item
             items_count += 1
 
