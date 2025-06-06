@@ -1,6 +1,6 @@
 from datetime import datetime, UTC, timedelta
 from enum import auto, StrEnum
-from typing import Any, AsyncGenerator, Callable, ClassVar, Literal, Optional
+from typing import Any, ClassVar, Literal, Optional
 
 from estuary_cdk.capture.common import (
     BasicAuth,
@@ -13,7 +13,6 @@ from estuary_cdk.capture.common import (
     LogCursor,
     Logger,
 )
-from estuary_cdk.http import HTTPSession
 from pydantic import AwareDatetime, BaseModel, Field
 
 
@@ -389,7 +388,7 @@ class LabelsResponse(PaginatedResponse):
     values: list[str]
 
 
-# Child streams
+# Platform API child streams
 class FilterSharing(FullRefreshStream):
     name: ClassVar[str] = "filter_sharing"
     path: ClassVar[str] = "permission"
@@ -442,7 +441,7 @@ class ProjectVersions(ProjectChildStream):
 
 
 class IssueChildResource(JiraResource):
-    # The connector adds issueId into the document.
+    # The connector adds issueId into each document.
     issueId: int
 
 
@@ -489,7 +488,7 @@ class IssueWorklogs(IssueChildStream):
     response_model: ClassVar[type[IssueWorklogsResponse]] = IssueWorklogsResponse
 
 
-# Software API Streams
+# Software API streams
 class Boards(FullRefreshPaginatedStream):
     name: ClassVar[str] = "boards"
     path: ClassVar[str] = "board"
@@ -500,7 +499,7 @@ class Boards(FullRefreshPaginatedStream):
     api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
 
 
-# Software API Child Streams
+# Software API child streams
 class BoardChildStream(FullRefreshStream):
     add_parent_id_to_documents: ClassVar[bool] = True
     api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
@@ -548,48 +547,48 @@ class RequestTypes(ServiceManagementFullRefreshPaginatedStream):
 
 FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ApplicationRoles,
+    Boards,
     Dashboards,
+    Epics,
+    FilterSharing,
     Filters,
     Groups,
-    Labels,
-    Permissions,
-    SystemAvatars,
-    IssueSecuritySchemes,
-    IssueLinkTypes,
+    IssueCustomFieldContexts,
+    IssueCustomFieldOptions,
     IssueFieldConfigurations,
     IssueFields,
+    IssueLinkTypes,
     IssueNavigatorSettings,
+    IssuePriorities,
     IssueResolutions,
+    IssueSecuritySchemes,
     IssueTypeSchemes,
     IssueTypeScreenSchemes,
     IssueTypes,
+    Labels,
     PermissionSchemes,
+    Permissions,
+    ProjectAvatars,
     ProjectCategories,
+    ProjectComponents,
+    ProjectEmails,
     ProjectRoles,
     ProjectTypes,
+    ProjectVersions,
     Projects,
-    Screens,
+    RequestTypes,
     ScreenSchemes,
+    ScreenTabFields,
     ScreenTabs,
+    Screens,
+    ServiceDesks,
+    Sprints,
+    SystemAvatars,
     Users,
     WorkflowSchemes,
     WorkflowStatusCategories,
     WorkflowStatuses,
     Workflows,
-    IssuePriorities,
-    FilterSharing,
-    IssueCustomFieldContexts,
-    IssueCustomFieldOptions,
-    ScreenTabFields,
-    ProjectAvatars,
-    ProjectComponents,
-    ProjectEmails,
-    ProjectVersions,
-    Boards,
-    Epics,
-    Sprints,
-    ServiceDesks,
-    RequestTypes,
 ]
 
 
