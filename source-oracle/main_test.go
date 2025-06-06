@@ -96,6 +96,7 @@ func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatc
 	sanitizers[`"AAAAAAA=":{"MessageCount"`] = regexp.MustCompile(`"[^"]+":{"MessageCount"`)
 	sanitizers[`"StartSCN":111111111"`] = regexp.MustCompile(`"StartSCN":[0-9]+`)
 	sanitizers[`"SCN":111111111"`] = regexp.MustCompile(`"SCN":[0-9]+`)
+	sanitizers[`"PendingTransactions":{},"SCN"`] = regexp.MustCompile(`"PendingTransactions":{.*},"SCN"`)
 
 	var cfg = tb.config
 	var cs = &st.CaptureSpec{

@@ -74,8 +74,9 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 	}
 
 	var db = &oracleDatabase{
-		config:       &config,
-		featureFlags: featureFlags,
+		config:              &config,
+		featureFlags:        featureFlags,
+		backfillRowIDRanges: make(map[sqlcapture.StreamID][]string),
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
@@ -141,9 +142,9 @@ type Config struct {
 type advancedConfig struct {
 	SkipBackfills        string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	WatermarksTable      string   `json:"watermarksTable,omitempty" jsonschema:"description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	BackfillChunkSize    int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	BackfillChunkSize    int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query. Only applies to tables with a primary key."`
 	IncrementalChunkSize int      `json:"incremental_chunk_size,omitempty" jsonschema:"title=Incremental Chunk Size,default=10000,description=The number of rows which should be fetched from the database in a single incremental query."`
-	IncrementalSCNRange  int      `json:"incremental_scn_range,omitempty" jsonschema:"title=Incremental SCN Range,default=50000,description=The SCN range captured at every iteration."`
+	IncrementalSCNRange  int      `json:"incremental_scn_range,omitempty" jsonschema:"-"`
 	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two modes based on requirements.,enum=extract,enum=online,enum=smart"`
@@ -233,7 +234,7 @@ func (c *Config) ToURI(prefetchRows int) string {
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
-	uri.RawQuery = fmt.Sprintf("PREFETCH_ROWS=%d", prefetchRows)
+	uri.RawQuery = fmt.Sprintf("PREFETCH_ROWS=%d&TIMEOUT=600", prefetchRows)
 	return uri.String()
 }
 
@@ -254,6 +255,8 @@ type oracleDatabase struct {
 	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
 	featureFlags       map[string]bool                  // Parsed feature flag settings with defaults applied
+
+	backfillRowIDRanges map[sqlcapture.StreamID][]string // List of backfill chunk rowids
 }
 
 func (db *oracleDatabase) IsRDS() bool {

@@ -48,7 +48,7 @@
           "backfill_chunk_size": {
             "type": "integer",
             "title": "Backfill Chunk Size",
-            "description": "The number of rows which should be fetched from the database in a single backfill query.",
+            "description": "The number of rows which should be fetched from the database in a single backfill query. Only applies to tables with a primary key.",
             "default": 50000
           },
           "incremental_chunk_size": {
@@ -56,12 +56,6 @@
             "title": "Incremental Chunk Size",
             "description": "The number of rows which should be fetched from the database in a single incremental query.",
             "default": 10000
-          },
-          "incremental_scn_range": {
-            "type": "integer",
-            "title": "Incremental SCN Range",
-            "description": "The SCN range captured at every iteration.",
-            "default": 50000
           },
           "discover_schemas": {
             "items": {
