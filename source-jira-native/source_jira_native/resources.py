@@ -244,6 +244,7 @@ def full_refresh_resources(
                     name=stream.name, interval=timedelta(minutes=60)
                 ),
                 schema_inference=True,
+                disable=stream.disable,
             )
         )
 
@@ -300,6 +301,7 @@ def issues(
             name="issues", interval=timedelta(minutes=5)
         ),
         schema_inference=True,
+        disable=False,
     )
 
 
@@ -360,6 +362,7 @@ def issue_child_resources(
                     name=stream.name, interval=timedelta(minutes=5)
                 ),
                 schema_inference=True,
+                disable=stream.disable,
             )
         )
 

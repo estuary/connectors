@@ -162,7 +162,12 @@ class JiraAPI(StrEnum):
     SOFTWARE = auto()
 
 
-class FullRefreshStream():
+class Stream():
+    # Unless overwritten by a subclass, initially disable streams by default.
+    disable: ClassVar[bool] = True
+
+
+class FullRefreshStream(Stream):
     name: ClassVar[str]
     path: ClassVar[str]
     extra_params: ClassVar[Optional[dict[str, str]]] = None
@@ -184,7 +189,7 @@ class ApplicationRoles(FullRefreshArrayedStream):
 class IssueFields(FullRefreshArrayedStream):
     name: ClassVar[str] = "issue_fields"
     path: ClassVar[str] = "field"
-
+    disable: ClassVar[bool] = False
 
 class IssueNavigatorSettings(FullRefreshArrayedStream):
     name: ClassVar[str] = "issue_navigator_settings"
@@ -199,6 +204,7 @@ class IssuePriorities(FullRefreshArrayedStream):
 class IssueTypes(FullRefreshArrayedStream):
     name: ClassVar[str] = "issue_types"
     path: ClassVar[str] = "issuetype"
+    disable: ClassVar[bool] = False
 
 
 class ProjectCategories(FullRefreshArrayedStream):
@@ -235,6 +241,7 @@ class FullRefreshPaginatedArrayedStream(FullRefreshStream):
 class Users(FullRefreshPaginatedArrayedStream):
     name: ClassVar[str] = "users"
     path: ClassVar[str] = "users/search"
+    disable: ClassVar[bool] = False
 
 
 # The various Jira APIs use different parameter names for the
@@ -269,7 +276,7 @@ class Dashboards(FullRefreshPaginatedStream):
     name: ClassVar[str] = "dashboards"
     path: ClassVar[str] = "dashboard"
     response_model: ClassVar[type[PaginatedResponse]] = DashboardsResponse
-
+    disable: ClassVar[bool] = False
 
 class IssueFieldConfigurations(FullRefreshPaginatedStream):
     name: ClassVar[str] = "issue_field_configurations"
@@ -334,7 +341,7 @@ class Projects(FullRefreshPaginatedStream):
         "status": "live,archived,deleted",
         "expand": "description,lead,projectKeys,url,issueTypes"
     }
-
+    disable: ClassVar[bool] = False
 
 # Full refresh resources whose API response contains an array of results at some top level field.
 class FullRefreshNestedArrayStream(FullRefreshStream):
@@ -453,7 +460,7 @@ class IssueWorklogsResponse(PaginatedResponse):
     values: list[APIRecord] = Field(alias="worklogs")
 
 
-class IssueChildStream():
+class IssueChildStream(Stream):
     name: ClassVar[str]
     path: ClassVar[str]
     api: ClassVar[JiraAPI] = JiraAPI.PLATFORM
@@ -497,6 +504,7 @@ class Boards(FullRefreshPaginatedStream):
         "orderBy": "name"
     }
     api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
+    disable: ClassVar[bool] = False
 
 
 # Software API child streams
@@ -514,6 +522,7 @@ class Sprints(BoardChildStream):
     name: ClassVar[str] = "sprints"
     path: ClassVar[str] = "sprint"
     add_parent_id_to_documents: ClassVar[bool] = False
+    disable: ClassVar[bool] = False
 
 
 # Service Managmement API Streams
