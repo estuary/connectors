@@ -20,6 +20,7 @@ pub struct EndpointConfig {
     pub credentials: Option<Credentials>,
     pub tls: Option<TlsSettings>,
     pub message_format: MessageFormat,
+    pub compression: Compression,
     pub schema_registry: Option<SchemaRegistryConfig>,
     pub topic_partitions: i32,
     pub topic_replication_factor: i32,
@@ -50,6 +51,28 @@ pub enum SaslMechanism {
 pub enum MessageFormat {
     Avro,
     JSON,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    None,
+    Gzip,
+    Snappy,
+    Lz4,
+    Zstd,
+}
+
+impl std::fmt::Display for Compression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Compression::None => write!(f, "none"),
+            Compression::Gzip => write!(f, "gzip"),
+            Compression::Snappy => write!(f, "snappy"),
+            Compression::Lz4 => write!(f, "lz4"),
+            Compression::Zstd => write!(f, "zstd"),
+        }
+    }
 }
 
 impl std::fmt::Display for SaslMechanism {
@@ -165,6 +188,20 @@ impl JsonSchema for EndpointConfig {
                     "type": "string",
                     "order": 3
                 },
+                "compression": {
+                    "description": "Compression algorithm to use for messages. Note that not all Kafka brokers support all compression algorithms.",
+                    "enum": [
+                        "none",
+                        "gzip",
+                        "lz4",
+                        "snappy",
+                        "zstd"
+                    ],
+                    "title": "Compression",
+                    "type": "string",
+                    "default": "lz4",
+                    "order": 4
+                },
                 "schema_registry": {
                     "title": "Schema Registry",
                     "description": "Connection details for interacting with a schema registry. This is necessary for materializing messages with Avro encoding.",
@@ -195,21 +232,21 @@ impl JsonSchema for EndpointConfig {
                         "username",
                         "password"
                     ],
-                    "order": 4
+                    "order": 5
                 },
                 "topic_partitions": {
                     "title": "Topic Partitions",
                     "description": "The number of partitions to create new topics with.",
                     "type": "integer",
                     "default": 6,
-                    "order": 5
+                    "order": 6
                 },
                 "topic_replication_factor": {
                     "title": "Topic Replication Factor",
                     "description": "The replication factor to create new topics with.",
                     "type": "integer",
                     "default": 3,
-                    "order": 6
+                    "order": 7
                 },
             }
         }))
@@ -276,7 +313,7 @@ impl EndpointConfig {
 
     pub fn to_producer(&self) -> Result<ThreadedProducer<FlowProducerContext>> {
         let mut config = self.common_config()?;
-        config.set("compression.type", "lz4");
+        config.set("compression.type", self.compression.to_string());
         Ok(config.create_with_context(FlowProducerContext::new())?)
     }
 
