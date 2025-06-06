@@ -38,7 +38,7 @@ func (snowflakeDriver) Validate(ctx context.Context, req *pc.Request_Validate) (
 		}
 		res.SetDefaults()
 
-		if err := setupTablePrerequisites(ctx, cfg, db, snowflakeObject{res.Schema, res.Table}); err != nil {
+		if err := setupTablePrerequisites(ctx, cfg, db, snowflakeObject{cfg.Database, res.Schema, res.Table}); err != nil {
 			errs = append(errs, err)
 			continue
 		}
@@ -87,8 +87,9 @@ func setupPrerequisites(ctx context.Context, cfg *config, db *sql.DB) []error {
 func prerequisiteFlowSchema(ctx context.Context, cfg *config, db *sql.DB) error {
 	var createSchemaQuery = fmt.Sprintf(
 		`CREATE TRANSIENT SCHEMA IF NOT EXISTS %s COMMENT = 'Schema containing Flow streams and staging tables';`,
-		quoteSnowflakeIdentifier(cfg.Advanced.FlowSchema),
+		quoteSnowflakeSchema(cfg.Advanced.FlowDB, cfg.Advanced.FlowSchema),
 	)
+	log.WithField("query", createSchemaQuery).Debug("verifying that the staging schema exists")
 	if _, err := db.ExecContext(ctx, createSchemaQuery); err != nil {
 		return fmt.Errorf("error creating Flow schema: %w", err)
 	}

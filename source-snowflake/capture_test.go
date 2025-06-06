@@ -253,7 +253,7 @@ func TestDynamicTable(t *testing.T) {
 	tb.Insert(ctx, t, baseTable, [][]any{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
 
 	// Create a dynamic table from the base table
-	var dynamicTable = snowflakeObject{*dbSchema, "test_" + strings.TrimPrefix(t.Name(), "Test") + "_" + uniqueB}.QuotedName()
+	var dynamicTable = snowflakeObject{*dbName, *dbSchema, "test_" + strings.TrimPrefix(t.Name(), "Test") + "_" + uniqueB}.QuotedName()
 	tb.Query(ctx, t, fmt.Sprintf("CREATE OR REPLACE DYNAMIC TABLE %s TARGET_LAG = '60 seconds' WAREHOUSE = '%s' REFRESH_MODE = INCREMENTAL AS SELECT id, data FROM %s;", dynamicTable, *dbWarehouse, baseTable))
 	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("DROP DYNAMIC TABLE IF EXISTS %s;", dynamicTable)) })
 

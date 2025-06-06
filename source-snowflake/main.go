@@ -25,13 +25,15 @@ type config struct {
 	Account   string         `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
 	User      string         `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
 	Password  string         `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
-	Database  string         `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=4"`
+	Database  string         `json:"database" jsonschema:"title=Database,description=The database name to capture from." jsonschema_extras:"order=4"`
 	Warehouse string         `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
 	Advanced  advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
 type advancedConfig struct {
-	FlowSchema string `json:"flowSchema,omitempty" jsonschema:"default=ESTUARY_STAGING,description=The schema in which Flow will create and manage its streams and staging tables."`
+	FlowSchema        string `json:"flowSchema,omitempty" jsonschema:"default=ESTUARY_STAGING,description=The schema in which Flow will create and manage its streams and staging tables."`
+	FlowDB            string `json:"flowDatabase,omitempty" jsonschema:"default=,description=The database in which Flow will create and manage its streams and staging tables. Defaults to the capture database if unset."`
+	FullCopySnapshots bool   `json:"fullCopySnapshots,omitempty" jsonschema:"default=false,description=If set the initial snapshot of a table will be a full copy rather than a zero-copy clone."`
 }
 
 var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
@@ -72,6 +74,9 @@ func (c *config) SetDefaults() {
 	// which cause these fields to be emitted as non-required.
 	if c.Advanced.FlowSchema == "" {
 		c.Advanced.FlowSchema = "ESTUARY_STAGING"
+	}
+	if c.Advanced.FlowDB == "" {
+		c.Advanced.FlowDB = c.Database // Default to the capture database.
 	}
 }
 
