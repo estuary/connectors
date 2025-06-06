@@ -9,45 +9,45 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import TypeAdapter
 
 from .models import (
-    FullRefreshResource,
-    PaginatedResponse,
-    JiraResource,
-    Issue,
-    IssuesResponse,
-    MyselfResponse,
-    LabelsResponse,
-    PermissionsResponse,
-    ProjectAvatarsResponse,
-    ScreenTabs,
-    SystemAvatarsResponse,
+    APIRecord,
+    BoardChildStream,
+    Boards,
     Filters,
-    IssueFields,
-    Projects,
-    ProjectChildStream,
-    ProjectAvatars,
-    ProjectComponents,
-    ProjectEmails,
-    ProjectVersions,
+    FullRefreshArrayedStream,
+    FullRefreshNestedArrayStream,
+    FullRefreshPaginatedArrayedStream,
+    FullRefreshPaginatedStream,
+    FullRefreshResource,
+    FullRefreshStream,
+    Issue,
+    IssueChangelogs,
     IssueChildResource,
     IssueChildStream,
     IssueComments,
-    IssueChangelogs,
-    IssueTransitions,
-    IssueWorklogs,
-    Boards,
-    BoardChildStream,
-    APIRecord,
-    JiraAPI,
-    FullRefreshStream,
-    FullRefreshArrayedStream,
-    FullRefreshNestedArrayStream,
-    FullRefreshPaginatedStream,
-    FullRefreshPaginatedArrayedStream,
     IssueCustomFieldContexts,
     IssueCustomFieldOptions,
-    ScreenTabFields,
+    IssueFields,
+    IssueTransitions,
+    IssueWorklogs,
+    IssuesResponse,
+    JiraAPI,
+    JiraResource,
+    LabelsResponse,
+    MyselfResponse,
     PaginationParameter,
+    PaginatedResponse,
+    PermissionsResponse,
+    ProjectAvatars,
+    ProjectAvatarsResponse,
+    ProjectChildStream,
+    ProjectComponents,
+    ProjectEmails,
+    Projects,
+    ProjectVersions,
     ResponseSizeParameter,
+    ScreenTabFields,
+    ScreenTabs,
+    SystemAvatarsResponse,
 )
 
 # Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
@@ -253,7 +253,6 @@ async def _paginate_through_resources(
             break
 
         params[pagination_param] = count
-
 
 
 async def snapshot_paginated_resources(
@@ -524,7 +523,6 @@ async def snapshot_project_child_resources(
         "status": "live",
     }
 
-    # In each tuple, the first element is the project id and the second element is the project key.
     project_ids: list[str] = []
     async for record in _paginate_through_resources(http, domain, Projects.api, Projects.path, Projects.extra_headers, extra_params,Projects.response_model, log):
         id = record.get("id", None)
@@ -546,7 +544,8 @@ async def snapshot_board_child_resources(
     board_ids: list[int] = []
     async for board in _paginate_through_resources(http, domain, Boards.api, Boards.path, Boards.extra_headers, Boards.extra_params, Boards.response_model, log):
         id = board.get("id", None)
-        # Attempting to fetch child resources of private boards returns a 404.
+        # Attempting to fetch child resources of private boards returns a 404,
+        # so we don't waste an API request trying to do so.
         isPrivate: bool | None = board.get("isPrivate", None)
         if id and not isPrivate:
             assert isinstance(id, int)
@@ -969,8 +968,6 @@ async def fetch_issues_child_resources(
     if last_seen > log_cursor:
         yield last_seen
 
-
-# NEED TO ADD A BACKFILL FUNCTION FOR CHILD RESOURCES!!!!!!!!!!!!!
 
 async def backfill_issues_child_resources(
     http: HTTPSession,
