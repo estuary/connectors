@@ -1,76 +1,5 @@
 [
   [
-    "acmeCo/teams",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "id": "1202780",
-      "name": "Team 1",
-      "owners": [
-        {
-          "id": "71985416"
-        }
-      ],
-      "picture_url": "https://cdn.monday.com/images/dapulse_team_default.png",
-      "users": [
-        {
-          "id": "71985416"
-        }
-      ]
-    }
-  ],
-  [
-    "acmeCo/users",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "birthday": null,
-      "country_code": "US",
-      "created_at": "2025-02-07T20:03:21Z",
-      "email": "justin@estuary.dev",
-      "enabled": true,
-      "id": "71985416",
-      "is_admin": true,
-      "is_guest": false,
-      "is_pending": false,
-      "is_verified": true,
-      "is_view_only": false,
-      "join_date": null,
-      "location": null,
-      "mobile_phone": null,
-      "name": "Justin Smith",
-      "phone": "",
-      "photo_original": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_small": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_thumb": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_thumb_small": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "photo_tiny": "https://cdn1.monday.com/dapulse_default_photo.png",
-      "time_zone_identifier": "America/Chicago",
-      "title": null,
-      "url": "https://estuarydev.monday.com/users/71985416",
-      "utc_hours_diff": "redacted"
-    }
-  ],
-  [
-    "acmeCo/tags",
-    {
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "color": "#579bfc",
-      "id": "25399873",
-      "name": "test"
-    }
-  ],
-  [
     "acmeCo/boards",
     {
       "_meta": {
@@ -175,96 +104,6 @@
         "id": "new_group29179"
       },
       "type": "board",
-      "updated_at": "redacted",
-      "updates": [],
-      "views": [],
-      "workspace": {
-        "description": null,
-        "id": "9823810",
-        "kind": "open",
-        "name": "Main workspace"
-      }
-    }
-  ],
-  [
-    "acmeCo/boards",
-    {
-      "_meta": {
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "board_kind": "public",
-      "columns": [
-        {
-          "archived": false,
-          "description": null,
-          "id": "name",
-          "settings_str": "{}",
-          "title": "Name",
-          "type": "name",
-          "width": 300
-        },
-        {
-          "archived": false,
-          "description": null,
-          "id": "person",
-          "settings_str": "{}",
-          "title": "Owner",
-          "type": "people",
-          "width": 98
-        },
-        {
-          "archived": false,
-          "description": null,
-          "id": "status",
-          "settings_str": "{\"done_colors\":[1],\"hide_footer\":true,\"labels\":{\"0\":\"Working on it\",\"1\":\"Done\",\"2\":\"Stuck\"},\"labels_positions_v2\":{\"0\":1,\"1\":2,\"2\":0,\"3\":3,\"4\":4,\"5\":9,\"6\":5,\"8\":6,\"9\":7,\"10\":8},\"labels_colors\":{\"0\":{\"color\":\"#fdab3d\",\"border\":\"#e99729\",\"var_name\":\"orange\"},\"1\":{\"color\":\"#00c875\",\"border\":\"#00b461\",\"var_name\":\"green-shadow\"},\"2\":{\"color\":\"#df2f4a\",\"border\":\"#ce3048\",\"var_name\":\"red-shadow\"}}}",
-          "title": "Status",
-          "type": "status",
-          "width": 136
-        },
-        {
-          "archived": false,
-          "description": null,
-          "id": "date0",
-          "settings_str": "{}",
-          "title": "Date",
-          "type": "date",
-          "width": 140
-        }
-      ],
-      "communication": null,
-      "creator": {
-        "id": "71985416"
-      },
-      "description": null,
-      "groups": [
-        {
-          "archived": false,
-          "color": "#579bfc",
-          "deleted": false,
-          "id": "topics",
-          "position": "65536",
-          "title": "Subitems"
-        }
-      ],
-      "id": "8483610893",
-      "name": "Subitems of Estuary",
-      "owners": [
-        {
-          "id": "71985416"
-        }
-      ],
-      "permissions": "everyone",
-      "state": "active",
-      "subscribers": [
-        {
-          "id": "71985416"
-        }
-      ],
-      "tags": [],
-      "top_group": {
-        "id": "topics"
-      },
-      "type": "sub_items_board",
       "updated_at": "redacted",
       "updates": [],
       "views": [],
@@ -430,267 +269,74 @@
     }
   ],
   [
-    "acmeCo/items",
+    "acmeCo/tags",
     {
       "_meta": {
+        "op": "c",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "assets": [],
-      "board": {
-        "id": "8483610893",
-        "name": "Subitems of Estuary"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "type": "people",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "type": "status",
-          "value": null
-        },
-        {
-          "id": "date0",
-          "text": "",
-          "type": "date",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-20T19:03:22Z",
-      "creator_id": "71985416",
-      "group": {
-        "id": "topics"
-      },
-      "id": "8531539316",
-      "name": "SubItem Number One",
-      "parent_item": {
-        "id": "8531390039"
-      },
-      "state": "active",
-      "subitems": [],
-      "subscribers": [
-        {
-          "id": "71985416"
-        }
-      ],
-      "updated_at": "redacted",
-      "updates": []
+      "color": "#579bfc",
+      "id": "25399873",
+      "name": "test"
     }
   ],
   [
-    "acmeCo/items",
+    "acmeCo/teams",
     {
       "_meta": {
+        "op": "c",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "assets": [],
-      "board": {
-        "id": "8483610893",
-        "name": "Subitems of Estuary"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "type": "people",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "type": "status",
-          "value": null
-        },
-        {
-          "id": "date0",
-          "text": "",
-          "type": "date",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-20T19:15:53Z",
-      "creator_id": "71985416",
-      "group": {
-        "id": "topics"
-      },
-      "id": "8531684828",
-      "name": "Second SubItem",
-      "parent_item": {
-        "id": "8531390039"
-      },
-      "state": "active",
-      "subitems": [],
-      "subscribers": [
+      "id": "1202780",
+      "name": "Team 1",
+      "owners": [
         {
           "id": "71985416"
         }
       ],
-      "updated_at": "redacted",
-      "updates": []
+      "picture_url": "https://cdn.monday.com/images/dapulse_team_default.png",
+      "users": [
+        {
+          "id": "71985416"
+        }
+      ]
     }
   ],
   [
-    "acmeCo/items",
+    "acmeCo/users",
     {
       "_meta": {
+        "op": "c",
+        "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "assets": [],
-      "board": {
-        "id": "8431289505",
-        "name": "Estuary"
-      },
-      "column_values": [
-        {
-          "id": "subitems_mkn5v6ah",
-          "text": null,
-          "type": "subtasks",
-          "value": null
-        },
-        {
-          "id": "project_owner",
-          "text": "",
-          "type": "people",
-          "value": null
-        },
-        {
-          "id": "project_status",
-          "text": "Not Started",
-          "type": "status",
-          "value": null
-        },
-        {
-          "id": "date",
-          "text": "",
-          "type": "date",
-          "value": null
-        },
-        {
-          "id": "tags_mkmy3r3g",
-          "text": "",
-          "type": "tags",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-24T02:14:12Z",
-      "creator_id": "71985416",
-      "group": {
-        "id": "new_group29179"
-      },
-      "id": "8547821762",
-      "name": "Parent Item 2",
-      "parent_item": null,
-      "state": "active",
-      "subitems": [
-        {
-          "assets": [],
-          "board": {
-            "id": "8483610893",
-            "name": "Subitems of Estuary"
-          },
-          "column_values": [
-            {
-              "id": "person",
-              "text": "",
-              "type": "people",
-              "value": null
-            },
-            {
-              "id": "status",
-              "text": null,
-              "type": "status",
-              "value": null
-            },
-            {
-              "id": "date0",
-              "text": "",
-              "type": "date",
-              "value": null
-            }
-          ],
-          "created_at": "2025-02-24T17:14:40Z",
-          "creator_id": "71985416",
-          "group": {
-            "id": "topics"
-          },
-          "id": "8553814342",
-          "name": "test",
-          "parent_item": {
-            "id": "8547821762"
-          },
-          "state": "active",
-          "subscribers": [
-            {
-              "id": "71985416"
-            }
-          ],
-          "updated_at": "2025-02-24T17:14:40Z",
-          "updates": []
-        }
-      ],
-      "subscribers": [
-        {
-          "id": "71985416"
-        }
-      ],
-      "updated_at": "redacted",
-      "updates": []
-    }
-  ],
-  [
-    "acmeCo/items",
-    {
-      "_meta": {
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "assets": [],
-      "board": {
-        "id": "8483610893",
-        "name": "Subitems of Estuary"
-      },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "type": "people",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": null,
-          "type": "status",
-          "value": null
-        },
-        {
-          "id": "date0",
-          "text": "",
-          "type": "date",
-          "value": null
-        }
-      ],
-      "created_at": "2025-02-24T17:14:40Z",
-      "creator_id": "71985416",
-      "group": {
-        "id": "topics"
-      },
-      "id": "8553814342",
-      "name": "test",
-      "parent_item": {
-        "id": "8547821762"
-      },
-      "state": "active",
-      "subitems": [],
-      "subscribers": [
-        {
-          "id": "71985416"
-        }
-      ],
-      "updated_at": "redacted",
-      "updates": []
+      "birthday": null,
+      "country_code": "US",
+      "created_at": "2025-02-07T20:03:21Z",
+      "email": "justin@estuary.dev",
+      "enabled": true,
+      "id": "71985416",
+      "is_admin": true,
+      "is_guest": false,
+      "is_pending": false,
+      "is_verified": true,
+      "is_view_only": false,
+      "join_date": null,
+      "location": null,
+      "mobile_phone": null,
+      "name": "Justin Smith",
+      "phone": "",
+      "photo_original": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_small": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_thumb": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_thumb_small": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "photo_tiny": "https://cdn1.monday.com/dapulse_default_photo.png",
+      "time_zone_identifier": "America/Chicago",
+      "title": null,
+      "url": "https://estuarydev.monday.com/users/71985416",
+      "utc_hours_diff": "redacted"
     }
   ]
 ]
