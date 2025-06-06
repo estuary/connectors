@@ -1,15 +1,18 @@
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator, Callable, TypeVar, Union
 
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, PageCursor
 
 from .models import (
+    DeletionRecord,
     IncrementalResource,
     SnapshotResource,
 )
 from .sage import Sage
+
+T = TypeVar("T", IncrementalResource, DeletionRecord)
 
 
 # This function is kind of intense, but what it's doing is repeatedly issuing
@@ -31,19 +34,18 @@ from .sage import Sage
 #
 # These factors all influence a strategy where only the last timestamp we know
 # we have seen all the records for is checkpointed, and a separate query can be
-# used for cycle breaking which is based on sorting by RECORDNO at a specific
+# used for cycle breaking which is based on sorting by `id_field` at a specific
 # WHENMODIFIED timestamp.
-#
-# At some point it may be worth generalizing this into a more generic version,
-# since it is a fairly common pattern in APIs.
-async def fetch_changes(
+async def _fetch_records_generic(
     object: str,
-    sage: Sage,
+    cls: type[T],
+    id_field: str,
     horizon: timedelta | None,
     page_size: int,
-    log: Logger,
     cursor: LogCursor,
-) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    fetch_since: Callable[[str, datetime], AsyncGenerator[Any, None]],
+    fetch_at: Callable[[str, datetime, Any], AsyncGenerator[Any, None]],
+) -> AsyncGenerator[T | LogCursor, None]:
     assert isinstance(cursor, datetime)
     now = datetime.now(UTC)
 
@@ -53,8 +55,8 @@ async def fetch_changes(
         cursor = last_completed_ts
         last_record_ts = None
         this_count = 0
-        async for rec in sage.fetch_since(object, cursor):
-            rec = IncrementalResource.model_validate(rec.model_dump())
+        async for rec in fetch_since(object, cursor):
+            rec = cls.model_validate(rec.model_dump())
             if last_record_ts and rec.WHENMODIFIED != last_record_ts:
                 # Got a timestamp change, which means the timestamp of the prior
                 # record has been fully read.
@@ -68,7 +70,7 @@ async def fetch_changes(
 
             this_count += 1
             last_record_ts = rec.WHENMODIFIED
-            if cache.should_yield(object, rec.RECORDNO, last_record_ts):
+            if cache.should_yield(object, getattr(rec, id_field), rec.WHENMODIFIED):
                 yield rec
 
         total_count += this_count
@@ -93,14 +95,14 @@ async def fetch_changes(
         # This is a cycle: We got a full page of records with the exact same
         # WHENMODIFIED timestamp.
         assert last_record_ts is not None
-        last_record_no = None
+        last_record_identifier = None
         while True:
             this_count = 0
-            async for rec in sage.fetch_at(object, last_record_ts, last_record_no):
-                rec = IncrementalResource.model_validate(rec.model_dump())
-                last_record_no = rec.RECORDNO
+            async for rec in fetch_at(object, last_record_ts, last_record_identifier):
+                rec = cls.model_validate(rec.model_dump())
+                last_record_identifier = getattr(rec, id_field)
                 this_count += 1
-                if cache.should_yield(object, rec.RECORDNO, rec.WHENMODIFIED):
+                if cache.should_yield(object, getattr(rec, id_field), rec.WHENMODIFIED):
                     yield rec
 
             if this_count < page_size:
@@ -108,6 +110,48 @@ async def fetch_changes(
                 last_completed_ts = last_record_ts
                 yield last_completed_ts
                 break
+
+
+async def fetch_changes(
+    object: str,
+    sage: Sage,
+    horizon: timedelta | None,
+    page_size: int,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    async for item in _fetch_records_generic(
+        object=object,
+        cls=IncrementalResource,
+        id_field="RECORDNO",
+        horizon=horizon,
+        page_size=page_size,
+        cursor=cursor,
+        fetch_since=sage.fetch_since,
+        fetch_at=sage.fetch_at,
+    ):
+        yield item
+
+
+async def fetch_deletions(
+    object: str,
+    sage: Sage,
+    horizon: timedelta | None,
+    page_size: int,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[DeletionRecord | LogCursor, None]:
+    async for item in _fetch_records_generic(
+        object=object,
+        cls=DeletionRecord,
+        id_field="ID",
+        horizon=horizon,
+        page_size=page_size,
+        cursor=cursor,
+        fetch_since=sage.fetch_deleted,
+        fetch_at=sage.fetch_deleted_at,
+    ):
+        yield item
 
 
 async def fetch_page(

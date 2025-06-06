@@ -63,6 +63,21 @@ ts = "2023-01-02 03:04:56"
             get_all_records_request,
             (cfg, session_id, object_name, fields, None),
         ),
+        (
+            "get_deletions_since_request.txt",
+            get_deletions_since_request,
+            (cfg, session_id, object_name, ts),
+        ),
+        (
+            "get_deletions_at_request.txt",
+            get_deletions_at_request,
+            (cfg, session_id, object_name, ts, "123:123456"),
+        ),
+        (
+            "get_deletions_at_request.txt",
+            get_deletions_at_request,
+            (cfg, session_id, object_name, ts, None),
+        ),
     ],
 )
 def test_xml_requests(snapshot, name, func, args):
