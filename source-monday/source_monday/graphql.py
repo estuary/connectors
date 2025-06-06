@@ -4,7 +4,6 @@ from logging import Logger
 from typing import Any, AsyncGenerator, Dict, Literal, Callable
 
 from estuary_cdk.http import HTTPSession
-
 from source_monday.models import (
     GraphQLResponse,
     GraphQLError,
@@ -79,14 +78,14 @@ async def execute_query(
             attempt += 1
 
 
-async def fetch_recently_updated(
+async def fetch_activity_log_ids(
     resource: Literal["board", "pulse"],
     http: HTTPSession,
     log: Logger,
     start: str,
 ) -> list[str] | None:
     """
-    Fetch IDs of recently updated resources.
+    Fetch IDs of recently updated resources from activity logs.
 
     Note:
     - Monday.com calls items a "pulse" in the Activity Logs API.
@@ -121,7 +120,7 @@ async def fetch_recently_updated(
             for activity_log in board.activity_logs:
                 id = activity_log.data.get(f"{resource}_id")
 
-                if id is not None:
+                if id is not None and not activity_log.event.startswith("delete_"):
                     try:
                         ids.add(str(id))
                     except (ValueError, TypeError) as e:
@@ -164,7 +163,8 @@ async def _fetch_boards(
         return
 
     for board in response.data.boards:
-        yield board
+        if board.state != "deleted":
+            yield board
 
 
 async def _fetch_in_chunks[T](
@@ -383,7 +383,8 @@ async def fetch_items_by_boards(
     board_id = board.id
 
     if items_page.cursor:
-        board_cursors[board.id] = items_page.cursor
+        if board.state != "deleted":
+            board_cursors[board.id] = items_page.cursor
     else:
         log.debug(f"Board {board.id} has no cursor.")
 
@@ -440,9 +441,10 @@ async def fetch_items_by_boards(
 
 
 ACTIVITY_LOGS = """
-query GetActivityLogs($start: ISO8601DateTime!, $limit: Int = 5, $page: Int = 1) {
-  boards(limit: $limit, page: $page) {
+query GetActivityLogs($start: ISO8601DateTime!, $limit: Int = 5, $page: Int = 1, $state: State = all) {
+  boards(limit: $limit, page: $page, state: $state) {
     id
+    state
     activity_logs(from: $start) {
       id
       entity
@@ -455,9 +457,10 @@ query GetActivityLogs($start: ISO8601DateTime!, $limit: Int = 5, $page: Int = 1)
 """
 
 BOARDS_TEMPLATE = """
-query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10, $ids: [ID!]) {
-  boards(order_by: $order_by, page: $page, limit: $limit, ids: $ids) {
+query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10, $ids: [ID!], $state: State = all) {
+  boards(order_by: $order_by, page: $page, limit: $limit, ids: $ids, state: $state) {
     id
+    state
     name
     board_kind
     type
@@ -636,9 +639,10 @@ fragment ItemFields on Item {
 """
 
 ITEMS = f"""
-query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 20) {{
-  boards(limit: $boardsLimit, page: $boardsPage) {{
+query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 20, $state: State = all) {{
+  boards(limit: $boardsLimit, page: $boardsPage, state: $state) {{
     id
+    state
     items_page(limit: $itemsLimit) {{
       cursor
       items {{
