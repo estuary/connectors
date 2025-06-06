@@ -48,7 +48,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "boards",
@@ -201,7 +202,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "filter_sharing",
@@ -252,7 +254,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "filters",
@@ -303,7 +306,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "groups",
@@ -354,7 +358,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_changelogs",
@@ -418,7 +423,8 @@
     "key": [
       "/id",
       "/issueId"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_comments",
@@ -482,7 +488,8 @@
     "key": [
       "/id",
       "/issueId"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_custom_field_contexts",
@@ -533,7 +540,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_custom_field_options",
@@ -584,7 +592,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_field_configurations",
@@ -635,7 +644,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_fields",
@@ -737,7 +747,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_navigator_settings",
@@ -788,7 +799,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_priorities",
@@ -839,7 +851,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_resolutions",
@@ -890,7 +903,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_security_schemes",
@@ -941,7 +955,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_transitions",
@@ -1005,7 +1020,8 @@
     "key": [
       "/id",
       "/issueId"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_type_schemes",
@@ -1056,7 +1072,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_type_screen_schemes",
@@ -1107,7 +1124,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issue_types",
@@ -1222,7 +1240,8 @@
     "key": [
       "/id",
       "/issueId"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "issues",
@@ -1331,7 +1350,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "permission_schemes",
@@ -1382,7 +1402,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "permissions",
@@ -1433,7 +1454,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "project_avatars",
@@ -1484,7 +1506,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "project_categories",
@@ -1535,7 +1558,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "project_components",
@@ -1586,7 +1610,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "project_emails",
@@ -1637,7 +1662,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "project_roles",
@@ -1688,7 +1714,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "project_types",
@@ -1739,7 +1766,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "project_versions",
@@ -1790,7 +1818,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "projects",
@@ -1892,7 +1921,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "screen_schemes",
@@ -1943,7 +1973,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "screen_tab_fields",
@@ -1994,7 +2025,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "screen_tabs",
@@ -2045,7 +2077,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "screens",
@@ -2096,7 +2129,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "service_desks",
@@ -2147,7 +2181,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "sprints",
@@ -2249,7 +2284,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "users",
@@ -2351,7 +2387,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "workflow_status_categories",
@@ -2402,7 +2439,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "workflow_statuses",
@@ -2453,7 +2491,8 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   },
   {
     "recommendedName": "workflows",
@@ -2504,6 +2543,7 @@
     },
     "key": [
       "/_meta/row_id"
-    ]
+    ],
+    "disable": true
   }
 ]
