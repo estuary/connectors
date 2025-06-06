@@ -65,7 +65,7 @@ pub async fn do_apply(req: Apply) -> Result<String> {
         .into_iter()
         .filter_map(|res| match res {
             Ok(t) => Some(Ok(t)),
-            Err((_, err_code)) if err_code == RDKafkaErrorCode::TopicAlreadyExists => None,
+            Err((_, RDKafkaErrorCode::TopicAlreadyExists)) => None,
             Err((err_msg, err_code)) => Some(Err(anyhow::anyhow!(
                 "failed to create topic: {} (code {})",
                 err_msg,

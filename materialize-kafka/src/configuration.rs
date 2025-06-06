@@ -1,9 +1,15 @@
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
+
 use anyhow::Result;
 use rdkafka::{
     admin::AdminClient,
     client::DefaultClientContext,
-    producer::{DefaultProducerContext, ThreadedProducer},
-    ClientConfig,
+    error::KafkaError,
+    producer::{ProducerContext, ThreadedProducer},
+    ClientConfig, ClientContext,
 };
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -14,6 +20,7 @@ pub struct EndpointConfig {
     pub credentials: Option<Credentials>,
     pub tls: Option<TlsSettings>,
     pub message_format: MessageFormat,
+    pub compression: Compression,
     pub schema_registry: Option<SchemaRegistryConfig>,
     pub topic_partitions: i32,
     pub topic_replication_factor: i32,
@@ -44,6 +51,28 @@ pub enum SaslMechanism {
 pub enum MessageFormat {
     Avro,
     JSON,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    None,
+    Gzip,
+    Snappy,
+    Lz4,
+    Zstd,
+}
+
+impl std::fmt::Display for Compression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Compression::None => write!(f, "none"),
+            Compression::Gzip => write!(f, "gzip"),
+            Compression::Snappy => write!(f, "snappy"),
+            Compression::Lz4 => write!(f, "lz4"),
+            Compression::Zstd => write!(f, "zstd"),
+        }
+    }
 }
 
 impl std::fmt::Display for SaslMechanism {
@@ -159,6 +188,20 @@ impl JsonSchema for EndpointConfig {
                     "type": "string",
                     "order": 3
                 },
+                "compression": {
+                    "description": "Compression algorithm to use for messages. Note that not all Kafka brokers support all compression algorithms.",
+                    "enum": [
+                        "none",
+                        "gzip",
+                        "lz4",
+                        "snappy",
+                        "zstd"
+                    ],
+                    "title": "Compression",
+                    "type": "string",
+                    "default": "lz4",
+                    "order": 4
+                },
                 "schema_registry": {
                     "title": "Schema Registry",
                     "description": "Connection details for interacting with a schema registry. This is necessary for materializing messages with Avro encoding.",
@@ -189,25 +232,73 @@ impl JsonSchema for EndpointConfig {
                         "username",
                         "password"
                     ],
-                    "order": 4
+                    "order": 5
                 },
                 "topic_partitions": {
                     "title": "Topic Partitions",
                     "description": "The number of partitions to create new topics with.",
                     "type": "integer",
                     "default": 6,
-                    "order": 5
+                    "order": 6
                 },
                 "topic_replication_factor": {
                     "title": "Topic Replication Factor",
                     "description": "The replication factor to create new topics with.",
                     "type": "integer",
                     "default": 3,
-                    "order": 6
+                    "order": 7
                 },
             }
         }))
         .unwrap()
+    }
+}
+
+#[derive(Clone)]
+pub struct FlowProducerContext {
+    success_count: Arc<AtomicUsize>,
+    first_error: Arc<Mutex<Result<(), KafkaError>>>,
+}
+
+impl FlowProducerContext {
+    fn new() -> Self {
+        FlowProducerContext {
+            success_count: Arc::new(AtomicUsize::new(0)),
+            first_error: Arc::new(Mutex::new(Ok(()))),
+        }
+    }
+
+    pub fn get_error(&self) -> Result<(), KafkaError> {
+        self.first_error.lock().unwrap().clone()
+    }
+
+    pub fn get_and_reset_count(&self) -> usize {
+        self.success_count.swap(0, Ordering::Relaxed)
+    }
+}
+
+impl ClientContext for FlowProducerContext {}
+
+impl ProducerContext for FlowProducerContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(
+        &self,
+        delivery_result: &rdkafka::message::DeliveryResult<'_>,
+        _: Self::DeliveryOpaque,
+    ) {
+        if let Err((error, _)) = delivery_result {
+            let mut res = self.first_error.lock().unwrap();
+            if res.is_ok() {
+                *res = Err(error.clone());
+            }
+        } else {
+            self.success_count.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn get_custom_partitioner(&self) -> Option<&rdkafka::producer::NoCustomPartitioner> {
+        None
     }
 }
 
@@ -220,10 +311,10 @@ impl EndpointConfig {
         Ok(())
     }
 
-    pub fn to_producer(&self) -> Result<ThreadedProducer<DefaultProducerContext>> {
+    pub fn to_producer(&self) -> Result<ThreadedProducer<FlowProducerContext>> {
         let mut config = self.common_config()?;
-        config.set("compression.type", "lz4");
-        Ok(config.create()?)
+        config.set("compression.type", self.compression.to_string());
+        Ok(config.create_with_context(FlowProducerContext::new())?)
     }
 
     pub fn to_admin(&self) -> Result<AdminClient<DefaultClientContext>> {

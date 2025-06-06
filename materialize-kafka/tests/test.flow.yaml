@@ -11,6 +11,7 @@ materializations:
           topic_partitions: 3
           topic_replication_factor: 1
           message_format: Avro
+          compression: none
           schema_registry:
             schema_registry_type: confluent_schema_registry
             endpoint: http://localhost:8081
@@ -38,6 +39,7 @@ materializations:
           topic_partitions: 3
           topic_replication_factor: 1
           message_format: JSON
+          compression: gzip
     bindings:
       - resource:
           topic: test_topic_json_1
