@@ -1,12 +1,17 @@
 use anyhow::Result;
 use rdkafka::{
     admin::AdminClient,
-    client::DefaultClientContext,
-    producer::{DefaultProducerContext, ThreadedProducer},
+    client::{ClientContext, DefaultClientContext},
+    error::KafkaError,
+    producer::{DeliveryResult, ProducerContext, ThreadedProducer},
     ClientConfig,
 };
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Condvar, Mutex,
+};
 
 #[derive(Serialize, Deserialize)]
 pub struct EndpointConfig {
@@ -14,6 +19,8 @@ pub struct EndpointConfig {
     pub credentials: Option<Credentials>,
     pub tls: Option<TlsSettings>,
     pub message_format: MessageFormat,
+    #[serde(default)]
+    pub compression: Compression,
     pub schema_registry: Option<SchemaRegistryConfig>,
     pub topic_partitions: i32,
     pub topic_replication_factor: i32,
@@ -44,6 +51,34 @@ pub enum SaslMechanism {
 pub enum MessageFormat {
     Avro,
     JSON,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Compression {
+    None,
+    Gzip,
+    Snappy,
+    Lz4,
+    Zstd,
+}
+
+impl std::fmt::Display for Compression {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Compression::None => write!(f, "none"),
+            Compression::Gzip => write!(f, "gzip"),
+            Compression::Snappy => write!(f, "snappy"),
+            Compression::Lz4 => write!(f, "lz4"),
+            Compression::Zstd => write!(f, "zstd"),
+        }
+    }
+}
+
+impl std::default::Default for Compression {
+    fn default() -> Self {
+        Compression::Lz4
+    }
 }
 
 impl std::fmt::Display for SaslMechanism {
@@ -159,6 +194,20 @@ impl JsonSchema for EndpointConfig {
                     "type": "string",
                     "order": 3
                 },
+                "compression": {
+                    "description": "Compression algorithm to use for messages. Note that not all Kafka brokers support all compression algorithms.",
+                    "enum": [
+                        "none",
+                        "gzip",
+                        "lz4",
+                        "snappy",
+                        "zstd"
+                    ],
+                    "title": "Compression",
+                    "type": "string",
+                    "default": "lz4",
+                    "order": 4
+                },
                 "schema_registry": {
                     "title": "Schema Registry",
                     "description": "Connection details for interacting with a schema registry. This is necessary for materializing messages with Avro encoding.",
@@ -189,21 +238,21 @@ impl JsonSchema for EndpointConfig {
                         "username",
                         "password"
                     ],
-                    "order": 4
+                    "order": 5
                 },
                 "topic_partitions": {
                     "title": "Topic Partitions",
                     "description": "The number of partitions to create new topics with.",
                     "type": "integer",
                     "default": 6,
-                    "order": 5
+                    "order": 6
                 },
                 "topic_replication_factor": {
                     "title": "Topic Replication Factor",
                     "description": "The replication factor to create new topics with.",
                     "type": "integer",
                     "default": 3,
-                    "order": 6
+                    "order": 7
                 },
             }
         }))
@@ -220,10 +269,11 @@ impl EndpointConfig {
         Ok(())
     }
 
-    pub fn to_producer(&self) -> Result<ThreadedProducer<DefaultProducerContext>> {
+    pub fn to_producer(&self) -> Result<ThreadedProducer<AckTrackingContext>> {
         let mut config = self.common_config()?;
-        config.set("compression.type", "lz4");
-        Ok(config.create()?)
+        config.set("compression.type", self.compression.to_string());
+        config.set("enable.idempotence", "true"); // Ensure message ordering and minimize duplication
+        Ok(config.create_with_context(AckTrackingContext::new())?)
     }
 
     pub fn to_admin(&self) -> Result<AdminClient<DefaultClientContext>> {
@@ -291,6 +341,80 @@ impl JsonSchema for Resource {
             }
         }))
         .unwrap()
+    }
+}
+
+pub struct AckTrackingContext {
+    pending_messages: AtomicUsize,
+    completed_messages: AtomicUsize,
+    state: Mutex<Option<KafkaError>>,
+    notify: Condvar,
+}
+
+impl AckTrackingContext {
+    pub fn new() -> Self {
+        Self {
+            pending_messages: AtomicUsize::new(0),
+            completed_messages: AtomicUsize::new(0),
+            state: Mutex::new(None),
+            notify: Condvar::new(),
+        }
+    }
+
+    pub fn increment_pending(&self) {
+        self.pending_messages.fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub fn wait_for_all_successful_acks(&self) -> Result<()> {
+        let mut guard = self.state.lock().unwrap();
+
+        loop {
+            // Check for failure (fail-fast)
+            if let Some(ref error) = *guard {
+                return Err(anyhow::anyhow!("Message delivery failed: {:?}", error));
+            }
+
+            // Check if all pending messages have been successfully delivered
+            let pending = self.pending_messages.load(Ordering::SeqCst);
+            let completed_count = self.completed_messages.load(Ordering::SeqCst);
+
+            if pending == completed_count {
+                break; // All messages successfully delivered
+            }
+
+            // Wait for more deliveries
+            guard = self.notify.wait(guard).unwrap();
+        }
+
+        Ok(())
+    }
+}
+
+impl ClientContext for AckTrackingContext {}
+
+impl ProducerContext for AckTrackingContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(&self, delivery_result: &DeliveryResult, _: Self::DeliveryOpaque) {
+        match delivery_result {
+            Ok(_) => {
+                let completed = self.completed_messages.fetch_add(1, Ordering::SeqCst) + 1;
+                let pending = self.pending_messages.load(Ordering::SeqCst);
+
+                // Only notify when all messages are acknowledged
+                if completed == pending {
+                    self.notify.notify_all();
+                }
+            }
+            Err((err, _)) => {
+                // Store error and notify for fail-fast behavior
+                let mut state = self.state.lock().unwrap();
+                if state.is_none() {
+                    *state = Some(err.clone());
+                }
+                self.notify.notify_all();
+            }
+        }
     }
 }
 
