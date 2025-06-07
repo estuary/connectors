@@ -27,6 +27,7 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
 
     let config: EndpointConfig = serde_json::from_str(&spec.config_json)?;
     let producer = config.to_producer()?;
+    let producer_context = producer.context();
 
     output.send(Response {
         opened: Some(Opened {
@@ -65,6 +66,7 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
                 store,
                 &bindings,
             )?;
+            producer_context.increment_pending();
 
             loop {
                 match producer.send(msg) {
@@ -88,7 +90,10 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
                 }
             }
         } else if request.start_commit.is_some() {
-            producer.flush(Timeout::Never)?;
+            // Wait for explicit delivery confirmations for all messages,
+            // or fail-fast on first delivery failure.
+            producer_context.wait_for_all_successful_acks()?;
+
             output.send(Response {
                 started_commit: Some(StartedCommit { state: None }),
                 ..Default::default()

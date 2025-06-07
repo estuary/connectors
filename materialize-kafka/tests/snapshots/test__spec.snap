@@ -12,6 +12,20 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
         "title": "Bootstrap Servers",
         "type": "string"
       },
+      "compression": {
+        "default": "lz4",
+        "description": "Compression algorithm to use for messages. Note that not all Kafka brokers support all compression algorithms.",
+        "enum": [
+          "none",
+          "gzip",
+          "lz4",
+          "snappy",
+          "zstd"
+        ],
+        "order": 4,
+        "title": "Compression",
+        "type": "string"
+      },
       "credentials": {
         "description": "The connection details for authenticating a client connection to Kafka via SASL. When not provided, the client connection will attempt to use PLAINTEXT (insecure) protocol. This must only be used in dev/test environments.",
         "discriminator": {
@@ -75,7 +89,7 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
       },
       "schema_registry": {
         "description": "Connection details for interacting with a schema registry. This is necessary for materializing messages with Avro encoding.",
-        "order": 4,
+        "order": 5,
         "properties": {
           "endpoint": {
             "description": "Schema registry API endpoint. For example: https://registry-id.us-east-2.aws.confluent.cloud",
@@ -118,14 +132,14 @@ expression: "serde_json::to_string_pretty(&got).unwrap()"
       "topic_partitions": {
         "default": 6,
         "description": "The number of partitions to create new topics with.",
-        "order": 5,
+        "order": 6,
         "title": "Topic Partitions",
         "type": "integer"
       },
       "topic_replication_factor": {
         "default": 3,
         "description": "The replication factor to create new topics with.",
-        "order": 6,
+        "order": 7,
         "title": "Topic Replication Factor",
         "type": "integer"
       }
