@@ -1,9 +1,14 @@
 use anyhow::Result;
 use rdkafka::{
     admin::AdminClient,
-    client::DefaultClientContext,
-    producer::{DefaultProducerContext, ThreadedProducer},
+    client::{ClientContext, DefaultClientContext},
+    error::KafkaError,
+    producer::{DeliveryResult, ProducerContext, ThreadedProducer},
     ClientConfig,
+};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Condvar, Mutex,
 };
 use schemars::{schema::RootSchema, JsonSchema};
 use serde::{Deserialize, Serialize};
@@ -220,10 +225,12 @@ impl EndpointConfig {
         Ok(())
     }
 
-    pub fn to_producer(&self) -> Result<ThreadedProducer<DefaultProducerContext>> {
+    pub fn to_producer(&self) -> Result<ThreadedProducer<AckTrackingContext>> {
         let mut config = self.common_config()?;
         config.set("compression.type", "lz4");
-        Ok(config.create()?)
+        config.set("request.required.acks", "-1"); // Wait for all in-sync replicas
+        config.set("enable.idempotence", "true");   // Ensure exactly-once semantics
+        Ok(config.create_with_context(AckTrackingContext::new())?)
     }
 
     pub fn to_admin(&self) -> Result<AdminClient<DefaultClientContext>> {
@@ -291,6 +298,80 @@ impl JsonSchema for Resource {
             }
         }))
         .unwrap()
+    }
+}
+
+pub struct AckTrackingContext {
+    pending_messages: AtomicUsize,
+    completed_messages: AtomicUsize,
+    first_failure: Arc<Mutex<Option<KafkaError>>>,
+    notify: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl AckTrackingContext {
+    pub fn new() -> Self {
+        Self {
+            pending_messages: AtomicUsize::new(0),
+            completed_messages: AtomicUsize::new(0),
+            first_failure: Arc::new(Mutex::new(None)),
+            notify: Arc::new((Mutex::new(false), Condvar::new())),
+        }
+    }
+    
+    pub fn increment_pending(&self) {
+        self.pending_messages.fetch_add(1, Ordering::SeqCst);
+    }
+    
+    pub fn wait_for_all_successful_acks(&self) -> Result<()> {
+        let (lock, cvar) = &*self.notify;
+        let mut completed = lock.lock().unwrap();
+        
+        loop {
+            // Check for failures first (fail-fast)
+            if let Some(ref error) = *self.first_failure.lock().unwrap() {
+                return Err(anyhow::anyhow!("Message delivery failed: {:?}", error));
+            }
+            
+            // Check if all pending messages have been successfully delivered
+            let pending = self.pending_messages.load(Ordering::SeqCst);
+            let completed_count = self.completed_messages.load(Ordering::SeqCst);
+            
+            if pending == completed_count {
+                break; // All messages successfully delivered
+            }
+            
+            // Wait for more deliveries
+            completed = cvar.wait(completed).unwrap();
+        }
+        
+        Ok(())
+    }
+}
+
+impl ClientContext for AckTrackingContext {}
+
+impl ProducerContext for AckTrackingContext {
+    type DeliveryOpaque = ();
+
+    fn delivery(&self, delivery_result: &DeliveryResult, _: Self::DeliveryOpaque) {
+        match delivery_result {
+            Ok(_) => {
+                self.completed_messages.fetch_add(1, Ordering::SeqCst);
+            }
+            Err((err, _)) => {
+                // Store the first failure for error reporting
+                let mut first_failure = self.first_failure.lock().unwrap();
+                if first_failure.is_none() {
+                    *first_failure = Some(err.clone());
+                }
+            }
+        }
+        
+        // Notify waiting threads that a message has been processed
+        let (lock, cvar) = &*self.notify;
+        let mut completed = lock.lock().unwrap();
+        *completed = true;
+        cvar.notify_all();
     }
 }
 
