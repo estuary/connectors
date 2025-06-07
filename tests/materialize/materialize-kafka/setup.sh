@@ -9,7 +9,8 @@ config_json_template='{
     "bootstrap_servers": "materialize-kafka-db-1.flow-test:9092",
     "topic_partitions": 3,
     "topic_replication_factor": 1,
-    "message_format": "JSON"
+    "message_format": "JSON",
+    "compression": "lz4"
 }'
 
 resources_json_template='[
