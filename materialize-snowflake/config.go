@@ -270,17 +270,17 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 	return &jsonschema.Schema{
 		Title:       "Authentication",
 		Description: "Snowflake Credentials",
-		Default:     map[string]string{"auth_type": UserPass},
+		Default:     map[string]string{"auth_type": JWT},
 		OneOf: []*jsonschema.Schema{
-			{
-				Title:      "User Password",
-				Required:   []string{"auth_type", "user", "password"},
-				Properties: uProps,
-			},
 			{
 				Title:      "Private Key (JWT)",
 				Required:   []string{"auth_type", "private_key"},
 				Properties: jwtProps,
+			},
+			{
+				Title:      "User Password",
+				Required:   []string{"auth_type", "user", "password"},
+				Properties: uProps,
 			},
 		},
 		Extras: map[string]interface{}{
