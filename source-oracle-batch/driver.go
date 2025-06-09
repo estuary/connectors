@@ -56,7 +56,7 @@ const (
 
 	// Maximum number of concurrent polling operations to run at once. Might be
 	// worth making this configurable in the advanced endpoint settings.
-	maxConcurrentQueries = 1
+	maxConcurrentQueries = 5
 )
 
 // BatchSQLDriver represents a generic "batch SQL" capture behavior, parameterized
