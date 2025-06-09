@@ -86,10 +86,10 @@
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/_OAuth2Credentials"
+              "$ref": "#/$defs/AccessToken"
             },
             {
-              "$ref": "#/$defs/AccessToken"
+              "$ref": "#/$defs/_OAuth2Credentials"
             }
           ],
           "title": "Authentication"
