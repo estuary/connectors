@@ -644,3 +644,30 @@ func TestTableNamesIdenticalUnderCapitalization(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+func TestDroppedAndRecreatedSchema(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueA, uniqueB = uniqueTableID(t, "a"), uniqueTableID(t, "b")
+	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
+	var tableA = tb.CreateTable(ctx, t, uniqueA, tableDef)
+	var tableB = tb.CreateTable(ctx, t, uniqueB, tableDef)
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
+	setShutdownAfterCaughtUp(t, true)
+
+	// Initial backfill
+	tb.Insert(ctx, t, tableA, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	tb.Insert(ctx, t, tableB, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
+	cs.Capture(ctx, t, nil)
+
+	// Drop the entire test schema and recreate it, then fill the tables with some new data.
+	tb.Query(ctx, t, fmt.Sprintf(`DROP DATABASE IF EXISTS %s;`, testSchemaName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE DATABASE %s;`, testSchemaName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableA, tableDef))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableB, tableDef))
+	tb.Insert(ctx, t, tableA, [][]any{{6, "six"}, {7, "seven"}, {8, "eight"}})
+	tb.Insert(ctx, t, tableB, [][]any{{9, "nine"}, {10, "ten"}, {11, "eleven"}})
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}

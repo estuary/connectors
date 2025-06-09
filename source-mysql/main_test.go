@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -204,6 +206,25 @@ func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, ar
 		t.Fatalf("error executing query %q: %v", query, err)
 	}
 	defer result.Close()
+}
+
+func uniqueTableID(t testing.TB, extra ...string) string {
+	t.Helper()
+	var h = sha256.New()
+	h.Write([]byte(t.Name()))
+	for _, x := range extra {
+		h.Write([]byte{':'})
+		h.Write([]byte(x))
+	}
+	var x = binary.BigEndian.Uint32(h.Sum(nil)[0:4])
+	return fmt.Sprintf("%d", (x%900000)+100000)
+}
+
+func setShutdownAfterCaughtUp(t testing.TB, setting bool) {
+	t.Helper()
+	var prevSetting = sqlcapture.TestShutdownAfterCaughtUp
+	sqlcapture.TestShutdownAfterCaughtUp = setting
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = prevSetting })
 }
 
 // TestGeneric runs the generic sqlcapture test suite.
