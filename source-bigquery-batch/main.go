@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"math/big"
 	"strings"
 	"text/template"
 	"time"
@@ -92,6 +93,16 @@ const (
 
 func translateBigQueryValue(val any, fieldType bigquery.FieldType) (any, error) {
 	switch val := val.(type) {
+	case *big.Rat:
+		n, exact := val.FloatPrec()
+		if !exact {
+			// Add three additional digits of precision to inexact representations.
+			// The amount is arbitrary but was chosen so 1/3 becomes "0.333" instead of "0"
+			// In theory it should never apply anyway since BigQuery seems to always return
+			// rationals with a power-of-ten denominator.
+			n += 3
+		}
+		return val.FloatString(n), nil
 	case civil.DateTime:
 		return val.In(time.UTC).Format(datetimeFormatMicros), nil
 	case string:
