@@ -37,7 +37,7 @@ REPORT_MAPPING = {
     "keyword_report": "keyword_view",
 }
 API_VERSION = "v19"
-GRCP_TIMEOUT = 120.0
+GRPC_TIMEOUT = 120.0
 REQUEST_TIMEOUT = 300.0
 logger = logging.getLogger("airbyte")
 
@@ -83,7 +83,7 @@ class GoogleAds:
         # a connector hanging locally with just the GRCP_TIMEOUT though, so hopefully the combination of both
         # timeouts will mitigate the issue.
         def do_request():
-            return [self.ga_service.search(search_request, timeout=GRCP_TIMEOUT)]
+            return [self.ga_service.search(search_request, timeout=GRPC_TIMEOUT)]
 
         with ThreadPoolExecutor(max_workers=1) as executor:
             future = executor.submit(do_request)
