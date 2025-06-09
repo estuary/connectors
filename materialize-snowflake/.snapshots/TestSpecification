@@ -53,34 +53,6 @@
             "properties": {
               "auth_type": {
                 "type": "string",
-                "const": "user_password",
-                "default": "user_password"
-              },
-              "user": {
-                "type": "string",
-                "title": "User",
-                "description": "The Snowflake user login name",
-                "order": 1
-              },
-              "password": {
-                "type": "string",
-                "title": "Password",
-                "description": "The password for the provided user",
-                "order": 2,
-                "secret": true
-              }
-            },
-            "required": [
-              "auth_type",
-              "user",
-              "password"
-            ],
-            "title": "User Password"
-          },
-          {
-            "properties": {
-              "auth_type": {
-                "type": "string",
                 "const": "jwt",
                 "default": "jwt"
               },
@@ -104,12 +76,40 @@
               "private_key"
             ],
             "title": "Private Key (JWT)"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "user_password",
+                "default": "user_password"
+              },
+              "user": {
+                "type": "string",
+                "title": "User",
+                "description": "The Snowflake user login name",
+                "order": 1
+              },
+              "password": {
+                "type": "string",
+                "title": "Password",
+                "description": "The password for the provided user",
+                "order": 2,
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "user",
+              "password"
+            ],
+            "title": "User Password"
           }
         ],
         "type": "object",
         "title": "Authentication",
         "default": {
-          "auth_type": "user_password"
+          "auth_type": "jwt"
         },
         "discriminator": {
           "propertyName": "auth_type"

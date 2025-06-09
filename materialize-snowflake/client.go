@@ -271,6 +271,10 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 			case 390189:
 				err = fmt.Errorf("role %q does not exist", cfg.Role)
 			}
+
+			if strings.Contains(sfError.Message, "MFA with TOTP is required.") {
+				err = fmt.Errorf("username/password authentication is not supported for your account - try a different authentication method")
+			}
 		}
 
 		errs.Err(err)
