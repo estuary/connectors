@@ -286,3 +286,5 @@ require (
 	gotest.tools/gotestsum v1.8.2 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
+
+replace github.com/sijms/go-ora/v2 => github.com/mdibaiee/go-ora/v2 v2.8.25-0.20250609184222-7728c3757554
