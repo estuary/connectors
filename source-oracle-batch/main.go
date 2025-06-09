@@ -125,6 +125,10 @@ func connectOracle(ctx context.Context, cfg *Config) (*sql.DB, error) {
 		}
 	}
 
+	log.WithFields(log.Fields{
+		"uri": cfg.ToURI(),
+	}).Info("connecting to database")
+
 	var db, err = sql.Open("oracle", cfg.ToURI())
 	if err != nil {
 		return nil, fmt.Errorf("error opening database connection: %w", err)
