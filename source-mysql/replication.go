@@ -42,6 +42,18 @@ var (
 	streamToFenceWatchdogTimeout = 5 * time.Minute
 )
 
+// InconsistentMetadataError represents a mismatch between expected and actual
+// column metadata. The custom error type allows us to respond by backfilling
+// the table automatically.
+type InconsistentMetadataError struct {
+	StreamID sqlcapture.StreamID
+	Message  string
+}
+
+func (e *InconsistentMetadataError) Error() string {
+	return e.Message
+}
+
 func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
@@ -341,202 +353,23 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 
 		switch data := event.Event.(type) {
 		case *replication.RowsEvent:
-			var schema, table = string(data.Table.Schema), string(data.Table.Table)
-			var streamID = sqlcapture.JoinStreamID(schema, table)
-
-			// Skip change events from tables which aren't being captured. Send a KeepaliveEvent
-			// to indicate that we are actively receiving events, just not ones that need to be
-			// decoded and processed further.
-			if !rs.tableActive(streamID) {
-				if err := rs.emitEvent(ctx, &sqlcapture.KeepaliveEvent{}); err != nil {
+			var eventCursor = fmt.Sprintf("%s:%d", cursor.Name, binlogEstimatedOffset)
+			if err := rs.handleRowsEvent(ctx, event, eventCursor); err != nil {
+				var metadataErr = &InconsistentMetadataError{}
+				if errors.As(err, &metadataErr) {
+					logrus.WithField("stream", metadataErr.StreamID).Warn("detected inconsistent metadata for stream, will backfill")
+					if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+						StreamID: metadataErr.StreamID,
+						Cause:    metadataErr.Message,
+					}); err != nil {
+						return fmt.Errorf("error emitting TableDropEvent(%q) after inconsistent metadata: %w", metadataErr.StreamID, err)
+					} else if err := rs.deactivateTable(metadataErr.StreamID); err != nil {
+						return fmt.Errorf("error deactivating table %q after inconsistent metadata: %w", metadataErr.StreamID, err)
+					}
+					// not returning, we just converted the error into a successful TableDropEvent
+				} else {
 					return err
 				}
-				continue
-			}
-
-			var sourceCommon = sqlcapture.SourceCommon{
-				Schema: schema,
-				Table:  table,
-			}
-			if !rs.gtidTimestamp.IsZero() {
-				sourceCommon.Millis = rs.gtidTimestamp.UnixMilli()
-			}
-
-			// Get column names and types from persistent metadata. If available, allow
-			// override the persistent column name tracking using binlog row metadata.
-			var metadata, ok = rs.tableMetadata(streamID)
-			if !ok || metadata == nil {
-				return fmt.Errorf("missing metadata for stream %q", streamID)
-			}
-			var columnTypes = metadata.Schema.ColumnTypes
-			var columnNames = data.Table.ColumnNameString()
-			if len(columnNames) == 0 {
-				columnNames = metadata.Schema.Columns
-			}
-
-			keyColumns, ok := rs.keyColumns(streamID)
-			if !ok {
-				return fmt.Errorf("unknown key columns for stream %q", streamID)
-			}
-
-			var nonTransactionalTable = rs.isNonTransactional(streamID)
-
-			switch event.Header.EventType {
-			case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
-				for rowIdx, row := range data.Rows {
-					var after, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
-					if err != nil {
-						return fmt.Errorf("error decoding row values: %w", err)
-					}
-					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
-					if err != nil {
-						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-					}
-					if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
-						return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
-					}
-					var sourceInfo = &mysqlSourceInfo{
-						SourceCommon: sourceCommon,
-						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
-					}
-					if rs.db.includeTxIDs[streamID] {
-						sourceInfo.TxID = rs.gtidString
-					}
-					if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
-						Operation: sqlcapture.InsertOp,
-						RowKey:    rowKey,
-						After:     after,
-						Source:    sourceInfo,
-					}); err != nil {
-						return err
-					}
-					rs.uncommittedChanges++ // Keep a count of all uncommitted changes
-					if nonTransactionalTable {
-						rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
-					}
-				}
-			case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
-				for rowIdx := range data.Rows {
-					// Update events contain alternating (before, after) pairs of rows
-					if rowIdx%2 == 1 {
-						before, err := decodeRow(streamID, columnNames, data.Rows[rowIdx-1], data.SkippedColumns[rowIdx-1])
-						if err != nil {
-							return fmt.Errorf("error decoding row values: %w", err)
-						}
-						after, err := decodeRow(streamID, columnNames, data.Rows[rowIdx], data.SkippedColumns[rowIdx])
-						if err != nil {
-							return fmt.Errorf("error decoding row values: %w", err)
-						}
-						after = mergePreimage(after, before)
-						rowKeyBefore, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
-						if err != nil {
-							return fmt.Errorf("error encoding 'before' row key for %q: %w", streamID, err)
-						}
-						rowKeyAfter, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
-						if err != nil {
-							return fmt.Errorf("error encoding 'after' row key for %q: %w", streamID, err)
-						}
-						if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
-							return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
-						}
-						if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
-							return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
-						}
-
-						var events []sqlcapture.DatabaseEvent
-						var eventTxID string
-						if rs.db.includeTxIDs[streamID] {
-							eventTxID = rs.gtidString
-						}
-						if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
-							// When the row key is changed by an update, translate it into a synthetic pair: a delete
-							// event of the old row-state, plus an insert event of the new row-state.
-							events = append(events, &sqlcapture.ChangeEvent{
-								Operation: sqlcapture.DeleteOp,
-								RowKey:    rowKeyBefore,
-								Before:    before,
-								Source: &mysqlSourceInfo{
-									SourceCommon: sourceCommon,
-									// Since updates consist of paired row-states (before, then after) which we iterate
-									// over two-at-a-time, it is consistent to have the row-index portion of the event
-									// cursor be the before-state index for this deletion and the after-state index for
-									// the insert.
-									EventCursor: fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx-1),
-									TxID:        eventTxID,
-								},
-							}, &sqlcapture.ChangeEvent{
-								Operation: sqlcapture.InsertOp,
-								RowKey:    rowKeyAfter,
-								After:     after,
-								Source: &mysqlSourceInfo{
-									SourceCommon: sourceCommon,
-									EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
-									TxID:         eventTxID,
-								},
-							})
-						} else {
-							events = append(events, &sqlcapture.ChangeEvent{
-								Operation: sqlcapture.UpdateOp,
-								RowKey:    rowKeyAfter,
-								Before:    before,
-								After:     after,
-								Source: &mysqlSourceInfo{
-									SourceCommon: sourceCommon,
-									// For updates the row-index part of the event cursor has to increment by two here
-									// so that there's room for synthetic delete/insert pairs. Since this value really
-									// just needs to be unique and properly ordered this is fine.
-									EventCursor: fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
-									TxID:        eventTxID,
-								},
-							})
-						}
-						for _, event := range events {
-							if err := rs.emitEvent(ctx, event); err != nil {
-								return err
-							}
-						}
-						rs.uncommittedChanges++ // Keep a count of all uncommitted changes
-						if nonTransactionalTable {
-							rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
-						}
-					}
-				}
-			case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
-				for rowIdx, row := range data.Rows {
-					var before, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
-					if err != nil {
-						return fmt.Errorf("error decoding row values: %w", err)
-					}
-					rowKey, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
-					if err != nil {
-						return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-					}
-					if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
-						return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
-					}
-					var sourceInfo = &mysqlSourceInfo{
-						SourceCommon: sourceCommon,
-						EventCursor:  fmt.Sprintf("%s:%d:%d", cursor.Name, binlogEstimatedOffset, rowIdx),
-						TxID:         rs.gtidString,
-					}
-					if rs.db.includeTxIDs[streamID] {
-						sourceInfo.TxID = rs.gtidString
-					}
-					if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
-						Operation: sqlcapture.DeleteOp,
-						RowKey:    rowKey,
-						Before:    before,
-						Source:    sourceInfo,
-					}); err != nil {
-						return err
-					}
-					rs.uncommittedChanges++ // Keep a count of all uncommitted changes
-					if nonTransactionalTable {
-						rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
-					}
-				}
-			default:
-				return fmt.Errorf("unknown row event type: %q", event.Header.EventType)
 			}
 		case *replication.XIDEvent:
 			logrus.WithFields(logrus.Fields{
@@ -649,19 +482,223 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 	}
 }
 
+func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *replication.BinlogEvent, eventCursor string) error {
+	var data, ok = event.Event.(*replication.RowsEvent)
+	if !ok {
+		return fmt.Errorf("internal error: expected RowsEvent, got %T", event.Event)
+	}
+
+	var schema, table = string(data.Table.Schema), string(data.Table.Table)
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+
+	// Skip change events from tables which aren't being captured. Send a KeepaliveEvent
+	// to indicate that we are actively receiving events, just not ones that need to be
+	// decoded and processed further.
+	if !rs.tableActive(streamID) {
+		return rs.emitEvent(ctx, &sqlcapture.KeepaliveEvent{})
+	}
+
+	var sourceCommon = sqlcapture.SourceCommon{
+		Schema: schema,
+		Table:  table,
+	}
+	if !rs.gtidTimestamp.IsZero() {
+		sourceCommon.Millis = rs.gtidTimestamp.UnixMilli()
+	}
+
+	// Get column names and types from persistent metadata. If available, allow
+	// override the persistent column name tracking using binlog row metadata.
+	metadata, ok := rs.tableMetadata(streamID)
+	if !ok || metadata == nil {
+		return fmt.Errorf("missing metadata for stream %q", streamID)
+	}
+	var columnTypes = metadata.Schema.ColumnTypes
+	var columnNames = data.Table.ColumnNameString()
+	if len(columnNames) == 0 {
+		columnNames = metadata.Schema.Columns
+	}
+
+	keyColumns, ok := rs.keyColumns(streamID)
+	if !ok {
+		return fmt.Errorf("unknown key columns for stream %q", streamID)
+	}
+
+	var nonTransactionalTable = rs.isNonTransactional(streamID)
+
+	switch event.Header.EventType {
+	case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
+		for rowIdx, row := range data.Rows {
+			var after, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
+			if err != nil {
+				return fmt.Errorf("error decoding row values: %w", err)
+			}
+			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
+			if err != nil {
+				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
+			if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
+				return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
+			}
+			var sourceInfo = &mysqlSourceInfo{
+				SourceCommon: sourceCommon,
+				EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+			}
+			if rs.db.includeTxIDs[streamID] {
+				sourceInfo.TxID = rs.gtidString
+			}
+			if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
+				Operation: sqlcapture.InsertOp,
+				RowKey:    rowKey,
+				After:     after,
+				Source:    sourceInfo,
+			}); err != nil {
+				return err
+			}
+			rs.uncommittedChanges++ // Keep a count of all uncommitted changes
+			if nonTransactionalTable {
+				rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
+			}
+		}
+	case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
+		for rowIdx := range data.Rows {
+			// Update events contain alternating (before, after) pairs of rows
+			if rowIdx%2 == 1 {
+				before, err := decodeRow(streamID, columnNames, data.Rows[rowIdx-1], data.SkippedColumns[rowIdx-1])
+				if err != nil {
+					return fmt.Errorf("error decoding row values: %w", err)
+				}
+				after, err := decodeRow(streamID, columnNames, data.Rows[rowIdx], data.SkippedColumns[rowIdx])
+				if err != nil {
+					return fmt.Errorf("error decoding row values: %w", err)
+				}
+				after = mergePreimage(after, before)
+				rowKeyBefore, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
+				if err != nil {
+					return fmt.Errorf("error encoding 'before' row key for %q: %w", streamID, err)
+				}
+				rowKeyAfter, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
+				if err != nil {
+					return fmt.Errorf("error encoding 'after' row key for %q: %w", streamID, err)
+				}
+				if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
+					return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
+				}
+				if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
+					return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
+				}
+
+				var events []sqlcapture.DatabaseEvent
+				var eventTxID string
+				if rs.db.includeTxIDs[streamID] {
+					eventTxID = rs.gtidString
+				}
+				if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
+					// When the row key is changed by an update, translate it into a synthetic pair: a delete
+					// event of the old row-state, plus an insert event of the new row-state.
+					events = append(events, &sqlcapture.ChangeEvent{
+						Operation: sqlcapture.DeleteOp,
+						RowKey:    rowKeyBefore,
+						Before:    before,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							// Since updates consist of paired row-states (before, then after) which we iterate
+							// over two-at-a-time, it is consistent to have the row-index portion of the event
+							// cursor be the before-state index for this deletion and the after-state index for
+							// the insert.
+							EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx-1),
+							TxID:        eventTxID,
+						},
+					}, &sqlcapture.ChangeEvent{
+						Operation: sqlcapture.InsertOp,
+						RowKey:    rowKeyAfter,
+						After:     after,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+							TxID:         eventTxID,
+						},
+					})
+				} else {
+					events = append(events, &sqlcapture.ChangeEvent{
+						Operation: sqlcapture.UpdateOp,
+						RowKey:    rowKeyAfter,
+						Before:    before,
+						After:     after,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							// For updates the row-index part of the event cursor has to increment by two here
+							// so that there's room for synthetic delete/insert pairs. Since this value really
+							// just needs to be unique and properly ordered this is fine.
+							EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+							TxID:        eventTxID,
+						},
+					})
+				}
+				for _, event := range events {
+					if err := rs.emitEvent(ctx, event); err != nil {
+						return err
+					}
+				}
+				rs.uncommittedChanges++ // Keep a count of all uncommitted changes
+				if nonTransactionalTable {
+					rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
+				}
+			}
+		}
+	case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
+		for rowIdx, row := range data.Rows {
+			var before, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
+			if err != nil {
+				return fmt.Errorf("error decoding row values: %w", err)
+			}
+			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
+			if err != nil {
+				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
+			if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
+				return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
+			}
+			var sourceInfo = &mysqlSourceInfo{
+				SourceCommon: sourceCommon,
+				EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+				TxID:         rs.gtidString,
+			}
+			if rs.db.includeTxIDs[streamID] {
+				sourceInfo.TxID = rs.gtidString
+			}
+			if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
+				Operation: sqlcapture.DeleteOp,
+				RowKey:    rowKey,
+				Before:    before,
+				Source:    sourceInfo,
+			}); err != nil {
+				return err
+			}
+			rs.uncommittedChanges++ // Keep a count of all uncommitted changes
+			if nonTransactionalTable {
+				rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
+			}
+		}
+	default:
+		return fmt.Errorf("unknown row event type: %q", event.Header.EventType)
+	}
+	return nil
+}
+
 // decodeRow takes a list of column names, a parallel list of column values, and a list of indices
 // of columns which should be omitted from the decoded row state, and returns a map from colum names
 // to the corresponding values.
 func decodeRow(streamID sqlcapture.StreamID, colNames []string, row []any, skips []int) (map[string]any, error) {
 	// If we have more or fewer values than expected, something has gone wrong
-	// with our metadata tracking and it's best to die immediately. The fix in
-	// this case is almost always going to be deleting and recreating the
-	// capture binding for a particular table.
+	// with our metadata tracking and this should trigger an automatic re-backfill.
 	if len(row) != len(colNames) {
 		if len(colNames) == 0 {
 			return nil, fmt.Errorf("metadata error (go.estuary.dev/eiKbOh): unknown column names for stream %q", streamID)
 		}
-		return nil, fmt.Errorf("metadata error (go.estuary.dev/eiKbOh): change event on stream %q contains %d values, expected %d", streamID, len(row), len(colNames))
+		return nil, &InconsistentMetadataError{
+			StreamID: streamID,
+			Message:  fmt.Sprintf("%d columns found when %d are expected", len(row), len(colNames)),
+		}
 	}
 
 	var fields = make(map[string]interface{})
