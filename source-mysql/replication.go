@@ -736,10 +736,25 @@ func (rs *mysqlReplicationStream) handleQuery(ctx context.Context, parser *sqlpa
 		logrus.WithField("query", query).Debug("ignoring benign query")
 	case *sqlparser.DropDatabase:
 		// Remember that In MySQL land "database" is a synonym for the usual SQL concept "schema"
-		if rs.schemaActive(stmt.GetDatabaseName()) {
-			return fmt.Errorf("cannot handle query %q: schema %q is actively being captured", query, stmt.GetDatabaseName())
+		if streamIDs := rs.tablesInSchema(stmt.GetDatabaseName()); len(streamIDs) > 0 {
+			logrus.WithFields(logrus.Fields{
+				"query":     query,
+				"schema":    stmt.GetDatabaseName(),
+				"streamIDs": streamIDs,
+			}).Info("dropped all tables in schema")
+			for _, streamID := range streamIDs {
+				if err := rs.emitEvent(ctx, &sqlcapture.TableDropEvent{
+					StreamID: streamID,
+					Cause:    fmt.Sprintf("schema %q was dropped by query %q", streamID, query),
+				}); err != nil {
+					return err
+				} else if err := rs.deactivateTable(streamID); err != nil {
+					return fmt.Errorf("cannot deactivate table %q after DROP DATABASE: %w", streamID, err)
+				}
+			}
+		} else {
+			logrus.WithField("query", query).Debug("ignorable dropped schema (not being captured from)")
 		}
-		logrus.WithField("query", query).Debug("ignorable dropped schema (not being captured from)")
 	case *sqlparser.AlterTable:
 		if streamID := resolveTableName(schema, stmt.Table); rs.tableActive(streamID) {
 			logrus.WithFields(logrus.Fields{
@@ -1057,15 +1072,17 @@ func (rs *mysqlReplicationStream) tableActive(streamID sqlcapture.StreamID) bool
 	return ok
 }
 
-func (rs *mysqlReplicationStream) schemaActive(schema string) bool {
+func (rs *mysqlReplicationStream) tablesInSchema(schema string) []sqlcapture.StreamID {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
+
+	var tables []sqlcapture.StreamID
 	for streamID := range rs.tables.active {
 		if strings.EqualFold(streamID.Schema, schema) {
-			return true
+			tables = append(tables, streamID)
 		}
 	}
-	return false
+	return tables
 }
 
 // isNonTransactional returns true if the stream ID refers to a table which
