@@ -671,3 +671,25 @@ func TestDroppedAndRecreatedSchema(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+func TestInconsistentMetadata(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	setShutdownAfterCaughtUp(t, true)
+
+	// Initial backfill
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
+	cs.Capture(ctx, t, nil)
+
+	// Deliberate metadata inconsistency
+	tb.Query(ctx, t, "SET SESSION sql_log_bin = OFF")
+	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN extra VARCHAR(32);", tableName))
+	tb.Query(ctx, t, "SET SESSION sql_log_bin = ON")
+	tb.Insert(ctx, t, tableName, [][]any{{3, "three", "extra data"}, {4, "four", "more extra data"}})
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
