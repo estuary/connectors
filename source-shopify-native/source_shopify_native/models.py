@@ -83,7 +83,7 @@ class EndpointConfig(BaseModel):
         title="Shopify Store",
         description="Shopify store ID. Use the prefix of your admin URL e.g. https://{YOUR_STORE}.myshopify.com/admin",
     )
-    credentials: OAuth2Credentials | AccessToken = Field(
+    credentials: AccessToken | OAuth2Credentials = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
