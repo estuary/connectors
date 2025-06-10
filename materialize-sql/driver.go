@@ -113,10 +113,11 @@ func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Re
 		return nil, err
 	}
 	validator := boilerplate.NewValidator(
-		constrainter{dialect: endpoint.Dialect},
+		constrainter{dialect: endpoint.Dialect, featureFlags: endpoint.FeatureFlags},
 		is,
 		endpoint.Dialect.MaxColumnCharLength,
 		endpoint.Dialect.CaseInsensitiveColumns,
+		endpoint.FeatureFlags,
 	)
 
 	if p := is.AmbiguousResourcePaths(resourcePaths); len(p) > 0 {
@@ -229,7 +230,7 @@ func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response
 		}
 	}
 
-	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint, constrainter{dialect: endpoint.Dialect}), is, endpoint.ConcurrentApply)
+	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint, constrainter{dialect: endpoint.Dialect, featureFlags: endpoint.FeatureFlags}), is, endpoint.ConcurrentApply)
 }
 
 func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
