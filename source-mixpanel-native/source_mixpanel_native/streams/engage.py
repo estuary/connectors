@@ -186,3 +186,8 @@ class Engage(MixpanelStream, IncrementalMixin):
 
         # Update state after finishing reading a stream slice.
         self.state = {self.cursor_field: _dt_to_str(stream_slice['end'])}
+
+    def request_kwargs(
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
+    ) -> Mapping[str, Any]:
+        return {"stream": True}
