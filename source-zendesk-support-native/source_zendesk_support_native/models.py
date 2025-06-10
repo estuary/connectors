@@ -7,7 +7,8 @@ from estuary_cdk.capture.common import (
     BasicAuth,
     BaseDocument,
     LongLivedClientCredentialsOAuth2Credentials,
-    OAuth2Spec,
+    RotatingOAuth2Credentials,
+    OAuth2RotatingTokenSpec,
     ResourceConfig,
     ResourceState,
 )
@@ -28,6 +29,11 @@ MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 # lowercase letter, and only contain lowercase letters, digits, or dashes.
 SUBDOMAIN_REGEX = r"^[a-z][a-z0-9-]{2,62}$"
 
+# Zendesk supports variable access token durations, between 5 minutes to 2 days.
+# To reduce how frequently we need to perform token rotations, we use the
+# largest possible access token duration.
+MAX_VALID_ACCESS_TOKEN_DURATION = int(timedelta(days=2).total_seconds())
+
 def urlencode_field(field: str):
     return "{{#urlencode}}{{{ " + field + " }}}{{/urlencode}}"
 
@@ -37,11 +43,11 @@ accessTokenBody = {
     "client_id": "{{{ client_id }}}",
     "client_secret": "{{{ client_secret }}}",
     "redirect_uri": "{{{ redirect_uri }}}",
-    "scope": "read"
+    "scope": "read",
+    "expires_in": MAX_VALID_ACCESS_TOKEN_DURATION,
 }
 
-
-OAUTH2_SPEC = OAuth2Spec(
+OAUTH2_SPEC = OAuth2RotatingTokenSpec(
     provider="zendesk",
     accessTokenBody=json.dumps(accessTokenBody),
     authUrlTemplate=(
@@ -55,17 +61,35 @@ OAUTH2_SPEC = OAuth2Spec(
     accessTokenUrlTemplate=("https://{{{ config.subdomain }}}.zendesk.com/oauth/tokens"),
     accessTokenResponseMap={
         "access_token": "/access_token",
+        "refresh_token": "/refresh_token",
+        "access_token_expires_at": r"{{#now_plus}}{{ expires_in }}{{/now_plus}}",
     },
     accessTokenHeaders={
         "Content-Type": "application/json",
     },
+    additionalTokenExchangeBody={
+        "expires_in": MAX_VALID_ACCESS_TOKEN_DURATION,
+    },
 )
+
+# Mustache templates in accessTokenUrlTemplate are not interpolated within the connector, so update_oauth_spec reassigns it for use within the connector.
+def update_oauth_spec(subdomain: str):
+    OAUTH2_SPEC.accessTokenUrlTemplate = f"https://{subdomain}.zendesk.com/oauth/tokens"
 
 
 if TYPE_CHECKING:
-    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials
+    OAuth2Credentials = RotatingOAuth2Credentials
+    DeprecatedOAuthCredentials = LongLivedClientCredentialsOAuth2Credentials
 else:
-    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+    OAuth2Credentials = RotatingOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+
+    class DeprecatedOAuthCredentials(
+        LongLivedClientCredentialsOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)  # type: ignore
+    ):
+        credentials_title: Literal["Deprecated OAuth Credentials"] = Field(
+            default="Deprecated OAuth Credentials",
+            json_schema_extra={"type": "string"},
+        )
 
 
 class ApiToken(BasicAuth):
@@ -99,7 +123,7 @@ class EndpointConfig(BaseModel):
         default_factory=default_start_date,
         ge=EPOCH,
     )
-    credentials: OAuth2Credentials | ApiToken = Field(
+    credentials: OAuth2Credentials | ApiToken | DeprecatedOAuthCredentials = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
@@ -119,6 +143,38 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"advanced": True},
     )
 
+    # Zendesk is updating their OAuth to expire access tokens, meaning this connector
+    # will need to use RotatingOAuth2Credentials instead of DeprecatedOAuthCredentials.
+    # During the migration period where both types of OAuth credentials are valid, we'll
+    # show the RotatingOAuth2Credentials option as the _only_ OAuth option in the UI &
+    # we'll hide the DeprecatedOAuthCredentials option. This lets existing
+    # captures continue working until users re-authenticate their tasks with the
+    # RotatingOAuth2Credentials option.
+    #
+    # Patching model_json_schema to remove DeprecatedOAuthCredentials makes
+    # RotatingOAuth2Credentials the only OAuth authentication option in the UI, and effectively
+    # "hides" the deprecated OAuth option. This is a bit gross, but it should only be needed for
+    # a little bit until all users that authenticated with OAuth have re-authenticated.
+    @classmethod
+    def model_json_schema(cls, *args, **kwargs) -> dict:
+        schema = super().model_json_schema(*args, **kwargs)
+
+        creds = schema.get("properties", {}).get("credentials", {})
+        one_of = creds.get("oneOf", [])
+        filtered_one_of = []
+
+        for option in one_of:
+            if "$ref" in option:
+                ref = option["$ref"]
+                def_name = ref.split("/")[-1]
+                # Do not include DeprecatedOAuthCredentials as an authentication option.
+                if "DeprecatedOAuthCredentials" in def_name:
+                    continue
+
+            filtered_one_of.append(option)
+
+        creds["oneOf"] = filtered_one_of
+        return schema
 
 ConnectorState = GenericConnectorState[ResourceState]
 
