@@ -408,7 +408,8 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 }
 
 type constrainter struct {
-	dialect Dialect
+	dialect      Dialect
+	featureFlags map[string]bool
 }
 
 func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, fc json.RawMessage) (*pm.Response_Validated_Constraint, error) {

@@ -110,4 +110,6 @@ type Endpoint struct {
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
 	// for changing many tables in a single apply.
 	ConcurrentApply bool
+	// FeatureFlags contains feature flags that control endpoint behavior.
+	FeatureFlags map[string]bool
 }

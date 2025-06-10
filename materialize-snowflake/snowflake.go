@@ -139,6 +139,7 @@ func newSnowflakeDriver() *sql.Driver {
 				NewTransactor:       prepareNewTransactor(snowpipeStreaming),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
+				FeatureFlags:        featureFlags,
 			}, nil
 		},
 		PreReqs: preReqs,

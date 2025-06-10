@@ -40,6 +40,9 @@ type Validator struct {
 	// their capitalization preserved from the information_schema view (or equivalent), but the
 	// materialized resource creation will still result in an error due to conflicts.
 	caseInsensitiveFields bool
+
+	// featureFlags contains feature flags that control validation behavior.
+	featureFlags map[string]bool
 }
 
 func NewValidator(
@@ -47,12 +50,14 @@ func NewValidator(
 	is *InfoSchema,
 	maxFieldLength int,
 	caseInsensitiveFields bool,
+	featureFlags map[string]bool,
 ) Validator {
 	return Validator{
 		c:                     c,
 		is:                    is,
 		maxFieldLength:        maxFieldLength,
 		caseInsensitiveFields: caseInsensitiveFields,
+		featureFlags:          featureFlags,
 	}
 }
 
@@ -91,6 +96,21 @@ func (v Validator) ValidateBinding(
 
 		if !mustExist && !hasDefault {
 			return nil, fmt.Errorf("cannot materialize collection '%s' with nullable key field '%s' unless it has a default value annotation", boundCollection.Name.String(), p.Field)
+		}
+	}
+
+	// Check if this is a new binding (no lastBinding) but the table already exists (existingResource != nil).
+	// This is a case we want to prevent unless its feature flag allows it.
+	if lastBinding == nil && existingResource != nil {
+		if !v.featureFlags["allow_existing_tables_for_new_bindings"] {
+			return nil, fmt.Errorf(
+				"table %v already exists for new binding %q. "+
+					"You must drop this table to continue. "+
+					"A 'allow_existing_tables_for_new_bindings' feature flag is available but has several caveats: "+
+					"contact Estuary support to determine if it's appropriate for your use case",
+				path,
+				boundCollection.Name.String(),
+			)
 		}
 	}
 

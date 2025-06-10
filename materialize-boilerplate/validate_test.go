@@ -50,6 +50,7 @@ func TestValidate(t *testing.T) {
 		proposedSpec       *pf.MaterializationSpec
 		fieldNameTransform func(string) string
 		maxFieldLength     int
+		featureFlags       map[string]bool
 	}
 
 	tests := []testCase{
@@ -151,6 +152,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true},
 		},
 		{
 			name:               "table already exists with incompatible proposed spec",
@@ -160,6 +162,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true},
 		},
 		{
 			name:               "new materialization with ambiguous fields",
@@ -178,6 +181,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "ambiguous-fields.flow.proto"),
 			fieldNameTransform: ambiguousTestTransform,
 			maxFieldLength:     0,
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true},
 		},
 		{
 			name:               "table already exists with a key column for an ambiguous field for a new materialization",
@@ -187,6 +191,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "ambiguous-key.flow.proto"),
 			fieldNameTransform: ambiguousTestTransform,
 			maxFieldLength:     0,
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true},
 		},
 		{
 			name:               "update an existing materialization with ambiguous fields",
@@ -239,7 +244,7 @@ func TestValidate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := NewValidator(testConstrainter{}, is, tt.maxFieldLength, true)
+			validator := NewValidator(testConstrainter{}, is, tt.maxFieldLength, true, tt.featureFlags)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
@@ -257,6 +262,43 @@ func TestValidate(t *testing.T) {
 	}
 	cupaloy.SnapshotT(t, snap.String())
 
+	// Test the new feature flag behavior for existing tables
+	t.Run("new binding with existing table - feature flag disabled (default)", func(t *testing.T) {
+		// Table exists but no lastBinding (new binding) - should error
+		is := testInfoSchemaFromSpec(t, loadValidateSpec(t, "base.flow.proto"), simpleTestTransform)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil) // No feature flags
+
+		_, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			loadValidateSpec(t, "base.flow.proto").Bindings[0].Backfill,
+			loadValidateSpec(t, "base.flow.proto").Bindings[0].Collection,
+			loadValidateSpec(t, "base.flow.proto").Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil, // No existing spec (new binding)
+		)
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "already exists for new binding")
+		require.Contains(t, err.Error(), "allow_existing_tables_for_new_bindings")
+	})
+
+	t.Run("new binding with existing table - feature flag enabled", func(t *testing.T) {
+		// Table exists but no lastBinding (new binding) - should succeed with feature flag
+		is := testInfoSchemaFromSpec(t, loadValidateSpec(t, "base.flow.proto"), simpleTestTransform)
+		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true}
+		validator := NewValidator(testConstrainter{}, is, 0, true, featureFlags)
+
+		cs, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			loadValidateSpec(t, "base.flow.proto").Bindings[0].Backfill,
+			loadValidateSpec(t, "base.flow.proto").Bindings[0].Collection,
+			loadValidateSpec(t, "base.flow.proto").Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil, // No existing spec (new binding)
+		)
+		require.NoError(t, err)
+		require.NotNil(t, cs)
+	})
+
 	t.Run("at least one required location must not be too long", func(t *testing.T) {
 		proposed := loadValidateSpec(t, "long-fields.flow.proto")
 
@@ -264,7 +306,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Field = "keyRenamedToSomethingThatIsReallyLong"
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 20, true)
+		validator := NewValidator(testConstrainter{}, is, 20, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -285,7 +327,8 @@ func TestValidate(t *testing.T) {
 		// it has already been materialized, and is either the root document projection or a
 		// collection key.
 		is := testInfoSchemaFromSpec(t, proposed, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 20, true)
+		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true}
+		validator := NewValidator(testConstrainter{}, is, 20, true, featureFlags)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -303,7 +346,7 @@ func TestValidate(t *testing.T) {
 		existing := loadValidateSpec(t, "increment-backfill.flow.proto")
 		proposed := loadValidateSpec(t, "base.flow.proto")
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0, true)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -324,7 +367,7 @@ func TestValidate(t *testing.T) {
 		existing.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0, true)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		// Enabled binding.
 		_, err := validator.ValidateBinding(
@@ -358,7 +401,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0, true)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -379,7 +422,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Inference.DefaultJson = nil
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0, true)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -397,7 +440,7 @@ func TestValidate(t *testing.T) {
 		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0, true)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
