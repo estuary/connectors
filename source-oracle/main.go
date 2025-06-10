@@ -140,9 +140,11 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	SkipBackfills        string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	WatermarksTable      string   `json:"watermarksTable,omitempty" jsonschema:"description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
-	BackfillChunkSize    int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query. Only applies to tables with a primary key."`
+	SkipBackfills           string          `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	WatermarksTable         string          `json:"watermarksTable,omitempty" jsonschema:"description=The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	BackfillChunkSize       int             `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	MinimumBackfillInterval common.Duration `json:"minimumBackfillInterval,omitempty" jsonschema:"title=Minimum Backfill Interval,description=An optional minimum time interval between backfill queries. This is usually not necessary but may be used to deliberately slow down backfills to reduce load on the database. Must be in the form of an ISO 8601 duration string."`
+
 	IncrementalChunkSize int      `json:"incremental_chunk_size,omitempty" jsonschema:"title=Incremental Chunk Size,default=10000,description=The number of rows which should be fetched from the database in a single incremental query."`
 	IncrementalSCNRange  int      `json:"incremental_scn_range,omitempty" jsonschema:"-"`
 	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
@@ -268,7 +270,7 @@ func (db *oracleDatabase) HistoryMode() bool {
 }
 
 func (db *oracleDatabase) MinimumBackfillInterval() time.Duration {
-	return 0
+	return db.config.Advanced.MinimumBackfillInterval.AsDuration()
 }
 
 // This function is a no-op if there is no PDB name configured
