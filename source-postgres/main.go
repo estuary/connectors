@@ -365,6 +365,14 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		logrus.WithField("timeout", statementTimeout).Warn("nonzero statement_timeout")
 	}
 
+	// Ask the database never to use parallel workers for our queries. In general they shouldn't
+	// be something we need, and sometimes the query planner makes really bad decisions when they
+	// are used, most notably when it sees a simple `WHERE ctid > $1 AND ctid <= $2` keyless backfill
+	// query and decides to use parallel workers scanning the entire table instead of a TID Range Scan.
+	if _, err := conn.Exec(ctx, "SET max_parallel_workers_per_gather TO 0"); err != nil {
+		logrus.WithField("err", err).Warn("error attempting to disable parallel workers")
+	}
+
 	db.conn = conn
 	return nil
 }
