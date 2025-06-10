@@ -349,7 +349,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		return nil, err
 	}
 
-	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields)
+	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, nil)
 	var out []*pm.Response_Validated_Binding
 	for idx, b := range req.Bindings {
 		path := paths[idx]

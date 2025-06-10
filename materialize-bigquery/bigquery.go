@@ -194,6 +194,7 @@ func newBigQueryDriver() *sql.Driver {
 				NewTransactor:       prepareNewTransactor(dialect, templates, objAndArrayAsJson),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
+				FeatureFlags:        featureFlags,
 			}, nil
 		},
 		PreReqs: preReqs,
