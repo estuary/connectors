@@ -7,7 +7,7 @@ from urllib import parse
 from estuary_cdk.capture.common import (
     BaseDocument,
     RotatingOAuth2Credentials,
-    OAuth2Spec,
+    OAuth2RotatingTokenSpec,
     ResourceConfig,
     ResourceState,
 )
@@ -91,7 +91,7 @@ accessTokenBody = {
 }
 
 
-OAUTH2_SPEC = OAuth2Spec(
+OAUTH2_SPEC = OAuth2RotatingTokenSpec(
     provider="outreach",
     accessTokenBody=json.dumps(accessTokenBody),
     authUrlTemplate=(
@@ -105,10 +105,13 @@ OAUTH2_SPEC = OAuth2Spec(
     accessTokenUrlTemplate="https://api.outreach.io/oauth/token",
     accessTokenResponseMap={
         "refresh_token": "/refresh_token",
+        "access_token": "/access_token",
+        "access_token_expires_at": r"{{#now_plus}}{{ expires_in }}{{/now_plus}}",
     },
     accessTokenHeaders={
         "Content-Type": "application/json",
     },
+    additionalTokenExchangeBody=None,
 )
 
 

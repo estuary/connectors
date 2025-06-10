@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta, UTC
 from estuary_cdk.capture.connector_status import ConnectorStatus
 from pydantic import BaseModel
 from typing import Generic, Awaitable, Any, BinaryIO, Callable
@@ -97,9 +98,9 @@ class BaseCaptureConnector(
                 await asyncio.sleep(24 * 60 * 60)  # 24 hours
                 stopping.event.set()
 
-            # Rotate refresh tokens for credentials with periodically expiring refresh tokens.
+            # Rotate OAuth2 tokens for credentials with periodically expiring tokens.
             if isinstance(self.token_source, TokenSource) and isinstance(self.token_source.credentials, RotatingOAuth2Credentials):
-                await self._rotate_refresh_tokens(log, open)
+                await self._rotate_oauth2_tokens(log, open)
 
             # Gracefully exit after a moderate period of time.
             # We don't do this within the TaskGroup because we don't
@@ -180,7 +181,7 @@ class BaseCaptureConnector(
 
         return json.loads(encrypted_config.decode('utf-8'))
 
-    async def _rotate_refresh_tokens(
+    async def _rotate_oauth2_tokens(
         self,
         log: FlowLogger,
         open: request.Open[EndpointConfig, ResourceConfig, _ConnectorState],
@@ -188,50 +189,21 @@ class BaseCaptureConnector(
         assert isinstance(self.token_source, TokenSource)
         assert isinstance(self.token_source.credentials, RotatingOAuth2Credentials)
 
-        try:
-            response = await self.token_source.initialize_oauth2_tokens(log, self)
+        now = datetime.now(tz=UTC)
+        access_token_expiration = self.token_source.credentials.access_token_expires_at
 
-            # Update the state with the refresh token we received to ensure the
-            # connector's state always has a valid refresh token.
-            self._checkpoint(
-                state=ConnectorState(
-                    refresh_token=response.refresh_token,
-                )
-            )
+        # Rotate tokens if the access token has expired / will expire in the next 5 minutes.
+        if access_token_expiration < now + timedelta(minutes=5):
+            # Exchange for new access token & refresh token.
+            log.info("Attempting to rotate OAuth2 tokens.")
+            token_exchange_response = await self.token_source.initialize_oauth2_tokens(log, self)
 
-        except HTTPError as err:
-            # TODO(bair): Allow connectors to specify a more specific error message / code when a refresh token is invalid.
-            if  500 > err.code >= 400 and "invalid_grant" in err.message:
-                assert isinstance(open.state.refresh_token, str)
+            # Replace tokens in the config.
+            credentials = self.token_source.credentials
+            credentials.access_token = token_exchange_response.access_token
+            credentials.refresh_token = token_exchange_response.refresh_token
+            credentials.access_token_expires_at = now + timedelta(seconds=token_exchange_response.expires_in)
 
-                # Set token source to use the token from the connector's state.
-                self.token_source.credentials.refresh_token = open.state.refresh_token
-
-                # Get a new token for the config.
-                new_config_token = (await self.token_source.initialize_oauth2_tokens(
-                    log,
-                    self,
-                )).refresh_token
-
-                # Get a new token for the state. This is done second to ensure the state 
-                # token will still be valid if the config token is expired.
-                new_state_token = (await self.token_source.initialize_oauth2_tokens(
-                    log,
-                    self,
-                )).refresh_token
-
-                # Emit a checkpoint with the new state token.
-                self._checkpoint(
-                    state=ConnectorState(
-                        refresh_token=new_state_token,
-                    )
-                )
-
-                # Update the connector's config with the new config token.
-                self.token_source.credentials.refresh_token = new_config_token
-
-                # Encrypt the updated config and emit an event telling the control plane to publish a new spec.
-                encrypted_config = await self._encrypt_config(log, open.capture.config)
-                log.event.config_update("Rotating refresh token in endpoint config.", encrypted_config)
-            else:
-                raise
+            # Encrypt the updated config and emit an event telling the control plane to publish a new spec.
+            encrypted_config = await self._encrypt_config(log, open.capture.config)
+            log.event.config_update("Rotating OAuth2 tokens in endpoint config.", encrypted_config)
