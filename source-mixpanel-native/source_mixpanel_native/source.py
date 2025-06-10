@@ -18,7 +18,7 @@ from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http.auth import BasicHttpAuthenticator, TokenAuthenticator
 from airbyte_cdk.utils import AirbyteTracedException
 
-from .streams import Annotations, CohortMembers, Cohorts, Engage, Export, Funnels, Revenue
+from .streams import Annotations, CohortMembers, Cohorts, Engage, Export, Funnels
 from .testing import adapt_streams_if_testing, adapt_validate_if_testing
 from .utils import read_full_refresh
 
@@ -37,7 +37,7 @@ class TokenAuthenticatorBase64(TokenAuthenticator):
 
 
 class SourceMixpanel(AbstractSource):
-    STREAMS = [Cohorts, CohortMembers, Funnels, Revenue, Export, Annotations, Engage]
+    STREAMS = [Cohorts, CohortMembers, Funnels, Export, Annotations, Engage]
 
     @staticmethod
     def get_authenticator(config: Mapping[str, Any]) -> TokenAuthenticator:

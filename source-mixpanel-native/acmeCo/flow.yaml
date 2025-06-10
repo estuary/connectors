@@ -26,7 +26,3 @@ collections:
     key:
       - /funnel_id
       - /date
-  acmeCo/revenue:
-    schema: revenue.schema.yaml
-    key:
-      - /date
