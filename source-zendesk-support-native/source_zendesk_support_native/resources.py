@@ -36,6 +36,7 @@ from .models import (
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
     POST_CHILD_RESOURCES,
+    update_oauth_spec,
 )
 from .api import (
     backfill_audit_logs,
@@ -846,6 +847,7 @@ def post_comment_votes(
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
+    update_oauth_spec(config.subdomain)
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
 
     resources = [
