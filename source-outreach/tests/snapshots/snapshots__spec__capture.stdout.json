@@ -25,12 +25,24 @@
               "secret": true,
               "title": "Refresh Token",
               "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            },
+            "access_token_expires_at": {
+              "format": "date-time",
+              "title": "Access token expiration time.",
+              "type": "string"
             }
           },
           "required": [
             "client_id",
             "client_secret",
-            "refresh_token"
+            "refresh_token",
+            "access_token",
+            "access_token_expires_at"
           ],
           "title": "OAuth",
           "type": "object",
@@ -111,6 +123,8 @@
         "Content-Type": "application/json"
       },
       "accessTokenResponseMap": {
+        "access_token": "/access_token",
+        "access_token_expires_at": "{{#now_plus}}{{ expires_in }}{{/now_plus}}",
         "refresh_token": "/refresh_token"
       }
     },

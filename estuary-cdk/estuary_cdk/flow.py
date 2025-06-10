@@ -1,5 +1,6 @@
 import abc
 from dataclasses import dataclass
+from datetime import datetime
 from pydantic import BaseModel, NonNegativeInt, PositiveInt, Field
 from typing import Any, Literal, TypeVar, Generic, Literal
 
@@ -78,6 +79,10 @@ class OAuth2Spec(BaseModel):
     accessTokenHeaders: dict[str, str]
     accessTokenResponseMap: dict[str, str]
     accessTokenUrlTemplate: str
+
+
+class OAuth2RotatingTokenSpec(OAuth2Spec):
+    additionalTokenExchangeBody: dict[str, str | int] | None
 
 
 class ConnectorSpec(BaseModel):
@@ -272,7 +277,15 @@ class BaseOAuth2Credentials(abc.ABC, BaseModel):
 
         return _OAuth2Credentials
 
+
 class RotatingOAuth2Credentials(BaseOAuth2Credentials):
+    access_token: str = Field(
+        title="Access Token",
+        json_schema_extra={"secret": True}
+    )
+    access_token_expires_at: datetime = Field(
+        title="Access token expiration time.",
+    )
     @staticmethod
     def for_provider(provider: str) -> type["RotatingOAuth2Credentials"]:
         """
