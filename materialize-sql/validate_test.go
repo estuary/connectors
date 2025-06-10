@@ -59,7 +59,7 @@ func TestValidateMigrations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := boilerplate.NewValidator(testConstrainter{}, is, tt.maxFieldLength, true)
+			validator := boilerplate.NewValidator(testConstrainter{}, is, tt.maxFieldLength, true, nil)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
