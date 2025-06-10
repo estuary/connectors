@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -16,6 +17,8 @@ import (
 	_ "github.com/trinodb/trino-go-client/trino"
 	"go.gazette.dev/core/consumer/protocol"
 )
+
+var featureFlagDefaults = map[string]bool{}
 
 // config represents the endpoint configuration for starburst.
 // It must match the one defined for the source specs (flow.yaml) in Rust.
@@ -32,6 +35,12 @@ type config struct {
 	BucketPath         string `json:"bucketPath" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
 
 	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // ToURI converts the Config to a DSN string.
@@ -117,6 +126,11 @@ func newStarburstDriver() *sql.Driver {
 				"schema":  cfg.Schema,
 			}).Info("opening Starburst")
 
+			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+			if cfg.Advanced.FeatureFlags != "" {
+				log.WithField("flags", featureFlags).Info("parsed feature flags")
+			}
+
 			var templates = renderTemplates(starburstTrinoDialect)
 
 			return &sql.Endpoint{
@@ -127,6 +141,7 @@ func newStarburstDriver() *sql.Driver {
 				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
+				FeatureFlags:        featureFlags,
 			}, nil
 		},
 		PreReqs: preReqs,
