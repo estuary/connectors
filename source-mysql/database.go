@@ -104,7 +104,7 @@ func (db *mysqlDatabase) HistoryMode() bool {
 }
 
 func (db *mysqlDatabase) MinimumBackfillInterval() time.Duration {
-	return 0
+	return db.config.Advanced.MinimumBackfillInterval.AsDuration()
 }
 
 // queryDatabaseVersion examines the server version string to figure out what product
