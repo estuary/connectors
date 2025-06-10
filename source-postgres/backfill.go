@@ -42,6 +42,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var usingCTID bool                  // True when we're running a CTID-ordered backfill
 	var afterCTID, untilCTID pgtype.TID // When using CTID, these are the lower and upper bounds for the backfill query
 	var tableMaximumPageID int64        // When using CTID, this is a conservative (over)estimate of the maximum page ID for the table, used to determine when backfill is complete
+	var disableParallelWorkers bool     // True when we want to disable parallel workers for the backfill query
 
 	switch state.Mode {
 	case sqlcapture.TableStateKeylessBackfill:
@@ -81,6 +82,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		query = db.keylessScanQuery(info, schema, table)
 		args = []any{afterCTID, untilCTID}
 		usingCTID = true
+		disableParallelWorkers = true
 	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
 		var isPrecise = (state.Mode == sqlcapture.TableStatePreciseBackfill)
 		if resumeAfter != nil {
@@ -103,6 +105,22 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		}
 	default:
 		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
+	}
+
+	// For efficiency we really need CTID backfills to execute as a TID Range Scan on the
+	// database. Normally the query planner is pretty good about using a TID Range Scan
+	// for `WHERE ctid > $1 AND ctid <= $2` queries, but it can make really bad choices
+	// if it decides to use parallel workers, so we disable those.
+	if disableParallelWorkers {
+		if _, err := db.conn.Exec(ctx, "SET max_parallel_workers_per_gather TO 0"); err != nil {
+			logrus.WithField("err", err).Warn("error attempting to disable parallel workers")
+		} else {
+			defer func() {
+				if _, err := db.conn.Exec(ctx, "SET max_parallel_workers_per_gather TO DEFAULT"); err != nil {
+					logrus.WithField("err", err).Warn("error resetting max_parallel_workers to default")
+				}
+			}()
+		}
 	}
 
 	// If this is the first chunk being backfilled, run an `EXPLAIN` on it and log the results
