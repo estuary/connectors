@@ -267,6 +267,10 @@ func (db *oracleDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
+func (db *oracleDatabase) MinimumBackfillInterval() time.Duration {
+	return 0
+}
+
 // This function is a no-op if there is no PDB name configured
 func (db *oracleDatabase) switchToCDB(ctx context.Context) error {
 	if db.pdbName == "" {

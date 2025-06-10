@@ -316,6 +316,10 @@ func (db *postgresDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
+func (db *postgresDatabase) MinimumBackfillInterval() time.Duration {
+	return 0
+}
+
 func (db *postgresDatabase) connect(ctx context.Context) error {
 	logrus.WithFields(logrus.Fields{
 		"address":  db.config.Address,

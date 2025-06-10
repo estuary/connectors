@@ -103,6 +103,10 @@ func (db *mysqlDatabase) HistoryMode() bool {
 	return db.config.HistoryMode
 }
 
+func (db *mysqlDatabase) MinimumBackfillInterval() time.Duration {
+	return 0
+}
+
 // queryDatabaseVersion examines the server version string to figure out what product
 // and release version we're talking to, and saves the results for later use.
 func (db *mysqlDatabase) queryDatabaseVersion() error {
