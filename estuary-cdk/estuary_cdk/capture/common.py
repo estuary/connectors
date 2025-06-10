@@ -28,6 +28,7 @@ from ..flow import (
     CaptureBinding,
     ClientCredentialsOAuth2Credentials,
     OAuth2TokenFlowSpec,
+    OAuth2RotatingTokenSpec,
     AuthorizationCodeFlowOAuth2Credentials,
     LongLivedClientCredentialsOAuth2Credentials,
     ResourceOwnerPasswordOAuth2Credentials,

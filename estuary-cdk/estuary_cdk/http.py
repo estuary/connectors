@@ -21,6 +21,7 @@ from .flow import (
     ResourceOwnerPasswordOAuth2Credentials,
     RotatingOAuth2Credentials,
     OAuth2Spec,
+    OAuth2RotatingTokenSpec,
 )
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
@@ -164,9 +165,10 @@ class TokenSource:
         refresh_token: str = ""
         scope: str = ""
 
-    oauth_spec: OAuth2Spec | OAuth2TokenFlowSpec | None
+    oauth_spec: OAuth2Spec | OAuth2TokenFlowSpec | OAuth2RotatingTokenSpec | None
     credentials: (
         BaseOAuth2Credentials
+        | RotatingOAuth2Credentials
         | ResourceOwnerPasswordOAuth2Credentials
         | ClientCredentialsOAuth2Credentials
         | AuthorizationCodeFlowOAuth2Credentials
@@ -179,8 +181,16 @@ class TokenSource:
     _fetched_at: int = 0
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
-        if isinstance(self.credentials, AccessToken) or isinstance(
-            self.credentials, LongLivedClientCredentialsOAuth2Credentials
+        if isinstance(self.credentials, (
+                AccessToken,
+                LongLivedClientCredentialsOAuth2Credentials,
+                # RotatingOAuth2Credentials are refreshed _only_ at connector startup.
+                # Expired tokens cause a crash, triggering a restart and token exchange.
+                # Mid-run exchanges would complicate token management and make it difficult
+                # to keep valid tokens in the endpoint config, so we never attempt to
+                # exchange tokens in `fetch_token` for `RotatingOAuth2Credentials`.
+                RotatingOAuth2Credentials,
+            )
         ):
             return ("Bearer", self.credentials.access_token)
         elif isinstance(self.credentials, BasicAuth):
@@ -250,7 +260,21 @@ class TokenSource:
         form = {}
 
         match credentials:
-            case BaseOAuth2Credentials() | RotatingOAuth2Credentials():
+            case RotatingOAuth2Credentials():
+                assert isinstance(self.oauth_spec, OAuth2RotatingTokenSpec)
+                form: dict[str, str | int] = {
+                    "grant_type": "refresh_token",
+                    "client_id": credentials.client_id,
+                    "client_secret": credentials.client_secret,
+                    "refresh_token": credentials.refresh_token,
+                }
+
+                # Some providers require additional parameters within the form body, like
+                # an `expires_in` to configure how long the access token remains valid.
+                if self.oauth_spec.additionalTokenExchangeBody:
+                    form.update(self.oauth_spec.additionalTokenExchangeBody)
+
+            case BaseOAuth2Credentials():
                 form = {
                     "grant_type": "refresh_token",
                     "client_id": credentials.client_id,
