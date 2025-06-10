@@ -5,7 +5,6 @@ from .cohorts import Cohorts
 from .engage import Engage
 from .export import Export, ExportSchema
 from .funnels import Funnels, FunnelsList
-from .revenue import Revenue
 
 __all__ = [
     "IncrementalMixpanelStream",
@@ -19,5 +18,4 @@ __all__ = [
     "Annotations",
     "Funnels",
     "FunnelsList",
-    "Revenue",
 ]

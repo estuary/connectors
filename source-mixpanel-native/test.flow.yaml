@@ -30,12 +30,6 @@ captures:
             - date
         target: acmeCo/funnels
       - resource:
-          stream: revenue
-          syncMode: incremental
-          cursorField:
-            - date
-        target: acmeCo/revenue
-      - resource:
           stream: export
           syncMode: incremental
           cursorField:
