@@ -129,65 +129,6 @@
     ]
   },
   {
-    "recommendedName": "revenue",
-    "resourceConfig": {
-      "stream": "revenue",
-      "syncMode": "incremental",
-      "cursorField": [
-        "date"
-      ]
-    },
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "type": "object",
-      "required": [
-        "date"
-      ],
-      "properties": {
-        "date": {
-          "description": "Date for which the revenue data is recorded",
-          "type": "string"
-        },
-        "count": {
-          "description": "Number of revenue transactions for the specified date",
-          "type": [
-            "null",
-            "integer"
-          ]
-        },
-        "paid_count": {
-          "description": "Number of successful paid transactions for the specified date",
-          "type": [
-            "null",
-            "integer"
-          ]
-        },
-        "amount": {
-          "description": "Total revenue amount for the specified date",
-          "type": [
-            "null",
-            "number"
-          ]
-        },
-        "_meta": {
-          "type": "object",
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ]
-        }
-      },
-      "x-infer-schema": true
-    },
-    "key": [
-      "/date"
-    ]
-  },
-  {
     "recommendedName": "export",
     "resourceConfig": {
       "stream": "export",
