@@ -117,7 +117,15 @@ func newTransactor(
 		})
 	}
 
-	return t, nil, nil
+	opts := &boilerplate.MaterializeOptions{
+		ExtendedLogging: true,
+		AckSchedule: &boilerplate.AckScheduleOption{
+			Config: cfg.Schedule,
+			Jitter: []byte(cfg.Token),
+		},
+	}
+
+	return t, opts, nil
 }
 
 type binding struct {

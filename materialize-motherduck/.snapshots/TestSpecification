@@ -147,6 +147,56 @@
           "propertyName": "stagingBucketType"
         },
         "order": 4
+      },
+      "syncSchedule": {
+        "properties": {
+          "syncFrequency": {
+            "type": "string",
+            "enum": [
+              "0s",
+              "30s",
+              "5m",
+              "15m",
+              "30m",
+              "1h",
+              "2h",
+              "4h"
+            ],
+            "title": "Sync Frequency",
+            "description": "Frequency at which transactions are executed when the materialization is fully caught up and streaming changes. May be enabled only for certain time periods and days of the week if configured below; otherwise it is effective 24/7. Defaults to 30 minutes if unset.",
+            "order": 0
+          },
+          "timezone": {
+            "type": "string",
+            "title": "Timezone",
+            "description": "Timezone applicable to sync time windows and active days. Must be a valid IANA time zone name or +HH:MM offset.",
+            "order": 1
+          },
+          "fastSyncStartTime": {
+            "type": "string",
+            "title": "Fast Sync Start Time",
+            "description": "Time of day that transactions begin executing at the configured Sync Frequency. Prior to this time transactions will be executed more slowly. Must be in the form of '09:00'.",
+            "order": 2,
+            "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "fastSyncStopTime": {
+            "type": "string",
+            "title": "Fast Sync Stop Time",
+            "description": "Time of day that transactions stop executing at the configured Sync Frequency. After this time transactions will be executed more slowly. Must be in the form of '17:00'.",
+            "order": 3,
+            "pattern": "^(0?[0-9]|1[0-9]|2[0-3]):[0-5][0-9]$"
+          },
+          "fastSyncEnabledDays": {
+            "type": "string",
+            "title": "Fast Sync Enabled Days",
+            "description": "Days of the week that the configured Sync Frequency is active. On days that are not enabled, transactions will be executed more slowly for the entire day. Examples: 'M-F' (Monday through Friday, inclusive), 'M,W,F' (Monday, Wednesday, and Friday), 'Su-T,Th-S' (Sunday through Tuesday, inclusive; Thursday through Saturday, inclusive). All days are enabled if unset.",
+            "order": 4
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Sync Schedule",
+        "description": "Configure schedule of transactions for the materialization."
       }
     },
     "type": "object",
