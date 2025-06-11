@@ -79,9 +79,9 @@ type TableState struct {
 	Mode string `json:"mode"`
 	// KeyColumns is the "primary key" used for ordering/chunking the backfill scan.
 	KeyColumns []string `json:"key_columns"`
-	// Scanned is a FoundationDB-serialized tuple representing the KeyColumns
-	// values of the last row which has been backfilled. Replication events will
-	// only be emitted for rows <= this value while backfilling is in progress.
+	// Scanned represents the current position of the backfill. For precise backfills the
+	// byte serialization ordering must strictly match the database backfill ordering,
+	// because we will only emit replication events for rows <= this value.
 	Scanned []byte `json:"scanned"`
 	// Metadata is some arbitrary amount of database-specific metadata
 	// which needs to be tracked persistently on a per-table basis. The
@@ -533,7 +533,7 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 
 		// The core event dispatch happens in handleReplicationEvent but it's useful to
 		// count changes separately from other stuff here.
-		if _, ok := event.(*ChangeEvent); ok {
+		if _, ok := event.(ChangeEvent); ok {
 			changeCount++
 		} else {
 			otherCount++
@@ -585,27 +585,25 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 	}
 
 	// Any other events processed here must be ChangeEvents.
-	if _, ok := event.(*ChangeEvent); !ok {
+	if _, ok := event.(ChangeEvent); !ok {
 		return fmt.Errorf("unhandled replication event %q", event.String())
 	}
-	var change = event.(*ChangeEvent)
-	var streamID = change.Source.Common().StreamID()
+	var change = event.(ChangeEvent)
+	var streamID = change.StreamID()
 	var binding = c.Bindings[streamID]
-	var tableState *TableState
-	if binding != nil {
-		tableState = c.State.Streams[binding.StateKey]
+	if binding == nil {
+		log.WithField("event", event).Debug("no binding for stream, ignoring")
+		return nil
 	}
+	var tableState = c.State.Streams[binding.StateKey]
 
 	// Decide what to do with the change event based on the state of the table.
 	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableStateIgnore {
-		log.WithFields(log.Fields{
-			"stream": streamID,
-			"op":     change.Operation,
-		}).Debug("ignoring stream")
+		log.WithField("event", event).Debug("inactive table, ignoring")
 		return nil
 	}
 	if tableState.Mode == TableStateActive || tableState.Mode == TableStateKeylessBackfill || tableState.Mode == TableStateUnfilteredBackfill {
-		if err := c.emitChange(change); err != nil {
+		if err := c.emitChange(binding, change); err != nil {
 			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 		}
 		return nil
@@ -614,8 +612,8 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		// When a table is being backfilled precisely, replication events lying within the
 		// already-backfilled portion of the table should be emitted, while replication events
 		// beyond that point should be ignored (since we'll reach that row later in the backfill).
-		if compareTuples(change.RowKey, tableState.Scanned) <= 0 {
-			if err := c.emitChange(change); err != nil {
+		if compareTuples(change.GetRowKey(), tableState.Scanned) <= 0 {
+			if err := c.emitChange(binding, change); err != nil {
 				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
 		}
@@ -652,14 +650,15 @@ func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*D
 }
 
 func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discoveryInfo *DiscoveryInfo) error {
-	var stateKey = c.Bindings[streamID].StateKey
+	var binding = c.Bindings[streamID]
+	var stateKey = binding.StateKey
 	var streamState = c.State.Streams[stateKey]
 
 	// Process backfill query results as a callback-driven stream.
-	var prevRowKey = streamState.Scanned
+	var prevRowKey = streamState.Scanned // Only used for ordering sanity check in precise backfills
 	var eventCount int
-	backfillComplete, nextRowKey, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
-		if streamState.Mode == TableStatePreciseBackfill && compareTuples(prevRowKey, event.RowKey) > 0 {
+	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event ChangeEvent) error {
+		if streamState.Mode == TableStatePreciseBackfill {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
 			// row keys.
@@ -674,11 +673,14 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 			// should have set `UnpredictableKeyOrdering` to true, which should have resulted in a
 			// backfill using the "UnfilteredBackfill" mode instead, which would not perform that
 			// filtering or this sanity check.
-			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", prevRowKey, event.RowKey)
+			var rowKey = event.GetRowKey()
+			if compareTuples(prevRowKey, rowKey) > 0 {
+				return fmt.Errorf("scan key ordering failure: last=%q, next=%q", prevRowKey, rowKey)
+			}
+			prevRowKey = rowKey
 		}
-		prevRowKey = event.RowKey
 
-		if err := c.emitChange(event); err != nil {
+		if err := c.emitChange(binding, event); err != nil {
 			return fmt.Errorf("error emitting %q backfill row: %w", streamID, err)
 		}
 		eventCount++
@@ -700,55 +702,27 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 		state.Mode = TableStateActive
 		state.Scanned = nil
 	} else {
-		state.Scanned = nextRowKey
+		state.Scanned = resumeCursor
 	}
 	state.dirty = true
 	c.State.Streams[stateKey] = state
 	return nil
 }
 
-func (c *Capture) emitChange(event *ChangeEvent) error {
-	var record map[string]interface{}
-	var meta = struct {
-		Operation ChangeOp               `json:"op"`
-		Source    SourceMetadata         `json:"source"`
-		Before    map[string]interface{} `json:"before,omitempty"`
-	}{
-		Operation: event.Operation,
-		Source:    event.Source,
-		Before:    nil,
-	}
-	switch event.Operation {
-	case InsertOp:
-		record = event.After // Before is never used.
-	case UpdateOp:
-		meta.Before, record = event.Before, event.After
-	case DeleteOp:
-		record = event.Before // After is never used.
-	}
-	if record == nil {
-		log.WithField("op", event.Operation).Warn("change event data map is nil")
-		record = make(map[string]interface{})
-	}
-	record["_meta"] = &meta
+// emitChangePool is a sync.Pool used to efficiently reuse byte slices for change events.
+var emitChangePool = sync.Pool{New: func() any { return make([]byte, 0, 1024) }}
 
-	var sourceCommon = event.Source.Common()
-	var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
-	var binding, ok = c.Bindings[streamID]
-	if !ok {
-		return fmt.Errorf("capture output to invalid stream %q", streamID)
-	}
+func (c *Capture) emitChange(binding *Binding, event ChangeEvent) error {
+	var buf = emitChangePool.Get().([]byte)[:0] // Get and reset a byte slice from the pool
+	defer emitChangePool.Put(buf)               // Put it back when done
+	var err error
 
-	var bs, err = json.Marshal(record)
+	buf, err = event.MarshalToJSON(buf)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"document": fmt.Sprintf("%#v", record),
-			"stream":   streamID,
-			"err":      err,
-		}).Error("document serialization error")
-		return fmt.Errorf("error serializing document from stream %q: %w", streamID, err)
+		log.WithField("event", event).WithField("err", err).Error("error serializing change event")
+		return fmt.Errorf("error serializing change event %q: %w", event.String(), err)
 	}
-	return c.Output.Documents(int(binding.Index), bs)
+	return c.Output.Documents(int(binding.Index), buf)
 }
 
 func (c *Capture) emitState() error {

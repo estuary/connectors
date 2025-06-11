@@ -12,7 +12,7 @@ import (
 // each field value so that complex database-specific types can be "lowered" into
 // FDB-serializable values.
 func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes map[string]T, translate func(key interface{}, ktype T) (tuple.TupleElement, error)) ([]byte, error) {
-	var xs = make([]interface{}, len(key))
+	var xs = make([]tuple.TupleElement, len(key))
 	var err error
 	for i, elem := range key {
 		var ktype = fieldTypes[elem]
@@ -20,7 +20,22 @@ func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes
 			return nil, fmt.Errorf("error encoding column %q: %w", elem, err)
 		}
 	}
-	return packTuple(xs)
+	return PackTuple(xs)
+}
+
+// EncodeRowKeyIndices extracts the appropriate key fields by index from a list and
+// encodes them as a FoundationDB serialized tuple. It applies the `translate` callback
+// to each field value so that complex database-specific types can be "lowered" into
+// FDB-serializable values.
+func EncodeRowKeyIndices[T any](keyIndices []int, vals []any, keyTypes []T, translate func(key any, ktype T) (tuple.TupleElement, error)) ([]byte, error) {
+	var xs = make([]tuple.TupleElement, len(keyIndices))
+	var err error
+	for i, n := range keyIndices {
+		if xs[i], err = translate(vals[n], keyTypes[i]); err != nil {
+			return nil, fmt.Errorf("error encoding column at index %d: %w", n, err)
+		}
+	}
+	return PackTuple(xs)
 }
 
 // We translate a list of column values (representing the primary key of a
@@ -31,26 +46,23 @@ func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes
 //
 // Encoding primary keys like this also makes `state.json` round-tripping
 // across restarts trivial.
-func packTuple(xs []interface{}) (bs []byte, err error) {
-	var t []tuple.TupleElement
-	for _, x := range xs {
+func PackTuple(xs []tuple.TupleElement) (bs []byte, err error) {
+	for i := range xs {
 		// Values not natively supported by the FoundationDB tuple encoding code
 		// must be converted into ones that are.
-		switch x := x.(type) {
+		switch x := xs[i].(type) {
 		case uint8:
-			t = append(t, uint(x))
+			xs[i] = uint(x)
 		case uint16:
-			t = append(t, uint(x))
+			xs[i] = uint(x)
 		case uint32:
-			t = append(t, uint(x))
+			xs[i] = uint(x)
 		case int8:
-			t = append(t, int(x))
+			xs[i] = int(x)
 		case int16:
-			t = append(t, int(x))
+			xs[i] = int(x)
 		case int32:
-			t = append(t, int(x))
-		default:
-			t = append(t, x)
+			xs[i] = int(x)
 		}
 	}
 
@@ -66,7 +78,7 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 			}
 		}
 	}()
-	return tuple.Tuple(t).Pack(), nil
+	return tuple.Tuple(xs).Pack(), nil
 }
 
 // UnpackTuple decodes a FoundationDB-serialized sequence of bytes into a list of

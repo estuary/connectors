@@ -199,22 +199,19 @@ func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
 
 // Documents emits one or more documents to the specified binding index.
 func (out *PullOutput) Documents(binding int, docs ...json.RawMessage) error {
-	var messages []*pc.Response
-	for _, doc := range docs {
-		messages = append(messages, &pc.Response{
-			Captured: &pc.Response_Captured{
-				Binding: uint32(binding),
-				DocJson: doc,
-			},
-		})
-	}
-
 	// Emit all the messages with a single mutex acquisition so that a single Documents()
 	// call is atomic (no Checkpoint outputs can be interleaved with it) even when handling
 	// multiple documents at once.
 	out.Lock()
 	defer out.Unlock()
-	for _, msg := range messages {
+
+	for _, doc := range docs {
+		var msg = &pc.Response{
+			Captured: &pc.Response_Captured{
+				Binding: uint32(binding),
+				DocJson: doc,
+			},
+		}
 		if err := out.Send(msg); err != nil {
 			return fmt.Errorf("writing captured documents: %w", err)
 		}

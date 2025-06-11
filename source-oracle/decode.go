@@ -375,7 +375,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		SSN:   msg.SSN,
 	}
 
-	var event = &sqlcapture.ChangeEvent{
+	var event = &sqlcapture.OldChangeEvent{
 		Operation: op,
 		RowKey:    rowKey,
 		Source:    sourceInfo,
