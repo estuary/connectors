@@ -31,7 +31,7 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 }
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
-func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
+func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
@@ -140,7 +140,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		log.WithField("fields", fields).Trace("got row")
 		var seqval = make([]byte, 10)
 		binary.BigEndian.PutUint64(seqval[2:], uint64(rowOffset))
-		var event = &sqlcapture.ChangeEvent{
+		var event = &sqlcapture.OldChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
 			Source: &sqlserverSourceInfo{

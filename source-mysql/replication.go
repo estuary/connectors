@@ -546,7 +546,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if rs.db.includeTxIDs[streamID] {
 				sourceInfo.TxID = rs.gtidString
 			}
-			if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
+			if err := rs.emitEvent(ctx, &sqlcapture.OldChangeEvent{
 				Operation: sqlcapture.InsertOp,
 				RowKey:    rowKey,
 				After:     after,
@@ -595,7 +595,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 				if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
 					// When the row key is changed by an update, translate it into a synthetic pair: a delete
 					// event of the old row-state, plus an insert event of the new row-state.
-					events = append(events, &sqlcapture.ChangeEvent{
+					events = append(events, &sqlcapture.OldChangeEvent{
 						Operation: sqlcapture.DeleteOp,
 						RowKey:    rowKeyBefore,
 						Before:    before,
@@ -608,7 +608,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 							EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx-1),
 							TxID:        eventTxID,
 						},
-					}, &sqlcapture.ChangeEvent{
+					}, &sqlcapture.OldChangeEvent{
 						Operation: sqlcapture.InsertOp,
 						RowKey:    rowKeyAfter,
 						After:     after,
@@ -619,7 +619,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 						},
 					})
 				} else {
-					events = append(events, &sqlcapture.ChangeEvent{
+					events = append(events, &sqlcapture.OldChangeEvent{
 						Operation: sqlcapture.UpdateOp,
 						RowKey:    rowKeyAfter,
 						Before:    before,
@@ -666,7 +666,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if rs.db.includeTxIDs[streamID] {
 				sourceInfo.TxID = rs.gtidString
 			}
-			if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
+			if err := rs.emitEvent(ctx, &sqlcapture.OldChangeEvent{
 				Operation: sqlcapture.DeleteOp,
 				RowKey:    rowKey,
 				Before:    before,
