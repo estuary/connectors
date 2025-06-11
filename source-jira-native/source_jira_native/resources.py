@@ -63,6 +63,9 @@ from .api import (
 )
 
 
+TEST_CONFIG_DOMAIN = "dontchangethisdomain.notareal.jira.domain"
+
+
 async def validate_projects(
     log: Logger, http: HTTPMixin, config: EndpointConfig,
 ):
@@ -414,6 +417,12 @@ async def all_resources(
         *issue_child_resources(log, http, config, timezone)
     ]
 
-    accessible_resources = await remove_permission_blocked_resources(log, http, config, resources) if should_check_permissions else resources
+    # To discover all resources for the discover snapshot, don't try to check permissions when using
+    # our test config domain. We don't have a test Jira account, so this permission check will crash
+    # without an escape hatch like this.
+    if should_check_permissions and config.domain != TEST_CONFIG_DOMAIN:
+        accessible_resources = await remove_permission_blocked_resources(log, http, config, resources)
+    else:
+        accessible_resources = resources
 
     return accessible_resources
