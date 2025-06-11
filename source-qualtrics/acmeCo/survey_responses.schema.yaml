@@ -18,6 +18,17 @@ $defs:
         type: integer
     title: Meta
     type: object
+  Values:
+    additionalProperties: true
+    properties:
+      recordedDate:
+        format: date-time
+        title: Recordeddate
+        type: string
+    required:
+      - recordedDate
+    title: Values
+    type: object
 additionalProperties: true
 properties:
   _meta:
@@ -26,30 +37,18 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  surveyId:
-    title: Surveyid
-    type: string
   responseId:
     title: Responseid
     type: string
-  recordedDate:
-    format: date-time
-    title: Recordeddate
+  surveyId:
+    title: Surveyid
     type: string
-  startDate:
-    format: date-time
-    title: Startdate
-    type: string
-  endDate:
-    format: date-time
-    title: Enddate
-    type: string
+  values:
+    $ref: "#/$defs/Values"
 required:
-  - surveyId
   - responseId
-  - recordedDate
-  - startDate
-  - endDate
+  - surveyId
+  - values
 title: SurveyResponse
 type: object
 x-infer-schema: true

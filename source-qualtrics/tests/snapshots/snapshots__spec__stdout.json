@@ -3,6 +3,19 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
+        "Advanced": {
+          "properties": {
+            "window_size": {
+              "default": 30,
+              "description": "Window size in days for incremental streams.",
+              "exclusiveMinimum": 0,
+              "title": "Window Size",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
         "Auth": {
           "properties": {
             "credentials_title": {
@@ -55,6 +68,12 @@
           "format": "date-time",
           "title": "Start Date",
           "type": "string"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [

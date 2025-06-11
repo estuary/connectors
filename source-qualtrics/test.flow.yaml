@@ -12,9 +12,11 @@ captures:
         config:
           credentials:
             credentials_title: Private App Credentials
-            access_token: your_api_token_here
-          data_center: "123"
-          start_date: "2023-01-01T00:00:00Z"
+            access_token: not-an-access-token
+          data_center: not-a-data-center
+          start_date: "2025-01-01T00:00:00Z"
+          advanced:
+            window_size: 30
     bindings:
       - resource:
           name: surveys
