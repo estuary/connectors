@@ -771,7 +771,7 @@ func (s *replicationStream) decodeChangeEvent(
 	if s.db.includeTxIDs[streamID] {
 		sourceInfo.TxID = s.nextTxnXID
 	}
-	var event = &sqlcapture.ChangeEvent{
+	var event = &sqlcapture.OldChangeEvent{
 		Operation: op,
 		RowKey:    rowKey,
 		Source:    sourceInfo,
