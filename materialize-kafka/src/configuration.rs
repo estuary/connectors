@@ -347,7 +347,7 @@ impl JsonSchema for Resource {
 pub struct AckTrackingContext {
     pending_messages: AtomicUsize,
     completed_messages: AtomicUsize,
-    state: Mutex<Option<KafkaError>>,
+    state: Mutex<Option<(KafkaError, usize)>>,
     notify: Condvar,
 }
 
@@ -365,13 +365,21 @@ impl AckTrackingContext {
         self.pending_messages.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn wait_for_all_successful_acks(&self) -> Result<()> {
+    pub fn wait_for_all_successful_acks(
+        &self,
+        bindings: &[crate::binding_info::BindingInfo],
+    ) -> Result<()> {
         let mut guard = self.state.lock().unwrap();
 
         loop {
             // Check for failure (fail-fast)
-            if let Some(ref error) = *guard {
-                return Err(anyhow::anyhow!("Message delivery failed: {:?}", error));
+            if let Some((ref error, binding_index)) = *guard {
+                return Err(anyhow::anyhow!(
+                    "Message delivery failed for topic '{}' (binding {}): {:?}",
+                    bindings[binding_index].topic,
+                    binding_index,
+                    error
+                ));
             }
 
             // Check if all pending messages have been successfully delivered
@@ -393,9 +401,9 @@ impl AckTrackingContext {
 impl ClientContext for AckTrackingContext {}
 
 impl ProducerContext for AckTrackingContext {
-    type DeliveryOpaque = ();
+    type DeliveryOpaque = usize;
 
-    fn delivery(&self, delivery_result: &DeliveryResult, _: Self::DeliveryOpaque) {
+    fn delivery(&self, delivery_result: &DeliveryResult, binding_index: Self::DeliveryOpaque) {
         match delivery_result {
             Ok(_) => {
                 let completed = self.completed_messages.fetch_add(1, Ordering::SeqCst) + 1;
@@ -407,10 +415,10 @@ impl ProducerContext for AckTrackingContext {
                 }
             }
             Err((err, _)) => {
-                // Store error and notify for fail-fast behavior
+                // Store error with binding context and notify for fail-fast behavior
                 let mut state = self.state.lock().unwrap();
                 if state.is_none() {
-                    *state = Some(err.clone());
+                    *state = Some((err.clone(), binding_index));
                 }
                 self.notify.notify_all();
             }
