@@ -3,7 +3,7 @@ credentials:
     username: alexb@estuary.dev
     password_sops: ENC[AES256_GCM,data:O5rJ/sJWpk8DxPQn4Q==,iv:OVelKHmeAE8GBVSr9JyQ8BUhfjQbMQhO9MrIyRXUq/E=,tag:nhNdx9dckVg3GM8M+AC1EQ==,type:str]
 start_date: "2025-05-22T00:00:00Z"
-domain: my.jira.domain
+domain: dontchangethisdomain.notareal.jira.domain
 projects: ""
 sops:
     kms: []
@@ -14,8 +14,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-05-22T15:24:01Z"
-    mac: ENC[AES256_GCM,data:+0MtahWQCmxK/JF0HzVWGL5okXwuewCSzJZBhHVC7i+DpD9ShXTRWB1TmnspO9esNdY+ISkMMBOwiXtwJTdqsIjewqlhoRAWfTT8ngbZcsqNORkynR6UOUgjsxTeJKqwGzZubyGQW4gDVky/gMbrUlBNGi4V463CFJJSJlkLaC8=,iv:v5+pifoFb/xcznKUu4qUN5kyRMGZr0jj20qartCDOfo=,tag:X0aFapMxivnPbGVPoVoFOw==,type:str]
+    lastmodified: "2025-06-11T15:02:27Z"
+    mac: ENC[AES256_GCM,data:Rh7TR3cCvcSFTxIo/BCho+gn50wv8sSQsjcfKIwXikzkhWCfCX4PVTYyg3Tde5uypvm9Mocb2okFHeGjRsY5TR3h/V8q/LG9cwmtz+TRuocizvLHGo4nn8QzTg7ODtR1nPsHgUePDSC48vQ0kA0KH2F/g27jOf9JiACaNFvgs44=,iv:sRPx4qNTQUl+TcjDv1cjLgrnVhKROT+cw1sR3D3RIvs=,tag:n68rwGJRl1p1f16tkXURNQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.0
