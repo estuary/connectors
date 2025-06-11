@@ -8,6 +8,8 @@ stagingBucket:
     awsSecretAccessKey_sops: ENC[AES256_GCM,data:jedDyrGXmwXprqeaTmMmM99mtPut7cYVm/+yX+agKPw0YOMZWyq7oA==,iv:P8gLYwp78emfOGI7Ly48IGQjFVXiuQLnkB7/EygdbF0=,tag:vIA9rhFW3Dyhn2qnxxVZ3w==,type:str]
     bucketS3: estuary-connector-test-bucket
     region: us-east-2
+syncSchedule:
+    syncFrequency: 0s
 sops:
     kms: []
     gcp_kms:
@@ -17,8 +19,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-04-24T20:59:17Z"
-    mac: ENC[AES256_GCM,data:viM4XOMp1kkoEroe64IWIDLX69BW9W5Zoq62PrlsaE3mWhikBDCObL65rzvIi6SoYA3RHGt51rjKvoMbO8c42tN4GEQLmW6brC5pn3U0SGBltw8vt7dNMLtkK6iKO7idgL07uMN3R5DzOn0IdVmpror9KhyE3b/MwzXZYNNRP6g=,iv:0L5xOtZ/Ac8T75Lzoyxpzzcz2QBHgQ5JPRcZervGhcc=,tag:YR5b5J5Ix14Hg/UfG1mIVg==,type:str]
+    lastmodified: "2025-06-11T18:35:14Z"
+    mac: ENC[AES256_GCM,data:h8iluxt1Dpmb4lqMb+Zz36MAGXfzkmuRHqKKvBUJtWtkzs5kbFy/qqqoTxsNFnYqyOyQA/hCoiMLGS/g0Cj42TEdUDRJDWqPqcKPSVRrzyxQGUC2AgOCEQh1kl+Yw9oGHLzGDjKpO2XYkA69Hjmf1HeRQja3C3OCLSCfPZsChU0=,iv:bXEulRYGAMfvrGMp3+F1MpjFzzh9T9P16CznsAzfmEY=,tag:l1iWvHniirr2nbMaHTHiuA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4
