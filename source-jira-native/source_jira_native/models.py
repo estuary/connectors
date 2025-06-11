@@ -116,11 +116,22 @@ class Issue(JiraResource):
                 return self.worklogs
 
         updated: AwareDatetime
-        # The following fields only default to None when fetching
-        # child resources of a specific issue. These fields are
-        # always present when an issue is yielded.
-        comment: Comment | None = None
-        worklog: Worklog | None = None
+        # Even when we explicitly request that Jira includes the
+        # comment or worklog fields, it sometimes still doesn't
+        # include them if there are no comments/worklogs. We rely
+        # on a default None value to handle that in the connector,
+        # but we don't schematize that default value to faithfully
+        # represent when Jira doesn't include these fields.
+        comment: Comment = Field(
+            default=None,
+            # Don't schematize the default value.
+            json_schema_extra=lambda x: x.pop('default') # type: ignore
+        )
+        worklog: Worklog = Field(
+            default=None,
+            # Don't schematize the default value.
+            json_schema_extra=lambda x: x.pop('default') # type: ignore
+        )
 
     class ChangeLog(Fields.NestedResources):
         histories: list[APIRecord]
