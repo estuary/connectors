@@ -89,7 +89,7 @@
         "order": 3,
         "items": {
           "type": "object",
-          "required": ["query", "table_name"],
+          "required": ["query", "table_name", "primary_key"],
           "properties": {
             "query": {
               "type": "string",
@@ -103,6 +103,11 @@
               "type": "string",
               "title": "Destination Table Name",
               "description": "The table name in your destination database for choosen query."
+            },
+            "primary_key": {
+                "type": "string",
+                "title": "Destination Table Primary Key",
+                "description": "The primary key in your destination database. Accepts a comma delimited string of fields present in your query."
             }
           }
         }

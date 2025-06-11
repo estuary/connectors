@@ -6,6 +6,10 @@ credentials:
     refresh_token_sops: ENC[AES256_GCM,data:bNgS+zsZZnTrpn3zbc1V/eRD/WhlUKr7SN42FC3jx5C031SdMR5qtE2MapYRw6Y1f2Kojzj4FZh10b2oRMY8MovrTRx7eNILfNFsWVZwUJe3D0L/ETk1SCMU/BfvOFhfNW3sqcS4AA==,iv:dIT7FRHpn0zcausNIxQzguQO7RC4Rcvu9ycBMOhzOeU=,tag:EuC/r3mrEHqjPTcWDj5Xpw==,type:str]
 customer_id: "6458773721"
 start_date: "2022-01-01"
+custom_queries:
+    - query: SELECT segments.ad_destination_type, segments.ad_network_type, segments.day_of_week, customer.auto_tagging_enabled, customer.id, metrics.conversions, campaign.start_date FROM campaign
+      primary_key: customer.id
+      table_name: my_custom_query
 sops:
     kms: []
     gcp_kms:
@@ -15,8 +19,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-02-01T15:12:59Z"
-    mac: ENC[AES256_GCM,data:kuLSbiCpD9A3PkLg4pEVxYWj8PFXXmoYrH/XGVKZcoJgNUlMehvfcrB2XKIfEnE/lEE9jyQNGMMExwXKFyLrSbT4dwR7rkjD3aW1yyoFaSmAcDReQKKkhhXd+vaOIOgvH0Rjap3btyKSF6M5/WjMo/eM15C4l4Z0809d7dzONvI=,iv:c8YHHO36hDWU7AFgChk+tHcE99krMmbo4UcuTGknSY0=,tag:yLyvkC55JnKSzznTN23Gjw==,type:str]
+    lastmodified: "2025-06-11T20:26:18Z"
+    mac: ENC[AES256_GCM,data:ib9b0KKu+2DAQNWCkMo9PbKvy7Rb96nQptk/TvGNAK9RzXuC77zZoAaZtmz9w68M33f128e+6o8XQYXo5K3uA69YUPhU2LpdncQprKjklZIpuKVt5DoUPAoFRAFXqrXu/g53OqCnqOYce3BPAmpDQ55DViRzcH9Vds7/qzvVxqM=,iv:8qMqKbPhk2tmnwlrubW32WAb5eLmHWKjENcnfA7XtlI=,tag:yEVCxLdJ8Ar304phxFsyoA==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.7.3
+    version: 3.9.0
