@@ -672,10 +672,11 @@ async def _fetch_issues_between(
 
     # Ensure the MINIMAL_ISSUE_FIELDS (id and updated) required for incremental
     # replication are always included.
-    if fields and fields != "*all":
-        fields = f"{MINIMAL_ISSUE_FIELDS},{fields}"
-    else:
-        fields = MINIMAL_ISSUE_FIELDS
+    if fields != ALL_ISSUE_FIELDS:
+        if fields != "":
+            fields = f"{MINIMAL_ISSUE_FIELDS},{fields}"
+        else:
+            fields = MINIMAL_ISSUE_FIELDS
 
     params: dict[str, str | int] = {
         "maxResults": 250,
