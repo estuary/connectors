@@ -92,7 +92,7 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
         } else if request.start_commit.is_some() {
             // Wait for explicit delivery confirmations for all messages,
             // or fail-fast on first delivery failure.
-            producer_context.wait_for_all_successful_acks()?;
+            producer_context.wait_for_all_successful_acks(&bindings)?;
 
             output.send(Response {
                 started_commit: Some(StartedCommit { state: None }),
@@ -118,7 +118,7 @@ fn msg_for_store<'a>(
     payload_buf: &'a mut Vec<u8>,
     store: Store,
     bindings: &'a [BindingInfo],
-) -> Result<BaseRecord<'a, Vec<u8>, Vec<u8>>> {
+) -> Result<BaseRecord<'a, Vec<u8>, Vec<u8>, usize>> {
     let Store {
         binding,
         key_packed,
@@ -159,7 +159,7 @@ fn msg_for_store<'a>(
                 .collect::<serde_json::Value>();
 
             serde_json::to_writer(&mut *key_buf, &key_doc)?;
-            let mut rec = BaseRecord::to(&b.topic).key(key_buf);
+            let mut rec = BaseRecord::with_opaque_to(&b.topic, binding as usize).key(key_buf);
 
             if !delete {
                 serde_json::to_writer(&mut *payload_buf, &doc)?;
@@ -184,7 +184,7 @@ fn msg_for_store<'a>(
             key_buf.push(0);
             key_buf.extend(schema.key_schema_id.to_be_bytes());
             encode_key(key_buf, &schema.key_schema, &doc, &b.key_ptr).context("encoding key")?;
-            let mut rec = BaseRecord::to(&b.topic).key(key_buf);
+            let mut rec = BaseRecord::with_opaque_to(&b.topic, binding as usize).key(key_buf);
 
             if !delete {
                 payload_buf.push(0);
