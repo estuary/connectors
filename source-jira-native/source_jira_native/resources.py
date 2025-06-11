@@ -26,14 +26,17 @@ from .models import (
     JiraResource,
     Labels,
     Permissions,
+    MyPermissionsResponse,
     ProjectChildStream,
     Projects,
     ResourceConfig,
     ResourceState,
     ScreenTabFields,
+    StandardPermissions,
     SystemAvatars,
     FULL_REFRESH_STREAMS,
     ISSUE_CHILD_STREAMS,
+    PERMISSION_BLOCKED_STREAMS,
 )
 from .api import (
     backfill_issues,
@@ -105,6 +108,33 @@ async def validate_credentials(
             msg = f"Encountered error validating credentials.\n\n{err.message}"
 
         raise ValidationError([msg])
+
+
+async def remove_permission_blocked_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig, resources: list[common.Resource]
+) -> list[common.Resource]:
+    url = f"{url_base(config.domain, JiraAPI.PLATFORM)}/mypermissions"
+
+    params = {
+        "permissions": [p for p in StandardPermissions]
+    }
+
+    response = MyPermissionsResponse.model_validate_json(
+        await http.request(log, url, params=params)
+    )
+
+    for (permissions, streams) in PERMISSION_BLOCKED_STREAMS:
+        is_accessible = False
+        for name in permissions:
+            this_permission = response.permissions.get(name)
+            if this_permission and this_permission.havePermission:
+                is_accessible = True
+
+        if not is_accessible:
+            for stream in streams:
+                resources = [r for r in resources if r.name != stream.name]
+
+    return resources
 
 
 def _get_partial_snapshot_fn(
@@ -370,7 +400,10 @@ def issue_child_resources(
 
 
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig, should_fetch_timezone: bool = True
+    log: Logger, http: HTTPMixin,
+    config: EndpointConfig,
+    should_fetch_timezone: bool = True,
+    should_check_permissions: bool = False,
 ) -> list[common.Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     timezone = await fetch_timezone(http, config.domain, log) if should_fetch_timezone else ZoneInfo("UTC")
@@ -381,4 +414,6 @@ async def all_resources(
         *issue_child_resources(log, http, config, timezone)
     ]
 
-    return resources
+    accessible_resources = await remove_permission_blocked_resources(log, http, config, resources) if should_check_permissions else resources
+
+    return accessible_resources

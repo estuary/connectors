@@ -39,7 +39,7 @@ class Connector(
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
-        resources = await all_resources(log, self, discover.config, should_fetch_timezone=False)
+        resources = await all_resources(log, self, discover.config, should_fetch_timezone=False, should_check_permissions=True)
         return common.discovered(resources)
 
     async def validate(
