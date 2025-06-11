@@ -199,8 +199,6 @@ func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
 
 // Documents emits one or more documents to the specified binding index.
 func (out *PullOutput) Documents(binding int, docs ...json.RawMessage) error {
-	log.WithField("count", len(docs)).Trace("emitting documents")
-
 	var messages []*pc.Response
 	for _, doc := range docs {
 		messages = append(messages, &pc.Response{

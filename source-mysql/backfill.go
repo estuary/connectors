@@ -106,7 +106,6 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			return fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
-		logrus.WithField("fields", fields).Trace("got row")
 		var event = &sqlcapture.ChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
