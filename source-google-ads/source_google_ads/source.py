@@ -49,7 +49,7 @@ class SourceGoogleAds(AbstractSource):
             config.pop("end_date")
         for query in config.get("custom_queries", []):
             try:
-                query["query"] = GAQL.parse(query["query"])
+                query["query"] = GAQL.parse(str(query["query"]))
             except ValueError:
                 message = f"The custom GAQL query {query['table_name']} failed. Validate your GAQL query with the Google Ads query validator. https://developers.google.com/google-ads/api/fields/v19/query_validator"
                 raise AirbyteTracedException(message=message, failure_type=FailureType.config_error)
@@ -112,8 +112,6 @@ class SourceGoogleAds(AbstractSource):
                             f"Please remove metrics fields in your custom query: {query}."
                         )
                     if query.resource_name not in FULL_REFRESH_CUSTOM_TABLE:
-                        if IncrementalCustomQuery.cursor_field in query.fields:
-                            return False, f"Custom query should not contain {IncrementalCustomQuery.cursor_field}"
                         query = IncrementalCustomQuery.insert_segments_date_expr(query, "1980-01-01", "1980-01-01")
                     query = query.set_limit(1)
                     response = google_api.send_request(str(query), customer_id=customer.id)

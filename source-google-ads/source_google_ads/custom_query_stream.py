@@ -15,14 +15,10 @@ class CustomQueryMixin:
         super().__init__(**kwargs)
 
     @property
-    def primary_key(self) -> str:
-        """
-        The primary_key option is disabled. Config should not provide the primary key.
-        It will be ignored if provided.
-        If you need to enable it, uncomment the next line instead of `return None` and modify your config
-        """
-        # return self.config.get("primary_key") or None
-        return None
+    def primary_key(self) -> list[str]:
+        input = self.config.get("primary_key")
+        keys = input.strip().split(",")
+        return [k.strip() for k in keys]
 
     @property
     def name(self):
