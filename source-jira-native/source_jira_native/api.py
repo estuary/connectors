@@ -904,10 +904,12 @@ async def _fetch_child_resources_for_issue(
     log: Logger,
 ) -> AsyncGenerator[IssueChildResource, None]:
     if issubclass(stream, IssueComments):
-        assert issue.fields.comment is not None
+        if issue.fields.comment is None:
+            return
         gen = _fetch_comments_or_worklogs_for_issue(http, domain, stream, issue.id, issue.fields.comment, log)
     elif issubclass(stream, IssueWorklogs):
-        assert issue.fields.worklog is not None
+        if issue.fields.worklog is None:
+            return
         gen = _fetch_comments_or_worklogs_for_issue(http, domain, stream, issue.id, issue.fields.worklog, log)
     elif issubclass(stream, IssueChangelogs):
         assert issue.changelog is not None
