@@ -11,17 +11,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/estuary/connectors/go/blob"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/invopop/jsonschema"
 	"google.golang.org/api/option"
 )
 
 type config struct {
-	Token         string              `json:"token" jsonschema:"title=Motherduck Service Token,description=Service token for authenticating with MotherDuck." jsonschema_extras:"secret=true,order=0"`
-	Database      string              `json:"database" jsonschema:"title=Database,description=The database to materialize to." jsonschema_extras:"order=1"`
-	Schema        string              `json:"schema" jsonschema:"title=Database Schema,default=main,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=2"`
-	HardDelete    bool                `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
-	StagingBucket stagingBucketConfig `json:"stagingBucket" jsonschema_extras:"order=4"`
+	Token         string                     `json:"token" jsonschema:"title=Motherduck Service Token,description=Service token for authenticating with MotherDuck." jsonschema_extras:"secret=true,order=0"`
+	Database      string                     `json:"database" jsonschema:"title=Database,description=The database to materialize to." jsonschema_extras:"order=1"`
+	Schema        string                     `json:"schema" jsonschema:"title=Database Schema,default=main,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=2"`
+	HardDelete    bool                       `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
+	StagingBucket stagingBucketConfig        `json:"stagingBucket" jsonschema_extras:"order=4"`
+	Schedule      boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 }
 
 func (c *config) Validate() error {
@@ -36,10 +38,14 @@ func (c *config) Validate() error {
 		}
 	}
 
+	if err := c.Schedule.Validate(); err != nil {
+		return err
+	}
+
 	// Sanity check that the provided authentication token is a well-formed JWT. It it's not, the
 	// sql.Open function used elsewhere will return an error string that is difficult to comprehend.
 	// This check isn't perfect but it should catch most of the blatantly obvious error cases.
-	for _, part := range strings.Split(c.Token, ".") {
+	for part := range strings.SplitSeq(c.Token, ".") {
 		if _, err := base64.RawURLEncoding.DecodeString(part); err != nil {
 			return fmt.Errorf("invalid token: must be a base64 encoded JWT")
 		}
