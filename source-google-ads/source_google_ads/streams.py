@@ -247,6 +247,7 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
         """
         self.logger.debug("Entering IncrementalGooglAdsStream.read_records")
         self.incremental_sieve_logger.bump()
+        previous_log_message = ""
         while True:
             self.logger.info("Starting a while loop iteration")
             customer_id = stream_slice and stream_slice["customer_id"]
@@ -259,7 +260,13 @@ class IncrementalGoogleAdsStream(GoogleAdsStream, IncrementalMixin, ABC):
                         date_in_latest_record = pendulum.parse(record[self.cursor_field])
                         cursor_value = (max(date_in_current_stream, date_in_latest_record)).to_date_string()
                         self.state = {customer_id: {self.cursor_field: cursor_value}}
-                        self.logger.info(f"Updated state for customer {customer_id}. Full state is {self.state}.")
+
+                        # If the log_message hasn't changed, don't log it.
+                        log_message = f"Updated state for customer {customer_id}. Full state is {self.state}."
+                        if log_message != previous_log_message:
+                            self.logger.info(log_message)
+                            previous_log_message = log_message
+
                         yield record
                         continue
                     self.state = {customer_id: {self.cursor_field: record[self.cursor_field]}}
