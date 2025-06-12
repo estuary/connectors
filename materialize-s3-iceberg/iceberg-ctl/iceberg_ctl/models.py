@@ -48,6 +48,14 @@ class GlueCatalogConfig(BaseModel):
         json_schema_extra={"type": "string"}
     )
 
+class AdvancedConfig(BaseModel):
+    feature_flags: Optional[str] = Field(
+        default=None,
+        title="Feature Flags",
+        description="This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+    )
+
+
 class EndpointConfig(BaseModel):
     aws_access_key_id: str = Field(
         title="AWS Access Key ID",
@@ -85,4 +93,10 @@ class EndpointConfig(BaseModel):
         discriminator="catalog_type",
         title="Catalog",
         json_schema_extra={"order": 7},
+    )
+    advanced: Optional[AdvancedConfig] = Field(
+        default=None,
+        title="Advanced Options",
+        description="Options for advanced users. You should not typically need to modify these.",
+        json_schema_extra={"order": 8, "advanced": True},
     )

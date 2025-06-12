@@ -25,6 +25,9 @@ func testConfig() *config {
 			Username: "elastic",
 			Password: "elastic",
 		},
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
 	}
 }
 
