@@ -18,16 +18,18 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
     Processes a stream of JSON bytes incrementally, yielding objects of type
     `streamed_item_cls` along the way. Once iteration is complete, the
     "remainder" of the input that was not present under the specific prefix can
-    be obtained using the `get_remainder` method.
+    be obtained using the `get_remainder` method (if applicable).
 
     The prefix is a path within the JSON document where objects to parse reside.
     Usually it will end with the ".item" suffix, which allows iteration through
     objects in an array. More nuanced scenarios are also possible.
 
-    Does not currently support parsing NDJSON since that can be more efficiently
-    processed via other means.
+    Supports both standard JSON and NDJSON (newline-delimited JSON) via the
+    `ndjson` parameter. When `ndjson=True`, each line is treated as a separate
+    JSON object, and the prefix can be used to extract nested objects from each
+    line.
 
-    Example usage if you only want the items and don't care about the remainder:
+    Example usage for standard JSON:
     ```python
     async for item in IncrementalJsonProcessor(
         input,
@@ -37,7 +39,29 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
         do_something_with(item)
     ```
 
-    For using the remainder after iteration is complete, keep a reference to the
+    Example usage for NDJSON:
+    ```python
+    async for item in IncrementalJsonProcessor(
+        input,
+        prefix="",  # Use "" to yield the whole object per line
+        streamed_item_cls=MyItem,
+        ndjson=True,
+    ):
+        do_something_with(item)
+    ```
+
+    Example usage for NDJSON with a nested prefix:
+    ```python
+    async for item in IncrementalJsonProcessor(
+        input,
+        prefix="record",  # Extracts the "record" object from each line
+        streamed_item_cls=MyItem,
+        ndjson=True,
+    ):
+        do_something_with(item)
+    ```
+
+    For using the remainder after iteration is complete (only for standard JSON), keep a reference to the
     processor:
     ```python
     processor = IncrementalJsonProcessor(
@@ -47,7 +71,7 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
         remainder_cls=MyRemainder,
     )
 
-    async for item processor:
+    async for item in processor:
         do_something_with(item)
 
     do_something_with(processor.get_remainder())
@@ -55,7 +79,7 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
 
     See the tests file `test_incremental_json_processor.py` for more examples,
     including various formulations of the prefix to support more complex data
-    structures.
+    structures and NDJSON scenarios.
     """
 
     def __init__(
@@ -64,13 +88,18 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
         prefix: str,
         streamed_item_cls: type[StreamedItem],
         remainder_cls: type[Remainder] = _NoopRemainder,
+        ndjson: bool = False,
     ):
         self.input = input
         self.prefix = prefix
         self.streamed_item_cls = streamed_item_cls
         self.remainder_cls = remainder_cls
-        self.parser = ijson.parse_async(_AsyncStreamWrapper(input))
+        self.parser = ijson.parse_async(
+            _AsyncStreamWrapper(input),
+            multiple_values=ndjson,
+        )
         self.remainder_builder = _ObjectBuilder()
+        self.ndjson = ndjson
         self.done = False
 
     def __aiter__(self):
@@ -114,25 +143,39 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
                 "attempted to access remainder before fully processing input"
             )
 
-        return self.remainder_cls.model_validate(self.remainder_builder.get_value())
+        if not self.ndjson:
+            return self.remainder_cls.model_validate(self.remainder_builder.get_value())
 
 
 class _AsyncStreamWrapper:
     def __init__(self, gen: AsyncGenerator[bytes, None]):
         self.gen = gen
         self.buf = b""
+        self.had_data = False
+        self.eof = False
 
     async def read(self, size: int = -1) -> bytes:
         if size == -1:
-            return self.buf + b"".join([chunk async for chunk in self.gen])
-
-        while len(self.buf) < size:
-            try:
-                self.buf += await anext(self.gen)
-            except StopAsyncIteration:
-                break
+            data = self.buf + b"".join([chunk async for chunk in self.gen])
+            self.eof = True
+        else:
+            while len(self.buf) < size:
+                try:
+                    self.buf += await anext(self.gen)
+                except StopAsyncIteration:
+                    self.eof = True
+                    break
 
         data, self.buf = self.buf[:size], self.buf[size:]
+        if not self.had_data:
+            data = data.lstrip(b" \t\n\r")
+
+        if self.eof and not data and not self.had_data:
+            raise StopAsyncIteration
+
+        if not self.had_data and data:
+            self.had_data = True
+
         return data
 
 

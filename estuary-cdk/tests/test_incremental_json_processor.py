@@ -1,7 +1,8 @@
 from typing import AsyncGenerator
 
 import pytest
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel
+from ijson.common import IncompleteJSONError
 
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
@@ -47,7 +48,7 @@ class ComplexRecord(BaseModel):
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "input_data, prefix, record_cls, remainder_cls, want_records, want_remainder",
+    "input_data, prefix, record_cls, remainder_cls, want_records, want_remainder, ndjson",
     [
         (
             b"""{
@@ -61,6 +62,7 @@ class ComplexRecord(BaseModel):
             SimpleMeta,
             [],
             SimpleMeta(count=2, total=10, next_page="asdf"),
+            False,
         ),
         (
             b"""{
@@ -73,6 +75,7 @@ class ComplexRecord(BaseModel):
             SimpleMeta,
             [],
             SimpleMeta(count=0, total=0, next_page=None),
+            False,
         ),
         (
             b"""{
@@ -92,6 +95,7 @@ class ComplexRecord(BaseModel):
                 SimpleRecord(id=2, value="test2"),
             ],
             SimpleMeta(count=2, total=10, next_page="asdf"),
+            False,
         ),
         (
             b"""{
@@ -104,6 +108,7 @@ class ComplexRecord(BaseModel):
             SimpleMeta,
             [],
             SimpleMeta(count=2, total=10, next_page="asdf"),
+            False,
         ),
         (
             # Repeated fields - not likely to encounter this in the wild, but it
@@ -130,6 +135,7 @@ class ComplexRecord(BaseModel):
                 SimpleRecord(id=2, value="test2"),
             ],
             SimpleMeta(count=2, total=20, next_page="asdf"),
+            False,
         ),
         (
             b"""{
@@ -185,6 +191,7 @@ class ComplexRecord(BaseModel):
                 paging=ComplexMeta.Paging(next=ComplexMeta.Cursor(after="asdf")),
                 total=10,
             ),
+            False,
         ),
         (
             # Works with more than just array items.
@@ -207,6 +214,7 @@ class ComplexRecord(BaseModel):
                 SimpleRecord(id=2, value="test2"),
             ],
             SimpleMeta(count=2, total=10, next_page="asdf"),
+            False,
         ),
         # Arrays of objects.
         (
@@ -222,6 +230,7 @@ class ComplexRecord(BaseModel):
                 SimpleRecord(id=2, value="test2"),
             ],
             None,
+            False,
         ),
         (
             b"""[
@@ -237,18 +246,117 @@ class ComplexRecord(BaseModel):
                 SimpleRecord(id=2, value="test2"),
             ],
             None,
+            False,
+        ),
+        # NDJSON (Newline Delimited JSON)
+        (
+            b"""{"id": 1, "value": "test1"}
+            {"id": 2, "value": "test2"}
+            {"id": 3, "value": "test3"}""",
+            "",  # Note: No prefix typically for NDJSON if you want the whole record.
+            SimpleRecord,
+            None,
+            [
+                SimpleRecord(id=1, value="test1"),
+                SimpleRecord(id=2, value="test2"),
+                SimpleRecord(id=3, value="test3"),
+            ],
+            None,
+            True,
+        ),
+        (
+            b"""{"record": {"id": 1, "value": "test1"}}
+            {"record": {"id": 2, "value": "test2"}}
+            {"not_a_record": {"something": "else"}}
+            {"record": {"id": 3, "value": "test3"}}""",
+            "record",  # Note: Prefix here is the key to the object in NDJSON.
+            SimpleRecord,
+            None,
+            [
+                SimpleRecord(id=1, value="test1"),
+                SimpleRecord(id=2, value="test2"),
+                SimpleRecord(id=3, value="test3"),
+            ],
+            None,
+            True,
+        ),
+        # emptry NDJSON
+        (
+            b"",
+            "",
+            SimpleRecord,
+            None,
+            [],
+            None,
+            True,
+        ),
+        # whitespace only NDJSON
+        (
+            b"   \n\t\n   ",
+            "",
+            SimpleRecord,
+            None,
+            [],
+            None,
+            True,
+        ),
+        # NDJSON with trailing newline
+        (
+            b"""{"id": 1, "value": "test1"}
+            {"id": 2, "value": "test2"}
+            
+            """,
+            "",
+            SimpleRecord,
+            None,
+            [
+                SimpleRecord(id=1, value="test1"),
+                SimpleRecord(id=2, value="test2"),
+            ],
+            None,
+            True,
+        ),
+        # NDJSON with multiple trailing newlines
+        (
+            b"""{"id": 1, "value": "test1"}
+            
+
+            """,
+            "",
+            SimpleRecord,
+            None,
+            [
+                SimpleRecord(id=1, value="test1"),
+            ],
+            None,
+            True,
         ),
     ],
 )
 async def test_incremental_json_processor(
-    input_data, prefix, record_cls, remainder_cls, want_records, want_remainder
+    input_data,
+    prefix,
+    record_cls,
+    remainder_cls,
+    want_records,
+    want_remainder,
+    ndjson,
 ):
     if remainder_cls:
         processor = IncrementalJsonProcessor(
-            bytes_gen(input_data), prefix, record_cls, remainder_cls
+            bytes_gen(input_data),
+            prefix,
+            record_cls,
+            remainder_cls,
+            ndjson=ndjson,
         )
     else:
-        processor = IncrementalJsonProcessor(bytes_gen(input_data), prefix, record_cls)
+        processor = IncrementalJsonProcessor(
+            bytes_gen(input_data),
+            prefix,
+            record_cls,
+            ndjson=ndjson,
+        )
 
     got = []
     async for record in processor:
@@ -257,3 +365,24 @@ async def test_incremental_json_processor(
     assert want_records == got
     if remainder_cls:
         assert want_remainder == processor.get_remainder()
+
+
+@pytest.mark.asyncio
+async def test_malformed_ndjson_fails():
+    # When ijson encounters malformed JSON in NDJSON mode, it fails immediately
+    # This is the expected behavior - we want to fail fast on malformed data
+    malformed_data = b"""
+    {"id": 1, "value": "test1"}
+    {"id": 2, "value": "test2"
+    {"id": 3, "value": "test3"}"""
+
+    processor = IncrementalJsonProcessor(
+        bytes_gen(malformed_data),
+        "",
+        SimpleRecord,
+        ndjson=True,
+    )
+
+    with pytest.raises(IncompleteJSONError):
+        async for record in processor:
+            pass  # We expect the error before any records are yielded due to ijson's buffering
