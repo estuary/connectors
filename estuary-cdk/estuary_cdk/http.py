@@ -298,16 +298,14 @@ class RateLimiter:
     RateLimiter maintains a `delay` parameter, which is the number of seconds
     to wait before issuing an HTTP request. It attempts to achieve a low rate
     of HTTP 429 (Rate Limit Exceeded) errors (under 5%) while fully utilizing
-    the available rate limit without excessively long delays due to more
-    traditional exponential back-off strategies.
+    the available rate limit without excessively long delays.
 
     As requests are made, RateLimiter.update() is called to dynamically adjust
     the `delay` parameter, decreasing it as successful request occur and
     increasing it as HTTP 429 (Rate Limit Exceeded) failures are reported.
 
-    It initially uses quadratic decrease of `delay` until a first failure is
-    encountered. Additional failures result in quadratic increase, while
-    successes apply a linear decay.
+    It uses quadratic increase on failures and tracks recent consecutive successes
+    to determine how aggressively to decrease the delay.
 
     To avoid excessively long delays, `delay` cannot grow larger than `MAX_DELAY`.
     """
@@ -318,6 +316,7 @@ class RateLimiter:
 
     failed: int = 0
     total: int = 0
+    consecutive_successes: int = 0
 
     def update(self, cur_delay: float, failed: bool):
         self.total += 1
@@ -326,10 +325,14 @@ class RateLimiter:
         if failed:
             update = max(cur_delay * 4.0, 0.1)
             self.failed += 1
+            self.consecutive_successes = 0
         elif self.failed == 0:
             update = cur_delay / 2.0
+            self.consecutive_successes += 1
         else:
-            update = cur_delay * (1 - self.gain)
+            self.consecutive_successes += 1
+            success_factor = min(0.9, self.consecutive_successes * 0.1)
+            update = cur_delay * (1.0 - success_factor)
 
         self.delay = (1 - self.gain) * self.delay + self.gain * update
         self.delay = min(self.delay, self.MAX_DELAY)
