@@ -4,12 +4,13 @@ from logging import Logger
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import common, Task
-from estuary_cdk.http import HTTPSession, HTTPError
+from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 from estuary_cdk.capture.common import ResourceConfig, ResourceState
 
 from .models import (
     EndpointConfig,
     QualtricsResource,
+    IncrementalResource,
     Survey,
     SurveyQuestion,
     SurveyResponse,
@@ -22,6 +23,9 @@ from .api import (
     snapshot_survey_questions,
     fetch_survey_responses_incremental,
 )
+
+AUTHORIZATION_HEADER = "X-API-TOKEN"
+
 
 FULL_REFRESH_RESOURCES: list[
     tuple[type[QualtricsResource], FullRefreshResourceFetchFn]
@@ -37,7 +41,7 @@ FULL_REFRESH_RESOURCES: list[
 ]
 
 INCREMENTAL_RESOURCES: list[
-    tuple[type[QualtricsResource], IncrementalResourceFetchChangesFn]
+    tuple[type[IncrementalResource], IncrementalResourceFetchChangesFn]
 ] = [
     (
         SurveyResponse,
@@ -46,13 +50,12 @@ INCREMENTAL_RESOURCES: list[
 ]
 
 
-async def validate_credentials(log: Logger, http: HTTPSession, config: EndpointConfig):
+async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
     headers = {
-        "X-API-TOKEN": config.credentials.access_token,
+        AUTHORIZATION_HEADER: config.credentials.access_token,
         "Content-Type": "application/json",
     }
-
-    url = f"{config.base_url}/surveys"
+    url = f"https://{config.data_center}.qualtrics.com/API/v3/surveys"
 
     try:
         await http.request(log, url, headers=headers, params={"limit": 1})
@@ -74,7 +77,7 @@ async def validate_credentials(log: Logger, http: HTTPSession, config: EndpointC
 
 
 def full_refresh_resources(
-    http: HTTPSession,
+    http: HTTPMixin,
     config: EndpointConfig,
 ) -> list[common.Resource]:
     def open(
@@ -93,18 +96,19 @@ def full_refresh_resources(
             fetch_snapshot=functools.partial(
                 fetch_snapshot_fn,
                 http,
-                config,
+                config.data_center,
             ),
+            tombstone=QualtricsResource(_meta=QualtricsResource.Meta(op="d")),
         )
 
     return [
         common.Resource(
             name=resource.RESOURCE_NAME,
-            key=["_meta/row_id"],
+            key=["/_meta/row_id"],
             model=resource,
             open=functools.partial(
                 open,
-                fetch_snapshot_fn=fetch_snapshot_fn,
+                fetch_snapshot_fn,
             ),
             initial_state=common.ResourceState(),
             initial_config=common.ResourceConfig(
@@ -117,7 +121,7 @@ def full_refresh_resources(
 
 
 def incremental_resources(
-    http: HTTPSession,
+    http: HTTPMixin,
     config: EndpointConfig,
 ) -> list[common.Resource]:
     def open(
@@ -133,7 +137,12 @@ def incremental_resources(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes_fn, http, config),
+            fetch_changes=functools.partial(
+                fetch_changes_fn,
+                http,
+                config.data_center,
+                config.advanced.window_size,
+            ),
         )
 
     return [
@@ -143,9 +152,11 @@ def incremental_resources(
             model=resource,
             open=functools.partial(
                 open,
-                fetch_changes_fn=fetch_changes_fn,
+                fetch_changes_fn,
             ),
-            initial_state=common.ResourceState(),
+            initial_state=common.ResourceState(
+                inc=common.ResourceState.Incremental(cursor=config.start_date),
+            ),
             initial_config=common.ResourceConfig(
                 name=resource.RESOURCE_NAME, interval=timedelta(minutes=5)
             ),
@@ -156,8 +167,14 @@ def incremental_resources(
 
 
 async def all_resources(
-    log: Logger, http: HTTPSession, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
+    http.token_source = TokenSource(
+        oauth_spec=None,
+        credentials=config.credentials,
+        authorization_header=AUTHORIZATION_HEADER,
+    )
+
     return [
         *full_refresh_resources(http, config),
         *incremental_resources(http, config),
