@@ -12,6 +12,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -45,6 +46,8 @@ const (
 	queryTimeout = 1 * time.Hour
 )
 
+var featureFlagDefaults = map[string]bool{}
+
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
 }
@@ -75,7 +78,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	SSLMode string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	SSLMode      string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // Validate the configuration.
@@ -231,6 +235,11 @@ func newPostgresDriver() *sql.Driver {
 				"user":     cfg.User,
 			}).Info("opening database")
 
+			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+			if cfg.Advanced.FeatureFlags != "" {
+				log.WithField("flags", featureFlags).Info("parsed feature flags")
+			}
+
 			var metaBase sql.TablePath
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
@@ -246,6 +255,7 @@ func newPostgresDriver() *sql.Driver {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
+				FeatureFlags:        featureFlags,
 			}, nil
 		},
 		PreReqs: preReqs,

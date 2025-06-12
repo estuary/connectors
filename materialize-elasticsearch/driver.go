@@ -13,6 +13,7 @@ import (
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -22,6 +23,8 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 )
+
+var featureFlagDefaults = map[string]bool{}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint"`
@@ -52,7 +55,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	Replicas *int `json:"number_of_replicas,omitempty"`
+	Replicas     *int   `json:"number_of_replicas,omitempty"`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // The `go-schema-gen` package doesn't have a good way of dealing with oneOf, and I couldn't get it
@@ -125,6 +129,11 @@ func configSchema() json.RawMessage {
 				"type": "integer",
 				"title": "Index Replicas",
 				"description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+			  },
+			  "feature_flags": {
+				"type": "string",
+				"title": "Feature Flags",
+				"description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
 			  }
 			},
 			"type": "object",
@@ -396,8 +405,14 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	if err != nil {
 		return nil, fmt.Errorf("getting infoSchema for validate: %w", err)
 	}
+
+	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	if cfg.Advanced.FeatureFlags != "" {
+		log.WithField("flags", featureFlags).Info("parsed feature flags")
+	}
+
 	// ElasticSearch has no limits on mapping field names by default and they are case sensitive.
-	validator := boilerplate.NewValidator(constrainter{}, is, 0, false)
+	validator := boilerplate.NewValidator(constrainter{}, is, 0, false, featureFlags)
 
 	var out []*pm.Response_Validated_Binding
 	for _, binding := range req.Bindings {

@@ -26,7 +26,8 @@ func testConfig() *config {
 		AWSSecretAccessKey: "anything",
 		Region:             "anything",
 		Advanced: advancedConfig{
-			Endpoint: "http://localhost:8000",
+			Endpoint:     "http://localhost:8000",
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}
 }

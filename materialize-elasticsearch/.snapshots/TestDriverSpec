@@ -65,6 +65,11 @@
             "type": "integer",
             "title": "Index Replicas",
             "description": "The number of replicas to create new indexes with. Leave blank to use the cluster default."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "type": "object",

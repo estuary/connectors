@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/blob"
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
@@ -40,6 +41,11 @@ func newDuckDriver() *sql.Driver {
 				"database": cfg.Database,
 			}).Info("opening database")
 
+			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+			if cfg.Advanced.FeatureFlags != "" {
+				log.WithField("flags", featureFlags).Info("parsed feature flags")
+			}
+
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             duckDialect,
@@ -50,6 +56,7 @@ func newDuckDriver() *sql.Driver {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
+				FeatureFlags:        featureFlags,
 			}, nil
 		},
 		PreReqs: preReqs,

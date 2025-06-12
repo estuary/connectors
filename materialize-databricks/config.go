@@ -11,6 +11,8 @@ import (
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
+var featureFlagDefaults = map[string]bool{}
+
 // config represents the endpoint configuration for sql server.
 type config struct {
 	Address       string                     `json:"address" jsonschema:"title=Address,description=Host and port of the SQL warehouse (in the form of host[:port]). Port 443 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
@@ -21,6 +23,12 @@ type config struct {
 	Credentials   credentialConfig           `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=5"`
 	Schedule      boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 const (

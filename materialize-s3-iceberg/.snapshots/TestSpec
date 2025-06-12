@@ -1,6 +1,25 @@
 {
   "config_schema_json": {
     "$defs": {
+      "AdvancedConfig": {
+        "properties": {
+          "feature_flags": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
+            "title": "Feature Flags"
+          }
+        },
+        "title": "AdvancedConfig",
+        "type": "object"
+      },
       "GlueCatalogConfig": {
         "properties": {
           "catalog_type": {
@@ -114,7 +133,7 @@
         "type": "string"
       },
       "upload_interval": {
-        "default": "PT300S",
+        "default": "PT5M",
         "description": "Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
         "format": "duration",
         "order": 6,
@@ -139,6 +158,21 @@
         ],
         "order": 7,
         "title": "Catalog"
+      },
+      "advanced": {
+        "advanced": true,
+        "anyOf": [
+          {
+            "$ref": "#/$defs/AdvancedConfig"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "order": 8,
+        "title": "Advanced Options"
       }
     },
     "required": [
