@@ -28,6 +28,11 @@
             "type": "string",
             "title": "AWS Endpoint",
             "description": "The AWS endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,

@@ -15,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	"github.com/estuary/connectors/filesink"
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -26,6 +27,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var featureFlagDefaults = map[string]bool{}
+
 type catalogType string
 
 const (
@@ -36,14 +39,15 @@ const (
 // There is an equivalent pydantic model in iceberg-ctl, and the config schema is generated from
 // that. The fields of this struct must be compatible with that model.
 type config struct {
-	Bucket             string        `json:"bucket"`
-	AWSAccessKeyID     string        `json:"aws_access_key_id"`
-	AWSSecretAccessKey string        `json:"aws_secret_access_key"`
-	Namespace          string        `json:"namespace"`
-	Region             string        `json:"region"`
-	UploadInterval     string        `json:"upload_interval"`
-	Prefix             string        `json:"prefix,omitempty"`
-	Catalog            catalogConfig `json:"catalog"`
+	Bucket             string         `json:"bucket"`
+	AWSAccessKeyID     string         `json:"aws_access_key_id"`
+	AWSSecretAccessKey string         `json:"aws_secret_access_key"`
+	Namespace          string         `json:"namespace"`
+	Region             string         `json:"region"`
+	UploadInterval     string         `json:"upload_interval"`
+	Prefix             string         `json:"prefix,omitempty"`
+	Catalog            catalogConfig  `json:"catalog"`
+	Advanced           advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
 type catalogConfig struct {
@@ -54,6 +58,10 @@ type catalogConfig struct {
 	Credential string `json:"credential,omitempty"`
 	Token      string `json:"token,omitempty"`
 	Warehouse  string `json:"warehouse,omitempty"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {
@@ -190,6 +198,11 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
+	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	if cfg.Advanced.FeatureFlags != "" {
+		log.WithField("flags", featureFlags).Info("parsed feature flags")
+	}
+
 	// Test creating, reading, and deleting an object from the configured bucket and prefix.
 	errs := &cerrors.PrereqErr{}
 
@@ -264,7 +277,7 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 
 	// AWS Glue prohibits field names longer than 255 characters, and considers "thisColumn" to be
 	// in conflict with "ThisColumn" etc.
-	validator := boilerplate.NewValidator(icebergConstrainter{}, is, 255, true)
+	validator := boilerplate.NewValidator(icebergConstrainter{}, is, 255, true, featureFlags)
 
 	var out []*pm.Response_Validated_Binding
 	for idx, binding := range req.Bindings {

@@ -14,6 +14,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -26,6 +27,8 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 )
+
+var featureFlagDefaults = map[string]bool{}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
@@ -58,6 +61,8 @@ type advancedConfig struct {
 	SSLServerCA   string `json:"ssl_server_ca,omitempty" jsonschema:"title=SSL Server CA,description=Optional server certificate authority to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional client certificate to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
+
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // Validate the configuration.
@@ -319,6 +324,11 @@ func newMysqlDriver() *sql.Driver {
 			var dialect = mysqlDialect(tzLocation, cfg.Database, product)
 			var templates = renderTemplates(dialect)
 
+			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+			if cfg.Advanced.FeatureFlags != "" {
+				log.WithField("flags", featureFlags).Info("parsed feature flags")
+			}
+
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             dialect,
@@ -329,6 +339,7 @@ func newMysqlDriver() *sql.Driver {
 				NewTransactor:       prepareNewTransactor(dialect, templates),
 				Tenant:              tenant,
 				ConcurrentApply:     false,
+				FeatureFlags:        featureFlags,
 			}, nil
 		},
 		PreReqs: preReqs,

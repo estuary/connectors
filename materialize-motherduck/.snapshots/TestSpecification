@@ -197,6 +197,19 @@
         "type": "object",
         "title": "Sync Schedule",
         "description": "Configure schedule of transactions for the materialization."
+      },
+      "advanced": {
+        "properties": {
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these."
       }
     },
     "type": "object",

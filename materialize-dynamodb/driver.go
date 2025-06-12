@@ -11,12 +11,16 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 )
+
+var featureFlagDefaults = map[string]bool{}
 
 type config struct {
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for materializing to DynamoDB." jsonschema_extras:"order=1"`
@@ -27,7 +31,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	Endpoint string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS."`
+	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS."`
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c *config) Validate() error {
@@ -170,6 +175,11 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 		return nil, err
 	}
 
+	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+	if cfg.Advanced.FeatureFlags != "" {
+		log.WithField("flags", featureFlags).Info("parsed feature flags")
+	}
+
 	client, err := cfg.client(ctx)
 	if err != nil {
 		return nil, err
@@ -196,7 +206,7 @@ func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Res
 	}
 	// Attribute names can be up to 64kb in length, which is for all practical purposes unlimited
 	// length, and they are case sensitive.
-	validator := boilerplate.NewValidator(constrainter{}, is, 0, false)
+	validator := boilerplate.NewValidator(constrainter{}, is, 0, false, featureFlags)
 
 	var bindings = []*pm.Response_Validated_Binding{}
 	for i, binding := range req.Bindings {

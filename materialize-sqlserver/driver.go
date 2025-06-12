@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -22,6 +23,8 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
+var featureFlagDefaults = map[string]bool{}
+
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
 	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
@@ -29,6 +32,10 @@ type sshForwarding struct {
 
 type tunnelConfig struct {
 	SshForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // config represents the endpoint configuration for sql server.
@@ -43,6 +50,8 @@ type config struct {
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
 // Validate the configuration.
@@ -177,6 +186,11 @@ func newSqlServerDriver() *sql.Driver {
 				"user":     cfg.User,
 			}).Info("opening database")
 
+			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+			if cfg.Advanced.FeatureFlags != "" {
+				log.WithField("flags", featureFlags).Info("parsed feature flags")
+			}
+
 			var metaBase sql.TablePath
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
@@ -214,6 +228,7 @@ func newSqlServerDriver() *sql.Driver {
 				NewTransactor:       prepareNewTransactor(templates),
 				Tenant:              tenant,
 				ConcurrentApply:     false,
+				FeatureFlags:        featureFlags,
 			}, nil
 		},
 		PreReqs: preReqs,
