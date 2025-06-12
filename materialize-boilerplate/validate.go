@@ -134,6 +134,14 @@ func (v Validator) ValidateBinding(
 		}
 	}
 
+	// Set folded field for each constraint where field translation changes the field name.
+	// This applies to both new and existing fields, ensuring complete coverage.
+	for field, constraint := range constraints {
+		if t := v.is.translateField(field); t != field {
+			constraint.FoldedField = t
+		}
+	}
+
 	return forbidLongFields(v.maxFieldLength, boundCollection, constraints)
 }
 

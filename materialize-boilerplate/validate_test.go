@@ -299,6 +299,57 @@ func TestValidate(t *testing.T) {
 		require.NotNil(t, cs)
 	})
 
+	t.Run("folded fields are set when field names are transformed", func(t *testing.T) {
+		proposed := loadValidateSpec(t, "base.flow.proto")
+
+		// Use the simpleTestTransform which appends "_transformed" to field names
+		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
+
+		cs, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil,
+		)
+		require.NoError(t, err)
+
+		// Verify that folded fields are set for all constraints
+		for field, constraint := range cs {
+			// simpleTestTransform adds "_transformed" to all field names
+			expectedFolded := field + "_transformed"
+			require.Equal(t, expectedFolded, constraint.FoldedField,
+				"FoldedField should be set to the transformed field name for field %q", field)
+		}
+	})
+
+	t.Run("folded fields are not set when field names are unchanged", func(t *testing.T) {
+		proposed := loadValidateSpec(t, "base.flow.proto")
+
+		// Use identity transform (no change to field names)
+		identityTransform := func(s string) string { return s }
+		is := testInfoSchemaFromSpec(t, nil, identityTransform)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
+
+		cs, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			nil,
+		)
+		require.NoError(t, err)
+
+		// Verify that folded fields are empty when no transformation occurs
+		for field, constraint := range cs {
+			require.Empty(t, constraint.FoldedField,
+				"FoldedField should be empty when field name is unchanged for field %q", field)
+		}
+	})
+
 	t.Run("at least one required location must not be too long", func(t *testing.T) {
 		proposed := loadValidateSpec(t, "long-fields.flow.proto")
 
