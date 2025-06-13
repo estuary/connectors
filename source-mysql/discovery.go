@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -18,6 +17,7 @@ import (
 	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/text/encoding/charmap"
+	"vitess.io/vitess/go/vt/sqlparser"
 )
 
 const (
@@ -564,41 +564,53 @@ func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient) ([]sqlc
 			"charset":    charsetName,
 			"maxLength":  maxLength,
 		}).Debug("discovered column")
+		var parsedDataType, err = db.parseDataType(dataType, fullColumnType, charsetName, maxLength)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing column %q.%q.%q type: %w", tableSchema, tableName, columnName, err)
+		}
 		columns = append(columns, sqlcapture.ColumnInfo{
 			TableSchema: tableSchema,
 			TableName:   tableName,
 			Index:       int(row[2].AsInt64()),
 			Name:        columnName,
 			IsNullable:  string(row[4].AsString()) != "NO",
-			DataType:    db.parseDataType(dataType, fullColumnType, charsetName, maxLength),
+			DataType:    parsedDataType,
 		})
 	}
 	return columns, err
 }
 
-func (db *mysqlDatabase) parseDataType(typeName, fullColumnType, charset string, maxLength int) any {
+func (db *mysqlDatabase) parseDataType(typeName, fullColumnType, charset string, maxLength int) (any, error) {
 	switch typeName {
 	case "enum":
 		// Illegal values are represented internally by MySQL as the integer 0. Adding
 		// this to the list as the zero-th element allows everything else to flow naturally.
-		return &mysqlColumnType{Type: "enum", EnumValues: append([]string{""}, parseEnumValues(fullColumnType)...)}
+		var enumValues, err = parseEnumValues(fullColumnType)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing enum %q values: %w", fullColumnType, err)
+		}
+		return &mysqlColumnType{Type: "enum", EnumValues: append([]string{""}, enumValues...)}, nil
 	case "set":
-		return &mysqlColumnType{Type: "set", EnumValues: parseEnumValues(fullColumnType)}
+		var enumValues, err = parseEnumValues(fullColumnType)
+		if err != nil {
+			return nil, fmt.Errorf("error parsing enum %q values: %w", fullColumnType, err)
+		}
+		return &mysqlColumnType{Type: "set", EnumValues: enumValues}, nil
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		if typeName == "tinyint" && fullColumnType == "tinyint(1)" && db.featureFlags["tinyint1_as_bool"] {
 			// Booleans in MySQL are annoying because 'BOOLEAN' is just an alias for 'TINYINT(1)'
 			// and 'TRUE/FALSE' for 1/0, but since it's 'TINYINT(1)' rather than just 'TINYINT'
 			// and nobody uses TINYINT(1) for other purposes we can reliably assume that it means
 			// the user wants us to treat it as a boolean anyway, so translate this as "boolean".
-			return &mysqlColumnType{Type: "boolean"}
+			return &mysqlColumnType{Type: "boolean"}, nil
 		}
-		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}
+		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}, nil
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-		return &mysqlColumnType{Type: typeName, Charset: charset}
+		return &mysqlColumnType{Type: typeName, Charset: charset}, nil
 	case "binary":
-		return &mysqlColumnType{Type: typeName, MaxLength: maxLength}
+		return &mysqlColumnType{Type: typeName, MaxLength: maxLength}, nil
 	}
-	return typeName
+	return typeName, nil
 }
 
 type mysqlColumnType struct {
@@ -833,17 +845,61 @@ func decodeUCS2(bs []byte) (string, error) {
 	return string(runes), nil
 }
 
-// enumValuesRegexp matches a MySQL-format single-quoted string followed by
-// a comma or EOL. It uses non-capturing groups for the alternations on string
-// body characters and terminator so that submatch #1 is the full string body.
-// The options for string body characters are, in order, two successive quotes,
-// anything backslash-escaped, and anything that isn't a single-quote.
-var enumValuesRegexp = regexp.MustCompile(`'((?:''|\\.|[^'])*)'(?:,|$)`)
+func parseEnumValues(details string) ([]string, error) {
+	// Construct a simple dummy query containing the full enum column type.
+	var query = fmt.Sprintf(`CREATE TABLE dummy (x %s)`, details)
 
-// enumValueReplacements contains the complete list of MySQL string escapes from
+	parser, err := sqlparser.New(sqlparser.Options{})
+	if err != nil {
+		return nil, fmt.Errorf("error constructing SQL parser: %w", err)
+	}
+	stmt, err := parser.Parse(query)
+	if err != nil {
+		return nil, fmt.Errorf("parse error: %w", err)
+	}
+
+	// We're making several unchecked assumptions here, but since we know the exact
+	// structure of the input query we can safely assume these things.
+	var enumValues = stmt.(*sqlparser.CreateTable).TableSpec.Columns[0].Type.EnumValues
+	return unquoteEnumValues(enumValues), nil
+}
+
+// unquoteEnumValues applies MySQL single-quote-unescaping to a list of single-quoted
+// escaped string values such as the EnumValues list returned by the Vitess SQL Parser
+// package when parsing a DDL query involving enum/set values.
+//
+// The single-quote wrapping and escaping of these strings is clearly deliberate, as
+// under the hood the package actually tokenizes the strings to raw values and then
+// explicitly calls `encodeSQLString()` to re-wrap them when building the AST. The
+// actual reason for doing this is unknown however, and it makes very little sense.
+//
+// So whatever, here's a helper function to undo that escaping and get back down to
+// the raw strings again.
+func unquoteEnumValues(values []string) []string {
+	var unquoted []string
+	for _, qval := range values {
+		unquoted = append(unquoted, unquoteMySQLString(qval))
+	}
+	return unquoted
+}
+
+// unquoteStringMySQL unquotes a MySQL-format single-quoted string (and unescapes
+// any backslash escapes) and returns it in unquoted, unescaped form.
+func unquoteMySQLString(qstr string) string {
+	if strings.HasPrefix(qstr, "'") && strings.HasSuffix(qstr, "'") {
+		qstr = strings.TrimPrefix(qstr, "'")
+		qstr = strings.TrimSuffix(qstr, "'")
+		for old, new := range mysqlStringEscapeReplacements {
+			qstr = strings.ReplaceAll(qstr, old, new)
+		}
+	}
+	return qstr
+}
+
+// mysqlStringEscapeReplacements contains the complete list of MySQL string escapes from
 // https://dev.mysql.com/doc/refman/8.0/en/string-literals.html#character-escape-sequences
 // plus the `'​'` repeated-single-quote mechanism.
-var enumValueReplacements = map[string]string{
+var mysqlStringEscapeReplacements = map[string]string{
 	`''`: "'",
 	`\0`: "\x00",
 	`\'`: "'",
@@ -856,37 +912,6 @@ var enumValueReplacements = map[string]string{
 	`\\`: "\\",
 	`\%`: "%",
 	`\_`: "_",
-}
-
-func parseEnumValues(details string) []string {
-	// The detailed type description looks something like `enum('foo', 'bar,baz', 'asdf')`
-	// so we start by extracting the parenthesized portion.
-	if i := strings.Index(details, "("); i >= 0 {
-		if j := strings.Index(details, ")"); j > i {
-			details = details[i+1 : j]
-		}
-	}
-
-	// Apply a regex which matches each `'foo',` clause in the enum/set description,
-	// and take submatch #1 which is the body of each string.
-	var opts []string
-	for _, match := range enumValuesRegexp.FindAllStringSubmatch(details, -1) {
-		opts = append(opts, unquoteMySQLString(match[1]))
-	}
-	return opts
-}
-
-// unquoteStringMySQL unquotes a MySQL-format single-quoted string (and unescapes
-// any backslash escapes) and returns it in unquoted, unescaped form.
-func unquoteMySQLString(qstr string) string {
-	if strings.HasPrefix(qstr, "'") && strings.HasSuffix(qstr, "'") {
-		qstr = strings.TrimPrefix(qstr, "'")
-		qstr = strings.TrimSuffix(qstr, "'")
-		for old, new := range enumValueReplacements {
-			qstr = strings.ReplaceAll(qstr, old, new)
-		}
-	}
-	return qstr
 }
 
 const queryDiscoverPrimaryKeys = `
