@@ -19,7 +19,7 @@ type Client interface {
 	// materialized tables in the schemas referenced by the resourcePaths. It doesn't necessarily
 	// need to include all tables in the entire destination system, but must include all tables in
 	// the relevant schemas.
-	InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error)
+	InfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error
 
 	// CreateTable creates a table in the destination system.
 	CreateTable(ctx context.Context, tc TableCreate) error
@@ -60,6 +60,10 @@ type Resource interface {
 	Path() TablePath
 	// DeltaUpdates is true if the resource should be materialized using delta updates.
 	DeltaUpdates() bool
+
+	Parameters() (path []string, deltaUpdates bool, err error)
+
+	WithDefaults(boilerplate.EndpointConfiger) Resource
 }
 
 // Fence is an installed barrier in a shared checkpoints table which prevents
@@ -87,7 +91,7 @@ type Fence struct {
 // Endpoint is a driver description of the SQL endpoint being driven.
 type Endpoint struct {
 	// Config is an implementation-specific type for the Endpoint configuration.
-	Config interface{}
+	Config boilerplate.EndpointConfiger
 	// Dialect of the Endpoint.
 	Dialect
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.

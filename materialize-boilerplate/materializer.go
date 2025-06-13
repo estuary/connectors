@@ -89,6 +89,7 @@ type MappedProjection[MT MappedTyper] struct {
 // resource configuration.
 type MappedBinding[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
 	pf.MaterializationSpec_Binding
+	Index        int
 	Config       RC
 	Keys, Values []MappedProjection[MT]
 	Document     *MappedProjection[MT]
@@ -148,6 +149,8 @@ func (mb *MappedBinding[EC, RC, MT]) convertTuple(in tuple.Tuple, offset int, ou
 // of changes a destination system will care about in response to a new binding
 // or change to an existing binding.
 type MaterializerBindingUpdate[MT MappedTyper] struct {
+	pf.MaterializationSpec_Binding
+	Index               int
 	NewProjections      []MappedProjection[MT]
 	NewlyNullableFields []ExistingField
 	FieldsToMigrate     []MigrateField[MT]
@@ -282,6 +285,8 @@ type Materializer[
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
 	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *BindingEvents) (MaterializerTransactor, error)
+
+	Close(context.Context)
 }
 
 type NewMaterializerFn[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] func(context.Context, string, EC) (Materializer[EC, FC, RC, MT], error)

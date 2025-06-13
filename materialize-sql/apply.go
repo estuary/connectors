@@ -2,7 +2,6 @@ package sql
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -15,8 +14,7 @@ import (
 type TableCreate struct {
 	Table
 	TableCreateSql string
-
-	ResourceConfigJson json.RawMessage
+	Resource       Resource
 }
 
 // TableAlter is the alterations for a table that are needed, including new columns that should be
@@ -193,5 +191,15 @@ func getTable(endpoint *Endpoint, spec *pf.MaterializationSpec, bindingIndex int
 	}
 
 	tableShape := BuildTableShape(spec, bindingIndex, resource)
+	return ResolveTable(tableShape, endpoint.Dialect)
+}
+
+func getTableV2(endpoint *Endpoint, materializationName string, binding *pf.MaterializationSpec_Binding, bindingIndex int) (Table, error) {
+	resource := endpoint.NewResource(endpoint)
+	if err := pf.UnmarshalStrict(binding.ResourceConfigJson, resource); err != nil {
+		return Table{}, fmt.Errorf("unmarshalling resource binding for collection %q: %w", binding.Collection.Name.String(), err)
+	}
+
+	tableShape := BuildTableShapeV2(materializationName, binding, bindingIndex, resource)
 	return ResolveTable(tableShape, endpoint.Dialect)
 }

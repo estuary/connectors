@@ -39,7 +39,7 @@ type Projection struct {
 	// Comment for this projection.
 	Comment string
 	// RawFieldConfig is (optional) field configuration supplied within the field selection.
-	RawFieldConfig json.RawMessage
+	FieldConfig fieldConfig
 }
 
 // BuildProjections returns the Projections extracted from a Binding.
@@ -62,10 +62,10 @@ func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Proj
 	return
 }
 
-func buildProjection(p *pf.Projection, rawFieldConfig json.RawMessage) Projection {
+func buildProjection(p *pf.Projection, fc fieldConfig) Projection {
 	var out = Projection{
-		Projection:     *p,
-		RawFieldConfig: rawFieldConfig,
+		Projection:  *p,
+		FieldConfig: fc,
 	}
 
 	var source = "auto-generated"
@@ -162,6 +162,32 @@ type MappedType struct {
 	// If the column is using user-defined DDL or not. The selected field will
 	// always pass validation if this is true.
 	UserDefinedDDL bool
+
+	IsRootDocumentProjection bool
+
+	MigratableTypes MigrationSpecs
+}
+
+func (m MappedType) String() string {
+	return m.NullableDDL
+}
+
+func (m MappedType) Compatible(existing boilerplate.ExistingField) bool {
+	if m.UserDefinedDDL {
+		return true
+	}
+
+	return slices.ContainsFunc(m.CompatibleColumnTypes, func(compatibleType string) bool {
+		return strings.EqualFold(existing.Type, compatibleType)
+	})
+}
+
+func (m MappedType) CanMigrate(existing boilerplate.ExistingField) bool {
+	if m.IsRootDocumentProjection {
+		return false
+	}
+
+	return m.MigratableTypes.FindMigrationSpec(existing.Type, m.NullableDDL) != nil
 }
 
 // MapProjectionFn is a function that converts a Projection into the column DDL
@@ -345,14 +371,22 @@ func MapSignedInt64(def, alt MapProjectionFn) MapProjectionFn {
 }
 
 type fieldConfig struct {
-	// CastToString will materialize the field as a string representation of its
+	// SetCastToString will materialize the field as a string representation of its
 	// value.
-	CastToString bool `json:"castToString"`
+	SetCastToString bool `json:"castToString"`
 	// IgnoreStringFormat is a legacy configuration used as an alias for
 	// castToString.
 	IgnoreStringFormat bool `json:"ignoreStringFormat"`
 	// DDL allows for user-defined DDL overrides for creating the column.
 	DDL string `json:"DDL"`
+}
+
+func (fc fieldConfig) CastToString() bool {
+	return fc.SetCastToString || fc.IgnoreStringFormat
+}
+
+func (fc fieldConfig) Validate() error {
+	return nil
 }
 
 func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
@@ -368,14 +402,7 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 		converter = passThrough
 	}
 
-	var fc fieldConfig
-	if p.RawFieldConfig != nil {
-		if err := json.Unmarshal(p.RawFieldConfig, &fc); err != nil {
-			return MappedType{}, fmt.Errorf("unmarshaling field config: %w", err)
-		}
-	}
-
-	if fc.IgnoreStringFormat || fc.CastToString {
+	if p.FieldConfig.IgnoreStringFormat || p.FieldConfig.SetCastToString {
 		// Materialize this field as a "plain" string, and convert its values to
 		// strings if configured.
 		p := *p
@@ -384,9 +411,9 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 		converter = ToStr
 	}
 
-	if fc.DDL != "" {
+	if p.FieldConfig.DDL != "" {
 		// User has specified a custom DDL, so use that.
-		ddl = fc.DDL
+		ddl = p.FieldConfig.DDL
 	}
 
 	out := MappedType{
@@ -394,7 +421,7 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 		NullableDDL:           ddl,
 		Converter:             converter,
 		CompatibleColumnTypes: compatibleTypes,
-		UserDefinedDDL:        fc.DDL != "",
+		UserDefinedDDL:        p.FieldConfig.DDL != "",
 	}
 
 	if mustExist && d.notNullText != "" {
@@ -453,8 +480,8 @@ func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, fc json.
 	return &constraint, nil
 }
 
-func (c constrainter) compatibleType(existing boilerplate.ExistingField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	proj := buildProjection(proposed, rawFieldConfig)
+func (c constrainter) compatibleType(existing boilerplate.ExistingField, proposed *pf.Projection, fc fieldConfig) (bool, error) {
+	proj := buildProjection(proposed, fc)
 	mapped, err := c.dialect.MapType(&proj)
 	if err != nil {
 		return false, fmt.Errorf("mapping type: %w", err)

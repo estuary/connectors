@@ -210,6 +210,25 @@ func BuildTableShape(spec *pf.MaterializationSpec, index int, resource Resource)
 	}
 }
 
+func BuildTableShapeV2(materializeName string, binding *pf.MaterializationSpec_Binding, bindingIndex int, resource Resource) TableShape {
+	var (
+		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
+			materializeName, binding.Collection.Name)
+		keys, values, document = BuildProjections(binding)
+	)
+
+	return TableShape{
+		Path:         resource.Path(),
+		Binding:      bindingIndex,
+		Source:       binding.Collection.Name,
+		Comment:      comment,
+		DeltaUpdates: resource.DeltaUpdates(),
+		Keys:         keys,
+		Values:       values,
+		Document:     document,
+	}
+}
+
 // Pop the last component from the TablePath and return its cloned result.
 func (p TablePath) Pop() TablePath {
 	if len(p) == 0 {

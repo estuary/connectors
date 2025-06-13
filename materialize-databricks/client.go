@@ -19,7 +19,6 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/databricks/databricks-sql-go"
@@ -129,11 +128,9 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return err
 	}
 
-	var res = newTableConfig(c.ep).(*tableConfig)
-	if tc.ResourceConfigJson != nil {
-		if err := pf.UnmarshalStrict(tc.ResourceConfigJson, res); err != nil {
-			return fmt.Errorf("unmarshalling resource binding for bound collection %q: %w", tc.Source.String(), err)
-		}
+	var res tableConfig
+	if tc.Resource != nil {
+		res = tc.Resource.(tableConfig)
 	}
 	if res.AdditionalSql != "" {
 		if _, err := c.db.ExecContext(ctx, res.AdditionalSql); err != nil {

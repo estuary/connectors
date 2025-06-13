@@ -36,6 +36,14 @@ type tableConfig struct {
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run after table is created." jsonschema_extras:"multiline=true"`
 }
 
+func (r tableConfig) Parameters() (path []string, deltaUpdates bool, err error) {
+	panic("unimplemented")
+}
+
+func (r tableConfig) WithDefaults(boilerplate.EndpointConfiger) sql.Resource {
+	panic("unimplemented")
+}
+
 func newTableConfig(ep *sql.Endpoint) sql.Resource {
 	return &tableConfig{Schema: ep.Config.(*config).SchemaName}
 }

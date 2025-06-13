@@ -15,27 +15,26 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
-	"go.gazette.dev/core/consumer/protocol"
 )
 
 type Driver struct {
 	// URL at which documentation for the driver may be found.
 	DocumentationURL string
 	// Instance of the type into which endpoint specifications are parsed.
-	EndpointSpecType interface{}
+	EndpointSpecType boilerplate.EndpointConfiger
 	// Instance of the type into which resource specifications are parsed.
 	ResourceSpecType Resource
 	// StartTunnel starts up an SSH tunnel if one is configured prior to running
 	// any operations that require connectivity to the database.
-	StartTunnel func(ctx context.Context, conf any) error
+	StartTunnel func(ctx context.Context, conf boilerplate.EndpointConfiger) error
 	// NewEndpoint returns an *Endpoint which will be used to handle interactions with the database.
-	NewEndpoint func(_ context.Context, endpointConfig json.RawMessage, tenant string) (*Endpoint, error)
+	NewEndpoint func(_ context.Context, endpointConfig boilerplate.EndpointConfiger, tenant string) (*Endpoint, error)
 	// PreReqs performs verification checks that the provided configuration can
 	// be used to interact with the endpoint to the degree required by the
 	// connector, to as much of an extent as possible. The returned PrereqErr
 	// can include multiple separate errors if it possible to determine that
 	// there is more than one issue that needs corrected.
-	PreReqs func(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr
+	PreReqs func(ctx context.Context, conf boilerplate.EndpointConfiger, tenant string) *cerrors.PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver{}
@@ -71,205 +70,278 @@ func (d *Driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_S
 }
 
 func (d *Driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	var (
-		err      error
-		endpoint *Endpoint
-		client   Client
-		resp     = new(pm.Response_Validated)
-		conf     = d.EndpointSpecType
-	)
-
-	if err = req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	} else if err := json.Unmarshal(req.ConfigJson, conf); err != nil {
-		return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-	} else if err := d.StartTunnel(ctx, conf); err != nil {
-		return nil, fmt.Errorf("starting network tunnel: %w", err)
-	} else if prereqErrs := d.PreReqs(ctx, conf, mustGetTenantNameFromTaskName(req.Name.String())); prereqErrs.Len() != 0 {
-		return nil, cerrors.NewUserError(nil, prereqErrs.Error())
-	} else if endpoint, err = d.NewEndpoint(ctx, req.ConfigJson, mustGetTenantNameFromTaskName(req.Name.String())); err != nil {
-		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-	defer client.Close()
-
-	resources := make([]Resource, 0, len(req.Bindings))
-	resourcePaths := make([][]string, 0, len(req.Bindings))
-	for _, b := range req.Bindings {
-		res := endpoint.NewResource(endpoint)
-		if err = pf.UnmarshalStrict(b.ResourceConfigJson, res); err != nil {
-			return nil, fmt.Errorf("unmarshalling resource binding for collection %q: %w", b.Collection.Name.String(), err)
-		}
-		resources = append(resources, res)
-		resourcePaths = append(resourcePaths, res.Path())
-	}
-	if endpoint.MetaCheckpoints != nil {
-		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
-	}
-
-	is, err := client.InfoSchema(ctx, resourcePaths)
-	if err != nil {
-		return nil, err
-	}
-	validator := boilerplate.NewValidator(
-		constrainter{dialect: endpoint.Dialect, featureFlags: endpoint.FeatureFlags},
-		is,
-		endpoint.Dialect.MaxColumnCharLength,
-		endpoint.Dialect.CaseInsensitiveColumns,
-		endpoint.FeatureFlags,
-	)
-
-	if p := is.AmbiguousResourcePaths(resourcePaths); len(p) > 0 {
-		// This is mostly a sanity-check since it is very unlikely to happen, given that Flow
-		// collection names don't allow for collections that are identical other than
-		// capitalization. It's still technically possible though if a user configures a different
-		// destination table name than the default, or the materialize connector does something
-		// weird with transforming table names (ex: materialize-bigquery).
-		return nil, fmt.Errorf("cannot materialize ambigous resource paths: [%s]", p)
-	}
-
-	// Produce constraints for each request binding, in turn.
-	for idx, bindingSpec := range req.Bindings {
-		res := resources[idx]
-
-		constraints, err := validator.ValidateBinding(
-			res.Path(),
-			res.DeltaUpdates(),
-			bindingSpec.Backfill,
-			bindingSpec.Collection,
-			bindingSpec.FieldConfigJsonMap,
-			req.LastMaterialization,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		resp.Bindings = append(resp.Bindings,
-			&pm.Response_Validated_Binding{
-				Constraints:  constraints,
-				DeltaUpdates: res.DeltaUpdates(),
-				ResourcePath: res.Path(),
-				SerPolicy:    endpoint.SerPolicy,
-			})
-	}
-
-	return resp, nil
+	return boilerplate.RunValidate(ctx, req, d.newMaterialization)
 }
 
 func (d *Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	var (
-		endpoint *Endpoint
-		client   Client
-		err      error
-		conf     = d.EndpointSpecType
-	)
+	return boilerplate.RunApply(ctx, req, d.newMaterialization)
+}
 
-	if err = req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	} else if err := json.Unmarshal(req.Materialization.ConfigJson, conf); err != nil {
-		return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-	} else if err := d.StartTunnel(ctx, conf); err != nil {
-		return nil, fmt.Errorf("starting network tunnel: %w", err)
-	} else if endpoint, err = d.NewEndpoint(ctx, req.Materialization.ConfigJson, mustGetTenantNameFromTaskName(req.Materialization.Name.String())); err != nil {
-		return nil, fmt.Errorf("building endpoint: %w", err)
-	} else if client, err = endpoint.NewClient(ctx, endpoint); err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-	defer client.Close()
+func (d *Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+	return boilerplate.RunNewTransactor(ctx, req, be, d.newMaterialization)
+}
 
-	resourcePaths := make([][]string, 0, len(req.Materialization.Bindings))
-	for _, b := range req.Materialization.Bindings {
-		resourcePaths = append(resourcePaths, b.ResourcePath)
-	}
-	if endpoint.MetaCheckpoints != nil {
-		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
-	}
+type sqlMaterialization struct {
+	materializationName string
+	driver              *Driver
+	endpoint            *Endpoint
+	client              Client
+}
 
-	is, err := client.InfoSchema(ctx, resourcePaths)
-	if err != nil {
+func (d *Driver) newMaterialization(ctx context.Context, materializationName string, cfg boilerplate.EndpointConfiger) (boilerplate.Materializer[boilerplate.EndpointConfiger, fieldConfig, Resource, MappedType], error) {
+	if err := d.StartTunnel(ctx, cfg); err != nil {
 		return nil, err
 	}
 
-	if sm, ok := client.(SchemaManager); ok {
-		// Create any schemas that don't already exist, if the endpoint supports schemas.
-		existingSchemas, err := sm.ListSchemas(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("getting schema list from client: %w", err)
-		}
-
-		requiredSchemas := make(map[string]struct{})
-		for _, p := range resourcePaths {
-			requiredSchemas[endpoint.Dialect.TableLocator(p).TableSchema] = struct{}{}
-		}
-
-		for r := range requiredSchemas {
-			if !slices.Contains(existingSchemas, r) {
-				if err := sm.CreateSchema(ctx, r); err != nil {
-					return nil, fmt.Errorf("client creating schema '%s': %w", r, err)
-				}
-				log.WithField("schema", r).Info("created schema")
-			}
-		}
-	}
-
-	if endpoint.MetaCheckpoints != nil && is.GetResource(endpoint.MetaCheckpoints.Path) == nil {
-		// Create the checkpoints table if it doesn't already exist.
-		if resolved, err := ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect); err != nil {
-			return nil, err
-		} else if createStatement, err := RenderTableTemplate(resolved, endpoint.CreateTableTemplate); err != nil {
-			return nil, err
-		} else if err := client.CreateTable(ctx, TableCreate{
-			Table:              resolved,
-			TableCreateSql:     createStatement,
-			ResourceConfigJson: nil, // not applicable for meta tables
-		}); err != nil {
-			return nil, fmt.Errorf("creating checkpoints table: %w", err)
-		} else {
-			log.WithField("table", resolved.Identifier).Info("created checkpoints table")
-		}
-	}
-
-	return boilerplate.ApplyChanges(ctx, req, newSqlApplier(client, is, endpoint, constrainter{dialect: endpoint.Dialect, featureFlags: endpoint.FeatureFlags}), is, endpoint.ConcurrentApply)
-}
-
-func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
-	var conf = d.EndpointSpecType
-
-	if err := json.Unmarshal(open.Materialization.ConfigJson, conf); err != nil {
-		return nil, nil, nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-	} else if err := d.StartTunnel(ctx, conf); err != nil {
-		return nil, nil, nil, fmt.Errorf("starting network tunnel: %w", err)
-	}
-
-	endpoint, err := d.NewEndpoint(ctx, open.Materialization.ConfigJson, mustGetTenantNameFromTaskName(open.Materialization.Name.String()))
+	endpoint, err := d.NewEndpoint(ctx, cfg, mustGetTenantNameFromTaskName(materializationName))
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("building endpoint: %w", err)
+		return nil, fmt.Errorf("creating endpoint: %w", err)
 	}
 
 	client, err := endpoint.NewClient(ctx, endpoint)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating client: %w", err)
+		return nil, fmt.Errorf("creating client: %w", err)
 	}
-	defer client.Close()
 
-	var resourcePaths [][]string
-	var tables []Table
-	for index, spec := range open.Materialization.Bindings {
-		resourcePaths = append(resourcePaths, spec.ResourcePath)
-		var resource = endpoint.NewResource(endpoint)
+	return &sqlMaterialization{
+		materializationName: materializationName,
+		driver:              d,
+		endpoint:            endpoint,
+		client:              client,
+	}, nil
+}
 
-		if err := pf.UnmarshalStrict(spec.ResourceConfigJson, resource); err != nil {
-			return nil, nil, nil, fmt.Errorf("resource binding for collection %q: %w", spec.Collection.Name, err)
+var _ boilerplate.Materializer[boilerplate.EndpointConfiger, fieldConfig, Resource, MappedType] = &sqlMaterialization{}
+
+func (s *sqlMaterialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
+	return s.driver.PreReqs(ctx, s.endpoint.Config, s.endpoint.Tenant)
+}
+
+func (s *sqlMaterialization) Config() boilerplate.MaterializeCfg {
+	_, doCreateSchemas := s.client.(SchemaManager)
+
+	return boilerplate.MaterializeCfg{
+		Locate:                ToLocatePathFn(s.endpoint.Dialect.TableLocator),
+		Translate:             s.endpoint.ColumnLocator,
+		MaxFieldLength:        s.endpoint.Dialect.MaxColumnCharLength,
+		CaseInsensitiveFields: s.endpoint.Dialect.CaseInsensitiveColumns,
+		ConcurrentApply:       s.endpoint.ConcurrentApply,
+		NoCreateNamespaces:    !doCreateSchemas,
+		// TODO: Get these from the endpoint.
+		MaterializeOptions: boilerplate.MaterializeOptions{},
+	}
+}
+
+func (s *sqlMaterialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
+	if err := s.client.(SchemaManager).CreateSchema(ctx, ns); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("CREATE SCHEMA %q;", ns), nil // todo: return the actual SQL statement used
+}
+
+func (s *sqlMaterialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) (string, boilerplate.ActionApplyFn, error) {
+	table, err := getTableV2(s.endpoint, s.materializationName, &res.MaterializationSpec_Binding, res.Index)
+	if err != nil {
+		return "", nil, err
+	}
+
+	createStatement, err := RenderTableTemplate(table, s.endpoint.CreateTableTemplate)
+	if err != nil {
+		return "", nil, err
+	}
+
+	return createStatement, func(ctx context.Context) error {
+		if err := s.client.CreateTable(ctx, TableCreate{
+			Table:          table,
+			TableCreateSql: createStatement,
+			Resource:       res.Config,
+		}); err != nil {
+			log.WithFields(log.Fields{
+				"table":          table.Identifier,
+				"tableCreateSql": createStatement,
+			}).Error("table creation failed")
+			return fmt.Errorf("failed to create table %q: %w", table.Identifier, err)
 		}
-		var shape = BuildTableShape(open.Materialization, index, resource)
 
-		if table, err := ResolveTable(shape, endpoint.Dialect); err != nil {
-			return nil, nil, nil, err
-		} else {
-			table.StateKey = spec.StateKey
-			tables = append(tables, table)
+		return nil
+	}, nil
+}
+
+func (s *sqlMaterialization) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return s.client.DeleteTable(ctx, path)
+}
+
+func (s *sqlMaterialization) MapType(p boilerplate.Projection, fc fieldConfig) (MappedType, boilerplate.ElementConverter) {
+	pp := buildProjection(&p.Projection, fc)
+
+	m, err := s.endpoint.Dialect.MapType(&pp)
+	if err != nil {
+		panic(err)
+	}
+
+	return m, boilerplate.ElementConverter(m.Converter)
+}
+
+func (s *sqlMaterialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+	_, isNumeric := boilerplate.AsFormattedNumeric(&p)
+
+	var constraint = pm.Response_Validated_Constraint{}
+	switch {
+	case p.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "All Locations that are part of the collections key are recommended"
+	case p.IsRootDocumentProjection() && deltaUpdates:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The root document should usually be materialized"
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case len(p.Inference.Types) == 0:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field with no types"
+	case p.Field == "_meta/op":
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The operation type should usually be materialized"
+	case strings.HasPrefix(p.Field, "_meta/"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Metadata fields are able to be materialized"
+	case p.Inference.IsSingleScalarType() || isNumeric:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The projection has a single scalar type"
+	case slices.Equal(p.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Object fields may be materialized"
+	default:
+		// Any other case is one where the field is an array or has multiple types.
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "This field is able to be materialized"
+	}
+
+	return constraint
+}
+
+func (s *sqlMaterialization) PopulateInfoSchema(ctx context.Context, paths [][]string, is *boilerplate.InfoSchema) error {
+	if s.endpoint.MetaCheckpoints != nil {
+		paths = append(paths, s.endpoint.MetaCheckpoints.Path)
+	}
+
+	if schemaLister, ok := s.client.(SchemaManager); ok {
+		schemas, err := schemaLister.ListSchemas(ctx)
+		if err != nil {
+			return fmt.Errorf("listing schemas: %w", err)
 		}
+		for _, schema := range schemas {
+			is.PushNamespace(schema)
+		}
+	}
+
+	return s.client.InfoSchema(ctx, is, paths)
+}
+
+func (s *sqlMaterialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	// Create the checkpoints table if it doesn't already exist & this endpoint
+	// needs a checkpoints table.
+	var createStatement string
+	if s.endpoint.MetaCheckpoints != nil && is.GetResource(s.endpoint.MetaCheckpoints.Path) == nil {
+		if resolved, err := ResolveTable(*s.endpoint.MetaCheckpoints, s.endpoint.Dialect); err != nil {
+			return "", err
+		} else if createStatement, err = RenderTableTemplate(resolved, s.endpoint.CreateTableTemplate); err != nil {
+			return "", err
+		} else if err := s.client.CreateTable(ctx, TableCreate{
+			Table:          resolved,
+			TableCreateSql: createStatement,
+		}); err != nil {
+			return "", fmt.Errorf("creating checkpoints table: %w", err)
+		}
+	}
+
+	return createStatement, nil
+}
+
+func (s *sqlMaterialization) UpdateResource(
+	ctx context.Context,
+	resourcePath []string,
+	existingResource boilerplate.ExistingResource,
+	bindingUpdate boilerplate.MaterializerBindingUpdate[MappedType],
+) (string, boilerplate.ActionApplyFn, error) {
+	table, err := getTableV2(s.endpoint, s.materializationName, &bindingUpdate.MaterializationSpec_Binding, bindingUpdate.Index)
+	if err != nil {
+		return "", nil, err
+	}
+
+	getColumn := func(field string) (Column, error) {
+		for _, c := range table.Columns() {
+			if field == c.Field {
+				return *c, nil
+			}
+		}
+		return Column{}, fmt.Errorf("could not find column for field %q in table %s", field, table.Identifier)
+	}
+
+	alter := TableAlter{
+		Table:        table,
+		DropNotNulls: bindingUpdate.NewlyNullableFields,
+	}
+
+	for _, newProjection := range bindingUpdate.NewProjections {
+		col, err := getColumn(newProjection.Field)
+		if err != nil {
+			return "", nil, err
+		}
+
+		if existingResource.GetField(col.Field+ColumnMigrationTemporarySuffix) != nil {
+			// At this stage we don't have the target MappedType anymore, but
+			// it's okay because if we don't have the original column anymore
+			// (hence the new projection), it means we have already created the
+			// new column and set its value.
+			alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, ColumnTypeMigration{
+				Column:               col,
+				ProgressColumnExists: true,
+				OriginalColumnExists: false,
+			})
+			continue
+		}
+		alter.AddColumns = append(alter.AddColumns, col)
+	}
+
+	for _, migrate := range bindingUpdate.FieldsToMigrate {
+		col, err := getColumn(migrate.To.Field)
+		if err != nil {
+			return "", nil, err
+		}
+
+		migrationSpec := s.endpoint.Dialect.MigratableTypes.FindMigrationSpec(migrate.From.Type, migrate.To.Mapped.NullableDDL)
+		var m = ColumnTypeMigration{
+			Column:               col,
+			MigrationSpec:        *migrationSpec,
+			OriginalColumnExists: true,
+			ProgressColumnExists: existingResource.GetField(col.Field+ColumnMigrationTemporarySuffix) != nil,
+		}
+		alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, m)
+	}
+
+	return s.client.AlterTable(ctx, alter)
+}
+
+func (s *sqlMaterialization) NewMaterializerTransactor(
+	ctx context.Context,
+	open pm.Request_Open,
+	is boilerplate.InfoSchema,
+	bindings []boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType],
+	be *boilerplate.BindingEvents,
+) (boilerplate.MaterializerTransactor, error) {
+	tables := make([]Table, 0, len(bindings))
+	for _, binding := range bindings {
+		table, err := getTableV2(s.endpoint, s.materializationName, &binding.MaterializationSpec_Binding, binding.Index)
+		if err != nil {
+			return nil, fmt.Errorf("getting table for binding %d: %w", binding.Index, err)
+		}
+		table.StateKey = binding.StateKey
+		tables = append(tables, table)
 	}
 
 	var fence = Fence{
@@ -281,46 +353,49 @@ func (d *Driver) NewTransactor(ctx context.Context, open pm.Request_Open, be *bo
 		Checkpoint:      nil, // Set later iff endpoint.MetaCheckpoints != nil.
 	}
 
-	if endpoint.MetaCheckpoints != nil {
-		resourcePaths = append(resourcePaths, endpoint.MetaCheckpoints.Path)
-
+	if checkpointsShape := s.endpoint.MetaCheckpoints; checkpointsShape != nil {
 		// We must install a fence to prevent another (zombie) instances of this
 		// materialization from committing further transactions.
-		var metaCheckpoints, err = ResolveTable(*endpoint.MetaCheckpoints, endpoint.Dialect)
+		var metaCheckpoints, err = ResolveTable(*checkpointsShape, s.endpoint.Dialect)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("resolving checkpoints table: %w", err)
+			return nil, fmt.Errorf("resolving checkpoints table: %w", err)
 		}
 
 		// Initialize a checkpoint such that the materialization starts from scratch,
 		// regardless of the recovery log checkpoint.
-		fence.TablePath = endpoint.MetaCheckpoints.Path
+		fence.TablePath = checkpointsShape.Path
 		fence.Checkpoint = pm.ExplicitZeroCheckpoint
 
-		fence, err = client.InstallFence(ctx, metaCheckpoints, fence)
+		fence, err = s.client.InstallFence(ctx, metaCheckpoints, fence)
 		if err != nil {
-			return nil, nil, nil, fmt.Errorf("installing checkpoints fence: %w", err)
+			return nil, fmt.Errorf("installing checkpoints fence: %w", err)
 		}
 	}
 
-	is, err := client.InfoSchema(ctx, resourcePaths)
+	transactor, _, err := s.endpoint.NewTransactor(ctx, s.endpoint, fence, tables, open, &is, be)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getting info schema: %w", err)
+		return nil, fmt.Errorf("building transactor: %w", err)
 	}
 
-	transactor, options, err := endpoint.NewTransactor(ctx, endpoint, fence, tables, open, is, be)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("building transactor: %w", err)
-	}
+	return &checkpointRecoverer{
+		Transactor: transactor,
+		cp:         fence.Checkpoint,
+	}, nil
+}
 
-	var cp *protocol.Checkpoint
-	if len(fence.Checkpoint) > 0 {
-		cp = new(protocol.Checkpoint)
-		if err := cp.Unmarshal(fence.Checkpoint); err != nil {
-			return nil, nil, nil, fmt.Errorf("unmarshalling fence.Checkpoint, %w", err)
-		}
-	}
+var _ boilerplate.MaterializerTransactor = &checkpointRecoverer{}
 
-	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, options, nil
+type checkpointRecoverer struct {
+	m.Transactor
+	cp []byte
+}
+
+func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.MaterializationSpec, pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+	return c.cp, nil
+}
+
+func (s *sqlMaterialization) Close(ctx context.Context) {
+	s.client.Close()
 }
 
 func mustGetTenantNameFromTaskName(taskName string) string {
