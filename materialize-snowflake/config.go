@@ -43,8 +43,12 @@ type advancedConfig struct {
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
+func (c config) DefaultNamespace() string {
+	return c.Schema
+}
+
 // toURI manually builds the DSN connection string.
-func (c *config) toURI(tenant string) (string, error) {
+func (c config) toURI(tenant string) (string, error) {
 	var uri = url.URL{
 		Host: c.Host + ":443",
 	}
@@ -138,7 +142,7 @@ func validHost(h string) error {
 	return nil
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"host", c.Host},
 		{"database", c.Database},

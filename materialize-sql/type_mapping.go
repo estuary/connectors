@@ -36,16 +36,12 @@ type Projection struct {
 	pf.Projection
 	// Comment for this projection.
 	Comment string
-	// RawFieldConfig is (optional) field configuration supplied within the field selection.
-	FieldConfig fieldConfig
 }
 
 // BuildProjections returns the Projections extracted from a Binding.
-func BuildProjections(binding boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) (keys, values []Projection, document *Projection) {
+func BuildProjections(binding *pf.MaterializationSpec_Binding) (keys, values []Projection, document *Projection) {
 	var do = func(field string) Projection {
-		p := binding.Collection.GetProjection(field)
-
-		return buildProjection(p, spec.FieldSelection.FieldConfigJsonMap[field])
+		return buildProjection(binding.Collection.GetProjection(field))
 	}
 
 	for _, field := range binding.FieldSelection.Keys {
@@ -62,10 +58,9 @@ func BuildProjections(binding boilerplate.MappedBinding[boilerplate.EndpointConf
 	return
 }
 
-func buildProjection(p *pf.Projection, fc fieldConfig) Projection {
+func buildProjection(p *pf.Projection) Projection {
 	var out = Projection{
-		Projection:  *p,
-		FieldConfig: fc,
+		Projection: *p,
 	}
 
 	var source = "auto-generated"
@@ -370,7 +365,7 @@ func MapSignedInt64(def, alt MapProjectionFn) MapProjectionFn {
 	}
 }
 
-type fieldConfig struct {
+type FieldConfig struct {
 	// SetCastToString will materialize the field as a string representation of its
 	// value.
 	SetCastToString bool `json:"castToString"`
@@ -381,15 +376,15 @@ type fieldConfig struct {
 	DDL string `json:"DDL"`
 }
 
-func (fc fieldConfig) CastToString() bool {
+func (fc FieldConfig) CastToString() bool {
 	return fc.SetCastToString || fc.IgnoreStringFormat
 }
 
-func (fc fieldConfig) Validate() error {
+func (fc FieldConfig) Validate() error {
 	return nil
 }
 
-func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
+func (d DDLMapper) MapType(p *Projection, fc FieldConfig) (MappedType, error) {
 	ft, mustExist := p.AsFlatType()
 
 	h, ok := d.m[ft]
@@ -402,7 +397,7 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 		converter = passThrough
 	}
 
-	if p.FieldConfig.IgnoreStringFormat || p.FieldConfig.SetCastToString {
+	if fc.IgnoreStringFormat || fc.SetCastToString {
 		// Materialize this field as a "plain" string, and convert its values to
 		// strings if configured.
 		p := *p
@@ -411,9 +406,9 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 		converter = ToStr
 	}
 
-	if p.FieldConfig.DDL != "" {
+	if fc.DDL != "" {
 		// User has specified a custom DDL, so use that.
-		ddl = p.FieldConfig.DDL
+		ddl = fc.DDL
 	}
 
 	out := MappedType{
@@ -421,7 +416,7 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 		NullableDDL:           ddl,
 		Converter:             converter,
 		CompatibleColumnTypes: compatibleTypes,
-		UserDefinedDDL:        p.FieldConfig.DDL != "",
+		UserDefinedDDL:        fc.DDL != "",
 	}
 
 	if mustExist && d.notNullText != "" {

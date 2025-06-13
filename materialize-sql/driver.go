@@ -88,7 +88,7 @@ type sqlMaterialization struct {
 	client              Client
 }
 
-func (d *Driver) newMaterialization(ctx context.Context, materializationName string, cfg boilerplate.EndpointConfiger) (boilerplate.Materializer[boilerplate.EndpointConfiger, fieldConfig, Resource, MappedType], error) {
+func (d *Driver) newMaterialization(ctx context.Context, materializationName string, cfg boilerplate.EndpointConfiger) (boilerplate.Materializer[boilerplate.EndpointConfiger, FieldConfig, Resource, MappedType], error) {
 	if err := d.StartTunnel(ctx, cfg); err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func (d *Driver) newMaterialization(ctx context.Context, materializationName str
 	}, nil
 }
 
-var _ boilerplate.Materializer[boilerplate.EndpointConfiger, fieldConfig, Resource, MappedType] = &sqlMaterialization{}
+var _ boilerplate.Materializer[boilerplate.EndpointConfiger, FieldConfig, Resource, MappedType] = &sqlMaterialization{}
 
 func (s *sqlMaterialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 	return s.driver.PreReqs(ctx, s.endpoint.Config, s.endpoint.Tenant)
@@ -172,10 +172,10 @@ func (s *sqlMaterialization) DeleteResource(ctx context.Context, path []string) 
 	return s.client.DeleteTable(ctx, path)
 }
 
-func (s *sqlMaterialization) MapType(p boilerplate.Projection, fc fieldConfig) (MappedType, boilerplate.ElementConverter) {
-	pp := buildProjection(&p.Projection, fc)
+func (s *sqlMaterialization) MapType(p boilerplate.Projection, fc FieldConfig) (MappedType, boilerplate.ElementConverter) {
+	pp := buildProjection(&p.Projection)
 
-	m, err := s.endpoint.Dialect.MapType(&pp)
+	m, err := s.endpoint.Dialect.MapType(&pp, fc)
 	if err != nil {
 		panic(err)
 	}
@@ -183,7 +183,7 @@ func (s *sqlMaterialization) MapType(p boilerplate.Projection, fc fieldConfig) (
 	return m, boilerplate.ElementConverter(m.Converter)
 }
 
-func (s *sqlMaterialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+func (s *sqlMaterialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc FieldConfig) pm.Response_Validated_Constraint {
 	_, isNumeric := boilerplate.AsFormattedNumeric(&p)
 
 	var constraint = pm.Response_Validated_Constraint{}
@@ -341,7 +341,7 @@ func (s *sqlMaterialization) NewMaterializerTransactor(
 ) (boilerplate.MaterializerTransactor, error) {
 	tables := make([]Table, 0, len(bindings))
 	for _, binding := range bindings {
-		table, err := getTable(s.endpoint, s.materializationName, &binding.MaterializationSpec_Binding, binding.Index)
+		table, err := getTable(s.endpoint, s.materializationName, binding)
 		if err != nil {
 			return nil, fmt.Errorf("getting table for binding %d: %w", binding.Index, err)
 		}
@@ -408,6 +408,10 @@ func mustGetTenantNameFromTaskName(taskName string) string {
 }
 
 func getTable(endpoint *Endpoint, materializationName string, binding boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) (Table, error) {
-	tableShape := BuildTableShape(materializationName, binding)
+	path, delta, err := binding.Config.Parameters()
+	if err != nil {
+		return Table{}, fmt.Errorf("getting parameters for binding %d: %w", binding.Index, err)
+	}
+	tableShape := BuildTableShape(materializationName, &binding.MaterializationSpec_Binding, binding.Index, path, delta)
 	return ResolveTable(tableShape, endpoint.Dialect)
 }

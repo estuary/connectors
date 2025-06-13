@@ -91,10 +91,6 @@ type tableConfig struct {
 	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides" jsonschema_extras:"x-schema-name=true"`
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{Schema: ep.Config.(*config).Schema}
-}
-
 func (c tableConfig) Validate() error {
 	if c.Table == "" {
 		return fmt.Errorf("expected table")
@@ -103,6 +99,7 @@ func (c tableConfig) Validate() error {
 }
 
 func (c tableConfig) Parameters() (path []string, deltaUpdates bool, err error) {
+	// Starburst currently does not support delta updates.
 	return []string{c.Schema, c.Table}, false, nil
 }
 
@@ -112,14 +109,6 @@ func (c tableConfig) WithDefaults(cfg boilerplate.EndpointConfiger) sql.Resource
 	}
 
 	return c
-}
-
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.Schema, c.Table}
-}
-
-func (c tableConfig) DeltaUpdates() bool {
-	return false // Starburst currently doesn't support delta updates.
 }
 
 // newStarburstDriver creates a new Driver for Starburst.
@@ -151,7 +140,6 @@ func newStarburstDriver() *sql.Driver {
 				Dialect:             starburstTrinoDialect,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				FeatureFlags:        featureFlags,

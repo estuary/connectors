@@ -38,20 +38,19 @@ type tableConfig struct {
 	endpointSchema string
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		// Default to the explicit endpoint configuration schema. This may be over-written by a
-		// present `schema` property within `raw` for the resource.
-		Schema:         ep.Config.(*config).Schema,
-		endpointSchema: ep.Config.(*config).Schema,
-	}
-}
-
 func (c tableConfig) Validate() error {
 	if c.Table == "" {
 		return fmt.Errorf("expected table")
 	}
 	return nil
+}
+
+func (c tableConfig) WithDefaults(cfg boilerplate.EndpointConfiger) sql.Resource {
+	if c.Schema == "" {
+		c.Schema = cfg.DefaultNamespace()
+	}
+
+	return c
 }
 
 func schemasEqual(s1 string, s2 string) bool {
@@ -65,18 +64,19 @@ func schemasEqual(s1 string, s2 string) bool {
 	return s1 == s2
 }
 
-func (c tableConfig) Path() sql.TablePath {
+func (c tableConfig) Parameters() (path []string, deltaUpdates bool, err error) {
+	var p []string
 	// This is here for backward compatibility purposes. There was a time when binding resources could not
 	// have schema configuration. If we change this for all bindings to be a two-part resource path, that will
 	// lead to a re-backfilling of the bindings which did not previously have a schema as part of their resource path
 	if c.Schema == "" || schemasEqual(c.Schema, c.endpointSchema) {
-		return []string{c.Table}
+		p = []string{c.Table}
+	} else {
+		p = []string{c.Schema, c.Table}
 	}
-	return []string{c.Schema, c.Table}
-}
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
+	return p, c.Delta, nil
+
 }
 
 // newSnowflakeDriver creates a new Driver for Snowflake.
@@ -85,27 +85,24 @@ func newSnowflakeDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var parsed = new(config)
-			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
-				return nil, fmt.Errorf("parsing Snowflake configuration: %w", err)
-			}
+		StartTunnel:      func(ctx context.Context, conf boilerplate.EndpointConfiger) error { return nil },
+		NewEndpoint: func(ctx context.Context, conf boilerplate.EndpointConfiger, tenant string) (*sql.Endpoint, error) {
+			var cfg = conf.(config)
 
 			log.WithFields(log.Fields{
-				"host":     parsed.Host,
-				"database": parsed.Database,
-				"schema":   parsed.Schema,
+				"host":     cfg.Host,
+				"database": cfg.Database,
+				"schema":   cfg.Schema,
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			var featureFlags = common.ParseFeatureFlags(parsed.Advanced.FeatureFlags, featureFlagDefaults)
-			if parsed.Advanced.FeatureFlags != "" {
+			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
+			if cfg.Advanced.FeatureFlags != "" {
 				log.WithField("flags", featureFlags).Info("parsed feature flags")
 			}
 			snowpipeStreaming := featureFlags["snowpipe_streaming"]
 
-			dsn, err := parsed.toURI(tenant)
+			dsn, err := cfg.toURI(tenant)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
 			}
@@ -121,21 +118,20 @@ func newSnowflakeDriver() *sql.Driver {
 				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
 			}
 
-			var dialect = snowflakeDialect(parsed.Schema, timestampTypeMapping)
+			var dialect = snowflakeDialect(cfg.Schema, timestampTypeMapping)
 			var templates = renderTemplates(dialect)
 
 			serPolicy := boilerplate.SerPolicyStd
-			if parsed.Advanced.DisableFieldTruncation {
+			if cfg.Advanced.DisableFieldTruncation {
 				serPolicy = boilerplate.SerPolicyDisabled
 			}
 
 			return &sql.Endpoint{
-				Config:              parsed,
+				Config:              cfg,
 				Dialect:             dialect,
 				SerPolicy:           serPolicy,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(snowpipeStreaming),
 				Tenant:              tenant,
 				ConcurrentApply:     true,

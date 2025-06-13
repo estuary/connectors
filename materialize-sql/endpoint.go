@@ -56,10 +56,6 @@ type SchemaManager interface {
 type Resource interface {
 	// Validate returns an error if the Resource is malformed.
 	Validate() error
-	// Path returns the fully qualified name of the resource as a slice of strings.
-	Path() TablePath
-	// DeltaUpdates is true if the resource should be materialized using delta updates.
-	DeltaUpdates() bool
 
 	Parameters() (path []string, deltaUpdates bool, err error)
 
@@ -104,9 +100,6 @@ type Endpoint struct {
 	NewClient func(context.Context, *Endpoint) (Client, error)
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
-	// NewResource returns an uninitialized or partially-initialized Resource
-	// which will be parsed into and validated from a resource configuration.
-	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
 	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open, is *boilerplate.InfoSchema, be *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error)
 	// Tenant owning this task, as determined from the task name.

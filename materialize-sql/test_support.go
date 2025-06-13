@@ -193,7 +193,7 @@ func RunSqlGenTests(
 
 	tables := []Table{}
 	for idx, delta := range []bool{false, true} {
-		shape := BuildTableShape(spec.Name.String(), spec.Bindings[idx], idx, newResource(spec.Bindings[idx].ResourcePath[0], delta))
+		shape := BuildTableShape(spec.Name.String(), spec.Bindings[idx], idx, spec.Bindings[idx].ResourcePath, delta)
 		if idx == 1 {
 			// The delta updates case.
 			shape.Document = nil
