@@ -58,3 +58,10 @@ func TestSecondaryIndexDiscovery(t *testing.T) {
 		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(uniqueString)))
 	})
 }
+
+// TestTrickyEnumValues tests some "gotcha" enum values to make sure the discovery parsing logic is robust.
+func TestTrickyEnumValues(t *testing.T) {
+	var tb, ctx, uniqueID = mysqlTestBackend(t), context.Background(), uniqueTableID(t)
+	tb.CreateTable(ctx, t, uniqueID, `(id INTEGER PRIMARY KEY, category ENUM('A', 'B (Parentheses)', '', 'Internal''Quote', 'Internal,Comma', 'Internal\nNewline', 'Internal;Semicolon', '   Leading Spaces', 'Trailing Spaces   ', 'Z'))`)
+	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+}
