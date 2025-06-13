@@ -42,6 +42,11 @@
       },
       "advanced": {
         "properties": {
+          "discover_only_enabled": {
+            "type": "boolean",
+            "title": "Discover Only CDC-Enabled Tables",
+            "description": "When set the connector will only discover tables which have already had CDC capture instances enabled."
+          },
           "skip_backfills": {
             "type": "string",
             "title": "Skip Backfills",
