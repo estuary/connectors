@@ -238,7 +238,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 			)
 			if err := c.backfillStreams(ctx, discovery); err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
-			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
+			} else if err := c.streamToFence(ctx, replStream, c.Database.MinimumBackfillInterval(), false); err != nil {
 				return fmt.Errorf("error streaming until fence: %w", err)
 			} else if err := c.emitState(); err != nil {
 				return err

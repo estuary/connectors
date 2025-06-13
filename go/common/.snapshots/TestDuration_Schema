@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/estuary/connectors/go/common/test-object",
+  "properties": {
+    "duration": {
+      "type": "string",
+      "format": "duration",
+      "title": "Duration Property",
+      "description": "This is a duration field with a title and description."
+    },
+    "duration_ptr": {
+      "type": "string",
+      "format": "duration",
+      "title": "Duration Pointer Property",
+      "description": "This is a duration pointer field with a title and description."
+    }
+  },
+  "type": "object",
+  "required": [
+    "duration"
+  ],
+  "title": "Test Object"
+}

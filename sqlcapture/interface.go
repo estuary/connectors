@@ -177,6 +177,11 @@ type Database interface {
 	// function provides a hook for database-specific diagnostic information to
 	// be logged.
 	ReplicationDiagnostics(ctx context.Context) error
+
+	// MinimumBackfillInterval returns a minimum time which much elapse between
+	// backfill queries. Normally this is zero, but can be set higher by the user
+	// to deliberately slow things down to reduce DB load.
+	MinimumBackfillInterval() time.Duration
 }
 
 // ReplicationStream represents the process of receiving change events
