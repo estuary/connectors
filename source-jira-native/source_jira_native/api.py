@@ -63,6 +63,8 @@ MIN_CHECKPOINT_INTERVAL = 200
 MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
 CUSTOM_FIELD_NOT_FOUND = r"The custom field was not found."
 BOARD_DOES_NOT_SUPPORT_SPRINTS = r"The board does not support sprints"
+DOES_NOT_EXIST = r"does not exist"
+
 
 ALL_ISSUE_FIELDS = "*all"
 MINIMAL_ISSUE_FIELDS = "id,updated"
@@ -445,10 +447,19 @@ async def snapshot_screen_tab_fields(
 
     for screen_id, tab_id in screen_and_tab_ids:
         path = f"screens/{screen_id}/tabs/{tab_id}/fields"
-        async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, log):
-            record["screenId"] = screen_id
-            record["tabId"] = tab_id
-            yield FullRefreshResource.model_validate(record)
+        try:
+            async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, log):
+                record["screenId"] = screen_id
+                record["tabId"] = tab_id
+                yield FullRefreshResource.model_validate(record)
+        except HTTPError as err:
+            if err.code == 400 and DOES_NOT_EXIST in err.message:
+                # Since we bulk fetch all screen tabs & Jira doesn't provide an efficient way
+                # of detecting which are deleted/archived, we'll end up making requests for fields of
+                # screen tabs that no longer exist.
+                continue
+            else:
+                raise
 
 
 async def _fetch_project_avatars(
