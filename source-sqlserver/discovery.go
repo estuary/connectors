@@ -161,6 +161,21 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 		}
 	}
 
+	// If we've been asked to only discover tables which are already enabled
+	// for CDC (== had capture instances created), go and and mark any tables
+	// without a CDC instance as omitted.
+	if db.config.Advanced.DiscoverOnlyEnabled {
+		var captureInstances, err = cdcListCaptureInstances(ctx, db.conn)
+		if err != nil {
+			return nil, fmt.Errorf("unable to list capture instances for 'discover_only_enabled' option: %w", err)
+		}
+		for streamID, info := range tableMap {
+			if len(captureInstances[streamID]) == 0 {
+				info.OmitBinding = true
+			}
+		}
+	}
+
 	if log.IsLevelEnabled(log.DebugLevel) {
 		for id, info := range tableMap {
 			log.WithFields(log.Fields{
