@@ -27,9 +27,10 @@
           "additionalProperties": false,
           "properties": {
             "limit": {
-              "default": 5,
-              "description": "Limit used in queries for incremental streams. This should be left as the default value unless connector errors indicate a smaller limit is required.",
+              "default": 100,
+              "description": "Limit used in queries for incremental streams. For items, this can be up to 500. For other resources, the limit may be lower. This should be left as the default value unless connector errors indicate a smaller limit is required.",
               "exclusiveMinimum": 0,
+              "maximum": 500,
               "title": "Limit",
               "type": "integer"
             }
