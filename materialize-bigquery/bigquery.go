@@ -39,7 +39,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."`
+	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c *config) Validate() error {
@@ -184,9 +185,21 @@ func newBigQueryDriver() *sql.Driver {
 			dialect := bqDialect(objAndArrayAsJson)
 			templates := renderTemplates(dialect)
 
+			// BigQuery's default SerPolicy has historically had limits of 1500
+			// for truncation, rather than the more common 1000.
+			serPolicy := &pf.SerPolicy{
+				StrTruncateAfter:       1 << 16, // 64 KiB
+				NestedObjTruncateAfter: 1500,
+				ArrayTruncateAfter:     1500,
+			}
+			if cfg.Advanced.DisableFieldTruncation {
+				serPolicy = boilerplate.SerPolicyDisabled
+			}
+
 			return &sql.Endpoint{
 				Config:              cfg,
 				Dialect:             dialect,
+				SerPolicy:           serPolicy,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.ProjectID, cfg.Dataset}),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
