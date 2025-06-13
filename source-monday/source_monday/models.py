@@ -69,10 +69,11 @@ class EndpointConfig(BaseModel):
         limit: Annotated[
             int,
             Field(
-                description="Limit used in queries for incremental streams. This should be left as the default value unless connector errors indicate a smaller limit is required.",
+                description="Limit used in queries for incremental streams. For items, this can be up to 500. For other resources, the limit may be lower. This should be left as the default value unless connector errors indicate a smaller limit is required.",
                 title="Limit",
-                default=5,
+                default=100,
                 gt=0,
+                le=500,
             ),
         ]
 
@@ -152,7 +153,7 @@ class Board(BaseDocument, extra="allow"):
 
 
 class BoardsResponse(BaseModel, extra="forbid"):
-    boards: list[Board]
+    boards: list[Board] | None = None
 
 
 class ParentItemRef(BaseModel, extra="allow"):
