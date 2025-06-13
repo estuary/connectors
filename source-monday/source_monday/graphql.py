@@ -1,5 +1,6 @@
 import json
 import asyncio
+import time
 from logging import Logger
 from typing import Any, AsyncGenerator, Dict, Literal, Callable
 
@@ -49,7 +50,7 @@ async def execute_query(
                     ),
                 )
             )
-
+            
             if "errors" in res:
                 raise GraphQLQueryError(
                     [GraphQLError.model_validate(e) for e in res["errors"]]
@@ -99,6 +100,8 @@ async def fetch_activity_log_ids(
         "limit": 5,
         "page": 1,
     }
+    total_logs_processed = 0
+    max_logs_limit = 10000  # Monday.com API total log limit
 
     while True:
         response = await execute_query(
@@ -114,10 +117,14 @@ async def fetch_activity_log_ids(
 
         variables["page"] += 1
 
+        logs_in_page = 0
         for board in response.data.boards:
             if not board.activity_logs:
                 continue
             for activity_log in board.activity_logs:
+                logs_in_page += 1
+                total_logs_processed += 1
+                
                 id = activity_log.data.get(f"{resource}_id")
 
                 if id is not None and not activity_log.event.startswith("delete_"):
@@ -126,7 +133,26 @@ async def fetch_activity_log_ids(
                     except (ValueError, TypeError) as e:
                         log.error(f"Failed to convert ID to string: {id}, error: {e}")
                         raise
+        
+        if logs_in_page == 0:
+            break
 
+    # If we processed 10,000 logs, there might be more that we can't fetch.
+    # Monday.com will only return the first 10,000 activity logs total with or without pagination.
+    # If we reach this limit, we raise an error to prevent data loss. The incremental sync
+    # interval should be reduced to potentially avoid this in the future.
+    if total_logs_processed >= max_logs_limit:
+        log.error(
+            f"Retrieved {total_logs_processed} activity logs, which meets or exceeds the Monday.com API limit of {max_logs_limit}. "
+            f"There may be additional changes that cannot be fetched."
+        )
+        raise RuntimeError(
+            f"Activity log limit of {max_logs_limit} reached. This indicates there are too many changes "
+            f"in the current sync interval. To avoid missing data, please reduce the sync interval "
+            f"(e.g., from 5 minutes to 1 minute) to ensure fewer than {max_logs_limit} changes occur between syncs."
+        )
+
+    log.debug(f"Processed {total_logs_processed} activity logs, found {len(ids)} unique {resource} IDs")
     return list(ids)
 
 
@@ -247,14 +273,30 @@ async def _fetch_boards_chunk(
                     http, log, BOARDS_WITH_KIND, variables
                 ):
                     yield board
-            except GraphQLQueryError:
+            except GraphQLQueryError as e:
                 log.info(
                     f"Trying to fetch board {board_id} without workspace 'kind' field"
                 )
-                async for board in _fetch_boards(
-                    http, log, BOARDS_WITHOUT_KIND, variables
-                ):
-                    yield board
+                try:
+                    async for board in _fetch_boards(
+                        http, log, BOARDS_WITHOUT_KIND, variables
+                    ):
+                        yield board
+                except GraphQLQueryError as e2:
+                    log.error(
+                        f"Failed to fetch board {board_id} with or without workspace 'kind' field. "
+                        f"With kind error: {e.errors}, Without kind error: {e2.errors}. "
+                        f"This board will be skipped, which may cause data loss."
+                    )
+                    # Re-raise to ensure the error is not silently ignored
+                    raise GraphQLQueryError(
+                        [
+                            GraphQLError(
+                                message=f"Failed to fetch board {board_id}. Template boards may need special handling. "
+                                f"Original errors: {e.errors}, {e2.errors}"
+                            )
+                        ]
+                    )
 
 
 async def fetch_boards(
@@ -358,7 +400,7 @@ async def fetch_items_by_boards(
     page: int,
     itemsLimit: int,
 ) -> AsyncGenerator[Item | str, None]:
-    board_cursors: dict[str, str] = {}
+    board_cursors: dict[str, tuple[str, float]] = {}  # board_id -> (cursor, creation_time)
 
     response = await execute_query(
         ItemsByBoardResponse,
@@ -384,7 +426,7 @@ async def fetch_items_by_boards(
 
     if items_page.cursor:
         if board.state != "deleted":
-            board_cursors[board.id] = items_page.cursor
+            board_cursors[board.id] = (items_page.cursor, time.time())
     else:
         log.debug(f"Board {board.id} has no cursor.")
 
@@ -396,7 +438,22 @@ async def fetch_items_by_boards(
     # Note that the cursor will expire in 60 minutes.
     while board_cursors:
         log.debug(f"Fetching next items for boards: {board_cursors.keys()}")
-        for b_id, cur in list(board_cursors.items()):
+        current_time = time.time()
+        
+        # Warn about cursors approaching expiration
+        for b_id in list(board_cursors.keys()):
+            _, creation_time = board_cursors[b_id]
+            elapsed_minutes = (current_time - creation_time) / 60
+            if elapsed_minutes > 50:
+                log.warning(
+                    f"Cursor for board {b_id} has been active for {elapsed_minutes:.1f} minutes. "
+                    f"Monday's item cursors expire at 60 minutes. Consider reducing batch sizes if processing is slow."
+                )
+        
+        if not board_cursors:
+            break
+            
+        for b_id, (cur, creation_time) in list(board_cursors.items()):
             log.debug(f"Board {b_id} has cursor: {cur}")
             variables = {
                 "limit": itemsLimit,
@@ -404,13 +461,26 @@ async def fetch_items_by_boards(
                 "boardId": b_id,
             }
 
-            response = await execute_query(
-                ItemsByBoardPageResponse,
-                http,
-                log,
-                NEXT_ITEMS,
-                variables,
-            )
+            try:
+                response = await execute_query(
+                    ItemsByBoardPageResponse,
+                    http,
+                    log,
+                    NEXT_ITEMS,
+                    variables,
+                )
+            except GraphQLQueryError as e:
+                # Check if this is a cursor expiration error
+                if any("cursor" in str(err.message).lower() for err in e.errors):
+                    raise RuntimeError(
+                        f"Cursor for board {b_id} has expired. This would result in missing items. "
+                        f"The connector must be restarted to avoid data loss. "
+                        f"Consider reducing batch sizes or increasing processing speed. Error: {e.errors}"
+                    )
+                else:
+                    # Re-raise any other GraphQL errors
+                    raise
+                    
             if not response.data or not response.data.next_items_page:
                 log.debug(f"Received empty response for board {b_id}")
                 board_cursors.pop(b_id)
@@ -430,7 +500,7 @@ async def fetch_items_by_boards(
                 log.debug(f"Board {b_id} has no next cursor.")
                 board_cursors.pop(b_id)
             else:
-                board_cursors[b_id] = next_cursor
+                board_cursors[b_id] = (next_cursor, creation_time)
 
     log.debug(
         f"Finished fetching items for board {board_id}. Remaining cursors: {board_cursors.keys()}"
@@ -639,7 +709,7 @@ fragment ItemFields on Item {
 """
 
 ITEMS = f"""
-query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 20, $state: State = all) {{
+query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 500, $state: State = all) {{
   boards(limit: $boardsLimit, page: $boardsPage, state: $state) {{
     id
     state
@@ -655,7 +725,7 @@ query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: I
 """
 
 NEXT_ITEMS = f"""
-query GetNextItems($cursor: String!, $limit: Int = 20) {{
+query GetNextItems($cursor: String!, $limit: Int = 500) {{
   next_items_page(limit: $limit, cursor: $cursor) {{
     cursor
     items {{
@@ -667,7 +737,7 @@ query GetNextItems($cursor: String!, $limit: Int = 20) {{
 """
 
 ITEMS_BY_IDS = f"""
-query GetItemsByIds($ids: [ID!]!, $page: Int = 1, $limit: Int = 20) {{
+query GetItemsByIds($ids: [ID!]!, $page: Int = 1, $limit: Int = 100) {{
   items(ids: $ids, page: $page, limit: $limit, newest_first: true) {{
     ...ItemFields
   }}
