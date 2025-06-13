@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "source_datadog"
+version = "0.1.0"
+description = ""
+authors = ["Dani Palma - dani@estuary.dev"]
+
+[tool.poetry.dependencies]
+estuary-cdk = {path="../estuary-cdk", develop = true}
+pydantic = "^2"
+python = "^3.12"
+datadog-api-client = "^2.34.0"
+
+[tool.poetry.group.dev.dependencies]
+debugpy = "^1.8.0"
+mypy = "^1.8.0"
+pytest = "^7.4.3"
+pytest-insta = "^0.3.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
