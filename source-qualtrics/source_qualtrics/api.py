@@ -1,18 +1,17 @@
 import asyncio
-import json
-from datetime import datetime
+from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator, Any
 from urllib.parse import urlparse, parse_qsl
 
 from estuary_cdk.capture.common import LogCursor
-from estuary_cdk.http import HTTPSession, HTTPError
+from estuary_cdk.http import HTTPError, HTTPMixin
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
+from estuary_cdk.unzip_stream import UnzipStream
 
 from .models import (
-    EndpointConfig,
     ApiResponse,
     PaginatedResponse,
-    QuestionsResponse,
     ExportCreationRequest,
     ExportStartResponse,
     ExportStatusResponse,
@@ -24,6 +23,7 @@ from .models import (
 
 
 PAGE_SIZE = 500  # Max allowed by Qualtrics API
+NO_INCREMENTAL_DATA_GRACE_PERIOD = timedelta(hours=1)
 
 
 def check_response_status(api_response: ApiResponse, log: Logger) -> None:
@@ -45,113 +45,122 @@ def check_response_status(api_response: ApiResponse, log: Logger) -> None:
 
 
 async def snapshot_surveys(
-    http: HTTPSession,
-    config: EndpointConfig,
+    http: HTTPMixin,
+    data_center: str,
     log: Logger,
 ) -> AsyncGenerator[QualtricsResource, None]:
-    headers = {
-        "X-API-TOKEN": config.credentials.access_token,
-        "Content-Type": "application/json",
-    }
-
-    url = f"{config.base_url}/surveys"
+    url = f"https://{data_center}.qualtrics.com/API/v3/surveys"
     offset = 0
 
     while True:
         params: dict[str, Any] = {"offset": offset}
 
-        api_response = ApiResponse[PaginatedResponse].model_validate(
+        api_response = ApiResponse[PaginatedResponse].model_validate_json(
             await http.request(
                 log=log,
                 url=url,
                 params=params,
-                headers=headers,
             )
         )
 
         check_response_status(api_response, log)
 
-        if api_response.result:
-            for item in api_response.result.elements:
-                yield Survey.model_validate(item)
+        if not api_response.result or not api_response.result.elements:
+            log.info("No surveys found.")
+            return
 
-            if not api_response.result.nextPage:
-                break
+        for item in api_response.result.elements:
+            yield Survey.model_validate(item)
 
-            parsed = urlparse(api_response.result.nextPage)
-            params = dict(parse_qsl(parsed.query))
-            offset = params.get("offset")
+        if not api_response.result.nextPage:
+            return
+
+        parsed = urlparse(api_response.result.nextPage)
+        params = dict(parse_qsl(parsed.query))
+        offset_str = params.get("offset")
+
+        if offset_str is None:
+            log.error(
+                f"No offset parameter found in nextPage URL: {api_response.result.nextPage}"
+            )
+            raise ValueError(
+                "The API returned a nextPage URL without an offset, which is unexpected."
+            )
+
+        try:
+            offset = int(offset_str)
+        except ValueError:
+            log.error(
+                f"Invalid offset value '{offset_str}' in nextPage URL: {api_response.result.nextPage}"
+            )
+            raise
 
 
 async def _fetch_survey_questions(
-    http: HTTPSession,
-    config: EndpointConfig,
-    log: Logger,
+    http: HTTPMixin,
+    data_center: str,
     survey_id: str,
+    log: Logger,
 ) -> AsyncGenerator[SurveyQuestion, None]:
-    headers = {
-        "X-API-TOKEN": config.credentials.access_token,
-        "Content-Type": "application/json",
-    }
-
-    url = f"{config.base_url}/surveys/{survey_id}/questions"
-    api_response = ApiResponse[QuestionsResponse].model_validate(
-        await http.request(log=log, url=url, headers=headers)
+    url = f"https://{data_center}.qualtrics.com/API/v3/survey-definitions/{survey_id}/questions"
+    api_response = ApiResponse[PaginatedResponse].model_validate_json(
+        await http.request(
+            log=log,
+            url=url,
+        )
     )
 
     check_response_status(api_response, log)
 
-    if not api_response.result or not api_response.result.questions:
-        log.warning(f"No questions found for survey {survey_id}")
-        return
-
-    for _, question_data in api_response.result.questions.items():
-        yield SurveyQuestion.model_validate(question_data)
+    if api_response.result:
+        for item in api_response.result.elements:
+            item["SurveyID"] = survey_id
+            survey_question = SurveyQuestion.model_validate(item)
+            yield survey_question
 
 
 async def snapshot_survey_questions(
-    http: HTTPSession,
-    config: EndpointConfig,
+    http: HTTPMixin,
+    data_center: str,
     log: Logger,
 ) -> AsyncGenerator[QualtricsResource, None]:
-    async for survey in snapshot_surveys(http, config, log):
+    async for survey in snapshot_surveys(http, data_center, log):
         if not isinstance(survey, Survey):
             log.warning(f"Unexpected resource type: {type(survey)}")
             raise TypeError(f"Expected Survey, got {type(survey)}")
-        async for question in _fetch_survey_questions(http, config, log, survey.id):
+        async for question in _fetch_survey_questions(
+            http,
+            data_center,
+            survey.id,
+            log,
+        ):
             yield question
 
 
 async def export_survey_responses(
-    http: HTTPSession,
-    config: EndpointConfig,
-    survey_id: str,
+    http: HTTPMixin,
     log: Logger,
+    data_center: str,
+    survey_id: str,
     start_date: datetime,
+    end_date: datetime | None,
 ) -> AsyncGenerator[SurveyResponse, None]:
-    headers = {
-        "X-API-TOKEN": config.credentials.access_token,
-        "Content-Type": "application/json",
-    }
-
-    export_url = f"{config.base_url}/surveys/{survey_id}/export-responses"
+    export_url = f"https://{data_center}.qualtrics.com/API/v3/surveys/{survey_id}/export-responses"
     # Note: Since we are using NDJSON format, we cannot use many parameters that are typically used with CSV exports.
     # This means we may need to make a request to the survey metadata or survey definition endpoints to get user-friendly labels
     # for questions that have multiple choices. By default, we will see the encoded numeric IDs for choices in the responses.
     export_request = ExportCreationRequest(
         format="ndjson",
-        startDate=start_date.isoformat() + "Z"
-        if start_date.tzinfo is None
-        else start_date.isoformat(),
+        startDate=start_date.isoformat(),
+        endDate=end_date.isoformat() if end_date else None,
     )
 
-    api_response = ApiResponse[ExportStartResponse].model_validate(
+    api_response = ApiResponse[ExportStartResponse].model_validate_json(
         await http.request(
             log=log,
             url=export_url,
             method="POST",
             json=export_request.model_dump(exclude_none=True),
-            headers=headers,
         )
     )
 
@@ -163,13 +172,13 @@ async def export_survey_responses(
 
     progress_id = api_response.result.progressId
     status_url = f"{export_url}/{progress_id}"
+    file_id = None
 
     while True:
-        status_response = ApiResponse[ExportStatusResponse].model_validate(
+        status_response = ApiResponse[ExportStatusResponse].model_validate_json(
             await http.request(
                 log=log,
                 url=status_url,
-                headers=headers,
             )
         )
 
@@ -180,8 +189,9 @@ async def export_survey_responses(
 
         status = status_response.result.status
         percent_complete = status_response.result.percentComplete
+        file_id = status_response.result.fileId
 
-        if status == "complete":
+        if status == "complete" or file_id is not None:
             break
         elif status == "failed":
             raise RuntimeError(f"Export failed for survey {survey_id}")
@@ -190,31 +200,28 @@ async def export_survey_responses(
 
         await asyncio.sleep(2)
 
-    download_url = f"{status_url}/file"
+    download_url = f"{export_url}/{file_id}/file"
     response_count = 0
 
     try:
-        _, body = await http.request_lines(
+        _, body = await http.request_stream(
             log=log,
             url=download_url,
-            headers=headers,
         )
 
-        # We can potentially have issues with this processing logic if the aiohttp.ClientSession does not automatically handle
-        # decompression for the response. If we encounter issues, we may need to handle decompression manually which is more complicated,
-        # especially if we want to do this in a streaming fashion rather than loading the entire response into memory. Compression
-        # is needed since Qualtrics will reject requests that exceed 1.8GB in size. Qualtrics docs also mentions they may return compressed responses
-        # even if the request does not specify compression if the response is large enough.
-        async for line in body():
+        async def unzip_stream() -> AsyncGenerator[bytes, None]:
+            async for chunk in UnzipStream(body()):
+                yield chunk
+
+        async for response in IncrementalJsonProcessor(
+            input=unzip_stream(),
+            prefix="",
+            streamed_item_cls=SurveyResponse,
+        ):
             try:
-                # Qualtrics response does not include surveyId, so we add it manually
-                response_data = json.loads(line)
-                response_data["surveyId"] = survey_id
-
-                response_obj = SurveyResponse.model_validate(response_data)
+                response.surveyId = survey_id
                 response_count += 1
-
-                yield response_obj
+                yield response
 
                 if response_count % 1000 == 0:
                     log.debug(
@@ -222,10 +229,8 @@ async def export_survey_responses(
                     )
 
             except Exception as e:
-                log.error(f"Failed to parse response line from survey {survey_id}: {e}")
+                log.error(f"Failed to process response from survey {survey_id}: {e}")
                 raise
-
-        log.info(f"Exported {response_count} responses from survey {survey_id}")
 
     except Exception as e:
         log.error(f"Error downloading responses for survey {survey_id}: {e}")
@@ -233,23 +238,47 @@ async def export_survey_responses(
 
 
 async def fetch_survey_responses_incremental(
-    http: HTTPSession,
-    config: EndpointConfig,
+    http: HTTPMixin,
+    data_center: str,
+    window_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[QualtricsResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
+    max_end = log_cursor + timedelta(days=window_size)
+    now = datetime.now(tz=UTC)
+    end = min(max_end, now)
     max_modified_date = log_cursor
+    has_docs = False
 
-    async for survey in snapshot_surveys(http, config, log):
+    async for survey in snapshot_surveys(http, data_center, log):
         if not isinstance(survey, Survey):
             log.warning(f"Unexpected resource type: {type(survey)}")
             raise TypeError(f"Expected Survey, got {type(survey)}")
         async for response in export_survey_responses(
-            http, config, survey.id, log, log_cursor
+            http,
+            log,
+            data_center,
+            survey.id,
+            log_cursor,
+            end,
         ):
-            if response.recordedDate > max_modified_date:
-                max_modified_date = response.recordedDate
+            if response.values.recordedDate > max_modified_date:
+                max_modified_date = response.values.recordedDate
             yield response
+            has_docs = True
 
-    yield max_modified_date
+    if not has_docs:
+        if end < now - NO_INCREMENTAL_DATA_GRACE_PERIOD:
+            log.info(
+                f"No survey responses found in window; advancing cursor to {end.isoformat()} (window sufficiently in the past)"
+            )
+            yield end
+        else:
+            log.warning(
+                "No survey responses found and window is too recent; not advancing cursor to avoid missing late-arriving data."
+            )
+
+        return
+
+    yield max_modified_date + timedelta(milliseconds=1)
