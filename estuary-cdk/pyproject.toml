@@ -15,6 +15,7 @@ pydantic = ">1.10,<3"
 xxhash = "^3.4.1"
 ijson = "^3.3.0"
 pycron = "^3.1.2"
+stream-unzip = "0.0.99"
 
 airbyte-cdk = "<=4.6.2"
 pendulum = "<=2.0.0 | >=3.0.0"
