@@ -664,7 +664,6 @@ def open_binding(
                     {
                         "subtask_id": subtask_id,
                         "inc_state": inc_state,
-                        "fetch_changes": subtask_fetch_changes,
                     },
                 )
                 assert inc_state
