@@ -43,8 +43,12 @@ type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
+func (c config) DefaultNamespace() string {
+	return c.Schema
+}
+
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c config) ToURI() string {
 
 	var params = make(url.Values)
 	params.Add("catalog", c.Catalog)
@@ -60,7 +64,7 @@ func (c *config) ToURI() string {
 	return uri.String()
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"account", c.Account},
 		{"host", c.Host},
@@ -98,6 +102,18 @@ func (c tableConfig) Validate() error {
 	return nil
 }
 
+func (c tableConfig) Parameters() (path []string, deltaUpdates bool, err error) {
+	return []string{c.Schema, c.Table}, false, nil
+}
+
+func (c tableConfig) WithDefaults(cfg boilerplate.EndpointConfiger) sql.Resource {
+	if c.Schema == "" {
+		c.Schema = cfg.DefaultNamespace()
+	}
+
+	return c
+}
+
 func (c tableConfig) Path() sql.TablePath {
 	return []string{c.Schema, c.Table}
 }
@@ -112,12 +128,9 @@ func newStarburstDriver() *sql.Driver {
 		DocumentationURL: "https://go.estuary.dev/materialize-starburst",
 		EndpointSpecType: new(config),
 		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("failed to parse Starburst configuration: %w", err)
-			}
+		StartTunnel:      func(ctx context.Context, conf boilerplate.EndpointConfiger) error { return nil },
+		NewEndpoint: func(ctx context.Context, conf boilerplate.EndpointConfiger, tenant string) (*sql.Endpoint, error) {
+			var cfg = conf.(config)
 
 			log.WithFields(log.Fields{
 				"host":    cfg.Host,

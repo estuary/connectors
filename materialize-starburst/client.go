@@ -51,12 +51,7 @@ func newClient(_ context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(c.ep.Dialect.TableLocator),
-		c.ep.Dialect.ColumnLocator,
-	)
-
+func (c *client) InfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
 	schemas := []string{c.ep.Dialect.Literal(c.cfg.Schema)}
 	for _, p := range resourcePaths {
@@ -77,7 +72,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
@@ -93,7 +88,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	for rows.Next() {
 		var c columnRow
 		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.ColumnDefault); err != nil {
-			return nil, err
+			return err
 		}
 
 		is.PushResource(c.TableSchema, c.TableName).PushField(boilerplate.ExistingField{
@@ -105,10 +100,10 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return is, nil
+	return nil
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -166,7 +161,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, conf boilerplate.EndpointConfiger, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	cfg := conf.(*config)

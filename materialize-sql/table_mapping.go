@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
@@ -189,28 +190,7 @@ func ResolveColumn(index int, projection *Projection, dialect Dialect) (Column, 
 	}, nil
 }
 
-// BuildTableShape for the indexed specification binding, which has a corresponding database Resource.
-func BuildTableShape(spec *pf.MaterializationSpec, index int, resource Resource) TableShape {
-	var (
-		binding = spec.Bindings[index]
-		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
-			spec.Name, binding.Collection.Name)
-		keys, values, document = BuildProjections(binding)
-	)
-
-	return TableShape{
-		Path:         resource.Path(),
-		Binding:      index,
-		Source:       binding.Collection.Name,
-		Comment:      comment,
-		DeltaUpdates: resource.DeltaUpdates(),
-		Keys:         keys,
-		Values:       values,
-		Document:     document,
-	}
-}
-
-func BuildTableShapeV2(materializeName string, binding *pf.MaterializationSpec_Binding, bindingIndex int, resource Resource) TableShape {
+func BuildTableShape(materializeName string, binding boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) TableShape {
 	var (
 		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
 			materializeName, binding.Collection.Name)
@@ -218,11 +198,11 @@ func BuildTableShapeV2(materializeName string, binding *pf.MaterializationSpec_B
 	)
 
 	return TableShape{
-		Path:         resource.Path(),
-		Binding:      bindingIndex,
+		Path:         binding.Config.Path(),
+		Binding:      binding.Index,
 		Source:       binding.Collection.Name,
 		Comment:      comment,
-		DeltaUpdates: resource.DeltaUpdates(),
+		DeltaUpdates: binding.Config.DeltaUpdates(),
 		Keys:         keys,
 		Values:       values,
 		Document:     document,

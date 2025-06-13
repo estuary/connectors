@@ -148,9 +148,8 @@ func (mb *MappedBinding[EC, RC, MT]) convertTuple(in tuple.Tuple, offset int, ou
 // MaterializerBindingUpdate is a distilled representation of the typical kinds
 // of changes a destination system will care about in response to a new binding
 // or change to an existing binding.
-type MaterializerBindingUpdate[MT MappedTyper] struct {
-	pf.MaterializationSpec_Binding
-	Index               int
+type MaterializerBindingUpdate[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
+	Binding             MappedBinding[EC, RC, MT]
 	NewProjections      []MappedProjection[MT]
 	NewlyNullableFields []ExistingField
 	FieldsToMigrate     []MigrateField[MT]
@@ -280,7 +279,7 @@ type Materializer[
 	// even if there are no pre-computed updates. This is to allow
 	// materializations to perform additional specific actions on binding
 	// changes that are not covered by the general cases.
-	UpdateResource(context.Context, []string, ExistingResource, MaterializerBindingUpdate[MT]) (string, ActionApplyFn, error)
+	UpdateResource(context.Context, []string, ExistingResource, MaterializerBindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
 
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
@@ -489,14 +488,15 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	for bindingIdx, commonUpdates := range common.updatedBindings {
-		update := MaterializerBindingUpdate[MT]{
-			NewlyNullableFields: commonUpdates.NewlyNullableFields,
-			NewlyDeltaUpdates:   commonUpdates.NewlyDeltaUpdates,
-		}
-
 		mb, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
+		}
+
+		update := MaterializerBindingUpdate[EC, RC, MT]{
+			Binding:             *mb,
+			NewlyNullableFields: commonUpdates.NewlyNullableFields,
+			NewlyDeltaUpdates:   commonUpdates.NewlyDeltaUpdates,
 		}
 
 		ps := mb.SelectedProjections()

@@ -23,7 +23,7 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
-	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
+	var shape1 = sqlDriver.BuildTableShape(spec.Name.String(), spec.Bindings[0], 0, tableConfig{
 		Schema: "a-schema",
 		Table:  "target_table",
 	})
@@ -74,9 +74,10 @@ func TestSQLGeneration(t *testing.T) {
 		AlterTableTemplateParams{targetTable.Identifier, "first_new_column", "STRING"}))
 	snap.WriteString("--- End alter table add columns ---\n\n")
 
-	var shapeNoValues = sqlDriver.BuildTableShape(spec, 2, tableConfig{
+	var shapeNoValues = sqlDriver.BuildTableShape(spec.Name.String(), spec.Bindings[2], 2, tableConfig{
 		Table: "target_table_no_values_materialized",
 	})
+
 	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, targetTableDialect)
 	require.NoError(t, err)
 

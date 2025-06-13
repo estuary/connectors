@@ -140,8 +140,8 @@ func (s *sqlMaterialization) CreateNamespace(ctx context.Context, ns string) (st
 	return fmt.Sprintf("CREATE SCHEMA %q;", ns), nil // todo: return the actual SQL statement used
 }
 
-func (s *sqlMaterialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) (string, boilerplate.ActionApplyFn, error) {
-	table, err := getTableV2(s.endpoint, s.materializationName, &res.MaterializationSpec_Binding, res.Index)
+func (s *sqlMaterialization) CreateResource(ctx context.Context, binding boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) (string, boilerplate.ActionApplyFn, error) {
+	table, err := getTable(s.endpoint, s.materializationName, binding)
 	if err != nil {
 		return "", nil, err
 	}
@@ -155,7 +155,7 @@ func (s *sqlMaterialization) CreateResource(ctx context.Context, res boilerplate
 		if err := s.client.CreateTable(ctx, TableCreate{
 			Table:          table,
 			TableCreateSql: createStatement,
-			Resource:       res.Config,
+			Resource:       binding.Config,
 		}); err != nil {
 			log.WithFields(log.Fields{
 				"table":          table.Identifier,
@@ -266,9 +266,9 @@ func (s *sqlMaterialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,
 	existingResource boilerplate.ExistingResource,
-	bindingUpdate boilerplate.MaterializerBindingUpdate[MappedType],
+	bindingUpdate boilerplate.MaterializerBindingUpdate[boilerplate.EndpointConfiger, Resource, MappedType],
 ) (string, boilerplate.ActionApplyFn, error) {
-	table, err := getTableV2(s.endpoint, s.materializationName, &bindingUpdate.MaterializationSpec_Binding, bindingUpdate.Index)
+	table, err := getTable(s.endpoint, s.materializationName, bindingUpdate.Binding)
 	if err != nil {
 		return "", nil, err
 	}
@@ -324,6 +324,11 @@ func (s *sqlMaterialization) UpdateResource(
 		alter.ColumnTypeChanges = append(alter.ColumnTypeChanges, m)
 	}
 
+	// If there is nothing to do, skip
+	if len(alter.AddColumns) == 0 && len(alter.DropNotNulls) == 0 && len(alter.ColumnTypeChanges) == 0 {
+		return "", nil, nil
+	}
+
 	return s.client.AlterTable(ctx, alter)
 }
 
@@ -336,7 +341,7 @@ func (s *sqlMaterialization) NewMaterializerTransactor(
 ) (boilerplate.MaterializerTransactor, error) {
 	tables := make([]Table, 0, len(bindings))
 	for _, binding := range bindings {
-		table, err := getTableV2(s.endpoint, s.materializationName, &binding.MaterializationSpec_Binding, binding.Index)
+		table, err := getTable(s.endpoint, s.materializationName, &binding.MaterializationSpec_Binding, binding.Index)
 		if err != nil {
 			return nil, fmt.Errorf("getting table for binding %d: %w", binding.Index, err)
 		}
@@ -400,4 +405,9 @@ func (s *sqlMaterialization) Close(ctx context.Context) {
 
 func mustGetTenantNameFromTaskName(taskName string) string {
 	return strings.Split(taskName, "/")[0]
+}
+
+func getTable(endpoint *Endpoint, materializationName string, binding boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) (Table, error) {
+	tableShape := BuildTableShape(materializationName, binding)
+	return ResolveTable(tableShape, endpoint.Dialect)
 }

@@ -1,7 +1,6 @@
 package sql
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
 	"slices"
@@ -9,7 +8,6 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 )
 
 // FlatType is a flattened, database-friendly representation of a document location's type.
@@ -43,18 +41,20 @@ type Projection struct {
 }
 
 // BuildProjections returns the Projections extracted from a Binding.
-func BuildProjections(spec *pf.MaterializationSpec_Binding) (keys, values []Projection, document *Projection) {
+func BuildProjections(binding boilerplate.MappedBinding[boilerplate.EndpointConfiger, Resource, MappedType]) (keys, values []Projection, document *Projection) {
 	var do = func(field string) Projection {
-		return buildProjection(spec.Collection.GetProjection(field), spec.FieldSelection.FieldConfigJsonMap[field])
+		p := binding.Collection.GetProjection(field)
+
+		return buildProjection(p, spec.FieldSelection.FieldConfigJsonMap[field])
 	}
 
-	for _, field := range spec.FieldSelection.Keys {
+	for _, field := range binding.FieldSelection.Keys {
 		keys = append(keys, do(field))
 	}
-	for _, field := range spec.FieldSelection.Values {
+	for _, field := range binding.FieldSelection.Values {
 		values = append(values, do(field))
 	}
-	if field := spec.FieldSelection.Document; field != "" {
+	if field := binding.FieldSelection.Document; field != "" {
 		document = new(Projection)
 		*document = do(field)
 	}
@@ -432,117 +432,4 @@ func (d DDLMapper) MapType(p *Projection) (MappedType, error) {
 	}
 
 	return out, nil
-}
-
-type constrainter struct {
-	dialect      Dialect
-	featureFlags map[string]bool
-}
-
-func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, fc json.RawMessage) (*pm.Response_Validated_Constraint, error) {
-	_, isNumeric := boilerplate.AsFormattedNumeric(p)
-
-	var constraint = pm.Response_Validated_Constraint{}
-	switch {
-	case p.IsPrimaryKey:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "All Locations that are part of the collections key are recommended"
-	case p.IsRootDocumentProjection() && deltaUpdates:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The root document should usually be materialized"
-	case p.IsRootDocumentProjection():
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "The root document must be materialized"
-	case len(p.Inference.Types) == 0:
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = "Cannot materialize a field with no types"
-	case p.Field == "_meta/op":
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The operation type should usually be materialized"
-	case strings.HasPrefix(p.Field, "_meta/"):
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "Metadata fields are able to be materialized"
-	case p.Inference.IsSingleScalarType() || isNumeric:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The projection has a single scalar type"
-	case slices.Equal(p.Inference.Types, []string{"null"}):
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
-	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "Object fields may be materialized"
-	default:
-		// Any other case is one where the field is an array or has multiple types.
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "This field is able to be materialized"
-	}
-
-	return &constraint, nil
-}
-
-func (c constrainter) compatibleType(existing boilerplate.ExistingField, proposed *pf.Projection, fc fieldConfig) (bool, error) {
-	proj := buildProjection(proposed, fc)
-	mapped, err := c.dialect.MapType(&proj)
-	if err != nil {
-		return false, fmt.Errorf("mapping type: %w", err)
-	}
-
-	if mapped.UserDefinedDDL {
-		// Fields with custom DDL set are always said to be compatible, since it
-		// is not practical in general to correlate the database's
-		// representation of an existing column and the user's DDL definition.
-		return true, nil
-	}
-
-	isCompatibleType := slices.ContainsFunc(mapped.CompatibleColumnTypes, func(compatibleType string) bool {
-		return strings.EqualFold(existing.Type, compatibleType)
-	})
-
-	return isCompatibleType, nil
-}
-
-func (c constrainter) migratable(existing boilerplate.ExistingField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, *MigrationSpec, error) {
-	if proposed.IsRootDocumentProjection() {
-		// Do not allow migration of the root document column. There is
-		// currently no known case where this would be useful, and in cases of
-		// pre-existing materializations where the document field was
-		// materialized as stringified JSON migrating it to a JSON column will
-		// most likely break the materialization, since the migrated value will
-		// be a JSON string instead of an object.
-		return false, nil, nil
-	}
-
-	proj := buildProjection(proposed, rawFieldConfig)
-	mapped, err := c.dialect.MapType(&proj)
-	if err != nil {
-		return false, nil, fmt.Errorf("mapping type: %w", err)
-	}
-
-	if migrationSpec := c.dialect.MigratableTypes.FindMigrationSpec(existing.Type, mapped.NullableDDL); migrationSpec != nil {
-		return true, migrationSpec, nil
-	}
-
-	return false, nil, nil
-}
-
-func (c constrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
-	if compatible, err := c.compatibleType(existing, proposed, rawFieldConfig); err != nil {
-		return false, err
-	} else if compatible {
-		return true, nil
-	} else {
-		migratable, _, err := c.migratable(existing, proposed, rawFieldConfig)
-		return migratable, err
-	}
-}
-
-func (c constrainter) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
-	pp := buildProjection(p, rawFieldConfig)
-
-	mapped, err := c.dialect.MapType(&pp)
-	if err != nil {
-		return "", fmt.Errorf("mapping type: %w", err)
-	}
-
-	return mapped.NullableDDL, nil
 }

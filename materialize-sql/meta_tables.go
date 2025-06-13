@@ -28,8 +28,7 @@ func FlowCheckpointsTable(base TablePath) *TableShape {
 						String_: &flow.Inference_String{},
 					},
 				},
-				RawFieldConfig: nil,
-				Comment:        "The name of the materialization.",
+				Comment: "The name of the materialization.",
 			},
 			{
 				Projection: flow.Projection{
@@ -39,8 +38,7 @@ func FlowCheckpointsTable(base TablePath) *TableShape {
 						Exists: flow.Inference_MUST,
 					},
 				},
-				RawFieldConfig: nil,
-				Comment:        "The inclusive lower-bound key hash covered by this checkpoint.",
+				Comment: "The inclusive lower-bound key hash covered by this checkpoint.",
 			},
 			{
 				Projection: flow.Projection{
@@ -50,8 +48,7 @@ func FlowCheckpointsTable(base TablePath) *TableShape {
 						Exists: flow.Inference_MUST,
 					},
 				},
-				RawFieldConfig: nil,
-				Comment:        "The inclusive upper-bound key hash covered by this checkpoint.",
+				Comment: "The inclusive upper-bound key hash covered by this checkpoint.",
 			},
 		},
 		Values: []Projection{
@@ -63,8 +60,7 @@ func FlowCheckpointsTable(base TablePath) *TableShape {
 						Exists: flow.Inference_MUST,
 					},
 				},
-				RawFieldConfig: nil,
-				Comment:        "This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.",
+				Comment: "This nonce is used to uniquely identify unique process assignments of a shard and prevent them from conflicting.",
 			},
 			{
 				Projection: flow.Projection{
@@ -77,8 +73,7 @@ func FlowCheckpointsTable(base TablePath) *TableShape {
 						},
 					},
 				},
-				RawFieldConfig: nil,
-				Comment:        "Checkpoint of the Flow consumer shard, encoded as base64 protobuf.",
+				Comment: "Checkpoint of the Flow consumer shard, encoded as base64 protobuf.",
 			},
 		},
 		Document: nil,
