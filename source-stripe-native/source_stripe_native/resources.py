@@ -274,7 +274,29 @@ def base_object(
                     and isinstance(initial_state.inc, dict)
                     and isinstance(initial_state.backfill, dict)
                 ):
+                    task.log.info(
+                        f"Checking account id {account_id} in state.",
+                        {
+                            "platform_account_id": platform_account_id,
+                            "account_id": account_id,
+                            "state_inc": state.inc,
+                            "state_backfill": state.backfill,
+                            "initial_state_inc": initial_state.inc,
+                            "initial_state_backfill": initial_state.backfill,
+                        }
+                    )
                     if account_id not in state.inc and account_id not in state.backfill:
+                        task.log.info(
+                            f"Adding missing account id {account_id} to state.",
+                            {
+                                "platform_account_id": platform_account_id,
+                                "account_id": account_id,
+                                "state_inc": state.inc,
+                                "state_backfill": state.backfill,
+                                "initial_state_inc": initial_state.inc,
+                                "initial_state_backfill": initial_state.backfill,
+                            }
+                        )
                         state.inc[account_id] = initial_state.inc[account_id]
                         state.backfill[account_id] = initial_state.backfill[account_id]
 
@@ -371,7 +393,29 @@ def child_object(
                     and isinstance(initial_state.inc, dict)
                     and isinstance(initial_state.backfill, dict)
                 ):
+                    task.log.info(
+                        f"Checking account id {account_id} in state.",
+                        {
+                            "platform_account_id": platform_account_id,
+                            "account_id": account_id,
+                            "state_inc": state.inc,
+                            "state_backfill": state.backfill,
+                            "initial_state_inc": initial_state.inc,
+                            "initial_state_backfill": initial_state.backfill,
+                        }
+                    )
                     if account_id not in state.inc and account_id not in state.backfill:
+                        task.log.info(
+                            f"Adding missing account id {account_id} to state.",
+                            {
+                                "platform_account_id": platform_account_id,
+                                "account_id": account_id,
+                                "state_inc": state.inc,
+                                "state_backfill": state.backfill,
+                                "initial_state_inc": initial_state.inc,
+                                "initial_state_backfill": initial_state.backfill,
+                            }
+                        )
                         state.inc[account_id] = initial_state.inc[account_id]
                         state.backfill[account_id] = initial_state.backfill[account_id]
 
@@ -472,7 +516,29 @@ def split_child_object(
                     and isinstance(initial_state.inc, dict)
                     and isinstance(initial_state.backfill, dict)
                 ):
+                    task.log.info(
+                        f"Checking account id {account_id} in state.",
+                        {
+                            "platform_account_id": platform_account_id,
+                            "account_id": account_id,
+                            "state_inc": state.inc,
+                            "state_backfill": state.backfill,
+                            "initial_state_inc": initial_state.inc,
+                            "initial_state_backfill": initial_state.backfill,
+                        }
+                    )
                     if account_id not in state.inc and account_id not in state.backfill:
+                        task.log.info(
+                            f"Adding missing account id {account_id} to state.",
+                            {
+                                "platform_account_id": platform_account_id,
+                                "account_id": account_id,
+                                "state_inc": state.inc,
+                                "state_backfill": state.backfill,
+                                "initial_state_inc": initial_state.inc,
+                                "initial_state_backfill": initial_state.backfill,
+                            }
+                        )
                         state.inc[account_id] = initial_state.inc[account_id]
                         state.backfill[account_id] = initial_state.backfill[account_id]
 
@@ -572,7 +638,29 @@ def usage_records(
                     and isinstance(initial_state.inc, dict)
                     and isinstance(initial_state.backfill, dict)
                 ):
+                    task.log.info(
+                        f"Checking account id {account_id} in state.",
+                        {
+                            "platform_account_id": platform_account_id,
+                            "account_id": account_id,
+                            "state_inc": state.inc,
+                            "state_backfill": state.backfill,
+                            "initial_state_inc": initial_state.inc,
+                            "initial_state_backfill": initial_state.backfill,
+                        }
+                    )
                     if account_id not in state.inc and account_id not in state.backfill:
+                        task.log.info(
+                            f"Adding missing account id {account_id} to state.",
+                            {
+                                "platform_account_id": platform_account_id,
+                                "account_id": account_id,
+                                "state_inc": state.inc,
+                                "state_backfill": state.backfill,
+                                "initial_state_inc": initial_state.inc,
+                                "initial_state_backfill": initial_state.backfill,
+                            }
+                        )
                         state.inc[account_id] = initial_state.inc[account_id]
                         state.backfill[account_id] = initial_state.backfill[account_id]
 
@@ -671,7 +759,29 @@ def no_events_object(
                     and isinstance(initial_state.inc, dict)
                     and isinstance(initial_state.backfill, dict)
                 ):
+                    task.log.info(
+                        f"Checking account id {account_id} in state.",
+                        {
+                            "platform_account_id": platform_account_id,
+                            "account_id": account_id,
+                            "state_inc": state.inc,
+                            "state_backfill": state.backfill,
+                            "initial_state_inc": initial_state.inc,
+                            "initial_state_backfill": initial_state.backfill,
+                        }
+                    )
                     if account_id not in state.inc and account_id not in state.backfill:
+                        task.log.info(
+                            f"Adding missing account id {account_id} to state.",
+                            {
+                                "platform_account_id": platform_account_id,
+                                "account_id": account_id,
+                                "state_inc": state.inc,
+                                "state_backfill": state.backfill,
+                                "initial_state_inc": initial_state.inc,
+                                "initial_state_backfill": initial_state.backfill,
+                            }
+                        )
                         state.inc[account_id] = initial_state.inc[account_id]
                         state.backfill[account_id] = initial_state.backfill[account_id]
 

@@ -659,6 +659,14 @@ def open_binding(
             assert resource_state.inc and isinstance(resource_state.inc, dict)
             for subtask_id, subtask_fetch_changes in fetch_changes.items():
                 inc_state = resource_state.inc.get(subtask_id)
+                task.log.info(
+                    "fetch_changes subtask",
+                    {
+                        "subtask_id": subtask_id,
+                        "inc_state": inc_state,
+                        "fetch_changes": subtask_fetch_changes,
+                    },
+                )
                 assert inc_state
 
                 task.spawn_child(
