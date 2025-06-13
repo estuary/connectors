@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/binary"
 	"flag"
 	"fmt"
 	"os"
@@ -216,6 +218,18 @@ func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, ar
 	t.Helper()
 	var _, err = tb.control.ExecContext(ctx, query, args...)
 	require.NoError(t, err)
+}
+
+func uniqueTableID(t testing.TB, extra ...string) string {
+	t.Helper()
+	var h = sha256.New()
+	h.Write([]byte(t.Name()))
+	for _, x := range extra {
+		h.Write([]byte{':'})
+		h.Write([]byte(x))
+	}
+	var x = binary.BigEndian.Uint32(h.Sum(nil)[0:4])
+	return fmt.Sprintf("%d", (x%900000)+100000)
 }
 
 // TestGeneric runs the generic sqlcapture test suite.
