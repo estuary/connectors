@@ -10,42 +10,72 @@ import (
 
 // A Shape represents the structure of a particular document.
 type Shape struct {
-	arity     int
-	prefixes  []string
-	swizzle   []int
-	flags     json.AppendFlags
+	arity     int            // Number of values which should be provided to Encode. May not match the length of prefix/swizzle arrays.
+	names     []string       // Names of the fields in the order they will be serialized.
+	prefixes  []string       // Prefixes for each field, in the order they will be serialized.
+	swizzle   []int          // Indices into the values list which correspond to the fields in the prefixes. May not include all values.
+	encoders  []ValueEncoder // Encoders for each field, in the order they will be used. A nil value indicates that normal JSON reflection should be used
 	skipNulls bool
 }
 
-// NewShape constructs a new Shape corresponding to the provided field names.
+// ValueEncoder represents strategies for encoding and appending JSON serialized values into a buffer.
+type ValueEncoder interface {
+	MarshalTo(buf []byte, v any) ([]byte, error)
+}
+
+// DefaultEncoder is a ValueEncoder which uses normal JSON reflection. It is flexible but inefficient.
+type DefaultEncoder struct {
+	Flags json.AppendFlags // Flags to pass to the JSON encoder.
+}
+
+func (e *DefaultEncoder) MarshalTo(buf []byte, v any) ([]byte, error) {
+	return json.Append(buf, v, e.Flags)
+}
+
+// NewShape constructs a new Shape corresponding to the provided field names
+// with DefaultEncoder as the ValueEncoder for each field.
 func NewShape(fields []string) *Shape {
+	var encoders = make([]ValueEncoder, len(fields))
+	for i := range encoders {
+		encoders[i] = &DefaultEncoder{Flags: json.EscapeHTML | json.SortMapKeys}
+	}
+	return NewShapeWithEncoders(fields, encoders)
+}
+
+// NewShapeWithEncoders constructs a new Shape corresponding to the provided field
+// names and encoders. A field name of "" represents a value which is present in
+// the values list but which should not be serialized.
+func NewShapeWithEncoders(fields []string, encoders []ValueEncoder) *Shape {
 	// Construct a list of swizzle indices which order the fields by name.
 	var swizzle = make([]int, len(fields))
-	for i := 0; i < len(fields); i++ {
+	for i := range swizzle {
 		swizzle[i] = i
 	}
 	sort.Slice(swizzle, func(i, j int) bool {
 		return fields[swizzle[i]] < fields[swizzle[j]]
 	})
 
-	// Sort names
-	var sortedNames = make([]string, len(fields))
+	// Remove any empty-name fields so that they will not be serialized.
+	// Since the swizzle indices are sorted, "" will always be at the start.
+	for fields[swizzle[0]] == "" {
+		swizzle = swizzle[1:]
+	}
+
+	// Reorder the names and encoders according to the swizzle indices.
+	var orderedNames = make([]string, len(swizzle))
+	var orderedEncoders = make([]ValueEncoder, len(swizzle))
 	for i, j := range swizzle {
-		sortedNames[i] = fields[j]
+		orderedNames[i] = fields[j]
+		orderedEncoders[i] = encoders[j]
 	}
 
 	return &Shape{
-		arity:    len(sortedNames),
-		prefixes: generatePrefixes(sortedNames),
+		arity:    len(fields),
+		names:    orderedNames,
+		prefixes: generatePrefixes(orderedNames),
 		swizzle:  swizzle,
-		// Default flags, unless overridden via SetFlags.
-		flags: json.EscapeHTML | json.SortMapKeys,
+		encoders: orderedEncoders,
 	}
-}
-
-// SetFlags overrides the default flags, if alternate behavior is desired.
-func (s *Shape) SetFlags(flags json.AppendFlags) {
-	s.flags = flags
 }
 
 // SkipNulls will cause serialized results to omit fields with a `nil` value.
@@ -82,15 +112,15 @@ func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 
 	buf = buf[:0]
 	for idx, vidx := range s.swizzle {
-		v := values[vidx]
+		var v = values[vidx]
 		if s.skipNulls && v == nil {
 			continue
 		}
 
 		buf = append(buf, s.prefixes[idx]...)
-		buf, err = json.Append(buf, v, s.flags)
+		buf, err = s.encoders[idx].MarshalTo(buf, v)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error encoding field %q: %w", s.names[idx], err)
 		}
 	}
 	buf = append(buf, '}')
