@@ -76,14 +76,18 @@ func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *Json
 	}
 
 	if fields != nil {
-		enc.shape = encrow.NewShape(fields)
 		// Setting TrustRawMessage here prevents unnecessary validation of pre-serialized JSON
 		// received from the runtime, which we can assume to be valid (flow_document for example).
 		// Note that we are also not setting SortMapKeys or EscapeHTML: Sorting keys is not needed
 		// because encrow.Shape already sorts the top-level keys and any object values are already
 		// serialized as JSON, and escaping HTML is not desired so as to avoid escaping values like
 		// <, >, &, etc. if they are present in the materialized collection's data.
-		enc.shape.SetFlags(json.TrustRawMessage)
+		var flags = json.TrustRawMessage
+		var encoders = make([]encrow.ValueEncoder, len(fields))
+		for i := range encoders {
+			encoders[i] = &encrow.DefaultEncoder{Flags: flags}
+		}
+		enc.shape = encrow.NewShapeWithEncoders(fields, encoders)
 		if cfg.skipNulls {
 			enc.shape.SkipNulls()
 		}
