@@ -376,16 +376,40 @@ async def snapshot_filter_sharing(
                 raise
 
 
-async def snapshot_issue_custom_field_contexts(
+def _is_field_with_options(
+    record: APIRecord,
+) -> bool:
+    schema = record.get("schema", {})
+    field_type: str = schema.get("type", "")
+    field_custom_type: str = schema.get("custom", "")
+    field_items: str = schema.get("items", "")
+
+    return (
+        field_type == "option" or
+        field_items == "option" or
+        (
+            "select" in field_custom_type or
+            "radio" in field_custom_type or
+            "checkbox" in field_custom_type
+        )
+    )
+
+
+async def _fetch_issue_custom_field_contexts(
     http: HTTPSession,
     domain: str,
     stream: type[IssueCustomFieldContexts],
     log: Logger,
-) -> AsyncGenerator[FullRefreshResource, None]:
+    omit_fields_without_options: bool = False,
+) -> AsyncGenerator[APIRecord, None]:
     issue_field_ids: list[str] = []
     async for record in _fetch_non_paginated_arrayed_resources(http, domain, IssueFields.api, IssueFields.path, stream.extra_headers, IssueFields.extra_params, log):
         is_custom_field: bool | None = record.get("custom", None)
         issue_field_id: str | None = record.get("id", None)
+
+        if omit_fields_without_options and not _is_field_with_options(record):
+            continue
+
         if is_custom_field and issue_field_id:
             assert isinstance(issue_field_id, str)
             issue_field_ids.append(issue_field_id)
@@ -395,7 +419,7 @@ async def snapshot_issue_custom_field_contexts(
         try:
             async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log):
                 record["issueFieldId"] = id
-                yield FullRefreshResource.model_validate(record)
+                yield record
         except HTTPError as err:
             # Requesting custom fields for "classic" style projects returns a 404.
             # https://community.developer.atlassian.com/t/get-custom-field-contexts-not-found-returned/48408
@@ -406,6 +430,21 @@ async def snapshot_issue_custom_field_contexts(
                 raise
 
 
+async def snapshot_issue_custom_field_contexts(
+    http: HTTPSession,
+    domain: str,
+    stream: type[IssueCustomFieldContexts],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    async for record in _fetch_issue_custom_field_contexts(
+        http,
+        domain,
+        stream,
+        log,
+    ):
+        yield FullRefreshResource.model_validate(record)
+
+
 async def snapshot_issue_custom_field_options(
     http: HTTPSession,
     domain: str,
@@ -414,10 +453,17 @@ async def snapshot_issue_custom_field_options(
 ) -> AsyncGenerator[FullRefreshResource, None]:
     # In each tuple, the first element is the field id and the second element is the context id.
     field_and_context_ids: list[tuple[str, str]] = []
-    async for context in snapshot_issue_custom_field_contexts(http, domain, IssueCustomFieldContexts, log):
-        record = context.model_dump()
-        field_id = record.get("issueFieldId", None)
-        context_id = record.get("id", None)
+    async for context in _fetch_issue_custom_field_contexts(
+        http,
+        domain,
+        IssueCustomFieldContexts,
+        log,
+        # Jira returns a 400 error if we try to fetch options
+        # for fields that don't support options. 
+        omit_fields_without_options=True,
+    ):
+        field_id = context.get("issueFieldId", None)
+        context_id = context.get("id", None)
         if field_id and context_id:
             assert (isinstance(field_id, str) and isinstance(context_id, str))
             field_and_context_ids.append((field_id, context_id))
