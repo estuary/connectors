@@ -70,10 +70,10 @@ type SourceMetadata interface {
 type ChangeEvent interface {
 	IsDatabaseEvent() // Tag method
 
-	String() string                       // Returns a string representation of the event, suitable for logging.
-	StreamID() StreamID                   // Returns the stream ID of the event.
-	GetRowKey() []byte                    // Returns the serialized row key for the change event.
-	MarshalToJSON([]byte) ([]byte, error) // Serializes the change event to JSON as an output document and appends to the provided buffer.
+	String() string                    // Returns a string representation of the event, suitable for logging.
+	StreamID() StreamID                // Returns the stream ID of the event.
+	GetRowKey() []byte                 // Returns the serialized row key for the change event.
+	AppendJSON([]byte) ([]byte, error) // Serializes the change event to JSON as an output document and appends to the provided buffer.
 }
 
 // OldChangeEvent is the old struct used to represent a change event. It implements ChangeEvent.
@@ -111,7 +111,7 @@ func (e *OldChangeEvent) GetRowKey() []byte {
 //
 // Note that this implementation is destructive, but that's okay because
 // emitting the serialized JSON is the last thing we ever do with a change.
-func (e *OldChangeEvent) MarshalToJSON(buf []byte) ([]byte, error) {
+func (e *OldChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
 	var record map[string]any
 	var meta = struct {
 		Operation ChangeOp       `json:"op"`
