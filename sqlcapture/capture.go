@@ -14,6 +14,7 @@ import (
 	"github.com/segmentio/encoding/json"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pc "github.com/estuary/flow/go/protocols/capture"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,6 +28,13 @@ var (
 	// to shut down after replication is all caught up and all tables are fully
 	// backfilled. It is always false in normal operation.
 	TestShutdownAfterCaughtUp = false
+
+	// When the TestShutdownAfterCaughtUp test behavior flag is hit, this variable
+	// will be set to the final state checkpoint. It does nothing in real-world
+	// operation. The purpose of this variable is solely so benchmarks can update
+	// the final capture state checkpoint without having to process every message
+	// the connector outputs, identify the checkpoints, and merge them together.
+	FinalStateCheckpoint json.RawMessage
 
 	// StreamingFenceInterval is a constant controlling how frequently the capture
 	// will establish a new fence during indefinite streaming. It's declared as a
@@ -133,6 +141,10 @@ type Capture struct {
 	State    *PersistentState        // State read from `state.json` and emitted as updates
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
+
+	emitChangeBuf []byte               // A reusable buffer used for serialized JSON documents in emitChange(). Note that this is not thread-safe, but since it's single-threaded we're okay for now.
+	emitChangeMsg pc.Response          // A reusable object for emitting change events. This is not thread-safe, but since it's single-threaded we're okay for now.
+	emitChangeDoc pc.Response_Captured // A reusable object for emitting change events. This is not thread-safe, but since it's single-threaded we're okay for now.
 
 	// A mutex-guarded list of checkpoint cursor values. Values are appended by
 	// emitState() whenever it outputs a checkpoint and removed whenever the
@@ -256,6 +268,9 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		// state during tests even if there is no backfill work to do.
 		if TestShutdownAfterCaughtUp {
 			log.Info("Shutting down after backfill due to TestShutdownAfterCaughtUp")
+			if bs, err := json.Marshal(c.State); err == nil {
+				FinalStateCheckpoint = bs // Set final state checkpoint
+			}
 			return c.emitState()
 		}
 
@@ -709,20 +724,20 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	return nil
 }
 
-// emitChangePool is a sync.Pool used to efficiently reuse byte slices for change events.
-var emitChangePool = sync.Pool{New: func() any { return make([]byte, 0, 1024) }}
-
 func (c *Capture) emitChange(binding *Binding, event ChangeEvent) error {
-	var buf = emitChangePool.Get().([]byte)[:0] // Get and reset a byte slice from the pool
-	defer emitChangePool.Put(buf)               // Put it back when done
 	var err error
-
-	buf, err = event.MarshalToJSON(buf)
+	var buf = c.emitChangeBuf[:0]
+	buf, err = event.AppendJSON(buf)
 	if err != nil {
 		log.WithField("event", event).WithField("err", err).Error("error serializing change event")
 		return fmt.Errorf("error serializing change event %q: %w", event.String(), err)
 	}
-	return c.Output.Documents(int(binding.Index), buf)
+	c.emitChangeBuf = buf
+
+	c.emitChangeDoc.Binding = binding.Index
+	c.emitChangeDoc.DocJson = buf
+	c.emitChangeMsg.Captured = &c.emitChangeDoc
+	return c.Output.Send(&c.emitChangeMsg)
 }
 
 func (c *Capture) emitState() error {

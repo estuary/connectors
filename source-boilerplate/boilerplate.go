@@ -69,22 +69,7 @@ func RunMain(connector Connector) {
 		log.SetLevel(lvl)
 	}
 
-	// Log an 'Initializing' message as soon as logging is configured.
-	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
-
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	var stream streamCodec
-
-	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
-	case "proto":
-		log.Debug("using protobuf codec")
-		stream = newProtoCodec(ctx)
-	case "json":
-		log.Debug("using json codec")
-		stream = newJsonCodec(ctx)
-	default:
-		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
-	}
 
 	go func() {
 		log.WithField("port", 6060).Debug("starting pprof server")
@@ -93,18 +78,34 @@ func RunMain(connector Connector) {
 		}
 	}()
 
-	var server = ConnectorServer{connector}
-
-	var err = server.Capture(stream)
-
-	// Ensure we flush any buffered output before exiting. Since we use os.Exit() to
-	// terminate the process we can't rely on a defer for this.
-	stream.Flush()
-
+	var err = InnerMain(ctx, connector, os.Stdin, os.Stdout)
 	if err != nil {
 		cerrors.HandleFinalError(err)
 	}
 	os.Exit(0)
+}
+
+// InnerMain is the portion of the main() function that can be run in a test context.
+// It omits portions of setup which are only appropriate for a standalone binary.
+func InnerMain(ctx context.Context, connector Connector, r io.Reader, w io.Writer) error {
+	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
+
+	var stream streamCodec
+	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
+	case "proto":
+		log.Debug("using protobuf codec")
+		stream = newProtoCodec(ctx, r, w)
+	case "json":
+		log.Debug("using json codec")
+		stream = newJsonCodec(ctx, r, w)
+	default:
+		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
+	}
+
+	var server = ConnectorServer{connector}
+	var err = server.Capture(stream)
+	stream.Flush() // Ensure we flush any buffered output before exiting.
+	return err
 }
 
 func getEnvDefault(name, def string) string {
@@ -177,6 +178,9 @@ type PullOutput struct {
 	sync.Mutex
 	pc.Connector_CaptureServer
 
+	msg pc.Response          // Preallocated message to avoid allocations in Document()
+	doc pc.Response_Captured // Preallocated captured document to avoid allocations in Document()
+
 	// Map from binding index to SHA-256 hash of the latest schema JSON we output,
 	// used to avoid outputting identical SourcedSchemas multiple times.
 	schemaHashes map[int][32]byte
@@ -198,24 +202,25 @@ func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
 }
 
 // Documents emits one or more documents to the specified binding index.
+//
+// TODO(wgd): We should change binding to be a uint32 since that's what they are in the protocol.
 func (out *PullOutput) Documents(binding int, docs ...json.RawMessage) error {
 	// Emit all the messages with a single mutex acquisition so that a single Documents()
 	// call is atomic (no Checkpoint outputs can be interleaved with it) even when handling
 	// multiple documents at once.
 	out.Lock()
-	defer out.Unlock()
-
 	for _, doc := range docs {
-		var msg = &pc.Response{
-			Captured: &pc.Response_Captured{
-				Binding: uint32(binding),
-				DocJson: doc,
-			},
-		}
-		if err := out.Send(msg); err != nil {
+		// Reset the preallocated message and then set it up for the current document.
+		out.msg.Reset()
+		out.msg.Captured = &out.doc
+		out.doc.Binding = uint32(binding)
+		out.doc.DocJson = doc
+		if err := out.Send(&out.msg); err != nil {
+			out.Unlock()
 			return fmt.Errorf("writing captured documents: %w", err)
 		}
 	}
+	out.Unlock()
 	return nil
 }
 
@@ -323,11 +328,11 @@ type streamCodec interface {
 	Flush() error
 }
 
-func newProtoCodec(ctx context.Context) streamCodec {
-	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
+func newProtoCodec(ctx context.Context, r io.Reader, w io.Writer) streamCodec {
+	var bw = bufio.NewWriterSize(w, outputWriteBuffer)
 	return &protoCodec{
 		ctx: ctx,
-		r:   bufio.NewReaderSize(os.Stdin, 1<<21),
+		r:   bufio.NewReaderSize(r, 1<<21),
 		bw:  bw,
 		pw:  protoio.NewUint32DelimitedWriter(bw, binary.LittleEndian),
 	}
@@ -440,8 +445,8 @@ func (c *protoCodec) peekMessage(size int) ([]byte, error) {
 	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
-func newJsonCodec(ctx context.Context) streamCodec {
-	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
+func newJsonCodec(ctx context.Context, r io.Reader, w io.Writer) streamCodec {
+	var bw = bufio.NewWriterSize(w, outputWriteBuffer)
 	return &jsonCodec{
 		ctx: ctx,
 		marshaler: jsonpb.Marshaler{
@@ -455,7 +460,7 @@ func newJsonCodec(ctx context.Context) streamCodec {
 			AllowUnknownFields: true,
 			AnyResolver:        nil,
 		},
-		decoder: json.NewDecoder(bufio.NewReaderSize(os.Stdin, 1<<21)),
+		decoder: json.NewDecoder(bufio.NewReaderSize(r, 1<<21)),
 		bw:      bw,
 	}
 }
