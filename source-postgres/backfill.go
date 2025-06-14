@@ -4,14 +4,17 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/jackc/pgx/v5"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/segmentio/encoding/json"
 	"github.com/sirupsen/logrus"
 )
 
@@ -116,50 +119,96 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	}
 	defer rows.Close()
 
+	// Preprocess the result column information for efficient result processing.
+	var typeMap = rows.Conn().TypeMap()
+	var resultColumns = rows.FieldDescriptions()
+	var resultColumnNames = make([]string, len(resultColumns))           // Names of all columns
+	var outputColumnNames = make([]string, len(resultColumns))           // Names of all columns, with omitted columns (generated plus xmin) set to ""
+	var outputEncoders = make([]encrow.ValueEncoder, len(resultColumns)) // Encoders for all columns, with omitted columns set to nil
+	for idx, col := range resultColumns {
+		var columnName = string(col.Name)
+		resultColumnNames[idx] = columnName
+
+		// We omit the XMIN column because we never want to capture its value in the output.
+		//
+		// We omit generated columns because they can't be captured by CDC, which means we
+		// mustn't capture them via backfills either or we'll end up with stale values.
+		// Best not to capture them at all.
+		if columnName == "xmin" || slices.Contains(generatedColumns, columnName) {
+			continue
+		}
+
+		var columnInfo *sqlcapture.ColumnInfo
+		var isPrimaryKey bool
+		if info != nil {
+			if x, ok := info.Columns[columnName]; ok {
+				columnInfo = &x
+			}
+			isPrimaryKey = slices.Contains(info.PrimaryKey, columnName)
+		}
+
+		outputColumnNames[idx] = columnName
+		outputEncoders[idx] = db.backfillValueEncoder(typeMap, &resultColumns[idx], columnInfo, isPrimaryKey)
+	}
+	// Append the '_meta' column to the output column names and encoders lists so event
+	// metadata can be similarly appended to the row values list later on.
+	outputColumnNames = append(outputColumnNames, "_meta")
+	outputEncoders = append(outputEncoders, &encrow.DefaultEncoder{Flags: json.EscapeHTML | json.SortMapKeys})
+	var xminIndex = slices.Index(resultColumnNames, "xmin") // The index of the xmin column, if it exists. Used for XID filtering.
+
+	var keyIndices []int // The indices of the key columns in the row values. Only set for keyed backfills.
+	var keyTypes []any   // The types of the key columns, used for serializing row keys. Only set for keyed backfills.
+	if !usingCTID {
+		keyIndices = make([]int, len(keyColumns))
+		keyTypes = make([]any, len(keyColumns))
+		for idx, colName := range keyColumns {
+			var resultIndex = slices.Index(resultColumnNames, colName)
+			if resultIndex < 0 {
+				return false, nil, fmt.Errorf("key column %q not found in result columns for %q", colName, streamID)
+			}
+			keyIndices[idx] = resultIndex
+			keyTypes[idx] = columnTypes[colName]
+		}
+	}
+
+	// Construct the backfill metadata struct which will be shared across all events.
+	var backfillMetadata = &postgresBackfillMetadata{
+		StreamID: streamID,
+		Shape:    encrow.NewShapeWithEncoders(outputColumnNames, outputEncoders),
+	}
+
 	// Process the results into `changeEvent` structs and return them
-	var cols = rows.FieldDescriptions()
 	var totalRows, resultRows int // totalRows counts DB returned rows, resultRows counts rows after XID filtering
 	var nextRowKey []byte         // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
+		var rawValues = rows.RawValues()
 		totalRows++
-
-		// Scan the row values and copy into the equivalent map
-		var vals, err = decodeRowValues(rows)
-		if err != nil {
-			return false, nil, fmt.Errorf("unable to get row values: %w", err)
-		}
-		var fields = make(map[string]interface{})
-		for idx := range cols {
-			fields[string(cols[idx].Name)] = vals[idx]
-		}
 
 		// Compute row key and update 'nextRowKey' before XID filtering, so that we can resume
 		// correctly when doing an XMIN-filtered backfill even if no result rows satisfy the filter.
 		var rowKey []byte
-		if usingCTID {
-			var ctid = fields["ctid"].(pgtype.TID)
-			delete(fields, "ctid")
-
-			if !ctid.Valid {
-				return false, nil, fmt.Errorf("internal error: invalid ctid value %#v", ctid)
+		if !usingCTID {
+			var xs = make([]tuple.TupleElement, len(keyIndices))
+			for i, n := range keyIndices {
+				if val, err := decodeRowValue(&resultColumns[n], typeMap, rawValues[n]); err != nil {
+					return false, nil, fmt.Errorf("error decoding column %q at index %d: %w", resultColumnNames[n], n, err)
+				} else if xs[i], err = encodeKeyFDB(val, keyTypes[i]); err != nil {
+					return false, nil, fmt.Errorf("error translating column %q at index %d: %w", resultColumnNames[n], n, err)
+				}
 			}
-			rowKey = []byte(fmt.Sprintf("(%d,%d)", ctid.BlockNumber, ctid.OffsetNumber))
-		} else {
-			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
+			rowKey, err = sqlcapture.PackTuple(xs)
 			if err != nil {
-				return false, nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+				return false, nil, fmt.Errorf("error packing row key for %q: %w", streamID, err)
 			}
 		}
 		nextRowKey = rowKey
 
-		// Filter result rows based on XMIN values
-		if db.config.Advanced.MinimumBackfillXID != "" {
-			xminStr, ok := fields["xmin"].(string)
-			if !ok {
-				return false, nil, fmt.Errorf("internal error: xmin column missing or not a string despite filtering being enabled")
-			}
+		// Filter result rows based on XMIN values. Since we 'SELECT xmin::text' we can safely
+		// assume that the raw bytes of the result value are the string representation of the XID.
+		if db.config.Advanced.MinimumBackfillXID != "" && xminIndex >= 0 {
+			var xminStr = string(rawValues[xminIndex])
 			xmin, err := strconv.ParseUint(xminStr, 10, 64)
 			if err != nil {
 				return false, nil, fmt.Errorf("invalid xmin value %q: %w", xminStr, err)
@@ -169,34 +218,24 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			if compareXID32(uint32(xmin), uint32(minXID)) < 0 {
 				continue // Skip this row
 			}
-			delete(fields, "xmin") // Remove xmin from captured fields now
 		}
 
-		for _, name := range generatedColumns {
-			// Generated column values cannot be captured via CDC, so we have to exclude them from
-			// backfills as well or we could end up with incorrect/stale values. Better not to have
-			// a property at all in those circumstances.
-			delete(fields, name)
-		}
-
-		if err := db.translateRecordFields(info, fields); err != nil {
-			return false, nil, fmt.Errorf("error backfilling table %q: %w", table, err)
-		}
-
-		var event = &sqlcapture.OldChangeEvent{
-			Operation: sqlcapture.InsertOp,
-			RowKey:    rowKey,
-			Source: &postgresSource{
-				SourceCommon: sqlcapture.SourceCommon{
-					Millis:   0, // Not known.
-					Schema:   schema,
-					Snapshot: true,
-					Table:    table,
+		var event = &postgresBackfillEvent{
+			Meta:   backfillMetadata,
+			RowKey: rowKey,
+			Values: rawValues,
+			DocMetadata: postgresDocumentMetadata{
+				Operation: sqlcapture.InsertOp, // All backfill events are inserts
+				Source: postgresSource{
+					SourceCommon: sqlcapture.SourceCommon{
+						Millis:   0, // Not known.
+						Schema:   schema,
+						Snapshot: true,
+						Table:    table,
+					},
+					Location: [3]int{-1, rowOffset, 0},
 				},
-				Location: [3]int{-1, rowOffset, 0},
 			},
-			Before: nil,
-			After:  fields,
 		}
 		if err := callback(event); err != nil {
 			return false, nil, fmt.Errorf("error processing change event: %w", err)
@@ -311,9 +350,9 @@ func (db *postgresDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schema
 	// Include xmin when using XID filtering
 	var xidFiltered = db.config.Advanced.MinimumBackfillXID != ""
 	if xidFiltered {
-		fmt.Fprintf(query, `SELECT ctid, xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
+		fmt.Fprintf(query, `SELECT xmin::text AS xmin, * FROM "%s"."%s"`, schemaName, tableName)
 	} else {
-		fmt.Fprintf(query, `SELECT ctid, * FROM "%s"."%s"`, schemaName, tableName)
+		fmt.Fprintf(query, `SELECT * FROM "%s"."%s"`, schemaName, tableName)
 	}
 
 	fmt.Fprintf(query, ` WHERE ctid > $1 AND ctid <= $2`)
@@ -420,49 +459,35 @@ func (db *postgresDatabase) explainQuery(ctx context.Context, streamID sqlcaptur
 	}
 }
 
-// decodeRowValues decodes the raw values from a pgx.Rows object into a slice of Go values.
-func decodeRowValues(rows pgx.Rows) ([]any, error) {
-	var fds = rows.FieldDescriptions()
-	var typeMap = rows.Conn().TypeMap()
-	var values = make([]any, 0, len(fds))
-	var rawValues = rows.RawValues()
-
-	for i := range fds {
-		var buf = rawValues[i]
-		var fd = &fds[i]
-
-		if buf == nil {
-			values = append(values, nil)
-			continue
-		}
-
-		if dt, ok := typeMap.TypeForOID(fd.DataTypeOID); ok {
-			value, err := dt.Codec.DecodeValue(typeMap, fd.DataTypeOID, fd.Format, buf)
-			if _, ok := err.(*time.ParseError); ok && fd.DataTypeOID == pgtype.TimestamptzOID {
-				// PostgreSQL supports dates/timestamps with years greater than 9999 or less than
-				// 0 AD, but the PGX client library uses a naive `time.Parse()` call which doesn't
-				// support 5-digit or negative years. We can't represent those as RFC3339 timestamps
-				// anyway, so if a timestamp fails to parse just map it to a sentinel value.
-				value = negativeInfinityTimestamp
-			} else if err != nil {
-				return nil, fmt.Errorf("error decoding value for column %q: %w", string(fd.Name), err)
-			}
-			values = append(values, value)
-		} else {
-			switch fd.Format {
-			case pgtype.TextFormatCode:
-				values = append(values, string(buf))
-			case pgtype.BinaryFormatCode:
-				newBuf := make([]byte, len(buf))
-				copy(newBuf, buf)
-				values = append(values, newBuf)
-			default:
-				return nil, fmt.Errorf("unknown format code %d", fd.Format)
-			}
-		}
+func decodeRowValue(fd *pgconn.FieldDescription, typeMap *pgtype.Map, rawValue []byte) (any, error) {
+	if rawValue == nil {
+		return nil, nil
 	}
 
-	return values, nil
+	if dt, ok := typeMap.TypeForOID(fd.DataTypeOID); ok {
+		value, err := dt.Codec.DecodeValue(typeMap, fd.DataTypeOID, fd.Format, rawValue)
+		if _, ok := err.(*time.ParseError); ok && fd.DataTypeOID == pgtype.TimestamptzOID {
+			// PostgreSQL supports dates/timestamps with years greater than 9999 or less than
+			// 0 AD, but the PGX client library uses a naive `time.Parse()` call which doesn't
+			// support 5-digit or negative years. We can't represent those as RFC3339 timestamps
+			// anyway, so if a timestamp fails to parse just map it to a sentinel value.
+			value = negativeInfinityTimestamp
+		} else if err != nil {
+			return nil, fmt.Errorf("error decoding value for column %q: %w", string(fd.Name), err)
+		}
+		return value, nil
+	} else {
+		switch fd.Format {
+		case pgtype.TextFormatCode:
+			return string(rawValue), nil
+		case pgtype.BinaryFormatCode:
+			newBuf := make([]byte, len(rawValue))
+			copy(newBuf, rawValue)
+			return newBuf, nil
+		default:
+			return nil, fmt.Errorf("unknown format code %d", fd.Format)
+		}
+	}
 }
 
 func compareXID32(a, b uint32) int {
