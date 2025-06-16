@@ -15,11 +15,12 @@ type Client interface {
 	ExecStatements(ctx context.Context, statements []string) error
 	InstallFence(ctx context.Context, checkpoints Table, fence Fence) (Fence, error)
 
-	// InfoSchema returns a populated *boilerplate.InfoSchema containing the state of the actual
-	// materialized tables in the schemas referenced by the resourcePaths. It doesn't necessarily
-	// need to include all tables in the entire destination system, but must include all tables in
-	// the relevant schemas.
-	InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error)
+	// PopulateInfoSchema populates a *boilerplate.InfoSchema with the state of
+	// the actual materialized tables in the schemas referenced by the
+	// resourcePaths. It doesn't necessarily need to include all tables in the
+	// entire destination system, but must include all tables in the relevant
+	// schemas.
+	PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error
 
 	// CreateTable creates a table in the destination system.
 	CreateTable(ctx context.Context, tc TableCreate) error
@@ -44,11 +45,12 @@ type SchemaManager interface {
 	// destination.
 	ListSchemas(ctx context.Context) ([]string, error)
 
-	// Create schema creates a schema. The schemaName will have already had any dialect-specific
-	// transformations applied to it (ex: replacing special characters with underscores) via
-	// TableLocator, but it will not have identifier quoting applied, and identifier quoting must be
-	// handled by the caller if needed.
-	CreateSchema(ctx context.Context, schemaName string) error
+	// CreateSchema creates a schema. The schemaName will have already had any
+	// dialect-specific transformations applied to it (ex: replacing special
+	// characters with underscores) via TableLocator, but it will not have
+	// identifier quoting applied, and identifier quoting must be handled by the
+	// caller if needed.
+	CreateSchema(ctx context.Context, schemaName string) (string, error)
 }
 
 // Resource is a driver-provided type which represents the SQL resource
@@ -56,10 +58,13 @@ type SchemaManager interface {
 type Resource interface {
 	// Validate returns an error if the Resource is malformed.
 	Validate() error
-	// Path returns the fully qualified name of the resource as a slice of strings.
-	Path() TablePath
-	// DeltaUpdates is true if the resource should be materialized using delta updates.
-	DeltaUpdates() bool
+	// Parameters provides the basic information to Validate a resource.
+	Parameters() (path []string, deltaUpdates bool, err error)
+	// WithDefaults provides the parsed endpoint config so that any defaults
+	// from the endpoint config can be set on the resource, for example a
+	// default "schema" to use if the corresponding value is absent from the
+	// resource config.
+	WithDefaults(boilerplate.EndpointConfiger) Resource
 }
 
 // Fence is an installed barrier in a shared checkpoints table which prevents
@@ -85,9 +90,9 @@ type Fence struct {
 }
 
 // Endpoint is a driver description of the SQL endpoint being driven.
-type Endpoint struct {
+type Endpoint[T boilerplate.EndpointConfiger] struct {
 	// Config is an implementation-specific type for the Endpoint configuration.
-	Config interface{}
+	Config T
 	// Dialect of the Endpoint.
 	Dialect
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
@@ -97,19 +102,16 @@ type Endpoint struct {
 	SerPolicy *flow.SerPolicy
 	// NewClient creates a client, which provides Endpoint-specific methods for performing
 	// operations with the Endpoint store.
-	NewClient func(context.Context, *Endpoint) (Client, error)
+	NewClient func(context.Context, *Endpoint[T]) (Client, error)
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
-	// NewResource returns an uninitialized or partially-initialized Resource
-	// which will be parsed into and validated from a resource configuration.
-	NewResource func(*Endpoint) Resource
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
-	NewTransactor func(ctx context.Context, _ *Endpoint, _ Fence, bindings []Table, open pm.Request_Open, is *boilerplate.InfoSchema, be *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error)
+	NewTransactor func(ctx context.Context, _ *Endpoint[T], _ Fence, bindings []Table, open pm.Request_Open, is *boilerplate.InfoSchema, be *boilerplate.BindingEvents) (m.Transactor, error)
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
 	// for changing many tables in a single apply.
 	ConcurrentApply bool
-	// FeatureFlags contains feature flags that control endpoint behavior.
-	FeatureFlags map[string]bool
+	// Options are general materialization options that apply to this task.
+	Options boilerplate.MaterializeOptions
 }

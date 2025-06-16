@@ -316,25 +316,21 @@ func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string
 	return out.String(), nil
 }
 
-// StdFetchInfoSchema returns the existing columns for implementations that use a standard *sql.DB
+// StdPopulateInfoSchema returns the existing columns for implementations that use a standard *sql.DB
 // and make a compliant INFORMATION_SCHEMA view available.
-func StdFetchInfoSchema(
+func StdPopulateInfoSchema(
 	ctx context.Context,
+	is *boilerplate.InfoSchema,
 	db *sql.DB,
 	dialect Dialect,
 	catalog string, // typically the "database"
 	resourcePaths [][]string,
-) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		ToLocatePathFn(dialect.TableLocator),
-		dialect.ColumnLocator,
-	)
-
+) error {
 	if len(resourcePaths) == 0 {
 		// Trivial case: No resources, so there are no applicable tables or columns. This is only
 		// possible if the materialization has no bindings and the endpoint doesn't have any
 		// metadata tables or their table paths are not included in the list of resource paths.
-		return is, nil
+		return nil
 	}
 
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
@@ -359,7 +355,7 @@ func StdFetchInfoSchema(
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tables.Close()
 
@@ -371,7 +367,7 @@ func StdFetchInfoSchema(
 	for tables.Next() {
 		var t tableRow
 		if err := tables.Scan(&t.TableSchema, &t.TableName); err != nil {
-			return nil, err
+			return err
 		}
 
 		is.PushResource(t.TableSchema, t.TableName)
@@ -388,7 +384,7 @@ func StdFetchInfoSchema(
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer columns.Close()
 
@@ -404,7 +400,7 @@ func StdFetchInfoSchema(
 	for columns.Next() {
 		var c columnRow
 		if err := columns.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
-			return nil, err
+			return err
 		}
 
 		is.PushResource(c.TableSchema, c.TableName).PushField(boilerplate.ExistingField{
@@ -416,10 +412,10 @@ func StdFetchInfoSchema(
 		})
 	}
 	if err := columns.Err(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return is, nil
+	return nil
 }
 
 type ListSchemasFn func(context.Context) ([]string, error)
@@ -446,9 +442,13 @@ func StdListSchemas(ctx context.Context, db *sql.DB) ([]string, error) {
 	return out, nil
 }
 
-func StdCreateSchema(ctx context.Context, db *sql.DB, dialect Dialect, schemaName string) error {
-	_, err := db.ExecContext(ctx, fmt.Sprintf("create schema %s", dialect.Identifier(schemaName)))
-	return err
+func StdCreateSchema(ctx context.Context, db *sql.DB, dialect Dialect, schemaName string) (string, error) {
+	stmt := fmt.Sprintf("CREATE SCHEMA %s;", dialect.Identifier(schemaName))
+	if _, err := db.ExecContext(ctx, stmt); err != nil {
+		return "", err
+	}
+
+	return stmt, nil
 }
 
 type MigrationInstruction struct {
