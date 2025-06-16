@@ -90,7 +90,7 @@ type materialization struct {
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
 
-func newMaterialization(ctx context.Context, materializationName string, cfg config) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
+func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mapped], error) {
 	catalog, err := cfg.toCatalog(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("creating catalog: %w", err)
@@ -343,7 +343,7 @@ func (d *materialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,
 	existing boilerplate.ExistingResource,
-	update boilerplate.MaterializerBindingUpdate[mapped],
+	update boilerplate.MaterializerBindingUpdate[config, resource, mapped],
 ) (string, boilerplate.ActionApplyFn, error) {
 	if len(update.NewProjections) == 0 && len(update.NewlyNullableFields) == 0 && len(update.FieldsToMigrate) == 0 {
 		return "", nil, nil
@@ -494,6 +494,8 @@ func (d *materialization) NewMaterializerTransactor(
 
 	return t, nil
 }
+
+func (d *materialization) Close(ctx context.Context) { return }
 
 //go:embed python
 var pyFilesFS embed.FS

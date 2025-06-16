@@ -40,7 +40,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	LowercaseColumnNames bool `json:"lowercase_column_names,omitempty" jsonschema:"title=Lowercase Column Names,description=Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."`
+	LowercaseColumnNames bool   `json:"lowercase_column_names,omitempty" jsonschema:"title=Lowercase Column Names,description=Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."`
+	FeatureFlags         string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {
@@ -103,6 +104,10 @@ func (c config) Validate() error {
 
 func (c config) DefaultNamespace() string {
 	return sanitizePath(c.Namespace)[0]
+}
+
+func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
+	return c.Advanced.FeatureFlags, make(map[string]bool)
 }
 
 type catalogAuthType string
