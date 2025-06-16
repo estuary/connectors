@@ -51,6 +51,12 @@
             "description": "The number of rows which should be fetched from the database in a single backfill query. Only applies to tables with a primary key.",
             "default": 50000
           },
+          "minimumBackfillInterval": {
+            "type": "string",
+            "format": "duration",
+            "title": "Minimum Backfill Interval",
+            "description": "An optional minimum time interval between backfill queries. This is usually not necessary but may be used to deliberately slow down backfills to reduce load on the database. Must be in the form of an ISO 8601 duration string."
+          },
           "incremental_chunk_size": {
             "type": "integer",
             "title": "Incremental Chunk Size",
