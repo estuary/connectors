@@ -1,0 +1,43 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key: { type: string }
+        scalarValue: { type: "string" }
+        nonScalarValue: { type: object }
+        multiple: { type: [integer, string, boolean] }
+        nullValue: { type: "null" }
+        optional: { type: object }
+        numericString: { type: "string" }
+        dateValue: { type: string }
+        datetimeValue: { type: string }
+        timeValue: { type: string }
+        int64: { type: integer, maximum: 10000000000000000000}
+        requiredNumeric: { type: string }
+        stringWidenedToJson: { type: [string, integer, boolean] }
+        intWidenedToJson: { type: [string, integer, boolean] }
+        boolWidenedToJson: { type: [boolean, string] }
+        intToNumber: { type: number }
+        int64ToNumber: { type: number, maximum: 10000000000000000000}
+      required: [key, scalarValue, requiredNumeric]
+    key: [/key]
+    projections:
+      flow_document: ""
+      second_root: ""
+
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+          include:
+            nonScalarValue: {}
+            multiple: {}
+            optional: {}
