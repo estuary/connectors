@@ -96,20 +96,11 @@ func (t *SshTunnel) Start() error {
 		return fmt.Errorf("could not get stderr pipe for network-tunnel: %w", err)
 	}
 	go func() {
+		// Copy log lines output from the network tunnel process to the
+		// connector's stderr.
 		_, err = io.Copy(os.Stderr, stderr)
 		if err != nil {
 			log.WithField("error", err).Info("error copying stderr of tunnel")
-		}
-
-		// The network tunnel should never stop once started. If it does, the
-		// connector should crash and attempt to log the final error message.
-		// It's not unlikely that some other error will occur within the
-		// connector's processing that will race this log, but we do the best we
-		// can.
-		if err = t.Cmd.Wait(); err != nil {
-			log.WithError(err).Fatal("network-tunnel failed")
-		} else {
-			log.Fatal("network-tunnel exited")
 		}
 	}()
 
@@ -132,6 +123,19 @@ func (t *SshTunnel) Start() error {
 	}
 
 	log.Info("network-tunnel ready")
+
+	go func() {
+		// The network tunnel should never stop once started. If it does, the
+		// connector should crash and attempt to log the final error message.
+		// It's not unlikely that some other error will occur within the
+		// connector's processing that will race this log, but we do the best we
+		// can.
+		if err = t.Cmd.Wait(); err != nil {
+			log.WithError(err).Fatal("network-tunnel failed")
+		} else {
+			log.Fatal("network-tunnel exited")
+		}
+	}()
 
 	return nil
 }
