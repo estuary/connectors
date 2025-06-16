@@ -1,0 +1,23 @@
+After installing fixtures:
+materialization, key_begin, key_end, fence, checkpoint
+other/one, 0, 4294967295, 99, b3RoZXItY2hlY2twb2ludA==
+the/materialization, 0, 499, 6, AQEBAQEBAQEBAQ==
+the/materialization, 0, 1000, 5, BAQEBAQEBAQEBA==
+the/materialization, 500, 799, 6, AgICAgICAgICAg==
+the/materialization, 800, 1000, 6, AwMDAwMDAwMDAw==
+After install fence under test:
+materialization, key_begin, key_end, fence, checkpoint
+other/one, 0, 4294967295, 99, b3RoZXItY2hlY2twb2ludA==
+the/materialization, 0, 499, 6, AQEBAQEBAQEBAQ==
+the/materialization, 0, 1000, 6, BAQEBAQEBAQEBA==
+the/materialization, 500, 599, 7, AgICAgICAgICAg==
+the/materialization, 500, 799, 7, AgICAgICAgICAg==
+the/materialization, 800, 1000, 6, AwMDAwMDAwMDAw==
+After update:
+materialization, key_begin, key_end, fence, checkpoint
+other/one, 0, 4294967295, 99, b3RoZXItY2hlY2twb2ludA==
+the/materialization, 0, 499, 6, AQEBAQEBAQEBAQ==
+the/materialization, 0, 1000, 6, BAQEBAQEBAQEBA==
+the/materialization, 500, 599, 7, AgICAgICAgICAgAAAAAAAAAA
+the/materialization, 500, 799, 7, AgICAgICAgICAg==
+the/materialization, 800, 1000, 6, AwMDAwMDAwMDAw==
