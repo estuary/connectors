@@ -183,7 +183,7 @@ type TestTemplates struct {
 func RunSqlGenTests(
 	t *testing.T,
 	dialect Dialect,
-	newResource func(table string, deltaUpdates bool) Resource,
+	newPath func(table string) []string,
 	templates TestTemplates,
 ) (*strings.Builder, []Table) {
 	specBytes, err := testFS.ReadFile("testdata/generated_specs/flow.proto")
@@ -193,8 +193,13 @@ func RunSqlGenTests(
 
 	tables := []Table{}
 	for idx, delta := range []bool{false, true} {
-		shape := BuildTableShape(&spec, idx, newResource(spec.Bindings[idx].ResourcePath[0], delta))
-
+		shape := BuildTableShape(
+			spec.Name.String(),
+			spec.Bindings[idx],
+			idx,
+			newPath(spec.Bindings[idx].ResourcePath[0]),
+			delta,
+		)
 		if idx == 1 {
 			// The delta updates case.
 			shape.Document = nil

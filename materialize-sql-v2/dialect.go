@@ -76,7 +76,7 @@ type Placeholderer interface {
 // A TypeMapper is a function that maps a Projection into a MappedType.
 // For example, it might map a `string` Projection into a `TEXT` SQL type.
 type TypeMapper interface {
-	MapType(*Projection) (MappedType, error)
+	MapType(*Projection, FieldConfig) MappedType
 }
 
 // TableLocatorFn is a function that implements TableLocatorer.
@@ -124,9 +124,9 @@ type PlaceholderFn func(index int) string
 func (f PlaceholderFn) Placeholder(index int) string { return f(index) }
 
 // TypeMapperFn is a function that implements TypeMapper.
-type TypeMapperFn func(*Projection) (MappedType, error)
+type TypeMapperFn func(*Projection, FieldConfig) (MappedType, error)
 
-func (f TypeMapperFn) MapType(p *Projection) (MappedType, error) { return f(p) }
+func (f TypeMapperFn) MapType(p *Projection, fc FieldConfig) (MappedType, error) { return f(p, fc) }
 
 // Compile-time check that wrapping functions with typed  Fn() implementations
 // can be used to build a Dialect.
