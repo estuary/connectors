@@ -17,12 +17,8 @@ func TestSQLGeneration(t *testing.T) {
 	snap, tables := sql.RunSqlGenTests(
 		t,
 		testDialect,
-		func(table string, delta bool) sql.Resource {
-			return tableConfig{
-				Table:  table,
-				Schema: "a-schema",
-				Delta:  delta,
-			}
+		func(table string) []string {
+			return []string{"a-schema", table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{

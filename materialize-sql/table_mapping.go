@@ -23,6 +23,11 @@ type TableShape struct {
 	Comment string
 	// The table is operating in delta-updates mode (instead of a standard materialization).
 	DeltaUpdates bool
+	// Field configurations for this table, keyed by field name.
+	// TODO(whb): This is somewhat of a temporary workaround, until the
+	// Materializer constructs are more thoroughly integrated into
+	// materialize-sql.
+	FieldConfigJsonMap map[string]json.RawMessage
 
 	Keys, Values []Projection
 	Document     *Projection
@@ -162,7 +167,14 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	}
 
 	for index, col := range table.Columns() {
-		resolved, err := ResolveColumn(index, &col.Projection, dialect)
+		var fc FieldConfig
+		if raw, ok := shape.FieldConfigJsonMap[col.Field]; ok {
+			if err := json.Unmarshal(raw, &fc); err != nil {
+				return Table{}, fmt.Errorf("unmarshalling field config for %s: %w", col.Field, err)
+			}
+		}
+
+		resolved, err := resolveColumn(index, &col.Projection, fc, dialect)
 		if err != nil {
 			return Table{}, fmt.Errorf("resolving column %s of %s: %w", col.Field, shape.Path, err)
 		}
@@ -172,8 +184,8 @@ func ResolveTable(shape TableShape, dialect Dialect) (Table, error) {
 	return table, nil
 }
 
-func ResolveColumn(index int, projection *Projection, dialect Dialect) (Column, error) {
-	mappedType, err := dialect.MapType(projection)
+func resolveColumn(index int, projection *Projection, fc FieldConfig, dialect Dialect) (Column, error) {
+	mappedType, err := dialect.MapType(projection, fc)
 	if err != nil {
 		return Column{}, err
 	}
@@ -189,24 +201,24 @@ func ResolveColumn(index int, projection *Projection, dialect Dialect) (Column, 
 	}, nil
 }
 
-// BuildTableShape for the indexed specification binding, which has a corresponding database Resource.
-func BuildTableShape(spec *pf.MaterializationSpec, index int, resource Resource) TableShape {
+func BuildTableShape(materializeName string, binding *pf.MaterializationSpec_Binding, bindingIdx int, path []string, deltaUpdates bool) TableShape {
 	var (
-		binding = spec.Bindings[index]
 		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
-			spec.Name, binding.Collection.Name)
+			materializeName, binding.Collection.Name)
 		keys, values, document = BuildProjections(binding)
 	)
 
 	return TableShape{
-		Path:         resource.Path(),
-		Binding:      index,
-		Source:       binding.Collection.Name,
-		Comment:      comment,
-		DeltaUpdates: resource.DeltaUpdates(),
-		Keys:         keys,
-		Values:       values,
-		Document:     document,
+		// This is not just the path, it needs to be determined from the parameters.
+		Path:               path,
+		Binding:            bindingIdx,
+		Source:             binding.Collection.Name,
+		Comment:            comment,
+		DeltaUpdates:       deltaUpdates,
+		FieldConfigJsonMap: binding.FieldSelection.FieldConfigJsonMap,
+		Keys:               keys,
+		Values:             values,
+		Document:           document,
 	}
 }
 

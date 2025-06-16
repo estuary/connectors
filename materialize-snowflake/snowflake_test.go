@@ -29,6 +29,7 @@ func mustGetCfg(t *testing.T) config {
 			AuthType: JWT,
 		},
 	}
+	out.Advanced.FeatureFlags = "allow_existing_tables_for_new_bindings"
 
 	for _, prop := range []struct {
 		key  string

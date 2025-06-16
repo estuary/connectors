@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/cespare/xxhash/v2"
-	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -38,20 +37,20 @@ type tableConfig struct {
 	endpointSchema string
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		// Default to the explicit endpoint configuration schema. This may be over-written by a
-		// present `schema` property within `raw` for the resource.
-		Schema:         ep.Config.(*config).Schema,
-		endpointSchema: ep.Config.(*config).Schema,
-	}
-}
-
 func (c tableConfig) Validate() error {
 	if c.Table == "" {
 		return fmt.Errorf("expected table")
 	}
 	return nil
+}
+
+func (c tableConfig) WithDefaults(cfg config) tableConfig {
+	if c.Schema == "" {
+		c.Schema = cfg.Schema
+	}
+	c.endpointSchema = cfg.Schema
+
+	return c
 }
 
 func schemasEqual(s1 string, s2 string) bool {
@@ -65,47 +64,37 @@ func schemasEqual(s1 string, s2 string) bool {
 	return s1 == s2
 }
 
-func (c tableConfig) Path() sql.TablePath {
+func (c tableConfig) Parameters() (path []string, deltaUpdates bool, err error) {
+	var p []string
 	// This is here for backward compatibility purposes. There was a time when binding resources could not
 	// have schema configuration. If we change this for all bindings to be a two-part resource path, that will
 	// lead to a re-backfilling of the bindings which did not previously have a schema as part of their resource path
 	if c.Schema == "" || schemasEqual(c.Schema, c.endpointSchema) {
-		return []string{c.Table}
+		p = []string{c.Table}
+	} else {
+		p = []string{c.Schema, c.Table}
 	}
-	return []string{c.Schema, c.Table}
-}
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
+	return p, c.Delta, nil
+
 }
 
 // newSnowflakeDriver creates a new Driver for Snowflake.
-func newSnowflakeDriver() *sql.Driver {
-	return &sql.Driver{
+func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var parsed = new(config)
-			if err := pf.UnmarshalStrict(raw, parsed); err != nil {
-				return nil, fmt.Errorf("parsing Snowflake configuration: %w", err)
-			}
-
+		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
-				"host":     parsed.Host,
-				"database": parsed.Database,
-				"schema":   parsed.Schema,
+				"host":     cfg.Host,
+				"database": cfg.Database,
+				"schema":   cfg.Schema,
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			var featureFlags = common.ParseFeatureFlags(parsed.Advanced.FeatureFlags, featureFlagDefaults)
-			if parsed.Advanced.FeatureFlags != "" {
-				log.WithField("flags", featureFlags).Info("parsed feature flags")
-			}
 			snowpipeStreaming := featureFlags["snowpipe_streaming"]
 
-			dsn, err := parsed.toURI(tenant)
+			dsn, err := cfg.toURI(tenant)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
 			}
@@ -121,25 +110,33 @@ func newSnowflakeDriver() *sql.Driver {
 				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
 			}
 
-			var dialect = snowflakeDialect(parsed.Schema, timestampTypeMapping)
+			var dialect = snowflakeDialect(cfg.Schema, timestampTypeMapping)
 			var templates = renderTemplates(dialect)
 
 			serPolicy := boilerplate.SerPolicyStd
-			if parsed.Advanced.DisableFieldTruncation {
+			if cfg.Advanced.DisableFieldTruncation {
 				serPolicy = boilerplate.SerPolicyDisabled
 			}
 
-			return &sql.Endpoint{
-				Config:              parsed,
+			opts := boilerplate.MaterializeOptions{
+				ExtendedLogging: true,
+				AckSchedule: &boilerplate.AckScheduleOption{
+					Config: cfg.Schedule,
+					Jitter: []byte(cfg.Host + cfg.Warehouse),
+				},
+				DBTJobTrigger: &cfg.DBTJobTrigger,
+			}
+
+			return &sql.Endpoint[config]{
+				Config:              cfg,
 				Dialect:             dialect,
 				SerPolicy:           serPolicy,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(snowpipeStreaming),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				FeatureFlags:        featureFlags,
+				Options:             opts,
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -177,7 +174,7 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 
 type transactor struct {
 	cfg           *config
-	ep            *sql.Endpoint
+	ep            *sql.Endpoint[config]
 	db            *stdsql.DB
 	streamManager *streamManager
 	pipeClient    *PipeClient
@@ -209,26 +206,26 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
-func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
-		ep *sql.Endpoint,
+		ep *sql.Endpoint[config],
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
 		be *boilerplate.BindingEvents,
-	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-		var cfg = ep.Config.(*config)
+	) (m.Transactor, error) {
+		var cfg = ep.Config
 
 		dsn, err := cfg.toURI(ep.Tenant)
 		if err != nil {
-			return nil, nil, fmt.Errorf("building snowflake dsn: %w", err)
+			return nil, fmt.Errorf("building snowflake dsn: %w", err)
 		}
 
 		db, err := stdsql.Open("snowflake", dsn)
 		if err != nil {
-			return nil, nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
+			return nil, fmt.Errorf("newTransactor stdsql.Open: %w", err)
 		}
 
 		var sm *streamManager
@@ -236,17 +233,17 @@ func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.End
 		if cfg.Credentials.AuthType == JWT {
 			var accountName string
 			if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
-				return nil, nil, fmt.Errorf("fetching current account name: %w", err)
-			} else if sm, err = newStreamManager(cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin); err != nil {
-				return nil, nil, fmt.Errorf("newStreamManager: %w", err)
-			} else if pipeClient, err = NewPipeClient(cfg, accountName, ep.Tenant); err != nil {
-				return nil, nil, fmt.Errorf("NewPipeClient: %w", err)
+				return nil, fmt.Errorf("fetching current account name: %w", err)
+			} else if sm, err = newStreamManager(&cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin); err != nil {
+				return nil, fmt.Errorf("newStreamManager: %w", err)
+			} else if pipeClient, err = NewPipeClient(&cfg, accountName, ep.Tenant); err != nil {
+				return nil, fmt.Errorf("NewPipeClient: %w", err)
 			}
 
 		}
 
 		var d = &transactor{
-			cfg:           cfg,
+			cfg:           &cfg,
 			ep:            ep,
 			templates:     renderTemplates(ep.Dialect),
 			db:            db,
@@ -261,38 +258,29 @@ func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.End
 
 		// Establish connections.
 		if db, err := stdsql.Open("snowflake", dsn); err != nil {
-			return nil, nil, fmt.Errorf("load stdsql.Open: %w", err)
+			return nil, fmt.Errorf("load stdsql.Open: %w", err)
 		} else if d.load.conn, err = db.Conn(ctx); err != nil {
-			return nil, nil, fmt.Errorf("load db.Conn: %w", err)
+			return nil, fmt.Errorf("load db.Conn: %w", err)
 		}
 
 		if db, err := stdsql.Open("snowflake", dsn); err != nil {
-			return nil, nil, fmt.Errorf("store stdsql.Open: %w", err)
+			return nil, fmt.Errorf("store stdsql.Open: %w", err)
 		} else if d.store.conn, err = db.Conn(ctx); err != nil {
-			return nil, nil, fmt.Errorf("store db.Conn: %w", err)
+			return nil, fmt.Errorf("store db.Conn: %w", err)
 		}
 
 		// Create stage for file-based transfers.
 		if _, err = d.load.conn.ExecContext(ctx, createStageSQL); err != nil {
-			return nil, nil, fmt.Errorf("creating transfer stage: %w", err)
+			return nil, fmt.Errorf("creating transfer stage: %w", err)
 		}
 
 		for _, binding := range bindings {
 			if err = d.addBinding(ctx, binding, snowpipeStreaming); err != nil {
-				return nil, nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
+				return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 			}
 		}
 
-		opts := &boilerplate.MaterializeOptions{
-			ExtendedLogging: true,
-			AckSchedule: &boilerplate.AckScheduleOption{
-				Config: cfg.Schedule,
-				Jitter: []byte(cfg.Host + cfg.Warehouse),
-			},
-			DBTJobTrigger: &cfg.DBTJobTrigger,
-		}
-
-		return d, opts, nil
+		return d, nil
 	}
 }
 
