@@ -8,11 +8,13 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	pb "go.gazette.dev/core/broker/protocol"
 	"go.gazette.dev/core/consumer/protocol"
 )
@@ -67,6 +69,9 @@ type MaterializeCfg struct {
 	// the namespace.
 	NoCreateNamespaces bool
 
+	// Serialization policy to use for all bindings of this materialization.
+	SerPolicy *pf.SerPolicy
+
 	// MaterializeOptions is a proxy for the options from boilerplate.go.
 	// Eventually this should be consolidated.
 	MaterializeOptions MaterializeOptions
@@ -89,6 +94,7 @@ type MappedProjection[MT MappedTyper] struct {
 // resource configuration.
 type MappedBinding[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
 	pf.MaterializationSpec_Binding
+	Index        int
 	Config       RC
 	Keys, Values []MappedProjection[MT]
 	Document     *MappedProjection[MT]
@@ -147,7 +153,8 @@ func (mb *MappedBinding[EC, RC, MT]) convertTuple(in tuple.Tuple, offset int, ou
 // MaterializerBindingUpdate is a distilled representation of the typical kinds
 // of changes a destination system will care about in response to a new binding
 // or change to an existing binding.
-type MaterializerBindingUpdate[MT MappedTyper] struct {
+type MaterializerBindingUpdate[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
+	Binding             MappedBinding[EC, RC, MT]
 	NewProjections      []MappedProjection[MT]
 	NewlyNullableFields []ExistingField
 	FieldsToMigrate     []MigrateField[MT]
@@ -181,12 +188,16 @@ type MaterializerTransactor interface {
 type EndpointConfiger interface {
 	pb.Validator
 
-	// Default namespace is the namespace used for bindings if no explicit
+	// DefaultNamespace is the namespace used for bindings if no explicit
 	// namespace is configured for the binding. It may also contain metadata
 	// tables, and needs to exist even if no binding is actually created in it.
 	// This can return an empty string if namespaces do not apply to the
 	// materialization.
 	DefaultNamespace() string
+
+	// FeatureFlags returns the raw string of comma-separated feature flags, and
+	// the default feature flag values that should be applied.
+	FeatureFlags() (raw string, defaults map[string]bool)
 }
 
 // Resourcer represents a parsed resource config.
@@ -277,14 +288,18 @@ type Materializer[
 	// even if there are no pre-computed updates. This is to allow
 	// materializations to perform additional specific actions on binding
 	// changes that are not covered by the general cases.
-	UpdateResource(context.Context, []string, ExistingResource, MaterializerBindingUpdate[MT]) (string, ActionApplyFn, error)
+	UpdateResource(context.Context, []string, ExistingResource, MaterializerBindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
 
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
 	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *BindingEvents) (MaterializerTransactor, error)
+
+	// Close performs any cleanup actions that should be done when gracefully
+	// exiting.
+	Close(context.Context)
 }
 
-type NewMaterializerFn[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] func(context.Context, string, EC) (Materializer[EC, FC, RC, MT], error)
+type NewMaterializerFn[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] func(context.Context, string, EC, map[string]bool) (Materializer[EC, FC, RC, MT], error)
 
 // RunSpec produces a spec response from the typical inputs of documentation
 // url, endpoint config schema, and resource config schema.
@@ -315,10 +330,12 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		return nil, err
 	}
 
-	materializer, err := newMaterializer(ctx, req.Name.String(), cfg)
+	parsedFlags := parseFlags(cfg)
+	materializer, err := newMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
+	defer materializer.Close(ctx)
 
 	mCfg := materializer.Config()
 
@@ -349,7 +366,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		return nil, err
 	}
 
-	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, nil)
+	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
 	var out []*pm.Response_Validated_Binding
 	for idx, b := range req.Bindings {
 		path := paths[idx]
@@ -361,6 +378,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 				Constraints:  constraints,
 				DeltaUpdates: delta,
 				ResourcePath: path,
+				SerPolicy:    mCfg.SerPolicy,
 			})
 		}
 	}
@@ -383,10 +401,11 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg)
+	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parseFlags(endpointCfg))
 	if err != nil {
 		return nil, err
 	}
+	defer materializer.Close(ctx)
 
 	// TODO(whb): Some point soon we will have the last committed checkpoint
 	// available here in the Apply message, and should start calling Unmarshal
@@ -484,14 +503,15 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	for bindingIdx, commonUpdates := range common.updatedBindings {
-		update := MaterializerBindingUpdate[MT]{
-			NewlyNullableFields: commonUpdates.NewlyNullableFields,
-			NewlyDeltaUpdates:   commonUpdates.NewlyDeltaUpdates,
-		}
-
 		mb, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
 		if err != nil {
 			return nil, err
+		}
+
+		update := MaterializerBindingUpdate[EC, RC, MT]{
+			Binding:             *mb,
+			NewlyNullableFields: commonUpdates.NewlyNullableFields,
+			NewlyDeltaUpdates:   commonUpdates.NewlyDeltaUpdates,
 		}
 
 		ps := mb.SelectedProjections()
@@ -558,7 +578,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		return nil, nil, nil, err
 	}
 
-	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg)
+	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, parseFlags(epCfg))
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -632,6 +652,7 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 
 	mapped := &MappedBinding[EC, RC, MT]{
 		MaterializationSpec_Binding: binding,
+		Index:                       idx,
 		Config:                      resCfg.WithDefaults(endpointCfg),
 	}
 
@@ -741,6 +762,16 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 
 	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
 	return mt.String(), nil
+}
+
+func parseFlags(cfg EndpointConfiger) map[string]bool {
+	rawFlags, defaultFlags := cfg.FeatureFlags()
+	parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+	if rawFlags != "" {
+		log.WithField("flags", parsedFlags).Info("parsed feature flags")
+	}
+
+	return parsedFlags
 }
 
 func unmarshalStrict[T pb.Validator](raw []byte, into *T) error {
