@@ -25,6 +25,7 @@ from .api import (
 
 from .models import (
     Accounts,
+    ConnectorState,
     EndpointConfig,
     ListResult,
     STREAMS,
@@ -84,6 +85,54 @@ async def _fetch_platform_account_id(
         await http.request(log, f"{API}/account")
     )
     return platform_account.id
+
+
+def _reconcile_connector_state(
+    account_ids: list[str],
+    binding: CaptureBinding[ResourceConfig],
+    state: ResourceState,
+    initial_state: ResourceState,
+    task: Task,
+):
+    if (
+        isinstance(state.inc, dict)
+        and isinstance(state.backfill, dict)
+        and isinstance(initial_state.inc, dict)
+        and isinstance(initial_state.backfill, dict)
+    ):
+        should_checkpoint = False
+
+        for account_id in account_ids:
+            inc_state_exists = account_id in state.inc
+            backfill_state_exists = account_id in state.backfill
+
+            if not inc_state_exists and not backfill_state_exists:
+                task.log.info(
+                    f"Initializing new subtask state for account id {account_id}."
+                )
+                state.inc[account_id] = initial_state.inc[account_id]
+                state.backfill[account_id] = initial_state.backfill[account_id]
+                should_checkpoint = True
+            elif not inc_state_exists and backfill_state_exists:
+                # Note: This case is to fix a legacy issue where the incremental state was not initialized
+                # due to the connector restarting with the backfill for this subtask checkpointing some progress.
+                # This is a temporary condition to ensure that we backfill these offending subtasks and reconcile their state.
+                task.log.info(
+                    f"Backfilling subtask for account id {account_id} due to missing incremental state."
+                )
+                state.inc[account_id] = initial_state.inc[account_id]
+                state.backfill[account_id] = initial_state.backfill[account_id]
+                should_checkpoint = True
+
+        if should_checkpoint:
+            task.log.info(
+                f"Checkpointing state to ensure any new state is persisted for {binding.stateKey}."
+            )
+            task.checkpoint(
+                ConnectorState(
+                    bindingStateV1={binding.stateKey: state},
+                )
+            )
 
 
 async def all_resources(
@@ -265,19 +314,6 @@ def base_object(
             fetch_page_fns = {}
 
             for account_id in all_account_ids:
-                # If there's persisted state and the connector found a new account id that's
-                # not present in that state, dynamically add that account id and that account id's
-                # initial state to it.
-                if (
-                    isinstance(state.inc, dict)
-                    and isinstance(state.backfill, dict)
-                    and isinstance(initial_state.inc, dict)
-                    and isinstance(initial_state.backfill, dict)
-                ):
-                    if account_id not in state.inc and account_id not in state.backfill:
-                        state.inc[account_id] = initial_state.inc[account_id]
-                        state.backfill[account_id] = initial_state.backfill[account_id]
-
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental,
                     cls,
@@ -293,6 +329,10 @@ def base_object(
                     account_id,
                     http,
                 )
+
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
         open_binding(
             binding,
@@ -362,19 +402,6 @@ def child_object(
             fetch_page_fns = {}
 
             for account_id in all_account_ids:
-                # If there's persisted state and the connector found a new account id that's
-                # not present in that state, dynamically add that account id and that account id's
-                # initial state to it.
-                if (
-                    isinstance(state.inc, dict)
-                    and isinstance(state.backfill, dict)
-                    and isinstance(initial_state.inc, dict)
-                    and isinstance(initial_state.backfill, dict)
-                ):
-                    if account_id not in state.inc and account_id not in state.backfill:
-                        state.inc[account_id] = initial_state.inc[account_id]
-                        state.backfill[account_id] = initial_state.backfill[account_id]
-
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_substreams,
                     cls,
@@ -392,6 +419,10 @@ def child_object(
                     account_id,
                     http,
                 )
+
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
         open_binding(
             binding,
@@ -463,19 +494,6 @@ def split_child_object(
             fetch_page_fns = {}
 
             for account_id in all_account_ids:
-                # If there's persisted state and the connector found a new account id that's
-                # not present in that state, dynamically add that account id and that account id's
-                # initial state to it.
-                if (
-                    isinstance(state.inc, dict)
-                    and isinstance(state.backfill, dict)
-                    and isinstance(initial_state.inc, dict)
-                    and isinstance(initial_state.backfill, dict)
-                ):
-                    if account_id not in state.inc and account_id not in state.backfill:
-                        state.inc[account_id] = initial_state.inc[account_id]
-                        state.backfill[account_id] = initial_state.backfill[account_id]
-
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental,
                     child_cls,
@@ -492,6 +510,10 @@ def split_child_object(
                     account_id,
                     http,
                 )
+
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
         open_binding(
             binding,
@@ -563,19 +585,6 @@ def usage_records(
             fetch_page_fns = {}
 
             for account_id in all_account_ids:
-                # If there's persisted state and the connector found a new account id that's
-                # not present in that state, dynamically add that account id and that account id's
-                # initial state to it.
-                if (
-                    isinstance(state.inc, dict)
-                    and isinstance(state.backfill, dict)
-                    and isinstance(initial_state.inc, dict)
-                    and isinstance(initial_state.backfill, dict)
-                ):
-                    if account_id not in state.inc and account_id not in state.backfill:
-                        state.inc[account_id] = initial_state.inc[account_id]
-                        state.backfill[account_id] = initial_state.backfill[account_id]
-
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_usage_records,
                     cls,
@@ -593,6 +602,10 @@ def usage_records(
                     account_id,
                     http,
                 )
+
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
         open_binding(
             binding,
@@ -662,19 +675,6 @@ def no_events_object(
             fetch_page_fns = {}
 
             for account_id in all_account_ids:
-                # If there's persisted state and the connector found a new account id that's
-                # not present in that state, dynamically add that account id and that account id's
-                # initial state to it.
-                if (
-                    isinstance(state.inc, dict)
-                    and isinstance(state.backfill, dict)
-                    and isinstance(initial_state.inc, dict)
-                    and isinstance(initial_state.backfill, dict)
-                ):
-                    if account_id not in state.inc and account_id not in state.backfill:
-                        state.inc[account_id] = initial_state.inc[account_id]
-                        state.backfill[account_id] = initial_state.backfill[account_id]
-
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_no_events,
                     cls,
@@ -690,6 +690,10 @@ def no_events_object(
                     account_id,
                     http,
                 )
+
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
         open_binding(
             binding,
