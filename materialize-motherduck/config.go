@@ -12,7 +12,6 @@ import (
 	"github.com/estuary/connectors/go/blob"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/invopop/jsonschema"
 	"google.golang.org/api/option"
 )
@@ -34,7 +33,7 @@ type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"token", c.Token},
 		{"database", c.Database},
@@ -105,6 +104,14 @@ func (c *config) Validate() error {
 	}
 
 	return nil
+}
+
+func (c config) DefaultNamespace() string {
+	return c.Schema
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 type stagingBucketType string
@@ -225,16 +232,6 @@ type tableConfig struct {
 	database string
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		// Default to the endpoint schema. This will be over-written by a present `schema` property
-		// within `raw`.
-		Schema:   ep.Config.(*config).Schema,
-		database: ep.Config.(*config).Database,
-	}
-}
-
-// Validate the resource configuration.
 func (r tableConfig) Validate() error {
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
@@ -243,10 +240,15 @@ func (r tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.database, c.Schema, c.Table}
+func (r tableConfig) WithDefaults(cfg config) tableConfig {
+	if r.Schema == "" {
+		r.Schema = cfg.Schema
+	}
+	r.database = cfg.Database
+
+	return r
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
+func (r tableConfig) Parameters() ([]string, bool, error) {
+	return []string{r.database, r.Schema, r.Table}, r.Delta, nil
 }

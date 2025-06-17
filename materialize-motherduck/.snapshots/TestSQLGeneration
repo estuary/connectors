@@ -1,6 +1,6 @@
---- Begin ""."a-schema".key_value createTargetTable ---
+--- Begin db."a-schema".key_value createTargetTable ---
 
-CREATE TABLE IF NOT EXISTS ""."a-schema".key_value (
+CREATE TABLE IF NOT EXISTS db."a-schema".key_value (
 	key1 BIGINT NOT NULL,
 	key2 BOOLEAN NOT NULL,
 	"key!binary" VARCHAR NOT NULL,
@@ -22,16 +22,16 @@ CREATE TABLE IF NOT EXISTS ""."a-schema".key_value (
 	"stringNumber" DOUBLE,
 	flow_document JSON NOT NULL
 );
---- End ""."a-schema".key_value createTargetTable ---
+--- End db."a-schema".key_value createTargetTable ---
 
---- Begin ""."a-schema".delta_updates createTargetTable ---
+--- Begin db."a-schema".delta_updates createTargetTable ---
 
-CREATE TABLE IF NOT EXISTS ""."a-schema".delta_updates (
+CREATE TABLE IF NOT EXISTS db."a-schema".delta_updates (
 	"theKey" VARCHAR NOT NULL,
 	"aValue" BIGINT,
 	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
---- End ""."a-schema".delta_updates createTargetTable ---
+--- End db."a-schema".delta_updates createTargetTable ---
 
 --- Begin Fence Update ---
 UPDATE path."to".checkpoints
@@ -42,9 +42,9 @@ UPDATE path."to".checkpoints
 	AND   fence     = 123;
 --- End Fence Update ---
 
---- Begin ""."a-schema".key_value loadQuery ---
+--- Begin db."a-schema".key_value loadQuery ---
 SELECT 0 AS binding, l.flow_document AS doc
-FROM ""."a-schema".key_value AS l
+FROM db."a-schema".key_value AS l
 JOIN read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
@@ -58,10 +58,10 @@ JOIN read_json(
 	 ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
 	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
---- End ""."a-schema".key_value loadQuery ---
+--- End db."a-schema".key_value loadQuery ---
 
---- Begin ""."a-schema".key_value storeDeleteQuery ---
-DELETE FROM ""."a-schema".key_value AS l
+--- Begin db."a-schema".key_value storeDeleteQuery ---
+DELETE FROM db."a-schema".key_value AS l
 USING read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
@@ -92,10 +92,10 @@ USING read_json(
 	 WHERE l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
 	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo=';
---- End ""."a-schema".key_value storeDeleteQuery ---
+--- End db."a-schema".key_value storeDeleteQuery ---
 
---- Begin ""."a-schema".key_value storeQuery ---
-INSERT INTO ""."a-schema".key_value BY NAME
+--- Begin db."a-schema".key_value storeQuery ---
+INSERT INTO db."a-schema".key_value BY NAME
 SELECT * FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
@@ -123,10 +123,10 @@ SELECT * FROM read_json(
 		flow_document: 'JSON NOT NULL'
 	}
 ) WHERE flow_document != '"delete"';
---- End ""."a-schema".key_value storeQuery ---
+--- End db."a-schema".key_value storeQuery ---
 
---- Begin ""."a-schema".delta_updates storeQuery ---
-INSERT INTO ""."a-schema".delta_updates BY NAME
+--- Begin db."a-schema".delta_updates storeQuery ---
+INSERT INTO db."a-schema".delta_updates BY NAME
 SELECT * FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
@@ -137,6 +137,6 @@ SELECT * FROM read_json(
 		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL'
 	}
 );
---- End ""."a-schema".delta_updates storeQuery ---
+--- End db."a-schema".delta_updates storeQuery ---
 
 
