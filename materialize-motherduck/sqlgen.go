@@ -5,7 +5,7 @@ import (
 	"slices"
 	"strings"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 )
 
 var duckDialect = func() sql.Dialect {

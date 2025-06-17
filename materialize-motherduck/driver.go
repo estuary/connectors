@@ -9,11 +9,10 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/blob"
-	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
@@ -25,38 +24,31 @@ import (
 	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
-func newDuckDriver() *sql.Driver {
-	return &sql.Driver{
+func newDuckDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-motherduck",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("could not parse endpoint configuration: %w", err)
-			}
-
+		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"database": cfg.Database,
 			}).Info("opening database")
 
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-			if cfg.Advanced.FeatureFlags != "" {
-				log.WithField("flags", featureFlags).Info("parsed feature flags")
-			}
-
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             duckDialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.Database, cfg.Schema}),
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					ExtendedLogging: true,
+					AckSchedule: &boilerplate.AckScheduleOption{
+						Config: cfg.Schedule,
+						Jitter: []byte(cfg.Token),
+					},
+				},
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -64,7 +56,7 @@ func newDuckDriver() *sql.Driver {
 }
 
 type transactor struct {
-	cfg *config
+	cfg config
 
 	fence      sql.Fence
 	conn       *stdsql.Conn
@@ -79,28 +71,28 @@ type transactor struct {
 
 func newTransactor(
 	ctx context.Context,
-	ep *sql.Endpoint,
+	ep *sql.Endpoint[config],
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
 	be *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-	cfg := ep.Config.(*config)
+) (_ m.Transactor, err error) {
+	var cfg = ep.Config
 
 	db, err := cfg.db(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	conn, err := db.Conn(ctx)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating connection: %w", err)
+		return nil, fmt.Errorf("creating connection: %w", err)
 	}
 
 	bucket, bucketPath, err := cfg.toBucketAndPath(ctx)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	t := &transactor{
@@ -124,15 +116,7 @@ func newTransactor(
 		})
 	}
 
-	opts := &boilerplate.MaterializeOptions{
-		ExtendedLogging: true,
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: cfg.Schedule,
-			Jitter: []byte(cfg.Token),
-		},
-	}
-
-	return t, opts, nil
+	return t, nil
 }
 
 type binding struct {

@@ -10,7 +10,7 @@ import (
 	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
 )
@@ -18,28 +18,24 @@ import (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	db *stdsql.DB
+	ep *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
-
-	db, err := cfg.db(ctx)
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	db, err := ep.Config.db(ctx)
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
-		db:  db,
-		cfg: cfg,
-		ep:  ep,
+		db: db,
+		ep: ep,
 	}, nil
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -99,7 +95,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	// StdListSchemasFn won't work if there are schemas with the same name in other databases.
 	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
 		"select schema_name from information_schema.schemata where catalog_name = %s",
-		duckDialect.Literal(c.cfg.Database),
+		duckDialect.Literal(c.ep.Config.Database),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("querying schemata: %w", err)
@@ -119,14 +115,12 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	return sql.StdCreateSchema(ctx, c.db, duckDialect, schemaName)
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	cfg := conf.(*config)
 
 	db, err := cfg.db(ctx)
 	if err != nil {
