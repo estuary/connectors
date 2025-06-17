@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -312,7 +313,7 @@ func (src *Source) Main() {
 
 type reader struct {
 	*connector
-
+	mu       sync.Mutex
 	pathRe   *regexp.Regexp
 	prefix   string
 	stateKey boilerplate.StateKey
@@ -452,6 +453,11 @@ func (r *reader) makeParseConfig(obj ObjectInfo) *parser.Config {
 }
 
 func (r *reader) emit(lines []json.RawMessage) error {
+	// Avoid concurrently writing documents and checkpoints
+	// from separate bindings to the stream.
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	for _, line := range lines {
 		if err := r.stream.Documents(r.binding, line); err != nil {
 			return err
