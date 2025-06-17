@@ -452,12 +452,6 @@ func (r *reader) makeParseConfig(obj ObjectInfo) *parser.Config {
 }
 
 func (r *reader) emit(lines []json.RawMessage) error {
-	for _, line := range lines {
-		if err := r.stream.Documents(r.binding, line); err != nil {
-			return err
-		}
-	}
-
 	var statePatch = CaptureState{
 		States: map[boilerplate.StateKey]State{
 			r.stateKey: r.state,
@@ -466,7 +460,7 @@ func (r *reader) emit(lines []json.RawMessage) error {
 
 	if encodedCheckpoint, err := json.Marshal(statePatch); err != nil {
 		return err
-	} else if err := r.stream.Checkpoint(encodedCheckpoint, true); err != nil {
+	} else if err := r.stream.DocumentsAndCheckpoint(encodedCheckpoint, true, r.binding, lines...); err != nil {
 		return err
 	}
 
