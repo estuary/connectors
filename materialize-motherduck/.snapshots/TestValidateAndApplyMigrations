@@ -45,8 +45,8 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), int64ToNumber (HUGEINT), intToNumber (BIGINT), intWidenedToJson (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), numericString (HUGEINT), optional (VARCHAR), requiredNumeric (HUGEINT), scalarValue (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (TIME), second_root (VARCHAR)
-1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, {}, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 1970-01-01T01:01:01Z, {}
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), int64ToNumber (HUGEINT), intToNumber (BIGINT), intWidenedToJson (BIGINT), multiple (VARCHAR), nonScalarValue (VARCHAR), numericString (HUGEINT), optional (VARCHAR), requiredNumeric (HUGEINT), scalarValue (VARCHAR), second_root (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (TIME), flow_document (VARCHAR)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T06:01:01.111111Z, 2024-09-13T05:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, map[], hello, 0001-01-01T01:01:01Z, map[]
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -95,6 +95,6 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), datetimeValue (TIMESTAMPTZ), flow_document (VARCHAR), flow_published_at (TIMESTAMPTZ), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), boolWidenedToJson (VARCHAR), dateValue (VARCHAR), int64 (HUGEINT), int64ToNumber (DOUBLE), intToNumber (DOUBLE), intWidenedToJson (VARCHAR), numericString (VARCHAR), requiredNumeric (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (VARCHAR)
-1, false, 2024-01-01T01:01:01.111111Z, {}, 2024-09-13T01:01:01Z, <nil>, <nil>, <nil>, test, {}, true, 2024-01-01, 1, 1e+19, 9.223372036854776e+18, 999, 123, 456, "hello", 01:01:01
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), datetimeValue (TIMESTAMPTZ), flow_published_at (TIMESTAMPTZ), multiple (VARCHAR), nonScalarValue (VARCHAR), optional (VARCHAR), scalarValue (VARCHAR), second_root (VARCHAR), flow_document (VARCHAR), boolWidenedToJson (VARCHAR), dateValue (VARCHAR), int64 (HUGEINT), int64ToNumber (DOUBLE), intToNumber (DOUBLE), intWidenedToJson (VARCHAR), numericString (VARCHAR), requiredNumeric (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (VARCHAR)
+1, false, 2024-01-01T06:01:01.111111Z, 2024-09-13T05:01:01Z, <nil>, <nil>, <nil>, test, map[], map[], true, 2024-01-01, 1, 1e+19, 9.223372036854776e+18, 999, 123, 456, hello, 01:01:01
 
