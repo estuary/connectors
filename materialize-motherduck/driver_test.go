@@ -10,7 +10,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 
@@ -23,7 +23,12 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	out := config{StagingBucket: stagingBucketConfig{StagingBucketType: stagingBucketTypeS3}}
+	out := config{
+		StagingBucket: stagingBucketConfig{
+			StagingBucketType: stagingBucketTypeS3,
+		},
+	}
+	out.Advanced.FeatureFlags = "allow_existing_tables_for_new_bindings"
 
 	for _, prop := range []struct {
 		key  string
@@ -166,7 +171,7 @@ func TestFencingCases(t *testing.T) {
 
 	var cfg = mustGetCfg(t)
 
-	c, err := newClient(ctx, &sql.Endpoint{Config: &cfg})
+	c, err := newClient(ctx, &sql.Endpoint[config]{Config: cfg})
 	require.NoError(t, err)
 	defer c.Close()
 
