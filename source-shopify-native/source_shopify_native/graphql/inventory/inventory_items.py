@@ -6,6 +6,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class InventoryItems(ShopifyGraphQLResource):
+    NAME = "inventory_items"
     QUERY = """
     id
     legacyResourceId

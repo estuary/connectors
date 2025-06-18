@@ -7,6 +7,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class OrderTransactions(ShopifyGraphQLResource):
+    NAME = "order_transactions"
     QUERY = """
     transactions {
         id

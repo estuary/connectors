@@ -8,6 +8,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class Orders(ShopifyGraphQLResource):
+    NAME = "orders"
     QUERY = """
     app {
         id

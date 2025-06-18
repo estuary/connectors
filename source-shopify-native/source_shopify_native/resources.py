@@ -17,8 +17,11 @@ import source_shopify_native.graphql as gql
 
 from .models import (
     OAUTH2_SPEC,
+    AccessToken,
     EndpointConfig,
     ShopifyGraphQLResource,
+    ShopDetails,
+    PlanName,
 )
 from .api import (
     fetch_incremental,
@@ -26,31 +29,68 @@ from .api import (
 
 AUTHORIZATION_HEADER = "X-Shopify-Access-Token"
 
-INCREMENTAL_RESOURCES: list[tuple[str, type[ShopifyGraphQLResource]]] = [
-    ("abandoned_checkouts", gql.AbandonedCheckouts),
-    ("customers", gql.Customers),
-    ("customer_metafields", gql.CustomerMetafields),
-    ("products", gql.Products),
-    ("product_media", gql.ProductMedia),
-    ("product_metafields", gql.ProductMetafields),
-    ("product_variants", gql.ProductVariants),
-    ("fulfillment_orders", gql.FulfillmentOrders),
-    ("fulfillments", gql.Fulfillments),
-    ("orders", gql.Orders),
-    ("order_agreements", gql.OrderAgreements),
-    ("order_metafields", gql.OrderMetafields),
-    ("order_transactions", gql.OrderTransactions),
-    ("order_refunds", gql.OrderRefunds),
-    ("order_risks", gql.OrderRisks),
-    ("inventory_items", gql.InventoryItems),
-    ("inventory_levels", gql.InventoryLevels),
-    ("custom_collections", gql.CustomCollections),
-    ("smart_collections", gql.SmartCollections),
-    ("custom_collection_metafields", gql.CustomCollectionMetafields),
-    ("smart_collection_metafields", gql.SmartCollectionMetafields),
-    ("locations", gql.Locations),
-    ("location_metafields", gql.LocationMetafields),
+INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
+    gql.AbandonedCheckouts,
+    gql.Customers,
+    gql.CustomerMetafields,
+    gql.Products,
+    gql.ProductMedia,
+    gql.ProductMetafields,
+    gql.ProductVariants,
+    gql.FulfillmentOrders,
+    gql.Fulfillments,
+    gql.Orders,
+    gql.OrderAgreements,
+    gql.OrderMetafields,
+    gql.OrderTransactions,
+    gql.OrderRefunds,
+    gql.OrderRisks,
+    gql.InventoryItems,
+    gql.InventoryLevels,
+    gql.CustomCollections,
+    gql.SmartCollections,
+    gql.CustomCollectionMetafields,
+    gql.SmartCollectionMetafields,
+    gql.Locations,
+    gql.LocationMetafields,
 ]
+
+
+PII_RESOURCES: list[type[ShopifyGraphQLResource]] = [
+    gql.Customers,
+    gql.Orders,
+    gql.FulfillmentOrders,
+]
+
+
+async def _can_access_pii(
+    http: HTTPMixin,
+    url: str,
+    log: Logger,
+) -> bool:
+    response = ShopDetails.model_validate_json(
+        await http.request(
+            log, url, method="POST", json={"query": ShopDetails.query()}
+        )
+    )
+
+    plan = response.data.shop.plan
+
+    if plan.partnerDevelopment or plan.shopifyPlus:
+        return True
+
+    match plan.displayName:
+        case PlanName.BASIC | PlanName.STARTER:
+            return False
+        case _:
+            if plan.displayName in PlanName:
+                return True
+            else:
+                log.warning(
+                    f"Shopify plan '{plan.displayName}' is not recognized. "
+                    f"Assuming access to PII is supported on the {plan.displayName} plan."
+                )
+                return True
 
 
 def _incremental_resources(
@@ -82,17 +122,17 @@ def _incremental_resources(
 
     return [
         Resource(
-            name=name,
+            name=model.NAME,
             key=["/id"],
             model=ShopifyGraphQLResource,
             open=functools.partial(open, model),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=config.start_date),
             ),
-            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
+            initial_config=ResourceConfig(name=model.NAME, interval=timedelta(minutes=5)),
             schema_inference=True,
         )
-        for name, model in INCREMENTAL_RESOURCES
+        for model in INCREMENTAL_RESOURCES
     ]
 
 
@@ -134,6 +174,19 @@ async def all_resources(
     if should_cancel_ongoing_job:
         await bulk_job_manager.cancel_current()
 
-    return [
+
+    resources = [
         *_incremental_resources(http, config, bulk_job_manager),
     ]
+
+    # If the user is authenticating with an access token from their custom Shopify app,
+    # they may not be able to access certain PII data.
+    # https://help.shopify.com/en/manual/apps/app-types/custom-apps
+    # https://community.shopify.com/c/shopify-discussions/no-more-customer-pii-in-custom-app-integrations-for-shopify/td-p/2496209
+    if isinstance(config.credentials, AccessToken) and not await _can_access_pii(http, bulk_job_manager.url, log):
+        for model in PII_RESOURCES:
+            resources = [
+                r for r in resources if r.name != model.NAME
+            ]
+
+    return resources

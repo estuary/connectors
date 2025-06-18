@@ -7,6 +7,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class OrderRefunds(ShopifyGraphQLResource):
+    NAME = "order_refunds"
     QUERY = """
     displayFinancialStatus
     displayFulfillmentStatus
