@@ -196,9 +196,53 @@ class BulkJobSubmitResponse(BaseModel, extra="allow"):
     data: Data
 
 
+# Names of Shopify plan types. Some plan types do not have access
+# to certain resources (ex: BASIC and STARTER plans cannot access PII, like customer data).
+class PlanName(StrEnum):
+    STARTER = "Starter"
+    BASIC = "Basic"
+    SHOPIFY = "Shopify"
+    ADVANCED = "Advanced"
+    PLUS = "Plus"
+    SHOPIFY_PLUS = "Shopify Plus"
+
+
+class ShopDetails(BaseModel, extra="allow"):
+    class Data(BaseModel, extra="forbid"):
+        class Shop(BaseModel, extra="forbid"):
+            class Plan(BaseModel, extra="forbid"):
+                # The displayName field will be deprecated in the future,
+                # but its replacement publicDisplayName is not available
+                # on the current API version 2025-04.
+                displayName: str
+                partnerDevelopment: bool
+                shopifyPlus: bool
+
+            plan: Plan
+
+        shop: Shop
+
+    data: Data
+
+    @staticmethod
+    def query() -> str:
+        return """
+        {
+            shop {
+                plan {
+                    displayName
+                    partnerDevelopment
+                    shopifyPlus
+                }
+            }
+        }
+        """
+
+
 class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     QUERY: ClassVar[str] = ""
     FRAGMENTS: ClassVar[list[str]] = []
+    NAME: ClassVar[str] = ""  # Add NAME class variable for resource name
 
     id: str
 

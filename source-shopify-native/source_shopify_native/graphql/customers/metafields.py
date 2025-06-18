@@ -3,6 +3,7 @@ from ..metafields import MetafieldsResource
 
 
 class CustomerMetafields(MetafieldsResource):
+    NAME = "customer_metafields"
     PARENT_ID_KEY = "gid://shopify/Customer/"
 
     @staticmethod

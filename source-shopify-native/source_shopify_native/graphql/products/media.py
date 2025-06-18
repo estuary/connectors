@@ -7,6 +7,7 @@ from source_shopify_native.models import ShopifyGraphQLResource
 
 
 class ProductMedia(ShopifyGraphQLResource):
+    NAME = "product_media"
     QUERY = """
     media(query:"media_type:IMAGE") {
         edges {

@@ -6,6 +6,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class Locations(ShopifyGraphQLResource):
+    NAME = "locations"
     QUERY = """
     id
     name

@@ -6,6 +6,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class OrderRisks(ShopifyGraphQLResource):
+    NAME = "order_risks"
     QUERY = """
     risk {
         recommendation

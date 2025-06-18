@@ -7,6 +7,7 @@ from source_shopify_native.models import ShopifyGraphQLResource
 
 
 class Products(ShopifyGraphQLResource):
+    NAME = "products"
     QUERY = """
     title
     bodyHtml
