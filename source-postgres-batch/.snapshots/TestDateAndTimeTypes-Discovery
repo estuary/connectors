@@ -81,7 +81,7 @@ Binding 0:
           "time_col": {
             "description": "(source type: time)",
             "type": [
-              "integer",
+              "string",
               "null"
             ]
           },
