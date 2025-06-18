@@ -3,6 +3,7 @@ from ..metafields import MetafieldsResource
 
 
 class CustomCollectionMetafields(MetafieldsResource):
+    NAME = "custom_collection_metafields"
     PARENT_ID_KEY = "gid://shopify/Collection/"
 
     @staticmethod
@@ -18,6 +19,7 @@ class CustomCollectionMetafields(MetafieldsResource):
 
 
 class SmartCollectionMetafields(MetafieldsResource):
+    NAME = "smart_collection_metafields"
     PARENT_ID_KEY = "gid://shopify/Collection/"
 
     @staticmethod

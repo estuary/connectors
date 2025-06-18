@@ -128,6 +128,7 @@ class _Collections(ShopifyGraphQLResource):
 
 
 class CustomCollections(_Collections):
+    NAME = "custom_collections"
     COLLECTION_TYPE = "custom"
 
     @staticmethod
@@ -142,6 +143,7 @@ class CustomCollections(_Collections):
 
 
 class SmartCollections(_Collections):
+    NAME = "smart_collections"
     COLLECTION_TYPE = "smart"
 
     @staticmethod

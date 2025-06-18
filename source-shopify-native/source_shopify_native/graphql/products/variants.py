@@ -7,6 +7,7 @@ from source_shopify_native.models import ShopifyGraphQLResource
 
 
 class ProductVariants(ShopifyGraphQLResource):
+    NAME = "product_variants"
     QUERY = """
     variants {
         edges {

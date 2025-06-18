@@ -6,6 +6,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class Customers(ShopifyGraphQLResource):
+    NAME = "customers"
     QUERY = """
     displayName
     email

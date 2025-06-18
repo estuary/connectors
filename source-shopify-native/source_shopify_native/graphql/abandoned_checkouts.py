@@ -8,6 +8,7 @@ from ..models import ShopifyGraphQLResource
 
 
 class AbandonedCheckouts(ShopifyGraphQLResource):
+    NAME = "abandoned_checkouts"
     QUERY = """
     id
     abandonedCheckoutUrl

@@ -8,6 +8,7 @@ from ...models import ShopifyGraphQLResource
 
 
 class OrderAgreements(ShopifyGraphQLResource):
+    NAME = "order_agreements"
     QUERY = """
     agreements {
         edges {
