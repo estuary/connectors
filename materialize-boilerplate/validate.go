@@ -95,7 +95,7 @@ func (v Validator) ValidateBinding(
 		hasDefault := p.Inference.DefaultJson != nil
 
 		if !mustExist && !hasDefault {
-			return nil, fmt.Errorf("cannot materialize collection '%s' with nullable key field '%s' unless it has a default value annotation", boundCollection.Name.String(), p.Field)
+			return nil, fmt.Errorf("materialized collection '%s' key field '%s' must be required and non-nullable, or have a default value annotation", boundCollection.Name.String(), p.Field)
 		}
 	}
 
