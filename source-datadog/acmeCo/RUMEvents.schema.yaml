@@ -1,0 +1,135 @@
+---
+$schema: "https://json-schema.org/draft/2020-12/schema"
+type: object
+properties:
+  id:
+    type: string
+    description: "Unique identifier of the RUM event"
+  type:
+    type: string
+    description: "Type of the RUM event"
+  timestamp:
+    type: string
+    format: date-time
+    description: "Timestamp when the event occurred"
+  attributes:
+    type: object
+    description: "Event-specific attributes"
+    properties:
+      timestamp:
+        type: string
+        format: date-time
+        description: "Timestamp of the event"
+      session:
+        type: object
+        description: "Session information"
+        properties:
+          id:
+            type: string
+            description: "Session ID"
+          type:
+            type: string
+            description: "Session type"
+      view:
+        type: object
+        description: "View information"
+        properties:
+          id:
+            type: string
+            description: "View ID"
+          name:
+            type: string
+            description: "View name"
+          url:
+            type: string
+            description: "View URL"
+      action:
+        type: object
+        description: "Action information"
+        properties:
+          id:
+            type: string
+            description: "Action ID"
+          type:
+            type: string
+            description: "Action type"
+          target:
+            type: object
+            description: "Action target"
+            properties:
+              name:
+                type: string
+                description: "Target name"
+      resource:
+        type: object
+        description: "Resource information"
+        properties:
+          id:
+            type: string
+            description: "Resource ID"
+          type:
+            type: string
+            description: "Resource type"
+          url:
+            type: string
+            description: "Resource URL"
+      error:
+        type: object
+        description: "Error information"
+        properties:
+          id:
+            type: string
+            description: "Error ID"
+          message:
+            type: string
+            description: "Error message"
+          source:
+            type: string
+            description: "Error source"
+      long_task:
+        type: object
+        description: "Long task information"
+        properties:
+          id:
+            type: string
+            description: "Long task ID"
+          duration:
+            type: number
+            description: "Task duration in milliseconds"
+      custom:
+        type: object
+        description: "Custom attributes"
+        additionalProperties: true
+    additionalProperties: true
+  relationships:
+    type: [object, 'null']
+    description: "Related resources"
+    properties:
+      session:
+        type: object
+        description: "Related session"
+        properties:
+          data:
+            type: object
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+      view:
+        type: object
+        description: "Related view"
+        properties:
+          data:
+            type: object
+            properties:
+              id:
+                type: string
+              type:
+                type: string
+    additionalProperties: true
+required:
+  - id
+  - type
+  - timestamp
+  - attributes 
