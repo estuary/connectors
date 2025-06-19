@@ -10,16 +10,17 @@ require (
 	cloud.google.com/go/storage v1.51.0
 	firebase.google.com/go v3.13.0+incompatible
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.18.0
-	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.9.0
+	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.10.1
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.6.1
 	github.com/alpacahq/alpaca-trade-api-go/v2 v2.8.0
 	github.com/apache/arrow-go/v18 v18.2.0
 	github.com/apache/iceberg-go v0.2.0
 	github.com/aws/aws-sdk-go v1.55.6
-	github.com/aws/aws-sdk-go-v2 v1.36.3
+	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.10
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.63
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.18.8
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.5.13
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.67
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.42.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.25.1
@@ -27,7 +28,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.33.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.2
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.58.0
-	github.com/aws/smithy-go v1.22.3
+	github.com/aws/aws-sdk-go-v2/service/sts v1.34.0
+	github.com/aws/smithy-go v1.22.4
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/databricks/databricks-sdk-go v0.41.0
@@ -72,11 +74,11 @@ require (
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
 	go.gazette.dev/core v0.100.1-0.20250509034818-0bfec5851754
 	go.mongodb.org/mongo-driver v1.16.1
-	golang.org/x/crypto v0.37.0
+	golang.org/x/crypto v0.38.0
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 	golang.org/x/oauth2 v0.28.0
-	golang.org/x/sync v0.13.0
-	golang.org/x/text v0.24.0
+	golang.org/x/sync v0.14.0
+	golang.org/x/text v0.25.0
 	golang.org/x/time v0.11.0
 	google.golang.org/api v0.226.0
 	google.golang.org/genproto v0.0.0-20250313205543-e70fdf4c4cb4
@@ -129,18 +131,17 @@ require (
 	github.com/astaxie/beego v1.12.3 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.6.10 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.16.30 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.34 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.34 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.3.36 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.6.36 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/v4a v1.3.34 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.12.4 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.7.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.10.15 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.15 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.12.17 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.29.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.33.17 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
@@ -270,9 +271,9 @@ require (
 	go.uber.org/zap v1.27.0 // indirect
 	gocloud.dev v0.40.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
-	golang.org/x/net v0.39.0 // indirect
-	golang.org/x/sys v0.32.0 // indirect
-	golang.org/x/term v0.31.0 // indirect
+	golang.org/x/net v0.40.0 // indirect
+	golang.org/x/sys v0.33.0 // indirect
+	golang.org/x/term v0.32.0 // indirect
 	golang.org/x/tools v0.31.0 // indirect
 	golang.org/x/xerrors v0.0.0-20240903120638-7835f813f4da // indirect
 	google.golang.org/appengine v1.6.8 // indirect
