@@ -13,11 +13,13 @@ from .models import (
     ResourceState,
     User,
     Conversation,
+    Team,
     OAUTH2_SPEC,
 )
 from .api import (
     snapshot_users,
     fetch_conversations,
+    fetch_teams,
     COMMON_API,
 )
 
@@ -90,6 +92,38 @@ def users(
             schema_inference=True,
         )
     
+def teams(log: Logger, http: HTTPMixin, config: EndpointConfig) -> common.Resource:
+    def open(
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_teams,
+                http,
+                config.genesys_cloud_domain
+            ),
+        )
+    return common.Resource(
+        name='teams',
+        key=["/id"],
+        model=Team,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=config.start_date),
+        ),
+        initial_config=ResourceConfig(
+            name='teams', interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
 
 def conversations(
         log: Logger, http: HTTPMixin, config: EndpointConfig
@@ -139,4 +173,5 @@ async def all_resources(
     return [
         conversations(log, http, config),
         users(log, http, config),
+        teams(log, http, config),
     ]

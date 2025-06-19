@@ -10,6 +10,8 @@ from .models import (
     User,
     UserResponse,
     Conversation,
+    Team,
+    TeamResponse,
     CreateJobResponse,
     CheckJobStatusResponse,
     JobResultsResponse,
@@ -52,6 +54,28 @@ async def snapshot_users(
 
         params["pageNumber"] += 1
         lastPageNumber = response.pageCount
+
+async def fetch_teams(
+        http: HTTPSession,
+        domain: str,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[Team | LogCursor, None]:
+    url = f"{COMMON_API}.{domain}/api/v2/teams"
+
+    params = {
+        "after": log_cursor.isoformat(),
+    }
+
+    response = TeamResponse.model_validate_json(
+        await http.request(log, url, method="GET", json=params)
+    )
+    for team in response.entities:
+        most_recent_team_dt = team.dateModified
+        yield team
+    if most_recent_team_dt > log_cursor:
+        yield most_recent_team_dt
+    
 
 
 async def fetch_conversations(

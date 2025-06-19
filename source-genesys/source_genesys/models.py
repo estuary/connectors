@@ -81,6 +81,17 @@ class UserResponse(BaseModel, extra="forbid"):
     firstUri: str
     selfUri: str
 
+class Team(BaseDocument, extra="allow"):
+    id: str
+    name: str
+    dateModified: str
+
+class TeamResponse(BaseModel, extra="forbid"):
+    entities: list[Team]
+    nextUri: str
+    selfUri: str
+    previousUri: str
+
 
 class Conversation(BaseDocument, extra="allow"):
     conversationId: str
