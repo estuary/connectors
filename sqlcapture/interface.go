@@ -2,11 +2,11 @@ package sqlcapture
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/invopop/jsonschema"
+	"github.com/segmentio/encoding/json"
 )
 
 // ChangeOp encodes a change operation type.
@@ -66,14 +66,77 @@ type SourceMetadata interface {
 	Common() SourceCommon
 }
 
-// ChangeEvent represents an Insert/Update/Delete operation on a specific
-// row in the database.
-type ChangeEvent struct {
+// ChangeEvent represents an Insert/Update/Delete operation on a specific row in the database.
+type ChangeEvent interface {
+	IsDatabaseEvent() // Tag method
+
+	String() string                       // Returns a string representation of the event, suitable for logging.
+	StreamID() StreamID                   // Returns the stream ID of the event.
+	GetRowKey() []byte                    // Returns the serialized row key for the change event.
+	MarshalToJSON([]byte) ([]byte, error) // Serializes the change event to JSON as an output document and appends to the provided buffer.
+}
+
+// OldChangeEvent is the old struct used to represent a change event. It implements ChangeEvent.
+type OldChangeEvent struct {
 	Operation ChangeOp
 	RowKey    []byte
 	Source    SourceMetadata
 	Before    map[string]interface{}
 	After     map[string]interface{}
+}
+
+func (OldChangeEvent) IsDatabaseEvent() {}
+
+func (e *OldChangeEvent) String() string {
+	switch e.Operation {
+	case InsertOp:
+		return fmt.Sprintf("Insert(%s)", e.Source.Common().StreamID())
+	case UpdateOp:
+		return fmt.Sprintf("Update(%s)", e.Source.Common().StreamID())
+	case DeleteOp:
+		return fmt.Sprintf("Delete(%s)", e.Source.Common().StreamID())
+	}
+	return fmt.Sprintf("UnknownChange(%s)", e.Source.Common().StreamID())
+}
+
+func (e *OldChangeEvent) StreamID() StreamID {
+	return e.Source.Common().StreamID()
+}
+
+func (e *OldChangeEvent) GetRowKey() []byte {
+	return e.RowKey
+}
+
+// MarshalJSON implements serialization of a ChangeEvent to JSON.
+//
+// Note that this implementation is destructive, but that's okay because
+// emitting the serialized JSON is the last thing we ever do with a change.
+func (e *OldChangeEvent) MarshalToJSON(buf []byte) ([]byte, error) {
+	var record map[string]any
+	var meta = struct {
+		Operation ChangeOp       `json:"op"`
+		Source    SourceMetadata `json:"source"`
+		Before    map[string]any `json:"before,omitempty"`
+	}{
+		Operation: e.Operation,
+		Source:    e.Source,
+		Before:    nil,
+	}
+	switch e.Operation {
+	case InsertOp:
+		record = e.After // Before is never used.
+	case UpdateOp:
+		meta.Before, record = e.Before, e.After
+	case DeleteOp:
+		record = e.Before // After is never used.
+	}
+	if record == nil {
+		record = make(map[string]any)
+	}
+	record["_meta"] = &meta
+
+	// Marshal to JSON and append to the provided buffer.
+	return json.Append(buf, record, json.EscapeHTML|json.SortMapKeys)
 }
 
 // FlushEvent informs the generic sqlcapture logic about transaction boundaries.
@@ -102,31 +165,19 @@ type TableDropEvent struct {
 
 // A DatabaseEvent can be a ChangeEvent, FlushEvent, MetadataEvent, or KeepaliveEvent.
 type DatabaseEvent interface {
-	isDatabaseEvent()
+	IsDatabaseEvent()
 	String() string
 }
 
-func (*ChangeEvent) isDatabaseEvent()    {}
-func (*FlushEvent) isDatabaseEvent()     {}
-func (*MetadataEvent) isDatabaseEvent()  {}
-func (*KeepaliveEvent) isDatabaseEvent() {}
-func (*TableDropEvent) isDatabaseEvent() {}
+func (*FlushEvent) IsDatabaseEvent()     {}
+func (*MetadataEvent) IsDatabaseEvent()  {}
+func (*KeepaliveEvent) IsDatabaseEvent() {}
+func (*TableDropEvent) IsDatabaseEvent() {}
 
-func (evt *ChangeEvent) String() string {
-	return fmt.Sprintf("ChangeEvent(%q)", evt.Source.Common().StreamID())
-}
 func (evt *FlushEvent) String() string     { return fmt.Sprintf("FlushEvent(%q)", evt.Cursor) }
-func (evt *MetadataEvent) String() string  { return fmt.Sprintf("MetadataEvent(%q)", evt.StreamID) }
+func (evt *MetadataEvent) String() string  { return fmt.Sprintf("MetadataEvent(%s)", evt.StreamID) }
 func (*KeepaliveEvent) String() string     { return "KeepaliveEvent" }
-func (evt *TableDropEvent) String() string { return fmt.Sprintf("TableDropEvent(%q)", evt.StreamID) }
-
-// KeyFields returns suitable fields for extracting the event primary key.
-func (e *ChangeEvent) KeyFields() map[string]interface{} {
-	if e.Operation == DeleteOp {
-		return e.Before
-	}
-	return e.After
-}
+func (evt *TableDropEvent) String() string { return fmt.Sprintf("TableDropEvent(%s)", evt.StreamID) }
 
 // Database represents the operations which must be performed on a specific database
 // during the course of a capture in order to perform discovery, backfill preexisting
@@ -138,9 +189,10 @@ type Database interface {
 	// a neverending sequence of change events can be read.
 	ReplicationStream(ctx context.Context, startCursor json.RawMessage) (ReplicationStream, error)
 
-	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
+	// ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `state.Scanned` cursor
+	// position if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
-	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event *ChangeEvent) error) (backfillComplete bool, nextRowKey []byte, err error)
+	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event ChangeEvent) error) (backfillComplete bool, nextResumeCursor []byte, err error)
 	// DiscoverTables queries the database for the latest information about tables available for capture.
 	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.

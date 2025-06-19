@@ -299,14 +299,7 @@ func (db *postgresDatabase) translateRecordField(column *sqlcapture.ColumnInfo, 
 	case net.HardwareAddr: // column types 'macaddr' and 'macaddr8'
 		return x.String(), nil
 	case [16]uint8: // column type 'uuid'
-		var s = new(strings.Builder)
-		for i := range x {
-			if i == 4 || i == 6 || i == 8 || i == 10 {
-				s.WriteString("-")
-			}
-			fmt.Fprintf(s, "%02x", x[i])
-		}
-		return s.String(), nil
+		return uuid.UUID(x).String(), nil
 	case string:
 		if len(x) > truncateColumnThreshold {
 			return x[:truncateColumnThreshold], nil
