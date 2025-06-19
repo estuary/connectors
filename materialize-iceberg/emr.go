@@ -145,7 +145,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
 		JobDriver: &emrTypes.JobDriverMemberSparkSubmit{
 			Value: emrTypes.SparkSubmit{
-				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s", pyFilesCommonURI)),
+				SparkSubmitParameters: aws.String(fmt.Sprintf("--py-files %s --conf spark.driver.maxResultSize=0", pyFilesCommonURI)),
 				EntryPoint:            aws.String(entryPointUri),
 				EntryPointArguments:   args,
 			},
