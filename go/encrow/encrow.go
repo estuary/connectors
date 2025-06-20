@@ -88,16 +88,12 @@ func (s *Shape) SetSkipNulls(skip bool) {
 // in the order they are provided.
 func GeneratePrefixes(fields []string) []string {
 	var prefixes []string
-	for idx, fieldName := range fields {
+	for _, fieldName := range fields {
 		var quotedFieldName, err = json.Marshal(fieldName)
 		if err != nil {
 			panic(fmt.Errorf("error escaping field name %q: %w", fieldName, err))
 		}
-		if idx == 0 {
-			prefixes = append(prefixes, fmt.Sprintf("{%s:", quotedFieldName))
-		} else {
-			prefixes = append(prefixes, fmt.Sprintf(",%s:", quotedFieldName))
-		}
+		prefixes = append(prefixes, fmt.Sprintf("%s:", quotedFieldName))
 	}
 	return prefixes
 }
@@ -112,11 +108,18 @@ func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 		return append(buf, '{', '}'), nil
 	}
 
+	var firstValue = true
+	buf = append(buf, '{')
 	for idx, vidx := range s.Swizzle {
 		var v = values[vidx]
 		if s.SkipNulls && v == nil {
 			continue
 		}
+
+		if !firstValue {
+			buf = append(buf, ',')
+		}
+		firstValue = false
 
 		buf = append(buf, s.Prefixes[idx]...)
 		buf, err = s.Encoders[idx].MarshalTo(buf, v)
