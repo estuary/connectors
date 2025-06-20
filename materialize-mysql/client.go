@@ -11,39 +11,33 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/go-sql-driver/mysql"
 )
 
 type client struct {
 	db         *stdsql.DB
-	cfg        *config
-	ep         *sql.Endpoint
+	ep         *sql.Endpoint[config]
 	tzLocation *time.Location
 }
 
-func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	return func(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-		cfg := ep.Config.(*config)
-
-		db, err := stdsql.Open("mysql", cfg.ToURI())
+func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	return func(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+		db, err := stdsql.Open("mysql", ep.Config.ToURI())
 		if err != nil {
 			return nil, err
 		}
 
 		return &client{
 			db:         db,
-			cfg:        cfg,
 			ep:         ep,
 			tzLocation: tzLocation,
 		}, nil
 	}
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	cfg := conf.(*config)
 
 	db, err := stdsql.Open("mysql", cfg.ToURI())
 	if err != nil {
@@ -98,8 +92,8 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 	return errs
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, "def", resourcePaths)
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, "def", resourcePaths)
 }
 
 var migrationSteps = []sql.ColumnMigrationStep{

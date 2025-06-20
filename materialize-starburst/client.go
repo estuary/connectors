@@ -9,15 +9,14 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
 	db        *stdsql.DB
-	cfg       *config
-	ep        *sql.Endpoint
+	ep        *sql.Endpoint[config]
 	templates templates
 }
 
@@ -33,10 +32,8 @@ func connectToDb(ctx context.Context, uri string) (*stdsql.Conn, error) {
 	return db.Conn(ctx)
 }
 
-func newClient(_ context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
-
-	db, err := openDB(cfg.ToURI())
+func newClient(_ context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	db, err := openDB(ep.Config.ToURI())
 	if err != nil {
 		return nil, err
 	}
@@ -45,20 +42,14 @@ func newClient(_ context.Context, ep *sql.Endpoint) (sql.Client, error) {
 
 	return &client{
 		db:        db,
-		cfg:       cfg,
 		ep:        ep,
 		templates: templates,
 	}, nil
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(c.ep.Dialect.TableLocator),
-		c.ep.Dialect.ColumnLocator,
-	)
-
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
-	schemas := []string{c.ep.Dialect.Literal(c.cfg.Schema)}
+	schemas := []string{c.ep.Dialect.Literal(c.ep.Config.Schema)}
 	for _, p := range resourcePaths {
 		loc := c.ep.Dialect.TableLocator(p)
 		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
@@ -73,11 +64,11 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		where table_catalog = %s
 		and table_schema in (%s)
 		`,
-		c.ep.Dialect.Literal(c.cfg.Catalog),
+		c.ep.Dialect.Literal(c.ep.Config.Catalog),
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer rows.Close()
 
@@ -93,7 +84,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	for rows.Next() {
 		var c columnRow
 		if err := rows.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.ColumnDefault); err != nil {
-			return nil, err
+			return err
 		}
 
 		is.PushResource(c.TableSchema, c.TableName).PushField(boilerplate.ExistingField{
@@ -105,10 +96,10 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return is, nil
+	return nil
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -162,14 +153,13 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return sql.StdListSchemas(ctx, c.db)
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	cfg := conf.(*config)
 	if db, err := openDB(cfg.ToURI()); err != nil {
 		errs.Err(err)
 	} else if err := db.PingContext(ctx); err != nil {

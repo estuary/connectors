@@ -12,7 +12,7 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -31,6 +31,14 @@ func (c config) Validate() error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string {
+	return ""
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return "", make(map[string]bool)
+}
+
 type tableConfig struct {
 	Table string `json:"table" jsonschema_extras:"x-collection-name=true"`
 }
@@ -42,26 +50,22 @@ func (c tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.Table}
+func (c tableConfig) WithDefaults(cfg config) tableConfig {
+	return c
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return false // SQLite doesn't support delta updates. We probably _could_ support it though.
-}
-
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{}
+func (c tableConfig) Parameters() ([]string, bool, error) {
+	// SQLite doesn't support delta updates. We probably _could_ support it
+	// though.
+	return []string{c.Table}, false, nil
 }
 
 // NewSQLiteDriver creates a new Driver for sqlite.
-func NewSQLiteDriver() *sql.Driver {
-	return &sql.Driver{
+func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlite",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, _ json.RawMessage, _ string) (*sql.Endpoint, error) {
+		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			var path = databasePath
 
 			// SQLite / go-sqlite3 is a bit fickle about raced opens of a newly created database,
@@ -78,18 +82,17 @@ func NewSQLiteDriver() *sql.Driver {
 				return nil, fmt.Errorf("opening SQLite database %q: %w", path, err)
 			}
 
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              config{path: path},
 				Dialect:             sqliteDialect,
 				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
 			}, nil
 		},
-		PreReqs: func(context.Context, any, string) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
+		PreReqs: func(context.Context, config, string) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
 	}
 }
 
@@ -97,7 +100,7 @@ type client struct {
 	db *stdsql.DB
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
 	db, err := stdsql.Open("sqlite3", databasePath)
 	if err != nil {
 		return nil, err
@@ -106,11 +109,8 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	return &client{db: db}, nil
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	return boilerplate.NewInfoSchema(
-		func(in []string) []string { return in },
-		func(in string) string { return in },
-	), nil
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	return nil
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
@@ -142,50 +142,50 @@ func (c *client) Close() {
 
 func newTransactor(
 	ctx context.Context,
-	ep *sql.Endpoint,
+	ep *sql.Endpoint[config],
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
 	_ *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
+) (m.Transactor, error) {
 	var d = &transactor{
 		dialect: &sqliteDialect,
 	}
 	d.store.fence = &fence
 
-	var cfg = ep.Config.(config)
+	var cfg = ep.Config
 
 	// Establish connections.
 	if db, err := stdsql.Open("sqlite3", cfg.path); err != nil {
-		return nil, nil, fmt.Errorf("load DB.Open: %w", err)
+		return nil, fmt.Errorf("load DB.Open: %w", err)
 	} else if d.load.conn, err = db.Conn(ctx); err != nil {
-		return nil, nil, fmt.Errorf("load DB.Conn: %w", err)
+		return nil, fmt.Errorf("load DB.Conn: %w", err)
 	}
 	if db, err := stdsql.Open("sqlite3", cfg.path); err != nil {
-		return nil, nil, fmt.Errorf("store DB.Open: %w", err)
+		return nil, fmt.Errorf("store DB.Open: %w", err)
 	} else if d.store.conn, err = db.Conn(ctx); err != nil {
-		return nil, nil, fmt.Errorf("store DB.Conn: %w", err)
+		return nil, fmt.Errorf("store DB.Conn: %w", err)
 	}
 
 	// Attach temporary DB used for staging keys to load.
-	if _, err = d.load.conn.ExecContext(ctx, attachSQL); err != nil {
-		return nil, nil, fmt.Errorf("Exec(%s): %w", attachSQL, err)
+	if _, err := d.load.conn.ExecContext(ctx, attachSQL); err != nil {
+		return nil, fmt.Errorf("Exec(%s): %w", attachSQL, err)
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding); err != nil {
-			return nil, nil, fmt.Errorf("adding binding: %w", err)
+		if err := d.addBinding(ctx, binding); err != nil {
+			return nil, fmt.Errorf("adding binding: %w", err)
 		}
 	}
 
 	// Since sqlite is ephemeral, we have to re-create tables before transactions
 	for _, table := range bindings {
 		if statement, err := sql.RenderTableTemplate(table, ep.CreateTableTemplate); err != nil {
-			return nil, nil, err
+			return nil, err
 		} else {
 			if _, err := d.store.conn.ExecContext(ctx, statement); err != nil {
-				return nil, nil, fmt.Errorf("applying schema updates: %w", err)
+				return nil, fmt.Errorf("applying schema updates: %w", err)
 			}
 		}
 	}
@@ -197,7 +197,7 @@ func newTransactor(
 	}
 	d.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-	return d, nil, nil
+	return d, nil
 }
 
 type transactor struct {

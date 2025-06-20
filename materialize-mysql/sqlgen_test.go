@@ -6,8 +6,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	sql "github.com/estuary/connectors/materialize-sql"
-	sqlDriver "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
@@ -20,11 +19,8 @@ func TestSQLGeneration(t *testing.T) {
 	snap, _ := sql.RunSqlGenTests(
 		t,
 		testDialect,
-		func(table string, delta bool) sql.Resource {
-			return tableConfig{
-				Table: table,
-				Delta: delta,
-			}
+		func(table string) []string {
+			return []string{table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
@@ -54,7 +50,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
+	var mapped = testDialect.MapType(&sql.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -62,8 +58,7 @@ func TestDateTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+	}, sql.FieldConfig{})
 	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
@@ -72,7 +67,7 @@ func TestDateTimeColumn(t *testing.T) {
 }
 
 func TestDateTimePKColumn(t *testing.T) {
-	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
+	var mapped = testDialect.MapType(&sql.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -81,13 +76,12 @@ func TestDateTimePKColumn(t *testing.T) {
 			},
 			IsPrimaryKey: true,
 		},
-	})
-	require.NoError(t, err)
+	}, sql.FieldConfig{})
 	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {
-	var mapped, err = testDialect.MapType(&sqlDriver.Projection{
+	var mapped = testDialect.MapType(&sql.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -95,8 +89,7 @@ func TestTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+	}, sql.FieldConfig{})
 	require.Equal(t, "TIME(6) NOT NULL", mapped.DDL)
 
 	parsed, err := mapped.Converter("10:09:08.234567Z")

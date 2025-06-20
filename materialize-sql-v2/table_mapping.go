@@ -194,10 +194,10 @@ func resolveColumn(index int, projection *Projection, fc FieldConfig, dialect Di
 	}
 }
 
-func BuildTableShape(materializeName string, binding *pf.MaterializationSpec_Binding, bindingIdx int, path []string, deltaUpdates bool) TableShape {
+func BuildTableShape(materializationName string, binding *pf.MaterializationSpec_Binding, bindingIdx int, path []string, deltaUpdates bool) TableShape {
 	var (
 		comment = fmt.Sprintf("Generated for materialization %s of collection %s",
-			materializeName, binding.Collection.Name)
+			materializationName, binding.Collection.Name)
 		keys, values, document = BuildProjections(binding)
 	)
 

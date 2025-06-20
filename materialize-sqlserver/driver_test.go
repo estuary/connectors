@@ -14,7 +14,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -24,12 +24,15 @@ import (
 
 //go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/apply-changes.flow.yaml
 
-func testConfig() *config {
-	return &config{
+func testConfig() config {
+	return config{
 		Address:  "localhost:1433",
 		User:     "sa",
 		Password: "!Flow1234",
 		Database: "master",
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
 	}
 }
 
@@ -198,7 +201,9 @@ func TestApplyChanges(t *testing.T) {
 
 	spec.ConfigJson = configJson
 	spec.Bindings[0].ResourceConfigJson = resourceConfigJson
-	spec.Bindings[0].ResourcePath = resourceConfig.Path()
+	path, _, err := resourceConfig.Parameters()
+	require.NoError(t, err)
+	spec.Bindings[0].ResourcePath = path
 
 	_, err = newSqlServerDriver().Apply(ctx, &pm.Request_Apply{
 		Materialization: &spec,
@@ -223,7 +228,7 @@ func TestFencingCases(t *testing.T) {
 	var dialect = testDialect
 	var templates = renderTemplates(dialect)
 
-	c, err := newClient(ctx, &sql.Endpoint{Config: testConfig(), Dialect: dialect})
+	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig(), Dialect: dialect})
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -254,35 +259,35 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) *config
+		cfg  func(config) config
 		want []string
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) *config { return &cfg },
+			cfg:  func(cfg config) config { return cfg },
 			want: nil,
 		},
 		{
 			name: "wrong username",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.User = "wrong" + cfg.User
-				return &cfg
+				return cfg
 			},
 			want: []string{"Login failed for user 'wrongsa'"},
 		},
 		{
 			name: "wrong password",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Password = "wrong" + cfg.Password
-				return &cfg
+				return cfg
 			},
 			want: []string{"Login failed for user 'sa'"},
 		},
 		{
 			name: "wrong database",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Database = "wrong" + cfg.Database
-				return &cfg
+				return cfg
 			},
 			want: []string{"Cannot open database \"wrongmaster\" that was requested by the login."},
 		},
@@ -292,7 +297,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var actual = preReqs(ctx, tt.cfg(*cfg), "testing").Unwrap()
+			var actual = preReqs(ctx, tt.cfg(cfg), "testing").Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

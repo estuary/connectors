@@ -15,7 +15,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -25,23 +25,29 @@ import (
 
 //go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/apply-changes.flow.yaml
 
-func testConfig() *config {
-	return &config{
+func testConfig() config {
+	return config{
 		Address:  "localhost:3306",
 		User:     "flow",
 		Password: "flow",
 		Database: "flow",
 		Timezone: "UTC",
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
 	}
 }
 
-func testMariaConfig() *config {
-	return &config{
+func testMariaConfig() config {
+	return config{
 		Address:  "localhost:3305",
 		User:     "flow",
 		Password: "flow",
 		Database: "flow",
 		Timezone: "UTC",
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
 	}
 }
 
@@ -257,7 +263,7 @@ func TestApplyChanges(t *testing.T) {
 
 	spec.ConfigJson = configJson
 	spec.Bindings[0].ResourceConfigJson = resourceConfigJson
-	spec.Bindings[0].ResourcePath = resourceConfig.Path()
+	spec.Bindings[0].ResourcePath = []string{translateFlowIdentifier(resourceConfig.Table)}
 
 	_, err = newMysqlDriver().Apply(ctx, &pm.Request_Apply{
 		Materialization: &spec,
@@ -282,7 +288,7 @@ func TestFencingCases(t *testing.T) {
 	var dialect = testDialect
 	var templates = renderTemplates(dialect)
 
-	c, err := prepareNewClient(time.UTC)(ctx, &sql.Endpoint{Config: testConfig()})
+	c, err := prepareNewClient(time.UTC)(ctx, &sql.Endpoint[config]{Config: testConfig()})
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -309,43 +315,43 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) *config
+		cfg  func(config) config
 		want []string
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) *config { return &cfg },
+			cfg:  func(cfg config) config { return cfg },
 			want: nil,
 		},
 		{
 			name: "wrong username",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.User = "wrong" + cfg.User
-				return &cfg
+				return cfg
 			},
 			want: []string{"incorrect username or password (1045): Access denied for user 'wrongflow'"},
 		},
 		{
 			name: "wrong password",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Password = "wrong" + cfg.Password
-				return &cfg
+				return cfg
 			},
 			want: []string{"incorrect username or password (1045): Access denied for user 'flow'"},
 		},
 		{
 			name: "wrong database",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Database = "wrong" + cfg.Database
-				return &cfg
+				return cfg
 			},
 			want: []string{"database \"wrongflow\" cannot be accessed, it might not exist or you do not have permission to access it ("},
 		},
 		{
 			name: "wrong address",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Address = cfg.Address + ".wrong"
-				return &cfg
+				return cfg
 			},
 			want: []string{fmt.Sprintf("host at address %q cannot be found", cfg.Address+".wrong")},
 		},
@@ -355,7 +361,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var actual = preReqs(ctx, tt.cfg(*cfg), "").Unwrap()
+			var actual = preReqs(ctx, tt.cfg(cfg), "").Unwrap()
 
 			require.Equal(t, len(tt.want), len(actual))
 			for i := 0; i < len(tt.want); i++ {

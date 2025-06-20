@@ -7,15 +7,15 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
-	_ "github.com/trinodb/trino-go-client/trino"
 	"go.gazette.dev/core/consumer/protocol"
+
+	_ "github.com/trinodb/trino-go-client/trino"
 )
 
 var featureFlagDefaults = map[string]bool{}
@@ -43,8 +43,7 @@ type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
-// ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c config) ToURI() string {
 
 	var params = make(url.Values)
 	params.Add("catalog", c.Catalog)
@@ -60,7 +59,7 @@ func (c *config) ToURI() string {
 	return uri.String()
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"account", c.Account},
 		{"host", c.Host},
@@ -82,13 +81,17 @@ func (c *config) Validate() error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string {
+	return c.Schema
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, make(map[string]bool)
+}
+
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the table" jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Schema,description=Schema where the table resides" jsonschema_extras:"x-schema-name=true"`
-}
-
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{Schema: ep.Config.(*config).Schema}
 }
 
 func (c tableConfig) Validate() error {
@@ -98,27 +101,25 @@ func (c tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.Schema, c.Table}
+func (r tableConfig) WithDefaults(cfg config) tableConfig {
+	if r.Schema == "" {
+		r.Schema = cfg.Schema
+	}
+
+	return r
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return false // Starburst currently doesn't support delta updates.
+func (r tableConfig) Parameters() ([]string, bool, error) {
+	// Starburst currently doesn't support delta updates.
+	return []string{r.Schema, r.Table}, false, nil
 }
 
 // newStarburstDriver creates a new Driver for Starburst.
-func newStarburstDriver() *sql.Driver {
-	return &sql.Driver{
+func newStarburstDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-starburst",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("failed to parse Starburst configuration: %w", err)
-			}
-
+		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"host":    cfg.Host,
 				"account": cfg.Account,
@@ -126,22 +127,22 @@ func newStarburstDriver() *sql.Driver {
 				"schema":  cfg.Schema,
 			}).Info("opening Starburst")
 
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-			if cfg.Advanced.FeatureFlags != "" {
-				log.WithField("flags", featureFlags).Info("parsed feature flags")
-			}
-
 			var templates = renderTemplates(starburstTrinoDialect)
 
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             starburstTrinoDialect,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					ExtendedLogging: true,
+					AckSchedule: &boilerplate.AckScheduleOption{
+						Config: cfg.Schedule,
+						Jitter: []byte(cfg.Account),
+					},
+				},
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -149,7 +150,7 @@ func newStarburstDriver() *sql.Driver {
 }
 
 type transactor struct {
-	cfg  *config
+	cfg  config
 	cp   checkpoint
 	load struct {
 		conn *stdsql.Conn
@@ -163,14 +164,15 @@ type transactor struct {
 
 func newTransactor(
 	ctx context.Context,
-	ep *sql.Endpoint,
+	ep *sql.Endpoint[config],
 	_ sql.Fence,
 	tables []sql.Table,
 	open pm.Request_Open,
 	_ *boilerplate.InfoSchema,
 	_ *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-	var cfg = ep.Config.(*config)
+) (m.Transactor, error) {
+	var err error
+	var cfg = ep.Config
 	var templates = renderTemplates(starburstTrinoDialect)
 
 	var transactor = &transactor{
@@ -180,35 +182,27 @@ func newTransactor(
 	// Establish connections.
 	transactor.load.conn, err = connectToDb(ctx, cfg.ToURI())
 	if err != nil {
-		return nil, nil, fmt.Errorf("connection for load failed: %w", err)
+		return nil, fmt.Errorf("connection for load failed: %w", err)
 	}
 	transactor.store.conn, err = connectToDb(ctx, cfg.ToURI())
 	if err != nil {
-		return nil, nil, fmt.Errorf("connection for store failed: %w", err)
+		return nil, fmt.Errorf("connection for store failed: %w", err)
 	}
 
 	for _, table := range tables {
 		materializationSpec := open.Materialization.Bindings[table.Binding]
 		if err = transactor.addBinding(ctx, materializationSpec, table, templates); err != nil {
-			return nil, nil, fmt.Errorf("adding binding %v failed: %w", table, err)
+			return nil, fmt.Errorf("adding binding %v failed: %w", table, err)
 		}
 	}
 
 	s3Config := s3config{AWSAccessKeyID: cfg.AWSAccessKeyID, AWSSecretAccessKey: cfg.AWSSecretAccessKey, Region: cfg.Region, Bucket: cfg.Bucket}
 	transactor.s3Operator, err = NewS3Operator(s3Config)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating s3 operator: %w", err)
+		return nil, fmt.Errorf("creating s3 operator: %w", err)
 	}
 
-	opts := &boilerplate.MaterializeOptions{
-		ExtendedLogging: true,
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: cfg.Schedule,
-			Jitter: []byte(cfg.Account),
-		},
-	}
-
-	return transactor, opts, nil
+	return transactor, nil
 }
 
 type binding struct {
