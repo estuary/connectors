@@ -88,9 +88,7 @@ func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *Json
 			encoders[i] = &encrow.DefaultEncoder{Flags: flags}
 		}
 		enc.shape = encrow.NewShapeWithEncoders(fields, encoders)
-		if cfg.skipNulls {
-			enc.shape.SkipNulls()
-		}
+		enc.shape.SetSkipNulls(cfg.skipNulls)
 	}
 
 	return enc

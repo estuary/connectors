@@ -10,12 +10,13 @@ import (
 
 // A Shape represents the structure of a particular document.
 type Shape struct {
-	arity     int            // Number of values which should be provided to Encode. May not match the length of prefix/swizzle arrays.
-	names     []string       // Names of the fields in the order they will be serialized.
-	prefixes  []string       // Prefixes for each field, in the order they will be serialized.
-	swizzle   []int          // Indices into the values list which correspond to the fields in the prefixes. May not include all values.
-	encoders  []ValueEncoder // Encoders for each field, in the order they will be used. A nil value indicates that normal JSON reflection should be used
-	skipNulls bool
+	Arity    int            // Number of values which should be provided to Encode. May not match the length of prefix/swizzle arrays.
+	Names    []string       // Names of the fields in the order they will be serialized.
+	Prefixes []string       // Prefixes for each field, in the order they will be serialized.
+	Swizzle  []int          // Indices into the values list which correspond to the fields in the prefixes. May not include all values.
+	Encoders []ValueEncoder // Encoders for each field, in the order they will be used. A nil value indicates that normal JSON reflection should be used
+
+	SkipNulls bool // When true, fields with a nil value will not be serialized.
 }
 
 // ValueEncoder represents strategies for encoding and appending JSON serialized values into a buffer.
@@ -70,20 +71,22 @@ func NewShapeWithEncoders(fields []string, encoders []ValueEncoder) *Shape {
 	}
 
 	return &Shape{
-		arity:    len(fields),
-		names:    orderedNames,
-		prefixes: generatePrefixes(orderedNames),
-		swizzle:  swizzle,
-		encoders: orderedEncoders,
+		Arity:    len(fields),
+		Names:    orderedNames,
+		Prefixes: GeneratePrefixes(orderedNames),
+		Swizzle:  swizzle,
+		Encoders: orderedEncoders,
 	}
 }
 
 // SkipNulls will cause serialized results to omit fields with a `nil` value.
-func (s *Shape) SkipNulls() {
-	s.skipNulls = true
+func (s *Shape) SetSkipNulls(skip bool) {
+	s.SkipNulls = skip
 }
 
-func generatePrefixes(fields []string) []string {
+// GeneratePrefixes creates a list of prefixes for the named object fields,
+// in the order they are provided.
+func GeneratePrefixes(fields []string) []string {
 	var prefixes []string
 	for idx, fieldName := range fields {
 		var quotedFieldName, err = json.Marshal(fieldName)
@@ -102,23 +105,23 @@ func generatePrefixes(fields []string) []string {
 // Encode serializes a list of values into the specified shape, appending to the provided buffer.
 func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 	var err error
-	if len(values) != s.arity {
-		return nil, fmt.Errorf("incorrect row arity: expected %d but got %d", s.arity, len(values))
+	if len(values) != s.Arity {
+		return nil, fmt.Errorf("incorrect row arity: expected %d but got %d", s.Arity, len(values))
 	}
-	if s.arity == 0 {
+	if s.Arity == 0 {
 		return append(buf, '{', '}'), nil
 	}
 
-	for idx, vidx := range s.swizzle {
+	for idx, vidx := range s.Swizzle {
 		var v = values[vidx]
-		if s.skipNulls && v == nil {
+		if s.SkipNulls && v == nil {
 			continue
 		}
 
-		buf = append(buf, s.prefixes[idx]...)
-		buf, err = s.encoders[idx].MarshalTo(buf, v)
+		buf = append(buf, s.Prefixes[idx]...)
+		buf, err = s.Encoders[idx].MarshalTo(buf, v)
 		if err != nil {
-			return nil, fmt.Errorf("error encoding field %q: %w", s.names[idx], err)
+			return nil, fmt.Errorf("error encoding field %q: %w", s.Names[idx], err)
 		}
 	}
 	buf = append(buf, '}')
