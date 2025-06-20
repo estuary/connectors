@@ -97,9 +97,9 @@ func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *Json
 }
 
 func (e *JsonEncoder) Encode(vals []any) (err error) {
+	e.buf = e.buf[:0]
 	if e.shape == nil {
 		// Serialize as a JSON array of values.
-		e.buf = e.buf[:0]
 		e.buf = append(e.buf, '[')
 		for idx, v := range vals {
 			if e.buf, err = json.Append(e.buf, v, json.TrustRawMessage); err != nil {

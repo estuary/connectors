@@ -57,7 +57,7 @@ func NewShapeWithEncoders(fields []string, encoders []ValueEncoder) *Shape {
 
 	// Remove any empty-name fields so that they will not be serialized.
 	// Since the swizzle indices are sorted, "" will always be at the start.
-	for fields[swizzle[0]] == "" {
+	for len(swizzle) > 0 && fields[swizzle[0]] == "" {
 		swizzle = swizzle[1:]
 	}
 
@@ -99,18 +99,16 @@ func generatePrefixes(fields []string) []string {
 	return prefixes
 }
 
-// Encode serializes a list of values into the specified shape. If a buffer slice
-// is provided it will be truncated and reused.
+// Encode serializes a list of values into the specified shape, appending to the provided buffer.
 func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 	var err error
 	if len(values) != s.arity {
 		return nil, fmt.Errorf("incorrect row arity: expected %d but got %d", s.arity, len(values))
 	}
 	if s.arity == 0 {
-		return []byte("{}"), nil
+		return append(buf, '{', '}'), nil
 	}
 
-	buf = buf[:0]
 	for idx, vidx := range s.swizzle {
 		var v = values[vidx]
 		if s.skipNulls && v == nil {
