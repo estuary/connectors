@@ -90,8 +90,8 @@ ALTER TABLE "a-schema".target_table ADD COLUMN first_new_column STRING
 --- End alter table add columns ---
 
 --- Begin target_table_no_values_materialized mergeInto ---
-MERGE INTO "".target_table_no_values_materialized AS l
-	USING "".target_table_no_values_materialized_store_temp AS r
+MERGE INTO "a-schema".target_table_no_values_materialized AS l
+	USING "a-schema".target_table_no_values_materialized_store_temp AS r
 	ON l.key1 = r.key1 AND l.key2 = r.key2
 	WHEN MATCHED THEN
 	UPDATE SET flow_document = r.flow_document

@@ -9,7 +9,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 
-	sqlDriver "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
@@ -23,14 +23,10 @@ func TestSQLGeneration(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(specJson, &spec))
 
-	var shape1 = sqlDriver.BuildTableShape(spec, 0, tableConfig{
-		Schema: "a-schema",
-		Table:  "target_table",
-	})
-
-	targetTable, err := sqlDriver.ResolveTable(shape1, targetTableDialect)
+	var shape1 = sql.BuildTableShape(spec.Name.String(), spec.Bindings[0], 0, []string{"a-schema", "target_table"}, false)
+	targetTable, err := sql.ResolveTable(shape1, targetTableDialect)
 	require.NoError(t, err)
-	tempTable, err := sqlDriver.ResolveTable(shape1, tempTableDialect)
+	tempTable, err := sql.ResolveTable(shape1, tempTableDialect)
 	require.NoError(t, err)
 
 	targetTableTemplates := renderTemplates(targetTableDialect)
@@ -74,10 +70,8 @@ func TestSQLGeneration(t *testing.T) {
 		AlterTableTemplateParams{targetTable.Identifier, "first_new_column", "STRING"}))
 	snap.WriteString("--- End alter table add columns ---\n\n")
 
-	var shapeNoValues = sqlDriver.BuildTableShape(spec, 2, tableConfig{
-		Table: "target_table_no_values_materialized",
-	})
-	tableNoValues, err := sqlDriver.ResolveTable(shapeNoValues, targetTableDialect)
+	var shapeNoValues = sql.BuildTableShape(spec.Name.String(), spec.Bindings[2], 2, []string{"a-schema", "target_table_no_values_materialized"}, false)
+	tableNoValues, err := sql.ResolveTable(shapeNoValues, targetTableDialect)
 	require.NoError(t, err)
 
 	snap.WriteString("--- Begin " + "target_table_no_values_materialized mergeInto" + " ---")
