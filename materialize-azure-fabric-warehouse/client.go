@@ -15,7 +15,7 @@ import (
 	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
@@ -24,40 +24,31 @@ import (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	db *stdsql.DB
+	ep *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
-
-	db, err := cfg.db()
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	db, err := ep.Config.db()
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
-		db:  db,
-		cfg: cfg,
-		ep:  ep,
+		db: db,
+		ep: ep,
 	}, nil
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
-	// The body of this function is a copy of sql.StdFetchInfoSchema, except the
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	// The body of this function is a copy of sql.StdPopulateInfoSchema, except the
 	// identifiers for the information schema views need to be in capital
 	// letters for Fabric Warehouse. I'd hope to replace this at some point with
 	// REST API calls if the necessary REST endpoints added to Fabric Warehouse,
 	// since right now there's only endpoints to list warehouses and they don't
 	// even work with service principal authentication.
-	is := boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(dialect.TableLocator),
-		dialect.ColumnLocator,
-	)
-
 	if len(resourcePaths) == 0 {
-		return is, nil
+		return nil
 	}
 
 	schemas := make([]string, 0, len(resourcePaths))
@@ -75,11 +66,11 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		where table_catalog = %s
 		and table_schema in (%s);
 		`,
-		dialect.Literal(c.cfg.Warehouse),
+		dialect.Literal(c.ep.Config.Warehouse),
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer tables.Close()
 
@@ -91,7 +82,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	for tables.Next() {
 		var t tableRow
 		if err := tables.Scan(&t.TableSchema, &t.TableName); err != nil {
-			return nil, err
+			return err
 		}
 
 		is.PushResource(t.TableSchema, t.TableName)
@@ -103,11 +94,11 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		where table_catalog = %s
 		and table_schema in (%s);
 		`,
-		dialect.Literal(c.cfg.Warehouse),
+		dialect.Literal(c.ep.Config.Warehouse),
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer columns.Close()
 
@@ -123,7 +114,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	for columns.Next() {
 		var c columnRow
 		if err := columns.Scan(&c.TableSchema, &c.TableName, &c.ColumnName, &c.IsNullable, &c.DataType, &c.CharacterMaximumLength, &c.ColumnDefault); err != nil {
-			return nil, err
+			return err
 		}
 
 		is.PushResource(c.TableSchema, c.TableName).PushField(boilerplate.ExistingField{
@@ -135,10 +126,10 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		})
 	}
 	if err := columns.Err(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return is, nil
+	return nil
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -264,7 +255,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	return sql.StdCreateSchema(ctx, c.db, dialect, schemaName)
 }
 
@@ -274,10 +265,8 @@ type badRequestResponseBody struct {
 	ErrorCodes       []int  `json:"error_codes"`
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	cfg := conf.(*config)
 
 	db, err := cfg.db()
 	if err != nil {

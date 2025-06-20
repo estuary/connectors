@@ -5,7 +5,7 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,13 +13,8 @@ func TestSQLGeneration(t *testing.T) {
 	snap, tables := sql.RunSqlGenTests(
 		t,
 		dialect,
-		func(table string, delta bool) sql.Resource {
-			return tableConfig{
-				Table:     table,
-				Schema:    "a-schema",
-				Delta:     delta,
-				warehouse: "a-warehouse",
-			}
+		func(table string) []string {
+			return []string{"a-warehouse", "a-schema", table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
