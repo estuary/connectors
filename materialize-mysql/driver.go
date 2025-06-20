@@ -14,13 +14,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	mysql "github.com/go-sql-driver/mysql"
@@ -65,8 +64,7 @@ type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
-// Validate the configuration.
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
@@ -102,9 +100,17 @@ func (c *config) Validate() error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string {
+	return ""
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 const customSSLConfigName = "custom"
 
-func registerCustomSSL(c *config) error {
+func registerCustomSSL(c config) error {
 	// Use the provided Server CA to create a root cert pool
 	var rootCertPool = x509.NewCertPool()
 	var rawServerCert = []byte(c.Advanced.SSLServerCA)
@@ -161,7 +167,7 @@ func registerCustomSSL(c *config) error {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c config) ToURI() string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:3306
 	// to address through the bastion server, so we use the tunnel's address
@@ -203,11 +209,6 @@ type tableConfig struct {
 	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{}
-}
-
-// Validate the resource configuration.
 func (r tableConfig) Validate() error {
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
@@ -215,22 +216,18 @@ func (r tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sql.TablePath {
-	return []string{translateFlowIdentifier(c.Table)}
+func (r tableConfig) WithDefaults(cfg config) tableConfig {
+	return r
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
+func (r tableConfig) Parameters() ([]string, bool, error) {
+	return []string{translateFlowIdentifier(r.Table)}, r.Delta, nil
 }
 
-func newMysqlDriver() *sql.Driver {
-	return &sql.Driver{
+func newMysqlDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-mysql",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel: func(ctx context.Context, conf any) error {
-			cfg := conf.(*config)
-
+		StartTunnel: func(ctx context.Context, cfg config) error {
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
 				host, port, err := net.SplitHostPort(cfg.Address)
@@ -256,12 +253,7 @@ func newMysqlDriver() *sql.Driver {
 
 			return nil
 		},
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-			}
-
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"database": cfg.Database,
 				"address":  cfg.Address,
@@ -324,22 +316,18 @@ func newMysqlDriver() *sql.Driver {
 			var dialect = mysqlDialect(tzLocation, cfg.Database, product)
 			var templates = renderTemplates(dialect)
 
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-			if cfg.Advanced.FeatureFlags != "" {
-				log.WithField("flags", featureFlags).Info("parsed feature flags")
-			}
-
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable(nil),
 				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(dialect, templates),
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					DBTJobTrigger: &cfg.DBTJobTrigger,
+				},
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -388,7 +376,7 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
 }
 
 type transactor struct {
-	cfg *config
+	cfg config
 
 	dialect   sql.Dialect
 	templates templates
@@ -416,35 +404,35 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates templates,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+) func(context.Context, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
-		ep *sql.Endpoint,
+		ep *sql.Endpoint[config],
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
 		be *boilerplate.BindingEvents,
-	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-		var cfg = ep.Config.(*config)
+	) (m.Transactor, error) {
+		var cfg = ep.Config
 		var d = &transactor{dialect: dialect, templates: templates, cfg: cfg, be: be}
 		d.store.fence = fence
 
 		// Establish connections.
 		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-			return nil, nil, fmt.Errorf("load sql.Open: %w", err)
+			return nil, fmt.Errorf("load sql.Open: %w", err)
 		} else if d.load.conn, err = db.Conn(ctx); err != nil {
-			return nil, nil, fmt.Errorf("load db.Conn: %w", err)
+			return nil, fmt.Errorf("load db.Conn: %w", err)
 		}
 		if db, err := stdsql.Open("mysql", cfg.ToURI()); err != nil {
-			return nil, nil, fmt.Errorf("store sql.Open: %w", err)
+			return nil, fmt.Errorf("store sql.Open: %w", err)
 		} else if d.store.conn, err = db.Conn(ctx); err != nil {
-			return nil, nil, fmt.Errorf("store db.Conn: %w", err)
+			return nil, fmt.Errorf("store db.Conn: %w", err)
 		}
 
 		for _, binding := range bindings {
-			if err = d.addBinding(ctx, binding, is); err != nil {
-				return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			if err := d.addBinding(ctx, binding, is); err != nil {
+				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
 
@@ -460,10 +448,7 @@ func prepareNewTransactor(
 		}
 		d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-		opts := &boilerplate.MaterializeOptions{
-			DBTJobTrigger: &cfg.DBTJobTrigger,
-		}
-		return d, opts, nil
+		return d, nil
 	}
 }
 
@@ -576,12 +561,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 
 	tempColumnMetas := make([]varcharColumnMeta, len(allColumns))
 	for idx, key := range target.Keys {
-		columnType, err := t.dialect.TypeMapper.MapType(&key.Projection)
-		if err != nil {
-			return fmt.Errorf("temp column metas: %w", err)
-		}
-
-		if strings.Contains(columnType.DDL, "VARCHAR(256)") {
+		if strings.Contains(key.DDL, "VARCHAR(256)") {
 			tempColumnMetas[idx] = varcharColumnMeta{
 				identifier: key.Identifier,
 				maxLength:  256,
