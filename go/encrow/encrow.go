@@ -13,8 +13,8 @@ type Shape struct {
 	Arity    int            // Number of values which should be provided to Encode. May not match the length of prefix/swizzle arrays.
 	Names    []string       // Names of the fields in the order they will be serialized.
 	Prefixes []string       // Prefixes for each field, in the order they will be serialized.
+	Encoders []ValueEncoder // Encoders for each field, in the order they will be serialized.
 	Swizzle  []int          // Indices into the values list which correspond to the fields in the prefixes. May not include all values.
-	Encoders []ValueEncoder // Encoders for each field, in the order they will be used. A nil value indicates that normal JSON reflection should be used
 
 	SkipNulls bool // When true, fields with a nil value will not be serialized.
 }
