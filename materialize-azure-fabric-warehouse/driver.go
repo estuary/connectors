@@ -3,15 +3,12 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
-	"encoding/json"
 	"fmt"
 	"strings"
 
-	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/microsoft/go-mssqldb/azuread"
 )
 
@@ -38,7 +35,7 @@ type config struct {
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"clientID", c.ClientID},
 		{"clientSecret", c.ClientSecret},
@@ -70,7 +67,7 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) db() (*stdsql.DB, error) {
+func (c config) db() (*stdsql.DB, error) {
 	db, err := stdsql.Open(
 		azuread.DriverName,
 		fmt.Sprintf(
@@ -84,21 +81,20 @@ func (c *config) db() (*stdsql.DB, error) {
 	return db, nil
 }
 
+func (c config) DefaultNamespace() string {
+	return c.Schema
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 type tableConfig struct {
 	Table  string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)." jsonschema_extras:"x-schema-name=true"`
 	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Update,description=Should updates to this table be done via delta updates." jsonschema_extras:"x-delta-updates=true"`
 
 	warehouse string
-}
-
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		// Default to the endpoint schema. This will be over-written by a present `schema` property
-		// within `raw`.
-		Schema:    ep.Config.(*config).Schema,
-		warehouse: ep.Config.(*config).Warehouse,
-	}
 }
 
 func (r tableConfig) Validate() error {
@@ -109,39 +105,41 @@ func (r tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.warehouse, c.Schema, c.Table}
+func (r tableConfig) WithDefaults(cfg config) tableConfig {
+	if r.Schema == "" {
+		r.Schema = cfg.Schema
+	}
+	r.warehouse = cfg.Warehouse
+
+	return r
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
+func (r tableConfig) Parameters() ([]string, bool, error) {
+	return []string{r.warehouse, r.Schema, r.Table}, r.Delta, nil
 }
 
-func newDriver() *sql.Driver {
-	return &sql.Driver{
+func newDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-azure-fabric-warehouse",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("could not parse endpoint configuration: %w", err)
-			}
-
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-
-			return &sql.Endpoint{
+		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.Warehouse, cfg.Schema}),
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					ExtendedLogging: true,
+					AckSchedule: &boilerplate.AckScheduleOption{
+						Config: cfg.Schedule,
+						Jitter: []byte(cfg.ConnectionString),
+					},
+					DBTJobTrigger: &cfg.DBTJobTrigger,
+				},
 			}, nil
 		},
 		PreReqs: preReqs,

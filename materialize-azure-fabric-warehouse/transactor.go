@@ -8,7 +8,7 @@ import (
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/segmentio/encoding/json"
@@ -31,7 +31,7 @@ type binding struct {
 }
 
 type transactor struct {
-	cfg *config
+	cfg config
 
 	fence sql.Fence
 
@@ -43,15 +43,14 @@ type transactor struct {
 
 func newTransactor(
 	ctx context.Context,
-	ep *sql.Endpoint,
+	ep *sql.Endpoint[config],
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
 	be *boilerplate.BindingEvents,
-) (m.Transactor, *boilerplate.MaterializeOptions, error) {
-	cfg := ep.Config.(*config)
-
+) (m.Transactor, error) {
+	var cfg = ep.Config
 	bucket, err := blob.NewAzureBlobBucket(
 		ctx,
 		cfg.ContainerName,
@@ -59,7 +58,7 @@ func newTransactor(
 		blob.WithAzureStorageAccountKey(cfg.StorageAccountKey),
 	)
 	if err != nil {
-		return nil, nil, fmt.Errorf("creating azure blob bucket: %w", err)
+		return nil, fmt.Errorf("creating azure blob bucket: %w", err)
 	}
 
 	t := &transactor{
@@ -90,16 +89,7 @@ func newTransactor(
 		t.bindings = append(t.bindings, b)
 	}
 
-	opts := &boilerplate.MaterializeOptions{
-		ExtendedLogging: true,
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: cfg.Schedule,
-			Jitter: []byte(cfg.ConnectionString),
-		},
-		DBTJobTrigger: &cfg.DBTJobTrigger,
-	}
-
-	return t, opts, nil
+	return t, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
