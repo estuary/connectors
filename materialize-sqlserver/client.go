@@ -14,37 +14,31 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	mssqldb "github.com/microsoft/go-mssqldb"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	db *stdsql.DB
+	ep *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
-
-	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	db, err := stdsql.Open("sqlserver", ep.Config.ToURI())
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
-		db:  db,
-		cfg: cfg,
-		ep:  ep,
+		db: db,
+		ep: ep,
 	}, nil
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	cfg := conf.(*config)
 
 	db, err := stdsql.Open("sqlserver", cfg.ToURI())
 	if err != nil {
@@ -84,8 +78,8 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 	return errs
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (is *boilerplate.InfoSchema, err error) {
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, c.cfg.Database, resourcePaths)
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
 }
 
 var columnMigrationSteps = []sql.ColumnMigrationStep{
@@ -178,7 +172,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		// string-type columns also have an collation that needs to be considered. Flow will create
 		// new string-type columns with a selected collation, but won't change the collation for
 		// pre-existing columns.
-		tableDetails, err := tableDetails(ctx, c.db, c.ep.Dialect, c.cfg.Database, ta.InfoLocation.TableSchema, ta.InfoLocation.TableName)
+		tableDetails, err := tableDetails(ctx, c.db, c.ep.Dialect, c.ep.Config.Database, ta.InfoLocation.TableSchema, ta.InfoLocation.TableName)
 		if err != nil {
 			return "", nil, fmt.Errorf("getting table details: %w", err)
 		}
@@ -225,7 +219,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return sql.StdListSchemas(ctx, c.db)
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
