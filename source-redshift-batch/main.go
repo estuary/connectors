@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 	"text/template"
+	"time"
 
 	"github.com/estuary/connectors/go/common"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -200,6 +201,15 @@ func generateRedshiftResource(cfg *Config, resourceName, schemaName, tableName, 
 }
 
 func translateRedshiftValue(val any, databaseTypeName string) (any, error) {
+	if val, ok := val.(time.Time); ok {
+		if val.Year() < 0 || val.Year() > 9999 {
+			// We could in theory clamp excessively large years to positive infinity, but this
+			// is of limited usefulness since these are never real dates, they're mostly just
+			// dumb typos like `20221` and so we might as well normalize all errors consistently.
+			return "0000-01-01T00:00:00Z", nil
+		}
+		return val.Format(time.RFC3339Nano), nil
+	}
 	if val, ok := val.([]byte); ok {
 		switch {
 		case strings.EqualFold(databaseTypeName, "JSON"):
