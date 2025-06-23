@@ -1,9 +1,6 @@
 import asyncio
-import json
 from logging import Logger
 from typing import Any
-
-from pydantic import ValidationError
 
 from estuary_cdk.http import HTTPSession
 from source_shopify_native.models import (
@@ -16,6 +13,7 @@ from source_shopify_native.models import (
     BulkOperationStatuses,
     BulkOperationTypes,
     BulkOperationUserErrors,
+    ShopifyGraphQLResource,
 )
 
 VERSION = "2025-04"
@@ -24,6 +22,7 @@ BULK_QUERY_ALREADY_EXISTS_ERROR = (
 )
 INITIAL_SLEEP = 1
 MAX_SLEEP = 150
+SIX_HOURS = 6 * 60 * 60
 
 bulk_job_lock = asyncio.Lock()
 
@@ -206,23 +205,41 @@ class BulkJobManager:
         return status
 
     # Submits a bulk job & fetches the result URL
-    async def execute(self, query: str) -> str | None:
+    async def execute(self, model: type[ShopifyGraphQLResource], query: str) -> str | None:
         # Only a single bulk query job can be executed at a time via Shopify's API.
         async with bulk_job_lock:
             job_id = await self._submit(query)
 
             delay = INITIAL_SLEEP
+            total_sleep = 0
 
             while True:
                 details = await self._get_job(job_id)
                 match details.status:
                     case BulkOperationStatuses.COMPLETED:
-                        self.log.info(f"Job {job_id} has completed.", details)
+                        self.log.info(f"Job {job_id} has completed.", {
+                            "stream": model.NAME,
+                            "details": details,
+                        })
                         return details.url
                     case BulkOperationStatuses.CREATED | BulkOperationStatuses.RUNNING:
                         self.log.info(
-                            f"Job {job_id} is {details.status}. Sleeping {delay} seconds to await job completion."
+                            f"Job {job_id} is {details.status}. Sleeping {delay} seconds to await job completion.", {
+                                "stream": model.NAME,
+                            }
                         )
+                        total_sleep += delay
+
+                        if total_sleep > SIX_HOURS:
+                            self.log.warning(
+                                f"Shopify has been working on job {job_id} for over {SIX_HOURS / (60 * 60)} hours. "
+                                "This is likely due to a large amount of data being processed within the job. "
+                                "Consider reducing how much data is processed in a single job by reducing the advanced date window setting in the config.", {
+                                    "stream": model.NAME,
+                                    "total_sleep": total_sleep,
+                                }
+                            )
+
                         await asyncio.sleep(delay)
                         delay = min(delay * 2, MAX_SLEEP)
                     case (

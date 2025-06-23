@@ -242,7 +242,7 @@ class ShopDetails(BaseModel, extra="allow"):
 class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     QUERY: ClassVar[str] = ""
     FRAGMENTS: ClassVar[list[str]] = []
-    NAME: ClassVar[str] = ""  # Add NAME class variable for resource name
+    NAME: ClassVar[str] = ""
 
     id: str
 
