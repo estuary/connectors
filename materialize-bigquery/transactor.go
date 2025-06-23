@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
@@ -474,6 +475,12 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	group, groupCtx := errgroup.WithContext(ctx)
+	// You can run up to 1,000 concurrent multi-statement queries, so we use a
+	// generous concurrency limit here, while not leaving it completely
+	// unlimited.
+	group.SetLimit(100)
+
 	for sk, item := range t.cp {
 		var b *binding
 		for _, binding := range t.bindings {
@@ -488,27 +495,34 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
-		// TODO: Concurrency.
-		t.be.StartedResourceCommit(b.target.Path)
-		if err := t.client.queryIdempotent(ctx, b.bqTableSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
-			return nil, fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
-		}
-		for _, uri := range item.SourceURIs {
-			trimmed := strings.TrimPrefix(uri, "gs://")
-			bucket, key, ok := strings.Cut(trimmed, "/")
-			if !ok {
-				return nil, fmt.Errorf("invalid uri %q", uri)
+		group.Go(func() error {
+			t.be.StartedResourceCommit(b.target.Path)
+			if err := t.client.queryIdempotent(groupCtx, b.bqTableSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
+				return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
 			}
-			if err := t.client.cloudStorageClient.Bucket(bucket).Object(key).Delete(ctx); err != nil {
-				var e *googleapi.Error
-				if errors.As(err, &e) && e.Code == 404 {
-					continue
+			for _, uri := range item.SourceURIs {
+				trimmed := strings.TrimPrefix(uri, "gs://")
+				bucket, key, ok := strings.Cut(trimmed, "/")
+				if !ok {
+					return fmt.Errorf("invalid uri %q", uri)
 				}
+				if err := t.client.cloudStorageClient.Bucket(bucket).Object(key).Delete(groupCtx); err != nil {
+					var e *googleapi.Error
+					if errors.As(err, &e) && e.Code == 404 {
+						continue
+					}
 
-				return nil, fmt.Errorf("cleaning up staged object: %w", err)
+					return fmt.Errorf("cleaning up staged object: %w", err)
+				}
 			}
-		}
-		t.be.FinishedResourceCommit(b.target.Path)
+			t.be.FinishedResourceCommit(b.target.Path)
+
+			return nil
+		})
+	}
+
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 
 	var checkpointClear = make(checkpoint)
