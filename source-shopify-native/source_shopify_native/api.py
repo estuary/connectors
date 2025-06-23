@@ -24,7 +24,7 @@ async def fetch_incremental(
     end = min(max_end, datetime.now(tz=UTC))
     query = model.build_query(log_cursor, end)
 
-    url = await bulk_job_manager.execute(query)
+    url = await bulk_job_manager.execute(model, query)
 
     if url is None:
         log.info(
@@ -51,7 +51,7 @@ async def fetch_full_refresh(
     end = datetime.now(tz=UTC)
     query = model.build_query(start_date, end)
 
-    url = await bulk_job_manager.execute(query)
+    url = await bulk_job_manager.execute(model, query)
 
     if url is None:
         log.info(
