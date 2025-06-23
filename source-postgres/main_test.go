@@ -311,7 +311,8 @@ func TestConfigURI(t *testing.T) {
 				valid = err.Error()
 			}
 			cfg.SetDefaults()
-			var uri = cfg.ToURI()
+			var uri, err = cfg.ToURI(context.Background())
+			require.NoError(t, err)
 			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
 		})
 	}

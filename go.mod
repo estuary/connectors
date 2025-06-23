@@ -16,10 +16,11 @@ require (
 	github.com/apache/arrow-go/v18 v18.2.0
 	github.com/apache/iceberg-go v0.2.0
 	github.com/aws/aws-sdk-go v1.55.6
-	github.com/aws/aws-sdk-go-v2 v1.36.3
+	github.com/aws/aws-sdk-go-v2 v1.36.5
 	github.com/aws/aws-sdk-go-v2/config v1.29.10
 	github.com/aws/aws-sdk-go-v2/credentials v1.17.63
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.18.8
+	github.com/aws/aws-sdk-go-v2/feature/rds/auth v1.5.13
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.17.67
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.42.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.25.1
@@ -27,7 +28,8 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/kinesis v1.33.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.78.2
 	github.com/aws/aws-sdk-go-v2/service/ssm v1.58.0
-	github.com/aws/smithy-go v1.22.3
+	github.com/aws/aws-sdk-go-v2/service/sts v1.33.17
+	github.com/aws/smithy-go v1.22.4
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0
 	github.com/databricks/databricks-sdk-go v0.41.0
@@ -140,7 +142,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.18.15 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.25.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.29.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.33.17 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
