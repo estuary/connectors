@@ -9,6 +9,7 @@ airbyte-cdk = "^0.52"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 freezegun = "^1.4.0"
 google-ads = "^26.1.0"
+protobuf = ">=5.29.5"
 pydantic = "==1.10.14"
 python = ">=3.11,<3.13"
 types-requests = "^2.31"
