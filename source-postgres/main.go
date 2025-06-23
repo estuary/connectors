@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
@@ -139,8 +140,8 @@ type credentialConfig struct {
 
 	Password string `json:"password,omitempty"`
 
-	AWSRegion    string `json:"aws_region,omitempty"`
-	AWSRole      string `json:"aws_role,omitempty"`
+	AWSRegion     string `json:"aws_region,omitempty"`
+	AWSRole       string `json:"aws_role,omitempty"`
 	AWSExternalId string `json:"aws_external_id,omitempty"`
 }
 
@@ -416,14 +417,27 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 			// Create STS client for role assumption
 			stsClient := sts.NewFromConfig(cfg)
 
-			// Create credentials that automatically assume the role
-			var roleCredentials *stscreds.AssumeRoleProvider
-			if c.Credentials.AWSExternalId != "" {
-				roleCredentials = stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole, func(o *stscreds.AssumeRoleOptions) {
-					o.ExternalID = &c.Credentials.AWSExternalId
-				})
+			// Check current caller identity
+			callerIdentity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+			if err != nil {
+				return "", fmt.Errorf("getting caller identity: %w", err)
+			}
+
+			// Check if current identity ARN matches the target role ARN
+			// If they match, we can skip the AssumeRole call and use current credentials
+			var credentialsProvider aws.CredentialsProvider
+			if callerIdentity.Arn != nil && *callerIdentity.Arn == c.Credentials.AWSRole {
+				// Current identity matches target role, use the default credentials from config
+				credentialsProvider = cfg.Credentials
 			} else {
-				roleCredentials = stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole)
+				// Need to assume the role
+				var opts []func(*stscreds.AssumeRoleOptions)
+				if c.Credentials.AWSExternalId != "" {
+					opts = append(opts, func(o *stscreds.AssumeRoleOptions) {
+						o.ExternalID = &c.Credentials.AWSExternalId
+					})
+				}
+				credentialsProvider = stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole, opts...)
 			}
 
 			// Generate IAM auth token
@@ -432,7 +446,7 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 				c.Address,
 				c.Credentials.AWSRegion,
 				user,
-				roleCredentials,
+				credentialsProvider,
 			)
 			if err != nil {
 				return "", fmt.Errorf("building AWS auth token: %w", err)
