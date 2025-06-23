@@ -24,7 +24,11 @@ var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
 
 func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJSON json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	// Replication database connection used for event streaming
-	connConfig, err := pgconn.ParseConfig(db.config.ToURI())
+	var connURI, err = db.config.ToURI(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("error generating connectiong URL: %w", err)
+	}
+	connConfig, err := pgconn.ParseConfig(connURI)
 	if err != nil {
 		return nil, err
 	}

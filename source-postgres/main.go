@@ -11,6 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -18,9 +22,11 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/sirupsen/logrus"
+	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
 type sshForwarding struct {
@@ -110,14 +116,97 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
-	Address     string         `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User        string         `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
-	Password    string         `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database    string         `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=3"`
-	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
-	Advanced    advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Address     string            `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string            `json:"user" jsonschema:"-"`
+	Password    string            `json:"password" jsonschema:""`
+	Database    string            `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=1"`
+	HistoryMode bool              `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=2"`
+	Credentials *credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=3"`
+	Advanced    advancedConfig    `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+}
+
+const (
+	UserPassword = "UserPassword"
+	AWSIAM       = "AWSIAM"
+)
+
+type credentialConfig struct {
+	AuthType string `json:"auth_type"`
+
+	User string `json:"user,omitempty"`
+
+	Password string `json:"password,omitempty"`
+
+	AWSRegion string `json:"aws_region,omitempty"`
+	AWSRole   string `json:"aws_role,omitemoty"`
+}
+
+// JSONSchema allows for the schema to be (semi-)manually specified when used with the
+// github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
+// our oauth
+func (credentialConfig) JSONSchema() *jsonschema.Schema {
+	userPass := orderedmap.New[string, *jsonschema.Schema]()
+	userPass.Set("auth_type", &jsonschema.Schema{
+		Type:    "string",
+		Default: UserPassword,
+		Const:   UserPassword,
+	})
+	userPass.Set("user", &jsonschema.Schema{
+		Description: "The database user to authenticate as.",
+		Type:        "string",
+		Default:     "flow_capture",
+	})
+	userPass.Set("password", &jsonschema.Schema{
+		Description: "Password for the specified database user.",
+		Type:        "string",
+		Extras: map[string]interface{}{
+			"secret": true,
+		},
+	})
+
+	aws := orderedmap.New[string, *jsonschema.Schema]()
+	aws.Set("auth_type", &jsonschema.Schema{
+		Type:    "string",
+		Default: AWSIAM,
+		Const:   AWSIAM,
+	})
+	aws.Set("user", &jsonschema.Schema{
+		Description: "The database user to authenticate as.",
+		Type:        "string",
+		Default:     "flow_capture",
+	})
+	aws.Set("aws_region", &jsonschema.Schema{
+		Type:        "string",
+		Description: "AWS Region of your database",
+		Enum:        []any{"us-east-2", "us-east-1", "us-west-1", "us-west-2", "af-south-1", "ap-east-1", "ap-south-2", "ap-southeast-3", "ap-southeast-5", "ap-southeast-4", "ap-south-1", "ap-northeast-3", "ap-northeast-2", "ap-southeast-1", "ap-southeast-2", "ap-east-2", "ap-southeast-7", "ap-northeast-1", "ca-central-1", "ca-west-1", "eu-central-1", "eu-west-1", "eu-west-2", "eu-south-1", "eu-west-3", "eu-south-2", "eu-north-1", "eu-central-2", "il-central-1", "mx-central-1", "me-south-1", "me-central-1", "sa-east-1", "us-gov-east-1", "us-gov-west-1"},
+	})
+	aws.Set("aws_role", &jsonschema.Schema{
+		Type:        "string",
+		Description: "AWS Role which has rds-db:connect access to be assumed by Estuary",
+	})
+
+	return &jsonschema.Schema{
+		Title:   "Authentication",
+		Default: map[string]string{"auth_type": UserPassword},
+		OneOf: []*jsonschema.Schema{
+			{
+				Title:      "Username & Password",
+				Required:   []string{"auth_type", UserPassword},
+				Properties: userPass,
+			},
+			{
+				Title:      "AWS IAM",
+				Required:   []string{"auth_type", AWSIAM},
+				Properties: aws,
+			},
+		},
+		Extras: map[string]interface{}{
+			"discriminator": map[string]string{"propertyName": "auth_type"},
+		},
+		Type: "object",
+	}
 }
 
 type advancedConfig struct {
@@ -188,14 +277,42 @@ var featureFlagDefaults = map[string]bool{
 
 // Validate checks that the configuration possesses all required properties.
 func (c *Config) Validate() error {
-	var requiredProperties = [][]string{
-		{"address", c.Address},
-		{"user", c.User},
-		{"password", c.Password},
+	if c.Address == "" {
+		return errors.New("missing 'address'")
 	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("missing '%s'", req[0])
+
+	if c.Credentials == nil {
+		var requiredProperties = [][]string{
+			{"user", c.User},
+			{"password", c.Password},
+		}
+		for _, req := range requiredProperties {
+			if req[1] == "" {
+				return fmt.Errorf("missing '%s'", req[0])
+			}
+		}
+
+	}
+
+	if c.Credentials != nil {
+		switch c.Credentials.AuthType {
+		case UserPassword:
+			if c.Credentials.User == "" {
+				return errors.New("missing 'user'")
+			}
+			if c.Credentials.Password == "" {
+				return errors.New("missing 'password'")
+			}
+		case AWSIAM:
+			if c.Credentials.AWSRegion == "" {
+				return errors.New("missing 'aws_region'")
+			}
+			if c.Credentials.AWSRole == "" {
+				return errors.New("missing 'aws_role'")
+			}
+			if c.Credentials.User == "" {
+				return errors.New("missing 'user'")
+			}
 		}
 	}
 
@@ -263,17 +380,55 @@ func (c *Config) SetDefaults() {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *Config) ToURI() string {
+func (c *Config) ToURI(ctx context.Context) (string, error) {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
 	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		address = "localhost:5432"
 	}
+
+	var user = c.User
+	var pass = c.Password
+	if c.Credentials != nil {
+		user = c.Credentials.User
+
+		switch c.Credentials.AuthType {
+		case UserPassword:
+			pass = c.Credentials.Password
+		case AWSIAM:
+			// Load AWS config
+			cfg, err := config.LoadDefaultConfig(ctx,
+				config.WithRegion(c.Credentials.AWSRegion),
+			)
+			if err != nil {
+				return "", fmt.Errorf("loading default AWS config: %w", err)
+			}
+
+			// Create STS client for role assumption
+			stsClient := sts.NewFromConfig(cfg)
+
+			// Create credentials that automatically assume the role
+			roleCredentials := stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole)
+
+			// Generate IAM auth token
+			pass, err = auth.BuildAuthToken(
+				ctx,
+				c.Address,
+				c.Credentials.AWSRegion,
+				user,
+				roleCredentials,
+			)
+			if err != nil {
+				return "", fmt.Errorf("building AWS auth token: %w", err)
+			}
+		}
+	}
+
 	var uri = url.URL{
 		Scheme: "postgres",
 		Host:   address,
-		User:   url.UserPassword(c.User, c.Password),
+		User:   url.UserPassword(user, pass),
 	}
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
@@ -286,7 +441,7 @@ func (c *Config) ToURI() string {
 	if len(params) > 0 {
 		uri.RawQuery = params.Encode()
 	}
-	return uri.String()
+	return uri.String(), nil
 }
 
 func configSchema() json.RawMessage {
@@ -324,8 +479,11 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		"slot":     db.config.Advanced.SlotName,
 	}).Info("initializing connector")
 
-	// Normal database connection used for table scanning
-	var config, err = pgx.ParseConfig(db.config.ToURI())
+	var connURI, err = db.config.ToURI(ctx)
+	if err != nil {
+		return fmt.Errorf("error generating connectiong URL: %w", err)
+	}
+	config, err := pgx.ParseConfig(connURI)
 	if err != nil {
 		return fmt.Errorf("error parsing database uri: %w", err)
 	}

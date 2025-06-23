@@ -10,29 +10,121 @@
         "description": "The host or host:port at which the database can be reached.",
         "order": 0
       },
-      "user": {
-        "type": "string",
-        "description": "The database user to authenticate as.",
-        "default": "flow_capture",
-        "order": 1
-      },
       "password": {
-        "type": "string",
-        "description": "Password for the specified database user.",
-        "order": 2,
-        "secret": true
+        "type": "string"
       },
       "database": {
         "type": "string",
         "description": "Logical database name to capture from.",
         "default": "postgres",
-        "order": 3
+        "order": 1
       },
       "historyMode": {
         "type": "boolean",
         "description": "Capture change events without reducing them to a final state.",
         "default": false,
-        "order": 4
+        "order": 2
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "UserPassword",
+                "default": "UserPassword"
+              },
+              "user": {
+                "type": "string",
+                "description": "The database user to authenticate as.",
+                "default": "flow_capture"
+              },
+              "password": {
+                "type": "string",
+                "description": "Password for the specified database user.",
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "UserPassword"
+            ],
+            "title": "Username \u0026 Password"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM"
+              },
+              "user": {
+                "type": "string",
+                "description": "The database user to authenticate as.",
+                "default": "flow_capture"
+              },
+              "aws_region": {
+                "type": "string",
+                "enum": [
+                  "us-east-2",
+                  "us-east-1",
+                  "us-west-1",
+                  "us-west-2",
+                  "af-south-1",
+                  "ap-east-1",
+                  "ap-south-2",
+                  "ap-southeast-3",
+                  "ap-southeast-5",
+                  "ap-southeast-4",
+                  "ap-south-1",
+                  "ap-northeast-3",
+                  "ap-northeast-2",
+                  "ap-southeast-1",
+                  "ap-southeast-2",
+                  "ap-east-2",
+                  "ap-southeast-7",
+                  "ap-northeast-1",
+                  "ca-central-1",
+                  "ca-west-1",
+                  "eu-central-1",
+                  "eu-west-1",
+                  "eu-west-2",
+                  "eu-south-1",
+                  "eu-west-3",
+                  "eu-south-2",
+                  "eu-north-1",
+                  "eu-central-2",
+                  "il-central-1",
+                  "mx-central-1",
+                  "me-south-1",
+                  "me-central-1",
+                  "sa-east-1",
+                  "us-gov-east-1",
+                  "us-gov-west-1"
+                ],
+                "description": "AWS Region of your database"
+              },
+              "aws_role": {
+                "type": "string",
+                "description": "AWS Role which has rds-db:connect access to be assumed by Estuary"
+              }
+            },
+            "required": [
+              "auth_type",
+              "AWSIAM"
+            ],
+            "title": "AWS IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "UserPassword"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 3
       },
       "advanced": {
         "properties": {
@@ -146,10 +238,10 @@
     "type": "object",
     "required": [
       "address",
-      "user",
       "password",
       "database",
-      "historyMode"
+      "historyMode",
+      "credentials"
     ],
     "title": "PostgreSQL Connection"
   },
