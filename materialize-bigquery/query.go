@@ -19,6 +19,108 @@ var (
 	errNotFound = errors.New("not found")
 )
 
+func (c client) queryIdempotent(
+	ctx context.Context,
+	schema bigquery.Schema,
+	query string,
+	jobPrefix string,
+	sourceURIs []string,
+	tempTableName string,
+) error {
+	var edcTableDefs = make(map[string]bigquery.ExternalData)
+	edcTableDefs[tempTableName] = &bigquery.ExternalDataConfig{
+		SourceFormat: bigquery.JSON,
+		SourceURIs:   sourceURIs,
+		Schema:       schema,
+		Compression:  bigquery.Gzip,
+	}
+
+	q := c.bigqueryClient.Query(query)
+	q.Location = c.cfg.Region
+	q.TableDefinitions = edcTableDefs
+
+	var attempt uint32 = 1
+	for ; ; attempt++ {
+		jobID := fmt.Sprintf("flow-%s-%010d", jobPrefix, attempt)
+		q.JobID = jobID
+
+		job, err := q.Run(ctx)
+		if err != nil {
+			var e *googleapi.Error
+			if errors.As(err, &e) && e.Code == 409 {
+				// A 409 error code means that a job with the given ID already
+				// exists. This happens if a prior attempt to run the job failed
+				// or has yet to complete. If a prior job with the same ID
+				// failed, we must try again with a new job ID that is 1 higher
+				// than the last one. If it is still running, we can wait for it
+				// to finish.
+				j, err := c.bigqueryClient.JobFromIDLocation(ctx, jobID, c.cfg.Region)
+				if err != nil {
+					return fmt.Errorf("getting job metadata for %q: %w", jobID, err)
+				}
+
+				if stat, err := j.Status(ctx); err != nil {
+					return fmt.Errorf("getting job status of previously submitted job %q: %w", jobID, err)
+				} else if stat.Err() != nil {
+					log.WithFields(log.Fields{
+						"error": err,
+						"jobID": jobID,
+						"query": query,
+					}).Warn("previously submitted job failed, will retry with new job ID")
+					continue
+				} else if stat.Done() {
+					// This would be somewhat unusual, but could happen if the
+					// connector exited for some reason after submitting a job
+					// but before it could acknowledge the commit to the Flow
+					// runtime.
+					log.WithField("jobID", jobID).Info("previously submitted job completed successfully")
+					return nil
+				}
+
+				log.WithFields(log.Fields{
+					"jobID": jobID,
+				}).Info("waiting for previously submitted job to finish")
+
+				if stat, err := j.Wait(ctx); err != nil {
+					return fmt.Errorf("getting job status of previously submitted job %q while waiting for it to finish: %w", jobID, err)
+				} else if stat.Err() != nil {
+					return fmt.Errorf("waited for previously submitted job %q to finish but it resulted in an error: %w", jobID, err)
+				} else if !stat.Done() {
+					return fmt.Errorf("interal application error: previously submitted job not done after waiting with no error")
+				}
+
+				log.WithFields(log.Fields{
+					"jobID": jobID,
+				}).Info("previously submitted job finished successfully after waiting")
+			}
+
+			// Other errors will crash the connector and automatically be
+			// retried when it restarts.
+			return err
+		}
+
+		// Check the job status to see if it failed immediately, which has been
+		// observed to happen under some circumstances and can cause `job.Wait`
+		// to hang.
+		if stat, err := job.Status(ctx); err != nil {
+			return fmt.Errorf("queryIdempotent: getting job status: %w", err)
+		} else if stat.Err() != nil {
+			return fmt.Errorf("queryIdempotent: job failed: %w", stat.Err())
+		}
+
+		// Wait for the job to complete, ensuring that it does so without error.
+		if stat, err := job.Wait(ctx); err != nil {
+			return fmt.Errorf("queryIdempotent: waiting for job: %w", err)
+		} else if stat.Err() != nil {
+			return fmt.Errorf("queryIdempotent: job failed after waiting: %w", stat.Err())
+		} else if !stat.Done() {
+			return fmt.Errorf("interal application error: job not done after waiting with no error")
+		}
+
+		return nil
+	}
+}
+
 // query executes a query against BigQuery and returns the completed job.
 func (c client) query(ctx context.Context, queryString string, parameters ...interface{}) (*bigquery.Job, error) {
 	return c.runQuery(ctx, c.newQuery(queryString, parameters...))

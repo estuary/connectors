@@ -11,6 +11,7 @@ import (
 type binding struct {
 	target         sql.Table
 	storeInsertSQL string
+	bqTableSchema  bigquery.Schema
 
 	loadFile         *stagedFile
 	storeFile        *stagedFile

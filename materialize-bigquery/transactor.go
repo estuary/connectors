@@ -13,10 +13,22 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
 )
+
+type checkpointItem struct {
+	Query      string
+	SourceURIs []string
+	JobPrefix  string
+	// TempTableName is referenced in the persisted query. We need to persist it
+	// separately to specify the external data connector table definition.
+	TempTableName string
+}
+
+type checkpoint = map[string]*checkpointItem
 
 type transactor struct {
 	fence             *sql.Fence
@@ -24,6 +36,7 @@ type transactor struct {
 	dialect           sql.Dialect
 	templates         templates
 	objAndArrayAsJson bool
+	idempotentApply   bool
 
 	client     *client
 	bucketPath string
@@ -31,6 +44,7 @@ type transactor struct {
 
 	bindings []*binding
 	be       *boilerplate.BindingEvents
+	cp       checkpoint
 
 	loggedStorageApiMessage bool
 }
@@ -39,6 +53,7 @@ func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates templates,
 	objAndArrayAsJson bool,
+	idempotentApply bool,
 ) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
 	return func(
 		ctx context.Context,
@@ -62,6 +77,7 @@ func prepareNewTransactor(
 			dialect:           dialect,
 			templates:         templates,
 			objAndArrayAsJson: objAndArrayAsJson,
+			idempotentApply:   idempotentApply,
 			client:            client,
 			bucketPath:        cfg.BucketPath,
 			bucket:            cfg.Bucket,
@@ -124,6 +140,7 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 
 	b := &binding{
 		target:           target,
+		bqTableSchema:    storeSchema,
 		loadFile:         newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, loadSchema),
 		storeFile:        newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, storeSchema),
 		loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
@@ -168,8 +185,13 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	return s, nil
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error {
+	if err := json.Unmarshal(state, &t.cp); err != nil {
+		return fmt.Errorf("unmarshaling checkpoint state: %w", err)
+	}
+
+	return nil
+}
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
@@ -330,6 +352,47 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		cleanupFiles = append(cleanupFiles, cleanupFn)
 	}
 
+	if t.idempotentApply {
+		for _, b := range t.bindings {
+			if !b.hasData {
+				continue
+			}
+
+			var query string
+			if b.mustMerge {
+				mergeQuery, err := renderQueryTemplate(b.target, t.templates.storeUpdate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
+				if err != nil {
+					return nil, fmt.Errorf("rendering merge query template: %w", err)
+				}
+				query = mergeQuery
+
+			} else {
+				query = b.storeInsertSQL
+			}
+
+			// Reset for the next round.
+			b.hasData = false
+			b.mustMerge = false
+
+			uris := b.storeFile.edc().SourceURIs
+			t.cp[b.target.StateKey] = &checkpointItem{
+				Query:         query,
+				SourceURIs:    uris,
+				JobPrefix:     uuid.NewString(),
+				TempTableName: b.tempTableName,
+			}
+		}
+
+		return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+			var checkpointJSON, err = json.Marshal(t.cp)
+			if err != nil {
+				return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+			}
+
+			return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
+		}, nil
+	}
+
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
 		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
@@ -406,6 +469,54 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 	}
 
 	return nil
+}
+
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	for sk, item := range t.cp {
+		// Look up the current binding for this item. If it's not found, skip,
+		// since it is probably a disabled binding.
+		var b *binding
+		for _, binding := range t.bindings {
+			if binding.target.StateKey == sk {
+				b = binding
+				break
+			}
+		}
+
+		if b == nil {
+			continue
+		}
+
+		// TODO: Concurrency.
+		t.be.StartedResourceCommit(b.target.Path)
+		if err := t.client.queryIdempotent(ctx, b.bqTableSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
+			return nil, fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
+		}
+		for _, uri := range item.SourceURIs {
+			trimmed := strings.TrimPrefix(uri, "gs://")
+			bucket, key, ok := strings.Cut(trimmed, "/")
+			if !ok {
+				return nil, fmt.Errorf("invalid uri %q", uri)
+			}
+			if err := t.client.cloudStorageClient.Bucket(bucket).Object(key).Delete(ctx); err != nil {
+				return nil, err
+			}
+		}
+
+		t.be.FinishedResourceCommit(b.target.Path)
+	}
+
+	var checkpointClear = make(checkpoint)
+	for _, b := range t.bindings {
+		checkpointClear[b.target.StateKey] = nil
+		delete(t.cp, b.target.StateKey)
+	}
+	var checkpointJSON, err = json.Marshal(checkpointClear)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+
+	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
 }
 
 func (t *transactor) Destroy() {
