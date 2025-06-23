@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_dateandtimetypes_307398": 11 Documents
+# Collection "acmeCo/test/test_dateandtimetypes_307398": 13 Documents
 # ================================
 {"type":"object","required":["_meta","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-postgres-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"}},"additionalProperties":false,"type":"object","required":["polled","index","row_id"],"additionalProperties":false},"date_col":{"format":"date-time","description":"(source type: date)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"},"interval_col":{"description":"(source type: interval)","type":["string"]},"time_col":{"description":"(source type: time)","type":["string"]},"timetz_col":{"format":"time","description":"(source type: timetz)","type":["string"]},"ts_col":{"format":"date-time","description":"(source type: timestamp)","type":["string"]},"tstz_col":{"format":"date-time","description":"(source type: timestamptz)","type":["string"]}},"x-infer-schema":true}
 {"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"date_col":"2025-02-14T00:00:00Z","id":0,"interval_col":"1 year 2 mons 3 days 04:05:06","time_col":"14:44:29","timetz_col":"14:44:29-05","ts_col":"2025-02-14T14:44:29Z","tstz_col":"2025-02-14T00:44:29-05:00","txid":999999}
@@ -12,8 +12,10 @@
 {"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7},"date_col":"2024-02-14T00:00:00Z","id":7,"interval_col":"00:00:01.123456","time_col":"15:30:45.123456","timetz_col":"15:30:45.123456+00","ts_col":"2024-02-14T15:30:45.123456Z","tstz_col":"2024-02-14T10:30:45.123456-05:00","txid":999999}
 {"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8},"date_col":"2024-02-14T00:00:00Z","id":8,"interval_col":"2 years 3 mons 4 days 12:30:45.123456","time_col":"15:30:45","timetz_col":"15:30:45+00","ts_col":"2024-02-14T15:30:45Z","tstz_col":"2024-02-14T10:30:45-05:00","txid":999999}
 {"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9},"date_col":null,"id":9,"interval_col":null,"time_col":null,"timetz_col":null,"ts_col":null,"tstz_col":null,"txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":10,"row_id":10},"date_col":"0000-01-01T00:00:00Z","id":10,"interval_col":null,"time_col":null,"timetz_col":null,"ts_col":"0000-01-01T00:00:00Z","tstz_col":"0000-01-01T00:00:00Z","txid":999999}
+{"_meta":{"polled":"<TIMESTAMP>","index":11,"row_id":11},"date_col":"0000-01-01T00:00:00Z","id":11,"interval_col":null,"time_col":null,"timetz_col":null,"ts_col":"0000-01-01T00:00:00Z","tstz_col":"0000-01-01T00:00:00Z","txid":999999}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test_dateandtimetypes_307398":{"BaseXID":999999,"CursorNames":["txid"],"DocumentCount":10,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)","NextXID":0,"ScanTID":""}}}
+{"bindingStateV1":{"test_dateandtimetypes_307398":{"BaseXID":999999,"CursorNames":["txid"],"DocumentCount":12,"LastPolled":"<TIMESTAMP>","Mode":"Incremental (XMIN)","NextXID":0,"ScanTID":""}}}
 

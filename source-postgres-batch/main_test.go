@@ -541,6 +541,12 @@ func TestDateAndTimeTypes(t *testing.T) {
 				"15:30:45", "15:30:45Z",
 				"2 years 3 months 4 days 12 hours 30 minutes 45.123456 seconds"},
 			{9, nil, nil, nil, nil, nil, nil},
+			{10, "22024-02-14", "22024-02-14 15:30:45",
+				time.Date(22024, 2, 14, 15, 30, 45, 0, time.UTC),
+				nil, nil, nil},
+			{11, "500-02-14 BC", "500-02-14 BC 15:30:45",
+				time.Date(-499, 2, 14, 15, 30, 45, 0, time.UTC),
+				nil, nil, nil},
 		} {
 			executeControlQuery(t, control, fmt.Sprintf(`
                 INSERT INTO %s (
