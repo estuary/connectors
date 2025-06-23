@@ -140,8 +140,9 @@ type credentialConfig struct {
 
 	Password string `json:"password,omitempty"`
 
-	AWSRegion string `json:"aws_region,omitempty"`
-	AWSRole   string `json:"aws_role,omitemoty"`
+	AWSRegion    string `json:"aws_region,omitempty"`
+	AWSRole      string `json:"aws_role,omitempty"`
+	AWSExternalId string `json:"aws_external_id,omitempty"`
 }
 
 // JSONSchema allows for the schema to be (semi-)manually specified when used with the
@@ -186,6 +187,13 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 	aws.Set("aws_role", &jsonschema.Schema{
 		Type:        "string",
 		Description: "AWS Role which has rds-db:connect access to be assumed by Estuary",
+	})
+	aws.Set("aws_external_id", &jsonschema.Schema{
+		Type:        "string",
+		Description: "External ID to use when assuming the AWS Role",
+		Extras: map[string]interface{}{
+			"secret": true,
+		},
 	})
 
 	return &jsonschema.Schema{
@@ -410,7 +418,14 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 			stsClient := sts.NewFromConfig(cfg)
 
 			// Create credentials that automatically assume the role
-			roleCredentials := stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole)
+			var roleCredentials *stscreds.AssumeRoleProvider
+			if c.Credentials.AWSExternalId != "" {
+				roleCredentials = stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole, func(o *stscreds.AssumeRoleOptions) {
+					o.ExternalID = &c.Credentials.AWSExternalId
+				})
+			} else {
+				roleCredentials = stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole)
+			}
 
 			// Generate IAM auth token
 			pass, err = auth.BuildAuthToken(
