@@ -3,6 +3,7 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"text/template"
@@ -16,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 )
 
@@ -473,8 +475,6 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	for sk, item := range t.cp {
-		// Look up the current binding for this item. If it's not found, skip,
-		// since it is probably a disabled binding.
 		var b *binding
 		for _, binding := range t.bindings {
 			if binding.target.StateKey == sk {
@@ -484,6 +484,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		if b == nil {
+			// No binding is enabled for this state key.
 			continue
 		}
 
@@ -499,10 +500,14 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				return nil, fmt.Errorf("invalid uri %q", uri)
 			}
 			if err := t.client.cloudStorageClient.Bucket(bucket).Object(key).Delete(ctx); err != nil {
-				return nil, err
+				var e *googleapi.Error
+				if errors.As(err, &e) && e.Code == 404 {
+					continue
+				}
+
+				return nil, fmt.Errorf("cleaning up staged object: %w", err)
 			}
 		}
-
 		t.be.FinishedResourceCommit(b.target.Path)
 	}
 
