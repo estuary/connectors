@@ -43,6 +43,7 @@ type transactor struct {
 
 func newTransactor(
 	ctx context.Context,
+	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
 	fence sql.Fence,
 	bindings []sql.Table,

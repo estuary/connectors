@@ -247,9 +247,10 @@ type transactor struct {
 
 func prepareNewTransactor(
 	templates templates,
-) func(context.Context, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
+) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
+		featureFlags map[string]bool,
 		ep *sql.Endpoint[config],
 		fence sql.Fence,
 		bindings []sql.Table,
