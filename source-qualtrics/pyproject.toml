@@ -11,6 +11,7 @@ authors = [
 estuary-cdk = { path = "../estuary-cdk", develop = true }
 python = "^3.11"
 pydantic = "^2"
+nltk = "^3.9.1"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"

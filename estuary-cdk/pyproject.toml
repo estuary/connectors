@@ -19,6 +19,7 @@ stream-unzip = "0.0.99"
 
 airbyte-cdk = "<=4.6.2"
 pendulum = "<=2.0.0 | >=3.0.0"
+nltk = "^3.9.1"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
