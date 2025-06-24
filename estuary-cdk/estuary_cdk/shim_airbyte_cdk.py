@@ -21,16 +21,31 @@ from .flow import CaptureBinding, OAuth2Spec, ConnectorSpec
 from . import ValidationError
 
 from airbyte_cdk.sources.source import Source as AirbyteSource
-from airbyte_protocol.models import (
-    SyncMode as AirbyteSyncMode,
-    ConfiguredAirbyteCatalog,
-    ConfiguredAirbyteStream,
-    AirbyteStateMessage,
-    AirbyteStateType,
-    AirbyteStream,
-    Status as AirbyteStatus,
-    Level as AirbyteLevel,
-)
+
+try:
+    # For older Airbyte CDK versions, models are imported from airbyte_protocol.models.
+    from airbyte_protocol.models import (
+        SyncMode as AirbyteSyncMode,
+        ConfiguredAirbyteCatalog,
+        ConfiguredAirbyteStream,
+        AirbyteStateMessage,
+        AirbyteStateType,
+        AirbyteStream,
+        Status as AirbyteStatus,
+        Level as AirbyteLevel,
+    )
+except ImportError:
+    # For newer Airbyte CDK versions, models are imported from airbyte_cdk.models.airbyte_protocol.
+    from airbyte_cdk.models.airbyte_protocol import (
+        SyncMode as AirbyteSyncMode,
+        ConfiguredAirbyteCatalog,
+        ConfiguredAirbyteStream,
+        AirbyteStateMessage,
+        AirbyteStateType,
+        AirbyteStream,
+        Status as AirbyteStatus,
+        Level as AirbyteLevel,
+    )
 
 
 # `logger` has name "flow", and we thread it through the Airbyte APIs,
