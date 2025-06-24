@@ -69,6 +69,7 @@ type SourceMetadata interface {
 // ChangeEvent represents an Insert/Update/Delete operation on a specific row in the database.
 type ChangeEvent interface {
 	IsDatabaseEvent() // Tag method
+	IsChangeEvent()   // Tag method
 
 	String() string                    // Returns a string representation of the event, suitable for logging.
 	StreamID() StreamID                // Returns the stream ID of the event.
@@ -86,6 +87,7 @@ type OldChangeEvent struct {
 }
 
 func (OldChangeEvent) IsDatabaseEvent() {}
+func (OldChangeEvent) IsChangeEvent()   {}
 
 func (e *OldChangeEvent) String() string {
 	switch e.Operation {
@@ -139,10 +141,30 @@ func (e *OldChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
 	return json.Append(buf, record, json.EscapeHTML|json.SortMapKeys)
 }
 
-// FlushEvent informs the generic sqlcapture logic about transaction boundaries.
-type FlushEvent struct {
+// CommitEvent represents a transaction commit.
+type CommitEvent interface {
+	IsDatabaseEvent() // Tag method
+	IsCommitEvent()   // Tag method
+	String() string   // Returns a string representation of the event, suitable for logging.
+
+	AppendJSON([]byte) ([]byte, error) // Serializes the stream cursor as a JSON value and appends to the provided buffer.
+}
+
+// OldFlushEvent informs the generic sqlcapture logic about transaction boundaries.
+type OldFlushEvent struct {
 	// The cursor value at which the current transaction was committed.
 	Cursor json.RawMessage
+}
+
+func (OldFlushEvent) IsDatabaseEvent() {}
+func (OldFlushEvent) IsCommitEvent()   {}
+
+func (evt *OldFlushEvent) String() string {
+	return fmt.Sprintf("OldFlushEvent(%s)", evt.Cursor)
+}
+
+func (evt *OldFlushEvent) AppendJSON(buf []byte) ([]byte, error) {
+	return append(buf, evt.Cursor...), nil
 }
 
 // MetadataEvent informs the generic sqlcapture logic about changes to
@@ -169,12 +191,10 @@ type DatabaseEvent interface {
 	String() string
 }
 
-func (*FlushEvent) IsDatabaseEvent()     {}
 func (*MetadataEvent) IsDatabaseEvent()  {}
 func (*KeepaliveEvent) IsDatabaseEvent() {}
 func (*TableDropEvent) IsDatabaseEvent() {}
 
-func (evt *FlushEvent) String() string     { return fmt.Sprintf("FlushEvent(%q)", evt.Cursor) }
 func (evt *MetadataEvent) String() string  { return fmt.Sprintf("MetadataEvent(%s)", evt.StreamID) }
 func (*KeepaliveEvent) String() string     { return "KeepaliveEvent" }
 func (evt *TableDropEvent) String() string { return fmt.Sprintf("TableDropEvent(%s)", evt.StreamID) }

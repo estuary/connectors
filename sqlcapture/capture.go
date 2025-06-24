@@ -535,9 +535,13 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 
 	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		// Flush events update the checkpoint LSN and may trigger a state update.
-		if event, ok := event.(*FlushEvent); ok {
+		if event, ok := event.(CommitEvent); ok {
+			var cursorJSON, err = event.AppendJSON(nil)
+			if err != nil {
+				return fmt.Errorf("error serializing commit cursor: %w", err)
+			}
 			flushCount++
-			c.State.Cursor = event.Cursor
+			c.State.Cursor = cursorJSON
 			if reportFlush {
 				if err := c.emitState(); err != nil {
 					return fmt.Errorf("error emitting state update: %w", err)

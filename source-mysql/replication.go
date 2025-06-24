@@ -391,7 +391,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			// also stop advancing the cursor position during offset overflow, so that part is
 			// handled elsewhere already.
 			if !binlogOffsetOverflow {
-				if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+				if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
 					Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 				}); err != nil {
 					return err
@@ -424,7 +424,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				// "COMMIT" query event as a transaction commit. This logic should match
 				// the XIDEvent handling.
 				if !binlogOffsetOverflow {
-					if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+					if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
 						Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 					}); err != nil {
 						return err
@@ -473,7 +473,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		// until a real commit event to flush the output) then report a new FlushEvent
 		// with the latest position.
 		if implicitFlush && rs.uncommittedChanges == 0 && !binlogOffsetOverflow {
-			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+			if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
 				Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 			}); err != nil {
 				return err
@@ -1286,7 +1286,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 					return err
 				}
 				timedEventsSinceFlush++
-				if event, ok := event.(*sqlcapture.FlushEvent); ok {
+				if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 					if str, err := unmarshalJSONString(event.Cursor); err != nil {
 						return fmt.Errorf("internal error: failed to unmarshal flush event cursor value %q: %w", event.Cursor, err)
 					} else {
@@ -1323,7 +1323,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{Cursor: marshalJSONString(latestFlushCursor)})
+		return callback(&sqlcapture.OldFlushEvent{Cursor: marshalJSONString(latestFlushCursor)})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -1350,7 +1350,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 
 			// The first flush event whose cursor position is equal to or after the fence
 			// position ends the stream-to-fence operation.
-			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// a bit of work to preserve the position as a typed struct.

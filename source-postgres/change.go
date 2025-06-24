@@ -8,10 +8,26 @@ import (
 
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/segmentio/encoding/json"
 )
+
+type postgresCommitEvent struct {
+	CommitLSN pglogrepl.LSN
+}
+
+func (postgresCommitEvent) IsDatabaseEvent() {}
+func (postgresCommitEvent) IsCommitEvent()   {}
+
+func (evt *postgresCommitEvent) String() string {
+	return fmt.Sprintf("Commit(%s)", evt.CommitLSN.String())
+}
+
+func (evt *postgresCommitEvent) AppendJSON(buf []byte) ([]byte, error) {
+	return json.AppendEscape(buf, evt.CommitLSN.String(), 0), nil
+}
 
 // A jsonTranscoder is a function which transcodes a PostgreSQL wire protocol value
 // into JSON and appends it to the provided buffer.
@@ -44,9 +60,10 @@ type postgresChangeMetadata struct {
 }
 
 func (postgresChangeEvent) IsDatabaseEvent() {}
+func (postgresChangeEvent) IsChangeEvent()   {}
 
 func (e *postgresChangeEvent) String() string {
-	return fmt.Sprintf("Backfill(%s)", e.Info.StreamID)
+	return fmt.Sprintf("Change(%s)", e.Info.StreamID)
 }
 
 func (e *postgresChangeEvent) StreamID() sqlcapture.StreamID {
