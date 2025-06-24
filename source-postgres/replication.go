@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"slices"
 	"sync"
@@ -14,9 +16,9 @@ import (
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
+	"github.com/jackc/pgio"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
@@ -180,6 +182,8 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		pubName:  publication,
 		replSlot: slot,
 
+		rxbuf: make([]byte, 0, rxBufferSize),
+
 		ackLSN:          uint64(startLSN),
 		lastTxnEndLSN:   startLSN,
 		nextTxnFinalLSN: 0,
@@ -240,6 +244,9 @@ type replicationStream struct {
 	conn     *pgconn.HijackedConn // The PostgreSQL replication connection, hijacked from PGX so we can parse the stream directly.
 	pubName  string               // The name of the PostgreSQL publication to use
 	replSlot string               // The name of the PostgreSQL replication slot to use
+
+	rxbuf []byte // Logical replication message stream receive/decode buffer.
+	rxoff int    // Logical replication message stream receive/decode buffer offset.
 
 	workerCtx       context.Context    // The context used for the worker goroutine, which is canceled when the stream is closed.
 	cancelWorkerCtx context.CancelFunc // The cancel function for the worker context, used to stop the worker goroutine.
@@ -305,6 +312,9 @@ var (
 	// some. This should never be hit in normal operation, and exists only so that certain
 	// rare failure modes produce an error rather than blocking forever.
 	streamToFenceWatchdogTimeout = 12 * 60 * time.Minute
+
+	// rxBufferSize is the initial size of the receive buffer into which replication messages are read.
+	rxBufferSize = 1 * 1024 * 1024 // 1 MiB
 )
 
 func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
@@ -420,29 +430,6 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 	return nil
 }
 
-func (s *replicationStream) relayChanges(ctx context.Context, callback func(event sqlcapture.DatabaseEvent) error) error {
-	for ctx.Err() == nil {
-		// Try to receive another message from the database.
-		var lsn, msg, err = s.receiveMessage(ctx)
-		if pgconn.Timeout(err) {
-			return ctx.Err()
-		} else if err != nil {
-			return err
-		}
-
-		// Once a message arrives, decode it and dispatch to the callback.
-		event, err := s.decodeMessage(lsn, msg)
-		if err != nil {
-			return fmt.Errorf("error decoding message: %w", err)
-		} else if event == nil {
-			continue
-		} else if err := callback(event); err != nil {
-			return err
-		}
-	}
-	return ctx.Err()
-}
-
 func (s *replicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
 	// Launch a little helper routine to just send standby status updates regularly.
 	s.workerCtx, s.cancelWorkerCtx = context.WithCancel(ctx)
@@ -467,44 +454,237 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	return nil
 }
 
-func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Message) (sqlcapture.DatabaseEvent, error) {
-	// Some notes on the Logical Replication / pgoutput message stream, since
-	// as far as I can tell this isn't documented anywhere but comments in the
-	// relevant PostgreSQL sources.
-	//
-	// The stream of messages we're processing here isn't necessarily in the
-	// same order as the underlying PostgreSQL WAL. The 'Reorder Buffer' logic
-	// (https://github.com/postgres/postgres/blob/master/src/backend/replication/logical/reorderbuffer.c)
-	// assembles individual changes into transactions and then only when it's
-	// committed does the output plugin get invoked to send us these messages.
-	//
-	// Consequently, we can rely on getting a BEGIN, then some changes, and
-	// finally a COMMIT message in that order. This is why only the BEGIN
-	// message includes an XID, it's implicit in any subsequent messages.
-	//
-	// The `Relation` messages are how `pgoutput` tells us about the columns
-	// of a particular table at the time a transaction was performed. Change
-	// messages won't include this information, instead they just encode a
-	// sequence of values along with a "Relation ID" which can be used to
-	// look it up. We will only be given a particular relation once (unless
-	// it changes on the server) in a given replication session, so entries
-	// in the relations mapping will never be removed.
-	switch msg := msg.(type) {
-	case *pglogrepl.RelationMessage:
-		var err = s.handleRelationMessage(msg)
-		return nil, err
-	case *pglogrepl.OriginMessage:
+func (s *replicationStream) relayChanges(ctx context.Context, callback func(event sqlcapture.DatabaseEvent) error) error {
+	for ctx.Err() == nil {
+		// Try to receive another message from the database.
+		var msg, err = s.receiveMessage(ctx)
+		if err != nil {
+			return err
+		}
+
+		// Parse the XLogData header
+		xld, err := pglogrepl.ParseXLogData(msg[1:])
+		if err != nil {
+			return fmt.Errorf("error parsing XLogData: %w", err)
+		}
+
+		// Once a message arrives, decode it and dispatch to the callback.
+		event, err := s.decodeMessage(xld.WALStart, xld.WALData)
+		if err != nil {
+			return fmt.Errorf("error decoding message: %w", err)
+		} else if event == nil {
+			continue
+		} else if err := callback(event); err != nil {
+			return err
+		}
+	}
+	return ctx.Err()
+}
+
+// receiveMessage reads and returns the next logical replication message from the database,
+// blocking until a message is available, the context is cancelled, or an error occurs. It
+// returns the complete XLogData ('w') message bytes, which are valid only until the next
+// call to receiveMessage.
+func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) {
+	for {
+		// 1. Check if a complete message exists in the buffer at rxoff. If so, parse and return it.
+		var msgType byte
+		var msgLen int
+		if len(s.rxbuf)-s.rxoff >= 5 {
+			// Read the message type and length from the buffer.
+			msgType = s.rxbuf[s.rxoff]
+			msgLen = int(binary.BigEndian.Uint32(s.rxbuf[s.rxoff+1 : s.rxoff+5])) // Length includes the 4-byte length field itself.
+			if len(s.rxbuf)-s.rxoff >= msgLen+1 {
+				// Slice out this message payload and move the offset forward to after this message.
+				var msgData = s.rxbuf[s.rxoff+5 : s.rxoff+1+msgLen]
+				s.rxoff += msgLen + 1
+
+				//logrus.WithFields(logrus.Fields{"type": msgType, "len": msgLen, "data": msgData}).Debug("receiveMessage")
+
+				switch msgType {
+				case 'S': // ParameterStatus
+					continue // Ignore and keep looking for something we care about.
+				case 'd': // CopyData messages are all we care about
+					switch msgData[0] {
+					case pglogrepl.PrimaryKeepaliveMessageByteID:
+						var pkm, err = pglogrepl.ParsePrimaryKeepaliveMessage(msgData[1:])
+						if err != nil {
+							return nil, fmt.Errorf("error parsing keepalive: %w", err)
+						}
+						if pkm.ReplyRequested {
+							if err := s.sendStandbyStatusUpdate(ctx); err != nil {
+								return nil, fmt.Errorf("error sending standby status update: %w", err)
+							}
+						}
+						continue // Keep looking for something we care about.
+					case pglogrepl.XLogDataByteID:
+						return msgData, nil // Return the XLogData message bytes directly.
+					default:
+						return nil, fmt.Errorf("unknown CopyData message: %v", msgData)
+					}
+				default:
+					return nil, fmt.Errorf("unexpected message type %q", msgType)
+				}
+			}
+		}
+
+		// 2. Shift any residual data down to the start of the buffer in preparation for reading more.
+		if s.rxoff > 0 {
+			copy(s.rxbuf, s.rxbuf[s.rxoff:])         // Move the residual data to the start of the buffer.
+			s.rxbuf = s.rxbuf[:len(s.rxbuf)-s.rxoff] // Reslice the buffer to match the new length.
+			s.rxoff = 0                              // Reset the offset to the start of the buffer.
+		}
+
+		// 3. Read more data from the connection into the buffer. If the buffer is full, return an error.
+		//    We will eventually need to handle this more gracefully by growing the buffer or something.
+		if len(s.rxbuf) >= cap(s.rxbuf) {
+			return nil, fmt.Errorf("replication buffer overflow: capacity %d filled but cannot hold message %q of length %d", cap(s.rxbuf), msgType, msgLen+1)
+		}
+		var n, err = s.conn.Conn.Read(s.rxbuf[len(s.rxbuf):cap(s.rxbuf)])
+		//logrus.WithFields(logrus.Fields{"residual": len(s.rxbuf), "received": n}).Warn("receiveMessage: read from connection")
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil, fmt.Errorf("connection closed while reading messages: %w", err)
+			}
+			return nil, fmt.Errorf("error reading messages from connection: %w", err)
+		}
+		s.rxbuf = s.rxbuf[:len(s.rxbuf)+n] // Resize the buffer to include the new data.
+	}
+}
+
+func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlcapture.DatabaseEvent, error) {
+	switch pglogrepl.MessageType(data[0]) {
+	// Transaction Control: Begin and Commit
+	case pglogrepl.MessageTypeBegin:
+		var msg pglogrepl.BeginMessage
+		if err := msg.Decode(data[1:]); err != nil {
+			return nil, fmt.Errorf("error decoding BEGIN message: %w", err)
+		}
+		if s.nextTxnFinalLSN != 0 {
+			return nil, fmt.Errorf("got BEGIN message while another transaction in progress")
+		}
+		s.nextTxnFinalLSN = msg.FinalLSN
+		s.nextTxnMillis = msg.CommitTime.UnixMilli()
+		s.nextTxnXID = msg.Xid
+		return nil, nil
+	case pglogrepl.MessageTypeCommit:
+		var msg pglogrepl.CommitMessage
+		if err := msg.Decode(data[1:]); err != nil {
+			return nil, fmt.Errorf("error decoding COMMIT message: %w", err)
+		}
+		if s.nextTxnFinalLSN == 0 {
+			return nil, fmt.Errorf("got COMMIT message without a transaction in progress")
+		} else if s.nextTxnFinalLSN != msg.CommitLSN {
+			return nil, fmt.Errorf("got COMMIT message with unexpected CommitLSN (%d; expected %d)",
+				msg.CommitLSN, s.nextTxnFinalLSN)
+		}
+		s.nextTxnFinalLSN = 0
+		s.nextTxnMillis = 0
+		s.nextTxnXID = 0
+		s.lastTxnEndLSN = msg.TransactionEndLSN
+		var event = &sqlcapture.FlushEvent{
+			Cursor: marshalJSONString(s.lastTxnEndLSN.String()),
+		}
+		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
+		return event, nil
+
+	// Change Events: Insert, Update, and Delete
+	case pglogrepl.MessageTypeInsert:
+		// Insert
+		//   Byte1('I')   Identifies the message as an insert message.
+		//   -- Int32 (XID)  XID of the transaction (only present for streamed transactions). (Only in protocol v2)
+		//   Int32 (OID)  OID of the relation corresponding to the ID in the relation message.
+		//   Byte1('N')   Identifies the following TupleData message as a new tuple.
+		//   TupleData    TupleData message part representing the contents of new tuple.
+		if len(data) < 8 {
+			return nil, fmt.Errorf("INSERT message too short: %d bytes, expected at least 8", len(data))
+		}
+		var relID = binary.BigEndian.Uint32(data[1:5])
+		if data[5] != 'N' {
+			return nil, fmt.Errorf("expected 'N' tuple type in INSERT message, got %q", data[5])
+		}
+		var tupleData = data[6:]
+		return s.decodeChangeEvent(sqlcapture.InsertOp, lsn, 0, nil, tupleData, relID)
+	case pglogrepl.MessageTypeUpdate:
+		// Update
+		//   Byte1('U')   Identifies the message as an update message.
+		//   -- Int32 (XID)  XID of the transaction (only present for streamed transactions). (Only in protocol v2)
+		//   Int32 (OID)  OID of the relation corresponding to the ID in the relation message.
+		//   Byte1('K')   Identifies the following TupleData submessage as a key. This field is optional and is only present if the update changed data in any of the column(s) that are part of the REPLICA IDENTITY index.
+		//   Byte1('O')   Identifies the following TupleData submessage as an old tuple. This field is optional and is only present if table in which the update happened has REPLICA IDENTITY set to FULL.
+		//   TupleData    TupleData message part representing the contents of the old tuple or primary key. Only present if the previous 'O' or 'K' part is present.
+		//   Byte1('N')   Identifies the following TupleData message as a new tuple.
+		//   TupleData    TupleData message part representing the contents of a new tuple.
+		// The Update message may contain either a 'K' message part or an 'O' message part or neither of them, but never both of them.
+		if len(data) < 6 {
+			return nil, fmt.Errorf("UPDATE message too short: %d bytes, expected at least 6", len(data))
+		}
+		var relID = binary.BigEndian.Uint32(data[1:5])
+		var oldTupleType byte
+		var oldTuple []byte
+		var newTuple []byte
+		switch data[5] {
+		case 'K', 'O': // Key or old tuple followed by new tuple
+			oldTupleType = data[5]
+			var idx = scanTupleEnd(data[6:]) // Get the index of the next byte after the old tuple
+			if data[idx] != 'N' {
+				return nil, fmt.Errorf("expected 'N' tuple type after 'K' or 'O' in UPDATE message, got %q", data[idx])
+			}
+			oldTuple = data[6:idx]
+			newTuple = data[idx+1:]
+		case 'N': // New tuple only
+			oldTupleType = 0 // No old tuple
+			oldTuple = nil
+			newTuple = data[6:]
+
+		default:
+			return nil, fmt.Errorf("expected 'N', 'K', or 'O' tuple type in UPDATE message, got %q", data[6])
+		}
+		return s.decodeChangeEvent(sqlcapture.UpdateOp, lsn, oldTupleType, oldTuple, newTuple, relID)
+
+	case pglogrepl.MessageTypeDelete:
+		// Delete
+		//   Byte1('D')   Identifies the message as a delete message.
+		//   -- Int32 (XID)  XID of the transaction (only present for streamed transactions). (Only in protocol v2)
+		//   Int32 (OID)  OID of the relation corresponding to the ID in the relation message.
+		//   Byte1('K')   Identifies the following TupleData submessage as a key. This field is present if the table in which the delete has happened uses an index as REPLICA IDENTITY.
+		//   Byte1('O')   Identifies the following TupleData message as an old tuple. This field is present if the table in which the delete happened has REPLICA IDENTITY set to FULL.
+		//   TupleData    TupleData message part representing the contents of the old tuple or primary key, depending on the previous field.
+		// The Delete message may contain either a 'K' message part or an 'O' message part, but never both of them.
+		if len(data) < 8 {
+			return nil, fmt.Errorf("DELETE message too short: %d bytes, expected at least 8", len(data))
+		}
+		var relID = binary.BigEndian.Uint32(data[1:5])
+		var oldTupleType = data[5]
+		if oldTupleType != 'K' && oldTupleType != 'O' {
+			return nil, fmt.Errorf("expected 'O' or 'K' tuple type in DELETE message, got %q", oldTupleType)
+		}
+		var tupleData = data[6:]
+		return s.decodeChangeEvent(sqlcapture.DeleteOp, lsn, oldTupleType, tupleData, nil, relID)
+
+	// Other Messages: Origin, Relation, Type, and Truncate
+	case pglogrepl.MessageTypeOrigin:
 		// Origin messages are sent when the postgres instance we're capturing from
 		// is itself replicating from another source instance. They indicate the original
 		// source of the transaction. We just ignore these messages for now, though in the
 		// future it might be desirable to add the origin as a `_meta` property. Sauce:
 		// https://www.highgo.ca/2020/04/18/the-origin-in-postgresql-logical-decoding/
+		var msg pglogrepl.OriginMessage
+		if err := msg.Decode(data[1:]); err != nil {
+			return nil, fmt.Errorf("error decoding ORIGIN message: %w", err)
+		}
 		logrus.WithFields(logrus.Fields{
 			"originName": msg.Name,
 			"originLSN":  msg.CommitLSN,
 		}).Trace("ignoring Origin message")
 		return nil, nil
-	case *pglogrepl.TypeMessage:
+	case pglogrepl.MessageTypeRelation:
+		var msg pglogrepl.RelationMessage
+		if err := msg.Decode(data[1:]); err != nil {
+			return nil, fmt.Errorf("error decoding RELATION message: %w", err)
+		}
+		return nil, s.handleRelationMessage(&msg)
+	case pglogrepl.MessageTypeType:
 		// There are five kinds of user-defined datatype in Postgres:
 		//  - Domain types declared via 'CREATE DOMAIN name AS data_type'
 		//  - Tuples declared via 'CREATE TYPE name AS (...elements...)'
@@ -529,6 +709,10 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		// base datatype it corresponds to. This is accomplished using a bit of logic
 		// that looks up the base name in the type map and then registers the user type
 		// OID as having the same name and codec.
+		var msg pglogrepl.TypeMessage
+		if err := msg.Decode(data[1:]); err != nil {
+			return nil, fmt.Errorf("error decoding TYPE message: %w", err)
+		}
 		logrus.WithFields(logrus.Fields{
 			"oid":       msg.DataType,
 			"namespace": msg.Namespace,
@@ -549,37 +733,11 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 			}
 		}
 		return nil, nil
-	case *pglogrepl.BeginMessage:
-		if s.nextTxnFinalLSN != 0 {
-			return nil, fmt.Errorf("got BEGIN message while another transaction in progress")
+	case pglogrepl.MessageTypeTruncate:
+		var msg pglogrepl.TruncateMessage
+		if err := msg.Decode(data[1:]); err != nil {
+			return nil, fmt.Errorf("error decoding TRUNCATE message: %w", err)
 		}
-		s.nextTxnFinalLSN = msg.FinalLSN
-		s.nextTxnMillis = msg.CommitTime.UnixMilli()
-		s.nextTxnXID = msg.Xid
-		return nil, nil
-	case *pglogrepl.InsertMessage:
-		return s.decodeChangeEvent(sqlcapture.InsertOp, lsn, 0, nil, msg.Tuple, msg.RelationID)
-	case *pglogrepl.UpdateMessage:
-		return s.decodeChangeEvent(sqlcapture.UpdateOp, lsn, msg.OldTupleType, msg.OldTuple, msg.NewTuple, msg.RelationID)
-	case *pglogrepl.DeleteMessage:
-		return s.decodeChangeEvent(sqlcapture.DeleteOp, lsn, msg.OldTupleType, msg.OldTuple, nil, msg.RelationID)
-	case *pglogrepl.CommitMessage:
-		if s.nextTxnFinalLSN == 0 {
-			return nil, fmt.Errorf("got COMMIT message without a transaction in progress")
-		} else if s.nextTxnFinalLSN != msg.CommitLSN {
-			return nil, fmt.Errorf("got COMMIT message with unexpected CommitLSN (%d; expected %d)",
-				msg.CommitLSN, s.nextTxnFinalLSN)
-		}
-		s.nextTxnFinalLSN = 0
-		s.nextTxnMillis = 0
-		s.nextTxnXID = 0
-		s.lastTxnEndLSN = msg.TransactionEndLSN
-		var event = &sqlcapture.FlushEvent{
-			Cursor: marshalJSONString(s.lastTxnEndLSN.String()),
-		}
-		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
-		return event, nil
-	case *pglogrepl.TruncateMessage:
 		for _, relID := range msg.RelationIDs {
 			var streamID, ok = s.streamIDFromRelationID(relID)
 			if !ok {
@@ -590,42 +748,22 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 			}
 		}
 		return nil, nil
-	}
 
-	// Unhandled messages are considered a fatal error. There are a bunch of
-	// oddball message types that aren't currently implemented in this connector
-	// (e.g. truncate, streaming transactions, or two-phase commits) and if we
-	// blithely ignored them and continued we're pretty much guaranteed to end
-	// up in an inconsistent state with the Postgres tables. Much better to die
-	// quickly and give humans a chance to fix things.
-	//
-	// If a human is reading this comment because this happened to you, you have
-	// three options to resolve the problem:
-	//
-	//   1. Implement additional logic to handle whatever edge case you hit.
-	//
-	//   2. If your use-case can tolerate a completely different set of
-	//      tradeoffs you can use the Airbyte Postgres source connector
-	//      in NON-CDC mode.
-	//
-	//      Note that in CDC mode that connector uses Debezium, which will choke
-	//      on these same edge cases, with the exception of TRUNCATE/TYPE/ORIGIN.
-	//      (See https://github.com/debezium/debezium/blob/52333596dec168a22674e04f8cd94b1f56607f73/debezium-connector-postgres/src/main/java/io/debezium/connector/postgresql/connection/pgoutput/PgOutputMessageDecoder.java#L106)
-	//
-	//   3. Force a full refresh of the relevant table. This will re-scan the
-	//      current table contents and then begin replication after the event
-	//      that caused this to fail.
-	//
-	//      But of course if this wasn't a one-off event it will fail again the
-	//      next time a problematic statement is executed on this table.
-	return nil, fmt.Errorf("unhandled message type %q: %v", msg.Type(), msg)
+	default:
+		// There shouldn't be any other message types in the replication stream,
+		// but we might as well handle them gracefully if they show up.
+		if len(data) > 8 {
+			data = data[:8]
+		}
+		return nil, fmt.Errorf("unsupported replication message type %q in %q", data[0], string(data)+"...")
+	}
 }
 
 func (s *replicationStream) decodeChangeEvent(
 	op sqlcapture.ChangeOp, // Operation of this event.
 	lsn pglogrepl.LSN, // LSN of this event.
 	beforeType uint8, // Postgres TupleType (0, 'K' for key, 'O' for old full tuple, 'N' for new).
-	before, after *pglogrepl.TupleData, // Before and after tuple data. Either may be nil.
+	before, after []byte, // Before and after tuple data. Either may be nil.
 	relID uint32, // Relation ID to which tuple data pertains.
 ) (sqlcapture.DatabaseEvent, error) {
 	if s.nextTxnFinalLSN == 0 {
@@ -709,190 +847,62 @@ func (s *replicationStream) decodeChangeEvent(
 	return &event, nil
 }
 
-func postgresTupleValues(tuple *pglogrepl.TupleData, tupleType uint8, before [][]byte) ([][]byte, error) {
-	switch tupleType {
-	case 0, 'K':
-	case 'O':
-		// Old tuple with REPLICA IDENTITY FULL set.
-	case 'N':
-		// New tuple.
-	default:
-		return nil, fmt.Errorf("unexpected tupleType %q", tupleType)
+func scanTupleEnd(data []byte) int {
+	// TupleData
+	//   Int16    Number of columns.
+	//
+	// Next, one of the following submessages appears for each column (except generated columns):
+	//   Byte1('n')  Identifies the data as NULL value.
+	//   Byte1('u')  Identifies unchanged TOASTed value (the actual value is not sent).
+	//   Byte1('t')  Identifies the data as text formatted value.
+	//   Byte1('b')  Identifies the data as binary formatted value.
+	//   Int32       Length of the column value.
+	//   Byten       The value of the column, either in binary or in text format. (As specified in the preceding format byte). n is the above length.
+	var off = 0                                     // Offset into the data slice
+	var ncol = int16(binary.BigEndian.Uint16(data)) // Number of columns in the tuple
+	for _ = range ncol {
+		switch data[off] {
+		case 'n', 'u': // Move past the type byte, no value.
+			off += 1
+		case 't', 'b': // Move past the type byte, length, and value.
+			off += 5 + int(binary.BigEndian.Uint32(data[off+1:]))
+		}
 	}
+	return off
+}
 
-	if tuple == nil {
+func postgresTupleValues(data []byte, tupleType uint8, before [][]byte) ([][]byte, error) {
+	if data == nil {
 		return nil, nil
 	}
+	if tupleType != 0 && tupleType != 'K' && tupleType != 'O' && tupleType != 'N' {
+		return nil, fmt.Errorf("unexpected tuple type %q", tupleType)
+	}
 
-	var values = make([][]byte, len(tuple.Columns))
-	for idx, col := range tuple.Columns {
-		switch col.DataType {
+	var off = 2                                   // Offset into the tuple data slice
+	var ncol = int(binary.BigEndian.Uint16(data)) // Number of columns in the tuple
+	var vals = make([][]byte, ncol)               // TODO(wgd): Remove this allocation and use a preallocated buffer instead.
+	for i := range ncol {
+		switch data[off] {
 		case 'n':
-			values[idx] = nil
-		case 't':
-			values[idx] = col.Data
+			vals[i] = nil
+			off += 1
+		case 'u':
+			vals[i] = before[i] // Unchanged TOASTed value, use the "before" value.
+			off += 1
 		case 'b':
 			// This is a binary value, which we don't currently support.
 			return nil, fmt.Errorf("binary column data type 'b' is not supported in replication")
-		case 'u':
-			// This fields is a TOAST value which is unchanged in this event.
-			// Depending on the REPLICA IDENTITY, the value may be available
-			// in the "before" tuple of the record.
-			values[idx] = before[idx]
-		default:
-			return nil, fmt.Errorf("unhandled column data type %v", col.DataType)
-		}
-	}
-	return values, nil
-}
-
-func (s *replicationStream) decodeTuple(
-	tuple *pglogrepl.TupleData,
-	tupleType uint8,
-	rel *pglogrepl.RelationMessage,
-	before map[string]interface{},
-) (map[string]interface{}, error) {
-
-	var keyOnly bool
-	switch tupleType {
-	case 0, 'K':
-		keyOnly = true
-	case 'O':
-		// Old tuple with REPLICA IDENTITY FULL set.
-	case 'N':
-		// New tuple.
-	default:
-		return nil, fmt.Errorf("unexpected tupleType %q", tupleType)
-	}
-
-	if tuple == nil {
-		return nil, nil
-	}
-
-	// Check if tuple columns match relation columns. They should never differ, so if
-	// they do something is very wrong and we need to log a bunch of debug info.
-	if len(tuple.Columns) > len(rel.Columns) {
-		var relColumnNames []string
-		var relColumnTypes []uint32
-		for _, col := range rel.Columns {
-			relColumnNames = append(relColumnNames, col.Name)
-			relColumnTypes = append(relColumnTypes, col.DataType)
-		}
-		var tupleColumnTypes []uint8
-		var tupleColumnData []string
-		for _, col := range tuple.Columns {
-			tupleColumnTypes = append(tupleColumnTypes, col.DataType)
-			tupleColumnData = append(tupleColumnData, string(col.Data))
-		}
-		logrus.WithFields(logrus.Fields{
-			"relNames":    relColumnNames,
-			"relTypeOIDs": relColumnTypes,
-			"tupleTypes":  tupleColumnTypes,
-			"tupleData":   tupleColumnData,
-		}).Warn("tuple has more columns than relation")
-		return nil, fmt.Errorf("tuple has %d columns but relation only has %d columns", len(tuple.Columns), len(rel.Columns))
-	}
-
-	var fields = make(map[string]interface{})
-	for idx, col := range tuple.Columns {
-		if keyOnly && (rel.Columns[idx].Flags&1) == 0 && col.DataType == 'n' {
-			// Skip null values of non-key columns in a key-only tuple because
-			// they aren't really null in the database.
-			continue
-		}
-		var colName = rel.Columns[idx].Name
-
-		switch col.DataType {
-		case 'n':
-			fields[colName] = nil
 		case 't':
-			var val, err = s.decodeTextColumnData(col.Data, rel.Columns[idx].DataType)
-			if err != nil {
-				return nil, fmt.Errorf("error decoding column data: %w", err)
-			}
-			fields[colName] = val
-		case 'u':
-			// This fields is a TOAST value which is unchanged in this event.
-			// Depending on the REPLICA IDENTITY, the value may be available
-			// in the "before" tuple of the record. If not, we simply omit it
-			// from the event output.
-			if val, ok := before[colName]; ok {
-				fields[colName] = val
-			}
-		default:
-			return nil, fmt.Errorf("unhandled column data type %v", col.DataType)
+			// Text value, read the length and then the value.
+			off += 1
+			var valueSize = int(binary.BigEndian.Uint32(data[off:]))
+			off += 4
+			vals[i] = data[off : off+valueSize]
+			off += valueSize
 		}
 	}
-	return fields, nil
-}
-
-func (s *replicationStream) decodeTextColumnData(data []byte, dataType uint32) (any, error) {
-	var dt, ok = s.typeMap.TypeForOID(dataType)
-	if !ok {
-		// Replication values always use the text encoding, and in the absence of any specific
-		// data type mapping we want to treat them as generic text strings, which is just a cast.
-		logrus.WithFields(logrus.Fields{
-			"oid":  dataType,
-			"text": string(data),
-		}).Trace("unknown OID, decoding as generic text")
-		return string(data), nil
-	}
-
-	var val, err = dt.Codec.DecodeValue(s.typeMap, dataType, pgtype.TextFormatCode, data)
-	// The only known situations where a valid Postgres timestamp may fail to parse
-	// are when the year is greater than 9999 or less than 0. We don't support years
-	// outside of that range because timestamps are serialized to RFC3339, but generally
-	// years >9999 aren't deliberate, they're dumb typos like `20221`, so normalizing
-	// these all to the same error value is as good as any other option.
-	if _, ok := err.(*time.ParseError); ok {
-		return negativeInfinityTimestamp, nil
-	}
-	return val, err
-}
-
-// receiveMessage reads and parses the next replication message from the database,
-// blocking until a message is available, the context is cancelled, or an error
-// occurs.
-func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, pglogrepl.Message, error) {
-	for {
-		var msg, err = s.conn.ReceiveMessage(ctx)
-		if err != nil {
-			return 0, nil, err
-		}
-
-		switch msg := msg.(type) {
-		case *pgproto3.ParameterStatus:
-			logrus.WithFields(logrus.Fields{
-				"name":  msg.Name,
-				"value": msg.Value,
-			}).Debug("ignoring parameter status message")
-		case *pgproto3.CopyData:
-			switch msg.Data[0] {
-			case pglogrepl.PrimaryKeepaliveMessageByteID:
-				var pkm, err = pglogrepl.ParsePrimaryKeepaliveMessage(msg.Data[1:])
-				if err != nil {
-					return 0, nil, fmt.Errorf("error parsing keepalive: %w", err)
-				}
-				if pkm.ReplyRequested {
-					// TODO(wgd): Trigger a standby status update here.
-				}
-			case pglogrepl.XLogDataByteID:
-				var xld, err = pglogrepl.ParseXLogData(msg.Data[1:])
-				if err != nil {
-					return 0, nil, fmt.Errorf("error parsing XLogData: %w", err)
-				}
-				msg, err := pglogrepl.Parse(xld.WALData)
-				if err != nil {
-					return 0, nil, fmt.Errorf("error parsing logical replication message: %w", err)
-				}
-				return xld.WALStart, msg, nil
-			default:
-				return 0, nil, fmt.Errorf("unknown CopyData message: %v", msg)
-			}
-		default:
-			return 0, nil, fmt.Errorf("unexpected message: %#v", msg)
-		}
-	}
+	return vals, nil
 }
 
 func (s *replicationStream) handleRelationMessage(msg *pglogrepl.RelationMessage) error {
@@ -1073,42 +1083,39 @@ func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 	} else {
 		logrus.WithField("ackLSN", ackLSN.String()).Debug("sending Standby Status Update")
 	}
-	return pglogrepl.SendStandbyStatusUpdate(ctx, s.conn, pglogrepl.StandbyStatusUpdate{
-		WALWritePosition: ackLSN,
-	})
-}
 
-//func SendStandbyStatusUpdate(_ context.Context, conn *pgconn.PgConn, ssu StandbyStatusUpdate) error {
-//	if ssu.WALFlushPosition == 0 {
-//		ssu.WALFlushPosition = ssu.WALWritePosition
-//	}
-//	if ssu.WALApplyPosition == 0 {
-//		ssu.WALApplyPosition = ssu.WALWritePosition
-//	}
-//	if ssu.ClientTime == (time.Time{}) {
-//		ssu.ClientTime = time.Now()
-//	}
-//
-//	data := make([]byte, 0, 34)
-//	data = append(data, StandbyStatusUpdateByteID)
-//	data = pgio.AppendUint64(data, uint64(ssu.WALWritePosition))
-//	data = pgio.AppendUint64(data, uint64(ssu.WALFlushPosition))
-//	data = pgio.AppendUint64(data, uint64(ssu.WALApplyPosition))
-//	data = pgio.AppendInt64(data, timeToPgTime(ssu.ClientTime))
-//	if ssu.ReplyRequested {
-//		data = append(data, 1)
-//	} else {
-//		data = append(data, 0)
-//	}
-//
-//	cd := &pgproto3.CopyData{Data: data}
-//	buf, err := cd.Encode(nil)
-//	if err != nil {
-//		return err
-//	}
-//
-//	return conn.Frontend().SendUnbufferedEncodedCopyData(buf)
-//}
+	// Message payload fields
+	var walWritePosition = ackLSN
+	var walFlushPosition = ackLSN
+	var walApplyPosition = ackLSN
+	var clientTime = time.Now()
+	var replyRequested = false
+
+	// Convert client time to microseconds since the Y2K epoch, since that's what the protocol message uses.
+	const microsecFromUnixEpochToY2K = 946684800 * 1000000
+	var clientTimeMicroseconds = clientTime.Unix()*1000000 + int64(clientTime.Nanosecond())/1000
+	clientTimeMicroseconds -= microsecFromUnixEpochToY2K // Convert to microseconds since the Y2K epoch.
+
+	// Construct message bytes (1 byte type, 4 byte length, 34 byte body)
+	var msg = make([]byte, 0, 39)
+	msg = append(msg, 'd')          // Message Type (CopyData = 'd')
+	msg = pgio.AppendInt32(msg, 38) // Length (message body plus this length field)
+	msg = append(msg, pglogrepl.StandbyStatusUpdateByteID)
+	msg = pgio.AppendUint64(msg, uint64(walWritePosition))
+	msg = pgio.AppendUint64(msg, uint64(walFlushPosition))
+	msg = pgio.AppendUint64(msg, uint64(walApplyPosition))
+	msg = pgio.AppendInt64(msg, clientTimeMicroseconds)
+	if replyRequested {
+		msg = append(msg, 1)
+	} else {
+		msg = append(msg, 0)
+	}
+
+	if _, err := s.conn.Conn.Write(msg); err != nil {
+		return fmt.Errorf("error sending Standby Status Update: %w", err)
+	}
+	return nil
+}
 
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
