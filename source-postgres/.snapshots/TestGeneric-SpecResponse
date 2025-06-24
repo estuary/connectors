@@ -56,7 +56,8 @@
               "auth_type": {
                 "type": "string",
                 "const": "AWSIAM",
-                "default": "AWSIAM"
+                "default": "AWSIAM",
+                "x-iam-auth-provider": "aws"
               },
               "user": {
                 "type": "string",
@@ -104,9 +105,13 @@
                 ],
                 "description": "AWS Region of your database"
               },
-              "aws_role": {
+              "aws_role_arn": {
                 "type": "string",
                 "description": "AWS Role which has rds-db:connect access to be assumed by Estuary"
+              },
+              "aws_external_id": {
+                "type": "string",
+                "description": "External ID to use when assuming the AWS Role"
               }
             },
             "required": [
@@ -114,6 +119,30 @@
               "AWSIAM"
             ],
             "title": "AWS IAM"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "GCPIAM",
+                "default": "GCPIAM"
+              },
+              "user": {
+                "type": "string",
+                "description": "The database user to authenticate as.",
+                "default": "flow_capture"
+              },
+              "gcp_service_account_to_impersonate": {
+                "type": "string",
+                "description": "GCP Service Account email for Cloud SQL IAM authentication, use a randomly-generated service account name for security.",
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "GCPIAM"
+            ],
+            "title": "Google Cloud IAM"
           }
         ],
         "type": "object",
@@ -124,7 +153,8 @@
         "discriminator": {
           "propertyName": "auth_type"
         },
-        "order": 3
+        "order": 3,
+        "x-iam-auth": true
       },
       "advanced": {
         "properties": {

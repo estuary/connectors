@@ -11,11 +11,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
+	iam "github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -130,24 +127,14 @@ type Config struct {
 
 const (
 	UserPassword = "UserPassword"
-	AWSIAM       = "AWSIAM"
 )
 
 type credentialConfig struct {
-	AuthType string `json:"auth_type"`
-
-	User string `json:"user,omitempty"`
+	iam.IAMConfig
 
 	Password string `json:"password,omitempty"`
-
-	AWSRegion     string `json:"aws_region,omitempty"`
-	AWSRole       string `json:"aws_role,omitempty"`
-	AWSExternalId string `json:"aws_external_id,omitempty"`
 }
 
-// JSONSchema allows for the schema to be (semi-)manually specified when used with the
-// github.com/invopop/jsonschema package in go-schema-gen, to fullfill the required schema shape for
-// our oauth
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
 	userPass := orderedmap.New[string, *jsonschema.Schema]()
 	userPass.Set("auth_type", &jsonschema.Schema{
@@ -168,54 +155,16 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 
-	aws := orderedmap.New[string, *jsonschema.Schema]()
-	aws.Set("auth_type", &jsonschema.Schema{
-		Type:    "string",
-		Default: AWSIAM,
-		Const:   AWSIAM,
-	})
-	aws.Set("user", &jsonschema.Schema{
-		Description: "The database user to authenticate as.",
-		Type:        "string",
-		Default:     "flow_capture",
-	})
-	aws.Set("aws_region", &jsonschema.Schema{
-		Type:        "string",
-		Description: "AWS Region of your database",
-		Enum:        []any{"us-east-2", "us-east-1", "us-west-1", "us-west-2", "af-south-1", "ap-east-1", "ap-south-2", "ap-southeast-3", "ap-southeast-5", "ap-southeast-4", "ap-south-1", "ap-northeast-3", "ap-northeast-2", "ap-southeast-1", "ap-southeast-2", "ap-east-2", "ap-southeast-7", "ap-northeast-1", "ca-central-1", "ca-west-1", "eu-central-1", "eu-west-1", "eu-west-2", "eu-south-1", "eu-west-3", "eu-south-2", "eu-north-1", "eu-central-2", "il-central-1", "mx-central-1", "me-south-1", "me-central-1", "sa-east-1", "us-gov-east-1", "us-gov-west-1"},
-	})
-	aws.Set("aws_role", &jsonschema.Schema{
-		Type:        "string",
-		Description: "AWS Role which has rds-db:connect access to be assumed by Estuary",
-	})
-	aws.Set("aws_external_id", &jsonschema.Schema{
-		Type:        "string",
-		Description: "External ID to use when assuming the AWS Role",
-		Extras: map[string]interface{}{
-			"secret": true,
-		},
-	})
+	schema := iam.IAMConfig{}.JSONSchema()
 
-	return &jsonschema.Schema{
-		Title:   "Authentication",
-		Default: map[string]string{"auth_type": UserPassword},
-		OneOf: []*jsonschema.Schema{
-			{
-				Title:      "Username & Password",
-				Required:   []string{"auth_type", UserPassword},
-				Properties: userPass,
-			},
-			{
-				Title:      "AWS IAM",
-				Required:   []string{"auth_type", AWSIAM},
-				Properties: aws,
-			},
-		},
-		Extras: map[string]interface{}{
-			"discriminator": map[string]string{"propertyName": "auth_type"},
-		},
-		Type: "object",
-	}
+	schema.Default = map[string]string{"auth_type": UserPassword}
+	schema.OneOf = append([]*jsonschema.Schema{{
+		Title:      "Username & Password",
+		Required:   []string{"auth_type", UserPassword},
+		Properties: userPass,
+	}}, schema.OneOf...)
+
+	return schema
 }
 
 type advancedConfig struct {
@@ -312,15 +261,9 @@ func (c *Config) Validate() error {
 			if c.Credentials.Password == "" {
 				return errors.New("missing 'password'")
 			}
-		case AWSIAM:
-			if c.Credentials.AWSRegion == "" {
-				return errors.New("missing 'aws_region'")
-			}
-			if c.Credentials.AWSRole == "" {
-				return errors.New("missing 'aws_role'")
-			}
-			if c.Credentials.User == "" {
-				return errors.New("missing 'user'")
+		default:
+			if err := c.Credentials.ValidateIAM(); err != nil {
+				return err
 			}
 		}
 	}
@@ -405,52 +348,20 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 		switch c.Credentials.AuthType {
 		case UserPassword:
 			pass = c.Credentials.Password
-		case AWSIAM:
-			// Load AWS config
-			cfg, err := config.LoadDefaultConfig(ctx,
-				config.WithRegion(c.Credentials.AWSRegion),
-			)
-			if err != nil {
-				return "", fmt.Errorf("loading default AWS config: %w", err)
-			}
-
-			// Create STS client for role assumption
-			stsClient := sts.NewFromConfig(cfg)
-
-			// Check current caller identity
-			callerIdentity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-			if err != nil {
-				return "", fmt.Errorf("getting caller identity: %w", err)
-			}
-
-			// Check if current identity ARN matches the target role ARN
-			// If they match, we can skip the AssumeRole call and use current credentials
-			var credentialsProvider aws.CredentialsProvider
-			if callerIdentity.Arn != nil && *callerIdentity.Arn == c.Credentials.AWSRole {
-				// Current identity matches target role, use the default credentials from config
-				credentialsProvider = cfg.Credentials
-			} else {
-				// Need to assume the role
-				var opts []func(*stscreds.AssumeRoleOptions)
-				if c.Credentials.AWSExternalId != "" {
-					opts = append(opts, func(o *stscreds.AssumeRoleOptions) {
-						o.ExternalID = &c.Credentials.AWSExternalId
-					})
-				}
-				credentialsProvider = stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole, opts...)
-			}
-
-			// Generate IAM auth token
+		case iam.AWSIAM:
+			var err error
 			pass, err = auth.BuildAuthToken(
 				ctx,
 				c.Address,
 				c.Credentials.AWSRegion,
 				user,
-				credentialsProvider,
+				c.Credentials.AWSCredentialsProvider(),
 			)
 			if err != nil {
 				return "", fmt.Errorf("building AWS auth token: %w", err)
 			}
+		case iam.GCPIAM:
+			pass = c.Credentials.GoogleToken()
 		}
 	}
 
@@ -464,8 +375,13 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 	}
 	var params = make(url.Values)
 	params.Set("application_name", "estuary_flow")
+
+	// Set SSL mode - user configuration takes precedence, then cloud IAM defaults
 	if c.Advanced.SSLMode != "" {
 		params.Set("sslmode", c.Advanced.SSLMode)
+	} else if c.Credentials != nil && c.Credentials.AuthType == iam.GCPIAM {
+		// Enable SSL for cloud provider IAM connections by default when not explicitly set
+		params.Set("sslmode", "require")
 	}
 	if len(params) > 0 {
 		uri.RawQuery = params.Encode()
