@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/template"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 

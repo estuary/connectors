@@ -13,7 +13,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -26,7 +26,11 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	out := config{}
+	out := config{
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
+	}
 
 	for _, prop := range []struct {
 		key  string
@@ -59,7 +63,7 @@ func TestValidateAndApply(t *testing.T) {
 		projectID: cfg.ProjectID,
 	}
 
-	client, err := cfg.client(ctx, &sql.Endpoint{Dialect: testDialect})
+	client, err := cfg.client(ctx, &sql.Endpoint[config]{Dialect: testDialect})
 	require.NoError(t, err)
 	defer client.Close()
 
@@ -93,7 +97,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		projectID: cfg.ProjectID,
 	}
 
-	client, err := cfg.client(ctx, &sql.Endpoint{Dialect: testDialect})
+	client, err := cfg.client(ctx, &sql.Endpoint[config]{Dialect: testDialect})
 	require.NoError(t, err)
 	defer client.Close()
 
@@ -198,7 +202,7 @@ func TestFencingCases(t *testing.T) {
 	cfg := mustGetCfg(t)
 
 	var ctx = context.Background()
-	client, err := cfg.client(ctx, &sql.Endpoint{Dialect: testDialect})
+	client, err := cfg.client(ctx, &sql.Endpoint[config]{Dialect: testDialect})
 	require.NoError(t, err)
 
 	var templates = renderTemplates(testDialect)
@@ -288,19 +292,19 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) *config
+		cfg  func(config) config
 		want []error
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) *config { return &cfg },
+			cfg:  func(cfg config) config { return cfg },
 			want: nil,
 		},
 		{
 			name: "bucket doesn't exist",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Bucket = nonExistentBucket
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("bucket %q does not exist", nonExistentBucket)},
 		},

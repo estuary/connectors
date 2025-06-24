@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -20,7 +20,7 @@ import (
 
 type transactor struct {
 	fence             *sql.Fence
-	cfg               *config
+	cfg               config
 	dialect           sql.Dialect
 	templates         templates
 	objAndArrayAsJson bool
@@ -39,32 +39,30 @@ func prepareNewTransactor(
 	dialect sql.Dialect,
 	templates templates,
 	objAndArrayAsJson bool,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+) func(context.Context, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
-		ep *sql.Endpoint,
+		ep *sql.Endpoint[config],
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
 		be *boilerplate.BindingEvents,
-	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-		cfg := ep.Config.(*config)
-
-		client, err := cfg.client(ctx, ep)
+	) (m.Transactor, error) {
+		client, err := ep.Config.client(ctx, ep)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		t := &transactor{
-			cfg:               cfg,
+			cfg:               ep.Config,
 			fence:             &fence,
 			dialect:           dialect,
 			templates:         templates,
 			objAndArrayAsJson: objAndArrayAsJson,
 			client:            client,
-			bucketPath:        cfg.BucketPath,
-			bucket:            cfg.Bucket,
+			bucketPath:        ep.Config.BucketPath,
+			bucket:            ep.Config.Bucket,
 			be:                be,
 		}
 
@@ -77,7 +75,7 @@ func prepareNewTransactor(
 			// have been created differently due to evolution of the dialect's column types.
 			res := is.GetResource(binding.Path)
 			if res == nil {
-				return nil, nil, fmt.Errorf("could not get metadata for table %s: verify that the table exists and that the connector service account user is authorized for it", binding.Identifier)
+				return nil, fmt.Errorf("could not get metadata for table %s: verify that the table exists and that the connector service account user is authorized for it", binding.Identifier)
 			}
 
 			schema := res.Meta.(bigquery.Schema)
@@ -94,20 +92,11 @@ func prepareNewTransactor(
 			}
 
 			if err = t.addBinding(binding, fieldSchemas, &ep.Dialect); err != nil {
-				return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
 
-		opts := &boilerplate.MaterializeOptions{
-			ExtendedLogging: true,
-			AckSchedule: &boilerplate.AckScheduleOption{
-				Config: cfg.Schedule,
-				Jitter: []byte(cfg.ProjectID + cfg.Dataset),
-			},
-			DBTJobTrigger: &cfg.DBTJobTrigger,
-		}
-
-		return t, opts, nil
+		return t, nil
 	}
 }
 

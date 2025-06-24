@@ -8,10 +8,9 @@ import (
 
 	"cloud.google.com/go/bigquery"
 	storage "cloud.google.com/go/storage"
-	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
@@ -43,7 +42,7 @@ type advancedConfig struct {
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"project_id", c.ProjectID},
 		{"credentials_json", c.CredentialsJSON},
@@ -81,7 +80,7 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) client(ctx context.Context, ep *sql.Endpoint) (*client, error) {
+func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
 	var clientOpts []option.ClientOption
 
 	clientOpts = append(clientOpts,
@@ -114,9 +113,17 @@ func (c *config) client(ctx context.Context, ep *sql.Endpoint) (*client, error) 
 	return &client{
 		bigqueryClient:     bigqueryClient,
 		cloudStorageClient: cloudStorageClient,
-		cfg:                *c,
+		cfg:                c,
 		ep:                 ep,
 	}, nil
+}
+
+func (c config) DefaultNamespace() string {
+	return c.Dataset
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 type tableConfig struct {
@@ -126,13 +133,13 @@ type tableConfig struct {
 	projectID string
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		// Default to the explicit endpoint configuration dataset. This may be over-written by a
-		// present `dataset` property within `raw` for the resource.
-		Dataset:   ep.Config.(*config).Dataset,
-		projectID: ep.Config.(*config).ProjectID,
+func (c tableConfig) WithDefaults(cfg config) tableConfig {
+	if c.Dataset == "" {
+		c.Dataset = cfg.Dataset
 	}
+	c.projectID = cfg.ProjectID
+
+	return c
 }
 
 func (c tableConfig) Validate() error {
@@ -142,32 +149,19 @@ func (c tableConfig) Validate() error {
 	return nil
 }
 
-// Path returns the sqlDriver.ResourcePath for a table.
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.projectID, c.Dataset, c.Table}
+func (c tableConfig) Parameters() ([]string, bool, error) {
+	return []string{c.projectID, c.Dataset, c.Table}, c.Delta, nil
 }
 
-// DeltaUpdates returns if BigQuery is in DeltaUpdates mode or not.
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
-}
-
-func Driver() *sql.Driver {
+func Driver() *sql.Driver[config, tableConfig] {
 	return newBigQueryDriver()
 }
 
-func newBigQueryDriver() *sql.Driver {
-	return &sql.Driver{
+func newBigQueryDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-			}
-
+		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"project_id":  cfg.ProjectID,
 				"dataset":     cfg.Dataset,
@@ -175,11 +169,6 @@ func newBigQueryDriver() *sql.Driver {
 				"bucket":      cfg.Bucket,
 				"bucket_path": cfg.BucketPath,
 			}).Info("creating bigquery endpoint")
-
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-			if cfg.Advanced.FeatureFlags != "" {
-				log.WithField("flags", featureFlags).Info("parsed feature flags")
-			}
 
 			objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
 			dialect := bqDialect(objAndArrayAsJson)
@@ -196,18 +185,24 @@ func newBigQueryDriver() *sql.Driver {
 				serPolicy = boilerplate.SerPolicyDisabled
 			}
 
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
 				SerPolicy:           serPolicy,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.ProjectID, cfg.Dataset}),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(dialect, templates, objAndArrayAsJson),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					ExtendedLogging: true,
+					AckSchedule: &boilerplate.AckScheduleOption{
+						Config: cfg.Schedule,
+						Jitter: []byte(cfg.ProjectID + cfg.Dataset),
+					},
+					DBTJobTrigger: &cfg.DBTJobTrigger,
+				},
 			}, nil
 		},
 		PreReqs: preReqs,

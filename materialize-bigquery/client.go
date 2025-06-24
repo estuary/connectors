@@ -15,7 +15,7 @@ import (
 	storage "cloud.google.com/go/storage"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -29,20 +29,14 @@ type client struct {
 	bigqueryClient     *bigquery.Client
 	cloudStorageClient *storage.Client
 	cfg                config
-	ep                 *sql.Endpoint
+	ep                 *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
-	return cfg.client(ctx, ep)
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	return ep.Config.client(ctx, ep)
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(c.ep.TableLocator),
-		c.ep.ColumnLocator,
-	)
-
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	rpDatasets := make(map[string]struct{})
 	for _, p := range resourcePaths {
 		rpDatasets[c.ep.TableLocator(p).TableSchema] = struct{}{}
@@ -58,7 +52,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	// tables in datasets that do exist.
 	existingDatasets, err := c.ListSchemas(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("listing schemas: %w", err)
+		return fmt.Errorf("listing schemas: %w", err)
 	}
 
 	for ds := range rpDatasets {
@@ -75,7 +69,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 				if err == iterator.Done {
 					break
 				}
-				return nil, fmt.Errorf("table iterator next: %w", err)
+				return fmt.Errorf("table iterator next: %w", err)
 			}
 
 			group.Go(func() error {
@@ -105,10 +99,10 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	}
 
 	if err := group.Wait(); err != nil {
-		return nil, err
+		return err
 	}
 
-	return is, nil
+	return nil
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -196,16 +190,19 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return dsNames, nil
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
-	return c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, schemaName).Create(ctx, &bigquery.DatasetMetadata{
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
+	if err := c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, schemaName).Create(ctx, &bigquery.DatasetMetadata{
 		Location: c.cfg.Region,
-	})
+	}); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("CREATE DATASET %q.%q", c.cfg.ProjectID, schemaName), nil
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	cfg := conf.(*config)
 	c, err := cfg.client(ctx, nil)
 	if err != nil {
 		errs.Err(fmt.Errorf("creating client: %w", err))
