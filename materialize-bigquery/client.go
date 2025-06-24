@@ -6,30 +6,28 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"path"
 	"slices"
 	"strings"
 	"sync"
 
 	"cloud.google.com/go/bigquery"
-	storage "cloud.google.com/go/storage"
+	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql-v2"
-	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	bigqueryClient     *bigquery.Client
-	cloudStorageClient *storage.Client
-	cfg                config
-	ep                 *sql.Endpoint[config]
+	bigqueryClient *bigquery.Client
+	cfg            config
+	ep             *sql.Endpoint[config]
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -224,53 +222,10 @@ func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr 
 		errs.Err(fmt.Errorf("dataset %q is actually in region %q, which is different than the configured region %q", c.cfg.Dataset, meta.Location, c.cfg.Region))
 	}
 
-	// Verify cloud storage abilities.
-	data := []byte("test")
-
-	objectDir := path.Join(c.cfg.Bucket, c.cfg.BucketPath)
-	objectKey := path.Join(objectDir, uuid.NewString())
-	objectHandle := c.cloudStorageClient.Bucket(c.cfg.Bucket).Object(objectKey)
-
-	writer := objectHandle.NewWriter(ctx)
-	if _, err := writer.Write(data); err != nil {
-		// This won't err until the writer is closed in the case of having the wrong bucket or
-		// authorization configured, and would most likely be caused by a logic error in the
-		// connector code.
+	if bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))); err != nil {
+		errs.Err(fmt.Errorf("creating GCS bucket: %w", err))
+	} else if err := bucket.CheckPermissions(ctx, blob.CheckPermissionsConfig{Prefix: cfg.BucketPath}); err != nil {
 		errs.Err(err)
-	} else if err := writer.Close(); err != nil {
-		// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
-		// exist but the configured credentials aren't authorized to write to it.
-		if errors.As(err, &googleErr) {
-			if googleErr.Code == http.StatusNotFound {
-				err = fmt.Errorf("bucket %q does not exist", c.cfg.Bucket)
-			} else if googleErr.Code == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to write to bucket %q", objectDir)
-			}
-		}
-		errs.Err(err)
-	} else {
-		// Verify that the created object can be read and deleted. The unauthorized case is handled
-		// & formatted specifically in these checks since the existence of the bucket has already
-		// been verified by creating the temporary test object.
-		if reader, err := objectHandle.NewReader(ctx); err != nil {
-			errs.Err(err)
-		} else if _, err := reader.Read(make([]byte, len(data))); err != nil {
-			if errors.As(err, &googleErr) && googleErr.Code == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to read from bucket %q", objectDir)
-			}
-			errs.Err(err)
-		} else {
-			reader.Close()
-		}
-
-		// It's technically possible to be able to delete but not read, so delete is checked even if
-		// read failed.
-		if err := objectHandle.Delete(ctx); err != nil {
-			if errors.As(err, &googleErr) && googleErr.Code == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to delete from bucket %q", objectDir)
-			}
-			errs.Err(err)
-		}
 	}
 
 	return errs
@@ -322,5 +277,4 @@ func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence)
 
 func (c *client) Close() {
 	c.bigqueryClient.Close()
-	c.cloudStorageClient.Close()
 }

@@ -79,6 +79,11 @@ func (b *GCSBucket) Delete(ctx context.Context, uris []string) error {
 		}
 		group.Go(func() error {
 			if err := b.client.Bucket(bucket).Object(key).Delete(groupCtx); err != nil {
+				var gErr *googleapi.Error
+				if errors.As(err, &gErr) && gErr.Code == http.StatusNotFound {
+					return nil
+				}
+
 				return fmt.Errorf("deleting blob %q: %w", uri, err)
 			}
 			return nil

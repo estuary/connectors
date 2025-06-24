@@ -1,141 +1,29 @@
 package connector
 
 import (
-	"context"
-	"fmt"
+	"io"
 	"path"
 
 	"cloud.google.com/go/bigquery"
-	storage "cloud.google.com/go/storage"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
-	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 )
 
-type stagedFile struct {
-	schema []*bigquery.FieldSchema
-	fields []string
-	client *storage.Client
+type stagedFileClient struct{}
 
-	// The GCS bucket configured for the materialization.
-	bucket string
-
-	// The prefix for files stored in the bucket. This includes the optional `bucketPath` if
-	// configured, and the randomly generated UUID of this stagedFile for this connector invocation.
-	prefix string
-
-	encoder *enc.JsonEncoder
-
-	// List of file names uploaded during the current transaction. The data file names are randomly
-	// generated UUIDs.
-	uploaded []string
-
-	// Indicates if the stagedFile has been initialized for this transaction yet. Set `true` by
-	// start() and `false` by flush(). Useful for the transactor to know if a binding has any data
-	// for the current transaction.
-	started bool
+func (stagedFileClient) NewEncoder(w io.WriteCloser, fields []string) boilerplate.Encoder {
+	return enc.NewJsonEncoder(w, fields, enc.WithJsonSkipNulls())
 }
 
-func newStagedFile(client *storage.Client, bucket string, bucketPath string, schema []*bigquery.FieldSchema) *stagedFile {
-	fields := make([]string, 0, len(schema))
-	for _, f := range schema {
-		fields = append(fields, f.Name)
-	}
-
-	return &stagedFile{
-		schema: schema,
-		fields: fields,
-		client: client,
-		bucket: bucket,
-		prefix: path.Join(bucketPath, uuid.NewString()),
-	}
+func (stagedFileClient) NewKey(keyParts []string) string {
+	return path.Join(keyParts...)
 }
 
-func (f *stagedFile) start() {
-	if f.started {
-		return
-	}
-
-	f.uploaded = []string{}
-	f.started = true
-}
-
-func (f *stagedFile) newFile(ctx context.Context) {
-	fName := uuid.NewString()
-	writer := f.client.Bucket(f.bucket).Object(path.Join(f.prefix, fName)).NewWriter(ctx)
-	f.encoder = enc.NewJsonEncoder(writer, f.fields, enc.WithJsonSkipNulls())
-	f.uploaded = append(f.uploaded, fName)
-}
-
-func (f *stagedFile) flushFile() error {
-	if f.encoder == nil {
-		return nil
-	} else if err := f.encoder.Close(); err != nil {
-		return fmt.Errorf("closing encoder: %w", err)
-	}
-
-	f.encoder = nil
-	return nil
-}
-
-func (f *stagedFile) encodeRow(ctx context.Context, row []interface{}) error {
-	// May not have an encoder set yet if the previous encodeRow() resulted in flushing the current
-	// file, or for the very first call to encodeRow().
-	if f.encoder == nil {
-		f.newFile(ctx)
-	}
-
-	if err := f.encoder.Encode(row); err != nil {
-		return fmt.Errorf("encoding row: %w", err)
-	}
-
-	if f.encoder.Written() >= enc.DefaultJsonFileSizeLimit {
-		if err := f.flushFile(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (f *stagedFile) fileURI(file string) string {
-	return "gs://" + path.Join(f.bucket, f.fileKey(file))
-}
-
-func (f *stagedFile) fileKey(file string) string {
-	return path.Join(f.prefix, file)
-}
-
-func (f *stagedFile) flush() (func(context.Context), error) {
-	if err := f.flushFile(); err != nil {
-		return nil, err
-	}
-
-	// Reset for next round.
-	f.started = false
-
-	return func(ctx context.Context) {
-		for _, fName := range f.uploaded {
-			if err := f.client.Bucket(f.bucket).Object(f.fileKey(fName)).Delete(ctx); err != nil {
-				log.WithFields(log.Fields{
-					"key": f.fileKey(fName),
-					"err": err,
-				}).Warn("failed to delete staged object file")
-			}
-		}
-	}, nil
-}
-
-func (f *stagedFile) edc() *bigquery.ExternalDataConfig {
-	uris := make([]string, 0, len(f.uploaded))
-	for _, fName := range f.uploaded {
-		uris = append(uris, f.fileURI(fName))
-	}
-
+func edc(uris []string, schema bigquery.Schema) *bigquery.ExternalDataConfig {
 	return &bigquery.ExternalDataConfig{
 		SourceFormat: bigquery.JSON,
 		SourceURIs:   uris,
-		Schema:       f.schema,
+		Schema:       schema,
 		Compression:  bigquery.Gzip,
 	}
 }
