@@ -9,7 +9,7 @@ import "github.com/invopop/jsonschema"
 // represented; use the OneofSubSchema helper function to create these.
 //
 // See one_of_test.go for an example of using this.
-func OneOfSchema(title, description, discriminator, default_ string, inputs ...oneOfSubSchema) *jsonschema.Schema {
+func OneOfSchema(title, description, discriminator, default_ string, inputs ...OneOfSubSchemaT) *jsonschema.Schema {
 	var oneOfs []*jsonschema.Schema
 
 	for _, input := range inputs {
@@ -37,11 +37,11 @@ func OneOfSchema(title, description, discriminator, default_ string, inputs ...o
 }
 
 // OneOfSubSchema builds a subschema to be included in a "OneOf" combination.
-func OneOfSubSchema(title string, configObj any, default_ string) oneOfSubSchema {
-	return oneOfSubSchema{title: title, configObj: configObj, default_: default_}
+func OneOfSubSchema(title string, configObj any, default_ string) OneOfSubSchemaT {
+	return OneOfSubSchemaT{title: title, configObj: configObj, default_: default_}
 }
 
-type oneOfSubSchema struct {
+type OneOfSubSchemaT struct {
 	title     string
 	configObj any
 	default_  string
