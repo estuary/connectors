@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strconv"
 	"unsafe"
@@ -10,7 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/segmentio/encoding/json"
-	"github.com/sirupsen/logrus"
 )
 
 // A jsonTranscoder is a function which transcodes a PostgreSQL wire protocol value
@@ -129,18 +129,12 @@ func (source *postgresSource) AppendJSON(buf []byte) ([]byte, error) {
 
 // backfillJSONTranscoder returns a jsonTranscoder for a specific column in a Postgres backfill.
 func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription, columnInfo *sqlcapture.ColumnInfo, isPrimaryKey bool) jsonTranscoder {
-	var logEntry = logrus.WithFields(logrus.Fields{
-		"column": string(fieldDescription.Name),
-		"oid":    fieldDescription.DataTypeOID,
-		"format": fieldDescription.Format,
-	})
 	// Look up the PGX type/codec for the column OID. If not found, we use a generic transcoder
 	// which treats the value as text or bytes depending on the format.
 	//
 	// TODO(wgd): Test if we could just swap this out for TextCodec without losing anything.
 	var pgType, ok = typeMap.TypeForOID(fieldDescription.DataTypeOID)
 	if !ok {
-		logEntry.Debug("backfillJSONTranscoder: unknown OID, using generic text transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			var val any
 			switch fieldDescription.Format {
@@ -168,7 +162,6 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 	// bytes and only need to marshal the string as a JSON string with escaping, so we can
 	// go significantly faster by using an unsafe cast.
 	if _, ok := codec.(pgtype.TextCodec); ok {
-		logEntry.Debug("backfillJSONTranscoder: using specialized string transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if bs == nil {
 				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
@@ -178,56 +171,69 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 		}
 	}
 
-	// Special case for the INT2 column type
 	if _, ok := codec.(pgtype.Int2Codec); ok && fieldDescription.Format == pgtype.BinaryFormatCode {
-		logEntry.Debug("backfillJSONTranscoder: using specialized INT2 transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if bs == nil {
 				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
 			} else if len(bs) != 2 {
 				return nil, fmt.Errorf("expected 2 bytes for INT2, got %d bytes", len(bs))
 			}
-			var val = int16(uint16(bs[0])<<8 | uint16(bs[1]))
-			buf = strconv.AppendInt(buf, int64(val), 10)
-			return buf, nil
+			return strconv.AppendInt(buf, int64(int16(binary.BigEndian.Uint16(bs))), 10), nil
 		}
 	}
 
-	// Special case for the INT4 column type
 	if _, ok := codec.(pgtype.Int4Codec); ok && fieldDescription.Format == pgtype.BinaryFormatCode {
-		logEntry.Debug("backfillJSONTranscoder: using specialized INT4 transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if bs == nil {
 				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
 			} else if len(bs) != 4 {
 				return nil, fmt.Errorf("expected 4 bytes for INT4, got %d bytes", len(bs))
 			}
-			var val = int32(uint32(bs[0])<<24 | uint32(bs[1])<<16 | uint32(bs[2])<<8 | uint32(bs[3]))
-			buf = strconv.AppendInt(buf, int64(val), 10)
-			return buf, nil
+			return strconv.AppendInt(buf, int64(int32(binary.BigEndian.Uint32(bs))), 10), nil
 		}
 	}
 
-	// Special case for the INT8 column type
 	if _, ok := codec.(pgtype.Int8Codec); ok && fieldDescription.Format == pgtype.BinaryFormatCode {
-		logEntry.Debug("backfillJSONTranscoder: using specialized INT8 transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if bs == nil {
 				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
 			} else if len(bs) != 8 {
 				return nil, fmt.Errorf("expected 8 bytes for INT8, got %d bytes", len(bs))
 			}
-			var val = int64(uint64(bs[0])<<56 | uint64(bs[1])<<48 | uint64(bs[2])<<40 | uint64(bs[3])<<32 |
-				uint64(bs[4])<<24 | uint64(bs[5])<<16 | uint64(bs[6])<<8 | uint64(bs[7]))
-			buf = strconv.AppendInt(buf, val, 10)
-			return buf, nil
+			return strconv.AppendInt(buf, int64(binary.BigEndian.Uint64(bs)), 10), nil
+		}
+	}
+
+	if _, ok := codec.(pgtype.Int2Codec); ok && fieldDescription.Format == pgtype.TextFormatCode {
+		return func(buf []byte, bs []byte) ([]byte, error) {
+			if bs == nil {
+				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
+			}
+			return append(buf, bs...), nil // Text-format integers are just decimal numbers, which are valid JSON
+		}
+	}
+
+	if _, ok := codec.(pgtype.Int4Codec); ok && fieldDescription.Format == pgtype.TextFormatCode {
+		return func(buf []byte, bs []byte) ([]byte, error) {
+			if bs == nil {
+				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
+			}
+			return append(buf, bs...), nil // Text-format integers are just decimal numbers, which are valid JSON
+		}
+	}
+
+	if _, ok := codec.(pgtype.Int8Codec); ok && fieldDescription.Format == pgtype.TextFormatCode {
+		return func(buf []byte, bs []byte) ([]byte, error) {
+			if bs == nil {
+				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
+			}
+			return append(buf, bs...), nil // Text-format integers are just decimal numbers, which are valid JSON
 		}
 	}
 
 	// This is the main value encoding logic used for most data types outside of special cases.
 	// We go the long way, first using PGX to decode the value and then translating it to another
 	// Go value and then finally serializing that as JSON.
-	logEntry.Debug("backfillJSONTranscoder: using general-purpose transcoder")
 	return func(buf []byte, bs []byte) ([]byte, error) {
 		var val any
 		var err error
@@ -248,12 +254,6 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 
 // backfillFDBTranscoder returns an fdbTranscoder for a specific column in a Postgres backfill.
 func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription, columnInfo *sqlcapture.ColumnInfo) fdbTranscoder {
-	var logEntry = logrus.WithFields(logrus.Fields{
-		"column": string(fieldDescription.Name),
-		"oid":    fieldDescription.DataTypeOID,
-		"format": fieldDescription.Format,
-	})
-
 	var columnType = columnInfo.DataType
 	var codec pgtype.Codec
 	if pgType, ok := typeMap.TypeForOID(fieldDescription.DataTypeOID); ok {
@@ -263,48 +263,59 @@ func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDesc
 	}
 
 	if _, ok := codec.(pgtype.TextCodec); ok {
-		logEntry.Debug("backfillFDBTranscoder: using specialized string transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			return sqlcapture.AppendBytesFDB(buf, sqlcapture.FDBStringCode, bs)
 		}
 	}
 
 	if _, ok := codec.(pgtype.Int2Codec); ok && fieldDescription.Format == pgtype.BinaryFormatCode {
-		logEntry.Debug("backfillFDBTranscoder: using specialized INT2 transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if len(bs) != 2 {
 				return nil, fmt.Errorf("expected 2 bytes for INT2, got %d bytes", len(bs))
 			}
-			var val = int16(uint16(bs[0])<<8 | uint16(bs[1]))
-			return sqlcapture.AppendIntFDB(buf, int64(val))
+			return sqlcapture.AppendIntFDB(buf, int64(int16(binary.BigEndian.Uint16(bs))))
 		}
 	}
 
 	if _, ok := codec.(pgtype.Int4Codec); ok && fieldDescription.Format == pgtype.BinaryFormatCode {
-		logEntry.Debug("backfillFDBTranscoder: using specialized INT4 transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if len(bs) != 4 {
 				return nil, fmt.Errorf("expected 4 bytes for INT4, got %d bytes", len(bs))
 			}
-			var val = int32(uint32(bs[0])<<24 | uint32(bs[1])<<16 | uint32(bs[2])<<8 | uint32(bs[3]))
-			return sqlcapture.AppendIntFDB(buf, int64(val))
+			return sqlcapture.AppendIntFDB(buf, int64(int32(binary.BigEndian.Uint32(bs))))
 		}
 	}
 
 	if _, ok := codec.(pgtype.Int8Codec); ok && fieldDescription.Format == pgtype.BinaryFormatCode {
-		logEntry.Debug("backfillFDBTranscoder: using specialized INT8 transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if len(bs) != 8 {
 				return nil, fmt.Errorf("expected 8 bytes for INT8, got %d bytes", len(bs))
 			}
-			var val = int64(uint64(bs[0])<<56 | uint64(bs[1])<<48 | uint64(bs[2])<<40 | uint64(bs[3])<<32 |
-				uint64(bs[4])<<24 | uint64(bs[5])<<16 | uint64(bs[6])<<8 | uint64(bs[7]))
+			return sqlcapture.AppendIntFDB(buf, int64(binary.BigEndian.Uint64(bs)))
+		}
+	}
+
+	if _, ok := codec.(pgtype.Int2Codec); ok && fieldDescription.Format == pgtype.TextFormatCode {
+		return func(buf []byte, bs []byte) ([]byte, error) {
+			var val, err = strconv.ParseInt(string(bs), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing INT2 value %q for column %q: %w", string(bs), string(fieldDescription.Name), err)
+			}
+			return sqlcapture.AppendIntFDB(buf, val)
+		}
+	}
+
+	if _, ok := codec.(pgtype.Int4Codec); ok && fieldDescription.Format == pgtype.TextFormatCode {
+		return func(buf []byte, bs []byte) ([]byte, error) {
+			var val, err = strconv.ParseInt(string(bs), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing INT4 value %q for column %q: %w", string(bs), string(fieldDescription.Name), err)
+			}
 			return sqlcapture.AppendIntFDB(buf, val)
 		}
 	}
 
 	if _, ok := codec.(pgtype.Int8Codec); ok && fieldDescription.Format == pgtype.TextFormatCode {
-		logEntry.Debug("backfillFDBTranscoder: using specialized INT8 transcoder")
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			var val, err = strconv.ParseInt(string(bs), 10, 64)
 			if err != nil {
@@ -314,7 +325,6 @@ func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDesc
 		}
 	}
 
-	logEntry.Debug("backfillFDBTranscoder: using general-purpose transcoder")
 	return func(buf, v []byte) ([]byte, error) {
 		var val any
 		var err error

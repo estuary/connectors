@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"regexp"
 	"slices"
 	"sync"
@@ -164,6 +163,12 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		return nil, fmt.Errorf("unable to start replication: %w", err)
 	}
 
+	hijacked, err := conn.Hijack()
+	if err != nil {
+		conn.Close(ctx)
+		return nil, fmt.Errorf("unable to hijack replication connection: %w", err)
+	}
+
 	var typeMap = pgtype.NewMap()
 	if err := registerDatatypeTweaks(ctx, db.conn, typeMap); err != nil {
 		return nil, err
@@ -171,7 +176,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 
 	var stream = &replicationStream{
 		db:       db,
-		conn:     conn,
+		conn:     hijacked,
 		pubName:  publication,
 		replSlot: slot,
 
@@ -180,7 +185,6 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		nextTxnFinalLSN: 0,
 		nextTxnMillis:   0,
 		typeMap:         typeMap,
-		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 
 		previousFenceLSN: startLSN,
 	}
@@ -233,14 +237,12 @@ func (s *postgresSource) Common() sqlcapture.SourceCommon {
 // and translating changes into a more friendly representation.
 type replicationStream struct {
 	db       *postgresDatabase
-	conn     *pgconn.PgConn // The PostgreSQL replication connection
-	pubName  string         // The name of the PostgreSQL publication to use
-	replSlot string         // The name of the PostgreSQL replication slot to use
+	conn     *pgconn.HijackedConn // The PostgreSQL replication connection, hijacked from PGX so we can parse the stream directly.
+	pubName  string               // The name of the PostgreSQL publication to use
+	replSlot string               // The name of the PostgreSQL replication slot to use
 
-	cancel   context.CancelFunc            // Cancel function for the replication goroutine's context
-	errCh    chan error                    // Error channel for the final exit status of the replication goroutine
-	events   chan sqlcapture.DatabaseEvent // The channel to which replication events will be written
-	eventBuf sqlcapture.DatabaseEvent      // A single-element buffer used in between 'receiveMessage' and the output channel
+	workerCtx       context.Context    // The context used for the worker goroutine, which is canceled when the stream is closed.
+	cancelWorkerCtx context.CancelFunc // The cancel function for the worker context, used to stop the worker goroutine.
 
 	previousFenceLSN pglogrepl.LSN // // The most recently reached fence LSN, updated at the end of each StreamToFence cycle.
 
@@ -250,11 +252,6 @@ type replicationStream struct {
 	nextTxnFinalLSN pglogrepl.LSN // Final LSN of the commit currently being processed, or zero if between transactions.
 	nextTxnMillis   int64         // Unix timestamp (in millis) at which the change originally occurred.
 	nextTxnXID      uint32        // XID of the commit currently being processed.
-
-	// standbyStatusDeadline is the time at which we need to stop receiving
-	// replication messages and go send a Standby Status Update message to
-	// the DB.
-	standbyStatusDeadline time.Time
 
 	// typeMap is a sort of type registry used when decoding values from the database.
 	typeMap *pgtype.Map
@@ -316,31 +313,23 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 	var latestFlushCursor = s.previousFenceLSN.String()
 	if fenceAfter > 0 {
 		logrus.WithField("cursor", latestFlushCursor).Debug("beginning timed streaming phase")
-		var deadline = time.NewTimer(fenceAfter)
-		defer deadline.Stop()
-	loop:
-		for {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-deadline.C:
-				break loop
-			case event, ok := <-s.events:
-				if !ok {
-					return sqlcapture.ErrFenceNotReached
-				} else if err := callback(event); err != nil {
-					return err
-				}
-				timedEventsSinceFlush++
-				if event, ok := event.(*sqlcapture.FlushEvent); ok {
-					if eventCursor, err := unmarshalJSONString(event.Cursor); err != nil {
-						return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
-					} else {
-						latestFlushCursor = eventCursor
-					}
-					timedEventsSinceFlush = 0
-				}
+		var relayCtx, _ = context.WithTimeout(ctx, fenceAfter)
+		if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
+			if err := callback(event); err != nil {
+				return err
 			}
+			timedEventsSinceFlush++
+			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+				if eventCursor, err := unmarshalJSONString(event.Cursor); err != nil {
+					return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
+				} else {
+					latestFlushCursor = eventCursor
+				}
+				timedEventsSinceFlush = 0
+			}
+			return nil
+		}); err != nil && !errors.Is(err, context.DeadlineExceeded) {
+			return err
 		}
 	}
 	logrus.WithField("cursor", latestFlushCursor).Debug("finished timed streaming phase")
@@ -381,144 +370,101 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 		}
 	}
 
+	// Stream replication events until the fence is reached or the watchdog timeout hits.
+	//
 	// Given that the early-exit fast path was not taken, there must be further data for
 	// us to read. Thus if we sit idle for a nontrivial length of time without reaching
 	// our fence position, something is wrong and we should error out instead of blocking
 	// forever.
-	var fenceWatchdog = time.NewTimer(streamToFenceWatchdogTimeout)
-
-	// Stream replication events until the fence is reached.
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-fenceWatchdog.C:
-			if s.db.config.Advanced.ReadOnlyCapture {
-				return fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
-			}
-			return fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
-		case event, ok := <-s.events:
-			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
-			if !ok {
-				return sqlcapture.ErrFenceNotReached
-			} else if err := callback(event); err != nil {
-				return err
-			}
-
-			// The first flush event whose cursor position is equal to or after the fence
-			// position ends the stream-to-fence operation.
-			if event, ok := event.(*sqlcapture.FlushEvent); ok {
-				// It might be a bit inefficient to re-parse every flush cursor here, but
-				// realistically it's probably not a significant slowdown and it would be
-				// more work to preserve cursors as a typed value instead of a string.
-				var eventCursor, err = unmarshalJSONString(event.Cursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
-				}
-				eventLSN, err := pglogrepl.ParseLSN(eventCursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
-				}
-				if eventLSN >= fenceLSN {
-					logrus.WithField("cursor", eventCursor).Debug("finished fenced streaming phase")
-					s.previousFenceLSN = eventLSN
-					return nil
-				}
-			}
+	var relayCtx, cancelRelayCtx = context.WithCancelCause(ctx)
+	var fenceWatchdog = time.AfterFunc(streamToFenceWatchdogTimeout, func() {
+		var err error
+		if s.db.config.Advanced.ReadOnlyCapture {
+			err = fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
 		}
-	}
-}
-
-func (s *replicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
-	var streamCtx, streamCancel = context.WithCancel(ctx)
-	s.events = make(chan sqlcapture.DatabaseEvent, replicationBufferSize)
-	s.errCh = make(chan error)
-	s.cancel = streamCancel
-
-	go func() {
-		var err = s.run(streamCtx)
-		// Context cancellation typically occurs only in tests, and for test stability
-		// it should be considered a clean shutdown and not necessarily an error.
-		if errors.Is(err, context.Canceled) {
-			err = nil
-		}
-		// Unexpected EOF errors come from dropped connections or database restarts
-		// and should be considered a clean shutdown and not necessarily an error since
-		// most of the time we'll just restart and continue where we left off.
-		if errors.Is(err, io.ErrUnexpectedEOF) {
-			err = nil
-		}
-		// Always take up to 1 second to notify the database that we're done
-		var closeCtx, cancel = context.WithTimeout(context.Background(), 1*time.Second)
-		s.conn.Close(closeCtx)
-		cancel()
-		close(s.events)
-		s.errCh <- err
-	}()
-	return nil
-}
-
-// run is the main loop of the replicationStream which combines message
-// receiving/relaying with periodic standby status updates.
-func (s *replicationStream) run(ctx context.Context) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-
-		if time.Now().After(s.standbyStatusDeadline) {
-			if err := s.sendStandbyStatusUpdate(ctx); err != nil {
-				return fmt.Errorf("failed to send status update: %w", err)
-			}
-			s.standbyStatusDeadline = time.Now().Add(standbyStatusInterval)
-		}
-
-		var workCtx, cancelWorkCtx = context.WithDeadline(ctx, s.standbyStatusDeadline)
-		var err = s.relayMessages(workCtx)
-		cancelWorkCtx()
-		if err != nil {
-			return fmt.Errorf("failed to relay messages: %w", err)
-		}
-	}
-}
-
-// relayMessages receives logical replication messages from PostgreSQL and sends
-// them on the stream's output channel until its context is cancelled. This is
-// expected to happen every 10 seconds, so that a standby status update can be
-// sent.
-func (s *replicationStream) relayMessages(ctx context.Context) error {
-	for {
-		// If there's already a change event which needs to be sent to the consumer,
-		// try to do so until/unless the context expires first.
-		if s.eventBuf != nil {
-			select {
-			case <-ctx.Done():
-				return nil
-			case s.events <- s.eventBuf:
-				s.eventBuf = nil
-			}
-		}
-
-		// In tbe absence of a buffered message, go try to receive another from
-		// the database.
-		var lsn, msg, err = s.receiveMessage(ctx)
-		if pgconn.Timeout(err) {
-			return nil
-		}
-		if err != nil {
+		err = fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
+		cancelRelayCtx(err)
+	})
+	if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
+		fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
+		if err := callback(event); err != nil {
 			return err
 		}
 
-		// Once a message arrives, decode it and buffer the result until the next
-		// time this function is invoked.
+		// The first flush event whose cursor position is equal to or after the fence
+		// position ends the stream-to-fence operation.
+		if event, ok := event.(*sqlcapture.FlushEvent); ok {
+			// It might be a bit inefficient to re-parse every flush cursor here, but
+			// realistically it's probably not a significant slowdown and it would be
+			// more work to preserve cursors as a typed value instead of a string.
+			var eventCursor, err = unmarshalJSONString(event.Cursor)
+			if err != nil {
+				return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
+			}
+			eventLSN, err := pglogrepl.ParseLSN(eventCursor)
+			if err != nil {
+				return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
+			}
+			if eventLSN >= fenceLSN {
+				logrus.WithField("cursor", eventCursor).Debug("finished fenced streaming phase")
+				s.previousFenceLSN = eventLSN
+				cancelRelayCtx(nil) // Stop the relay loop so we can exit cleanly. A nil cause means no error.
+			}
+		}
+		return nil
+	}); errors.Is(err, context.Canceled) {
+		return context.Cause(ctx)
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (s *replicationStream) relayChanges(ctx context.Context, callback func(event sqlcapture.DatabaseEvent) error) error {
+	for ctx.Err() == nil {
+		// Try to receive another message from the database.
+		var lsn, msg, err = s.receiveMessage(ctx)
+		if pgconn.Timeout(err) {
+			return ctx.Err()
+		} else if err != nil {
+			return err
+		}
+
+		// Once a message arrives, decode it and dispatch to the callback.
 		event, err := s.decodeMessage(lsn, msg)
 		if err != nil {
 			return fmt.Errorf("error decoding message: %w", err)
+		} else if event == nil {
+			continue
+		} else if err := callback(event); err != nil {
+			return err
 		}
-		s.eventBuf = event
 	}
+	return ctx.Err()
+}
+
+func (s *replicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
+	// Launch a little helper routine to just send standby status updates regularly.
+	s.workerCtx, s.cancelWorkerCtx = context.WithCancel(ctx)
+	go func() {
+		if err := s.sendStandbyStatusUpdate(ctx); err != nil {
+			logrus.WithError(err).Fatal("failed to send standby status update")
+		}
+		var ticker = time.NewTicker(standbyStatusInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-s.workerCtx.Done():
+				return
+			case <-ticker.C:
+				if err := s.sendStandbyStatusUpdate(ctx); err != nil {
+					logrus.WithError(err).Fatal("failed to send standby status update")
+				}
+			}
+		}
+	}()
+
+	return nil
 }
 
 func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Message) (sqlcapture.DatabaseEvent, error) {
@@ -928,7 +874,7 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, 
 					return 0, nil, fmt.Errorf("error parsing keepalive: %w", err)
 				}
 				if pkm.ReplyRequested {
-					s.standbyStatusDeadline = time.Now()
+					// TODO(wgd): Trigger a standby status update here.
 				}
 			case pglogrepl.XLogDataByteID:
 				var xld, err = pglogrepl.ParseXLogData(msg.Data[1:])
@@ -1132,10 +1078,49 @@ func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 	})
 }
 
+//func SendStandbyStatusUpdate(_ context.Context, conn *pgconn.PgConn, ssu StandbyStatusUpdate) error {
+//	if ssu.WALFlushPosition == 0 {
+//		ssu.WALFlushPosition = ssu.WALWritePosition
+//	}
+//	if ssu.WALApplyPosition == 0 {
+//		ssu.WALApplyPosition = ssu.WALWritePosition
+//	}
+//	if ssu.ClientTime == (time.Time{}) {
+//		ssu.ClientTime = time.Now()
+//	}
+//
+//	data := make([]byte, 0, 34)
+//	data = append(data, StandbyStatusUpdateByteID)
+//	data = pgio.AppendUint64(data, uint64(ssu.WALWritePosition))
+//	data = pgio.AppendUint64(data, uint64(ssu.WALFlushPosition))
+//	data = pgio.AppendUint64(data, uint64(ssu.WALApplyPosition))
+//	data = pgio.AppendInt64(data, timeToPgTime(ssu.ClientTime))
+//	if ssu.ReplyRequested {
+//		data = append(data, 1)
+//	} else {
+//		data = append(data, 0)
+//	}
+//
+//	cd := &pgproto3.CopyData{Data: data}
+//	buf, err := cd.Encode(nil)
+//	if err != nil {
+//		return err
+//	}
+//
+//	return conn.Frontend().SendUnbufferedEncodedCopyData(buf)
+//}
+
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
-	s.cancel()
-	return <-s.errCh
+
+	// Convert back to a pgconn connection so we can close it cleanly with a termination message.
+	var conn, err = pgconn.Construct(s.conn)
+	if err != nil {
+		return fmt.Errorf("error constructing pgconn from connection: %w", err)
+	}
+	conn.Close(ctx)
+	s.cancelWorkerCtx() // Stop the standby status update goroutine.
+	return nil
 }
 
 func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
