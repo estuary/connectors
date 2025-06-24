@@ -183,7 +183,8 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		replSlot: slot,
 
 		rxbuf:              make([]byte, 0, rxBufferSize),
-		reusedEvent:        new(postgresChangeEvent),
+		reusedChangeEvent:  new(postgresChangeEvent),
+		reusedCommitEvent:  new(postgresCommitEvent),
 		reusedBeforeValues: make([][]byte, 0, 32),
 		reusedAfterValues:  make([][]byte, 0, 32),
 
@@ -251,9 +252,11 @@ type replicationStream struct {
 	rxbuf []byte // Logical replication message stream receive/decode buffer.
 	rxoff int    // Logical replication message stream receive/decode buffer offset.
 
-	reusedEvent        *postgresChangeEvent // A reusable event object used to avoid allocations when decoding messages.
-	reusedBeforeValues [][]byte             // Reusable slice of wire protocol values
-	reusedAfterValues  [][]byte             // Reusable slice of wire protocol values
+	reusedChangeEvent  *postgresChangeEvent // Reusable event object, so change decoding doesn't allocate.
+	reusedCommitEvent  *postgresCommitEvent // Reusable event object, so change decoding doesn't allocate.
+	reusedRowKey       []byte               // Reusable slice for row key serialization, so change decoding doesn't allocate.
+	reusedBeforeValues [][]byte             // Reusable slice of wire protocol values, so change decoding doesn't allocate.
+	reusedAfterValues  [][]byte             // Reusable slice of wire protocol values, so change decoding doesn't allocate.
 
 	workerCtx       context.Context    // The context used for the worker goroutine, which is canceled when the stream is closed.
 	cancelWorkerCtx context.CancelFunc // The cancel function for the worker context, used to stop the worker goroutine.
@@ -316,55 +319,50 @@ var (
 
 func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
 	// Time-based event streaming until the fenceAfter duration is reached.
-	var timedEventsSinceFlush int
-	var latestFlushCursor = s.previousFenceLSN.String()
+	var timedEventsSinceCommit int
+	var latestCommitLSN = s.previousFenceLSN
 	if fenceAfter > 0 {
-		logrus.WithField("cursor", latestFlushCursor).Debug("beginning timed streaming phase")
+		logrus.WithField("cursor", latestCommitLSN).Debug("beginning timed streaming phase")
 		var relayCtx, _ = context.WithTimeout(ctx, fenceAfter)
 		if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
 			if err := callback(event); err != nil {
 				return err
 			}
-			timedEventsSinceFlush++
-			if event, ok := event.(*sqlcapture.FlushEvent); ok {
-				if eventCursor, err := unmarshalJSONString(event.Cursor); err != nil {
-					return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
-				} else {
-					latestFlushCursor = eventCursor
-				}
-				timedEventsSinceFlush = 0
+			timedEventsSinceCommit++
+			if event, ok := event.(*postgresCommitEvent); ok {
+				latestCommitLSN = event.CommitLSN
+				timedEventsSinceCommit = 0
 			}
 			return nil
 		}); err != nil && !errors.Is(err, context.DeadlineExceeded) {
 			return err
 		}
 	}
-	logrus.WithField("cursor", latestFlushCursor).Debug("finished timed streaming phase")
+	logrus.WithField("cursor", latestCommitLSN.String()).Debug("finished timed streaming phase")
 
 	// Establish a fence based on the latest server LSN
 	var fenceLSN, err = queryLatestServerLSN(ctx, s.db.conn)
 	if err != nil {
 		return fmt.Errorf("error establishing WAL fence position: %w", err)
 	}
-	logrus.WithField("cursor", latestFlushCursor).WithField("target", fenceLSN.String()).Debug("beginning fenced streaming phase")
-	if latestFlushLSN, err := pglogrepl.ParseLSN(latestFlushCursor); err != nil {
-		return fmt.Errorf("internal error: failed to parse flush cursor value %q", latestFlushCursor)
-	} else if fenceLSN == latestFlushLSN {
+	logrus.WithField("cursor", latestCommitLSN.String()).WithField("target", fenceLSN.String()).Debug("beginning fenced streaming phase")
+	if fenceLSN == latestCommitLSN {
 		// As an internal sanity check, we assert that it should never be possible
 		// to hit this early exit unless the database has been idle since the last
 		// flush event we observed.
-		if timedEventsSinceFlush > 0 {
-			return fmt.Errorf("internal error: sanity check failed: already at fence after processing %d changes during timed phase", timedEventsSinceFlush)
+		if timedEventsSinceCommit > 0 {
+			return fmt.Errorf("internal error: sanity check failed: already at fence after processing %d changes during timed phase", timedEventsSinceCommit)
 		}
 
 		// Mark the position of the flush event as the latest fence before returning.
-		s.previousFenceLSN = latestFlushLSN
+		s.previousFenceLSN = latestCommitLSN
 
 		// Since we're still at a valid flush position and those are always between
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{Cursor: marshalJSONString(latestFlushLSN.String())})
+		*s.reusedCommitEvent = postgresCommitEvent{CommitLSN: latestCommitLSN}
+		return callback(s.reusedCommitEvent)
 	}
 
 	// After establishing a target fence position, issue a watermark write. This ensures
@@ -387,9 +385,9 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 	var fenceWatchdog = time.AfterFunc(streamToFenceWatchdogTimeout, func() {
 		var err error
 		if s.db.config.Advanced.ReadOnlyCapture {
-			err = fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
+			err = fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
 		}
-		err = fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushCursor, fenceLSN.String())
+		err = fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
 		cancelRelayCtx(err)
 	})
 	if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
@@ -400,20 +398,13 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 
 		// The first flush event whose cursor position is equal to or after the fence
 		// position ends the stream-to-fence operation.
-		if event, ok := event.(*sqlcapture.FlushEvent); ok {
+		if event, ok := event.(*postgresCommitEvent); ok {
 			// It might be a bit inefficient to re-parse every flush cursor here, but
 			// realistically it's probably not a significant slowdown and it would be
 			// more work to preserve cursors as a typed value instead of a string.
-			var eventCursor, err = unmarshalJSONString(event.Cursor)
-			if err != nil {
-				return fmt.Errorf("internal error: failed to parse flush event cursor: %w", err)
-			}
-			eventLSN, err := pglogrepl.ParseLSN(eventCursor)
-			if err != nil {
-				return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
-			}
+			var eventLSN = event.CommitLSN
 			if eventLSN >= fenceLSN {
-				logrus.WithField("cursor", eventCursor).Debug("finished fenced streaming phase")
+				logrus.WithField("cursor", eventLSN.String()).Debug("finished fenced streaming phase")
 				s.previousFenceLSN = eventLSN
 				cancelRelayCtx(nil) // Stop the relay loop so we can exit cleanly. A nil cause means no error.
 			}
@@ -579,10 +570,9 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlca
 		s.nextTxnMillis = 0
 		s.nextTxnXID = 0
 		s.lastTxnEndLSN = msg.TransactionEndLSN
-		var event = &sqlcapture.FlushEvent{
-			Cursor: marshalJSONString(s.lastTxnEndLSN.String()),
-		}
-		return event, nil
+
+		*s.reusedCommitEvent = postgresCommitEvent{CommitLSN: msg.TransactionEndLSN}
+		return s.reusedCommitEvent, nil
 
 	// Change Events: Insert, Update, and Delete
 	case pglogrepl.MessageTypeInsert:
@@ -807,17 +797,18 @@ func (s *replicationStream) decodeChangeEvent(
 	// Compute row key for this change event, if key columns are defined.
 	var rowKey []byte
 	if info.KeyColumns != nil {
-		rowKey = make([]byte, 0, 16) // Preallocate a small buffer for the row key.
+		rowKey = s.reusedRowKey[:0] // Reset the reused row key buffer.
 		for _, n := range info.KeyColumns {
 			rowKey, err = info.RowKeyTranscoders[n](rowKey, values[n])
 			if err != nil {
 				return nil, fmt.Errorf("error encoding row key column %q at index %d: %w", info.ColumnNames[n], n, err)
 			}
 		}
+		s.reusedRowKey = rowKey // Update in case of resizing
 	}
 
 	_ = beforeValues // TODO(wgd): Include the before tuple values so that updates with full REPLICA IDENTITY work correctly.
-	*s.reusedEvent = postgresChangeEvent{
+	*s.reusedChangeEvent = postgresChangeEvent{
 		Info: info.Shared,
 		Meta: postgresChangeMetadata{
 			Operation: op,
@@ -838,9 +829,9 @@ func (s *replicationStream) decodeChangeEvent(
 		Values: values,
 	}
 	if s.db.includeTxIDs[info.StreamID] {
-		s.reusedEvent.Meta.Source.TxID = s.nextTxnXID
+		s.reusedChangeEvent.Meta.Source.TxID = s.nextTxnXID
 	}
-	return s.reusedEvent, nil
+	return s.reusedChangeEvent, nil
 }
 
 func scanTupleEnd(data []byte) int {
