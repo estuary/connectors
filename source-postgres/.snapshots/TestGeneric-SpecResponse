@@ -56,7 +56,8 @@
               "auth_type": {
                 "type": "string",
                 "const": "AWSIAM",
-                "default": "AWSIAM"
+                "default": "AWSIAM",
+                "x-iam-auth-provider": "aws"
               },
               "user": {
                 "type": "string",
@@ -102,11 +103,19 @@
                   "us-gov-east-1",
                   "us-gov-west-1"
                 ],
-                "description": "AWS Region of your database"
+                "description": "AWS Region of your database",
+                "x-aws-region": true
               },
               "aws_role": {
                 "type": "string",
-                "description": "AWS Role which has rds-db:connect access to be assumed by Estuary"
+                "description": "AWS Role which has rds-db:connect access to be assumed by Estuary",
+                "x-aws-role-arn": true
+              },
+              "aws_external_id": {
+                "type": "string",
+                "description": "External ID to use when assuming the AWS Role",
+                "secret": true,
+                "x-aws-external-id": true
               }
             },
             "required": [
@@ -114,6 +123,36 @@
               "AWSIAM"
             ],
             "title": "AWS IAM"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "GCPIAM",
+                "default": "GCPIAM",
+                "x-iam-auth-provider": "gcp"
+              },
+              "user": {
+                "type": "string",
+                "description": "The database user to authenticate as.",
+                "default": "flow_capture"
+              },
+              "gcp_service_account": {
+                "type": "string",
+                "description": "GCP Service Account email for Cloud SQL IAM authentication",
+                "x-gcp-service-account": true
+              },
+              "gcp_project_id": {
+                "type": "string",
+                "description": "GCP Project ID where the Cloud SQL instance is located",
+                "x-gcp-project-id": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "GCPIAM"
+            ],
+            "title": "Google Cloud IAM"
           }
         ],
         "type": "object",

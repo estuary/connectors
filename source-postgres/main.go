@@ -7,15 +7,13 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -131,6 +129,7 @@ type Config struct {
 const (
 	UserPassword = "UserPassword"
 	AWSIAM       = "AWSIAM"
+	GCPIAM       = "GCPIAM"
 )
 
 type credentialConfig struct {
@@ -143,6 +142,9 @@ type credentialConfig struct {
 	AWSRegion     string `json:"aws_region,omitempty"`
 	AWSRole       string `json:"aws_role,omitempty"`
 	AWSExternalId string `json:"aws_external_id,omitempty"`
+
+	GCPServiceAccount string `json:"gcp_service_account,omitempty"`
+	GCPProjectID      string `json:"gcp_project_id,omitempty"`
 }
 
 // JSONSchema allows for the schema to be (semi-)manually specified when used with the
@@ -173,6 +175,9 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		Type:    "string",
 		Default: AWSIAM,
 		Const:   AWSIAM,
+		Extras: map[string]interface{}{
+			"x-iam-auth-provider": "aws",
+		},
 	})
 	aws.Set("user", &jsonschema.Schema{
 		Description: "The database user to authenticate as.",
@@ -183,16 +188,52 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		Type:        "string",
 		Description: "AWS Region of your database",
 		Enum:        []any{"us-east-2", "us-east-1", "us-west-1", "us-west-2", "af-south-1", "ap-east-1", "ap-south-2", "ap-southeast-3", "ap-southeast-5", "ap-southeast-4", "ap-south-1", "ap-northeast-3", "ap-northeast-2", "ap-southeast-1", "ap-southeast-2", "ap-east-2", "ap-southeast-7", "ap-northeast-1", "ca-central-1", "ca-west-1", "eu-central-1", "eu-west-1", "eu-west-2", "eu-south-1", "eu-west-3", "eu-south-2", "eu-north-1", "eu-central-2", "il-central-1", "mx-central-1", "me-south-1", "me-central-1", "sa-east-1", "us-gov-east-1", "us-gov-west-1"},
+		Extras: map[string]interface{}{
+			"x-aws-region": true,
+		},
 	})
 	aws.Set("aws_role", &jsonschema.Schema{
 		Type:        "string",
 		Description: "AWS Role which has rds-db:connect access to be assumed by Estuary",
+		Extras: map[string]interface{}{
+			"x-aws-role-arn": true,
+		},
 	})
 	aws.Set("aws_external_id", &jsonschema.Schema{
 		Type:        "string",
 		Description: "External ID to use when assuming the AWS Role",
 		Extras: map[string]interface{}{
-			"secret": true,
+			"secret":            true,
+			"x-aws-external-id": true,
+		},
+	})
+
+	gcp := orderedmap.New[string, *jsonschema.Schema]()
+	gcp.Set("auth_type", &jsonschema.Schema{
+		Type:    "string",
+		Default: GCPIAM,
+		Const:   GCPIAM,
+		Extras: map[string]interface{}{
+			"x-iam-auth-provider": "gcp",
+		},
+	})
+	gcp.Set("user", &jsonschema.Schema{
+		Description: "The database user to authenticate as.",
+		Type:        "string",
+		Default:     "flow_capture",
+	})
+	gcp.Set("gcp_service_account", &jsonschema.Schema{
+		Type:        "string",
+		Description: "GCP Service Account email for Cloud SQL IAM authentication",
+		Extras: map[string]interface{}{
+			"x-gcp-service-account": true,
+		},
+	})
+	gcp.Set("gcp_project_id", &jsonschema.Schema{
+		Type:        "string",
+		Description: "GCP Project ID where the Cloud SQL instance is located",
+		Extras: map[string]interface{}{
+			"x-gcp-project-id": true,
 		},
 	})
 
@@ -209,6 +250,11 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 				Title:      "AWS IAM",
 				Required:   []string{"auth_type", AWSIAM},
 				Properties: aws,
+			},
+			{
+				Title:      "Google Cloud IAM",
+				Required:   []string{"auth_type", GCPIAM},
+				Properties: gcp,
 			},
 		},
 		Extras: map[string]interface{}{
@@ -319,6 +365,16 @@ func (c *Config) Validate() error {
 			if c.Credentials.AWSRole == "" {
 				return errors.New("missing 'aws_role'")
 			}
+			if c.Credentials.AWSExternalId == "" {
+				return errors.New("missing 'aws_external_id'")
+			}
+			if c.Credentials.User == "" {
+				return errors.New("missing 'user'")
+			}
+		case GCPIAM:
+			if c.Credentials.GCPServiceAccount == "" {
+				return errors.New("missing 'gcp_service_account'")
+			}
 			if c.Credentials.User == "" {
 				return errors.New("missing 'user'")
 			}
@@ -406,7 +462,7 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 		case UserPassword:
 			pass = c.Credentials.Password
 		case AWSIAM:
-			// Load AWS config
+			// Use the runtime-provided AWS credentials to generate the token
 			cfg, err := config.LoadDefaultConfig(ctx,
 				config.WithRegion(c.Credentials.AWSRegion),
 			)
@@ -414,42 +470,23 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 				return "", fmt.Errorf("loading default AWS config: %w", err)
 			}
 
-			// Create STS client for role assumption
-			stsClient := sts.NewFromConfig(cfg)
-
-			// Check current caller identity
-			callerIdentity, err := stsClient.GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
-			if err != nil {
-				return "", fmt.Errorf("getting caller identity: %w", err)
-			}
-
-			// Check if current identity ARN matches the target role ARN
-			// If they match, we can skip the AssumeRole call and use current credentials
-			var credentialsProvider aws.CredentialsProvider
-			if callerIdentity.Arn != nil && *callerIdentity.Arn == c.Credentials.AWSRole {
-				// Current identity matches target role, use the default credentials from config
-				credentialsProvider = cfg.Credentials
-			} else {
-				// Need to assume the role
-				var opts []func(*stscreds.AssumeRoleOptions)
-				if c.Credentials.AWSExternalId != "" {
-					opts = append(opts, func(o *stscreds.AssumeRoleOptions) {
-						o.ExternalID = &c.Credentials.AWSExternalId
-					})
-				}
-				credentialsProvider = stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole, opts...)
-			}
-
-			// Generate IAM auth token
 			pass, err = auth.BuildAuthToken(
 				ctx,
 				c.Address,
 				c.Credentials.AWSRegion,
 				user,
-				credentialsProvider,
+				cfg.Credentials, // Use default credentials provider (from environment)
 			)
 			if err != nil {
 				return "", fmt.Errorf("building AWS auth token: %w", err)
+			}
+		case GCPIAM:
+			// Use runtime-provided GCP access token for Cloud SQL IAM authentication
+			// The runtime provides the access token via GOOGLE_ACCESS_TOKEN environment variable
+			if accessToken := os.Getenv("GOOGLE_ACCESS_TOKEN"); accessToken != "" {
+				pass = accessToken
+			} else {
+				return "", fmt.Errorf("GOOGLE_ACCESS_TOKEN environment variable not set for GCP IAM authentication")
 			}
 		}
 	}
@@ -464,8 +501,13 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 	}
 	var params = make(url.Values)
 	params.Set("application_name", "estuary_flow")
+
+	// Set SSL mode - user configuration takes precedence, then cloud IAM defaults
 	if c.Advanced.SSLMode != "" {
 		params.Set("sslmode", c.Advanced.SSLMode)
+	} else if c.Credentials != nil && c.Credentials.AuthType == GCPIAM {
+		// Enable SSL for cloud provider IAM connections by default when not explicitly set
+		params.Set("sslmode", "require")
 	}
 	if len(params) > 0 {
 		uri.RawQuery = params.Encode()
