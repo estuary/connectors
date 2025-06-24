@@ -226,11 +226,6 @@ func (out *PullOutput) Documents(binding int, docs ...json.RawMessage) error {
 
 // Checkpoint emits a state checkpoint, with or without RFC 7396 patch-merge semantics.
 func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error {
-	log.WithFields(log.Fields{
-		"checkpoint": checkpoint,
-		"merge":      merge,
-	}).Trace("emitting checkpoint")
-
 	var msg = &pc.Response{
 		Checkpoint: &pc.Response_Checkpoint{
 			State: &pf.ConnectorState{

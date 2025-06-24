@@ -188,7 +188,7 @@ func insertBenchmarkRows(ctx context.Context, t testing.TB, tb *testBackend, sha
 	}).Info("inserting benchmark rows")
 
 	// Insert rows in batches so we get periodic transaction commits
-	const batchSize = 5000
+	const batchSize = 1000
 	for i := minID; i < maxID; i += batchSize {
 		var j = i + batchSize
 		if j > maxID {

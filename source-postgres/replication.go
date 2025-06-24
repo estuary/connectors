@@ -182,7 +182,10 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		pubName:  publication,
 		replSlot: slot,
 
-		rxbuf: make([]byte, 0, rxBufferSize),
+		rxbuf:              make([]byte, 0, rxBufferSize),
+		reusedEvent:        new(postgresChangeEvent),
+		reusedBeforeValues: make([][]byte, 0, 32),
+		reusedAfterValues:  make([][]byte, 0, 32),
 
 		ackLSN:          uint64(startLSN),
 		lastTxnEndLSN:   startLSN,
@@ -248,6 +251,10 @@ type replicationStream struct {
 	rxbuf []byte // Logical replication message stream receive/decode buffer.
 	rxoff int    // Logical replication message stream receive/decode buffer offset.
 
+	reusedEvent        *postgresChangeEvent // A reusable event object used to avoid allocations when decoding messages.
+	reusedBeforeValues [][]byte             // Reusable slice of wire protocol values
+	reusedAfterValues  [][]byte             // Reusable slice of wire protocol values
+
 	workerCtx       context.Context    // The context used for the worker goroutine, which is canceled when the stream is closed.
 	cancelWorkerCtx context.CancelFunc // The cancel function for the worker context, used to stop the worker goroutine.
 
@@ -297,16 +304,6 @@ type tableProcessingInfo struct {
 const standbyStatusInterval = 10 * time.Second
 
 var (
-	// replicationBufferSize controls how many change events can be buffered in the
-	// replicationStream before it stops receiving further events from PostgreSQL.
-	// In normal use it's a constant, it's just a variable so that tests are more
-	// likely to exercise blocking sends and backpressure.
-	//
-	// This buffer has been set to a fairly small value, because larger buffers can
-	// cause OOM kills when the incoming data rate exceeds the rate at which we're
-	// serializing data and getting it into Gazette journals.
-	replicationBufferSize = 16
-
 	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
 	// operation will error out if no further events are received when there ought to be
 	// some. This should never be hit in normal operation, and exists only so that certain
@@ -585,7 +582,6 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlca
 		var event = &sqlcapture.FlushEvent{
 			Cursor: marshalJSONString(s.lastTxnEndLSN.String()),
 		}
-		logrus.WithField("lsn", s.lastTxnEndLSN).Debug("commit event")
 		return event, nil
 
 	// Change Events: Insert, Update, and Delete
@@ -784,11 +780,11 @@ func (s *replicationStream) decodeChangeEvent(
 	}
 
 	// Decode the before and after tuples into slices of wire protocol values.
-	beforeTupleValues, err := postgresTupleValues(before, beforeType, nil)
+	beforeTupleValues, err := postgresTupleValues(&s.reusedBeforeValues, before, beforeType, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding 'before' tuple: %w", err)
 	}
-	afterTupleValues, err := postgresTupleValues(after, 'N', beforeTupleValues)
+	afterTupleValues, err := postgresTupleValues(&s.reusedAfterValues, after, 'N', beforeTupleValues)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding 'after' tuple: %w", err)
 	}
@@ -821,7 +817,7 @@ func (s *replicationStream) decodeChangeEvent(
 	}
 
 	_ = beforeValues // TODO(wgd): Include the before tuple values so that updates with full REPLICA IDENTITY work correctly.
-	var event = postgresChangeEvent{
+	*s.reusedEvent = postgresChangeEvent{
 		Info: info.Shared,
 		Meta: postgresChangeMetadata{
 			Operation: op,
@@ -842,9 +838,9 @@ func (s *replicationStream) decodeChangeEvent(
 		Values: values,
 	}
 	if s.db.includeTxIDs[info.StreamID] {
-		event.Meta.Source.TxID = s.nextTxnXID
+		s.reusedEvent.Meta.Source.TxID = s.nextTxnXID
 	}
-	return &event, nil
+	return s.reusedEvent, nil
 }
 
 func scanTupleEnd(data []byte) int {
@@ -871,7 +867,7 @@ func scanTupleEnd(data []byte) int {
 	return off
 }
 
-func postgresTupleValues(data []byte, tupleType uint8, before [][]byte) ([][]byte, error) {
+func postgresTupleValues(valsPtr *[][]byte, data []byte, tupleType uint8, before [][]byte) ([][]byte, error) {
 	if data == nil {
 		return nil, nil
 	}
@@ -881,14 +877,14 @@ func postgresTupleValues(data []byte, tupleType uint8, before [][]byte) ([][]byt
 
 	var off = 2                                   // Offset into the tuple data slice
 	var ncol = int(binary.BigEndian.Uint16(data)) // Number of columns in the tuple
-	var vals = make([][]byte, ncol)               // TODO(wgd): Remove this allocation and use a preallocated buffer instead.
+	var vals = (*valsPtr)[:0]                     // Load the reusable values slice and reset to zero
 	for i := range ncol {
 		switch data[off] {
 		case 'n':
-			vals[i] = nil
+			vals = append(vals, nil)
 			off += 1
 		case 'u':
-			vals[i] = before[i] // Unchanged TOASTed value, use the "before" value.
+			vals = append(vals, before[i])
 			off += 1
 		case 'b':
 			// This is a binary value, which we don't currently support.
@@ -898,10 +894,11 @@ func postgresTupleValues(data []byte, tupleType uint8, before [][]byte) ([][]byt
 			off += 1
 			var valueSize = int(binary.BigEndian.Uint32(data[off:]))
 			off += 4
-			vals[i] = data[off : off+valueSize]
+			vals = append(vals, data[off:off+valueSize])
 			off += valueSize
 		}
 	}
+	*valsPtr = vals // Store back into the pointer in case it was resized.
 	return vals, nil
 }
 

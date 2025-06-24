@@ -764,7 +764,6 @@ func (c *Capture) emitState() error {
 	if err != nil {
 		return fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
-	log.WithField("state", string(bs)).Trace("emitting state update")
 	return c.Output.Checkpoint(bs, true)
 }
 
