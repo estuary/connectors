@@ -106,14 +106,6 @@ type testBackend struct {
 
 func (tb *testBackend) UpperCaseMode() bool { return false }
 
-func (tb *testBackend) lowerTuningParameters(t testing.TB) {
-	t.Helper()
-
-	var prevBufferSize = replicationBufferSize
-	t.Cleanup(func() { replicationBufferSize = prevBufferSize })
-	replicationBufferSize = 0
-}
-
 func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
 	var sanitizers = make(map[string]*regexp.Regexp)
 	sanitizers[`"loc":[11111111,11111111,11111111]`] = regexp.MustCompile(`"loc":\[(-1|[0-9]+),[0-9]+,[0-9]+\]`)
@@ -199,7 +191,9 @@ func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, w
 
 func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
-	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
+	}
 	var rows, err = tb.control.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
@@ -258,7 +252,6 @@ func setResourceBackfillMode(t *testing.T, binding *flow.CaptureSpec_Binding, mo
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
 	var tb = postgresTestBackend(t)
-	tb.lowerTuningParameters(t)
 	tests.Run(context.Background(), t, tb)
 }
 
