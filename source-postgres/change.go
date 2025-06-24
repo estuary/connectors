@@ -21,43 +21,43 @@ type jsonTranscoder func(buf []byte, v []byte) ([]byte, error)
 // into the FDB tuple encoding and appends it to the provided buffer.
 type fdbTranscoder func(buf []byte, v []byte) ([]byte, error)
 
-// postgresBackfillInfo holds information which can be shared across many backfill events.
-type postgresBackfillInfo struct {
-	StreamID    sqlcapture.StreamID // StreamID of the table this backfill event came from.
+// postgresChangeSharedInfo holds information which can be shared across many change events from a given source.
+type postgresChangeSharedInfo struct {
+	StreamID    sqlcapture.StreamID // StreamID of the table this change event came from.
 	Shape       *encrow.Shape       // Shape of the row values, used to serialize them to JSON.
 	Transcoders []jsonTranscoder    // Transcoders for column values, in DB column order.
 }
 
-// postgresBackfillEvent is a specialized Postgres implementation of sqlcapture.ChangeEvent for backfill rows.
-type postgresBackfillEvent struct {
-	Info *postgresBackfillInfo // Information about the source table structure which is shared across events.
+// postgresChangeEvent is a specialized Postgres implementation of sqlcapture.ChangeEvent for PostgreSQL.
+type postgresChangeEvent struct {
+	Info *postgresChangeSharedInfo // Information about the source table structure which is shared across events.
 
-	Meta postgresDocumentMetadata // Document metadata object, which contains non-column values which vary by event.
+	Meta postgresChangeMetadata // Document metadata object, which contains non-column values which vary by event.
 
 	RowKey []byte   // Serialized row key, if applicable.
 	Values [][]byte // Raw byte values of the row, in DB column order.
 }
 
-type postgresDocumentMetadata struct {
+type postgresChangeMetadata struct {
 	Operation sqlcapture.ChangeOp `json:"op"`
 	Source    postgresSource      `json:"source"`
 }
 
-func (postgresBackfillEvent) IsDatabaseEvent() {}
+func (postgresChangeEvent) IsDatabaseEvent() {}
 
-func (e *postgresBackfillEvent) String() string {
+func (e *postgresChangeEvent) String() string {
 	return fmt.Sprintf("Backfill(%s)", e.Info.StreamID)
 }
 
-func (e *postgresBackfillEvent) StreamID() sqlcapture.StreamID {
+func (e *postgresChangeEvent) StreamID() sqlcapture.StreamID {
 	return e.Info.StreamID
 }
 
-func (e *postgresBackfillEvent) GetRowKey() []byte {
+func (e *postgresChangeEvent) GetRowKey() []byte {
 	return e.RowKey
 }
 
-func (e *postgresBackfillEvent) AppendJSON(buf []byte) ([]byte, error) {
+func (e *postgresChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
 	var shape = e.Info.Shape
 
 	// The number of byte values should be one less than the shape's arity, because the last value
@@ -85,7 +85,7 @@ func (e *postgresBackfillEvent) AppendJSON(buf []byte) ([]byte, error) {
 	return append(buf, '}'), nil
 }
 
-func (meta *postgresDocumentMetadata) AppendJSON(buf []byte) ([]byte, error) {
+func (meta *postgresChangeMetadata) AppendJSON(buf []byte) ([]byte, error) {
 	var err error
 	buf = append(buf, []byte(`{"op":"`)...)
 	buf = append(buf, []byte(meta.Operation)...)
@@ -303,6 +303,17 @@ func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDesc
 		}
 	}
 
+	if _, ok := codec.(pgtype.Int8Codec); ok && fieldDescription.Format == pgtype.TextFormatCode {
+		logEntry.Debug("backfillFDBTranscoder: using specialized INT8 transcoder")
+		return func(buf []byte, bs []byte) ([]byte, error) {
+			var val, err = strconv.ParseInt(string(bs), 10, 64)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing INT8 value %q for column %q: %w", string(bs), string(fieldDescription.Name), err)
+			}
+			return sqlcapture.AppendIntFDB(buf, val)
+		}
+	}
+
 	logEntry.Debug("backfillFDBTranscoder: using general-purpose transcoder")
 	return func(buf, v []byte) ([]byte, error) {
 		var val any
@@ -320,6 +331,26 @@ func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDesc
 			return sqlcapture.AppendFDB(buf, translated)
 		}
 	}
+}
+
+// replicationJSONTranscoder returns a jsonTranscoder for a specific column of a specific table in a Postgres replication stream.
+func (db *postgresDatabase) replicationJSONTranscoder(typeMap *pgtype.Map, typeOID uint32, columnInfo *sqlcapture.ColumnInfo, isPrimaryKey bool) jsonTranscoder {
+	var fieldDescription = &pgconn.FieldDescription{
+		Name:        columnInfo.Name,
+		DataTypeOID: typeOID,
+		Format:      pgtype.TextFormatCode, // Replication streams use text format
+	}
+	return db.backfillJSONTranscoder(typeMap, fieldDescription, columnInfo, isPrimaryKey)
+}
+
+// replicationFDBTranscoder returns an fdbTranscoder for a specific column of a specific table in a Postgres replication stream.
+func (db *postgresDatabase) replicationFDBTranscoder(typeMap *pgtype.Map, typeOID uint32, columnInfo *sqlcapture.ColumnInfo) fdbTranscoder {
+	var fieldDescription = &pgconn.FieldDescription{
+		Name:        columnInfo.Name,
+		DataTypeOID: typeOID,
+		Format:      pgtype.TextFormatCode, // Replication streams use text format
+	}
+	return db.backfillFDBTranscoder(typeMap, fieldDescription, columnInfo)
 }
 
 // TODO(wgd): Reinstate this timestamptz special case
