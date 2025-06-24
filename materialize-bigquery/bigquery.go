@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigquery"
-	storage "cloud.google.com/go/storage"
 	"github.com/estuary/connectors/go/dbt"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql-v2"
@@ -105,16 +104,10 @@ func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, 
 		return nil, fmt.Errorf("enabling storage read client: %w", err)
 	}
 
-	cloudStorageClient, err := storage.NewClient(ctx, clientOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("creating cloud storage client: %w", err)
-	}
-
 	return &client{
-		bigqueryClient:     bigqueryClient,
-		cloudStorageClient: cloudStorageClient,
-		cfg:                c,
-		ep:                 ep,
+		bigqueryClient: bigqueryClient,
+		cfg:            c,
+		ep:             ep,
 	}, nil
 }
 

@@ -12,10 +12,9 @@ type binding struct {
 	target         sql.Table
 	storeInsertSQL string
 
-	loadFile         *stagedFile
-	storeFile        *stagedFile
+	loadSchema       bigquery.Schema
+	storeSchema      bigquery.Schema
 	tempTableName    string
-	hasData          bool
 	mustMerge        bool
 	loadMergeBounds  *sql.MergeBoundsBuilder
 	storeMergeBounds *sql.MergeBoundsBuilder

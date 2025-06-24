@@ -8,14 +8,17 @@ import (
 	"text/template"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
 
 type transactor struct {
@@ -26,8 +29,8 @@ type transactor struct {
 	objAndArrayAsJson bool
 
 	client     *client
-	bucketPath string
-	bucket     string
+	storeFiles *boilerplate.StagedFiles
+	loadFiles  *boilerplate.StagedFiles
 
 	bindings []*binding
 	be       *boilerplate.BindingEvents
@@ -48,21 +51,28 @@ func prepareNewTransactor(
 		is *boilerplate.InfoSchema,
 		be *boilerplate.BindingEvents,
 	) (m.Transactor, error) {
-		client, err := ep.Config.client(ctx, ep)
+		var cfg = ep.Config
+
+		client, err := cfg.client(ctx, ep)
 		if err != nil {
 			return nil, err
 		}
 
+		bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, option.WithCredentialsJSON([]byte(cfg.CredentialsJSON)))
+		if err != nil {
+			return nil, fmt.Errorf("creating GCS bucket: %w", err)
+		}
+
 		t := &transactor{
-			cfg:               ep.Config,
+			cfg:               cfg,
 			fence:             &fence,
 			dialect:           ep.Dialect,
 			templates:         templates,
 			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
 			client:            client,
-			bucketPath:        ep.Config.BucketPath,
-			bucket:            ep.Config.Bucket,
 			be:                be,
+			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.BucketPath, false, false),
+			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.BucketPath, true, false),
 		}
 
 		for _, binding := range bindings {
@@ -112,8 +122,8 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 
 	b := &binding{
 		target:           target,
-		loadFile:         newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, loadSchema),
-		storeFile:        newStagedFile(t.client.cloudStorageClient, t.bucket, t.bucketPath, storeSchema),
+		loadSchema:       loadSchema,
+		storeSchema:      storeSchema,
 		loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
 		storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
 	}
@@ -130,6 +140,17 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 			return err
 		}
 	}
+
+	loadFields := make([]string, 0, len(loadSchema))
+	storeFields := make([]string, 0, len(storeSchema))
+	for _, field := range loadSchema {
+		loadFields = append(loadFields, field.Name)
+	}
+	for _, field := range storeSchema {
+		storeFields = append(storeFields, field.Name)
+	}
+	t.loadFiles.AddBinding(target.Binding, loadFields)
+	t.storeFiles.AddBinding(target.Binding, storeFields)
 
 	t.bindings = append(t.bindings, b)
 	return nil
@@ -164,11 +185,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	for it.Next() {
 		var b = t.bindings[it.Binding]
-		b.loadFile.start()
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting load key: %w", err)
-		} else if err = b.loadFile.encodeRow(ctx, converted); err != nil {
+		} else if err = t.loadFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
 		} else {
 			b.loadMergeBounds.NextKey(converted)
@@ -178,30 +198,24 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
+	defer t.loadFiles.CleanupCurrentTransaction(ctx)
+
 	// Build the queries of all documents across all bindings that were requested.
 	var subqueries []string
 	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
 
 	for idx, b := range t.bindings {
-		if !b.loadFile.started {
-			// No loads for this binding.
+		if !t.loadFiles.Started(idx) {
 			continue
-		}
-
-		loadQuery, err := renderQueryTemplate(b.target, t.templates.loadQuery, b.loadMergeBounds.Build(), t.objAndArrayAsJson)
-		if err != nil {
+		} else if uris, err := t.loadFiles.Flush(idx); err != nil {
+			return fmt.Errorf("flushing load file: %w", err)
+		} else if loadQuery, err := renderQueryTemplate(b.target, t.templates.loadQuery, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
 			return fmt.Errorf("rendering load query template: %w", err)
+		} else {
+			subqueries = append(subqueries, loadQuery)
+			edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
 		}
-		subqueries = append(subqueries, loadQuery)
-
-		delete, err := b.loadFile.flush()
-		if err != nil {
-			return fmt.Errorf("flushing load file for binding[%d]: %w", idx, err)
-		}
-		defer delete(ctx)
-
-		edcTableDefs[b.tempTableName] = b.loadFile.edc()
 	}
 
 	if len(subqueries) == 0 {
@@ -240,11 +254,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if err != nil {
 			ll.WithError(err).Error("query results iterator failed")
 			return fmt.Errorf("load row read: %w", err)
-		}
-
-		if err = loaded(bd.Binding, bd.Document); err != nil {
+		} else if err = loaded(bd.Binding, bd.Document); err != nil {
 			return fmt.Errorf("load row loaded: %w", err)
 		}
+	}
+
+	if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
+		return fmt.Errorf("cleaning up load files: %w", err)
 	}
 
 	return nil
@@ -253,52 +269,25 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	cleanupFiles := []func(context.Context){}
-
-	var lastBinding = -1
 	for it.Next() {
-		if lastBinding == -1 {
-			lastBinding = it.Binding
-		}
-
-		if lastBinding != it.Binding {
-			// Flush the staged file(s) for the binding now that it's stores are
-			// fully processed.
-			var b = t.bindings[lastBinding]
-			// There may be no staged file if the binding has received nothing
-			// but hard deletion requests for keys that aren't in the
-			// destination table.
-			if b.storeFile.started {
-				cleanupFn, err := b.storeFile.flush()
-				if err != nil {
-					return nil, fmt.Errorf("flushing staged files for collection %q: %w", b.target.Source.String(), err)
-				}
-				cleanupFiles = append(cleanupFiles, cleanupFn)
-			}
-			lastBinding = it.Binding
+		if t.cfg.HardDelete && it.Delete && !it.Exists {
+			// Ignore documents which do not exist and are being deleted.
+			continue
 		}
 
 		var b = t.bindings[it.Binding]
-
 		if it.Exists {
 			b.mustMerge = true
 		}
 
 		var flowDocument = it.RawJSON
 		if t.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				flowDocument = json.RawMessage(`"delete"`)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+			flowDocument = json.RawMessage(`"delete"`)
 		}
 
-		b.storeFile.start()
-		b.hasData = true
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err = b.storeFile.encodeRow(ctx, converted); err != nil {
+		} else if err = t.storeFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
 			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
@@ -308,32 +297,18 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	// Flush the final binding.
-	if lastBinding != -1 {
-		var b = t.bindings[lastBinding]
-		cleanupFn, err := b.storeFile.flush()
-		if err != nil {
-			return nil, fmt.Errorf("final binding flushing staged files for collection %q: %w", b.target.Source.String(), err)
-		}
-		cleanupFiles = append(cleanupFiles, cleanupFn)
-	}
-
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		var err error
 		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
 		}
 
-		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx, cleanupFiles) })
+		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
 	}, nil
 }
 
-func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Context)) error {
-	defer func() {
-		for _, f := range cleanupFiles {
-			f(ctx)
-		}
-	}()
+func (t *transactor) commit(ctx context.Context) error {
+	defer t.storeFiles.CleanupCurrentTransaction(ctx)
 
 	// Build the slice of transactions required for a commit.
 	var subqueries []string
@@ -353,13 +328,17 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 	// This is the map of external table references we will populate. Loop through the bindings and
 	// append the SQL for that table.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
-	for _, b := range t.bindings {
-		if !b.hasData {
-			// No stores for this binding.
+	for idx, b := range t.bindings {
+		if !t.storeFiles.Started(idx) {
 			continue
 		}
 
-		edcTableDefs[b.tempTableName] = b.storeFile.edc()
+		uris, err := t.storeFiles.Flush(idx)
+		if err != nil {
+			return fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
+		}
+
+		edcTableDefs[b.tempTableName] = edc(uris, b.storeSchema)
 
 		if !b.mustMerge {
 			subqueries = append(subqueries, b.storeInsertSQL)
@@ -372,7 +351,6 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 		}
 
 		// Reset for the next round.
-		b.hasData = false
 		b.mustMerge = false
 	}
 
@@ -391,6 +369,8 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 	if _, err := t.client.runQuery(ctx, query); err != nil {
 		log.WithField("query", queryString).Error("query failed")
 		return fmt.Errorf("commit query: %w", err)
+	} else if err := t.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
+		return fmt.Errorf("cleaning up store files: %w", err)
 	}
 
 	return nil
@@ -398,5 +378,4 @@ func (t *transactor) commit(ctx context.Context, cleanupFiles []func(context.Con
 
 func (t *transactor) Destroy() {
 	_ = t.client.bigqueryClient.Close()
-	_ = t.client.cloudStorageClient.Close()
 }
