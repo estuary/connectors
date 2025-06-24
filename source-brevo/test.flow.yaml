@@ -7,7 +7,9 @@ captures:
           - python
           - "-m"
           - source_brevo
-        config: {}
+        config:
+          api-key: not_a_real_api_key
+          start_date: "2023-01-01T00:00:00.000Z"
     bindings:
       - resource:
           stream: Contacts

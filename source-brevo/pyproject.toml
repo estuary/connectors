@@ -5,13 +5,14 @@ description = "Source implementation for brevo."
 authors = [ "Jonathan Wihl <jonathan@estuary.dev>",]
 
 [tool.poetry.dependencies]
-airbyte-cdk = "^4.6.2"
+airbyte-cdk = "^6.6.3"
 estuary-cdk = {path="../estuary-cdk", develop = true}
-python = "^3.11"
+python = ">=3.11,<3.13"
 pydantic = "^2"
 pytz = "^2024.1"
 requests-futures = "^1.0.1"
 setuptools = "^70.0.0"
+nltk = "^3.9.1"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
