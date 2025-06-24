@@ -36,12 +36,11 @@ type transactor struct {
 }
 
 func prepareNewTransactor(
-	dialect sql.Dialect,
 	templates templates,
-	objAndArrayAsJson bool,
-) func(context.Context, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
+) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
+		featureFlags map[string]bool,
 		ep *sql.Endpoint[config],
 		fence sql.Fence,
 		bindings []sql.Table,
@@ -57,9 +56,9 @@ func prepareNewTransactor(
 		t := &transactor{
 			cfg:               ep.Config,
 			fence:             &fence,
-			dialect:           dialect,
+			dialect:           ep.Dialect,
 			templates:         templates,
-			objAndArrayAsJson: objAndArrayAsJson,
+			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
 			client:            client,
 			bucketPath:        ep.Config.BucketPath,
 			bucket:            ep.Config.Bucket,

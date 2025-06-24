@@ -79,6 +79,7 @@ func (d *Driver[EC, RC]) NewTransactor(ctx context.Context, req pm.Request_Open,
 
 type sqlMaterialization[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] struct {
 	materializationName string
+	featureFlags        map[string]bool
 	driver              *Driver[EC, RC]
 	endpoint            *Endpoint[EC]
 	client              Client
@@ -101,6 +102,7 @@ func (d *Driver[EC, RC]) newMaterialization(ctx context.Context, materialization
 
 	return &sqlMaterialization[EC, RC]{
 		materializationName: materializationName,
+		featureFlags:        featureFlags,
 		driver:              d,
 		endpoint:            endpoint,
 		client:              client,
@@ -378,7 +380,7 @@ func (s *sqlMaterialization[EC, RC]) NewMaterializerTransactor(
 		}
 	}
 
-	transactor, err := s.endpoint.NewTransactor(ctx, s.endpoint, fence, tables, open, &is, be)
+	transactor, err := s.endpoint.NewTransactor(ctx, s.featureFlags, s.endpoint, fence, tables, open, &is, be)
 	if err != nil {
 		return nil, fmt.Errorf("building transactor: %w", err)
 	}

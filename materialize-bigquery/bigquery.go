@@ -170,8 +170,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"bucket_path": cfg.BucketPath,
 			}).Info("creating bigquery endpoint")
 
-			objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
-			dialect := bqDialect(objAndArrayAsJson)
+			dialect := bqDialect(featureFlags["objects_and_arrays_as_json"])
 			templates := renderTemplates(dialect)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500
@@ -192,7 +191,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.ProjectID, cfg.Dataset}),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
-				NewTransactor:       prepareNewTransactor(dialect, templates, objAndArrayAsJson),
+				NewTransactor:       prepareNewTransactor(templates),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
 				Options: boilerplate.MaterializeOptions{

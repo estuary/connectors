@@ -322,7 +322,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				MetaCheckpoints:     sql.FlowCheckpointsTable(nil),
 				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
-				NewTransactor:       prepareNewTransactor(dialect, templates),
+				NewTransactor:       prepareNewTransactor(templates),
 				Tenant:              tenant,
 				ConcurrentApply:     false,
 				Options: boilerplate.MaterializeOptions{
@@ -402,11 +402,11 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error                
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
 func prepareNewTransactor(
-	dialect sql.Dialect,
 	templates templates,
-) func(context.Context, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
+) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
+		featureFlags map[string]bool,
 		ep *sql.Endpoint[config],
 		fence sql.Fence,
 		bindings []sql.Table,
@@ -415,7 +415,7 @@ func prepareNewTransactor(
 		be *boilerplate.BindingEvents,
 	) (m.Transactor, error) {
 		var cfg = ep.Config
-		var d = &transactor{dialect: dialect, templates: templates, cfg: cfg, be: be}
+		var d = &transactor{dialect: ep.Dialect, templates: templates, cfg: cfg, be: be}
 		d.store.fence = fence
 
 		// Establish connections.

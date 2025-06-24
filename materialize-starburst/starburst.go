@@ -164,6 +164,7 @@ type transactor struct {
 
 func newTransactor(
 	ctx context.Context,
+	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
 	_ sql.Fence,
 	tables []sql.Table,

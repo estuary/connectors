@@ -90,9 +90,9 @@ type Fence struct {
 }
 
 // Endpoint is a driver description of the SQL endpoint being driven.
-type Endpoint[T boilerplate.EndpointConfiger] struct {
+type Endpoint[EC boilerplate.EndpointConfiger] struct {
 	// Config is an implementation-specific type for the Endpoint configuration.
-	Config T
+	Config EC
 	// Dialect of the Endpoint.
 	Dialect
 	// MetaCheckpoints is the checkpoints meta-table of the Endpoint.
@@ -102,11 +102,20 @@ type Endpoint[T boilerplate.EndpointConfiger] struct {
 	SerPolicy *flow.SerPolicy
 	// NewClient creates a client, which provides Endpoint-specific methods for performing
 	// operations with the Endpoint store.
-	NewClient func(context.Context, *Endpoint[T]) (Client, error)
+	NewClient func(context.Context, *Endpoint[EC]) (Client, error)
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
-	NewTransactor func(ctx context.Context, _ *Endpoint[T], _ Fence, bindings []Table, open pm.Request_Open, is *boilerplate.InfoSchema, be *boilerplate.BindingEvents) (m.Transactor, error)
+	NewTransactor func(
+		ctx context.Context,
+		featureFlags map[string]bool,
+		_ *Endpoint[EC],
+		_ Fence,
+		bindings []Table,
+		open pm.Request_Open,
+		is *boilerplate.InfoSchema,
+		be *boilerplate.BindingEvents,
+	) (m.Transactor, error)
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
