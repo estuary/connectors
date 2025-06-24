@@ -7,10 +7,12 @@ import (
 	"fmt"
 	"io"
 	"regexp"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	"github.com/jackc/pglogrepl"
@@ -178,14 +180,16 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		nextTxnFinalLSN: 0,
 		nextTxnMillis:   0,
 		typeMap:         typeMap,
-		relations:       make(map[uint32]*pglogrepl.RelationMessage),
 		// standbyStatusDeadline is left uninitialized so an update will be sent ASAP
 
 		previousFenceLSN: startLSN,
 	}
-	stream.tables.active = make(map[sqlcapture.StreamID]struct{})
-	stream.tables.keyColumns = make(map[sqlcapture.StreamID][]string)
+	// Allocate table information maps
+	stream.tables.relations = make(map[uint32]*pglogrepl.RelationMessage)
+	stream.tables.relationStreamID = make(map[uint32]sqlcapture.StreamID)
 	stream.tables.discovery = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
+	stream.tables.keyColumns = make(map[sqlcapture.StreamID][]string)
+	stream.tables.infoCache = make(map[sqlcapture.StreamID]*tableProcessingInfo)
 	return stream, nil
 }
 
@@ -255,19 +259,35 @@ type replicationStream struct {
 	// typeMap is a sort of type registry used when decoding values from the database.
 	typeMap *pgtype.Map
 
-	// relations keeps track of all "Relation Messages" from the database. These
-	// messages tell us about the integer ID corresponding to a particular table
-	// and other information about the table structure at a particular moment.
-	relations map[uint32]*pglogrepl.RelationMessage
-
-	// The 'active tables' set, guarded by a mutex so it can be modified from
-	// the main goroutine while it's read by the replication goroutine.
+	// Information about tables of possible interest, guarded by a mutex so that they can
+	// be activated concurrently with ongoing replication processing.
+	//
+	// The `discovery` map is filled out by `ActivateTable()` calls while the `relations`
+	// map is filled out by messages received from the database, and the `computed` map
+	// is computed by combining the two sources of information. We have to keep track of
+	// the inputs separately because a table may be activated before or after we receive
+	// a RelationMessage for it, and we may receive additional RelationMessages later on
+	// if the table definition changes.
 	tables struct {
 		sync.RWMutex
-		active     map[sqlcapture.StreamID]struct{}
-		keyColumns map[sqlcapture.StreamID][]string
-		discovery  map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo
+		discovery        map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo // Discovery information for active tables, keyed by StreamID.
+		keyColumns       map[sqlcapture.StreamID][]string                  // Key column names for active table, keyed by StreamID.
+		relations        map[uint32]*pglogrepl.RelationMessage             // Relation messages received from the database, keyed by Relation ID.
+		relationStreamID map[uint32]sqlcapture.StreamID                    // Relation ID to StreamID mapping, used to look up the StreamID for a RelationMessage.
+		infoCache        map[sqlcapture.StreamID]*tableProcessingInfo      // Cached processing information, keyed by StreamID.
 	}
+}
+
+// tableProcessingInfo holds precomputed information about a particular active table
+// so that we can efficiently process and decode its change events.
+type tableProcessingInfo struct {
+	StreamID          sqlcapture.StreamID        // The StreamID of this relation.
+	Schema, Table     string                     // Schema and table name of this relation
+	Relation          *pglogrepl.RelationMessage // The RelationMessage which describes this relation.
+	KeyColumns        []int                      // Indices of key columns in the table, in key order.
+	ColumnNames       []string                   // Names of all columns of the table, in table column order.
+	RowKeyTranscoders []fdbTranscoder            // Transcoders for row key serialization, in table column order.
+	Shared            *postgresChangeSharedInfo  // Shared information used for change event processing.
 }
 
 const standbyStatusInterval = 10 * time.Second
@@ -525,8 +545,8 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 	// in the relations mapping will never be removed.
 	switch msg := msg.(type) {
 	case *pglogrepl.RelationMessage:
-		s.relations[msg.RelationID] = msg
-		return nil, nil
+		var err = s.handleRelationMessage(msg)
+		return nil, err
 	case *pglogrepl.OriginMessage:
 		// Origin messages are sent when the postgres instance we're capturing from
 		// is itself replicating from another source instance. They indicate the original
@@ -615,8 +635,10 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, msg pglogrepl.Messa
 		return event, nil
 	case *pglogrepl.TruncateMessage:
 		for _, relID := range msg.RelationIDs {
-			var relation = s.relations[relID]
-			var streamID = sqlcapture.JoinStreamID(relation.Namespace, relation.RelationName)
+			var streamID, ok = s.streamIDFromRelationID(relID)
+			if !ok {
+				return nil, fmt.Errorf("got TRUNCATE message for unknown relation ID %d", relID)
+			}
 			if s.tableActive(streamID) {
 				logrus.WithField("table", streamID).Warn("ignoring TRUNCATE on active table")
 			}
@@ -664,15 +686,12 @@ func (s *replicationStream) decodeChangeEvent(
 		return nil, fmt.Errorf("got %q message without a transaction in progress", op)
 	}
 
-	var rel, ok = s.relations[relID]
-	if !ok {
-		return nil, fmt.Errorf("unknown relation ID %d", relID)
+	var info, active, err = s.getTableProcessingInfo(relID)
+	if err != nil {
+		return nil, fmt.Errorf("error getting table processing info: %w", err)
 	}
-
-	// If this change event is on a table we're not capturing, skip doing any
-	// further processing on it.
-	var streamID = sqlcapture.JoinStreamID(rel.Namespace, rel.RelationName)
-	if !s.tableActive(streamID) {
+	// If this change event is on a table we're not capturing, skip doing any further processing on it.
+	if !active {
 		// Return a KeepaliveEvent to indicate that we're actively receiving and discarding
 		// change data. This avoids situations where a sufficiently large transaction full
 		// of changes on a not-currently-active table causes the fenced streaming watchdog
@@ -680,105 +699,105 @@ func (s *replicationStream) decodeChangeEvent(
 		return &sqlcapture.KeepaliveEvent{}, nil
 	}
 
-	bf, err := s.decodeTuple(before, beforeType, rel, nil)
+	// Decode the before and after tuples into slices of wire protocol values.
+	beforeTupleValues, err := postgresTupleValues(before, beforeType, nil)
 	if err != nil {
-		return nil, fmt.Errorf("'before' tuple: %w", err)
+		return nil, fmt.Errorf("error decoding 'before' tuple: %w", err)
 	}
-	af, err := s.decodeTuple(after, 'N', rel, bf)
+	afterTupleValues, err := postgresTupleValues(after, 'N', beforeTupleValues)
 	if err != nil {
-		return nil, fmt.Errorf("'after' tuple: %w", err)
+		return nil, fmt.Errorf("error decoding 'after' tuple: %w", err)
 	}
 
-	// This whole chunk of logic is debug logging for a situation which shouldn't be
-	// possible but which has clearly occurred in production. We can probably remove
-	// it in the future once we've figured out what's going on, but it also won't
-	// trigger unless something has gone badly wrong so it's not a big deal to leave
-	// it in place until it becomes a maintainance burden.
-	//
-	// The before tuple of a deletion should never be empty, since the tuple columns
-	// should always match the table's REPLICA IDENTITY which can't be empty if the
-	// table allows deletions.
-	if op == sqlcapture.DeleteOp && len(bf) == 0 {
-		if before == nil {
-			logrus.WithFields(logrus.Fields{
-				"streamID":  streamID,
-				"op":        op,
-				"tupleType": beforeType,
-			}).Error("nil before tuple for deletion")
-		} else {
-			logrus.WithFields(logrus.Fields{
-				"streamID":     streamID,
-				"op":           op,
-				"tupleType":    beforeType,
-				"tuple":        before,
-				"tupleColumns": len(before.Columns),
-				"relColumns":   len(rel.Columns),
-				"relReplIdent": rel.ReplicaIdentity,
-			}).Error("empty before tuple for deletion")
-			for idx, col := range before.Columns {
-				logrus.WithFields(logrus.Fields{
-					"streamID":    streamID,
-					"idx":         idx,
-					"colName":     rel.Columns[idx].Name,
-					"colType":     rel.Columns[idx].DataType,
-					"colFlags":    rel.Columns[idx].Flags,
-					"colData":     col.Data,
-					"colDataType": col.DataType,
-				}).Error("before tuple column")
+	// Shuffle things around so that we have a consistent concept of "values" versus
+	// the before-values which are only present for updates.
+	var values, beforeValues [][]byte
+	switch op {
+	case sqlcapture.InsertOp:
+		values = afterTupleValues
+	case sqlcapture.UpdateOp:
+		values = afterTupleValues
+		beforeValues = beforeTupleValues
+	case sqlcapture.DeleteOp:
+		values = beforeTupleValues
+	default:
+		return nil, fmt.Errorf("unexpected change operation %q", op)
+	}
+
+	// Compute row key for this change event, if key columns are defined.
+	var rowKey []byte
+	if info.KeyColumns != nil {
+		rowKey = make([]byte, 0, 16) // Preallocate a small buffer for the row key.
+		for _, n := range info.KeyColumns {
+			rowKey, err = info.RowKeyTranscoders[n](rowKey, values[n])
+			if err != nil {
+				return nil, fmt.Errorf("error encoding row key column %q at index %d: %w", info.ColumnNames[n], n, err)
 			}
 		}
-		return nil, fmt.Errorf("empty before tuple for %q deletion", streamID)
 	}
 
-	keyColumns, ok := s.keyColumns(streamID)
-	if !ok {
-		return nil, fmt.Errorf("unknown key columns for stream %q", streamID)
-	}
-	var rowKey []byte
-	if op == sqlcapture.InsertOp || op == sqlcapture.UpdateOp {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, af, nil, encodeKeyFDB)
-	} else {
-		rowKey, err = sqlcapture.EncodeRowKey(keyColumns, bf, nil, encodeKeyFDB)
-	}
-	if err != nil {
-		return nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
-	}
-
-	discovery, ok := s.tables.discovery[streamID]
-	if !ok {
-		return nil, fmt.Errorf("unknown discovery info for stream %q", streamID)
-	}
-	if err := s.db.translateRecordFields(discovery, bf); err != nil {
-		return nil, fmt.Errorf("error translating 'before' tuple: %w", err)
-	}
-	if err := s.db.translateRecordFields(discovery, af); err != nil {
-		return nil, fmt.Errorf("error translating 'after' tuple: %w", err)
-	}
-
-	var sourceInfo = &postgresSource{
-		SourceCommon: sqlcapture.SourceCommon{
-			Millis:   s.nextTxnMillis,
-			Schema:   rel.Namespace,
-			Snapshot: false,
-			Table:    rel.RelationName,
+	_ = beforeValues // TODO(wgd): Include the before tuple values so that updates with full REPLICA IDENTITY work correctly.
+	var event = postgresChangeEvent{
+		Info: info.Shared,
+		Meta: postgresChangeMetadata{
+			Operation: op,
+			Source: postgresSource{
+				SourceCommon: sqlcapture.SourceCommon{
+					Millis: s.nextTxnMillis,
+					Schema: info.Schema,
+					Table:  info.Table,
+				},
+				Location: [3]int{
+					int(s.lastTxnEndLSN),
+					int(lsn),
+					int(s.nextTxnFinalLSN),
+				},
+			},
 		},
-		Location: [3]int{
-			int(s.lastTxnEndLSN),
-			int(lsn),
-			int(s.nextTxnFinalLSN),
-		},
+		RowKey: rowKey,
+		Values: values,
 	}
-	if s.db.includeTxIDs[streamID] {
-		sourceInfo.TxID = s.nextTxnXID
+	if s.db.includeTxIDs[info.StreamID] {
+		event.Meta.Source.TxID = s.nextTxnXID
 	}
-	var event = &sqlcapture.OldChangeEvent{
-		Operation: op,
-		RowKey:    rowKey,
-		Source:    sourceInfo,
-		Before:    bf,
-		After:     af,
+	return &event, nil
+}
+
+func postgresTupleValues(tuple *pglogrepl.TupleData, tupleType uint8, before [][]byte) ([][]byte, error) {
+	switch tupleType {
+	case 0, 'K':
+	case 'O':
+		// Old tuple with REPLICA IDENTITY FULL set.
+	case 'N':
+		// New tuple.
+	default:
+		return nil, fmt.Errorf("unexpected tupleType %q", tupleType)
 	}
-	return event, nil
+
+	if tuple == nil {
+		return nil, nil
+	}
+
+	var values = make([][]byte, len(tuple.Columns))
+	for idx, col := range tuple.Columns {
+		switch col.DataType {
+		case 'n':
+			values[idx] = nil
+		case 't':
+			values[idx] = col.Data
+		case 'b':
+			// This is a binary value, which we don't currently support.
+			return nil, fmt.Errorf("binary column data type 'b' is not supported in replication")
+		case 'u':
+			// This fields is a TOAST value which is unchanged in this event.
+			// Depending on the REPLICA IDENTITY, the value may be available
+			// in the "before" tuple of the record.
+			values[idx] = before[idx]
+		default:
+			return nil, fmt.Errorf("unhandled column data type %v", col.DataType)
+		}
+	}
+	return values, nil
 }
 
 func (s *replicationStream) decodeTuple(
@@ -930,27 +949,138 @@ func (s *replicationStream) receiveMessage(ctx context.Context) (pglogrepl.LSN, 
 	}
 }
 
+func (s *replicationStream) handleRelationMessage(msg *pglogrepl.RelationMessage) error {
+	var streamID = sqlcapture.JoinStreamID(msg.Namespace, msg.RelationName)
+	s.tables.Lock()
+	s.tables.relations[msg.RelationID] = msg
+	s.tables.relationStreamID[msg.RelationID] = streamID
+	delete(s.tables.infoCache, streamID) // Invalidate cached table processing info.
+	s.tables.Unlock()
+	return nil
+}
+
+func (s *replicationStream) ActivateTable(ctx context.Context, streamID sqlcapture.StreamID, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+	s.tables.Lock()
+	s.tables.discovery[streamID] = discovery
+	s.tables.keyColumns[streamID] = keyColumns
+	delete(s.tables.infoCache, streamID) // Invalidate cached table processing info.
+	s.tables.Unlock()
+	return nil
+}
+
+func (s *replicationStream) streamIDFromRelationID(relID uint32) (sqlcapture.StreamID, bool) {
+	s.tables.RLock()
+	var streamID, ok = s.tables.relationStreamID[relID]
+	s.tables.RUnlock()
+	return streamID, ok
+}
+
 func (s *replicationStream) tableActive(streamID sqlcapture.StreamID) bool {
 	s.tables.RLock()
-	defer s.tables.RUnlock()
-	var _, ok = s.tables.active[streamID]
+	var _, ok = s.tables.discovery[streamID]
+	s.tables.RUnlock()
 	return ok
 }
 
 func (s *replicationStream) keyColumns(streamID sqlcapture.StreamID) ([]string, bool) {
 	s.tables.RLock()
-	defer s.tables.RUnlock()
 	var keyColumns, ok = s.tables.keyColumns[streamID]
+	s.tables.RUnlock()
 	return keyColumns, ok
 }
 
-func (s *replicationStream) ActivateTable(ctx context.Context, streamID sqlcapture.StreamID, keyColumns []string, discovery *sqlcapture.DiscoveryInfo, metadataJSON json.RawMessage) error {
+// getTableProcessingInfo retrieves the processing info for a table given its relation ID.
+// If the info is not already cached, it computes it and stores it in the cache.
+// It returns the processing info, a boolean indicating if the table is active, and an error.
+// An inactive table returns info=nil and active=false, but no error.
+func (s *replicationStream) getTableProcessingInfo(relID uint32) (info *tableProcessingInfo, active bool, err error) {
+	// If we have cached processing info for this relation ID, return it. It should never
+	// be possible to have a relation ID here for which we don't know the stream ID, but
+	// we have an error check just in case.
+	s.tables.RLock()
+	streamID, ok := s.streamIDFromRelationID(relID)
+	if !ok {
+		s.tables.RUnlock()
+		return nil, false, fmt.Errorf("unknown relation ID %d", relID)
+	}
+	cachedInfo, ok := s.tables.infoCache[streamID]
+	if ok {
+		s.tables.RUnlock()
+		return cachedInfo, true, nil
+	}
+	s.tables.RUnlock()
+
+	// Acquire a write lock so we can update the cache.
 	s.tables.Lock()
 	defer s.tables.Unlock()
-	s.tables.active[streamID] = struct{}{}
-	s.tables.keyColumns[streamID] = keyColumns
-	s.tables.discovery[streamID] = discovery
-	return nil
+
+	discovery, ok := s.tables.discovery[streamID]
+	if !ok {
+		return nil, false, nil
+	}
+	var keyColumns, _ = s.tables.keyColumns[streamID]  // Skipping 'ok' check here because keyColumns should always be in sync with discovery.
+	var relationMessage, _ = s.tables.relations[relID] // Skipping 'ok' check here because relations should always be in sync with streamIDFromRelationID
+
+	processingInfo, err := s.computeTableProcessingInfo(streamID, discovery, keyColumns, relationMessage)
+	if err != nil {
+		return nil, false, fmt.Errorf("error computing table processing info for %q: %w", streamID, err)
+	}
+	s.tables.infoCache[streamID] = processingInfo
+	return processingInfo, true, nil
+}
+
+func (s *replicationStream) computeTableProcessingInfo(
+	streamID sqlcapture.StreamID,
+	discovery *sqlcapture.DiscoveryInfo,
+	keyColumnNames []string,
+	relationMessage *pglogrepl.RelationMessage,
+) (*tableProcessingInfo, error) {
+	var keyColumns = make([]int, len(keyColumnNames))                            // Indices of key columns in the table, in key order.
+	var columnNames = make([]string, len(relationMessage.Columns))               // Names of all columns, in table order.
+	var outputColumnNames = make([]string, len(relationMessage.Columns))         // Names of all columns with omitted columns set to "", in table order.
+	var outputTranscoders = make([]jsonTranscoder, len(relationMessage.Columns)) // Transcoders from DB values to JSON, with omitted columns set to nil.
+	var rowKeyTranscoders = make([]fdbTranscoder, len(relationMessage.Columns))  // Transcoders from DB values to FDB row keys, with non-key columns set to nil.
+
+	for idx, col := range relationMessage.Columns {
+		columnNames[idx] = col.Name
+		outputColumnNames[idx] = col.Name
+		var columnInfo, ok = discovery.Columns[col.Name]
+		if !ok {
+			return nil, fmt.Errorf("column %q not found in discovery info for relation %q", col.Name, streamID)
+		}
+		var isPrimaryKey = slices.Contains(discovery.PrimaryKey, col.Name)
+		outputTranscoders[idx] = s.db.replicationJSONTranscoder(s.typeMap, col.DataType, &columnInfo, isPrimaryKey)
+		if slices.Contains(keyColumnNames, col.Name) {
+			rowKeyTranscoders[idx] = s.db.replicationFDBTranscoder(s.typeMap, col.DataType, &columnInfo)
+		}
+	}
+
+	// Add the _meta property to the end of the output columns list. This matches up with
+	// a special-case in the postgresChangeEvent serialization logic.
+	outputColumnNames = append(outputColumnNames, "_meta")
+
+	for keyIndex, keyColName := range keyColumnNames {
+		var columnIndex = slices.Index(columnNames, keyColName)
+		if columnIndex < 0 {
+			return nil, fmt.Errorf("key column %q not found in relation %q", keyColName, streamID)
+		}
+		keyColumns[keyIndex] = columnIndex
+	}
+
+	return &tableProcessingInfo{
+		StreamID:          streamID,
+		Schema:            relationMessage.Namespace,
+		Table:             relationMessage.RelationName,
+		Relation:          relationMessage,
+		KeyColumns:        keyColumns,
+		ColumnNames:       columnNames,
+		RowKeyTranscoders: rowKeyTranscoders,
+		Shared: &postgresChangeSharedInfo{
+			StreamID:    streamID,
+			Shape:       encrow.NewShape(outputColumnNames),
+			Transcoders: outputTranscoders,
+		},
+	}, nil
 }
 
 // Acknowledge informs the ReplicationStream that all messages up to the specified

@@ -169,7 +169,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	}
 
 	// Construct the backfill metadata struct which will be shared across all events.
-	var backfillEventInfo = &postgresBackfillInfo{
+	var backfillEventInfo = &postgresChangeSharedInfo{
 		StreamID:    streamID,
 		Shape:       encrow.NewShape(outputColumnNames),
 		Transcoders: outputTranscoders,
@@ -179,7 +179,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 	var totalRows, resultRows int    // totalRows counts DB returned rows, resultRows counts rows after XID filtering
 	var rowKey = make([]byte, 0, 64) // The row key of the most recent row processed, for keyed backfills only
 	var rowOffset = state.BackfilledCount
-	var event = postgresBackfillEvent{} // Preallocated event struct, reused for each row
+	var event = postgresChangeEvent{} // Preallocated event struct, reused for each row
 	logEntry.Debug("translating query rows to change events")
 	for rows.Next() {
 		var rawValues = rows.RawValues()
@@ -212,9 +212,9 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 			}
 		}
 
-		event = postgresBackfillEvent{
+		event = postgresChangeEvent{
 			Info: backfillEventInfo,
-			Meta: postgresDocumentMetadata{
+			Meta: postgresChangeMetadata{
 				Operation: sqlcapture.InsertOp, // All backfill events are inserts
 				Source: postgresSource{
 					SourceCommon: sqlcapture.SourceCommon{
