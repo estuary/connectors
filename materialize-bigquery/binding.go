@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/bigquery"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 )
 
 type binding struct {
