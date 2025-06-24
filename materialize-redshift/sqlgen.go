@@ -164,7 +164,14 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 }
 
 func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
-	return fmt.Sprintf(`json_parse('"' || %s || '"')`, migration.Identifier)
+	// The escape character (\) or double quotes (") in the input must be
+	// escaped so that the Redshift JSON parser doesn't try to interpret the
+	// input as JSON, which it may not be. There's no reasonable way to try to
+	// parse as JSON first and then escape if that doesn't work, which would be
+	// nicer for migrating from stringified JSON to actual JSON. Also note that
+	// CHR(92) is an escape (\), and it needs to be written in this weird way
+	// since Redshift does not support C-style escape sequences in SQL strings.
+	return fmt.Sprintf(`json_parse('"' || REPLACE(REPLACE(%s, CHR(92), CHR(92)||CHR(92)), '"', CHR(92)||'"') || '"')`, migration.Identifier)
 }
 
 type copyFromS3Params struct {
