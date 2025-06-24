@@ -22,7 +22,7 @@ func GenerateSchema(title string, configObject interface{}) *jsonschema.Schema {
 	schema.Title = title
 	walkSchema(
 		schema,
-		fixSchemaFlagBools("secret", "advanced", "multiline", "x-collection-name", "x-schema-name", "x-delta-updates"),
+		fixSchemaFlagBools("secret", "advanced", "multiline", "x-collection-name", "x-schema-name", "x-delta-updates", "x-iam-auth"),
 		fixSchemaOrderingStrings,
 	)
 
