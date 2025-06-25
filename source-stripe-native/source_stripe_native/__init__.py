@@ -38,7 +38,7 @@ class Connector(
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
-        resources = await all_resources(log, self, discover.config)
+        resources = await all_resources(log, self, discover.config, should_fetch_connected_accounts=False)
         return common.discovered(resources)
 
     async def validate(
@@ -54,7 +54,7 @@ class Connector(
             )
             or not validate.lastCapture.bindings
         ):
-            resources = await all_resources(log, self, validate.config)
+            resources = await all_resources(log, self, validate.config, should_fetch_connected_accounts=False)
             resolved = common.resolve_bindings(validate.bindings, resources)
             return common.validated(resolved)
 
@@ -75,7 +75,7 @@ class Connector(
                     ]
                 )
 
-        resources = await all_resources(log, self, validate.config)
+        resources = await all_resources(log, self, validate.config, should_fetch_connected_accounts=False)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
