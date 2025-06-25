@@ -69,12 +69,25 @@ async def _fetch_connected_account_ids(
     http: HTTPSession,
     log: Logger,
 ) -> list[str]:
-    connected_accounts = ListResult[Accounts].model_validate_json(
-        await http.request(log, f"{API}/accounts")
-    )
-    return list(
-        set([item.id for item in connected_accounts.data if item.id is not None])
-    )
+    account_ids: set[str] = set()
+
+    url = f"{API}/accounts"
+    params: dict[str, str | int] = {"limit": 100}
+
+    while True:
+        response = ListResult[Accounts].model_validate_json(
+            await http.request(log, url, params=params)
+        )
+
+        for account in response.data:
+            account_ids.add(account.id)
+
+        if not response.has_more:
+            break
+
+        params["starting_after"] = response.data[-1].id
+
+    return list(account_ids)
 
 
 async def _fetch_platform_account_id(
@@ -136,7 +149,7 @@ def _reconcile_connector_state(
 
 
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger, http: HTTPMixin, config: EndpointConfig, should_fetch_connected_accounts: bool = True,
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     is_restricted_api_key = config.credentials.access_token.startswith("rk_")
@@ -153,8 +166,14 @@ async def all_resources(
 
     platform_account_id = await _fetch_platform_account_id(http, log)
     connected_account_ids = []
-    if config.capture_connected_accounts:
+    if config.capture_connected_accounts and should_fetch_connected_accounts:
+        log.info("Fetching connected account IDs. This may take multiple minutes if there are many connected accounts.")
         connected_account_ids = await _fetch_connected_account_ids(http, log)
+        log.info(
+            f"Found {len(connected_account_ids)} connected account IDs.", {
+                "connected_account_ids": connected_account_ids,
+            }
+        )
 
     for element in STREAMS:
         is_accessible_stream = True
