@@ -4,24 +4,156 @@
 ]
 [
   "connectorState",
-  {}
-]
-[
-  "connectorState",
-  {}
-]
-[
-  "connectorState",
-  {}
-]
-[
-  "connectorState",
-  {}
+  {
+    "updated": {}
+  }
 ]
 [
   "connectorState",
   {
-    "updated": {}
+    "updated": {
+      "estuary-theatre%2Ftesting%2Fdeletions": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.deletions (id, _meta_op, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_5;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_5"
+      },
+      "estuary-theatre%2Ftesting%2Fduplicate_keys": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str, flow_document)\nSELECT c0, c1, c2, c3, c4 FROM flow_temp_table_1;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_1"
+      },
+      "estuary-theatre%2Ftesting%2Fformatted_strings": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.formatted_strings (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 FROM flow_temp_table_3;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_3"
+      },
+      "estuary-theatre%2Ftesting%2Fmultiple_types": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.multiple_types (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 FROM flow_temp_table_2;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_2"
+      },
+      "estuary-theatre%2Ftesting%2Fsimple": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_0;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_0"
+      },
+      "estuary-theatre%2Ftesting%2Fstring_escaped_key": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.string_escaped_key (id, counter, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_6;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_6"
+      },
+      "estuary-theatre%2Ftesting%2Funsigned_bigint": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.unsigned_bigint (id, flow_published_at, unsigned_bigint, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_4;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_4"
+      }
+    }
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "estuary-theatre%2Ftesting%2Fdeletions": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.deletions AS l\nUSING flow_temp_table_5 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 3\nWHEN MATCHED AND TO_JSON_STRING(r.c3)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l._meta_op = r.c1, l.flow_published_at = r.c2, l.flow_document = r.c3\nWHEN NOT MATCHED THEN\n\tINSERT (id, _meta_op, flow_published_at, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_5"
+      },
+      "estuary-theatre%2Ftesting%2Fduplicate_keys": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.duplicate_keys AS l\nUSING flow_temp_table_1 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 5\nWHEN MATCHED AND TO_JSON_STRING(r.c4)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.c1, l.int = r.c2, l.str = r.c3, l.flow_document = r.c4\nWHEN NOT MATCHED THEN\n\tINSERT (id, flow_published_at, int, str, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_1"
+      },
+      "estuary-theatre%2Ftesting%2Fformatted_strings": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.formatted_strings (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 FROM flow_temp_table_3;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_3"
+      },
+      "estuary-theatre%2Ftesting%2Fmultiple_types": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.multiple_types AS l\nUSING flow_temp_table_2 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND TO_JSON_STRING(r.c10)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.c1, l.binary_field = r.c2, l.bool_field = r.c3, l.float_field = r.c4, l.flow_published_at = r.c5, l.multiple = r.c6, l.nested = r.c7, l.nullable_int = r.c8, l.str_field = r.c9, l.flow_document = r.c10\nWHEN NOT MATCHED THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_2"
+      },
+      "estuary-theatre%2Ftesting%2Fsimple": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_0;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_0"
+      },
+      "estuary-theatre%2Ftesting%2Fstring_escaped_key": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.string_escaped_key AS l\nUSING flow_temp_table_6 AS r\nON \n\tl.id = r.c0 AND l.id >= '\\\\he \\\\ \\' \" `llo`' AND l.id <= '\\\\he \\\\ \\' \" `llo`'\nWHEN MATCHED AND TO_JSON_STRING(r.c3)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c1, l.flow_published_at = r.c2, l.flow_document = r.c3\nWHEN NOT MATCHED THEN\n\tINSERT (id, counter, flow_published_at, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_6"
+      }
+    }
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "estuary-theatre%2Ftesting%2Fduplicate_keys": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str, flow_document)\nSELECT c0, c1, c2, c3, c4 FROM flow_temp_table_1;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_1"
+      }
+    }
+  }
+]
+[
+  "connectorState",
+  {
+    "updated": {
+      "estuary-theatre%2Ftesting%2Fduplicate_keys": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str, flow_document)\nSELECT c0, c1, c2, c3, c4 FROM flow_temp_table_1;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_1"
+      }
+    }
   }
 ]
 {
