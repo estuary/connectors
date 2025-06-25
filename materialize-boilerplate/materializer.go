@@ -427,17 +427,6 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	actionDescriptions := []string{}
 	actions := []ActionApplyFn{}
 
-	if desc, err := materializer.Setup(ctx, is); err != nil {
-		return nil, fmt.Errorf("running PreApply: %w", err)
-	} else if desc != "" {
-		actionDescriptions = append(actionDescriptions, desc)
-	}
-
-	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
-	if err != nil {
-		return nil, err
-	}
-
 	if !mCfg.NoCreateNamespaces {
 		// Create any required namespaces before other actions, which may
 		// include resource creation. Otherwise resources creation may fail due
@@ -464,6 +453,17 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				actionDescriptions = append(actionDescriptions, desc)
 			}
 		}
+	}
+
+	if desc, err := materializer.Setup(ctx, is); err != nil {
+		return nil, fmt.Errorf("running setup: %w", err)
+	} else if desc != "" {
+		actionDescriptions = append(actionDescriptions, desc)
+	}
+
+	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
+	if err != nil {
+		return nil, err
 	}
 
 	addAction := func(desc string, a ActionApplyFn) {
