@@ -11,7 +11,7 @@ python = ">=3.11,<3.13"
 pydantic = "^2"
 pytz = "^2024.1"
 requests-futures = "^1.0.1"
-setuptools = "^70.0.0"
+setuptools = ">=78.1.1"
 nltk = "^3.9.1"
 
 [tool.poetry.group.dev.dependencies]
