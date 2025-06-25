@@ -74,18 +74,16 @@ async def _fetch_connected_account_ids(
     url = f"{API}/accounts"
     params: dict[str, str | int] = {"limit": 100}
 
-    while True:
-        response = ListResult[Accounts].model_validate_json(
-            await http.request(log, url, params=params)
-        )
+    # We should paginate to get all connected account, but
+    # we've seen captures OOM when there are more than a few hundred accounts.
+    # While we figure out how to handle so many connected accounts without OOM-ing,
+    # only capture from the 100 most recent accounts.
+    response = ListResult[Accounts].model_validate_json(
+        await http.request(log, url, params=params)
+    )
 
-        for account in response.data:
-            account_ids.add(account.id)
-
-        if not response.has_more:
-            break
-
-        params["starting_after"] = response.data[-1].id
+    for account in response.data:
+        account_ids.add(account.id)
 
     return list(account_ids)
 
