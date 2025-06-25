@@ -10,9 +10,10 @@ keywords = [
 license = "AGPL-3.0"
 
 [tool.poetry.dependencies]
-python = "<3.12,>=3.7.1"
+python = "<3.12,>=3.9"
 requests = "^2.31.0"
 singer-sdk = "^0.33.0"
+setuptools = ">=78.1.1"
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2.5"

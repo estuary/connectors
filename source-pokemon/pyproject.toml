@@ -9,6 +9,7 @@ airbyte-cdk = "^0.52"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 python = "^3.11"
 types-requests = "^2.31"
+setuptools = ">=78.1.1"
 
 [build-system]
 requires = ["poetry-core"]
