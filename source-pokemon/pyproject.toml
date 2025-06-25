@@ -8,6 +8,7 @@ authors = ["Johnny Graettinger <johnny@estuary.dev>"]
 airbyte-cdk = "^0.52"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 python = "^3.11"
+setuptools = ">=78.1.1"
 types-requests = "^2.31"
 
 [build-system]
