@@ -10,7 +10,11 @@ estuary-cdk = {path="../estuary-cdk", develop = true}
 airbyte-cdk = "^0.52"
 pydantic = "1.10.14"
 pendulum = "^3.0.0"
-cryptography = "==44.0.1"
+certifi = ">=2024.7.4"
+cryptography = ">=43.0.1"
+peewee = ">=3.17.1"
+requests = ">=2.32.4"
+urllib3 = ">=2.5.0"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
