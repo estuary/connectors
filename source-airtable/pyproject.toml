@@ -9,6 +9,10 @@ airbyte-cdk = "^0.52"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 python = "^3.11"
 types-requests = "^2.31"
+aiohttp = ">=3.10.11"
+pycares = ">=4.9.0"
+requests = ">=2.32.4"
+urllib3 = ">=2.5.0"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
