@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgio"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
 )
@@ -155,30 +156,6 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		}).Warn("resume cursor mismatch: resume LSN is less than replication slot confirmed_flush_lsn (this means the slot was probably deleted+recreated and all bindings need to be backfilled)")
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"startLSN":    startLSN.String(),
-		"publication": publication,
-		"slot":        slot,
-	}).Info("starting replication")
-
-	if err := pglogrepl.StartReplication(ctx, conn, slot, startLSN, pglogrepl.StartReplicationOptions{
-		PluginArgs: []string{
-			`"proto_version" '1'`,
-			fmt.Sprintf(`"publication_names" '%s'`, publication),
-		},
-	}); err != nil {
-		conn.Close(ctx)
-		// The number one source of errors at this point in the capture is that another
-		// capture task is already running, using the replication slot we want. We can
-		// give the user a more friendly error message to help them understand that.
-		if err, ok := err.(*pgconn.PgError); ok {
-			if slotInUseRe.MatchString(err.Message) {
-				return nil, fmt.Errorf("another capture is already running against this database: %s", err.Message)
-			}
-		}
-		return nil, fmt.Errorf("unable to start replication: %w", err)
-	}
-
 	hijacked, err := conn.Hijack()
 	if err != nil {
 		conn.Close(ctx)
@@ -274,6 +251,7 @@ type replicationStream struct {
 
 	workerCtx       context.Context    // The context used for the worker goroutine, which is canceled when the stream is closed.
 	cancelWorkerCtx context.CancelFunc // The cancel function for the worker context, used to stop the worker goroutine.
+	workerDone      chan struct{}      // Channel used to signal that the worker goroutine has finished.
 
 	previousFenceLSN pglogrepl.LSN // // The most recently reached fence LSN, updated at the end of each StreamToFence cycle.
 
@@ -443,7 +421,9 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 func (s *replicationStream) StartReplication(ctx context.Context, discovery map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo) error {
 	// Launch a little helper routine to just send standby status updates regularly.
 	s.workerCtx, s.cancelWorkerCtx = context.WithCancel(ctx)
+	s.workerDone = make(chan struct{})
 	go func() {
+		defer close(s.workerDone)
 		if err := s.sendStandbyStatusUpdate(ctx); err != nil {
 			logrus.WithError(err).Fatal("failed to send standby status update")
 		}
@@ -461,7 +441,50 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 		}
 	}()
 
-	return nil
+	var startLSN = s.lastTxnEndLSN
+	logrus.WithFields(logrus.Fields{
+		"startLSN":    startLSN.String(),
+		"publication": s.pubName,
+		"slot":        s.replSlot,
+	}).Info("starting replication")
+
+	// Construct and send the START_REPLICATION command to the database.
+	var sql = fmt.Sprintf(`START_REPLICATION SLOT %s LOGICAL %s ("proto_version" '1', "publication_names" '%s')`, s.replSlot, startLSN, s.pubName)
+	if bs, err := (&pgproto3.Query{String: sql}).Encode(nil); err != nil {
+		return fmt.Errorf("error encoding START_REPLICATION query: %w", err)
+	} else if _, err := s.conn.Conn.Write(bs); err != nil {
+		return fmt.Errorf("error sending START_REPLICATION query: %w", err)
+	}
+
+	// Need to read response messages. The receiveMessage() method already does basically
+	// what we need here, but we'll need to handle the expected response message types.
+	for {
+		var msg, err = s.receiveMessage(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to receive message: %w", err)
+		}
+
+		switch msg[0] {
+		case 'N', 'C', 'Z': // Notice, CommandComplete, ReadyForQuery
+			continue
+		case 'E': // Error
+			var resp pgproto3.ErrorResponse
+			if err := resp.Decode(msg[5:]); err != nil {
+				return fmt.Errorf("error decoding ErrorResponse: %w", err)
+			} else if pgErr := pgconn.ErrorResponseToPgError(&resp); slotInUseRe.MatchString(pgErr.Message) {
+				// The number one source of errors at this point in the capture is that another
+				// capture task is already running, using the replication slot we want. We can
+				// give the user a more friendly error message to help them understand that.
+				return fmt.Errorf("another capture is already running against this database: %s", pgErr.Message)
+			} else {
+				return pgErr
+			}
+		case 'W': // Start CopyBoth
+			return nil // This signals the start of the replication stream.
+		default:
+			return fmt.Errorf("unexpected response type: %T", msg)
+		}
+	}
 }
 
 func (s *replicationStream) relayChanges(ctx context.Context, callback func(event sqlcapture.DatabaseEvent) error) error {
@@ -474,13 +497,38 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 			return err
 		}
 
-		// Parse the XLogData header
-		xld, err := pglogrepl.ParseXLogData(msg[1:])
-		if err != nil {
-			return fmt.Errorf("error parsing XLogData: %w", err)
+		// Handle messages that aren't CopyData
+		var data []byte
+		switch msgType := msg[0]; msgType {
+		case 'S': // ParameterStatus
+			continue // Ignore and keep looking for something we care about.
+		case 'd': // CopyData messages are all we care about during replication streaming
+			data = msg[5:]
+		default:
+			return fmt.Errorf("unexpected message type %q", msgType)
 		}
 
-		// Once a message arrives, decode it and dispatch to the callback.
+		// Handle CopyData messages that aren't XLogData
+		var xld pglogrepl.XLogData
+		switch data[0] {
+		case pglogrepl.PrimaryKeepaliveMessageByteID:
+			if pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(data[1:]); err != nil {
+				return fmt.Errorf("error parsing keepalive: %w", err)
+			} else if pkm.ReplyRequested {
+				if err := s.sendStandbyStatusUpdate(ctx); err != nil {
+					return fmt.Errorf("error sending standby status update: %w", err)
+				}
+			}
+			continue // Keep looking for something we care about.
+		case pglogrepl.XLogDataByteID:
+			if xld, err = pglogrepl.ParseXLogData(data[1:]); err != nil {
+				return fmt.Errorf("error parsing XLogData: %w", err)
+			}
+		default:
+			return fmt.Errorf("unknown CopyData message: %v", data)
+		}
+
+		// Once an XLogData message arrives, decode it and dispatch to the callback.
 		event, err := s.decodeMessage(xld.WALStart, xld.WALData)
 		if err != nil {
 			return fmt.Errorf("error decoding message: %w", err)
@@ -493,50 +541,22 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 	return ctx.Err()
 }
 
-// receiveMessage reads and returns the next logical replication message from the database,
-// blocking until a message is available, the context is cancelled, or an error occurs. It
-// returns the complete XLogData ('w') message bytes, which are valid only until the next
-// call to receiveMessage.
+// receiveMessage reads and returns the next complete message from the database. It will
+// return os.DeadlineExceeded if no message is immediately available. It returns the
+// complete message including initial message type byte and length header. The bytes
+// are valid only until the next call to receiveMessage.
 func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) {
 	for {
-		// 1. Check if a complete message exists in the buffer at rxoff. If so, parse and return it.
-		var msgType byte
-		var msgLen int
+		// 1. Check if a complete message exists in the buffer at rxoff. If so, slice and return it.
+		var msgLen int // Length includes the 4-byte length field itself, but not the preceding type byte.
 		if len(s.rxbuf)-s.rxoff >= 5 {
-			// Read the message type and length from the buffer.
-			msgType = s.rxbuf[s.rxoff]
-			msgLen = int(binary.BigEndian.Uint32(s.rxbuf[s.rxoff+1 : s.rxoff+5])) // Length includes the 4-byte length field itself.
+			// Read the message length from the buffer.
+			msgLen = int(binary.BigEndian.Uint32(s.rxbuf[s.rxoff+1 : s.rxoff+5]))
 			if len(s.rxbuf)-s.rxoff >= msgLen+1 {
 				// Slice out this message payload and move the offset forward to after this message.
-				var msgData = s.rxbuf[s.rxoff+5 : s.rxoff+1+msgLen]
+				var msg = s.rxbuf[s.rxoff : s.rxoff+1+msgLen]
 				s.rxoff += msgLen + 1
-
-				//logrus.WithFields(logrus.Fields{"type": msgType, "len": msgLen, "data": msgData}).Debug("receiveMessage")
-
-				switch msgType {
-				case 'S': // ParameterStatus
-					continue // Ignore and keep looking for something we care about.
-				case 'd': // CopyData messages are all we care about
-					switch msgData[0] {
-					case pglogrepl.PrimaryKeepaliveMessageByteID:
-						var pkm, err = pglogrepl.ParsePrimaryKeepaliveMessage(msgData[1:])
-						if err != nil {
-							return nil, fmt.Errorf("error parsing keepalive: %w", err)
-						}
-						if pkm.ReplyRequested {
-							if err := s.sendStandbyStatusUpdate(ctx); err != nil {
-								return nil, fmt.Errorf("error sending standby status update: %w", err)
-							}
-						}
-						continue // Keep looking for something we care about.
-					case pglogrepl.XLogDataByteID:
-						return msgData, nil // Return the XLogData message bytes directly.
-					default:
-						return nil, fmt.Errorf("unknown CopyData message: %v", msgData)
-					}
-				default:
-					return nil, fmt.Errorf("unexpected message type %q", msgType)
-				}
+				return msg, nil // Return the complete message, including the type byte and length field.
 			}
 		}
 
@@ -551,6 +571,7 @@ func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) 
 		//    We will eventually need to handle this more gracefully by growing the buffer or something.
 		if len(s.rxbuf) >= cap(s.rxbuf) {
 			if cap(s.rxbuf) >= rxBufferMaximumSize {
+				var msgType = s.rxbuf[0] // The relevant message type is always at index 0 when buffer overflow occurs.
 				return nil, fmt.Errorf("replication buffer overflow: capacity %d filled but cannot hold message %q of length %d", cap(s.rxbuf), msgType, msgLen+1)
 			}
 			// Resize rxbuf to twice its current capacity
@@ -562,7 +583,6 @@ func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) 
 			return nil, fmt.Errorf("error setting read deadline: %w", err)
 		}
 		var n, err = s.conn.Conn.Read(s.rxbuf[len(s.rxbuf):cap(s.rxbuf)])
-		//logrus.WithFields(logrus.Fields{"residual": len(s.rxbuf), "received": n}).Warn("receiveMessage: read from connection")
 		if err != nil {
 			if errors.Is(err, io.EOF) {
 				return nil, fmt.Errorf("connection closed while reading messages: %w", err)
@@ -786,7 +806,7 @@ func (s *replicationStream) decodeChangeEvent(
 	relID uint32, // Relation ID to which tuple data pertains.
 ) (sqlcapture.DatabaseEvent, error) {
 	if s.nextTxnFinalLSN == 0 {
-		return nil, fmt.Errorf("got %q message without a transaction in progress", op)
+		return nil, fmt.Errorf("got change event without a transaction in progress")
 	}
 
 	var info, active, err = s.getTableProcessingInfo(relID)
@@ -1165,13 +1185,16 @@ func (s *replicationStream) sendStandbyStatusUpdate(ctx context.Context) error {
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
 
+	// Shut down the standby status update goroutine and ensure it's finished.
+	s.cancelWorkerCtx()
+	<-s.workerDone
+
 	// Convert back to a pgconn connection so we can close it cleanly with a termination message.
-	var conn, err = pgconn.Construct(s.conn)
-	if err != nil {
+	if conn, err := pgconn.Construct(s.conn); err != nil {
 		return fmt.Errorf("error constructing pgconn from connection: %w", err)
+	} else if err := conn.Close(ctx); err != nil {
+		return fmt.Errorf("error closing replication stream connection: %w", err)
 	}
-	conn.Close(ctx)
-	s.cancelWorkerCtx() // Stop the standby status update goroutine.
 	return nil
 }
 
@@ -1213,17 +1236,6 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	query("SELECT * FROM pg_replication_slots;")
 	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
 	return nil
-}
-
-// marshalJSONString returns the serialized JSON representation of the provided string.
-//
-// A Go string can always be successfully serialized into JSON.
-func marshalJSONString(str string) json.RawMessage {
-	var bs, err = json.Marshal(str)
-	if err != nil {
-		panic(fmt.Errorf("internal error: failed to marshal string %q to JSON: %w", str, err))
-	}
-	return bs
 }
 
 func unmarshalJSONString(bs json.RawMessage) (string, error) {
