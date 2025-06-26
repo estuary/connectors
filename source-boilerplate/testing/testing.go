@@ -265,7 +265,7 @@ func (a *pullAdapter) Recv() (*pc.Request, error) {
 	// Since Recv() is blocking it must either be running in a separate thread
 	// from the one Send()ing checkpoints, or it must be called at a time when
 	// there are already pending checkpoints.
-	for {
+	for a.ctx.Err() == nil {
 		var count = a.pendingCheckpoints.Load()
 		if count > 0 && a.pendingCheckpoints.CompareAndSwap(count, 0) {
 			return &pc.Request{Acknowledge: &pc.Request_Acknowledge{
@@ -274,6 +274,7 @@ func (a *pullAdapter) Recv() (*pc.Request, error) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	return nil, io.EOF // Always return io.EOF when the context expires
 }
 
 func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {

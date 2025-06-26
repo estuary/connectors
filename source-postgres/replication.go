@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"regexp"
 	"slices"
 	"sync"
@@ -21,6 +22,19 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	// streamToFenceWatchdogInterval is the length of time to wait between checking whether
+	// we're still processing change events. This should never be hit in normal operation,
+	// and exists only so that certain rare failure modes produce an error rather than
+	// blocking forever.
+	streamToFenceWatchdogInterval = 6 * time.Hour
+
+	// replicationStreamReadTimeout is the maximum amount of time any single read operation may
+	// block for. But all we do when it's hit is check the context for cancellation and retry,
+	// so the precise value isn't very important.
+	replicationStreamReadTimeout = 100 * time.Millisecond
 )
 
 var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
@@ -182,7 +196,7 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		pubName:  publication,
 		replSlot: slot,
 
-		rxbuf:              make([]byte, 0, rxBufferSize),
+		rxbuf:              make([]byte, 0, rxBufferInitialSize),
 		reusedChangeEvent:  new(postgresChangeEvent),
 		reusedCommitEvent:  new(postgresCommitEvent),
 		reusedBeforeValues: make([][]byte, 0, 32),
@@ -307,14 +321,11 @@ type tableProcessingInfo struct {
 const standbyStatusInterval = 10 * time.Second
 
 var (
-	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
-	// operation will error out if no further events are received when there ought to be
-	// some. This should never be hit in normal operation, and exists only so that certain
-	// rare failure modes produce an error rather than blocking forever.
-	streamToFenceWatchdogTimeout = 12 * 60 * time.Minute
+	// rxBufferInitialSize is the initial size of the receive buffer into which replication messages are read.
+	rxBufferInitialSize = 1 * 1024 * 1024
 
-	// rxBufferSize is the initial size of the receive buffer into which replication messages are read.
-	rxBufferSize = 1 * 1024 * 1024 // 1 MiB
+	// rxBufferMaximumSize is the maximum size to which the receive buffer may grow, and thus also the maximum size of a single message we can handle.
+	rxBufferMaximumSize = 256 * 1024 * 1024
 )
 
 func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
@@ -377,21 +388,32 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 
 	// Stream replication events until the fence is reached or the watchdog timeout hits.
 	//
-	// Given that the early-exit fast path was not taken, there must be further data for
-	// us to read. Thus if we sit idle for a nontrivial length of time without reaching
-	// our fence position, something is wrong and we should error out instead of blocking
-	// forever.
 	var relayCtx, cancelRelayCtx = context.WithCancelCause(ctx)
-	var fenceWatchdog = time.AfterFunc(streamToFenceWatchdogTimeout, func() {
-		var err error
+	defer cancelRelayCtx(nil)
+
+	// Given that the early-exit fast path was not taken, there must be further data for
+	// us to read. Thus if we sit idle for too long without reaching our fence position,
+	// something is wrong and we should error out instead of blocking forever.
+	var eventCount atomic.Int64
+	var previousCount int64
+	var watchdog *time.Timer
+	watchdog = time.AfterFunc(streamToFenceWatchdogInterval, func() {
+		if count := eventCount.Load(); count > previousCount {
+			previousCount = count
+			watchdog.Reset(streamToFenceWatchdogInterval)
+			return
+		}
+
+		var err = fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
 		if s.db.config.Advanced.ReadOnlyCapture {
 			err = fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
 		}
-		err = fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
 		cancelRelayCtx(err)
 	})
+	defer watchdog.Stop()
+
 	if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
-		fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
+		eventCount.Add(1)
 		if err := callback(event); err != nil {
 			return err
 		}
@@ -446,7 +468,9 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 	for ctx.Err() == nil {
 		// Try to receive another message from the database.
 		var msg, err = s.receiveMessage(ctx)
-		if err != nil {
+		if errors.Is(err, os.ErrDeadlineExceeded) {
+			continue // Try again if the read timed out. This gives us a chance to check the context for cancellation.
+		} else if err != nil {
 			return err
 		}
 
@@ -526,7 +550,16 @@ func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) 
 		// 3. Read more data from the connection into the buffer. If the buffer is full, return an error.
 		//    We will eventually need to handle this more gracefully by growing the buffer or something.
 		if len(s.rxbuf) >= cap(s.rxbuf) {
-			return nil, fmt.Errorf("replication buffer overflow: capacity %d filled but cannot hold message %q of length %d", cap(s.rxbuf), msgType, msgLen+1)
+			if cap(s.rxbuf) >= rxBufferMaximumSize {
+				return nil, fmt.Errorf("replication buffer overflow: capacity %d filled but cannot hold message %q of length %d", cap(s.rxbuf), msgType, msgLen+1)
+			}
+			// Resize rxbuf to twice its current capacity
+			var newbuf = make([]byte, len(s.rxbuf), cap(s.rxbuf)*2)
+			copy(newbuf, s.rxbuf)
+			s.rxbuf = newbuf
+		}
+		if err := s.conn.Conn.SetReadDeadline(time.Now().Add(replicationStreamReadTimeout)); err != nil {
+			return nil, fmt.Errorf("error setting read deadline: %w", err)
 		}
 		var n, err = s.conn.Conn.Read(s.rxbuf[len(s.rxbuf):cap(s.rxbuf)])
 		//logrus.WithFields(logrus.Fields{"residual": len(s.rxbuf), "received": n}).Warn("receiveMessage: read from connection")
@@ -591,6 +624,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlca
 		}
 		var tupleData = data[6:]
 		return s.decodeChangeEvent(sqlcapture.InsertOp, lsn, 0, nil, tupleData, relID)
+
 	case pglogrepl.MessageTypeUpdate:
 		// Update
 		//   Byte1('U')   Identifies the message as an update message.
@@ -612,7 +646,7 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlca
 		switch data[5] {
 		case 'K', 'O': // Key or old tuple followed by new tuple
 			oldTupleType = data[5]
-			var idx = scanTupleEnd(data[6:]) // Get the index of the next byte after the old tuple
+			var idx = scanTupleEnd(data[6:]) + 6 // Get the index of the next byte after the old tuple
 			if data[idx] != 'N' {
 				return nil, fmt.Errorf("expected 'N' tuple type after 'K' or 'O' in UPDATE message, got %q", data[idx])
 			}
@@ -622,7 +656,6 @@ func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlca
 			oldTupleType = 0 // No old tuple
 			oldTuple = nil
 			newTuple = data[6:]
-
 		default:
 			return nil, fmt.Errorf("expected 'N', 'K', or 'O' tuple type in UPDATE message, got %q", data[6])
 		}
@@ -811,6 +844,7 @@ func (s *replicationStream) decodeChangeEvent(
 	*s.reusedChangeEvent = postgresChangeEvent{
 		Info: info.Shared,
 		Meta: postgresChangeMetadata{
+			Info:      info.Shared,
 			Operation: op,
 			Source: postgresSource{
 				SourceCommon: sqlcapture.SourceCommon{
@@ -824,6 +858,7 @@ func (s *replicationStream) decodeChangeEvent(
 					int(s.nextTxnFinalLSN),
 				},
 			},
+			Before: beforeValues,
 		},
 		RowKey: rowKey,
 		Values: values,
@@ -835,17 +870,7 @@ func (s *replicationStream) decodeChangeEvent(
 }
 
 func scanTupleEnd(data []byte) int {
-	// TupleData
-	//   Int16    Number of columns.
-	//
-	// Next, one of the following submessages appears for each column (except generated columns):
-	//   Byte1('n')  Identifies the data as NULL value.
-	//   Byte1('u')  Identifies unchanged TOASTed value (the actual value is not sent).
-	//   Byte1('t')  Identifies the data as text formatted value.
-	//   Byte1('b')  Identifies the data as binary formatted value.
-	//   Int32       Length of the column value.
-	//   Byten       The value of the column, either in binary or in text format. (As specified in the preceding format byte). n is the above length.
-	var off = 0                                     // Offset into the data slice
+	var off = 2                                     // Offset into the data slice
 	var ncol = int16(binary.BigEndian.Uint16(data)) // Number of columns in the tuple
 	for _ = range ncol {
 		switch data[off] {
@@ -858,11 +883,29 @@ func scanTupleEnd(data []byte) int {
 	return off
 }
 
+// A special value used to indicate that a tuple value is omitted entirely.
+var tupleValueOmitted = tupleValueOmittedData[:]
+var tupleValueOmittedData [1]byte
+
 func postgresTupleValues(valsPtr *[][]byte, data []byte, tupleType uint8, before [][]byte) ([][]byte, error) {
+	// TupleData
+	//   Int16    Number of columns.
+	//
+	// Next, one of the following submessages appears for each column (except generated columns):
+	//   Byte1('n')  Identifies the data as NULL value.
+	//   Byte1('u')  Identifies unchanged TOASTed value (the actual value is not sent).
+	//   Byte1('t')  Identifies the data as text formatted value.
+	//   Byte1('b')  Identifies the data as binary formatted value.
+	//   Int32       Length of the column value.
+	//   Byten       The value of the column, either in binary or in text format. (As specified in the preceding format byte). n is the above length.
+	//
+	// Tuple Types:
+	//   Inserts: an after tuple has data with tuple type 'N', a before tuple is always nil with a type of 0.
+	//   Updates: an after tuple has data with tuple type 'N', a before tuple has a type of 'K' or 'O' or 0 and some data. But if the type is 0 then the data is always nil.
+	//   Deletions: an after tuple is always nil with tuple type 'N', a before tuple has a type of 'K' or 'O' and some data.
 	if data == nil {
 		return nil, nil
-	}
-	if tupleType != 0 && tupleType != 'K' && tupleType != 'O' && tupleType != 'N' {
+	} else if tupleType != 0 && tupleType != 'K' && tupleType != 'O' && tupleType != 'N' {
 		return nil, fmt.Errorf("unexpected tuple type %q", tupleType)
 	}
 
@@ -872,10 +915,24 @@ func postgresTupleValues(valsPtr *[][]byte, data []byte, tupleType uint8, before
 	for i := range ncol {
 		switch data[off] {
 		case 'n':
-			vals = append(vals, nil)
+			if tupleType == 'K' {
+				// Per the PostgreSQL documentation:
+				//  - The tupleType is 'K' IFF this is an update/delete before-tuple _and_ the table
+				//    uses an index for its REPLICA IDENTITY (not REPLICA IDENTITY FULL).
+				//  - A replica identity index may only ever contain non-nullable columns.
+				// Thus any time we see a nil value in a 'K' tuple, we should ignore it rather
+				// than treating it as a "real" null value to be captured.
+				vals = append(vals, tupleValueOmitted)
+			} else {
+				vals = append(vals, nil)
+			}
 			off += 1
 		case 'u':
-			vals = append(vals, before[i])
+			if i < len(before) {
+				vals = append(vals, before[i])
+			} else {
+				vals = append(vals, tupleValueOmitted) // If we don't have a before tuple value for this column, treat it as omitted.
+			}
 			off += 1
 		case 'b':
 			// This is a binary value, which we don't currently support.
@@ -942,7 +999,7 @@ func (s *replicationStream) getTableProcessingInfo(relID uint32) (info *tablePro
 	// be possible to have a relation ID here for which we don't know the stream ID, but
 	// we have an error check just in case.
 	s.tables.RLock()
-	streamID, ok := s.streamIDFromRelationID(relID)
+	streamID, ok := s.tables.relationStreamID[relID]
 	if !ok {
 		s.tables.RUnlock()
 		return nil, false, fmt.Errorf("unknown relation ID %d", relID)

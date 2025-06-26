@@ -43,15 +43,21 @@ var benchmarkTableShapes = map[string]struct {
 			c TEXT
 		)`,
 		InsertQuery: `
-			INSERT INTO %[1]s SELECT
-				id,
-				(id %% 7777)::integer,
-				(id %% 131313)::integer,
-				(id %% 33333333)::integer,
-				'text-' || id::text,
-				'text-' || (id + 1)::text,
-				'text-' || (id + 2)::text
-			FROM generate_series(%[2]d, %[3]d) AS id
+			DO $$
+			DECLARE id INTEGER;
+			BEGIN
+				FOR id IN %[2]d..%[3]d LOOP
+					INSERT INTO %[1]s SELECT
+						id,
+						(id %% 7777)::integer,
+						(id %% 131313)::integer,
+						(id %% 33333333)::integer,
+						'text-' || id::text,
+						'text-' || (id + 1)::text,
+						'text-' || (id + 2)::text;
+					COMMIT;
+				END LOOP;
+			END $$;
 		`,
 	},
 
@@ -67,15 +73,21 @@ var benchmarkTableShapes = map[string]struct {
 			c TEXT
 		)`,
 		InsertQuery: `
-			INSERT INTO %[1]s SELECT
-				gen_random_uuid(),
-				(id %% 7777)::integer,
-				(id %% 131313)::integer,
-				(id %% 33333333)::integer,
-				'text-' || id::text,
-				'text-' || (id + 1)::text,
-				'text-' || (id + 2)::text
-			FROM generate_series(%[2]d, %[3]d) AS id
+			DO $$
+			DECLARE id INTEGER;
+			BEGIN
+				FOR id IN %[2]d..%[3]d LOOP
+					INSERT INTO %[1]s SELECT
+						gen_random_uuid(),
+						(id %% 7777)::integer,
+						(id %% 131313)::integer,
+						(id %% 33333333)::integer,
+						'text-' || id::text,
+						'text-' || (id + 1)::text,
+						'text-' || (id + 2)::text;
+					COMMIT;
+				END LOOP;
+			END $$;
 		`,
 	},
 
@@ -91,15 +103,21 @@ var benchmarkTableShapes = map[string]struct {
 			c TEXT
 		)`,
 		InsertQuery: `
-			INSERT INTO %[1]s SELECT
-				gen_random_uuid()::text,
-				(id %% 7777)::integer,
-				(id %% 131313)::integer,
-				(id %% 33333333)::integer,
-				'text-' || id::text,
-				'text-' || (id + 1)::text,
-				'text-' || (id + 2)::text
-			FROM generate_series(%[2]d, %[3]d) AS id
+			DO $$
+			DECLARE id INTEGER;
+			BEGIN
+				FOR id IN %[2]d..%[3]d LOOP
+					INSERT INTO %[1]s SELECT
+						gen_random_uuid()::text,
+						(id %% 7777)::integer,
+						(id %% 131313)::integer,
+						(id %% 33333333)::integer,
+						'text-' || id::text,
+						'text-' || (id + 1)::text,
+						'text-' || (id + 2)::text;
+					COMMIT;
+				END LOOP;
+			END $$;
 		`,
 	},
 
@@ -112,60 +130,72 @@ var benchmarkTableShapes = map[string]struct {
 			content TEXT
 		)`,
 		InsertQuery: `
-			INSERT INTO %[1]s SELECT
-				id,
-				'2024-01-01 00:00:00 UTC'::timestamptz + ((id %% 8760) || ' hours')::interval,
-				'2024-01-01 00:00:00 UTC'::timestamptz + ((id %% 8760) || ' hours')::interval,
-				'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla posuere eu dolor sit amet dapibus. Donec vel semper nunc. Aenean metus mauris, volutpat et pharetra a, ornare ut ex. Nunc ut sagittis turpis, ut ultrices purus. Cras ante mi, faucibus eget tellus sed, ultrices fringilla diam. Aenean massa metus, lobortis et est sit amet, viverra suscipit justo. Morbi urna arcu, elementum aliquet tincidunt sed, euismod et risus. Maecenas pulvinar elit nec diam bibendum, nec tincidunt mauris cursus. Suspendisse dictum mauris a ex molestie, quis volutpat quam rhoncus. Nulla facilisi. Etiam sodales ligula ut risus vulputate, nec semper nibh fringilla.' ||
-				'Quisque sit amet ex id augue laoreet lobortis. Sed ac libero convallis justo posuere dignissim at vel diam. Curabitur ac ornare ante. Integer a dolor ut dui ullamcorper scelerisque ut vel est. Curabitur dapibus ipsum ut sapien porta tempor. Vestibulum bibendum egestas purus, a euismod risus vehicula eu. Integer faucibus justo in ex sodales venenatis. Proin commodo tortor a maximus aliquam. Nam eu enim nulla. Proin ac erat augue. Aliquam eleifend sagittis lacus quis tempus. Donec nisi turpis, rhoncus at ultrices nec, faucibus eu odio. Integer consequat ex dolor, in cursus odio lacinia vitae. Sed aliquam, neque consectetur tristique rutrum, mauris ligula hendrerit dui, vitae dictum nibh lorem sed est. Fusce lobortis dictum augue dignissim fermentum. Aliquam faucibus congue nulla sed consectetur.' ||
-				'Etiam non libero sapien. Morbi vitae fringilla est, ut efficitur lorem. Aliquam scelerisque viverra orci, vitae ullamcorper magna pellentesque sit amet. Quisque lobortis dignissim porttitor. Suspendisse gravida magna a consectetur sagittis. Suspendisse in diam ut nunc varius dictum. Proin nec quam euismod elit rhoncus mattis vel sed leo. Praesent purus nunc, tincidunt sit amet tempor vitae, imperdiet non mauris. Maecenas commodo hendrerit ex a interdum. Morbi placerat tortor id lorem pellentesque, ac luctus arcu molestie.' ||
-				'Nullam sit amet tristique odio, ultrices semper lectus. Curabitur at maximus justo. Etiam nulla erat, commodo a metus in, condimentum pellentesque ipsum. Phasellus sed leo quis lectus suscipit ullamcorper. Proin eu ipsum in tortor fringilla consequat. Nullam ultrices mattis porta. Mauris orci nulla, finibus vel turpis nec, sagittis commodo odio. Aenean viverra metus leo. In hac habitasse platea dictumst. Vestibulum egestas gravida nibh non faucibus.' ||
-				'Ut et magna dictum, vulputate nibh nec, varius magna. Quisque dignissim neque elementum, pulvinar turpis nec, suscipit lorem. Nulla ac dui id diam sodales pulvinar sed quis lorem. Suspendisse potenti. Praesent tristique ultricies pellentesque. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Cras mollis, turpis id vehicula luctus, ante risus tincidunt sem, vitae dictum tortor tellus eget justo. Integer sed porttitor libero, sed ullamcorper sapien. Curabitur pretium nibh a tellus facilisis, non porttitor magna ultrices. Nam tincidunt ipsum volutpat erat porta, quis auctor mauris luctus. Integer ut leo turpis. Mauris egestas cursus diam, in euismod odio tempus non. Maecenas a orci vel nisi sodales mattis non a mauris. Integer molestie molestie dictum.' ||
-				'Nulla facilisi. Nullam tristique bibendum enim at tristique. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris eget elit varius, elementum arcu sit amet, ultricies velit. Cras eu ex quis leo fringilla congue. Ut viverra a nibh nec semper. Fusce sodales ligula dolor, tristique finibus lorem iaculis ac. Etiam pellentesque vestibulum dolor vel mollis. In tristique lacus vehicula, hendrerit felis eu, auctor leo. Nam porta sapien dolor, eget euismod dui ullamcorper nec. In id placerat magna. Nam non elementum ligula. Cras scelerisque justo at libero finibus luctus. Proin orci lacus, vulputate vitae mauris id, tristique bibendum erat. Sed sollicitudin congue felis at sodales.'
-				'Morbi at scelerisque nibh. Duis dapibus sollicitudin augue, quis volutpat ipsum varius id. Phasellus ut dolor fringilla, molestie turpis at, auctor nisl. Aliquam luctus vel.'
-			FROM generate_series(%[2]d, %[3]d) AS id
+			DO $$
+			DECLARE id INTEGER;
+			BEGIN
+				FOR id IN %[2]d..%[3]d LOOP
+					INSERT INTO %[1]s SELECT
+						id,
+						'2024-01-01 00:00:00 UTC'::timestamptz + ((id %% 8760) || ' hours')::interval,
+						'2024-01-01 00:00:00 UTC'::timestamptz + ((id %% 8760) || ' hours')::interval,
+						'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nulla posuere eu dolor sit amet dapibus. Donec vel semper nunc. Aenean metus mauris, volutpat et pharetra a, ornare ut ex. Nunc ut sagittis turpis, ut ultrices purus. Cras ante mi, faucibus eget tellus sed, ultrices fringilla diam. Aenean massa metus, lobortis et est sit amet, viverra suscipit justo. Morbi urna arcu, elementum aliquet tincidunt sed, euismod et risus. Maecenas pulvinar elit nec diam bibendum, nec tincidunt mauris cursus. Suspendisse dictum mauris a ex molestie, quis volutpat quam rhoncus. Nulla facilisi. Etiam sodales ligula ut risus vulputate, nec semper nibh fringilla.' ||
+						'Quisque sit amet ex id augue laoreet lobortis. Sed ac libero convallis justo posuere dignissim at vel diam. Curabitur ac ornare ante. Integer a dolor ut dui ullamcorper scelerisque ut vel est. Curabitur dapibus ipsum ut sapien porta tempor. Vestibulum bibendum egestas purus, a euismod risus vehicula eu. Integer faucibus justo in ex sodales venenatis. Proin commodo tortor a maximus aliquam. Nam eu enim nulla. Proin ac erat augue. Aliquam eleifend sagittis lacus quis tempus. Donec nisi turpis, rhoncus at ultrices nec, faucibus eu odio. Integer consequat ex dolor, in cursus odio lacinia vitae. Sed aliquam, neque consectetur tristique rutrum, mauris ligula hendrerit dui, vitae dictum nibh lorem sed est. Fusce lobortis dictum augue dignissim fermentum. Aliquam faucibus congue nulla sed consectetur.' ||
+						'Etiam non libero sapien. Morbi vitae fringilla est, ut efficitur lorem. Aliquam scelerisque viverra orci, vitae ullamcorper magna pellentesque sit amet. Quisque lobortis dignissim porttitor. Suspendisse gravida magna a consectetur sagittis. Suspendisse in diam ut nunc varius dictum. Proin nec quam euismod elit rhoncus mattis vel sed leo. Praesent purus nunc, tincidunt sit amet tempor vitae, imperdiet non mauris. Maecenas commodo hendrerit ex a interdum. Morbi placerat tortor id lorem pellentesque, ac luctus arcu molestie.' ||
+						'Nullam sit amet tristique odio, ultrices semper lectus. Curabitur at maximus justo. Etiam nulla erat, commodo a metus in, condimentum pellentesque ipsum. Phasellus sed leo quis lectus suscipit ullamcorper. Proin eu ipsum in tortor fringilla consequat. Nullam ultrices mattis porta. Mauris orci nulla, finibus vel turpis nec, sagittis commodo odio. Aenean viverra metus leo. In hac habitasse platea dictumst. Vestibulum egestas gravida nibh non faucibus.' ||
+						'Ut et magna dictum, vulputate nibh nec, varius magna. Quisque dignissim neque elementum, pulvinar turpis nec, suscipit lorem. Nulla ac dui id diam sodales pulvinar sed quis lorem. Suspendisse potenti. Praesent tristique ultricies pellentesque. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Cras mollis, turpis id vehicula luctus, ante risus tincidunt sem, vitae dictum tortor tellus eget justo. Integer sed porttitor libero, sed ullamcorper sapien. Curabitur pretium nibh a tellus facilisis, non porttitor magna ultrices. Nam tincidunt ipsum volutpat erat porta, quis auctor mauris luctus. Integer ut leo turpis. Mauris egestas cursus diam, in euismod odio tempus non. Maecenas a orci vel nisi sodales mattis non a mauris. Integer molestie molestie dictum.' ||
+						'Nulla facilisi. Nullam tristique bibendum enim at tristique. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Mauris eget elit varius, elementum arcu sit amet, ultricies velit. Cras eu ex quis leo fringilla congue. Ut viverra a nibh nec semper. Fusce sodales ligula dolor, tristique finibus lorem iaculis ac. Etiam pellentesque vestibulum dolor vel mollis. In tristique lacus vehicula, hendrerit felis eu, auctor leo. Nam porta sapien dolor, eget euismod dui ullamcorper nec. In id placerat magna. Nam non elementum ligula. Cras scelerisque justo at libero finibus luctus. Proin orci lacus, vulputate vitae mauris id, tristique bibendum erat. Sed sollicitudin congue felis at sodales.'
+						'Morbi at scelerisque nibh. Duis dapibus sollicitudin augue, quis volutpat ipsum varius id. Phasellus ut dolor fringilla, molestie turpis at, auctor nisl. Aliquam luctus vel.';
+					COMMIT;
+				END LOOP;
+			END $$;
 		`,
 	},
 
 	// A table with many different types of columns.
 	"many_types": {
 		Definition: `(
-	        id BIGINT PRIMARY KEY,
-	        small_int SMALLINT,
-	        normal_int INTEGER,
-	        big_int BIGINT,
-	        float_val FLOAT8,
-	        decimal_val DECIMAL(10,2),
-	        text_val TEXT,
-	        varchar_val VARCHAR(100),
-	        bool_val BOOLEAN,
-	        date_val DATE,
-	        timestamp_val TIMESTAMP WITH TIME ZONE,
-	        json_val JSONB,
-	        uuid_val UUID,
-	        array_val INTEGER[]
-	    )`,
+			id BIGINT PRIMARY KEY,
+			small_int SMALLINT,
+			normal_int INTEGER,
+			big_int BIGINT,
+			float_val FLOAT8,
+			decimal_val DECIMAL(10,2),
+			text_val TEXT,
+			varchar_val VARCHAR(100),
+			bool_val BOOLEAN,
+			date_val DATE,
+			timestamp_val TIMESTAMP WITH TIME ZONE,
+			json_val JSONB,
+			uuid_val UUID,
+			array_val INTEGER[]
+		)`,
 		InsertQuery: `
-			INSERT INTO %[1]s SELECT
-				id,
-				(id %% 32767)::smallint,
-				(id %% 2147483647)::integer,
-				(id %% 1000) * 1000000::bigint,
-				sqrt(id::float8),
-				(id %% 1000 * 3.14)::decimal(10,2),
-				'text-' || id::text,
-				'varchar-' || md5(id::text),
-				id %% 2 = 0,
-				'2024-01-01'::date + ((id %% 365) || ' days')::interval,
-				'2024-01-01 00:00:00 UTC'::timestamptz + ((id %% 8760) || ' hours')::interval,
-				json_build_object(
-					'key1', id %% 1000000,
-					'key2', 'value-' || id::text,
-					'key3', ARRAY[id %% 100, id %% 100 + 1, id %% 100 + 2]
-				),
-				gen_random_uuid(),
-				ARRAY[id %% 1000, (id %% 1000) * 2, (id %% 1000) * 3]
-			FROM generate_series(%[2]d, %[3]d) AS id
+			DO $$
+			DECLARE id INTEGER;
+			BEGIN
+				FOR id IN %[2]d..%[3]d LOOP
+					INSERT INTO %[1]s SELECT
+						id,
+						(id %% 32767)::smallint,
+						(id %% 2147483647)::integer,
+						(id %% 1000) * 1000000::bigint,
+						sqrt(id::float8),
+						(id %% 1000 * 3.14)::decimal(10,2),
+						'text-' || id::text,
+						'varchar-' || md5(id::text),
+						id %% 2 = 0,
+						'2024-01-01'::date + ((id %% 365) || ' days')::interval,
+						'2024-01-01 00:00:00 UTC'::timestamptz + ((id %% 8760) || ' hours')::interval,
+						json_build_object(
+							'key1', id %% 1000000,
+							'key2', 'value-' || id::text,
+							'key3', ARRAY[id %% 100, id %% 100 + 1, id %% 100 + 2]
+						),
+						gen_random_uuid(),
+						ARRAY[id %% 1000, (id %% 1000) * 2, (id %% 1000) * 3];
+					COMMIT;
+				END LOOP;
+			END $$;
 		`,
 	},
 }
@@ -187,8 +217,8 @@ func insertBenchmarkRows(ctx context.Context, t testing.TB, tb *testBackend, sha
 		"count": maxID - minID,
 	}).Info("inserting benchmark rows")
 
-	// Insert rows in batches so we get periodic transaction commits
-	const batchSize = 1000
+	// Insert rows in batches of size N
+	const batchSize = 10000
 	for i := minID; i < maxID; i += batchSize {
 		var j = i + batchSize
 		if j > maxID {

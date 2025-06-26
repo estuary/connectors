@@ -55,8 +55,11 @@ type postgresChangeEvent struct {
 }
 
 type postgresChangeMetadata struct {
+	Info *postgresChangeSharedInfo `json:"-"` // Information about the source table structure which is shared across events. Used to serialize the before values.
+
 	Operation sqlcapture.ChangeOp `json:"op"`
 	Source    postgresSource      `json:"source"`
+	Before    [][]byte            `json:"before,omitempty"` // Only present for UPDATE events.
 }
 
 func (postgresChangeEvent) IsDatabaseEvent() {}
@@ -86,12 +89,19 @@ func (e *postgresChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
 	var err error
 	buf = append(buf, '{')
 	for idx, vidx := range shape.Swizzle {
+		var val []byte
+		if vidx < len(e.Values) {
+			val = e.Values[vidx]
+			if unsafe.SliceData(val) == unsafe.SliceData(tupleValueOmitted) {
+				continue
+			}
+		}
 		if idx > 0 {
 			buf = append(buf, ',')
 		}
 		buf = append(buf, shape.Prefixes[idx]...)
 		if vidx < len(e.Values) {
-			buf, err = e.Info.Transcoders[vidx](buf, e.Values[vidx])
+			buf, err = e.Info.Transcoders[vidx](buf, val)
 		} else {
 			buf, err = e.Meta.AppendJSON(buf) // The last value index is the metadata
 		}
@@ -111,8 +121,49 @@ func (meta *postgresChangeMetadata) AppendJSON(buf []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error encoding source metadata: %w", err)
 	}
-	// TODO(wgd): Add /_meta/before in the future when this is extended to support replication
+	if meta.Before != nil {
+		buf = append(buf, []byte(`,"before":`)...)
+		buf, err = meta.AppendBeforeJSON(buf)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding before values: %w", err)
+		}
+	}
 	return append(buf, '}'), nil
+}
+
+func (meta *postgresChangeMetadata) AppendBeforeJSON(buf []byte) ([]byte, error) {
+	var shape = meta.Info.Shape
+
+	// The number of byte values should be one less than the shape's arity, because the last value is the metadata.
+	if len(meta.Before) != shape.Arity-1 {
+		return nil, fmt.Errorf("incorrect row arity: expected %d but got %d", shape.Arity, len(meta.Before))
+	}
+
+	var err error
+	var subsequentField bool
+	buf = append(buf, '{')
+	for idx, vidx := range shape.Swizzle {
+		if vidx >= len(meta.Before) {
+			// Skip the nonexistent "final" value index, which represents the metadata
+			// that we are already in the process of serializing.
+			continue
+		}
+		var val = meta.Before[vidx]
+		if unsafe.SliceData(val) == unsafe.SliceData(tupleValueOmitted) {
+			continue
+		}
+		if subsequentField {
+			buf = append(buf, ',')
+		}
+		subsequentField = true
+		buf = append(buf, shape.Prefixes[idx]...)
+		buf, err = meta.Info.Transcoders[vidx](buf, val)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding field %q: %w", shape.Names[idx], err)
+		}
+	}
+	buf = append(buf, '}')
+	return buf, nil
 }
 
 func (source *postgresSource) AppendJSON(buf []byte) ([]byte, error) {
@@ -182,6 +233,9 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 		return func(buf []byte, bs []byte) ([]byte, error) {
 			if bs == nil {
 				return append(buf, []byte("null")...), nil // Literally append "null" when it's nil
+			} else if len(bs) > truncateColumnThreshold {
+				// TODO(wgd): Consider moving all truncation earlier in the message receive/decode process
+				bs = bs[:truncateColumnThreshold] // Truncate large text values
 			}
 			var str = *(*string)(unsafe.Pointer(&bs))
 			return json.AppendEscape(buf, str, 0), nil
