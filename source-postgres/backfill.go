@@ -190,7 +190,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		if !usingCTID {
 			rowKey = rowKey[:0] // Reset the row key buffer for each row
 			for _, n := range keyIndices {
-				rowKey, err = rowKeyTranscoders[n](rowKey, rawValues[n])
+				rowKey, err = rowKeyTranscoders[n].TranscodeFDB(rowKey, rawValues[n])
 				if err != nil {
 					return false, nil, fmt.Errorf("error encoding column %q at index %d: %w", resultColumnNames[n], n, err)
 				}

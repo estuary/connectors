@@ -772,7 +772,8 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	var streamState = c.State.Streams[stateKey]
 
 	// Process backfill query results as a callback-driven stream.
-	var prevRowKey = streamState.Scanned // Only used for ordering sanity check in precise backfills
+	var prevRowKey = make([]byte, 0, 64)                        // Only used for ordering sanity check in precise backfills.
+	prevRowKey = append(prevRowKey[:0], streamState.Scanned...) // Start with the resume key.
 	var eventCount int
 	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event ChangeEvent) error {
 		if streamState.Mode == TableStatePreciseBackfill {
@@ -794,7 +795,7 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 			if compareTuples(prevRowKey, rowKey) > 0 {
 				return fmt.Errorf("scan key ordering failure: last=%q, next=%q", prevRowKey, rowKey)
 			}
-			prevRowKey = rowKey
+			prevRowKey = append(prevRowKey[:0], rowKey...) // Update the previous row key for the next iteration.
 		}
 
 		if err := c.emitChange(binding, event); err != nil {

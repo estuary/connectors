@@ -852,7 +852,7 @@ func (s *replicationStream) decodeChangeEvent(
 	if info.KeyColumns != nil {
 		rowKey = s.reusedRowKey[:0] // Reset the reused row key buffer.
 		for _, n := range info.KeyColumns {
-			rowKey, err = info.RowKeyTranscoders[n](rowKey, values[n])
+			rowKey, err = info.RowKeyTranscoders[n].TranscodeFDB(rowKey, values[n])
 			if err != nil {
 				return nil, fmt.Errorf("error encoding row key column %q at index %d: %w", info.ColumnNames[n], n, err)
 			}
