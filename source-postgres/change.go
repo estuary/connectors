@@ -318,7 +318,7 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 		} else if translated, err := db.translateRecordField(columnInfo, isPrimaryKey, val); err != nil {
 			return nil, fmt.Errorf("error translating value %v: %w", val, err)
 		} else {
-			return json.Append(buf, translated, json.EscapeHTML) // Consider removing json.EscapeHTML, though it will change some outputs like the `circle` column type
+			return json.Append(buf, translated, json.EscapeHTML|json.SortMapKeys) // Consider removing json.EscapeHTML, though it will change some outputs like the `circle` column type
 		}
 	}
 }
