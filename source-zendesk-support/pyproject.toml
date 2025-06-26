@@ -11,6 +11,11 @@ python = "^3.11"
 pydantic = "< 1.10.15"
 pytz = "^2024.1"
 requests-futures = "^1.0.1"
+urllib3 = "^2.2.4"
+pycares = "^4.9.0"
+requests = "^2.32.4"
+Jinja2 = "^3.1.5"
+aiohttp = "^3.11.11"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
