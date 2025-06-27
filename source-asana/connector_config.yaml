@@ -1,19 +1,14 @@
 credentials:
     client_id: 1206051774640962
     client_secret_sops: ENC[AES256_GCM,data:0o6XBkERucbt0PvDLxg0nB+XM6Vqap+tnK3awcvPIts=,iv:z8MygzAVfx9fSyyGPNAM1MH5q1ZRydKSu3+hsGyfzsw=,tag:ApNaRqfdPCJzLMZZsQRXaA==,type:str]
-    access_token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3MDMwNjk3MjgsInNjb3BlIjoiZGVmYXVsdCBpZGVudGl0eSIsInN1YiI6MTIwNTg0NjE3MTg3MDQ0NywicmVmcmVzaF90b2tlbiI6MTIwNjIxMTY5NTkzMDkwMywidmVyc2lvbiI6MiwiYXBwIjoxMjA2MDUxNzc0NjQwOTYyLCJleHAiOjE3MDMwNzMzMjh9.EF0PQEyUNmvquY4Kd1RsJ1CAlk-zM_FCe3WqrZktdzA
-    refresh_token: 2/1205846171870447/1206051774640962:853855efe43e617bc61c74ecaae037b7
+    access_token_sops: ENC[AES256_GCM,data:yYr+eX85PB7l/RCGPmWC3But8mZdFdxRhGeqkcEnb+PvUF+06dHcu6XIabnvCgmNbhTkjVewIXiRJ/oWlpnb5JtG8cjRs/m67YrUbFV+dbqztGUkvYV/ExjrSGi3+PdCwh+LogDUW6LQ+sdQ8PEQxEL+8spc/IrvCPBDcXR+HnsiGy3GECobNvNmttlSrXYA8AMIYA8L8yFdZF3VQnAK2viU7CPLQrR6ZuEaQP8S8jPpK0q+Pa8kDnQW++lsDRZ5l3zqJ3+t88wxumtTQHGe1pCqvgnMuAgztLJLCXOImW0IjvvuIqZatjn8WJFpQcsV2kB5QQ8Gl+703P60rZ2c8HGTSUzM7CGC4S+HzkmoXb5FcjNQ5qO0GZspSx2Y,iv:GBWL5oG1rCGtraO8WAONv1fYQfDTk7jrwQAfUopH54M=,tag:n+R8+yCWUYdi5GjKz8HWcA==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:SHAbpTKaG2teTB6fybS/4Qq3YtlsMfqKJS/g7ZpOaiOCtlOHqKTirPV0lHRMBVDZS3Y9yIZ1sQB7gum0IqvSQyz/FbY=,iv:h3Pc6St8Nv/DQ45qTZiw9D8NTRqjB5TUOY2fzMBHAD4=,tag:0VXIEMYfqqvDIaFpz5kRYg==,type:str]
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2023-12-20T11:25:27Z"
           enc: CiQAdmEdwlyZioJtw43BG/YxzPGumPOhI0PX2/MlbiluWJ93wgISSQCVvC1zo1Gor0ujElAy8sLId/5cw3/yQ/XvfQOYkTxx9gB4TdqkAa7zaI3l3Xuec7rx7grnmqXgCSUCc8dNQpOqy6pD7aWsLBU=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2023-12-20T11:25:28Z"
-    mac: ENC[AES256_GCM,data:/Ji5UafoosGnOUPEpQBUxIlav7yBdlzXKNMG7b7d1itl3bavL/Ux09yCsGfn0ehXTLMeb/DroCxQ87xPeK+4hWhnP/MKYb4d/Krd8FXjGtVSyUpbrkfH6WA5I9H4p+dCtOWGHMFRws9ebvH+zVaDtD/Hs9PZgFhlau8lzTCjtqk=,iv:24kGBzMgPr50YyDrdSUNd9FOsPw38dY9+3ha+YhvlOw=,tag:Am+a6Yah2uiVQ/PYR1jOwg==,type:str]
-    pgp: []
+    lastmodified: "2025-06-27T15:28:39Z"
+    mac: ENC[AES256_GCM,data:csRzH73gGivhli9l2Cc5yjCwJo3J/D/DNh1sR5mQyyiBNhLUxMh8hQ2pOs38bzAEqxn0tsn6w9o16jGAQefsFnKe3pOmd9ixiZ5Rt9gBlwcbMuIo50HUDM+X9ja8Cc5T5XlWPaoTeMIL2z2UN+AfqO6TWu0szSnvOmWo5uPWLNM=,iv:kMpQD9v3N14kiM48vC4GBfW/41FJmzhurO6HrmYr95s=,tag:q3p9dpJJKOu+816l8G7O4w==,type:str]
     encrypted_suffix: _sops
-    version: 3.7.3
+    version: 3.10.2
