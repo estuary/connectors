@@ -213,33 +213,13 @@ func (source *postgresSource) AppendJSON(buf []byte) ([]byte, error) {
 
 // backfillJSONTranscoder returns a jsonTranscoder for a specific column in a Postgres backfill.
 func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription, columnInfo *sqlcapture.ColumnInfo, isPrimaryKey bool) jsonTranscoder {
-	// Look up the PGX type/codec for the column OID. If not found, we use a generic transcoder
-	// which treats the value as text or bytes depending on the format.
-	//
-	// TODO(wgd): Test if we could just swap this out for TextCodec without losing anything.
-	var pgType, ok = typeMap.TypeForOID(fieldDescription.DataTypeOID)
-	if !ok {
-		return jsonTranscoderFunc(func(buf []byte, bs []byte) ([]byte, error) {
-			var val any
-			switch fieldDescription.Format {
-			case pgtype.TextFormatCode:
-				val = string(bs)
-			case pgtype.BinaryFormatCode:
-				newBuf := make([]byte, len(bs))
-				copy(newBuf, bs)
-				val = newBuf
-			default:
-				return nil, fmt.Errorf("unknown format code %d", fieldDescription.Format)
-			}
-			if translated, err := db.translateRecordField(columnInfo, isPrimaryKey, val); err != nil {
-				return nil, fmt.Errorf("error translating value %v: %w", val, err)
-			} else {
-				return json.Append(buf, translated, json.EscapeHTML) // Consider removing json.EscapeHTML, though it may change some outputs
-			}
-		})
+	var codec pgtype.Codec
+	if pgType, ok := typeMap.TypeForOID(fieldDescription.DataTypeOID); ok {
+		codec = pgType.Codec
+	} else {
+		codec = &pgtype.TextCodec{} // Default to text codec for unknown OIDs
 	}
 
-	var codec = pgType.Codec
 	switch codec.(type) {
 	case pgtype.TextCodec:
 		// Special case for the text codec (used for TEXT and VARCHAR and a few other column
@@ -317,7 +297,6 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 
 // backfillFDBTranscoder returns an fdbTranscoder for a specific column in a Postgres backfill.
 func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription, columnInfo *sqlcapture.ColumnInfo) fdbTranscoder {
-	var columnType = columnInfo.DataType
 	var codec pgtype.Codec
 	if pgType, ok := typeMap.TypeForOID(fieldDescription.DataTypeOID); ok {
 		codec = pgType.Codec
@@ -383,6 +362,7 @@ func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDesc
 		}
 	}
 
+	var columnType = columnInfo.DataType
 	return fdbTranscoderFunc(func(buf, v []byte) ([]byte, error) {
 		var val any
 		var err error
