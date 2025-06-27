@@ -13,6 +13,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"syscall"
 
@@ -89,6 +90,9 @@ func RunMain(connector Connector) {
 // It omits portions of setup which are only appropriate for a standalone binary.
 func InnerMain(ctx context.Context, connector Connector, r io.Reader, w io.Writer) error {
 	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
+
+	// TODO(wgd): Remove this when committing for real, this is just some prod debugging.
+	runtime.SetBlockProfileRate(10000000) // Sample one blocking event per 10ms spent blocked
 
 	var stream streamCodec
 	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
