@@ -65,25 +65,6 @@ class EndpointConfig(BaseModel):
         discriminator="credentials_title",
     )
 
-    class Advanced(BaseModel, extra="forbid"):
-        limit: Annotated[
-            int,
-            Field(
-                description="Limit used in queries for incremental streams. For items, this can be up to 500. For other resources, the limit may be lower. This should be left as the default value unless connector errors indicate a smaller limit is required.",
-                title="Limit",
-                default=100,
-                gt=0,
-                le=500,
-            ),
-        ]
-
-    advanced: Advanced = Field(
-        default_factory=Advanced,  # type: ignore
-        title="Advanced Config",
-        description="Advanced settings for the connector.",
-        json_schema_extra={"advanced": True},
-    )
-
 
 ConnectorState = GenericConnectorState[ResourceState]
 ResponseObject = TypeVar("ResponseObject", bound=BaseModel)
@@ -116,8 +97,8 @@ class GraphQLResponse(BaseModel, Generic[ResponseObject], extra="allow"):
 
 
 class ActivityLog(BaseModel, extra="allow"):
-    id: str
-    entity: str
+    resource_id: str | None = None
+    entity: Literal["board", "pulse"]
     event: str
     data: dict[str, Any] = Field(default_factory=dict)
     created_at: str
@@ -128,6 +109,30 @@ class ActivityLog(BaseModel, extra="allow"):
         if isinstance(v, str):
             return json.loads(v)
         return v
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.resource_id = self._get_resource_id()
+
+    def _get_resource_id(self) -> str | None:
+        """
+        Extract the primary ID of the entity being acted upon from the data field.
+
+        Note: when an item (pulse) is created we do not receive a pulse_id. The incremental stream will
+        rely on querying for recently updated items to find updated items, which should capture these events.
+        Alternatively, we could extract the board_id and backfill the board items again.
+        """
+        if not self.data:
+            return None
+
+        if self.entity == "pulse":
+            pulse_id = self.data.get("pulse_id")
+            return str(pulse_id) if pulse_id else None
+        elif self.entity == "board":
+            board_id = self.data.get("board_id")
+            return str(board_id) if board_id else None
+
+        return None
 
 
 class BoardActivityLogs(BaseModel, extra="allow"):
@@ -148,7 +153,7 @@ class Board(BaseDocument, extra="allow"):
 
     id: str
     updated_at: AwareDatetime
-    workspace: Workspace
+    workspace: Workspace | None = None
     state: Literal["all", "active", "archived", "deleted"]
 
 
@@ -179,7 +184,7 @@ class BoardItems(BaseModel, extra="allow"):
 
 
 class ItemsByBoardResponse(BaseModel, extra="allow"):
-    boards: list[BoardItems] | None = Field(default_factory=list)
+    boards: list[BoardItems] | None = Field(default_factory=lambda: [])
 
 
 class ItemsByBoardPageResponse(BaseModel, extra="allow"):
@@ -187,7 +192,7 @@ class ItemsByBoardPageResponse(BaseModel, extra="allow"):
 
 
 class ItemsByIdResponse(BaseModel, extra="allow"):
-    items: list[Item] | None = Field(default_factory=list)
+    items: list[Item] | None = Field(default_factory=lambda: [])
 
 
 class Team(BaseDocument, extra="allow"):
@@ -212,15 +217,15 @@ class TagsResponse(BaseModel, extra="allow"):
 
 
 FullRefreshResourceFetchFn = Callable[
-    [HTTPSession, int, Logger], AsyncGenerator[BaseDocument, None]
+    [HTTPSession, Logger], AsyncGenerator[BaseDocument, None]
 ]
 
 IncrementalResourceFetchChangesFn = Callable[
-    [HTTPSession, int, Logger, LogCursor],
-    AsyncGenerator[BaseDocument | LogCursor, None],
+    [HTTPSession, Logger, LogCursor],
+    AsyncGenerator[Any, None],
 ]
 
 IncrementalResourceFetchPageFn = Callable[
-    [HTTPSession, int, Logger, PageCursor, LogCursor],
+    [HTTPSession, Logger, PageCursor, LogCursor],
     AsyncGenerator[BaseDocument | PageCursor, None],
 ]

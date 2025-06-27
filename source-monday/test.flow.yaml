@@ -13,21 +13,25 @@ captures:
     bindings:
       - resource:
           name: teams
-          interval: PT5M
+          interval: PT15M
         target: acmeCo/teams
       - resource:
           name: users
-          interval: PT5M
+          interval: PT15M
         target: acmeCo/users
       - resource:
           name: tags
-          interval: PT5M
+          interval: PT15M
         target: acmeCo/tags
       - resource:
           name: boards
           interval: PT5M
+          schedule: 0 */6 * * *
         target: acmeCo/boards
       - resource:
           name: items
           interval: PT5M
+          schedule: 0 */6 * * *
         target: acmeCo/items
+    shards:
+      logLevel: debug
