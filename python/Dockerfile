@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 ARG CONNECTOR_NAME
 # Adapted from here: https://github.com/orgs/python-poetry/discussions/1879#discussioncomment-7284113
@@ -61,4 +61,4 @@ COPY --from=builder /builder/python ./python
 
 # Arg substitution in CMD doesn't seem to work
 ENV CONNECTOR_NAME=$CONNECTOR_NAME
-CMD python -m $CONNECTOR_NAME
+CMD ["/bin/sh", "-c", "python -m $CONNECTOR_NAME"]

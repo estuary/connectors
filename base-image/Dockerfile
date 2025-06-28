@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 debian:stable-slim as debian
+FROM --platform=linux/amd64 debian:stable-slim AS debian
 
 RUN apt-get update && apt-get install -y openssh-client ca-certificates curl
 
