@@ -1,3 +1,4 @@
+import asyncio
 from logging import Logger
 from typing import Callable, Awaitable
 
@@ -18,6 +19,16 @@ from .models import (
     ConnectorState,
     EndpointConfig,
 )
+
+# When the capture_connected_accounts config setting is enabled,
+# and there are thousands of connected accounts, we can't capture
+# from all connected accounts in a single connector invocation
+# without running out of memory. So we stop the connector after 30 minutes
+# and restart it to capture from a different subset of connected accounts
+# on the next invocation.
+async def periodic_stop_to_rotate_connected_accounts(task: Task) -> None:
+    await asyncio.sleep(30 * 60)  # 30 minutes
+    task.stopping.event.set()
 
 
 class Connector(
@@ -86,4 +97,12 @@ class Connector(
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         resources = await all_resources(log, self, open.capture.config)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
-        return common.open(open, resolved)
+        opened, run_fn = common.open(open, resolved)
+
+        # Wrap the run function to add periodic stop when connected accounts are enabled.
+        async def wrapped_run(task: Task) -> None:
+            if open.capture.config.capture_connected_accounts:
+                asyncio.create_task(periodic_stop_to_rotate_connected_accounts(task))
+            await run_fn(task)
+
+        return (opened, wrapped_run)

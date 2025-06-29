@@ -1,6 +1,7 @@
 from datetime import datetime, UTC, timedelta
 from logging import Logger
 import functools
+import heapq
 import re
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
@@ -34,6 +35,7 @@ from .models import (
 )
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
+ACTIVE_CONNECTED_ACCOUNT_LIMIT = 100
 
 
 async def check_accessibility(
@@ -74,16 +76,18 @@ async def _fetch_connected_account_ids(
     url = f"{API}/accounts"
     params: dict[str, str | int] = {"limit": 100}
 
-    # We should paginate to get all connected account, but
-    # we've seen captures OOM when there are more than a few hundred accounts.
-    # While we figure out how to handle so many connected accounts without OOM-ing,
-    # only capture from the 100 most recent accounts.
-    response = ListResult[Accounts].model_validate_json(
-        await http.request(log, url, params=params)
-    )
+    while True:
+        response = ListResult[Accounts].model_validate_json(
+            await http.request(log, url, params=params)
+        )
 
-    for account in response.data:
-        account_ids.add(account.id)
+        for account in response.data:
+            account_ids.add(account.id)
+
+        if not response.has_more:
+            break
+
+        params["starting_after"] = response.data[-1].id
 
     return list(account_ids)
 
@@ -144,6 +148,75 @@ def _reconcile_connector_state(
                     bindingStateV1={binding.stateKey: state},
                 )
             )
+
+def _filter_connected_account_ids(
+    all_connected_account_ids: list[str],
+    state: ResourceState,
+) -> set[str]:
+    """
+    Filters and prioritizes connected account IDs to process in the current connector run.
+
+    This function implements a prioritization strategy to handle large numbers of connected 
+    accounts without running out of memory. It limits processing to ACTIVE_CONNECTED_ACCOUNT_LIMIT
+    accounts per run  based on the following priority order:
+
+    1. **Incomplete backfills first**: Accounts that have unfinished backfill operations 
+       are prioritized so backfills can complete.
+    2. **Oldest incremental cursors**: Among remaining accounts, those with the oldest 
+       incremental state cursors are selected to ensure fair rotation and prevent 
+       accounts from being starved of updates.
+
+    Args:
+        all_connected_account_ids: Complete list of available connected account IDs.
+        state: Current connector state containing backfill and incremental state for accounts.
+
+    Returns:
+        Set of up to ACTIVE_CONNECTED_ACCOUNT_LIMIT account IDs to process, prioritized as described above.
+
+    Note:
+        This filtering is necessary because processing thousands of connected accounts 
+        simultaneously can cause memory issues, so the connector processes a subset 
+        each run and relies on restarts to eventually cover all accounts.
+    """
+    # Convert to set for O(1) lookup performance
+    all_ids = set(all_connected_account_ids)
+
+    if len(all_ids) <= ACTIVE_CONNECTED_ACCOUNT_LIMIT:
+        return all_ids
+
+    # Prioritize connected accounts that have incomplete backfills.
+    ids_subset: set[str] = set()
+
+    assert isinstance(state.backfill, dict)
+    for account_id, backfill in state.backfill.items():
+        if isinstance(backfill, ResourceState.Backfill) and account_id in all_ids:
+            ids_subset.add(account_id)
+            if len(ids_subset) >= ACTIVE_CONNECTED_ACCOUNT_LIMIT:
+                return ids_subset
+
+    assert isinstance(state.inc, dict)
+
+    remaining_slots = ACTIVE_CONNECTED_ACCOUNT_LIMIT - len(ids_subset)
+
+    # Use heapq.nsmallest for efficient partial sorting - only sort as much as needed.
+    # This is more efficient than sorting all candidates when we only need the top N
+    candidate_accounts = [
+        (inc.cursor, account_id)  # Note: cursor first for correct sorting
+        for account_id, inc in state.inc.items() 
+        if (account_id not in ids_subset 
+            and account_id in all_ids
+            and isinstance(inc, ResourceState.Incremental) 
+            and isinstance(inc.cursor, datetime))
+    ]
+
+    # Get the N smallest (oldest) cursors efficiently
+    oldest_accounts = heapq.nsmallest(remaining_slots, candidate_accounts)
+
+    # Add the account IDs with the oldest cursors
+    for _, account_id in oldest_accounts:
+        ids_subset.add(account_id)
+
+    return ids_subset
 
 
 async def all_resources(
@@ -327,10 +400,18 @@ def base_object(
                 http,
             )
         else:
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
+
+            account_ids_subset = _filter_connected_account_ids(
+                all_account_ids, state
+            )
+
             fetch_changes_fns = {}
             fetch_page_fns = {}
 
-            for account_id in all_account_ids:
+            for account_id in account_ids_subset:
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental,
                     cls,
@@ -346,10 +427,6 @@ def base_object(
                     account_id,
                     http,
                 )
-
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
 
         open_binding(
             binding,
@@ -415,10 +492,18 @@ def child_object(
                 http,
             )
         else:
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
+
+            account_ids_subset = _filter_connected_account_ids(
+                all_account_ids, state
+            )
+
             fetch_changes_fns = {}
             fetch_page_fns = {}
 
-            for account_id in all_account_ids:
+            for account_id in account_ids_subset:
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_substreams,
                     cls,
@@ -436,10 +521,6 @@ def child_object(
                     account_id,
                     http,
                 )
-
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
 
         open_binding(
             binding,
@@ -507,10 +588,18 @@ def split_child_object(
                 http,
             )
         else:
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
+
+            account_ids_subset = _filter_connected_account_ids(
+                all_account_ids, state
+            )
+
             fetch_changes_fns = {}
             fetch_page_fns = {}
 
-            for account_id in all_account_ids:
+            for account_id in account_ids_subset:
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental,
                     child_cls,
@@ -527,10 +616,6 @@ def split_child_object(
                     account_id,
                     http,
                 )
-
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
 
         open_binding(
             binding,
@@ -598,10 +683,18 @@ def usage_records(
                 http,
             )
         else:
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
+
+            account_ids_subset = _filter_connected_account_ids(
+                all_account_ids, state
+            )
+
             fetch_changes_fns = {}
             fetch_page_fns = {}
 
-            for account_id in all_account_ids:
+            for account_id in account_ids_subset:
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_usage_records,
                     cls,
@@ -619,10 +712,6 @@ def usage_records(
                     account_id,
                     http,
                 )
-
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
 
         open_binding(
             binding,
@@ -688,10 +777,18 @@ def no_events_object(
                 http,
             )
         else:
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
+
+            account_ids_subset = _filter_connected_account_ids(
+                all_account_ids, state
+            )
+
             fetch_changes_fns = {}
             fetch_page_fns = {}
 
-            for account_id in all_account_ids:
+            for account_id in account_ids_subset:
                 fetch_changes_fns[account_id] = functools.partial(
                     fetch_incremental_no_events,
                     cls,
@@ -707,10 +804,6 @@ def no_events_object(
                     account_id,
                     http,
                 )
-
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
-            )
 
         open_binding(
             binding,
