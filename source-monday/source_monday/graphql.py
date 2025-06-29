@@ -2,16 +2,17 @@ import json
 import asyncio
 import time
 from logging import Logger
-from typing import Any, AsyncGenerator, Dict, Literal, Callable
+from typing import Any, AsyncGenerator, Dict, Type
 
 from estuary_cdk.http import HTTPSession
 from source_monday.models import (
+    ActivityLogsResponse,
+    ActivityLog,
     GraphQLResponse,
     GraphQLError,
     ResponseObject,
     BoardsResponse,
     Board,
-    ActivityLogsResponse,
     ItemsByIdResponse,
     ItemsByBoardPageResponse,
     ItemsByBoardResponse,
@@ -19,6 +20,308 @@ from source_monday.models import (
 )
 
 API = "https://api.monday.com/v2"
+CURSOR_EXCEPTION_CODE = "CursorException"
+
+
+class CursorManager:
+    """
+    Manage cursor-based pagination with expiration tracking for board items.
+    Monday's API uses cursor-based pagination for items, and cursors can expire after 60 minutes.
+    The cursors are unique identifiers returned by the API when running a query for the first
+    page of items for a board as shown below:
+    ```
+    query {
+        boards(limit: 1, page: 1) {
+            items_page(limit: 100) {
+                cursor
+                items {
+                    id
+                    ...
+                }
+            }
+        }
+    }
+    ```
+    The API returns a unique cursor in the API response, which can be used to fetch the subspequent pages
+    of items using a separate query as shown below:
+    ```
+    query {
+        next_items_page(limit: 100, cursor: "unique_cursor_value_returned_from_previous_query") {
+            cursor
+            items {
+                id
+                ...
+            }
+        }
+    }
+    ```
+    """
+
+    def __init__(self, log: Logger):
+        self.log: Logger = log
+        self.cursors: Dict[
+            str, tuple[str, float]
+        ] = {}  # board_id -> (cursor, creation_time)
+
+    def add_cursor(self, board_id: str, cursor: str) -> None:
+        self.cursors[board_id] = (cursor, time.time())
+
+    def get_cursor(self, board_id: str) -> str | None:
+        if board_id in self.cursors:
+            return self.cursors[board_id][0]
+        return None
+
+    def update_cursor(self, board_id: str, new_cursor: str) -> None:
+        if board_id in self.cursors:
+            _, creation_time = self.cursors[board_id]
+            self.cursors[board_id] = (new_cursor, creation_time)
+
+    def remove_cursor(self, board_id: str) -> None:
+        self.cursors.pop(board_id, None)
+
+    def get_all_board_ids(self) -> list[str]:
+        return list(self.cursors.keys())
+
+    def check_expiration_warnings(self) -> None:
+        current_time = time.time()
+        for board_id, (_, creation_time) in self.cursors.items():
+            elapsed_minutes = (current_time - creation_time) / 60
+            if elapsed_minutes >= 55:
+                self.log.warning(
+                    f"Cursor for board {board_id} approaching expiration",
+                    {
+                        "board_id": board_id,
+                        "elapsed_minutes": round(elapsed_minutes, 1),
+                        "remaining_minutes": round(60 - elapsed_minutes, 1),
+                        "cursor_creation_time": creation_time,
+                    },
+                )
+
+    def is_empty(self) -> bool:
+        return len(self.cursors) == 0
+
+
+async def _execute_board_query_with_fallback(
+    http: HTTPSession,
+    log: Logger,
+    variables: Dict[str, Any],
+    board_id: str | None = None,
+) -> AsyncGenerator[Board, None]:
+    """
+    Execute board query with fallback from 'kind' field to without 'kind' field.
+    This has been observed for boards that are set up as templates, which error
+    when the workspace 'kind' field is queried.
+    """
+    context = (
+        f"board {board_id}" if board_id else f"page {variables.get('page', 'unknown')}"
+    )
+
+    try:
+        log.debug(f"Trying to fetch {context} with workspace 'kind' field")
+        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
+            yield board
+    except GraphQLQueryError as e:
+        log.debug(f"Trying to fetch {context} without workspace 'kind' field")
+        try:
+            async for board in _fetch_boards(http, log, BOARDS_WITHOUT_KIND, variables):
+                yield board
+        except GraphQLQueryError as e2:
+            if board_id:
+                log.error(
+                    f"Failed to fetch board {board_id} with or without workspace 'kind' field. "
+                    f"With kind error: {e.errors}, Without kind error: {e2.errors}. "
+                    f"This board will be skipped, which may cause data loss."
+                )
+                raise GraphQLQueryError(
+                    [
+                        GraphQLError(
+                            message=f"Failed to fetch board {board_id}. Template boards may need special handling. "
+                            f"Original errors: {e.errors}, {e2.errors}"
+                        )
+                    ]
+                )
+            else:
+                # Re-raise the original error for page-level failures
+                raise e
+
+
+async def _process_cursor_pagination(
+    cursor_manager: CursorManager,
+    http: HTTPSession,
+    log: Logger,
+    items_limit: int,
+    query: str,
+) -> AsyncGenerator[Item, None]:
+    """
+    Handle cursor-based pagination for items with expiration management.
+    """
+    cursor_loop_iteration = 0
+
+    while not cursor_manager.is_empty():
+        cursor_loop_iteration += 1
+
+        log.info(
+            f"Starting cursor processing iteration {cursor_loop_iteration}",
+            {
+                "iteration": cursor_loop_iteration,
+                "active_boards": cursor_manager.get_all_board_ids(),
+                "active_cursor_count": len(cursor_manager.cursors),
+            },
+        )
+
+        cursor_manager.check_expiration_warnings()
+
+        if cursor_manager.is_empty():
+            log.info("No more active cursors, exiting cursor processing loop")
+            break
+
+        for board_id in list(cursor_manager.get_all_board_ids()):
+            cursor = cursor_manager.get_cursor(board_id)
+            if not cursor:
+                continue
+
+            variables = {"cursor": cursor, "limit": items_limit}
+
+            attempts = 0
+            max_attempts = 2
+            cursor_processing_start = time.time()
+            response = None
+
+            while attempts <= max_attempts:
+                try:
+                    response = await execute_query(
+                        ItemsByBoardPageResponse,
+                        http,
+                        log,
+                        query,
+                        variables,
+                    )
+                    cursor_processing_time = time.time() - cursor_processing_start
+                    log.debug(
+                        f"Successfully fetched next items for board {board_id}",
+                        {
+                            "board_id": board_id,
+                            "cursor_retry_count": attempts,
+                            "processing_time_ms": round(
+                                cursor_processing_time * 1000, 2
+                            ),
+                        },
+                    )
+                    break
+                except GraphQLQueryError as e:
+                    attempts += 1
+                    processing_time = time.time() - cursor_processing_start
+
+                    is_cursor_error = False
+                    for err in e.errors:
+                        if (
+                            err.extensions
+                            and err.extensions.code == CURSOR_EXCEPTION_CODE
+                        ):
+                            is_cursor_error = True
+                            break
+
+                    if is_cursor_error:
+                        log.warning(
+                            f"Cursor expired/invalid for board {board_id}. Failing early to avoid missing data.",
+                            {
+                                "board_id": board_id,
+                                "cursor": cursor,
+                                "error_messages": [
+                                    str(err.message) for err in e.errors
+                                ],
+                                "processing_time_ms": round(processing_time * 1000, 2),
+                            },
+                        )
+                        raise
+                    elif attempts <= max_attempts:
+                        retry_delay = 5 + (2**attempts)
+                        log.warning(
+                            f"Server error for board {board_id} cursor query, will retry",
+                            {
+                                "board_id": board_id,
+                                "cursor": cursor,
+                                "attempt": attempts,
+                                "max_retries": max_attempts,
+                                "retry_delay_s": retry_delay,
+                                "error_messages": [
+                                    str(err.message) for err in e.errors
+                                ],
+                                "processing_time_ms": round(processing_time * 1000, 2),
+                            },
+                        )
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        log.error(
+                            f"Unrecoverable error for board {board_id} cursor query",
+                            {
+                                "board_id": board_id,
+                                "cursor": cursor,
+                                "total_attempts": attempts,
+                                "error_messages": [
+                                    str(err.message) for err in e.errors
+                                ],
+                                "processing_time_ms": round(processing_time * 1000, 2),
+                            },
+                        )
+                        raise
+
+            if response is None:
+                log.error(
+                    f"Failed to fetch next items for board {board_id} after {max_attempts} retries."
+                )
+                raise GraphQLQueryError(
+                    [
+                        GraphQLError(
+                            message=f"Failed to fetch next items for board {board_id} after {max_attempts} retries."
+                        )
+                    ]
+                )
+
+            if not response.data or not response.data.next_items_page:
+                log.debug(f"Received empty response for board {board_id}")
+                cursor_manager.remove_cursor(board_id)
+                continue
+
+            items_page = response.data.next_items_page
+            if not items_page.items:
+                log.info(
+                    f"Board {board_id} cursor returned no items, removing from processing",
+                    {
+                        "board_id": board_id,
+                        "cursor": cursor,
+                        "reason": "no_items_in_page",
+                    },
+                )
+                cursor_manager.remove_cursor(board_id)
+                continue
+
+            items_yielded = 0
+            for item in items_page.items:
+                yield item
+                items_yielded += 1
+
+            next_cursor = response.data.next_items_page.cursor
+            if not next_cursor:
+                log.info(
+                    f"Board {board_id} cursor processing completed - no next cursor",
+                    {
+                        "board_id": board_id,
+                        "items_yielded": items_yielded,
+                        "reason": "no_next_cursor",
+                    },
+                )
+                cursor_manager.remove_cursor(board_id)
+            else:
+                log.debug(
+                    f"Board {board_id} cursor updated for next iteration",
+                    {
+                        "board_id": board_id,
+                        "items_yielded": items_yielded,
+                        "cursor_age_preserved": True,
+                    },
+                )
+                cursor_manager.update_cursor(board_id, next_cursor)
 
 
 class GraphQLQueryError(RuntimeError):
@@ -28,16 +331,16 @@ class GraphQLQueryError(RuntimeError):
 
 
 async def execute_query(
-    cls: type[ResponseObject],
+    cls: Type[ResponseObject],
     http: HTTPSession,
     log: Logger,
     query: str,
     variables: Dict[str, Any] | None = None,
 ) -> GraphQLResponse[ResponseObject]:
     attempt = 1
+
     while True:
         try:
-            log.debug(f"Executing query {query} with variables: {variables}")
             res: dict[str, Any] = json.loads(
                 await http.request(
                     log,
@@ -50,11 +353,10 @@ async def execute_query(
                     ),
                 )
             )
-            
+
             if "errors" in res:
-                raise GraphQLQueryError(
-                    [GraphQLError.model_validate(e) for e in res["errors"]]
-                )
+                error_details = [GraphQLError.model_validate(e) for e in res["errors"]]
+                raise GraphQLQueryError(error_details)
 
             response = GraphQLResponse[cls].model_validate(res)
 
@@ -62,29 +364,38 @@ async def execute_query(
                 raise GraphQLQueryError(response.errors)
 
             return response
+
         except Exception as e:
             if attempt == 5:
+                log.error(
+                    "GraphQL query failed permanently",
+                    {
+                        "total_attempts": attempt,
+                        "final_error": str(e),
+                        "variables": variables,
+                    },
+                )
                 raise
 
             log.warning(
-                "failed to execute query (will retry)",
+                "GraphQL query failed, will retry",
                 {
                     "error": str(e),
                     "attempt": attempt,
                     "query": query,
                     "variables": variables,
+                    "next_retry_delay_s": attempt * 2,
                 },
             )
             await asyncio.sleep(attempt * 2)
             attempt += 1
 
 
-async def fetch_activity_log_ids(
-    resource: Literal["board", "pulse"],
+async def fetch_activity_logs(
     http: HTTPSession,
     log: Logger,
     start: str,
-) -> list[str] | None:
+) -> AsyncGenerator[ActivityLog, None]:
     """
     Fetch IDs of recently updated resources from activity logs.
 
@@ -94,7 +405,6 @@ async def fetch_activity_log_ids(
     So, if a subitem is updated, the parent item ID will be returned. If a parent item is updated,
     the parent item ID will be returned.
     """
-    ids: set[str] = set()
     variables: dict[str, Any] = {
         "start": start,
         "limit": 5,
@@ -122,18 +432,10 @@ async def fetch_activity_log_ids(
             if not board.activity_logs:
                 continue
             for activity_log in board.activity_logs:
+                yield activity_log
                 logs_in_page += 1
                 total_logs_processed += 1
-                
-                id = activity_log.data.get(f"{resource}_id")
 
-                if id is not None and not activity_log.event.startswith("delete_"):
-                    try:
-                        ids.add(str(id))
-                    except (ValueError, TypeError) as e:
-                        log.error(f"Failed to convert ID to string: {id}, error: {e}")
-                        raise
-        
         if logs_in_page == 0:
             break
 
@@ -152,9 +454,6 @@ async def fetch_activity_log_ids(
             f"(e.g., from 5 minutes to 1 minute) to ensure fewer than {max_logs_limit} changes occur between syncs."
         )
 
-    log.debug(f"Processed {total_logs_processed} activity logs, found {len(ids)} unique {resource} IDs")
-    return list(ids)
-
 
 async def _fetch_single_board(
     http: HTTPSession,
@@ -162,14 +461,10 @@ async def _fetch_single_board(
     page: int,
 ) -> AsyncGenerator[Board, None]:
     variables: Dict[str, Any] = {"limit": 1, "page": page}
-    try:
-        log.info(f"Trying to fetch board {page} with workspace 'kind' field")
-        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
-            yield board
-    except GraphQLQueryError:
-        log.info(f"Trying to fetch board {page} without workspace 'kind' field")
-        async for board in _fetch_boards(http, log, BOARDS_WITHOUT_KIND, variables):
-            yield board
+    async for board in _execute_board_query_with_fallback(
+        http, log, variables, str(page)
+    ):
+        yield board
 
 
 async def _fetch_boards(
@@ -185,60 +480,40 @@ async def _fetch_boards(
         query,
         variables,
     )
-    if not response.data or not response.data.boards:
+    if not response.data:
         return
 
-    for board in response.data.boards:
-        if board.state != "deleted":
-            yield board
+    boards = response.data.boards
+    if not boards:
+        return
 
-
-async def _fetch_in_chunks[T](
-    http: HTTPSession,
-    log: Logger,
-    ids: list[str],
-    chunk_size: int,
-    fetch_fn: Callable[
-        [HTTPSession, Logger, list[str], int | None], AsyncGenerator[T, None]
-    ],
-    limit: int | None = None,
-) -> AsyncGenerator[T, None]:
-    if not ids:
-        raise ValueError("No IDs provided.")
-
-    for i in range(0, len(ids), chunk_size):
-        chunk = ids[i : i + chunk_size]
-        async for item in fetch_fn(http, log, chunk, limit):
-            yield item
+    for board in boards:
+        yield board
 
 
 async def _fetch_items_chunk(
     http: HTTPSession,
     log: Logger,
     chunk: list[str],
-    limit: int | None = None,
 ) -> AsyncGenerator[Item, None]:
     page = 1
+    page_limit = 100
+
     while True:
+        variables = {"ids": chunk, "page": page, "limit": page_limit}
         response = await execute_query(
-            ItemsByIdResponse,
-            http,
-            log,
-            ITEMS_BY_IDS,
-            {
-                "limit": limit,
-                "ids": chunk,
-                "page": page,
-            },
+            ItemsByIdResponse, http, log, ITEMS_BY_IDS, variables
         )
 
         if not response.data or not response.data.items:
             break
 
+        items_in_page = 0
         for item in response.data.items:
             yield item
+            items_in_page += 1
 
-        if limit is not None and len(response.data.items) < limit:
+        if items_in_page < page_limit:
             break
 
         page += 1
@@ -268,42 +543,64 @@ async def _fetch_boards_chunk(
                 "page": 1,
                 "ids": [board_id],
             }
+            async for board in _execute_board_query_with_fallback(
+                http, log, variables, board_id
+            ):
+                yield board
+
+
+async def _fetch_boards_page_with_fallback(
+    http: HTTPSession,
+    log: Logger,
+    current_page: int,
+    limit: int,
+) -> AsyncGenerator[Board, None]:
+    """
+    Fetch a page of boards, with fallback to individual board queries if needed.
+    This function first attempts to query with the 'kind' field in the workspace section.
+    If that fails for a page, it switches to querying one board at a time for that page,
+    trying with 'kind' first and falling back to without 'kind' if necessary.
+    """
+    variables = {
+        "limit": limit,
+        "page": current_page,
+    }
+
+    try:
+        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
+            yield board
+    except GraphQLQueryError:
+        log.info(
+            f"Boards query with workspace 'kind' field failed for page {current_page}, "
+            f"switching to querying one board at a time."
+        )
+
+        # Calculate the starting item index based on the current page and limit
+        # For example, if we're on page 139 with limit 5, we start from item 691 (138*5 + 1)
+        start_item = ((current_page - 1) * limit) + 1
+
+        for i in range(int(limit)):
+            item_page = start_item + i
             try:
-                async for board in _fetch_boards(
-                    http, log, BOARDS_WITH_KIND, variables
-                ):
+                async for board in _fetch_single_board(http, log, item_page):
                     yield board
-            except GraphQLQueryError as e:
-                log.info(
-                    f"Trying to fetch board {board_id} without workspace 'kind' field"
+            except GraphQLQueryError:
+                log.error(
+                    f"Failed to fetch board {item_page} with or without workspace 'kind' field"
                 )
-                try:
-                    async for board in _fetch_boards(
-                        http, log, BOARDS_WITHOUT_KIND, variables
-                    ):
-                        yield board
-                except GraphQLQueryError as e2:
-                    log.error(
-                        f"Failed to fetch board {board_id} with or without workspace 'kind' field. "
-                        f"With kind error: {e.errors}, Without kind error: {e2.errors}. "
-                        f"This board will be skipped, which may cause data loss."
-                    )
-                    # Re-raise to ensure the error is not silently ignored
-                    raise GraphQLQueryError(
-                        [
-                            GraphQLError(
-                                message=f"Failed to fetch board {board_id}. Template boards may need special handling. "
-                                f"Original errors: {e.errors}, {e2.errors}"
-                            )
-                        ]
-                    )
+                raise GraphQLQueryError(
+                    [
+                        GraphQLError(
+                            message=f"Failed to fetch board {item_page} with or without workspace 'kind' field"
+                        )
+                    ]
+                )
 
 
 async def fetch_boards(
     http: HTTPSession,
     log: Logger,
     page: int | None = None,
-    limit: int | None = None,
     ids: list[str] | None = None,
 ) -> AsyncGenerator[Board, None]:
     """
@@ -318,89 +615,176 @@ async def fetch_boards(
     boards that are set up as templates. Template boards error when the workspace 'kind' field is queried
     and there is not a way to query them otherwise.
     """
-    if page is not None and limit is None:
-        raise ValueError("limit is required when specifying page")
+    limit = 10
 
     if ids:
-        async for board in _fetch_in_chunks(
-            http, log, ids, chunk_size=100, fetch_fn=_fetch_boards_chunk, limit=limit
-        ):
-            yield board
+        # Process IDs in chunks of 100 (API limit)
+        for i in range(0, len(ids), 100):
+            chunk = ids[i : i + 100]
+            async for board in _fetch_boards_chunk(http, log, chunk, limit):
+                yield board
         return
 
     current_page = 1 if not page else page
-    current_limit = 10 if not limit else limit
 
     while True:
-        try:
-            variables = {
-                "limit": current_limit,
-                "page": current_page,
-            }
+        boards_in_page = 0
+        async for board in _fetch_boards_page_with_fallback(
+            http, log, current_page, limit
+        ):
+            yield board
+            boards_in_page += 1
 
-            boards_in_page = 0
-            async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
-                yield board
-                boards_in_page += 1
-
-            if page is not None or boards_in_page < current_limit:
-                break
-
-        except GraphQLQueryError:
-            log.info(
-                f"Boards query with workspace 'kind' field failed for page {current_page}, switching to querying one board at a time."
-            )
-
-            # Calculate the starting item index based on the current page and limit
-            # For example, if we're on page 139 with limit 5, we start from item 691 (138*5 + 1)
-            start_item = ((current_page - 1) * current_limit) + 1
-            boards_in_page = 0
-
-            for i in range(int(current_limit)):
-                item_page = start_item + i
-
-                try:
-                    async for board in _fetch_single_board(http, log, item_page):
-                        yield board
-                        boards_in_page += 1
-
-                except GraphQLQueryError:
-                    log.error(
-                        f"Failed to fetch board {item_page} with or without workspace 'kind' field"
-                    )
-                    raise GraphQLQueryError(
-                        [
-                            GraphQLError(
-                                message=f"Failed to fetch board {item_page} with or without workspace 'kind' field"
-                            )
-                        ]
-                    )
-
-            if page is not None or boards_in_page < current_limit:
-                break
+        if page is not None or boards_in_page < limit:
+            break
 
         current_page += 1
+
+
+async def fetch_boards_minimal(
+    http: HTTPSession,
+    log: Logger,
+) -> AsyncGenerator[Board, None]:
+    limit = 10000
+    query = """
+    query ($limit: Int = 10000, $page: Int = 1, $state: State = all) {
+        boards(limit: $limit, page: $page, state: $state) {
+            id
+            name
+            state
+            updated_at
+        }
+    }
+    """
+
+    page = 1
+
+    while True:
+        variables = {"state": "all", "page": page, "limit": limit}
+        response = await execute_query(BoardsResponse, http, log, query, variables)
+
+        if not response.data or not response.data.boards:
+            break
+
+        boards_in_page = 0
+        for board in response.data.boards:
+            yield board
+            boards_in_page += 1
+
+        if boards_in_page < limit:
+            break
+
+        page += 1
+
+
+async def fetch_items_minimal(
+    http: HTTPSession,
+    log: Logger,
+) -> AsyncGenerator[Item, None]:
+    items_limit = 500  # Maximum allowed by Monday.com API
+    board_page = 1
+    cursor_manager = CursorManager(log)
+
+    while True:
+        # Get one board per page to iterate through all boards
+        response = await execute_query(
+            ItemsByBoardResponse,
+            http,
+            log,
+            """
+            query GetMinimalItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 500, $state: State = all) {
+                boards(limit: $boardsLimit, page: $boardsPage, state: $state) {
+                    id
+                    state
+                    items_page(limit: $itemsLimit, query_params: {
+                        order_by: [{
+                            column_id: "__last_updated__",
+                            direction: desc
+                        }]
+                    }) {
+                        cursor
+                        items {
+                            id
+                            state
+                            updated_at
+                        }
+                    }
+                }
+            }
+            """,
+            {
+                "boardsLimit": 1,
+                "boardsPage": board_page,
+                "itemsLimit": items_limit,
+            },
+        )
+
+        if not response.data or not response.data.boards:
+            break
+
+        board = response.data.boards[0]
+        if board.state == "deleted":
+            board_page += 1
+            continue
+
+        items_page = board.items_page
+        if not items_page or not items_page.items:
+            board_page += 1
+            continue
+
+        # Yield items from this board's first page
+        for item in items_page.items:
+            yield item
+
+        # Add cursor to manager if available
+        if items_page.cursor:
+            cursor_manager.add_cursor(board.id, items_page.cursor)
+
+        board_page += 1
+
+    # Process all cursors using the helper function
+    minimal_cursor_query = """
+    query GetNextMinimalItems($cursor: String!, $limit: Int = 500) {
+        next_items_page(limit: $limit, cursor: $cursor) {
+            cursor
+            items {
+                id
+                state
+                updated_at
+            }
+        }
+    }
+    """
+
+    async for item in _process_cursor_pagination(
+        cursor_manager,
+        http,
+        log,
+        items_limit,
+        minimal_cursor_query,
+    ):
+        yield item
 
 
 async def fetch_items_by_ids(
     http: HTTPSession,
     log: Logger,
     item_ids: list[str],
-    limit: int | None = None,
 ) -> AsyncGenerator[Item, None]:
-    async for item in _fetch_in_chunks(
-        http, log, item_ids, chunk_size=100, fetch_fn=_fetch_items_chunk, limit=limit
-    ):
-        yield item
+    # Process IDs in chunks of 100 (API limit)
+    for i in range(0, len(item_ids), 100):
+        chunk = item_ids[i : i + 100]
+        async for item in _fetch_items_chunk(http, log, chunk):
+            yield item
 
 
 async def fetch_items_by_boards(
     http: HTTPSession,
     log: Logger,
     page: int,
-    itemsLimit: int,
 ) -> AsyncGenerator[Item | str, None]:
-    board_cursors: dict[str, tuple[str, float]] = {}  # board_id -> (cursor, creation_time)
+    cursor_manager = CursorManager(log)
+    itemsLimit = 100
 
     response = await execute_query(
         ItemsByBoardResponse,
@@ -414,97 +798,70 @@ async def fetch_items_by_boards(
         },
     )
 
-    if not response.data or not response.data.boards:
+    if not response.data:
         log.debug(
             f"Received empty response for page {page} with itemsLimit {itemsLimit}"
         )
         return
 
-    board = response.data.boards[0]
-    items_page = board.items_page
+    boards = response.data.boards
+    if not boards:
+        log.debug(
+            f"Received response with no boards for page {page} with itemsLimit {itemsLimit}"
+        )
+        return
+
+    board = boards[0]
     board_id = board.id
 
+    if board.state == "deleted":
+        log.debug(f"Skipping querying items for deleted board {board.id}")
+        yield board_id
+        return
+
+    items_page = board.items_page
+
     if items_page.cursor:
-        if board.state != "deleted":
-            board_cursors[board.id] = (items_page.cursor, time.time())
+        cursor_manager.add_cursor(board.id, items_page.cursor)
+        log.info(
+            f"Initialized cursor for board {board.id}",
+            {
+                "board_id": board.id,
+                "cursor": items_page.cursor,
+                "initial_items_count": len(items_page.items),
+                "cursor_creation_time": time.time(),
+            },
+        )
     else:
-        log.debug(f"Board {board.id} has no cursor.")
+        log.info(
+            f"Board {board.id} has no cursor - no further items to fetch",
+            {
+                "board_id": board.id,
+                "initial_items_count": len(items_page.items),
+            },
+        )
 
     for item in items_page.items:
         log.debug(f"Yielding item {item.id} from board {board.id}")
         yield item
 
-    # Monday returns a cursor for each board's items_page. We use this cursor to fetch next items.
-    # Note that the cursor will expire in 60 minutes.
-    while board_cursors:
-        log.debug(f"Fetching next items for boards: {board_cursors.keys()}")
-        current_time = time.time()
-        
-        # Warn about cursors approaching expiration
-        for b_id in list(board_cursors.keys()):
-            _, creation_time = board_cursors[b_id]
-            elapsed_minutes = (current_time - creation_time) / 60
-            if elapsed_minutes > 50:
-                log.warning(
-                    f"Cursor for board {b_id} has been active for {elapsed_minutes:.1f} minutes. "
-                    f"Monday's item cursors expire at 60 minutes. Consider reducing batch sizes if processing is slow."
-                )
-        
-        if not board_cursors:
-            break
-            
-        for b_id, (cur, creation_time) in list(board_cursors.items()):
-            log.debug(f"Board {b_id} has cursor: {cur}")
-            variables = {
-                "limit": itemsLimit,
-                "cursor": cur,
-                "boardId": b_id,
-            }
+    async for item in _process_cursor_pagination(
+        cursor_manager,
+        http,
+        log,
+        itemsLimit,
+        NEXT_ITEMS,
+    ):
+        yield item
 
-            try:
-                response = await execute_query(
-                    ItemsByBoardPageResponse,
-                    http,
-                    log,
-                    NEXT_ITEMS,
-                    variables,
-                )
-            except GraphQLQueryError as e:
-                # Check if this is a cursor expiration error
-                if any("cursor" in str(err.message).lower() for err in e.errors):
-                    raise RuntimeError(
-                        f"Cursor for board {b_id} has expired. This would result in missing items. "
-                        f"The connector must be restarted to avoid data loss. "
-                        f"Consider reducing batch sizes or increasing processing speed. Error: {e.errors}"
-                    )
-                else:
-                    # Re-raise any other GraphQL errors
-                    raise
-                    
-            if not response.data or not response.data.next_items_page:
-                log.debug(f"Received empty response for board {b_id}")
-                board_cursors.pop(b_id)
-                continue
-
-            items_page = response.data.next_items_page
-            if not items_page.items:
-                log.debug(f"Board {b_id} has no items in next page.")
-                board_cursors.pop(b_id)
-                continue
-
-            for item in items_page.items:
-                yield item
-
-            next_cursor = response.data.next_items_page.cursor
-            if not next_cursor:
-                log.debug(f"Board {b_id} has no next cursor.")
-                board_cursors.pop(b_id)
-            else:
-                board_cursors[b_id] = (next_cursor, creation_time)
-
-    log.debug(
-        f"Finished fetching items for board {board_id}. Remaining cursors: {board_cursors.keys()}"
+    log.info(
+        f"Finished fetching items for board {board_id}",
+        {
+            "board_id": board_id,
+            "remaining_active_cursors": cursor_manager.get_all_board_ids(),
+        },
     )
+
     # Yield the board ID in case we did not have items to yield for this board.
     # This ensures that the caller continues to the next page of boards.
     yield board_id
@@ -595,6 +952,7 @@ query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10, 
 
 BOARDS_WITH_KIND = BOARDS_TEMPLATE % "kind"
 BOARDS_WITHOUT_KIND = BOARDS_TEMPLATE % ""
+
 
 TEAMS = """
 query {
@@ -709,11 +1067,16 @@ fragment ItemFields on Item {
 """
 
 ITEMS = f"""
-query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 500, $state: State = all) {{
+query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 50, $state: State = all) {{
   boards(limit: $boardsLimit, page: $boardsPage, state: $state) {{
     id
     state
-    items_page(limit: $itemsLimit) {{
+    items_page(limit: $itemsLimit, query_params: {{
+      order_by: [{{
+        column_id: "__last_updated__",
+        direction: desc
+      }}]
+    }}) {{
       cursor
       items {{
         ...ItemFields
@@ -725,7 +1088,7 @@ query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: I
 """
 
 NEXT_ITEMS = f"""
-query GetNextItems($cursor: String!, $limit: Int = 500) {{
+query GetNextItems($cursor: String!, $limit: Int = 200) {{
   next_items_page(limit: $limit, cursor: $cursor) {{
     cursor
     items {{

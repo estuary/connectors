@@ -60,7 +60,6 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
 def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     def open(
         fetch_snapshot_fn: FullRefreshResourceFetchFn,
-        limit: int,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -72,7 +71,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(fetch_snapshot_fn, http, limit),
+            fetch_snapshot=functools.partial(fetch_snapshot_fn, http),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d")),
         )
 
@@ -81,9 +80,9 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             name=name,
             key=["/_meta/row_id"],
             model=FullRefreshResource,
-            open=functools.partial(open, fetch_snapshot_fn, config.advanced.limit),
+            open=functools.partial(open, fetch_snapshot_fn),
             initial_state=ResourceState(),
-            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
+            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=15)),
             schema_inference=True,
         )
         for name, fetch_snapshot_fn in FULL_REFRESH_RESOURCES
@@ -94,7 +93,6 @@ def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     def open(
         fetch_changes_fn: IncrementalResourceFetchChangesFn,
         fetch_page_fn: IncrementalResourceFetchPageFn,
-        limit: int,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -106,8 +104,8 @@ def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes_fn, http, limit),
-            fetch_page=functools.partial(fetch_page_fn, http, limit),
+            fetch_changes=functools.partial(fetch_changes_fn, http),
+            fetch_page=functools.partial(fetch_page_fn, http),
         )
 
     cutoff = datetime.now(tz=UTC).replace(microsecond=0)
@@ -117,9 +115,7 @@ def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
             name=name,
             key=["/id"],
             model=IncrementalResource,
-            open=functools.partial(
-                open, fetch_changes_fn, fetch_page_fn, config.advanced.limit
-            ),
+            open=functools.partial(open, fetch_changes_fn, fetch_page_fn),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(cutoff=cutoff, next_page=1),
