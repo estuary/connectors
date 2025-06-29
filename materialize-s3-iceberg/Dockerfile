@@ -1,8 +1,8 @@
-FROM python:3.12-slim-bookworm as base
+FROM python:3.12-slim-bookworm AS base
 
 # Python build stage
 ################################################################################
-FROM base as pybuilder
+FROM base AS pybuilder
 
 RUN apt-get update && \
     apt install -y --no-install-recommends \
@@ -19,7 +19,7 @@ RUN poetry install
 
 # Go build stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.24-bullseye as gobuilder
+FROM --platform=linux/amd64 golang:1.24-bullseye AS gobuilder
 
 WORKDIR /builder
 
@@ -40,7 +40,7 @@ RUN go build -o ./connector -v ./materialize-s3-iceberg
 # Runtime stage
 ################################################################################
 
-FROM base as runner
+FROM base AS runner
 
 COPY --from=pybuilder /opt/venv /opt/venv
 COPY --from=pybuilder /opt/iceberg-ctl /opt/iceberg-ctl

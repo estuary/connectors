@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
-FROM python:3.12-slim as base
-FROM base as builder
+FROM python:3.12-slim AS base
+FROM base AS builder
 
 ARG CONNECTOR_NAME
 
@@ -18,7 +18,7 @@ COPY estuary-cdk /opt/estuary-cdk
 RUN poetry install
 
 
-FROM base as runner
+FROM base AS runner
 
 ARG CONNECTOR_NAME
 ARG CONNECTOR_TYPE
@@ -44,4 +44,4 @@ COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flo
 ENV DOCS_URL=${DOCS_URL}
 ENV CONNECTOR_NAME=${CONNECTOR_NAME}
 
-CMD /opt/venv/bin/python -m $(echo "$CONNECTOR_NAME" | tr '-' '_')
+CMD ["/bin/sh", "-c", "/opt/venv/bin/python -m $(echo \"$CONNECTOR_NAME\" | tr '-' '_')"]

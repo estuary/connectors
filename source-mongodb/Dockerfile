@@ -1,6 +1,6 @@
 # Build Stage
 ################################################################################
-FROM golang:1.24-bullseye as builder
+FROM golang:1.24-bullseye AS builder
 
 WORKDIR /builder
 
