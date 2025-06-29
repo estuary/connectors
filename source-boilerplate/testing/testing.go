@@ -252,8 +252,9 @@ type pullAdapter struct {
 	callback   func(data json.RawMessage)
 	sanitizers map[string]*regexp.Regexp
 
-	transaction        []*pc.Response_Captured
-	transactionSchemas []*pc.Response_SourcedSchema
+	docsBuffer         []byte // Buffer for underlying document bytes in the current transaction
+	transaction        []pc.Response_Captured
+	transactionSchemas []pc.Response_SourcedSchema
 
 	// pendingCheckpoints is a counter of checkpoints emitted by the capture,
 	// used to produce valid Acknowledge messages upon request.
@@ -264,7 +265,7 @@ func (a *pullAdapter) Recv() (*pc.Request, error) {
 	// Since Recv() is blocking it must either be running in a separate thread
 	// from the one Send()ing checkpoints, or it must be called at a time when
 	// there are already pending checkpoints.
-	for {
+	for a.ctx.Err() == nil {
 		var count = a.pendingCheckpoints.Load()
 		if count > 0 && a.pendingCheckpoints.CompareAndSwap(count, 0) {
 			return &pc.Request{Acknowledge: &pc.Request_Acknowledge{
@@ -273,6 +274,7 @@ func (a *pullAdapter) Recv() (*pc.Request, error) {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
+	return nil, io.EOF // Always return io.EOF when the context expires
 }
 
 func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
@@ -285,9 +287,21 @@ func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
 
 func (a *pullAdapter) Send(m *pc.Response) error {
 	if m.Captured != nil {
-		a.transaction = append(a.transaction, &pc.Response_Captured{
+		var docStartIndex = len(a.docsBuffer)
+		a.docsBuffer = append(a.docsBuffer, m.Captured.DocJson...)
+		var docEndIndex = len(a.docsBuffer)
+		a.transaction = append(a.transaction, pc.Response_Captured{
 			Binding: m.Captured.Binding,
-			DocJson: append(json.RawMessage(nil), m.Captured.DocJson...),
+			DocJson: a.docsBuffer[docStartIndex:docEndIndex],
+		})
+	}
+	if m.SourcedSchema != nil {
+		var docStartIndex = len(a.docsBuffer)
+		a.docsBuffer = append(a.docsBuffer, m.SourcedSchema.SchemaJson...)
+		var docEndIndex = len(a.docsBuffer)
+		a.transactionSchemas = append(a.transactionSchemas, pc.Response_SourcedSchema{
+			Binding:    m.SourcedSchema.Binding,
+			SchemaJson: a.docsBuffer[docStartIndex:docEndIndex],
 		})
 	}
 	if m.Checkpoint != nil {
@@ -332,16 +346,14 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 				a.callback(doc.DocJson)
 			}
 		}
-		a.transaction = nil
-		a.transactionSchemas = nil
+		a.docsBuffer = a.docsBuffer[:0]
+		a.transaction = a.transaction[:0]
+		a.transactionSchemas = a.transactionSchemas[:0]
 
 		a.validator.Checkpoint(a.checkpoint)
 		if a.callback != nil {
 			a.callback(a.checkpoint)
 		}
-	}
-	if m.SourcedSchema != nil {
-		a.transactionSchemas = append(a.transactionSchemas, m.SourcedSchema)
 	}
 	return nil
 }
@@ -381,6 +393,7 @@ func (v *SortedCaptureValidator) SourcedSchema(collection string, schema json.Ra
 		if v.sourcedSchemas == nil {
 			v.sourcedSchemas = make(map[string][]json.RawMessage)
 		}
+		schema = append([]byte(nil), schema...) // Ensure we have our own copy of the data
 		v.sourcedSchemas[collection] = append(v.sourcedSchemas[collection], schema)
 	}
 }
@@ -390,6 +403,7 @@ func (v *SortedCaptureValidator) Output(collection string, data json.RawMessage)
 	if v.documents == nil {
 		v.documents = make(map[string][]json.RawMessage)
 	}
+	data = append([]byte(nil), data...) // Ensure we have our own copy of the data
 	v.documents[collection] = append(v.documents[collection], data)
 }
 
@@ -457,6 +471,7 @@ func (v *OrderedCaptureValidator) Output(collection string, data json.RawMessage
 	if v.documents == nil {
 		v.documents = make(map[string][]json.RawMessage)
 	}
+	data = append([]byte(nil), data...) // Ensure we have our own copy of the data
 	v.documents[collection] = append(v.documents[collection], data)
 }
 

@@ -15,7 +15,7 @@ import (
 )
 
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from `resumeKey` if non-nil.
-func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event *sqlcapture.ChangeEvent) error) (bool, []byte, error) {
+func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	logrus.WithField("state", state).Debug("backfill: ScanChunk")
 	var keyColumns = state.KeyColumns
 	var resumeAfter = state.Scanned
@@ -113,7 +113,7 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 		}
 		nextRowKey = rowKey
 
-		var event = &sqlcapture.ChangeEvent{
+		var event = &sqlcapture.OldChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
 			Source: &oracleSource{

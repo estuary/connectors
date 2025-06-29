@@ -9,5 +9,5 @@
 # ================================
 # Captures Terminated With Errors
 # ================================
-error creating replication stream: unable to start replication: ERROR: replication slot "flow_slot" does not exist (SQLSTATE 42704)
+error starting replication: ERROR: replication slot "flow_slot" does not exist (SQLSTATE 42704)
 

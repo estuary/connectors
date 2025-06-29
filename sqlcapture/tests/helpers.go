@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
@@ -20,6 +21,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"go.gazette.dev/core/broker/protocol"
 )
 
 // VerifiedCapture performs a capture using the provided st.CaptureSpec and shuts it
@@ -120,16 +122,37 @@ func ConvertBindings(t testing.TB, discovered []*capture.Response_Discovered_Bin
 		var res sqlcapture.Resource
 		require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &res))
 		var path = []string{res.Namespace, res.Stream}
+
+		var projections []pf.Projection
+		projections = append(projections, pf.Projection{
+			Ptr:   "/_meta/source/txid",
+			Field: "_meta_source_txid",
+		})
+		for _, keyPtr := range b.Key {
+			projections = append(projections, pf.Projection{
+				Ptr:          keyPtr,
+				Field:        strings.ReplaceAll(strings.TrimPrefix(keyPtr, "/"), "/", "_"),
+				IsPrimaryKey: true,
+			})
+		}
+
 		bindings = append(bindings, &pf.CaptureSpec_Binding{
 			ResourceConfigJson: b.ResourceConfigJson,
 			Collection: pf.CollectionSpec{
 				Name:           pf.Collection("acmeCo/test/" + b.RecommendedName),
 				ReadSchemaJson: b.DocumentSchemaJson,
 				Key:            b.Key,
-				// Converting the discovered schema into a list of projections would be quite
-				// a task and all we actually need it for is to enable transaction IDs in
-				// MySQL and Postgres.
-				Projections: []pf.Projection{{Ptr: "/_meta/source/txid"}},
+				Projections:    projections,
+				// This whole PartitionTemplate is just a dummy to satisfy protocol validation.
+				PartitionTemplate: &protocol.JournalSpec{
+					Name:        protocol.Journal("acmeCo/test/" + b.RecommendedName + "/pivot=00"),
+					Replication: 3,
+					Fragment: protocol.JournalSpec_Fragment{
+						Length:           512 * 1024 * 1024, // 512 MiB
+						CompressionCodec: protocol.CompressionCodec_GZIP,
+						RefreshInterval:  30 * time.Second,
+					},
+				},
 			},
 			ResourcePath: path,
 			StateKey:     StateKey(path),

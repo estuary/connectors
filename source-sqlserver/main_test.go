@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -49,10 +50,13 @@ func TestMain(m *testing.M) {
 		log.SetLevel(level)
 	}
 
+	// Set a 900MiB memory limit, same as we use in production.
+	debug.SetMemoryLimit(900 * 1024 * 1024)
+
 	os.Exit(m.Run())
 }
 
-func sqlserverTestBackend(t *testing.T) *testBackend {
+func sqlserverTestBackend(t testing.TB) *testBackend {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
