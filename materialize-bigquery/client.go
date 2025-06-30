@@ -224,7 +224,7 @@ func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr 
 
 	if bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))); err != nil {
 		errs.Err(fmt.Errorf("creating GCS bucket: %w", err))
-	} else if err := bucket.CheckPermissions(ctx, blob.CheckPermissionsConfig{Prefix: cfg.BucketPath}); err != nil {
+	} else if err := bucket.CheckPermissions(ctx, blob.CheckPermissionsConfig{Prefix: cfg.effectiveBucketPath()}); err != nil {
 		errs.Err(err)
 	}
 

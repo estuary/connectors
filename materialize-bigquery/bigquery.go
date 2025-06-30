@@ -66,12 +66,6 @@ func (c config) Validate() error {
 		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
 	}
 
-	if c.BucketPath != "" {
-		// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
-		// chars in the URI and so that the object key does not start with a /.
-		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
-	}
-
 	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
@@ -81,6 +75,12 @@ func (c config) Validate() error {
 	}
 
 	return nil
+}
+
+func (c config) effectiveBucketPath() string {
+	// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
+	// chars in the URI and so that the object key does not start with a /.
+	return strings.TrimPrefix(c.BucketPath, "/")
 }
 
 func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
@@ -164,7 +164,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"dataset":     cfg.Dataset,
 				"region":      cfg.Region,
 				"bucket":      cfg.Bucket,
-				"bucket_path": cfg.BucketPath,
+				"bucket_path": cfg.effectiveBucketPath(),
 			}).Info("creating bigquery endpoint")
 
 			dialect := bqDialect(featureFlags["objects_and_arrays_as_json"])
