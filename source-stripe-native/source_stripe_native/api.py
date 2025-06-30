@@ -11,7 +11,7 @@ from estuary_cdk.capture.common import (
 
 
 from estuary_cdk.http import HTTPError
-
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
     Events,
@@ -117,13 +117,18 @@ async def fetch_incremental(
     max_ts = log_cursor
 
     while iterating:
-        events = EventResult.model_validate_json(
-            await http.request(
-                log, url, method="GET", params=parameters, headers=headers
-            )
+        _, body = await http.request_stream(log, url, params=parameters, headers=headers)
+        processor = IncrementalJsonProcessor(
+            body(),
+            "data.item",
+            EventResult.Data,
+            EventResult,
         )
 
-        for event in events.data:
+        last_event: EventResult.Data | None = None
+
+        async for event in processor:
+            last_event = event
             event_ts = _s_to_dt(event.created)
 
             # Update the most recent timestamp seen.
@@ -161,8 +166,15 @@ async def fetch_incremental(
                 iterating = False
                 break
 
-        if events.has_more is True:
-            parameters["starting_after"] = events.data[-1].id
+        async for _ in processor:
+            # Consume any remaining items in the processor to ensure we don't leave any
+            # unprocessed items in the stream.
+            pass
+
+        remainder = processor.get_remainder()
+
+        if remainder.has_more is True and last_event:
+            parameters["starting_after"] = last_event.id
         else:
             break
 
@@ -218,11 +230,36 @@ async def fetch_backfill(
         parameters["status"] = "all"
 
     try:
-        result = BackfillResult[cls].model_validate_json(
-            await http.request(log, url, method="GET", params=parameters, headers=headers)
+        _, body = await http.request_stream(log, url, params=parameters, headers=headers)
+        processor = IncrementalJsonProcessor(
+            body(),
+            "data.item",
+            cls,
+            BackfillResult[cls]
         )
+
+        last_doc: StripeObjectWithEvents | None = None
+        async for doc in processor:
+            last_doc = doc
+            # Sometimes API results don't have a created field. These may have been added by some legacy Stripe system
+            # that didn't add the created field. Since we can't determine when these results were created, treat them
+            # like other results within the backfill window and yield them.
+            doc_ts = _s_to_dt(doc.created) if doc.created is not None else None
+
+            if account_id:
+                doc.account_id = account_id
+
+            if doc_ts == start_date:
+                # Yield final document for reference
+                yield doc
+                return
+            elif doc_ts is not None and doc_ts < start_date:
+                return
+            elif doc_ts is None or doc_ts < cutoff:
+                yield doc
+
     except HTTPError as err:
-        # Once we reach the very last event when backfilling Events, it's possible for event
+        # Once we reach the very last event when backfilling Events, it's possible for the event
         # we checkpointed as the page token to age out of Stripe's retention window. This
         # means we've reached the end of the events stream & the backfill is complete.
         if err.code == 400 and EVENT_NO_LONGER_RETAINED in err.message and cls == Events:
@@ -230,26 +267,14 @@ async def fetch_backfill(
         else:
             raise
 
-    for doc in result.data:
-        # Sometimes API results don't have a created field. These may have been added by some legacy Stripe system
-        # that didn't add the created field. Since we can't determine when these results were created, treat them
-        # like other results within the backfill window and yield them.
-        doc_ts = _s_to_dt(doc.created) if doc.created is not None else None
+    async for _ in processor:
+        # Consume any remaining items in the processor to ensure we don't leave any
+        # unprocessed items in the stream.
+        pass
 
-        if account_id:
-            doc.account_id = account_id
-
-        if doc_ts == start_date:
-            # Yield final document for reference
-            yield doc
-            return
-        elif doc_ts is not None and doc_ts < start_date:
-            return
-        elif doc_ts is None or doc_ts < cutoff:
-            yield doc
-
-    if result.has_more:
-        yield result.data[-1].id
+    remainder = processor.get_remainder()
+    if remainder.has_more and last_doc:
+        yield last_doc.id
     else:
         return
 
@@ -500,11 +525,19 @@ async def _capture_substreams(
             break
 
         try:
-            result_child = ListResult[cls_child].model_validate_json(
-                await http.request(
-                    log, child_url, method="GET", params=parameters, headers=headers
-                )
+            _, body = await http.request_stream(log, child_url, params=parameters, headers=headers)
+            processor = IncrementalJsonProcessor(
+                body(),
+                "data.item",
+                cls_child,
+                ListResult[cls_child],
             )
+            last_doc: StripeChildObject | None = None
+            async for doc in processor:
+                last_doc = doc
+                if account_id:
+                    doc.account_id = account_id
+                yield doc
         except HTTPError as err:
             # It's possible for us to process events for deleted parent resources, making
             # the requests for the associated child resources fail. Stripe returns a 404
@@ -545,13 +578,10 @@ async def _capture_substreams(
             else:
                 raise err
 
-        for doc in result_child.data:
-            if account_id:
-                doc.account_id = account_id
-            yield doc
+        remainder = processor.get_remainder()
 
-        if result_child.has_more:
-            parameters["starting_after"] = result_child.data[-1].id
+        if remainder.has_more and last_doc:
+            parameters["starting_after"] = last_doc.id
         else:
             break
 
@@ -590,13 +620,17 @@ async def fetch_incremental_no_events(
     end = datetime.now(tz=UTC) - LAG
 
     while iterating:
-        resources = ListResult[cls].model_validate_json(
-            await http.request(
-                log, url, method="GET", params=parameters, headers=headers
-            )
+        _, body = await http.request_stream(log, url, params=parameters, headers=headers)
+        processor = IncrementalJsonProcessor(
+            body(),
+            "data.item",
+            cls,
+            ListResult[cls],
         )
 
-        for resource in resources.data:
+        last_resource: StripeObjectNoEvents | None = None
+        async for resource in processor:
+            last_resource = resource
             resource_ts = _s_to_dt(resource.created)
 
             # Update the most recent timestamp seen.
@@ -613,8 +647,14 @@ async def fetch_incremental_no_events(
                 iterating = False
                 break
 
-        if resources.has_more is True:
-            parameters["starting_after"] = resources.data[-1].id
+        async for _ in processor:
+            # Consume any remaining items in the processor to ensure we don't leave any
+            # unprocessed items in the stream.
+            pass
+
+        remainder = processor.get_remainder()
+        if remainder.has_more is True and last_resource:
+            parameters["starting_after"] = last_resource.id
         else:
             break
 
