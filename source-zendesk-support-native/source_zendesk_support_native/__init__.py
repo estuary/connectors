@@ -13,7 +13,7 @@ from estuary_cdk.capture import (
     response,
 )
 
-from .resources import all_resources, validate_credentials
+from .resources import all_resources, enabled_resources, validate_credentials
 from .models import (
     ConnectorState,
     EndpointConfig,
@@ -49,7 +49,7 @@ class Connector(
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
         await validate_credentials(log, self, validate.config)
-        resources = await all_resources(log, self, validate.config)
+        resources = await enabled_resources(log, self, validate.config, validate.bindings)
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
@@ -58,6 +58,6 @@ class Connector(
         log: Logger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
-        resources = await all_resources(log, self, open.capture.config)
+        resources = await enabled_resources(log, self, open.capture.config, open.capture.bindings)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
         return common.open(open, resolved)

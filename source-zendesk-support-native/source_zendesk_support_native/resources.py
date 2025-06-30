@@ -844,13 +844,10 @@ def post_comment_votes(
     )
 
 
-async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
+def _generate_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig,
 ) -> list[common.Resource]:
-    update_oauth_spec(config.subdomain)
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
-
-    resources = [
+    return [
         audit_logs(log, http, config),
         ticket_metrics(log, http, config),
         *full_refresh_resources(log, http, config),
@@ -867,6 +864,15 @@ async def all_resources(
         post_comment_votes(log, http, config),
     ]
 
+
+async def all_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+    update_oauth_spec(config.subdomain)
+    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+
+    resources = _generate_resources(log, http, config)
+
     if not await _is_enterprise_account(log, http, config):
         resources = [r for r in resources if r.name not in ENTERPRISE_STREAMS]
 
@@ -874,3 +880,20 @@ async def all_resources(
         resources = [r for r in resources if r.name not in HELP_DESK_STREAMS]
 
     return resources
+
+
+async def enabled_resources(
+    log: Logger, http: HTTPMixin, config: EndpointConfig, bindings: list[common._ResolvableBinding]
+) -> list[common.Resource]:
+    update_oauth_spec(config.subdomain)
+    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+
+    enabled_binding_names: list[str] = []
+
+    for binding in bindings:
+        path: list[str] = binding.resourceConfig.path()
+        enabled_binding_names.append(path[0])
+
+    enabled_resources: list[common.Resource] = [r for r in _generate_resources(log, http, config) if r.name in enabled_binding_names]
+
+    return enabled_resources
