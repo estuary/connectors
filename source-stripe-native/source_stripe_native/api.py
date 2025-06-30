@@ -168,6 +168,12 @@ async def fetch_incremental(
 
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+    elif connected_account_id and end > log_cursor:
+        # If there were no events and we are capturing a connected account, move the cursor
+        # forward. This is necessary since we can't process all connected accounts in a single
+        # connector invocation, and we try to fairly rotated which connected accounts are processed
+        # based on how old their incremental cursors are.
+        yield end
 
 
 async def fetch_backfill(
@@ -343,6 +349,12 @@ async def fetch_incremental_substreams(
             break
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+    elif connected_account_id and end > log_cursor:
+        # If there were no events and we are capturing a connected account, move the cursor
+        # forward. This is necessary since we can't process all connected accounts in a single
+        # connector invocation, and we try to fairly rotated which connected accounts are processed
+        # based on how old their incremental cursors are.
+        yield end
 
 
 async def fetch_backfill_substreams(
@@ -575,6 +587,8 @@ async def fetch_incremental_no_events(
     if account_id:
         headers["Stripe-Account"] = account_id
 
+    end = datetime.now(tz=UTC) - LAG
+
     while iterating:
         resources = ListResult[cls].model_validate_json(
             await http.request(
@@ -606,6 +620,12 @@ async def fetch_incremental_no_events(
 
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+    elif connected_account_id and end > log_cursor:
+        # If there were no events and we are capturing a connected account, move the cursor
+        # forward. This is necessary since we can't process all connected accounts in a single
+        # connector invocation, and we try to fairly rotated which connected accounts are processed
+        # based on how old their incremental cursors are.
+        yield end
 
 
 async def fetch_incremental_usage_records(
@@ -702,6 +722,12 @@ async def fetch_incremental_usage_records(
 
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+    elif connected_account_id and end > log_cursor:
+        # If there were no events and we are capturing a connected account, move the cursor
+        # forward. This is necessary since we can't process all connected accounts in a single
+        # connector invocation, and we try to fairly rotated which connected accounts are processed
+        # based on how old their incremental cursors are.
+        yield end
 
 
 async def fetch_backfill_usage_records(

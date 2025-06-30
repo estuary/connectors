@@ -10,6 +10,10 @@ from estuary_cdk.capture.common import (
     ResourceConfig,
     ResourceState,
 )
+
+from .priority_capture import (
+    open_binding_with_priority_queue,
+)
 from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource, HTTPError
 
 from .api import (
@@ -74,16 +78,18 @@ async def _fetch_connected_account_ids(
     url = f"{API}/accounts"
     params: dict[str, str | int] = {"limit": 100}
 
-    # We should paginate to get all connected account, but
-    # we've seen captures OOM when there are more than a few hundred accounts.
-    # While we figure out how to handle so many connected accounts without OOM-ing,
-    # only capture from the 100 most recent accounts.
-    response = ListResult[Accounts].model_validate_json(
-        await http.request(log, url, params=params)
-    )
+    while True:
+        response = ListResult[Accounts].model_validate_json(
+            await http.request(log, url, params=params)
+        )
 
-    for account in response.data:
-        account_ids.add(account.id)
+        for account in response.data:
+            account_ids.add(account.id)
+
+        if not response.has_more:
+            break
+
+        params["starting_after"] = response.data[-1].id
 
     return list(account_ids)
 
@@ -326,19 +332,30 @@ def base_object(
                 None,
                 http,
             )
+            open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_changes=fetch_changes_fns,
+                fetch_page=fetch_page_fns,
+            )
         else:
-            fetch_changes_fns = {}
-            fetch_page_fns = {}
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
-            for account_id in all_account_ids:
-                fetch_changes_fns[account_id] = functools.partial(
+            def fetch_changes_factory(account_id: str):
+                return functools.partial(
                     fetch_incremental,
                     cls,
                     platform_account_id,
                     account_id,
                     http,
                 )
-                fetch_page_fns[account_id] = functools.partial(
+
+            def fetch_page_factory(account_id: str):
+                return functools.partial(
                     fetch_backfill,
                     cls,
                     start_date,
@@ -347,18 +364,15 @@ def base_object(
                     http,
                 )
 
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
+            open_binding_with_priority_queue(
+                binding,
+                binding_index,
+                state,
+                task,
+                all_account_ids,
+                fetch_changes_factory=fetch_changes_factory,
+                fetch_page_factory=fetch_page_factory,
             )
-
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=fetch_changes_fns,
-            fetch_page=fetch_page_fns,
-        )
 
     return Resource(
         name=cls.NAME,
@@ -414,12 +428,21 @@ def child_object(
                 None,
                 http,
             )
+            open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_changes=fetch_changes_fns,
+                fetch_page=fetch_page_fns,
+            )
         else:
-            fetch_changes_fns = {}
-            fetch_page_fns = {}
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
-            for account_id in all_account_ids:
-                fetch_changes_fns[account_id] = functools.partial(
+            def fetch_changes_factory(account_id: str):
+                return functools.partial(
                     fetch_incremental_substreams,
                     cls,
                     child_cls,
@@ -427,7 +450,9 @@ def child_object(
                     account_id,
                     http,
                 )
-                fetch_page_fns[account_id] = functools.partial(
+
+            def fetch_page_factory(account_id: str):
+                return functools.partial(
                     fetch_backfill_substreams,
                     cls,
                     child_cls,
@@ -437,18 +462,16 @@ def child_object(
                     http,
                 )
 
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
+            open_binding_with_priority_queue(
+                binding,
+                binding_index,
+                state,
+                task,
+                all_account_ids,
+                fetch_changes_factory=fetch_changes_factory,
+                fetch_page_factory=fetch_page_factory,
             )
 
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=fetch_changes_fns,
-            fetch_page=fetch_page_fns,
-        )
 
     return Resource(
         name=child_cls.NAME,
@@ -506,19 +529,30 @@ def split_child_object(
                 None,
                 http,
             )
+            open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_changes=fetch_changes_fns,
+                fetch_page=fetch_page_fns,
+            )
         else:
-            fetch_changes_fns = {}
-            fetch_page_fns = {}
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
-            for account_id in all_account_ids:
-                fetch_changes_fns[account_id] = functools.partial(
+            def fetch_changes_factory(account_id: str):
+                return functools.partial(
                     fetch_incremental,
                     child_cls,
                     platform_account_id,
                     account_id,
                     http,
                 )
-                fetch_page_fns[account_id] = functools.partial(
+
+            def fetch_page_factory(account_id: str):
+                return functools.partial(
                     fetch_backfill_substreams,
                     cls,
                     child_cls,
@@ -528,18 +562,16 @@ def split_child_object(
                     http,
                 )
 
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
+            open_binding_with_priority_queue(
+                binding,
+                binding_index,
+                state,
+                task,
+                all_account_ids,
+                fetch_changes_factory=fetch_changes_factory,
+                fetch_page_factory=fetch_page_factory,
             )
 
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=fetch_changes_fns,
-            fetch_page=fetch_page_fns,
-        )
 
     return Resource(
         name=child_cls.NAME,
@@ -597,12 +629,21 @@ def usage_records(
                 None,
                 http,
             )
+            open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_changes=fetch_changes_fns,
+                fetch_page=fetch_page_fns,
+            )
         else:
-            fetch_changes_fns = {}
-            fetch_page_fns = {}
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
-            for account_id in all_account_ids:
-                fetch_changes_fns[account_id] = functools.partial(
+            def fetch_changes_factory(account_id: str):
+                return functools.partial(
                     fetch_incremental_usage_records,
                     cls,
                     child_cls,
@@ -610,7 +651,9 @@ def usage_records(
                     account_id,
                     http,
                 )
-                fetch_page_fns[account_id] = functools.partial(
+
+            def fetch_page_factory(account_id: str):
+                return functools.partial(
                     fetch_backfill_usage_records,
                     cls,
                     child_cls,
@@ -620,18 +663,15 @@ def usage_records(
                     http,
                 )
 
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
+            open_binding_with_priority_queue(
+                binding,
+                binding_index,
+                state,
+                task,
+                all_account_ids,
+                fetch_changes_factory=fetch_changes_factory,
+                fetch_page_factory=fetch_page_factory,
             )
-
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=fetch_changes_fns,
-            fetch_page=fetch_page_fns,
-        )
 
     return Resource(
         name=child_cls.NAME,
@@ -672,6 +712,7 @@ def no_events_object(
         all_bindings,
     ):
         if not connected_account_ids:
+            # Handle single platform account case (no connected accounts)
             fetch_changes_fns = functools.partial(
                 fetch_incremental_no_events,
                 cls,
@@ -687,19 +728,30 @@ def no_events_object(
                 None,
                 http,
             )
+            open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_changes=fetch_changes_fns,
+                fetch_page=fetch_page_fns,
+            )
         else:
-            fetch_changes_fns = {}
-            fetch_page_fns = {}
+            _reconcile_connector_state(
+                all_account_ids, binding, state, initial_state, task
+            )
 
-            for account_id in all_account_ids:
-                fetch_changes_fns[account_id] = functools.partial(
+            def fetch_changes_factory(account_id: str):
+                return functools.partial(
                     fetch_incremental_no_events,
                     cls,
                     platform_account_id,
                     account_id,
                     http,
                 )
-                fetch_page_fns[account_id] = functools.partial(
+
+            def fetch_page_factory(account_id: str):
+                return functools.partial(
                     fetch_backfill,
                     cls,
                     start_date,
@@ -708,18 +760,16 @@ def no_events_object(
                     http,
                 )
 
-            _reconcile_connector_state(
-                all_account_ids, binding, state, initial_state, task
+            open_binding_with_priority_queue(
+                binding,
+                binding_index,
+                state,
+                task,
+                all_account_ids,
+                fetch_changes_factory=fetch_changes_factory,
+                fetch_page_factory=fetch_page_factory,
             )
 
-        open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_changes=fetch_changes_fns,
-            fetch_page=fetch_page_fns,
-        )
 
     return Resource(
         name=cls.NAME,
