@@ -87,8 +87,8 @@ func prepareNewTransactor(
 			idempotentApply:   featureFlags["idempotent_apply"],
 			client:            client,
 			be:                be,
-			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.BucketPath, false, false),
-			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.BucketPath, true, false),
+			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
+			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
 		}
 
 		for _, binding := range bindings {
