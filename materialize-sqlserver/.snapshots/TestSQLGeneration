@@ -23,7 +23,7 @@ TRUNCATE TABLE #flow_temp_store_1;
 CREATE TABLE #flow_temp_load_0 (
 		key1 BIGINT NOT NULL,
 		key2 BIT NOT NULL,
-		"key!binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"key!binary" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		PRIMARY KEY (key1, key2, "key!binary")
 );
 --- End key_value createLoadTable ---
@@ -41,7 +41,7 @@ CREATE TABLE #flow_temp_load_1 (
 CREATE TABLE #flow_temp_store_0 (
 		key1 BIGINT NOT NULL,
 		key2 BIT NOT NULL,
-		"key!binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"key!binary" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"boolean" BIT,
@@ -79,7 +79,7 @@ IF OBJECT_ID(N'key_value', 'U') IS NULL BEGIN
 CREATE TABLE key_value (
 		key1 BIGINT NOT NULL,
 		key2 BIT NOT NULL,
-		"key!binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"key!binary" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"boolean" BIT,
