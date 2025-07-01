@@ -16,7 +16,7 @@ import (
 func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
 	log.WithFields(log.Fields{
 		"host":     cfg.Host,
-		"user":     cfg.User,
+		"user":     cfg.Credentials.User,
 		"database": cfg.Database,
 	}).Info("connecting to database")
 
@@ -26,7 +26,12 @@ func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
 	// it is our normal error propagation will handle it.
 	gosnowflake.GetLogger().SetOutput(io.Discard)
 
-	var conn, err = sql.Open("snowflake", cfg.ToURI())
+	dsn, err := cfg.ToURI()
+	if err != nil {
+		return nil, fmt.Errorf("error generating DSN: %w", err)
+	}
+
+	conn, err := sql.Open("snowflake", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
