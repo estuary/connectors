@@ -541,6 +541,230 @@
       "estimatedTaxes": false,
       "id": "gid://shopify/Order/5714619858989",
       "legacyResourceId": "5714619858989",
+      "lineItems": [
+        {
+          "__parentId": "gid://shopify/Order/5714619858989",
+          "currentQuantity": 1,
+          "discountAllocations": [],
+          "discountedTotalSet": {
+            "presentmentMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            }
+          },
+          "discountedUnitPriceAfterAllDiscountsSet": {
+            "presentmentMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            }
+          },
+          "discountedUnitPriceSet": {
+            "presentmentMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            }
+          },
+          "duties": [],
+          "id": "gid://shopify/LineItem/14150963134509",
+          "image": {
+            "originalSrc": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/gift_card.png?v=1736867416"
+          },
+          "isGiftCard": true,
+          "lineItemGroup": null,
+          "nonFulfillableQuantity": 0,
+          "originalTotalSet": {
+            "presentmentMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            }
+          },
+          "originalUnitPriceSet": {
+            "presentmentMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            }
+          },
+          "product": {
+            "id": "gid://shopify/Product/8086707830829",
+            "legacyResourceId": "8086707830829"
+          },
+          "quantity": 1,
+          "refundableQuantity": 1,
+          "requiresShipping": false,
+          "sellingPlan": null,
+          "sku": null,
+          "taxLines": [],
+          "taxable": false,
+          "totalDiscountSet": {
+            "presentmentMoney": {
+              "amount": "0.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "0.0",
+              "currencyCode": "USD"
+            }
+          },
+          "unfulfilledDiscountedTotalSet": {
+            "presentmentMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            }
+          },
+          "unfulfilledOriginalTotalSet": {
+            "presentmentMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "25.0",
+              "currencyCode": "USD"
+            }
+          },
+          "unfulfilledQuantity": 1,
+          "variant": {
+            "id": "gid://shopify/ProductVariant/43217823367213",
+            "legacyResourceId": "43217823367213",
+            "sku": null
+          },
+          "vendor": "Snowboard Vendor"
+        },
+        {
+          "__parentId": "gid://shopify/Order/5714619858989",
+          "currentQuantity": 1,
+          "discountAllocations": [],
+          "discountedTotalSet": {
+            "presentmentMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            }
+          },
+          "discountedUnitPriceAfterAllDiscountsSet": {
+            "presentmentMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            }
+          },
+          "discountedUnitPriceSet": {
+            "presentmentMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            }
+          },
+          "duties": [],
+          "id": "gid://shopify/LineItem/14150963167277",
+          "image": {
+            "originalSrc": "https://cdn.shopify.com/s/files/1/0663/4006/1229/files/gift_card.png?v=1736867416"
+          },
+          "isGiftCard": true,
+          "lineItemGroup": null,
+          "nonFulfillableQuantity": 0,
+          "originalTotalSet": {
+            "presentmentMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            }
+          },
+          "originalUnitPriceSet": {
+            "presentmentMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            }
+          },
+          "product": {
+            "id": "gid://shopify/Product/8086707830829",
+            "legacyResourceId": "8086707830829"
+          },
+          "quantity": 1,
+          "refundableQuantity": 1,
+          "requiresShipping": false,
+          "sellingPlan": null,
+          "sku": null,
+          "taxLines": [],
+          "taxable": false,
+          "totalDiscountSet": {
+            "presentmentMoney": {
+              "amount": "0.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "0.0",
+              "currencyCode": "USD"
+            }
+          },
+          "unfulfilledDiscountedTotalSet": {
+            "presentmentMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            }
+          },
+          "unfulfilledOriginalTotalSet": {
+            "presentmentMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            },
+            "shopMoney": {
+              "amount": "50.0",
+              "currencyCode": "USD"
+            }
+          },
+          "unfulfilledQuantity": 1,
+          "variant": {
+            "id": "gid://shopify/ProductVariant/43217823399981",
+            "legacyResourceId": "43217823399981",
+            "sku": null
+          },
+          "vendor": "Snowboard Vendor"
+        }
+      ],
       "merchantOfRecordApp": null,
       "name": "#1001",
       "note": "Testing a note.",
