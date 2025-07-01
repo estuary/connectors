@@ -26,6 +26,7 @@ func duckdbReadFile(t *testing.T, f string, outFormat string) string {
 	bootQueries := []string{
 		"INSTALL 'json'",
 		"LOAD 'json'",
+		"SET TimeZone = 'UTC';",
 	}
 	for _, q := range bootQueries {
 		_, err := db.Exec(q)
