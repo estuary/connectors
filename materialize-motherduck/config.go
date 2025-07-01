@@ -166,14 +166,14 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 	var createTempSecret string
 	switch c.StagingBucket.StagingBucketType {
 	case stagingBucketTypeS3:
-		createTempSecret = fmt.Sprintf(`CREATE SECRET (
+		createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
 			TYPE S3,
 			KEY_ID '%s',
 			SECRET '%s',
 			REGION '%s'
 		);`, c.StagingBucket.AWSAccessKeyID, c.StagingBucket.AWSSecretAccessKey, c.StagingBucket.Region)
 	case stagingBucketTypeGCS:
-		createTempSecret = fmt.Sprintf(`CREATE SECRET (
+		createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
 			TYPE GCS,
 			KEY_ID '%s',
 			SECRET '%s'
