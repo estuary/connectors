@@ -81,6 +81,10 @@ class PollEvent(BaseDocument, extra="allow"):
     pollId: str
 
 
+class Account(BaseDocument, extra="allow"):
+    accountId: str
+
+
 class Visitor(BaseDocument, extra="allow"):
     visitorId: str
 
@@ -145,6 +149,7 @@ AGGREGATED_EVENT_TYPES: list[tuple[str, str, str, type[BaseDocument]]] = [
 
 # Supported incremental resource types, their corresponding resource name, their key, their updated_at field, and their model.
 INCREMENTAL_RESOURCE_TYPES: list[tuple[str, str, str, str, type[BaseDocument]]] = [
+    ("accounts", "Account", "accountId", "metadata.auto.lastupdated", Account),
     ("visitors", "Visitor", "visitorId", "metadata.auto.lastupdated", Visitor),
     ("trackTypes", "TrackType", "id", "lastUpdatedAt", TrackType),
 ]
