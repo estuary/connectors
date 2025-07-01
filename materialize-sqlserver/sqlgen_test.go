@@ -96,3 +96,33 @@ func TestTimeColumn(t *testing.T) {
 	require.Equal(t, expected, parsed)
 	require.NoError(t, err)
 }
+
+func TestBinaryColumn(t *testing.T) {
+	var dialect = testDialect
+	var mapped = dialect.MapType(&sql.Projection{
+		Projection: pf.Projection{
+			Inference: pf.Inference{
+				Types:   []string{"string"},
+				String_: &pf.Inference_String{Format: "base64"},
+				Exists:  pf.Inference_MUST,
+			},
+			IsPrimaryKey: false,
+		},
+	}, sql.FieldConfig{})
+	require.Equal(t, "varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL", mapped.DDL)
+}
+
+func TestBinaryPKColumn(t *testing.T) {
+	var dialect = testDialect
+	var mapped = dialect.MapType(&sql.Projection{
+		Projection: pf.Projection{
+			Inference: pf.Inference{
+				Types:   []string{"string"},
+				String_: &pf.Inference_String{Format: "base64"},
+				Exists:  pf.Inference_MUST,
+			},
+			IsPrimaryKey: true,
+		},
+	}, sql.FieldConfig{})
+	require.Equal(t, "varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL", mapped.DDL)
+}
