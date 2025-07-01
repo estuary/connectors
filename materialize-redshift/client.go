@@ -20,7 +20,7 @@ import (
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -31,12 +31,12 @@ var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
 	db  *stdsql.DB
-	cfg *config
-	ep  *sql.Endpoint
+	cfg config
+	ep  *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	cfg := ep.Config
 
 	db, err := stdsql.Open("pgx", cfg.toURI())
 	if err != nil {
@@ -50,17 +50,17 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	catalog := c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active
 		// database if that's the case.
 		if err := c.db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
-			return nil, fmt.Errorf("querying for connected database: %w", err)
+			return fmt.Errorf("querying for connected database: %w", err)
 		}
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, c.ep.Dialect, catalog, resourcePaths)
+	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, catalog, resourcePaths)
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -134,14 +134,12 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	cfg := conf.(*config)
 
 	db, err := stdsql.Open("pgx", cfg.toURI())
 	if err != nil {
@@ -187,7 +185,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 	}
 
 	// Test creating, reading, and deleting an object from the configured bucket and bucket path.
-	testKey := path.Join(cfg.BucketPath, uuid.NewString())
+	testKey := path.Join(cfg.effectiveBucketPath(), uuid.NewString())
 
 	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
@@ -201,7 +199,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
 				err = fmt.Errorf("bucket %q does not exist", cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to write to %q", path.Join(cfg.Bucket, cfg.BucketPath))
+				err = fmt.Errorf("not authorized to write to %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 			}
 		}
 		errs.Err(err)
@@ -210,7 +208,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 		Key:    aws.String(testKey),
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.BucketPath))
+			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)
 	} else if _, err := s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
@@ -218,7 +216,7 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 		Key:    aws.String(testKey),
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.BucketPath))
+			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.effectiveBucketPath()))
 		}
 		errs.Err(err)
 	}

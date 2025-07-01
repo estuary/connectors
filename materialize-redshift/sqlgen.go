@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
@@ -178,7 +178,7 @@ type copyFromS3Params struct {
 	Target                         string
 	Columns                        []*sql.Column
 	ManifestURL                    string
-	Config                         *config
+	Config                         config
 	CaseSensitiveIdentifierEnabled bool
 	TruncateColumns                bool
 }
