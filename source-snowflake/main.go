@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strings"
 
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
-	sf "github.com/snowflakedb/gosnowflake"
 )
 
 func main() {
@@ -22,11 +22,11 @@ type snowflakeDriver struct{}
 // config represents the endpoint configuration for Snowflake.
 type config struct {
 	Host      string         `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
-	Account   string         `json:"account" jsonschema:"title=Account,description=The Snowflake account identifier." jsonschema_extras:"order=1"`
-	User      string         `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=2"`
-	Password  string         `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=3"`
-	Database  string         `json:"database" jsonschema:"title=Database,description=The database name to capture from." jsonschema_extras:"order=4"`
-	Warehouse string         `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
+	User      string         `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=1"`
+	Password  string         `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=2"`
+	Database  string         `json:"database" jsonschema:"title=Database,description=The database name to capture from." jsonschema_extras:"order=3"`
+	Warehouse string         `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=4"`
+	Account   string         `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=5,x-hidden-field=true"`
 	Advanced  advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
@@ -42,7 +42,6 @@ var hostRe = regexp.MustCompile(`(?i)^.+.snowflakecomputing\.com$`)
 func (c *config) Validate() error {
 	// Required properties must be present
 	var requiredProperties = [][]string{
-		{"account", c.Account},
 		{"host", c.Host},
 		{"user", c.User},
 		{"password", c.Password},
@@ -82,31 +81,37 @@ func (c *config) SetDefaults() {
 
 // ToURI converts the Config to a DSN string.
 func (c *config) ToURI() string {
+	var uri = url.URL{
+		Host: c.Host + ":443",
+	}
+
 	var trueString = "true"
 	var jsonString = "json"
 
-	// Build a DSN connection string.
-	var cfg = &sf.Config{
-		Account:   c.Account,
-		Host:      c.Host,
-		User:      c.User,
-		Password:  c.Password,
-		Database:  c.Database,
-		Warehouse: c.Warehouse,
-		Params: map[string]*string{
-			// client_session_keep_alive causes the driver to issue a periodic keepalive request.
-			// Without this, the authentication token will expire after 4 hours of inactivity.
-			"client_session_keep_alive": &trueString,
-			// Return query results as individual JSON documents representing rows rather than
-			// as *batches* of Arrow records.
-			"GO_QUERY_RESULT_FORMAT": &jsonString,
-		},
+	queryParams := make(url.Values)
+
+	// Required params
+	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
+	// Without this, the authentication token will expire after 4 hours of inactivity.
+	queryParams.Add("client_session_keep_alive", trueString)
+	queryParams.Add("database", c.Database)
+	// GO_QUERY_RESULT_FORMAT returns query results as individual JSON documents
+	// representing rows rather than as *batches* of Arrow records.
+	queryParams.Add("GO_QUERY_RESULT_FORMAT", jsonString)
+
+	// Optional params
+	if c.Warehouse != "" {
+		queryParams.Add("warehouse", c.Warehouse)
 	}
 
-	dsn, err := sf.DSN(cfg)
-	if err != nil {
-		panic(fmt.Errorf("internal error building snowflake dsn: %w", err))
+	if c.Account != "" {
+		queryParams.Add("account", c.Account)
 	}
+
+	// Authentication
+	var user = url.QueryEscape(c.User) + ":" + url.QueryEscape(c.Password)
+
+	dsn := user + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
 	return dsn
 }
 

@@ -13,7 +13,6 @@ func TestConfigURI(t *testing.T) {
 			Host:     "orgname-accountname.snowflakecomputing.com",
 			Database: "mydb",
 			User:     "will",
-			Account:  "myaccount",
 			Password: "some+complex/password",
 		},
 		"Optional Parameters": {
