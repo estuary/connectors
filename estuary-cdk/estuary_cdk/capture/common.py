@@ -1,5 +1,6 @@
 import abc
 import asyncio
+import copy
 import functools
 from enum import Enum, StrEnum
 from dataclasses import dataclass
@@ -412,6 +413,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     initial_state: _BaseResourceState
     initial_config: _BaseResourceConfig
     schema_inference: bool
+    schema_inference_limit: int | None = None
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
 
@@ -428,7 +430,10 @@ def discovered(
             schema = resource.model.model_json_schema(mode="serialization")
 
         if resource.schema_inference:
-            schema["x-infer-schema"] = True
+            key_only_schema = subset_schema(schema, resource.key)
+            schema["x-infer-schema"] = key_only_schema
+            if resource.schema_inference_limit is not None:
+                schema["x-schema-inference-limit"] = resource.schema_inference_limit
 
         if resource.reduction_strategy:
             schema["reduce"] = {"strategy": resource.reduction_strategy}
@@ -1056,3 +1061,46 @@ async def _binding_incremental_task(
             "incremental task is idle",
             {"sleep_for": sleep_for, "cursor": state.cursor, "subtask_id": subtask_id},
         )
+
+def subset_schema(schema: dict, pointers: list[str]) -> dict:
+    """
+    Extracts a subset of a JSON Schema based on a list of JSON Pointers.
+    
+    Constructs a new schema containing only the elements specified by the 
+    pointers and the necessary structural parents to maintain their paths.
+    """
+    subset: dict = {}
+
+    for pointer in pointers:
+        if pointer == "" or pointer == "/":
+            continue
+
+        # According to RFC 6901, pointers start with '/', so we strip it.
+        # An empty string after stripping means an invalid pointer format, so we skip.
+        if not pointer.startswith('/'):
+            continue
+        
+        parts = pointer.lstrip('/').split('/')
+
+        # Decode JSON Pointer escape sequences (~1 for / and ~0 for ~)
+        decoded_parts = [part.replace('~1', '/').replace('~0', '~') for part in parts]
+
+        # We will traverse both the source schema and our destination subset simultaneously.
+        current_source_level = schema
+        current_dest_level = subset
+
+        # Iterate through all but the last part of the path
+        for i, part in enumerate(decoded_parts):
+            # Move down one level in the source schema
+            current_source_level = current_source_level[part]
+
+            # If this is the final part of the path, we copy the entire value.
+            if i == len(decoded_parts) - 1:
+                current_dest_level[part] = copy.deepcopy(current_source_level)
+            else:
+                # For intermediate parts, we ensure the path exists in the destination.
+                # setdefault is perfect here: it gets the key if it exists, or creates
+                # it with a default value ({}) if it doesn't, and returns the value.
+                current_dest_level = current_dest_level.setdefault(part, {})
+
+    return subset
