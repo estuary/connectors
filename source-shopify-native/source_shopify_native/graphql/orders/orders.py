@@ -170,6 +170,100 @@ class Orders(ShopifyGraphQLResource):
             }
         }
     }
+    lineItems {
+        edges {
+            node {
+                # identifiers
+                id
+                sku
+                vendor
+                image {
+                    originalSrc
+                }
+
+                # quantities and statuses useful for reporting
+                quantity
+                currentQuantity
+                unfulfilledQuantity
+                refundableQuantity
+                nonFulfillableQuantity
+                requiresShipping
+                isGiftCard
+                taxable
+
+                # unit-level prices
+                originalUnitPriceSet {
+                    ..._MoneyBagFields
+                }
+                discountedUnitPriceSet {
+                    ..._MoneyBagFields
+                }
+                discountedUnitPriceAfterAllDiscountsSet {
+                    ..._MoneyBagFields
+                }
+
+                # total-level prices (quantity already factored)
+                originalTotalSet {
+                    ..._MoneyBagFields
+                }
+                discountedTotalSet {
+                    ..._MoneyBagFields
+                }
+                totalDiscountSet {
+                    ..._MoneyBagFields
+                }
+
+                # unfulfilled totals
+                unfulfilledDiscountedTotalSet {
+                    ..._MoneyBagFields
+                }
+                unfulfilledOriginalTotalSet {
+                    ..._MoneyBagFields
+                }
+
+                # promotions, taxes, duties
+                discountAllocations {
+                    allocatedAmountSet {
+                        ..._MoneyBagFields
+                    }
+                }
+                taxLines {
+                    title
+                    ratePercentage
+                    priceSet {
+                        ..._MoneyBagFields
+                    }
+                }
+                duties {
+                    id
+                    price {
+                        ..._MoneyBagFields
+                    }
+                }
+
+                # subscription & bundle information
+                sellingPlan {
+                    name
+                    sellingPlanId
+                }
+                lineItemGroup {
+                    title
+                    quantity
+                }
+
+                # product and variant information
+                variant {
+                    id
+                    legacyResourceId
+                    sku
+                }
+                product {
+                    id
+                    legacyResourceId
+                }
+            }
+        }
+    }
     phone
     poNumber
     presentmentCurrencyCode
@@ -179,9 +273,6 @@ class Orders(ShopifyGraphQLResource):
     sourceName
     registeredSourceUrl
     subtotalPrice
-    subtotalPriceSet {
-        ..._MoneyBagFields
-    }
     tags
     taxExempt
     taxLines {
@@ -236,6 +327,7 @@ class Orders(ShopifyGraphQLResource):
         DISCOUNT_APPLICATIONS_KEY = "discountApplications"
         PAYMENT_TERMS_KEY = "paymentTerms"
         PAYMENT_SCHEDULES_KEY = "paymentSchedules"
+        LINE_ITEMS_KEY = "lineItems"
         current_order = None
 
         async for line in lines:
@@ -255,6 +347,7 @@ class Orders(ShopifyGraphQLResource):
                     else record["paymentTerms"]
                 )
                 current_order[PAYMENT_TERMS_KEY][PAYMENT_SCHEDULES_KEY] = []
+                current_order[LINE_ITEMS_KEY] = []
 
             elif (
                 "gid://shopify/AutomaticDiscountApplication/" in id
@@ -352,6 +445,23 @@ class Orders(ShopifyGraphQLResource):
                     raise RuntimeError()
 
                 current_order[PAYMENT_TERMS_KEY][PAYMENT_SCHEDULES_KEY].append(record)
+
+            elif "gid://shopify/LineItem/" in id:
+                if not current_order:
+                    log.error("Found a line item before finding an order.")
+                    raise RuntimeError()
+                elif record.get("__parentId", "") != current_order.get("id", ""):
+                    log.error(
+                        "Line item's parent id does not match the current order's id. Check if the JSONL response from Shopify is not ordered correctly.",
+                        {
+                            "lineItem.id": id,
+                            "lineItem.__parentId": record.get("__parentId"),
+                            "current_order.id": current_order.get("id"),
+                        },
+                    )
+                    raise RuntimeError()
+
+                current_order[LINE_ITEMS_KEY].append(record)
 
             else:
                 log.error("Unidentified line in JSONL response.", record)
