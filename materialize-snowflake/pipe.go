@@ -136,7 +136,7 @@ func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient,
 		return nil, fmt.Errorf("parsing snowflake dsn: %w", err)
 	}
 
-	key, err := cfg.Credentials.privateKey()
+	key, err := cfg.Credentials.ParsePrivateKey()
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,7 @@ const userAgent = "Estuary Technologies Flow"
 
 func (c *PipeClient) refreshJWT() error {
 	if time.Until(c.expiry).Minutes() < 5 {
-		var key, err = c.cfg.Credentials.privateKey()
+		var key, err = c.cfg.Credentials.ParsePrivateKey()
 		if err != nil {
 			return err
 		}

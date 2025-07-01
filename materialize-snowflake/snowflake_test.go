@@ -14,6 +14,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 
 	_ "github.com/snowflakedb/gosnowflake"
 )
@@ -25,8 +26,8 @@ func mustGetCfg(t *testing.T) config {
 	}
 
 	out := config{
-		Credentials: credentialConfig{
-			AuthType: JWT,
+		Credentials: &snowflake_auth.CredentialConfig{
+			AuthType: snowflake_auth.JWT,
 		},
 	}
 
