@@ -2,15 +2,19 @@ package main
 
 import (
 	"context"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
 	"strings"
 
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
+	sf "github.com/snowflakedb/gosnowflake"
 )
 
 func main() {
@@ -21,13 +25,12 @@ type snowflakeDriver struct{}
 
 // config represents the endpoint configuration for Snowflake.
 type config struct {
-	Host      string         `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
-	User      string         `json:"user" jsonschema:"title=User,description=The Snowflake user login name." jsonschema_extras:"order=1"`
-	Password  string         `json:"password" jsonschema:"title=Password,description=The password for the provided user." jsonschema_extras:"secret=true,order=2"`
-	Database  string         `json:"database" jsonschema:"title=Database,description=The database name to capture from." jsonschema_extras:"order=3"`
-	Warehouse string         `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=4"`
-	Account   string         `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=5,x-hidden-field=true"`
-	Advanced  advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Host        string                           `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
+	Database    string                           `json:"database" jsonschema:"title=Database,description=The database name to capture from." jsonschema_extras:"order=1"`
+	Warehouse   string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=2"`
+	Account     string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=3,x-hidden-field=true"`
+	Credentials *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
+	Advanced    advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
 type advancedConfig struct {
@@ -43,14 +46,16 @@ func (c *config) Validate() error {
 	// Required properties must be present
 	var requiredProperties = [][]string{
 		{"host", c.Host},
-		{"user", c.User},
-		{"password", c.Password},
 		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	// Host must look correct
@@ -80,7 +85,7 @@ func (c *config) SetDefaults() {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c *config) ToURI() (string, error) {
 	var uri = url.URL{
 		Host: c.Host + ":443",
 	}
@@ -109,10 +114,28 @@ func (c *config) ToURI() string {
 	}
 
 	// Authentication
-	var user = url.QueryEscape(c.User) + ":" + url.QueryEscape(c.Password)
+	var user string
+	if c.Credentials.AuthType == snowflake_auth.UserPass {
+		user = url.QueryEscape(c.Credentials.User) + ":" + url.QueryEscape(c.Credentials.Password)
+	} else if c.Credentials.AuthType == snowflake_auth.JWT {
+		// We run this as part of validate to ensure that there is no error, so
+		// this is not expected to error here.
+		if key, err := c.Credentials.ParsePrivateKey(); err != nil {
+			return "", err
+		} else if privateKey, err := x509.MarshalPKCS8PrivateKey(key); err != nil {
+			return "", fmt.Errorf("parsing private key: %w", err)
+		} else {
+			privateKeyString := base64.URLEncoding.EncodeToString(privateKey)
+			queryParams.Add("privateKey", privateKeyString)
+			queryParams.Add("authenticator", strings.ToLower(sf.AuthTypeJwt.String()))
+		}
+		user = url.QueryEscape(c.Credentials.User)
+	} else {
+		return "", fmt.Errorf("unknown auth type: %s", c.Credentials.AuthType)
+	}
 
 	dsn := user + "@" + uri.Hostname() + ":" + uri.Port() + "?" + queryParams.Encode()
-	return dsn
+	return dsn, nil
 }
 
 type resource struct {

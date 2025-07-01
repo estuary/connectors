@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -74,20 +75,24 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 	if controlPass == "" {
 		controlPass = *dbCapturePass
 	}
-	var controlURI = (&config{
+	controlURI, err := (&config{
 		Host:      *dbHost,
 		Account:   *dbAccount,
-		User:      controlUser,
-		Password:  controlPass,
 		Database:  *dbName,
 		Warehouse: *dbWarehouse,
+		Credentials: &snowflake_auth.CredentialConfig{
+			AuthType: snowflake_auth.UserPass,
+			User:     controlUser,
+			Password: controlPass,
+		},
 	}).ToURI()
+	require.NoError(t, err)
 	log.WithFields(log.Fields{
 		"user":     controlUser,
 		"addr":     *dbHost,
 		"database": *dbName,
 	}).Info("opening control connection")
-	var conn, err = sql.Open("snowflake", controlURI)
+	conn, err := sql.Open("snowflake", controlURI)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
 
@@ -95,10 +100,13 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 	var captureConfig = config{
 		Host:      *dbHost,
 		Account:   *dbAccount,
-		User:      *dbCaptureUser,
-		Password:  *dbCapturePass,
 		Database:  *dbName,
 		Warehouse: *dbWarehouse,
+		Credentials: &snowflake_auth.CredentialConfig{
+			AuthType: snowflake_auth.UserPass,
+			User:     *dbCaptureUser,
+			Password: *dbCapturePass,
+		},
 	}
 	if err := captureConfig.Validate(); err != nil {
 		t.Fatalf("error validating capture config: %v", err)
