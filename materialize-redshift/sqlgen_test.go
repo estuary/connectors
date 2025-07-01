@@ -6,8 +6,8 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
-	sql "github.com/estuary/connectors/materialize-sql"
-	sqlDriver "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sqlDriver "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -19,12 +19,8 @@ func TestSQLGeneration(t *testing.T) {
 	snap, tables := sql.RunSqlGenTests(
 		t,
 		testDialect,
-		func(table string, delta bool) sql.Resource {
-			return tableConfig{
-				Table:  table,
-				Schema: "a-schema",
-				Delta:  delta,
-			}
+		func(table string) []string {
+			return []string{"a-schema", table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
@@ -76,7 +72,7 @@ func TestSQLGeneration(t *testing.T) {
 			},
 		},
 		ManifestURL: "s3://some_bucket/files.manifest",
-		Config: &config{
+		Config: config{
 			AWSAccessKeyID:     "accessKeyID",
 			AWSSecretAccessKey: "secretKey",
 			Region:             "us-somewhere-1",

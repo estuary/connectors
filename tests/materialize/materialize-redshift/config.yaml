@@ -3,6 +3,7 @@ database: dev
 password_sops: ENC[AES256_GCM,data:kcluRuHji9ckwA==,iv:SRE4ZtcVSFOPHikXJhXEFF5xXcMa7kTbPUCqmgBqbQ0=,tag:mjqomw4ihdngh9yzvIKTkg==,type:str]
 user: estuary
 bucket: estuary-connector-test-bucket
+bucketPath: /data
 awsAccessKeyId_sops: ENC[AES256_GCM,data:3L+AVRhCzLkB4U8w60c2yGy2+d0=,iv:28lMs99/dxbwRXHTq+wrMWQ1O5NOVKQ68MSBknYH23Q=,tag:xpVNrAD3jAsRskHF1U0mlQ==,type:str]
 awsSecretAccessKey_sops: ENC[AES256_GCM,data:Pxfnq7DKq37jczCgThj0YxJVXG2oGAjecoOLsdxXocW8HtHj2uFCpQ==,iv:aK9IQZfzoDGLXSjCxnAL8uzGnxQoMUamHNgCkIb7A3A=,tag:ofO838dR/xnXVyOGTSWfAA==,type:str]
 region: us-east-2
@@ -18,8 +19,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-02-12T15:21:19Z"
-    mac: ENC[AES256_GCM,data:KBhiyfZdptjpTzTE9dg3PRxpH3HXSimDlm8l18P3tP/pwJCZAftQ91qI0AVqWhSgUgItZBQ75sY5RcePVEGQYLMw1iYxBs7wP/48G6nG2Uzm69LaOOX3MwGfkSwiWTli0hy9aHZdfL8jH4wY8oe/KTiJKRqBIeSwxvo//DadAis=,iv:2PzsVce/xnWa/Jno0gXwGf/XYnWo5oOqOtX9nhV1F80=,tag:pw+cidgbHuqWG6UbNWeCaQ==,type:str]
+    lastmodified: "2025-07-01T20:14:25Z"
+    mac: ENC[AES256_GCM,data:a3k77KKy2QF0vuAH7p4n9OMlwzQQkQ2v5owooWgHpmTbBbIyNv1kfs0E+Vdj8JBcJHUGVVScrm7kiPXq6DkaQKQAwDbwGETpEota3CmXlw7y6fy5ecEDBb1s4sHcwkMdgHMHFxJZ8/9Ie0pOZDyv8JlMAVHgfyXzuDRO0LcmnkU=,iv:UAZrOEakRooZd95QwwqO24Vv7haUZAlv9NOVsuYvDXU=,tag:vdX3V0vmaRonyiTY8Hm70g==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4

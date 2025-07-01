@@ -14,12 +14,11 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jackc/pgconn"
@@ -86,7 +85,7 @@ type config struct {
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
@@ -102,12 +101,6 @@ func (c *config) Validate() error {
 		}
 	}
 
-	if c.BucketPath != "" {
-		// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
-		// chars in the URI and so that the object key does not start with a /.
-		c.BucketPath = strings.TrimPrefix(c.BucketPath, "/")
-	}
-
 	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
@@ -119,11 +112,25 @@ func (c *config) Validate() error {
 	return nil
 }
 
-func (c *config) networkTunnelEnabled() bool {
+func (c config) effectiveBucketPath() string {
+	// If BucketPath starts with a / trim the leading / so that we don't end up with repeated /
+	// chars in the URI and so that the object key does not start with a /.
+	return strings.TrimPrefix(c.BucketPath, "/")
+}
+
+func (c config) DefaultNamespace() string {
+	return c.Schema
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
+func (c config) networkTunnelEnabled() bool {
 	return c.NetworkTunnel != nil && c.NetworkTunnel.SshForwarding != nil && c.NetworkTunnel.SshForwarding.SshEndpoint != ""
 }
 
-func (c *config) toURI() string {
+func (c config) toURI() string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432 to address
 	// through the bastion server, so we use the tunnel's address
@@ -147,7 +154,7 @@ func (c *config) toURI() string {
 	return uri.String()
 }
 
-func (c *config) toS3Client(ctx context.Context) (*s3.Client, error) {
+func (c config) toS3Client(ctx context.Context) (*s3.Client, error) {
 	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
 		awsConfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""),
@@ -167,12 +174,11 @@ type tableConfig struct {
 	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		// Default to an explicit endpoint configuration schema, if set.
-		// This will be over-written by a present `schema` property within `raw`.
-		Schema: ep.Config.(*config).Schema,
+func (c tableConfig) WithDefaults(cfg config) tableConfig {
+	if c.Schema == "" {
+		c.Schema = cfg.Schema
 	}
+	return c
 }
 
 // Validate the resource configuration.
@@ -183,25 +189,20 @@ func (r tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sql.TablePath {
+func (c tableConfig) Parameters() ([]string, bool, error) {
+	var path []string
 	if c.Schema != "" {
-		return []string{c.Schema, c.Table}
+		path = []string{c.Schema, c.Table}
+	} else {
+		path = []string{c.Table}
 	}
-	return []string{c.Table}
+	return path, c.Delta, nil
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
-}
-
-func newRedshiftDriver() *sql.Driver {
-	return &sql.Driver{
+func newRedshiftDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-redshift",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel: func(ctx context.Context, conf any) error {
-			cfg := conf.(*config)
-
+		StartTunnel: func(ctx context.Context, cfg config) error {
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.networkTunnelEnabled() {
 				host, port, err := net.SplitHostPort(cfg.Address)
@@ -225,12 +226,7 @@ func newRedshiftDriver() *sql.Driver {
 
 			return nil
 		},
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("could not parse endpoint configuration: %w", err)
-			}
-
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"database": cfg.Database,
 				"address":  cfg.Address,
@@ -261,22 +257,27 @@ func newRedshiftDriver() *sql.Driver {
 				log.WithField("caseSensitiveIdentifierEnabled", caseSensitiveIdentifierEnabled).Info("detected value for enable_case_sensitive_identifier")
 			}
 
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
 			if cfg.Advanced.FeatureFlags != "" {
 				log.WithField("flags", featureFlags).Info("parsed feature flags")
 			}
 
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       prepareNewTransactor(templates, caseSensitiveIdentifierEnabled),
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					ExtendedLogging: true,
+					AckSchedule: &boilerplate.AckScheduleOption{
+						Config: cfg.Schedule,
+						Jitter: []byte(cfg.Address),
+					},
+					DBTJobTrigger: &cfg.DBTJobTrigger,
+				},
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -289,23 +290,24 @@ type transactor struct {
 	fence     sql.Fence
 	bindings  []*binding
 	be        *boilerplate.BindingEvents
-	cfg       *config
+	cfg       config
 }
 
 func prepareNewTransactor(
 	templates templates,
 	caseSensitiveIdentifierEnabled bool,
-) func(context.Context, *sql.Endpoint, sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, *boilerplate.MaterializeOptions, error) {
+) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
-		ep *sql.Endpoint,
+		featureFlags map[string]bool,
+		ep *sql.Endpoint[config],
 		fence sql.Fence,
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
 		be *boilerplate.BindingEvents,
-	) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-		var cfg = ep.Config.(*config)
+	) (m.Transactor, error) {
+		var cfg = ep.Config
 
 		var d = &transactor{
 			templates: templates,
@@ -317,7 +319,7 @@ func prepareNewTransactor(
 
 		s3client, err := d.cfg.toS3Client(ctx)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
 		for idx, target := range bindings {
@@ -328,20 +330,11 @@ func prepareNewTransactor(
 				is,
 				caseSensitiveIdentifierEnabled,
 			); err != nil {
-				return nil, nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
 		}
 
-		opts := &boilerplate.MaterializeOptions{
-			ExtendedLogging: true,
-			AckSchedule: &boilerplate.AckScheduleOption{
-				Config: cfg.Schedule,
-				Jitter: []byte(cfg.Address),
-			},
-			DBTJobTrigger: &cfg.DBTJobTrigger,
-		}
-
-		return d, opts, nil
+		return d, nil
 	}
 }
 
@@ -392,9 +385,9 @@ func (t *transactor) addBinding(
 ) error {
 	var b = &binding{
 		target:     target,
-		loadFile:   newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
-		storeFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.ColumnNames()),
-		deleteFile: newStagedFile(client, t.cfg.Bucket, t.cfg.BucketPath, target.KeyNames()),
+		loadFile:   newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		storeFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
+		deleteFile: newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
 	}
 
 	// Render templates that require specific S3 "COPY INTO" parameters.

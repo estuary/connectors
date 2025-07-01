@@ -12,7 +12,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -155,7 +155,7 @@ func TestFencingCases(t *testing.T) {
 	ctx := context.Background()
 	templates := renderTemplates(testDialect)
 
-	c, err := newClient(ctx, &sql.Endpoint{Config: &cfg})
+	c, err := newClient(ctx, &sql.Endpoint[config]{Config: cfg})
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -233,68 +233,68 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) *config
+		cfg  func(config) config
 		want []error
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) *config { return &cfg },
+			cfg:  func(cfg config) config { return cfg },
 			want: nil,
 		},
 		{
 			name: "wrong username",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.User = "wrong" + cfg.User
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong password",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Password = "wrong" + cfg.Password
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong database",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Database = "wrong" + cfg.Database
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("database %q does not exist", "wrong"+cfg.Database)},
 		},
 		{
 			name: "bucket doesn't exist",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Bucket = nonExistentBucket
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("bucket %q does not exist", nonExistentBucket)},
 		},
 		{
 			name: "unauthorized to bucket: access key id",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.AWSAccessKeyID = "wrong" + cfg.AWSAccessKeyID
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("not authorized to write to %q", cfg.Bucket)},
 		},
 		{
 			name: "unauthorized to bucket: secret access key",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.AWSSecretAccessKey = "wrong" + cfg.AWSSecretAccessKey
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("not authorized to write to %q", cfg.Bucket)},
 		},
 		{
 			name: "database problem and bucket problem",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Database = "wrong" + cfg.Database
 				cfg.Bucket = nonExistentBucket
-				return &cfg
+				return cfg
 			},
 			want: []error{
 				fmt.Errorf("database %q does not exist", "wrong"+cfg.Database),
