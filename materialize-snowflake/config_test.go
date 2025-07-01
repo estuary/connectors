@@ -5,6 +5,8 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/stretchr/testify/require"
+
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 )
 
 func TestConfigURI(t *testing.T) {
@@ -13,11 +15,11 @@ func TestConfigURI(t *testing.T) {
 			Host:     "orgname-accountname.snowflakecomputing.com",
 			Database: "mydb",
 			Schema:   "myschema",
-			Credentials: credentialConfig{
-				UserPass,
-				"will",
-				"some+complex/password",
-				"non-existant-jwt",
+			Credentials: &snowflake_auth.CredentialConfig{
+				AuthType:   snowflake_auth.UserPass,
+				User:       "will",
+				Password:   "some+complex/password",
+				PrivateKey: "non-existant-jwt",
 			},
 		},
 		"Optional Parameters": {
@@ -27,11 +29,11 @@ func TestConfigURI(t *testing.T) {
 			Warehouse: "mywarehouse",
 			Role:      "myrole",
 			Account:   "myaccount",
-			Credentials: credentialConfig{
-				UserPass,
-				"alex",
-				"mysecret",
-				"non-existant-jwt",
+			Credentials: &snowflake_auth.CredentialConfig{
+				AuthType:   snowflake_auth.UserPass,
+				User:       "alex",
+				Password:   "mysecret",
+				PrivateKey: "non-existant-jwt",
 			},
 		},
 	} {

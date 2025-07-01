@@ -24,6 +24,7 @@ import (
 	sf "github.com/snowflakedb/gosnowflake"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 )
 
 type tableConfig struct {
@@ -233,7 +234,7 @@ func prepareNewTransactor(snowpipeStreaming bool) func(context.Context, *sql.End
 
 		var sm *streamManager
 		var pipeClient *PipeClient
-		if cfg.Credentials.AuthType == JWT {
+		if cfg.Credentials.AuthType == snowflake_auth.JWT {
 			var accountName string
 			if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
 				return nil, nil, fmt.Errorf("fetching current account name: %w", err)
@@ -323,7 +324,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT && streamingEnabled {
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
 		if err := d.streamManager.addBinding(ctx, loc.TableSchema, target); err != nil {
 			var apiError *streamingApiError
@@ -350,7 +351,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	b.load.stage = newStagedFile(os.TempDir())
 	b.store.stage = newStagedFile(os.TempDir())
 
-	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == JWT {
+	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
 		var tableName = b.target.Path[len(b.target.Path)-1]
 		parts := pipeParts{

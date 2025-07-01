@@ -180,7 +180,7 @@ type streamClient struct {
 func newStreamClient(cfg *config, account string) (*streamClient, error) {
 	var role *string
 
-	key, err := cfg.Credentials.privateKey()
+	key, err := cfg.Credentials.ParsePrivateKey()
 	if err != nil {
 		return nil, err
 	}
