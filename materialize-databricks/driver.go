@@ -14,10 +14,9 @@ import (
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
-	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -36,18 +35,17 @@ type tableConfig struct {
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run after table is created." jsonschema_extras:"multiline=true"`
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{Schema: ep.Config.(*config).SchemaName}
+func (c tableConfig) WithDefaults(cfg config) tableConfig {
+	if c.Schema == "" {
+		c.Schema = cfg.SchemaName
+	}
+	return c
 }
 
 // Validate the resource configuration.
 func (r tableConfig) Validate() error {
 	if r.Table == "" {
 		return fmt.Errorf("missing table")
-	}
-
-	if r.Schema == "" {
-		return fmt.Errorf("missing schema")
 	}
 
 	var forbiddenChars = ". /"
@@ -62,48 +60,41 @@ func (r tableConfig) Validate() error {
 // control characters. Ref: https://docs.databricks.com/en/sql/language-manual/sql-ref-names.html
 var tableSanitizerRegex = regexp.MustCompile(`[\. \/]`)
 
-func (c tableConfig) Path() sql.TablePath {
-	return []string{c.Schema, tableSanitizerRegex.ReplaceAllString(c.Table, "_")}
+func (c tableConfig) Parameters() ([]string, bool, error) {
+	return []string{c.Schema, tableSanitizerRegex.ReplaceAllString(c.Table, "_")}, c.Delta, nil
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
-}
-
-func newDatabricksDriver() *sql.Driver {
-	return &sql.Driver{
+func newDatabricksDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel:      func(ctx context.Context, conf any) error { return nil },
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-			}
-
+		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"address": cfg.Address,
 				"path":    cfg.HTTPPath,
 				"catalog": cfg.CatalogName,
 			}).Info("connecting to databricks")
 
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-			if cfg.Advanced.FeatureFlags != "" {
-				log.WithField("flags", featureFlags).Info("parsed feature flags")
-			}
+			var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
+			var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             databricksDialect,
 				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					ExtendedLogging: true,
+					AckSchedule: &boilerplate.AckScheduleOption{
+						Config: cfg.Schedule,
+						Jitter: []byte(warehouseId),
+					},
+					DBTJobTrigger: &cfg.DBTJobTrigger,
+				},
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -111,7 +102,7 @@ func newDatabricksDriver() *sql.Driver {
 }
 
 type transactor struct {
-	cfg              *config
+	cfg              config
 	cp               checkpoint
 	cpRecovery       bool // is this checkpoint a recovered checkpoint?
 	wsClient         *databricks.WorkspaceClient
@@ -131,14 +122,15 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 
 func newTransactor(
 	ctx context.Context,
-	ep *sql.Endpoint,
+	featureFlags map[string]bool,
+	ep *sql.Endpoint[config],
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
 	be *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-	var cfg = ep.Config.(*config)
+) (m.Transactor, error) {
+	var cfg = ep.Config
 
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
 		Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
@@ -147,24 +139,21 @@ func newTransactor(
 		HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
 	})
 	if err != nil {
-		return nil, nil, fmt.Errorf("initialising workspace client: %w", err)
+		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
 
 	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be}
 
-	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
-	var warehouseId = httpPathSplit[len(httpPathSplit)-1]
-
 	db, err := stdsql.Open("databricks", d.cfg.ToURI())
 	if err != nil {
-		return nil, nil, fmt.Errorf("sql.Open: %w", err)
+		return nil, fmt.Errorf("sql.Open: %w", err)
 	}
 	defer db.Close()
 
 	schemas := map[string]struct{}{cfg.SchemaName: {}}
 	for _, binding := range bindings {
 		if err = d.addBinding(binding); err != nil {
-			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 
 		schemas[binding.Path[0]] = struct{}{}
@@ -177,26 +166,17 @@ func newTransactor(
 			"volumeName": volumeName,
 		}).Debug("creating volume for schema if it doesn't already exist")
 		if _, err := db.ExecContext(ctx, fmt.Sprintf("CREATE VOLUME IF NOT EXISTS `%s`.`%s`;", sch, volumeName)); err != nil {
-			return nil, nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
+			return nil, fmt.Errorf("Exec(CREATE VOLUME IF NOT EXISTS `%s`.`%s`;): %w", sch, volumeName, err)
 		}
 	}
 
 	if tempDir, err := os.MkdirTemp("", "staging"); err != nil {
-		return nil, nil, err
+		return nil, err
 	} else {
 		d.localStagingPath = tempDir
 	}
 
-	opts := &boilerplate.MaterializeOptions{
-		ExtendedLogging: true,
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: cfg.Schedule,
-			Jitter: []byte(warehouseId),
-		},
-		DBTJobTrigger: &cfg.DBTJobTrigger,
-	}
-
-	return d, opts, nil
+	return d, nil
 }
 
 type binding struct {
