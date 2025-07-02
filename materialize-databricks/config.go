@@ -97,7 +97,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 }
 
 // Validate the configuration.
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"http_path", c.HTTPPath},
@@ -121,8 +121,16 @@ func (c *config) Validate() error {
 	return c.Credentials.Validate()
 }
 
+func (c config) DefaultNamespace() string {
+	return c.SchemaName
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 // ToURI puts together address and http_path to form the full workspace URL
-func (c *config) ToURI() string {
+func (c config) ToURI() string {
 	var address = c.Address
 	if !strings.Contains(address, ":") {
 		address = address + ":" + defaultPort
