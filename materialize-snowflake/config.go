@@ -40,7 +40,7 @@ type advancedConfig struct {
 }
 
 // toURI manually builds the DSN connection string.
-func (c *config) toURI(tenant string) (string, error) {
+func (c config) toURI(tenant string) (string, error) {
 	var uri = url.URL{
 		Host: c.Host + ":443",
 	}
@@ -116,7 +116,11 @@ func validHost(h string) error {
 	return nil
 }
 
-func (c *config) Validate() error {
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"host", c.Host},
 		{"database", c.Database},

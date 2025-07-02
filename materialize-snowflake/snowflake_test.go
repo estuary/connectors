@@ -11,7 +11,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
@@ -28,6 +28,9 @@ func mustGetCfg(t *testing.T) config {
 	out := config{
 		Credentials: &snowflake_auth.CredentialConfig{
 			AuthType: snowflake_auth.JWT,
+		},
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}
 
@@ -208,7 +211,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(cfg), "testing").Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), *tt.cfg(cfg), "testing").Unwrap())
 		})
 	}
 }
