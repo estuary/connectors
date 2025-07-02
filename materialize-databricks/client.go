@@ -18,8 +18,7 @@ import (
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/databricks/databricks-sql-go"
@@ -29,13 +28,13 @@ var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
 	db       *stdsql.DB
-	cfg      *config
-	ep       *sql.Endpoint
+	cfg      config
+	ep       *sql.Endpoint[config]
 	wsClient *databricks.WorkspaceClient
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	cfg := ep.Config
 
 	db, err := stdsql.Open("databricks", cfg.ToURI())
 	if err != nil {
@@ -59,12 +58,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	}, nil
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(c.ep.Dialect.TableLocator),
-		c.ep.Dialect.ColumnLocator,
-	)
-
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	rpSchemas := make(map[string]struct{})
 	for _, p := range resourcePaths {
 		rpSchemas[databricksDialect.TableLocator(p).TableSchema] = struct{}{}
@@ -82,7 +76,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	// tables in schemas that do exist.
 	existingSchemas, err := c.ListSchemas(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("listing schemas: %w", err)
+		return fmt.Errorf("listing schemas: %w", err)
 	}
 
 	for sc := range rpSchemas {
@@ -99,14 +93,14 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		for tableIter.HasNext(ctx) {
 			t, err := tableIter.Next(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("iterating tables: %w", err)
+				return fmt.Errorf("iterating tables: %w", err)
 			}
 
 			res := is.PushResource(t.SchemaName, t.Name)
 			for _, c := range t.Columns {
 				var colMeta columnMeta
 				if err := json.Unmarshal([]byte(c.TypeJson), &colMeta); err != nil {
-					return nil, fmt.Errorf("unmarshalling column metadata: %w", err)
+					return fmt.Errorf("unmarshalling column metadata: %w", err)
 				}
 
 				res.PushField(boilerplate.ExistingField{
@@ -120,7 +114,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		}
 	}
 
-	return is, nil
+	return nil
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -129,12 +123,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return err
 	}
 
-	var res = newTableConfig(c.ep).(*tableConfig)
-	if tc.ResourceConfigJson != nil {
-		if err := pf.UnmarshalStrict(tc.ResourceConfigJson, res); err != nil {
-			return fmt.Errorf("unmarshalling resource binding for bound collection %q: %w", tc.Source.String(), err)
-		}
-	}
+	var res = tc.Resource.(tableConfig).WithDefaults(c.cfg)
 	if res.AdditionalSql != "" {
 		if _, err := c.db.ExecContext(ctx, res.AdditionalSql); err != nil {
 			return fmt.Errorf("executing additional SQL statement '%s': %w", res.AdditionalSql, err)
@@ -213,19 +202,17 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return schemaNames, nil
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	_, err := c.wsClient.Schemas.Create(ctx, catalog.CreateSchema{
 		CatalogName: c.cfg.CatalogName,
 		Name:        schemaName,
 	})
 
-	return err
+	return fmt.Sprintf("CREATE SCHEMA %s;", schemaName), err
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	cfg := conf.(*config)
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
 		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
 		Token:       cfg.Credentials.PersonalAccessToken,

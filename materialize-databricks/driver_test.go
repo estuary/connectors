@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/databricks/databricks-sql-go"
@@ -23,7 +23,11 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	out := config{}
+	out := config{
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
+	}
 
 	for _, prop := range []struct {
 		key  string
