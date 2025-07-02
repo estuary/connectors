@@ -28,7 +28,6 @@ type config struct {
 	Host        string                           `json:"host" jsonschema:"title=Host URL,description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
 	Database    string                           `json:"database" jsonschema:"title=Database,description=The database name to capture from." jsonschema_extras:"order=1"`
 	Warehouse   string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=2"`
-	Account     string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=3,x-hidden-field=true"`
 	Credentials *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
 	Advanced    advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
@@ -107,10 +106,6 @@ func (c *config) ToURI() (string, error) {
 	// Optional params
 	if c.Warehouse != "" {
 		queryParams.Add("warehouse", c.Warehouse)
-	}
-
-	if c.Account != "" {
-		queryParams.Add("account", c.Account)
 	}
 
 	// Authentication

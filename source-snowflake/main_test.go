@@ -24,7 +24,6 @@ import (
 
 var (
 	dbHost      = flag.String("db_host", "bn92689.us-central1.gcp.snowflakecomputing.com", "The Snowflake host to use for tests")
-	dbAccount   = flag.String("db_account", "bn92689", "The Snowflake account ID to use for tests")
 	dbName      = flag.String("db_name", "CONNECTOR_TESTING", "The database to use for tests")
 	dbWarehouse = flag.String("db_warehouse", "COMPUTE_WH", "The warehouse to execute test queries in")
 	dbSchema    = flag.String("db_schema", "PUBLIC", "The schema to execute test queries in")
@@ -77,7 +76,6 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 	}
 	controlURI, err := (&config{
 		Host:      *dbHost,
-		Account:   *dbAccount,
 		Database:  *dbName,
 		Warehouse: *dbWarehouse,
 		Credentials: &snowflake_auth.CredentialConfig{
@@ -99,7 +97,6 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 	// Construct the capture config
 	var captureConfig = config{
 		Host:      *dbHost,
-		Account:   *dbAccount,
 		Database:  *dbName,
 		Warehouse: *dbWarehouse,
 		Credentials: &snowflake_auth.CredentialConfig{
