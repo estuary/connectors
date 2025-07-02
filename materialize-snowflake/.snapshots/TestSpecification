@@ -38,7 +38,8 @@
         "type": "string",
         "title": "Account",
         "description": "Optional Snowflake account identifier.",
-        "order": 7
+        "order": 7,
+        "x-hidden-field": true
       },
       "hardDelete": {
         "type": "boolean",
