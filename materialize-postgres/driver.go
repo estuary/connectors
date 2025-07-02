@@ -12,13 +12,12 @@ import (
 	"text/template"
 	"time"
 
-	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jackc/pgx/v5"
@@ -82,8 +81,12 @@ type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 // Validate the configuration.
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
@@ -116,7 +119,7 @@ func (c *config) Validate() error {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c config) ToURI() string {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
@@ -163,12 +166,11 @@ type tableConfig struct {
 	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
-func newTableConfig(ep *sql.Endpoint) sql.Resource {
-	return &tableConfig{
-		// Default to an explicit endpoint configuration schema, if set.
-		// This will be over-written by a present `schema` property within `raw`.
-		Schema: ep.Config.(*config).Schema,
+func (c tableConfig) WithDefaults(cfg config) tableConfig {
+	if c.Schema == "" {
+		c.Schema = cfg.Schema
 	}
+	return c
 }
 
 // Validate the resource configuration.
@@ -179,24 +181,20 @@ func (r tableConfig) Validate() error {
 	return nil
 }
 
-func (c tableConfig) Path() sql.TablePath {
+func (c tableConfig) Parameters() ([]string, bool, error) {
+	var path []string
 	if c.Schema != "" {
-		return []string{c.Schema, c.Table}
+		path = []string{c.Schema, c.Table}
+	} else {
+		path = []string{c.Table}
 	}
-	return []string{c.Table}
+	return path, c.Delta, nil
 }
 
-func (c tableConfig) DeltaUpdates() bool {
-	return c.Delta
-}
-
-func newPostgresDriver() *sql.Driver {
-	return &sql.Driver{
+func newPostgresDriver() *sql.Driver[config, tableConfig] {
+	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-postgresql",
-		EndpointSpecType: new(config),
-		ResourceSpecType: new(tableConfig),
-		StartTunnel: func(ctx context.Context, conf any) error {
-			cfg := conf.(*config)
+		StartTunnel: func(ctx context.Context, cfg config) error {
 
 			// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
 			if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SshForwarding != nil && cfg.NetworkTunnel.SshForwarding.SshEndpoint != "" {
@@ -223,39 +221,30 @@ func newPostgresDriver() *sql.Driver {
 
 			return nil
 		},
-		NewEndpoint: func(ctx context.Context, raw json.RawMessage, tenant string) (*sql.Endpoint, error) {
-			var cfg = new(config)
-			if err := pf.UnmarshalStrict(raw, cfg); err != nil {
-				return nil, fmt.Errorf("parsing endpoint configuration: %w", err)
-			}
-
+		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"database": cfg.Database,
 				"address":  cfg.Address,
 				"user":     cfg.User,
 			}).Info("opening database")
 
-			var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-			if cfg.Advanced.FeatureFlags != "" {
-				log.WithField("flags", featureFlags).Info("parsed feature flags")
-			}
-
 			var metaBase sql.TablePath
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
 
-			return &sql.Endpoint{
+			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             pgDialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
-				NewResource:         newTableConfig,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				FeatureFlags:        featureFlags,
+				Options: boilerplate.MaterializeOptions{
+					DBTJobTrigger: &cfg.DBTJobTrigger,
+				},
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -263,7 +252,7 @@ func newPostgresDriver() *sql.Driver {
 }
 
 type transactor struct {
-	cfg *config
+	cfg config
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -281,37 +270,39 @@ type transactor struct {
 
 func newTransactor(
 	ctx context.Context,
-	ep *sql.Endpoint,
+	featureFlags map[string]bool,
+	ep *sql.Endpoint[config],
 	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
 	be *boilerplate.BindingEvents,
-) (_ m.Transactor, _ *boilerplate.MaterializeOptions, err error) {
-	var cfg = ep.Config.(*config)
+) (m.Transactor, error) {
+	var cfg = ep.Config
 
 	var d = &transactor{cfg: cfg, be: be}
 	d.store.fence = fence
 
 	// Establish connections.
+	var err error
 	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
-		return nil, nil, fmt.Errorf("load pgx.Connect: %w", err)
+		return nil, fmt.Errorf("load pgx.Connect: %w", err)
 	}
 	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
-		return nil, nil, fmt.Errorf("store pgx.Connect: %w", err)
+		return nil, fmt.Errorf("store pgx.Connect: %w", err)
 	}
 
 	// Override statement_timeout with a session-level setting to never timeout
 	// statements.
 	if _, err := d.load.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
-		return nil, nil, fmt.Errorf("load set statement_timeout: %w", err)
+		return nil, fmt.Errorf("load set statement_timeout: %w", err)
 	} else if _, err := d.store.conn.Exec(ctx, "set statement_timeout = 0;"); err != nil {
-		return nil, nil, fmt.Errorf("store set statement_timeout: %w", err)
+		return nil, fmt.Errorf("store set statement_timeout: %w", err)
 	}
 
 	for _, binding := range bindings {
 		if err = d.addBinding(ctx, binding, is); err != nil {
-			return nil, nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
+			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
 
@@ -322,11 +313,7 @@ func newTransactor(
 	}
 	d.load.unionSQL = strings.Join(subqueries, "\nUNION ALL\n") + ";"
 
-	opts := &boilerplate.MaterializeOptions{
-		DBTJobTrigger: &cfg.DBTJobTrigger,
-	}
-
-	return d, opts, nil
+	return d, nil
 }
 
 type binding struct {

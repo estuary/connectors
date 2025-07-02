@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 )
 
 var pgDialect = func() sql.Dialect {

@@ -6,7 +6,7 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )
@@ -15,11 +15,8 @@ func TestSQLGeneration(t *testing.T) {
 	snap, _ := sql.RunSqlGenTests(
 		t,
 		pgDialect,
-		func(table string, delta bool) sql.Resource {
-			return tableConfig{
-				Table: table,
-				Delta: delta,
-			}
+		func(table string) []string {
+			return []string{table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
@@ -43,7 +40,7 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped, err = pgDialect.MapType(&sql.Projection{
+	var mapped = pgDialect.MapType(&sql.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},
@@ -51,8 +48,7 @@ func TestDateTimeColumn(t *testing.T) {
 				Exists:  pf.Inference_MUST,
 			},
 		},
-	})
-	require.NoError(t, err)
+	}, sql.FieldConfig{})
 	require.Equal(t, "TIMESTAMPTZ NOT NULL", mapped.DDL)
 
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
