@@ -22,10 +22,19 @@ Example `flow.yaml` for discovery:
           connector:
             image: "ghcr.io/estuary/source-snowflake:v1"
             config:
+              credentials:
+                auth_type: jwt
+                user: snowflake_user
+                privateKey: |
+                  -----BEGIN PRIVATE KEY-----
+                  MIIEv....
+                  ...
+                  ...
+                  ...
+                  ...
+                  ...
+                  -----END PRIVATE KEY-----
               host: bn92689.us-central1.gcp.snowflakecomputing.com
-              account: bn92689
-              user: USERNAME
-              password: secret1234
               database: CONNECTOR_TESTING
               warehouse: COMPUTE_WH
         bindings: []
