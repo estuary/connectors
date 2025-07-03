@@ -178,6 +178,11 @@ type PullOutput struct {
 	sync.Mutex
 	pc.Connector_CaptureServer
 
+	reused struct {
+		msg pc.Response          // Preallocated message to avoid allocations in Document()
+		doc pc.Response_Captured // Preallocated captured document to avoid allocations in Document()
+	}
+
 	// Map from binding index to SHA-256 hash of the latest schema JSON we output,
 	// used to avoid outputting identical SourcedSchemas multiple times.
 	schemaHashes map[int][32]byte
@@ -199,39 +204,30 @@ func (out *PullOutput) Ready(explicitAcknowledgements bool) error {
 }
 
 // Documents emits one or more documents to the specified binding index.
+//
+// TODO(wgd): We should change binding to be a uint32 since that's what they are in the protocol.
 func (out *PullOutput) Documents(binding int, docs ...json.RawMessage) error {
-	log.WithField("count", len(docs)).Trace("emitting documents")
-
-	var messages []*pc.Response
-	for _, doc := range docs {
-		messages = append(messages, &pc.Response{
-			Captured: &pc.Response_Captured{
-				Binding: uint32(binding),
-				DocJson: doc,
-			},
-		})
-	}
-
 	// Emit all the messages with a single mutex acquisition so that a single Documents()
 	// call is atomic (no Checkpoint outputs can be interleaved with it) even when handling
 	// multiple documents at once.
 	out.Lock()
-	defer out.Unlock()
-	for _, msg := range messages {
-		if err := out.Send(msg); err != nil {
+	for _, doc := range docs {
+		// Reset the preallocated message and then set it up for the current document.
+		out.reused.msg.Reset()
+		out.reused.msg.Captured = &out.reused.doc
+		out.reused.doc.Binding = uint32(binding)
+		out.reused.doc.DocJson = doc
+		if err := out.Send(&out.reused.msg); err != nil {
+			out.Unlock()
 			return fmt.Errorf("writing captured documents: %w", err)
 		}
 	}
+	out.Unlock()
 	return nil
 }
 
 // Checkpoint emits a state checkpoint, with or without RFC 7396 patch-merge semantics.
 func (out *PullOutput) Checkpoint(checkpoint json.RawMessage, merge bool) error {
-	log.WithFields(log.Fields{
-		"checkpoint": checkpoint,
-		"merge":      merge,
-	}).Trace("emitting checkpoint")
-
 	var msg = &pc.Response{
 		Checkpoint: &pc.Response_Checkpoint{
 			State: &pf.ConnectorState{
