@@ -9,39 +9,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 )
-
-type ddbApplier struct {
-	client *client
-	cfg    config
-}
-
-func (e *ddbApplier) CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
-	binding := spec.Bindings[bindingIndex]
-
-	tableName := binding.ResourcePath[0]
-	attrs, schema := tableConfigFromBinding(binding.Collection.Projections)
-
-	return fmt.Sprintf("create table %q", tableName), func(ctx context.Context) error {
-		return createTable(ctx, e.client, tableName, attrs, schema)
-	}, nil
-}
-
-func (e *ddbApplier) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	return fmt.Sprintf("delete table %q", path[0]), func(ctx context.Context) error {
-		return deleteTable(ctx, e.client, path[0])
-	}, nil
-}
-
-func (e *ddbApplier) UpdateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
-	// No-op since DynamoDB only applies a schema to the key columns, and Flow doesn't allow you to
-	// change the key of an established collection, and the Validation constraints don't allow
-	// changing the type of a key field in a way that would change its materialized type.
-	return "", nil, nil
-}
 
 func createTable(
 	ctx context.Context,
@@ -127,32 +96,4 @@ func deleteTable(ctx context.Context, client *client, name string) error {
 		time.Sleep(1 * time.Second)
 		attempts -= 1
 	}
-}
-
-func tableConfigFromBinding(projections []pf.Projection) ([]types.AttributeDefinition, []types.KeySchemaElement) {
-	mappedKeys := []mappedType{}
-	for _, p := range projections {
-		if p.IsPrimaryKey {
-			mappedKeys = append(mappedKeys, mapType(&p))
-		}
-	}
-
-	// The collection keys will be used as the partition key and sort key, respectively.
-	keyTypes := [2]types.KeyType{types.KeyTypeHash, types.KeyTypeRange}
-
-	attrs := []types.AttributeDefinition{}
-	schema := []types.KeySchemaElement{}
-
-	for idx, k := range mappedKeys {
-		attrs = append(attrs, types.AttributeDefinition{
-			AttributeName: aws.String(k.field),
-			AttributeType: k.ddbScalarType,
-		})
-		schema = append(schema, types.KeySchemaElement{
-			AttributeName: aws.String(k.field),
-			KeyType:       keyTypes[idx],
-		})
-	}
-
-	return attrs, schema
 }

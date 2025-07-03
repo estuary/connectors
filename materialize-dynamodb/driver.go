@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -11,13 +11,13 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/estuary/connectors/go/common"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
-	log "github.com/sirupsen/logrus"
 )
 
 var featureFlagDefaults = map[string]bool{}
@@ -35,7 +35,7 @@ type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"awsAccessKeyId", c.AWSAccessKeyID},
 		{"awsSecretAccessKey", c.AWSSecretAccessKey},
@@ -50,11 +50,15 @@ func (c *config) Validate() error {
 	return nil
 }
 
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 type resource struct {
 	Table string `json:"table" jsonschema:"title=Table Name,description=The name of the table to be materialized to." jsonschema_extras:"x-collection-name=true"`
 }
 
-func (r *resource) Validate() error {
+func (r resource) Validate() error {
 	var requiredProperties = [][]string{
 		{"table", r.Table},
 	}
@@ -69,6 +73,19 @@ func (r *resource) Validate() error {
 	}
 
 	return nil
+}
+
+func (r resource) WithDefaults(cfg config) resource {
+	return r
+}
+
+func (r resource) Parameters() ([]string, bool, error) {
+	tableName, err := normalizeTableName(r.Table)
+	if err != nil {
+		return nil, false, err
+	}
+
+	return []string{tableName}, false, nil
 }
 
 var (
@@ -143,12 +160,7 @@ type driver struct{}
 var _ boilerplate.Connector = &driver{}
 
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
-	es := schemagen.GenerateSchema("Materialize DynamoDB Spec", &config{})
-	endpointSchema, err := es.MarshalJSON()
+	endpointSchema, err := schemagen.GenerateSchema("Materialize DynamoDB Spec", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -158,162 +170,206 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.Response_Spec{
-		ConfigSchemaJson:         json.RawMessage(endpointSchema),
-		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:         "https://go.estuary.dev/materialize-dynamodb",
-	}, nil
+	return boilerplate.RunSpec(ctx, req, "https://go.estuary.dev/materialize-dynamodb", endpointSchema, resourceSchema)
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
-	cfg, err := resolveEndpointConfig(req.ConfigJson)
-	if err != nil {
-		return nil, err
-	}
-
-	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-	if cfg.Advanced.FeatureFlags != "" {
-		log.WithField("flags", featureFlags).Info("parsed feature flags")
-	}
-
-	client, err := cfg.client(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	tableNames := make([]string, 0, len(req.Bindings))
-	for _, binding := range req.Bindings {
-		res, err := resolveResourceConfig(binding.ResourceConfigJson)
-		if err != nil {
-			return nil, fmt.Errorf("building resource for binding %v: %w", binding.Collection.Name.String(), err)
-		}
-
-		tableName, err := normalizeTableName(res.Table)
-		if err != nil {
-			return nil, err
-		}
-
-		tableNames = append(tableNames, tableName)
-	}
-
-	is, err := infoSchema(ctx, client.db, tableNames)
-	if err != nil {
-		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
-	}
-	// Attribute names can be up to 64kb in length, which is for all practical purposes unlimited
-	// length, and they are case sensitive.
-	validator := boilerplate.NewValidator(constrainter{}, is, 0, false, featureFlags)
-
-	var bindings = []*pm.Response_Validated_Binding{}
-	for i, binding := range req.Bindings {
+	for _, b := range req.Bindings {
 		// The primary key for a DynamoDB table is the partition key, and an optional sort key. For
 		// now we only support materializing collections with at most 2 collection keys, to map to
 		// this table structure.
-		if len(binding.Collection.Key) > 2 {
+		if len(b.Collection.Key) > 2 {
 			return nil, fmt.Errorf(
-				"cannot materialize collection '%s' because it has more than 2 keys (has %d keys)'",
-				binding.Collection.Name.String(),
-				len(binding.Collection.Key),
+				"cannot materialize collection '%s' because it has more than 2 keys (has %d keys)",
+				b.Collection.Name.String(),
+				len(b.Collection.Key),
 			)
 		}
-
-		constraints, err := validator.ValidateBinding(
-			[]string{tableNames[i]},
-			false,
-			binding.Backfill,
-			binding.Collection,
-			binding.FieldConfigJsonMap,
-			req.LastMaterialization,
-		)
-		if err != nil {
-			return nil, err
-		}
-
-		bindings = append(bindings, &pm.Response_Validated_Binding{
-			Constraints:  constraints,
-			ResourcePath: []string{tableNames[i]},
-			DeltaUpdates: false,
-		})
 	}
-	var response = &pm.Response_Validated{Bindings: bindings}
 
-	return response, nil
+	return boilerplate.RunValidate(ctx, req, newMaterialization)
 }
 
 func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := cfg.client(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	tableNames := make([]string, 0, len(req.Materialization.Bindings))
-	for _, binding := range req.Materialization.Bindings {
-		tableNames = append(tableNames, binding.ResourcePath[0]) // Table names are already normalized in the Validate response.
-	}
-
-	is, err := infoSchema(ctx, client.db, tableNames)
-	if err != nil {
-		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
-	}
-
-	return boilerplate.ApplyChanges(ctx, req, &ddbApplier{
-		client: client,
-		cfg:    cfg,
-	}, is, true)
+	return boilerplate.RunApply(ctx, req, newMaterialization)
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
-	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
-	if err != nil {
-		return nil, nil, nil, err
-	}
+func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+}
 
+type materialization struct {
+	cfg    config
+	client *client
+}
+
+var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
+
+func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
 	client, err := cfg.client(ctx)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating client: %w", err)
+		return nil, err
 	}
 
+	return &materialization{
+		cfg:    cfg,
+		client: client,
+	}, nil
+}
+
+func (d *materialization) Config() boilerplate.MaterializeCfg {
+	return boilerplate.MaterializeCfg{
+		Translate:          func(f string) string { return f },
+		ConcurrentApply:    true,
+		NoCreateNamespaces: true,
+	}
+}
+
+func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
+	for _, p := range resourcePaths {
+		tableName := p[0]
+
+		d, err := d.client.db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
+			TableName: aws.String(tableName),
+		})
+		if err != nil {
+			var errNotFound *types.ResourceNotFoundException
+			if errors.As(err, &errNotFound) {
+				// Table hasn't been created yet.
+				continue
+			}
+			return fmt.Errorf("describing table %q: %w", tableName, err)
+		}
+
+		res := is.PushResource(tableName)
+		for _, def := range d.Table.AttributeDefinitions {
+			res.PushField(boilerplate.ExistingField{
+				Name:               *def.AttributeName,
+				Nullable:           false,                     // Table keys can never be nullable.
+				Type:               string(def.AttributeType), // "B", "S", or "N".
+				CharacterMaxLength: 0,
+			})
+		}
+	}
+
+	return nil
+}
+
+func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
+	return nil
+}
+
+func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+	// By default only the collection key and root document fields are materialized, due to
+	// DynamoDB's 400kb single item size limit. Additional fields are optional and may be selected
+	// to materialize as top-level properties with the applicable conversion applied, if desired.
+	var constraint = pm.Response_Validated_Constraint{}
+	switch {
+	case p.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "Primary key locations are required"
+	case p.IsRootDocumentProjection() && !deltaUpdates:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document is required for a standard updates materialization"
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The root document should usually be materialized"
+	default:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "This field is able to be materialized"
+	}
+
+	return constraint
+}
+
+func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
+	return mapType(p.Projection), nil
+}
+
+func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+	tableName := res.ResourcePath[0]
+	attrs, schema := tableConfigFromProjections(res.Keys)
+
+	return fmt.Sprintf("create table %q", tableName), func(ctx context.Context) error {
+		return createTable(ctx, d.client, tableName, attrs, schema)
+	}, nil
+}
+
+func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
+	return fmt.Sprintf("delete table %q", resourcePath[0]), func(ctx context.Context) error {
+		return deleteTable(ctx, d.client, resourcePath[0])
+	}, nil
+}
+
+func (d *materialization) UpdateResource(
+	ctx context.Context,
+	resourcePath []string,
+	existing boilerplate.ExistingResource,
+	update boilerplate.MaterializerBindingUpdate[config, resource, mappedType],
+) (string, boilerplate.ActionApplyFn, error) {
+	// No-op since DynamoDB only applies a schema to the key columns, and Flow doesn't allow you to
+	// change the key of an established collection, and the Validation constraints don't allow
+	// changing the type of a key field in a way that would change its materialized type.
+	return "", nil, nil
+}
+
+func (d *materialization) NewMaterializerTransactor(
+	ctx context.Context,
+	req pm.Request_Open,
+	is boilerplate.InfoSchema,
+	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
+	be *boilerplate.BindingEvents,
+) (boilerplate.MaterializerTransactor, error) {
 	var bindings []binding
 	tablesToBindings := make(map[string]int)
-	for idx, b := range open.Materialization.Bindings {
+	for idx, b := range mappedBindings {
+		mappedFields := make([]mappedType, 0, len(b.FieldSelection.AllFields()))
+		for _, p := range b.SelectedProjections() {
+			mappedFields = append(mappedFields, p.Mapped)
+		}
+
 		tablesToBindings[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			tableName: b.ResourcePath[0],
-			fields:    mapFields(b),
-			docField:  b.FieldSelection.Document,
+			fields:    mappedFields,
+			docField:  b.Document.Field,
 		})
 	}
 
 	return &transactor{
-		client:           client,
+		client:           d.client,
 		bindings:         bindings,
 		tablesToBindings: tablesToBindings,
-	}, &pm.Response_Opened{}, nil, nil
+	}, nil
 }
 
-func resolveEndpointConfig(specJson json.RawMessage) (config, error) {
-	var cfg = config{}
-	if err := pf.UnmarshalStrict(specJson, &cfg); err != nil {
-		return cfg, fmt.Errorf("parsing endpoint config: %w", err)
+func (d *materialization) Close(ctx context.Context) {}
+
+func tableConfigFromProjections(keys []boilerplate.MappedProjection[mappedType]) ([]types.AttributeDefinition, []types.KeySchemaElement) {
+	// The collection keys will be used as the partition key and sort key, respectively.
+	keyTypes := [2]types.KeyType{types.KeyTypeHash, types.KeyTypeRange}
+
+	attrs := []types.AttributeDefinition{}
+	schema := []types.KeySchemaElement{}
+
+	for idx, k := range keys {
+		attrs = append(attrs, types.AttributeDefinition{
+			AttributeName: aws.String(k.Field),
+			AttributeType: k.Mapped.ddbScalarType,
+		})
+		schema = append(schema, types.KeySchemaElement{
+			AttributeName: aws.String(k.Field),
+			KeyType:       keyTypes[idx],
+		})
 	}
 
-	return cfg, nil
-}
-
-func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
-	var res = resource{}
-	if err := pf.UnmarshalStrict(specJson, &res); err != nil {
-		return res, fmt.Errorf("parsing resource config: %w", err)
-	}
-
-	return res, nil
+	return attrs, schema
 }
