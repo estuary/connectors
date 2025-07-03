@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/segmentio/encoding/json"
+	"golang.org/x/sync/errgroup"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	pc "github.com/estuary/flow/go/protocols/capture"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -27,6 +29,13 @@ var (
 	// to shut down after replication is all caught up and all tables are fully
 	// backfilled. It is always false in normal operation.
 	TestShutdownAfterCaughtUp = false
+
+	// When the TestShutdownAfterCaughtUp test behavior flag is hit, this variable
+	// will be set to the final state checkpoint. It does nothing in real-world
+	// operation. The purpose of this variable is solely so benchmarks can update
+	// the final capture state checkpoint without having to process every message
+	// the connector outputs, identify the checkpoints, and merge them together.
+	FinalStateCheckpoint json.RawMessage
 
 	// StreamingFenceInterval is a constant controlling how frequently the capture
 	// will establish a new fence during indefinite streaming. It's declared as a
@@ -134,6 +143,12 @@ type Capture struct {
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
 
+	reused struct {
+		emitChangeBuf []byte               // A reusable buffer used for serialized JSON documents in emitChange(). Note that this is not thread-safe, but since the capture is single-threaded we're okay for now.
+		emitChangeMsg pc.Response          // A reusable object for emitting change events. This is not thread-safe, but since it's single-threaded we're okay for now.
+		emitChangeDoc pc.Response_Captured // A reusable object for emitting change events. This is not thread-safe, but since it's single-threaded we're okay for now.
+	}
+
 	// A mutex-guarded list of checkpoint cursor values. Values are appended by
 	// emitState() whenever it outputs a checkpoint and removed whenever the
 	// acknowledgement-relaying goroutine receives an Acknowledge message.
@@ -199,11 +214,13 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 	// Start a goroutine which will read acknowledgement messages from stdin
 	// and relay them to the replication stream acknowledgement.
+	var acknowledgeWorkerCtx, cancelAcknowledgeWorkerCtx = context.WithCancel(ctx)
 	go func() {
-		if err := c.acknowledgeWorker(ctx, c.Output, replStream); err != nil {
+		if err := c.acknowledgeWorker(acknowledgeWorkerCtx, c.Output, replStream); err != nil {
 			log.WithField("err", err).Fatal("error relaying acknowledgements from stdin")
 		}
 	}()
+	defer cancelAcknowledgeWorkerCtx()
 
 	// Perform an initial "catch-up" stream-to-fence before entering the main capture loop.
 	log.WithField("eventType", "connectorStatus").Info("Catching up on CDC history")
@@ -256,6 +273,9 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		// state during tests even if there is no backfill work to do.
 		if TestShutdownAfterCaughtUp {
 			log.Info("Shutting down after backfill due to TestShutdownAfterCaughtUp")
+			if bs, err := json.Marshal(c.State); err == nil {
+				FinalStateCheckpoint = bs // Set final state checkpoint
+			}
 			return c.emitState()
 		}
 
@@ -518,29 +538,128 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 		}).Info("processed replication events")
 	}()
 
-	return replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
-		// Flush events update the checkpoint LSN and may trigger a state update.
-		if event, ok := event.(*FlushEvent); ok {
-			flushCount++
-			c.State.Cursor = event.Cursor
-			if reportFlush {
-				if err := c.emitState(); err != nil {
-					return fmt.Errorf("error emitting state update: %w", err)
-				}
+	// Commit buffering state. Depending on write patterns, commit events can be a substantial fraction
+	// of the overall WAL event stream. And unlike change events, any individual commit event may be
+	// ignored so long as we guarantee that there will be commit that gets emitted every so often, and
+	// that if the stream of changes becomes idle the last commit event gets emitted in a timely fashion.
+	//
+	// Our solution here has a couple of moving pieces in order to account for all the edge cases. The
+	// main elements in practice are the timer and `processNext` boolean: we set the timer, then when it
+	// fires we set the boolean, and then when it's true the next commit event we receive will actually be
+	// processed. Thus if the change stream is sufficiently busy, we simply process one commit every
+	// <commitBufferingInterval> milliseconds and ignore any others.
+	//
+	// However if the change stream goes idle, we need to ensure that the last commit event is processed.
+	// That's where the `event` field comes in: it's set whenever we receive a commit event and do not
+	// immediately process it, cleared by any other event, and then if there's an event still present when
+	// the timer fires we output that instead of setting `processNext`. This means that if the stream goes
+	// idle after a transaction, we will emit the final commit after at most <commitBufferingInterval>.
+	//
+	// This assumes that there is no way for a change stream to go idle after a non-commit event, but this
+	// is already true both as a property of how our source DBs work and because of how StreamToFence is
+	// implemented for all our connectors.
+	const commitBufferingInterval = 100 * time.Millisecond
+	var processCommit = func(event CommitEvent) error {
+		var cursorJSON, err = event.AppendJSON(nil)
+		if err != nil {
+			return fmt.Errorf("error serializing commit cursor: %w", err)
+		}
+		c.State.Cursor = cursorJSON
+		if reportFlush {
+			if err := c.emitState(); err != nil {
+				return fmt.Errorf("error emitting state update: %w", err)
 			}
+		}
+		return nil
+	}
+	var bufferedCommit struct {
+		sync.Mutex
+		processNext bool        // True when the next commit event should be processed immediately, false when it should be buffered.
+		event       CommitEvent // When we have a buffered commit event which hasn't yet been processed or invalidated, this is it. Otherwise it's nil.
+	}
+	var workerCtx, cancelWorkerCtx = context.WithCancel(ctx) // Context for the commit buffering worker goroutine
+	var workerGroup errgroup.Group
+	workerGroup.Go(func() error {
+		var ticker = time.NewTicker(commitBufferingInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-workerCtx.Done():
+				return workerCtx.Err() // Exit the worker goroutine when the context is cancelled
+			case <-ticker.C: // Every <commitBufferingInterval> milliseconds, check if we need to process a buffered commit.
+				bufferedCommit.Lock()
+				if bufferedCommit.event == nil {
+					// No buffered commit, so we should process the next one immediately on the main thread.
+					bufferedCommit.processNext = true
+				} else {
+					// Buffered commit exists, so we should process it now.
+					if err := processCommit(bufferedCommit.event); err != nil {
+						bufferedCommit.Unlock()
+						return fmt.Errorf("error processing buffered commit: %w", err)
+					}
+					bufferedCommit.processNext = false
+					bufferedCommit.event = nil
+				}
+				bufferedCommit.Unlock()
+			}
+		}
+	})
+
+	if err := replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
+		// Flush events update the checkpoint LSN and may trigger a state update.
+		if event, ok := event.(CommitEvent); ok {
+			flushCount++
+			bufferedCommit.Lock()
+			if bufferedCommit.processNext {
+				bufferedCommit.processNext = false
+				if err := processCommit(event); err != nil {
+					bufferedCommit.Unlock()
+					return fmt.Errorf("error processing immediate commit: %w", err)
+				}
+			} else {
+				bufferedCommit.event = event
+			}
+			bufferedCommit.Unlock()
 			return nil
 		}
 
+		// Any other events clear the buffered commit event, since it is no longer valid after any other events.
+		bufferedCommit.Lock()
+		if bufferedCommit.event != nil {
+			bufferedCommit.event = nil
+		}
+		bufferedCommit.Unlock()
+
 		// The core event dispatch happens in handleReplicationEvent but it's useful to
 		// count changes separately from other stuff here.
-		if _, ok := event.(*ChangeEvent); ok {
+		if _, ok := event.(ChangeEvent); ok {
 			changeCount++
 		} else {
 			otherCount++
 		}
 
 		return c.handleReplicationEvent(event)
-	})
+	}); err != nil {
+		return err
+	}
+
+	// Shut down the commit buffering worker goroutine, ensure that it exits,
+	// and then ensure that the final buffered commit (if any) is processed.
+	cancelWorkerCtx()
+	if err := workerGroup.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+		return fmt.Errorf("error from commit buffering worker: %w", err)
+	}
+	bufferedCommit.Lock()
+	if bufferedCommit.event != nil {
+		if err := processCommit(bufferedCommit.event); err != nil {
+			bufferedCommit.Unlock()
+			return fmt.Errorf("error processing final commit: %w", err)
+		}
+		bufferedCommit.event = nil // Clear the event after processing
+	}
+	bufferedCommit.Unlock()
+
+	return nil
 }
 
 func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
@@ -585,27 +704,25 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 	}
 
 	// Any other events processed here must be ChangeEvents.
-	if _, ok := event.(*ChangeEvent); !ok {
+	if _, ok := event.(ChangeEvent); !ok {
 		return fmt.Errorf("unhandled replication event %q", event.String())
 	}
-	var change = event.(*ChangeEvent)
-	var streamID = change.Source.Common().StreamID()
+	var change = event.(ChangeEvent)
+	var streamID = change.StreamID()
 	var binding = c.Bindings[streamID]
-	var tableState *TableState
-	if binding != nil {
-		tableState = c.State.Streams[binding.StateKey]
+	if binding == nil {
+		log.WithField("event", event).Debug("no binding for stream, ignoring")
+		return nil
 	}
+	var tableState = c.State.Streams[binding.StateKey]
 
 	// Decide what to do with the change event based on the state of the table.
 	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableStateIgnore {
-		log.WithFields(log.Fields{
-			"stream": streamID,
-			"op":     change.Operation,
-		}).Debug("ignoring stream")
+		log.WithField("event", event).Debug("inactive table, ignoring")
 		return nil
 	}
 	if tableState.Mode == TableStateActive || tableState.Mode == TableStateKeylessBackfill || tableState.Mode == TableStateUnfilteredBackfill {
-		if err := c.emitChange(change); err != nil {
+		if err := c.emitChange(binding, change); err != nil {
 			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 		}
 		return nil
@@ -614,8 +731,8 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		// When a table is being backfilled precisely, replication events lying within the
 		// already-backfilled portion of the table should be emitted, while replication events
 		// beyond that point should be ignored (since we'll reach that row later in the backfill).
-		if compareTuples(change.RowKey, tableState.Scanned) <= 0 {
-			if err := c.emitChange(change); err != nil {
+		if compareTuples(change.GetRowKey(), tableState.Scanned) <= 0 {
+			if err := c.emitChange(binding, change); err != nil {
 				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
 			}
 		}
@@ -652,14 +769,16 @@ func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*D
 }
 
 func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discoveryInfo *DiscoveryInfo) error {
-	var stateKey = c.Bindings[streamID].StateKey
+	var binding = c.Bindings[streamID]
+	var stateKey = binding.StateKey
 	var streamState = c.State.Streams[stateKey]
 
 	// Process backfill query results as a callback-driven stream.
-	var prevRowKey = streamState.Scanned
+	var prevRowKey = make([]byte, 0, 64)                        // Only used for ordering sanity check in precise backfills.
+	prevRowKey = append(prevRowKey[:0], streamState.Scanned...) // Start with the resume key.
 	var eventCount int
-	backfillComplete, nextRowKey, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event *ChangeEvent) error {
-		if streamState.Mode == TableStatePreciseBackfill && compareTuples(prevRowKey, event.RowKey) > 0 {
+	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event ChangeEvent) error {
+		if streamState.Mode == TableStatePreciseBackfill {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
 			// result rows must match our own bytewise lexicographic ordering of serialized
 			// row keys.
@@ -674,11 +793,14 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 			// should have set `UnpredictableKeyOrdering` to true, which should have resulted in a
 			// backfill using the "UnfilteredBackfill" mode instead, which would not perform that
 			// filtering or this sanity check.
-			return fmt.Errorf("scan key ordering failure: last=%q, next=%q", prevRowKey, event.RowKey)
+			var rowKey = event.GetRowKey()
+			if compareTuples(prevRowKey, rowKey) > 0 {
+				return fmt.Errorf("scan key ordering failure: last=%q, next=%q", prevRowKey, rowKey)
+			}
+			prevRowKey = append(prevRowKey[:0], rowKey...) // Update the previous row key for the next iteration.
 		}
-		prevRowKey = event.RowKey
 
-		if err := c.emitChange(event); err != nil {
+		if err := c.emitChange(binding, event); err != nil {
 			return fmt.Errorf("error emitting %q backfill row: %w", streamID, err)
 		}
 		eventCount++
@@ -700,55 +822,27 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 		state.Mode = TableStateActive
 		state.Scanned = nil
 	} else {
-		state.Scanned = nextRowKey
+		state.Scanned = resumeCursor
 	}
 	state.dirty = true
 	c.State.Streams[stateKey] = state
 	return nil
 }
 
-func (c *Capture) emitChange(event *ChangeEvent) error {
-	var record map[string]interface{}
-	var meta = struct {
-		Operation ChangeOp               `json:"op"`
-		Source    SourceMetadata         `json:"source"`
-		Before    map[string]interface{} `json:"before,omitempty"`
-	}{
-		Operation: event.Operation,
-		Source:    event.Source,
-		Before:    nil,
-	}
-	switch event.Operation {
-	case InsertOp:
-		record = event.After // Before is never used.
-	case UpdateOp:
-		meta.Before, record = event.Before, event.After
-	case DeleteOp:
-		record = event.Before // After is never used.
-	}
-	if record == nil {
-		log.WithField("op", event.Operation).Warn("change event data map is nil")
-		record = make(map[string]interface{})
-	}
-	record["_meta"] = &meta
-
-	var sourceCommon = event.Source.Common()
-	var streamID = JoinStreamID(sourceCommon.Schema, sourceCommon.Table)
-	var binding, ok = c.Bindings[streamID]
-	if !ok {
-		return fmt.Errorf("capture output to invalid stream %q", streamID)
-	}
-
-	var bs, err = json.Marshal(record)
+func (c *Capture) emitChange(binding *Binding, event ChangeEvent) error {
+	var err error
+	var buf = c.reused.emitChangeBuf[:0]
+	buf, err = event.AppendJSON(buf)
 	if err != nil {
-		log.WithFields(log.Fields{
-			"document": fmt.Sprintf("%#v", record),
-			"stream":   streamID,
-			"err":      err,
-		}).Error("document serialization error")
-		return fmt.Errorf("error serializing document from stream %q: %w", streamID, err)
+		log.WithField("event", event).WithField("err", err).Error("error serializing change event")
+		return fmt.Errorf("error serializing change event %q: %w", event.String(), err)
 	}
-	return c.Output.Documents(int(binding.Index), bs)
+	c.reused.emitChangeBuf = buf
+
+	c.reused.emitChangeDoc.Binding = binding.Index
+	c.reused.emitChangeDoc.DocJson = buf
+	c.reused.emitChangeMsg.Captured = &c.reused.emitChangeDoc
+	return c.Output.Send(&c.reused.emitChangeMsg)
 }
 
 func (c *Capture) emitState() error {
@@ -775,7 +869,6 @@ func (c *Capture) emitState() error {
 	if err != nil {
 		return fmt.Errorf("error serializing state checkpoint: %w", err)
 	}
-	log.WithField("state", string(bs)).Trace("emitting state update")
 	return c.Output.Checkpoint(bs, true)
 }
 
@@ -803,7 +896,7 @@ func (c *Capture) emitSourcedSchemas(discovery map[StreamID]*DiscoveryInfo) erro
 }
 
 func (c *Capture) acknowledgeWorker(ctx context.Context, stream *boilerplate.PullOutput, replStream ReplicationStream) error {
-	for {
+	for ctx.Err() == nil {
 		var request, err = stream.Recv()
 		if err == io.EOF {
 			return nil
@@ -822,6 +915,7 @@ func (c *Capture) acknowledgeWorker(ctx context.Context, stream *boilerplate.Pul
 			return fmt.Errorf("unexpected message %#v", request)
 		}
 	}
+	return nil // Context cancellation is not an error for us
 }
 
 func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStream ReplicationStream) error {
