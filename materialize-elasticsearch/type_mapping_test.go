@@ -95,9 +95,7 @@ func TestPropForProjection(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := propForProjection(tt.in, tt.in.Inference.Types, nil)
-			require.NoError(t, err)
-			require.Equal(t, tt.want, got)
+			require.Equal(t, tt.want, propForProjection(tt.in, tt.in.Inference.Types, fieldConfig{}))
 		})
 	}
 }
