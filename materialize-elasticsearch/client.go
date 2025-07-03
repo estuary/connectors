@@ -114,32 +114,22 @@ type indexMetaResponse struct {
 	} `json:"mappings"`
 }
 
-func (c *client) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error) {
+func (c *client) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema) error {
 	res, err := c.es.Indices.Get(
 		[]string{"*"}, // Get info for all indices the connector has access to.
 		c.es.Indices.Get.WithContext(ctx),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("getting index metadata: %w", err)
+		return fmt.Errorf("getting index metadata: %w", err)
 	}
 	defer res.Body.Close()
 	if res.IsError() {
-		return nil, fmt.Errorf("getting index metadata error response [%s] %s", res.Status(), res.String())
+		return fmt.Errorf("getting index metadata error response [%s] %s", res.Status(), res.String())
 	}
-
-	is := boilerplate.NewInfoSchema(
-		func(rp []string) []string {
-			// Pass-through the index name as-is, since it is the only component of the resource
-			// path and the required transformations are assumed to already be done as part of the
-			// Validate response.
-			return rp
-		},
-		translateField,
-	)
 
 	var indexMeta map[string]indexMetaResponse
 	if err := json.NewDecoder(res.Body).Decode(&indexMeta); err != nil {
-		return nil, fmt.Errorf("decoding index metadata response: %w", err)
+		return fmt.Errorf("decoding index metadata response: %w", err)
 	}
 
 	for index, meta := range indexMeta {
@@ -154,7 +144,7 @@ func (c *client) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error
 		}
 	}
 
-	return is, nil
+	return nil
 }
 
 func (c *client) isServerless(ctx context.Context) (bool, error) {
