@@ -300,9 +300,10 @@ async def fetch_items_page(
 
     if item_ids and cursor:
         async for item in fetch_items_by_ids(http, log, item_ids):
-            items_yielded += 1
-            max_updated_at = max(max_updated_at, item.updated_at)
-            yield item
+            if item.updated_at <= cutoff:
+                items_yielded += 1
+                max_updated_at = max(max_updated_at, item.updated_at)
+                yield item
 
         cursor_dt = datetime.fromisoformat(cursor)
         if cursor_dt != max_updated_at:
