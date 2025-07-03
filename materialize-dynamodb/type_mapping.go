@@ -1,35 +1,18 @@
 package main
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"slices"
 	"strconv"
 	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 )
-
-func mapFields(spec *pf.MaterializationSpec_Binding) []mappedType {
-	out := []mappedType{}
-
-	for _, f := range spec.FieldSelection.AllFields() {
-		p := spec.Collection.GetProjection(f)
-		out = append(out, mapType(p))
-	}
-
-	return out
-}
 
 type mappedType struct {
 	// Name of the field.
@@ -43,22 +26,43 @@ type mappedType struct {
 	converter func(tuple.TupleElement) (any, error)
 }
 
-func mapType(p *pf.Projection) mappedType {
+func (m mappedType) String() string {
+	out := ""
+	switch t := m.ddbScalarType; t {
+	case types.ScalarAttributeTypeS:
+		out = "string"
+	case types.ScalarAttributeTypeN:
+		out = "numeric"
+	case types.ScalarAttributeTypeB:
+		out = "binary"
+	}
+	return out
+}
+
+func (m mappedType) Compatible(existing boilerplate.ExistingField) bool {
+	// Non-key fields have no compatibility restrictions and can be changed in any way at any time.
+	// This relies on the assumption that the key of an establish Flow collection cannot be changed
+	// after the fact.
+	return strings.EqualFold(existing.Type, string(m.ddbScalarType))
+}
+
+func (m mappedType) CanMigrate(existing boilerplate.ExistingField) bool {
+	return false
+}
+
+func mapType(p pf.Projection) mappedType {
 	out := mappedType{
 		field: p.Field,
 	}
 
-	if _, ok := boilerplate.AsFormattedNumeric(p); ok {
+	if _, ok := boilerplate.AsFormattedNumeric(&p); ok {
 		// A string field formatted as an integer or number, with a possible additional
 		// corresponding integer or number type.
 		out.converter = convertNumeric
 		return out
 	}
 
-	jsonTypes := slices.DeleteFunc(p.Inference.Types, func(t string) bool {
-		// DynamoDB has no requirements for nullability of non-key fields.
-		return t == pf.JsonTypeNull
-	})
+	jsonTypes := typesWithoutNull(p.Inference.Types)
 
 	if len(jsonTypes) != 1 {
 		// Multiple possible types, a single null type, or completely unconstrained types.
@@ -90,11 +94,26 @@ func mapType(p *pf.Projection) mappedType {
 		out.ddbScalarType = types.ScalarAttributeTypeN
 		out.converter = convertNumeric
 	case pf.JsonTypeNumber:
+		out.ddbScalarType = types.ScalarAttributeTypeN
 		out.converter = convertNumeric
 	case pf.JsonTypeArray, pf.JsonTypeObject:
 		out.converter = convertObject
+	case "":
+		// Empty type string - treat as passthrough
+		out.converter = passthrough
 	default:
 		panic(fmt.Errorf("invalid JSON type %s", t))
+	}
+
+	return out
+}
+
+func typesWithoutNull(ts []string) []string {
+	out := []string{}
+	for _, t := range ts {
+		if t != "null" {
+			out = append(out, t)
+		}
 	}
 
 	return out
@@ -191,91 +210,12 @@ func convertBase64(te tuple.TupleElement) (any, error) {
 	}
 }
 
-type constrainter struct{}
+type fieldConfig struct{}
 
-func (constrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
-	// By default only the collection key and root document fields are materialized, due to
-	// DynamoDB's 400kb single item size limit. Additional fields are optional and may be selected
-	// to materialize as top-level properties with the applicable conversion applied, if desired.
-	var constraint = pm.Response_Validated_Constraint{}
-	switch {
-	case p.IsPrimaryKey:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "Primary key locations are required"
-	case p.IsRootDocumentProjection() && !deltaUpdates:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "The root document is required for a standard updates materialization"
-	case p.IsRootDocumentProjection():
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The root document should usually be materialized"
-
-	default:
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "This field is able to be materialized"
-	}
-
-	return &constraint, nil
+func (fieldConfig) Validate() error {
+	return nil
 }
 
-func (constrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
-	// Non-key fields have no compatibility restrictions and can be changed in any way at any time.
-	// This relies on the assumption that the key of an establish Flow collection cannot be changed
-	// after the fact.
-	if !proposed.IsPrimaryKey {
-		return true, nil
-	}
-
-	return strings.EqualFold(existing.Type, string(mapType(proposed).ddbScalarType)), nil
-}
-
-func (constrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) (string, error) {
-	out := ""
-	switch t := mapType(p).ddbScalarType; t {
-	case types.ScalarAttributeTypeS:
-		out = "string"
-	case types.ScalarAttributeTypeN:
-		out = "numeric"
-	case types.ScalarAttributeTypeB:
-		out = "binary"
-	}
-
-	return out, nil
-}
-
-func infoSchema(ctx context.Context, db *dynamodb.Client, tableNames []string) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		func(rp []string) []string {
-			// Pass-through the index name as-is, since it is the only component of the resource
-			// path and the required transformations are assumed to already be done as part of the
-			// Validate response.
-			return rp
-		},
-		func(f string) string { return f },
-	)
-
-	for _, t := range tableNames {
-		d, err := db.DescribeTable(ctx, &dynamodb.DescribeTableInput{
-			TableName: aws.String(t),
-		})
-		if err != nil {
-			var errNotFound *types.ResourceNotFoundException
-			if errors.As(err, &errNotFound) {
-				// Table hasn't been created yet.
-				continue
-			}
-			return nil, fmt.Errorf("describing table %q: %w", t, err)
-		}
-
-		res := is.PushResource(t)
-		for _, def := range d.Table.AttributeDefinitions {
-			res.PushField(boilerplate.ExistingField{
-				Name:               *def.AttributeName,
-				Nullable:           false,                     // Table keys can never be nullable.
-				Type:               string(def.AttributeType), // "B", "S", or "N".
-				CharacterMaxLength: 0,
-			})
-		}
-	}
-
-	return is, nil
+func (fieldConfig) CastToString() bool {
+	return false
 }

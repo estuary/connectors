@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
@@ -91,6 +92,10 @@ func (b binding) convert(ts tuple.Tuple, doc json.RawMessage) (map[string]types.
 	}
 
 	return attrs, nil
+}
+
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+	return nil, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
