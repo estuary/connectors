@@ -122,6 +122,11 @@ class BaseCaptureConnector(
 
             # When capture() completes, the connector exits.
             if stopping.first_error:
+                # If the first_error doesn't have a meaningful string representation,
+                # set it to the exception type's name so something more useful is logged.
+                if str(stopping.first_error) == "":
+                    stopping.first_error.args = (f"{type(stopping.first_error).__name__}",)
+
                 raise Stopped(
                     f"Task {stopping.first_error_task}: {stopping.first_error}"
                 )
