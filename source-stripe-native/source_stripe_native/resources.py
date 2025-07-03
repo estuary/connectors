@@ -712,7 +712,6 @@ def no_events_object(
         all_bindings,
     ):
         if not connected_account_ids:
-            # Handle single platform account case (no connected accounts)
             fetch_changes_fns = functools.partial(
                 fetch_incremental_no_events,
                 cls,

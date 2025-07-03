@@ -139,7 +139,7 @@ class PriorityCalculator:
             "after state reconciliation. Check _reconcile_connector_state implementation and usage."
         )
 
-    def select_prioritized_accounts(self, all_account_ids: List[str], max_worker_count: int) -> List[str]:
+    def select_prioritized_accounts(self, all_account_ids: List[str], max_worker_count: int) -> set[str]:
         account_priorities = [
             self.get_account_priority(account_id)
             for account_id in all_account_ids
@@ -148,7 +148,7 @@ class PriorityCalculator:
         # Use heapq for efficient partial sorting - only sort as much as needed.
         top_priority_accounts = heapq.nsmallest(max_worker_count, account_priorities)
 
-        return [priority.account_id for priority in top_priority_accounts]
+        return set([priority.account_id for priority in top_priority_accounts])
 
 
 class WorkItemManager:
@@ -163,10 +163,10 @@ class WorkItemManager:
         fetch_changes_factory: FetchChangesFnFactory,
         fetch_page_factory: FetchPageFnFactory,
         resource_state: ResourceState,
-    ) -> List[WorkItem]:
+    ) -> tuple[list[WorkItem], set[str]]:
         work_items: list[WorkItem] = []
 
-        priority_account_ids = self.priority_calculator.select_prioritized_accounts(all_account_ids, max_worker_count)
+        priority_account_ids: set[str] = self.priority_calculator.select_prioritized_accounts(all_account_ids, max_worker_count)
 
         for account_id in priority_account_ids:
             # Do not create duplicate work items for accounts that already have active work.
@@ -178,7 +178,7 @@ class WorkItemManager:
             )
             work_items.append(work_item)
 
-        return work_items
+        return work_items, priority_account_ids
 
     def _create_work_item_for_account(
         self, account_id: str,
@@ -413,7 +413,7 @@ class PriorityQueueManager:
                 await self._refresh_work_queue()
 
     async def _refresh_work_queue(self):
-        new_work_items = self.work_item_manager.generate_work_items(
+        new_work_items, prioritized_account_ids = self.work_item_manager.generate_work_items(
             self.all_account_ids,
             self.config.max_worker_count,
             self.fetch_changes_factory,
@@ -421,8 +421,8 @@ class PriorityQueueManager:
             self.resource_state
         )
 
-        current_account_ids = {item.account_id for item in new_work_items}
-        accounts_to_cancel = set(self.work_item_manager.active_work_by_account.keys()) - current_account_ids
+        current_account_ids = set(self.work_item_manager.active_work_by_account.keys())
+        accounts_to_cancel = current_account_ids - prioritized_account_ids
 
         for account_id in accounts_to_cancel:
             self.work_item_manager.cancel_work_for_account(account_id)
