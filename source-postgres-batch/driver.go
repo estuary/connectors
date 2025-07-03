@@ -675,7 +675,7 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 		}
 		rowValues[len(rowValues)-1] = metadata
 
-		serializedDocument, err = shape.Encode(serializedDocument, rowValues)
+		serializedDocument, err = shape.Encode(serializedDocument[:0], rowValues)
 		if err != nil {
 			return fmt.Errorf("error serializing document: %w", err)
 		} else if err := c.Output.Documents(binding.index, serializedDocument); err != nil {
@@ -903,7 +903,7 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		}
 		outputValues[len(outputValues)-1] = metadata
 
-		serializedDocument, err = shape.Encode(serializedDocument, outputValues)
+		serializedDocument, err = shape.Encode(serializedDocument[:0], outputValues)
 		if err != nil {
 			return fmt.Errorf("error serializing document: %w", err)
 		} else if err := c.Output.Documents(binding.index, serializedDocument); err != nil {
