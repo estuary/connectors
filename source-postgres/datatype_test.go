@@ -50,6 +50,7 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `char(10)`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo       "`},
 		{ColumnType: `char`, ExpectType: `{"type":["string","null"]}`, InputValue: `f`, ExpectValue: `"f"`},
 		{ColumnType: `text`, ExpectType: `{"type":["string","null"]}`, InputValue: `foo`, ExpectValue: `"foo"`},
+		{ColumnType: `text`, ExpectType: `{"type":["string","null"]}`, InputValue: nil, ExpectValue: `null`},
 		{ColumnType: `bytea`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: `\xDEADBEEF`, ExpectValue: `"3q2+7w=="`},
 		{ColumnType: `bit`, ExpectType: `{"type":["string","null"]}`, InputValue: `1`, ExpectValue: `"1"`},
 		{ColumnType: `bit(3)`, ExpectType: `{"type":["string","null"]}`, InputValue: `101`, ExpectValue: `"101"`},

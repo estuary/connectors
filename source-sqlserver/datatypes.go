@@ -6,7 +6,6 @@ import (
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -124,10 +123,6 @@ func (db *sqlserverDatabase) translateRecordFields(columnTypes map[string]interf
 }
 
 func (db *sqlserverDatabase) translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
-	log.WithFields(log.Fields{
-		"type":  columnType,
-		"value": val,
-	}).Trace("translate record field")
 	switch val := val.(type) {
 	case []byte:
 		switch columnType {

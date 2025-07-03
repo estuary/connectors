@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"testing"
 
@@ -53,6 +54,9 @@ func TestMain(m *testing.M) {
 	} else {
 		log.SetLevel(log.DebugLevel)
 	}
+
+	// Set a 900MiB memory limit, same as we use in production.
+	debug.SetMemoryLimit(900 * 1024 * 1024)
 
 	os.Exit(m.Run())
 }
@@ -195,7 +199,9 @@ func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, w
 
 func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...interface{}) {
 	t.Helper()
-	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
+	if log.IsLevelEnabled(log.DebugLevel) {
+		log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
+	}
 	var rows, err = tb.control.Query(ctx, query, args...)
 	if err != nil {
 		t.Fatalf("unable to execute query: %v", err)
