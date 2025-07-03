@@ -6,58 +6,48 @@ from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 
 from source_monday.graphql import (
-    TAGS,
-    TEAMS,
-    USERS,
     execute_query,
     fetch_activity_logs,
-    fetch_boards,
+    fetch_boards_by_ids,
     fetch_boards_minimal,
-    fetch_items_by_boards,
     fetch_items_by_ids,
     fetch_items_minimal,
+    fetch_boards_with_retry,
+    TEAMS,
+    USERS,
+    TAGS,
 )
 from source_monday.models import (
-    TeamsResponse,
-    UsersResponse,
-    TagsResponse,
-    User,
-    Tag,
+    FullRefreshResource,
     Board,
     Item,
-    Team,
-    DeletionRecord,
 )
+from source_monday.item_cache import ItemIdCache
+from source_monday.utils import parse_monday_timestamp
 
 
-def _parse_monday_timestamp(timestamp_str: str, log: Logger) -> datetime:
-    """
-    Parse a Monday.com timestamp string into a datetime object.
-    This value will be a 17-digit UNIX timestamp which can be converted to milliseconds
-    by dividing by 10,000 and 10,000,000 to get seconds.
-    """
-    try:
-        # 17-digit timestamp format
-        timestamp_17_digit = int(timestamp_str)
-        timestamp_seconds = timestamp_17_digit / 10_000_000
-        return datetime.fromtimestamp(timestamp_seconds, tz=UTC)
-    except Exception:
-        log.warning(f"Unable to parse timestamp: {timestamp_str}")
-        raise
+MAX_WINDOW_SIZE = timedelta(hours=2)
+FULL_REFRESH_RESOURCES: list[tuple[str, str]] = [
+    ("tags", TAGS),
+    ("users", USERS),
+    ("teams", TEAMS),
+]
+
+
+_item_id_cache = ItemIdCache()
 
 
 async def fetch_boards_changes(
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[Board | DeletionRecord | LogCursor, None]:
+) -> AsyncGenerator[Board | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
     max_updated_at = log_cursor
     has_updates = False
     board_ids_to_fetch: set[str] = set()
 
-    # Phase 1: Check for boards updated since log_cursor
     minimal_boards_checked = 0
     async for board in fetch_boards_minimal(http, log):
         minimal_boards_checked += 1
@@ -78,7 +68,6 @@ async def fetch_boards_changes(
                     f"Board {board.id} added to fetch list (updated: {board.updated_at})"
                 )
 
-    # Phase 2: Process activity logs for deletions and additional updates
     activity_logs_processed = 0
     async for activity_log in fetch_activity_logs(
         http,
@@ -86,7 +75,7 @@ async def fetch_boards_changes(
         log_cursor.replace(microsecond=0).isoformat(),
     ):
         activity_logs_processed += 1
-        created_at = _parse_monday_timestamp(activity_log.created_at, log)
+        created_at = parse_monday_timestamp(activity_log.created_at, log)
 
         if not activity_log.resource_id:
             log.debug(
@@ -98,9 +87,12 @@ async def fetch_boards_changes(
             continue
 
         if "delete" in activity_log.event:
-            deleted_board = DeletionRecord(
+            deleted_board = Board(
                 id=activity_log.resource_id,
                 updated_at=created_at,
+                state="deleted",
+                workspace=None,
+                _meta=Board.Meta(op="d"),
             )
             has_updates = True
             max_updated_at = max(max_updated_at, created_at)
@@ -117,10 +109,9 @@ async def fetch_boards_changes(
 
     log.debug(f"Total unique board IDs to fetch: {len(board_ids_to_fetch)}")
 
-    # Phase 3: Fetch full board data for updated boards
     boards_yielded = 0
     if board_ids_to_fetch:
-        async for board in fetch_boards(http, log, ids=list(board_ids_to_fetch)):
+        async for board in fetch_boards_by_ids(http, log, ids=list(board_ids_to_fetch)):
             if board.updated_at > log_cursor:
                 if board.state == "deleted":
                     board.meta_ = Board.Meta(op="d")
@@ -130,18 +121,7 @@ async def fetch_boards_changes(
                 boards_yielded += 1
 
     log.debug(
-        "Board incremental sync complete",
-        {
-            "minimal_boards_checked": minimal_boards_checked,
-            "activity_logs_processed": activity_logs_processed,
-            "unique_board_ids_to_fetch": len(board_ids_to_fetch),
-            "boards_yielded": boards_yielded,
-            "has_updates": has_updates,
-            "original_cursor": log_cursor,
-            "new_cursor": max_updated_at + timedelta(seconds=1)
-            if has_updates
-            else None,
-        },
+        f"Board sync: {boards_yielded} yielded, {minimal_boards_checked} checked, {activity_logs_processed} activity logs"
     )
 
     if has_updates:
@@ -155,82 +135,95 @@ async def fetch_boards_changes(
 async def fetch_boards_page(
     http: HTTPSession,
     log: Logger,
-    page: PageCursor,
+    page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Board | PageCursor, None]:
-    assert isinstance(page, int)
+    assert page is None or isinstance(page, int)
     assert isinstance(cutoff, datetime)
 
-    doc_count = 0
+    if not page:
+        page = 1
 
-    async for board in fetch_boards(http, log, page=page):
+    limit = 256
+    should_yield_page = True
+    docs_emitted = 0
+
+    async for board in fetch_boards_with_retry(
+        http,
+        log,
+        page=page,
+        limit=limit,
+    ):
         if board.updated_at <= cutoff and board.state != "deleted":
-            doc_count += 1
+            docs_emitted += 1
             yield board
 
-    log.debug(
-        f"Boards page {page} completed",
-        {
-            "page": page,
-            "qualifying_boards": doc_count,
-            "has_more": doc_count > 0,
-            "cutoff": cutoff,
-        },
-    )
+        should_yield_page = True
 
-    if doc_count > 0:
+    if should_yield_page:
+        log.debug(
+            f"Boards backfill completed for page {page}",
+            {
+                "board_page": page,
+                "qualifying_boards": docs_emitted,
+                "next_page": page + 1,
+            },
+        )
         yield page + 1
     else:
         log.debug(
-            f"Boards backfill completed at page {page}",
-            {"final_page": page, "reason": "no_boards_from_api"},
+            f"Boards backfill completed for page {page} - no more qualifying boards",
+            {
+                "board_page": page,
+                "qualifying_boards": docs_emitted,
+                "reason": "no_more_boards",
+            },
         )
+        return
 
 
 async def fetch_items_changes(
     http: HTTPSession,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[Item | DeletionRecord | LogCursor, None]:
+) -> AsyncGenerator[Item | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    max_updated_at = log_cursor
-    has_updates = False
+    window_start = log_cursor
+    now = datetime.now(UTC)
+    window_end = min(window_start + MAX_WINDOW_SIZE, now)
+
+    window_has_updates = False
+    max_updated_at_in_window = window_start
     item_ids_to_fetch: set[str] = set()
 
-    # Phase 1: Check for items updated since log_cursor
     minimal_items_checked = 0
     async for item in fetch_items_minimal(http, log):
         minimal_items_checked += 1
 
-        if item.updated_at > log_cursor:
+        if window_start <= item.updated_at <= window_end:
             if item.state == "deleted":
                 item.meta_ = Item.Meta(op="d")
-                has_updates = True
-                max_updated_at = max(max_updated_at, item.updated_at)
-                yield item
-                log.debug(
-                    f"Item {item.id} marked as deleted (updated: {item.updated_at})"
+                window_has_updates = True
+                max_updated_at_in_window = max(
+                    max_updated_at_in_window, item.updated_at
                 )
+                yield item
             else:
                 item_ids_to_fetch.add(item.id)
-                max_updated_at = max(max_updated_at, item.updated_at)
-                log.debug(
-                    f"Item {item.id} added to fetch list (updated: {item.updated_at})"
+                max_updated_at_in_window = max(
+                    max_updated_at_in_window, item.updated_at
                 )
 
-    # Phase 2: Process activity logs for deletions and additional updates
     activity_logs_processed = 0
     async for activity_log in fetch_activity_logs(
         http,
         log,
-        log_cursor.replace(microsecond=0).isoformat(),
+        window_start.replace(microsecond=0).isoformat(),
+        window_end.replace(microsecond=0).isoformat(),
     ):
         activity_logs_processed += 1
-        created_at = _parse_monday_timestamp(activity_log.created_at, log)
-
-        if created_at is None:
-            continue
+        created_at = parse_monday_timestamp(activity_log.created_at, log)
 
         if not activity_log.resource_id:
             log.debug(
@@ -242,26 +235,18 @@ async def fetch_items_changes(
             continue
 
         if "delete" in activity_log.event:
-            deleted_item = DeletionRecord(
+            deleted_item = Item(
                 id=activity_log.resource_id,
                 updated_at=created_at,
+                state="deleted",
+                _meta=Item.Meta(op="d"),
             )
-            has_updates = True
-            max_updated_at = max(max_updated_at, created_at)
+            window_has_updates = True
+            max_updated_at_in_window = max(max_updated_at_in_window, created_at)
             yield deleted_item
-            log.debug(
-                f"Item {activity_log.resource_id} marked as deleted in activity logs"
-            )
         else:
             item_ids_to_fetch.add(activity_log.resource_id)
-            log.debug(
-                f"Activity log found for item {activity_log.resource_id} "
-                f"(event created_at: {created_at})"
-            )
 
-    log.debug(f"Total unique item IDs to fetch: {len(item_ids_to_fetch)}")
-
-    # Phase 3: Fetch full item data for updated items
     items_yielded = 0
     if item_ids_to_fetch:
         async for item in fetch_items_by_ids(
@@ -269,139 +254,82 @@ async def fetch_items_changes(
             log,
             list(item_ids_to_fetch),
         ):
-            if item.updated_at > log_cursor:
+            if window_start <= item.updated_at <= window_end:
                 if item.state == "deleted":
                     item.meta_ = Item.Meta(op="d")
-                has_updates = True
-                max_updated_at = max(max_updated_at, item.updated_at)
+
+                window_has_updates = True
+                max_updated_at_in_window = max(
+                    max_updated_at_in_window, item.updated_at
+                )
                 yield item
                 items_yielded += 1
 
-    log.debug(
-        "Item incremental sync complete",
-        {
-            "minimal_items_checked": minimal_items_checked,
-            "activity_logs_processed": activity_logs_processed,
-            "unique_item_ids_to_fetch": len(item_ids_to_fetch),
-            "items_yielded": items_yielded,
-            "has_updates": has_updates,
-            "original_cursor": log_cursor,
-            "new_cursor": max_updated_at + timedelta(seconds=1)
-            if has_updates
-            else None,
-        },
-    )
-
-    if has_updates:
-        new_cursor = max_updated_at + timedelta(seconds=1)
-        log.debug(f"Incremental sync complete. New cursor: {new_cursor}")
-        yield new_cursor
+    if window_has_updates:
+        yield max_updated_at_in_window + timedelta(seconds=1)
     else:
-        log.debug("Incremental sync complete. No updates found.")
+        yield window_end
 
 
 async def fetch_items_page(
     http: HTTPSession,
     log: Logger,
-    page: PageCursor,
+    page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Item | PageCursor, None]:
-    assert isinstance(page, int)
+    assert page is None or isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    has_board = False
-    board_id = None
-    items_count = 0
-    total_items_seen = 0
+    await _item_id_cache.populate_if_needed(http, log, page, cutoff)
 
-    async for item in fetch_items_by_boards(
+    cache_info = _item_id_cache.get_cache_info()
+    log.debug(
+        f"Items backfill: {cache_info['total_items']} items available",
+        {
+            "total_items": cache_info["total_items"],
+            "cutoff": cutoff,
+            "page_cursor": page,
+        },
+    )
+
+    batch_size = 1000
+    items_yielded = 0
+    max_updated_at = datetime.min.replace(tzinfo=UTC)
+
+    item_ids, cursor = _item_id_cache.get_next_batch(batch_size)
+
+    if item_ids and cursor:
+        async for item in fetch_items_by_ids(http, log, item_ids):
+            items_yielded += 1
+            max_updated_at = max(max_updated_at, item.updated_at)
+            yield item
+
+        cursor_dt = datetime.fromisoformat(cursor)
+        if cursor_dt != max_updated_at:
+            raise ValueError(
+                f"Cursor {cursor} does not match max updated at {max_updated_at}."
+            )
+
+        log.debug(f"Yielding checkpoint cursor: {cursor}")
+        yield cursor
+
+    processed, total = _item_id_cache.get_progress()
+    log.debug(
+        f"Items page complete: {items_yielded} items yielded, {processed}/{total} processed from cache"
+    )
+
+
+async def snapshot_resource(
+    http: HTTPSession,
+    json_path: str,
+    query: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    async for resource_data in execute_query(
+        FullRefreshResource,
         http,
         log,
-        page=page,
+        json_path,
+        query,
     ):
-        if isinstance(item, str):
-            has_board = True
-            board_id = item
-            log.debug(f"Processing board {board_id} on page {page}")
-            continue
-
-        total_items_seen += 1
-
-        if item.updated_at <= cutoff and item.state != "deleted":
-            yield item
-            items_count += 1
-
-    if has_board:
-        log.debug(
-            f"Items backfill completed for board page {page}",
-            {
-                "board_page": page,
-                "board_id": board_id,
-                "qualifying_items": items_count,
-                "total_items_seen": total_items_seen,
-                "next_page": page + 1,
-            },
-        )
-        yield page + 1
-    else:
-        log.debug(
-            f"Items backfill completed at board page {page}",
-            {
-                "final_board_page": page,
-                "reason": "no_board_found",
-                "total_items_processed": items_count,
-            },
-        )
-
-
-async def snapshot_teams(
-    http: HTTPSession,
-    log: Logger,
-) -> AsyncGenerator[Team, None]:
-    response = await execute_query(TeamsResponse, http, log, TEAMS)
-
-    if response.data and response.data.teams:
-        for team in response.data.teams:
-            yield team
-
-
-async def snapshot_users(
-    http: HTTPSession,
-    log: Logger,
-) -> AsyncGenerator[User, None]:
-    limit = 100
-    page = 1
-
-    while True:
-        variables = {"limit": limit, "page": page}
-        response = await execute_query(
-            UsersResponse,
-            http,
-            log,
-            USERS,
-            variables,
-        )
-
-        if not response.data or not response.data.users:
-            break
-
-        users_in_page = 0
-        for user in response.data.users:
-            yield user
-            users_in_page += 1
-
-        if len(response.data.users) < limit:
-            break
-
-        page += 1
-
-
-async def snapshot_tags(
-    http: HTTPSession,
-    log: Logger,
-) -> AsyncGenerator[Tag, None]:
-    response = await execute_query(TagsResponse, http, log, TAGS)
-
-    if response.data and response.data.tags:
-        for tag in response.data.tags:
-            yield tag
+        yield resource_data

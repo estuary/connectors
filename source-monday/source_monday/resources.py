@@ -12,25 +12,23 @@ from source_monday.api import (
     fetch_boards_page,
     fetch_items_changes,
     fetch_items_page,
-    snapshot_tags,
-    snapshot_teams,
-    snapshot_users,
+    snapshot_resource,
 )
-from source_monday.graphql import API
+from source_monday.graphql import API, TAGS, USERS, TEAMS
 from source_monday.models import (
     EndpointConfig,
-    FullRefreshResourceFetchFn,
     IncrementalResourceFetchChangesFn,
     IncrementalResourceFetchPageFn,
     ResourceState,
-    FullRefreshResource,
     IncrementalResource,
+    FullRefreshResource,
 )
 
-FULL_REFRESH_RESOURCES: list[tuple[str, FullRefreshResourceFetchFn]] = [
-    ("teams", snapshot_teams),
-    ("users", snapshot_users),
-    ("tags", snapshot_tags),
+# Defines a full refresh resource with ("resource_name", "json_path", "query").
+FULL_REFRESH_RESOURCES: list[tuple[str, str, str]] = [
+    ("teams", "data.teams.item", TEAMS),
+    ("users", "data.users.item", USERS),
+    ("tags", "data.tags.item", TAGS),
 ]
 
 
@@ -59,7 +57,8 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
 
 def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     def open(
-        fetch_snapshot_fn: FullRefreshResourceFetchFn,
+        json_path: str,
+        query: str,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -71,7 +70,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(fetch_snapshot_fn, http),
+            fetch_snapshot=functools.partial(snapshot_resource, http, json_path, query),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d")),
         )
 
@@ -80,12 +79,12 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             name=name,
             key=["/_meta/row_id"],
             model=FullRefreshResource,
-            open=functools.partial(open, fetch_snapshot_fn),
+            open=functools.partial(open, json_path, query),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(name=name, interval=timedelta(minutes=15)),
             schema_inference=True,
         )
-        for name, fetch_snapshot_fn in FULL_REFRESH_RESOURCES
+        for name, json_path, query in FULL_REFRESH_RESOURCES
     ]
 
 
@@ -118,7 +117,7 @@ def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
             open=functools.partial(open, fetch_changes_fn, fetch_page_fn),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=1),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
             ),
             initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
             schema_inference=True,

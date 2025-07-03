@@ -4,8 +4,6 @@ from typing import (
     Any,
     AsyncGenerator,
     Callable,
-    Generic,
-    TypeVar,
     Literal,
 )
 import json
@@ -66,16 +64,6 @@ class EndpointConfig(BaseModel):
 
 
 ConnectorState = GenericConnectorState[ResourceState]
-ResponseObject = TypeVar("ResponseObject", bound=BaseModel)
-
-
-class FullRefreshResource(BaseDocument, extra="allow"):
-    pass
-
-
-class IncrementalResource(BaseDocument, extra="allow"):
-    id: str
-    updated_at: AwareDatetime
 
 
 class GraphQLErrorLocation(BaseModel, extra="forbid"):
@@ -95,12 +83,27 @@ class GraphQLError(BaseModel, extra="allow"):
     extensions: Extensions | None = None
 
 
-class GraphQLResponse(BaseModel, Generic[ResponseObject], extra="allow"):
-    data: ResponseObject | None = None
+class ComplexityInfo(BaseModel, extra="allow"):
+    query: int
+    after: int
+    reset_in_x_seconds: int
+
+
+class GraphQLResponseRemainder(BaseModel, extra="allow"):
+    class Data(BaseModel, extra="allow"):
+        complexity: ComplexityInfo | None = None
+
+    data: Data | None = None
     errors: list[GraphQLError] | None = None
 
+    def has_errors(self) -> bool:
+        return self.errors is not None and len(self.errors) > 0
 
-class ActivityLog(BaseModel, extra="allow"):
+    def get_errors(self) -> list[GraphQLError]:
+        return self.errors or []
+
+
+class ActivityLog(BaseDocument, extra="allow"):
     resource_id: str | None = None
     entity: Literal["board", "pulse"]
     event: str
@@ -139,50 +142,28 @@ class ActivityLog(BaseModel, extra="allow"):
         return None
 
 
-class BoardActivityLogs(BaseModel, extra="allow"):
-    activity_logs: list[ActivityLog] | None
-
-
-class ActivityLogsResponse(BaseModel, extra="forbid"):
-    boards: list[BoardActivityLogs]
-
-
-class Tag(BaseDocument, extra="allow"):
+class FullRefreshResource(BaseDocument, extra="allow"):
     pass
 
 
-class Board(BaseDocument, extra="allow"):
+class IncrementalResource(BaseDocument, extra="allow"):
+    id: str
+    updated_at: AwareDatetime
+
+
+class Board(IncrementalResource):
     class Workspace(BaseModel, extra="allow"):
         kind: str | None = None
 
-    id: str
-    updated_at: AwareDatetime
-    workspace: Workspace
     state: Literal["all", "active", "archived", "deleted"]
-
-
-class DeletionRecord(BaseDocument, extra="forbid"):
-    id: str
-    updated_at: AwareDatetime
-
-    meta_: "DeletionRecord.Meta" = Field(
-        default_factory=lambda: DeletionRecord.Meta(op="d")
+    workspace: Workspace | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
     )
 
 
-class BoardsResponse(BaseModel, extra="forbid"):
-    boards: list[Board] | None = None
-
-
-class ParentItemRef(BaseModel, extra="allow"):
-    id: str
-
-
-class Item(BaseDocument, extra="allow"):
-    id: str
+class Item(IncrementalResource):
     state: Literal["all", "active", "archived", "deleted"]
-    parent_item: ParentItemRef | None = None
-    updated_at: AwareDatetime
 
 
 class ItemsPage(BaseModel, extra="allow"):
@@ -190,47 +171,14 @@ class ItemsPage(BaseModel, extra="allow"):
     items: list[Item]
 
 
-class BoardItems(BaseModel, extra="allow"):
+class BoardItems(BaseDocument, extra="allow"):
     id: str
     state: str | None = None
     items_page: ItemsPage
 
 
-class ItemsByBoardResponse(BaseModel, extra="allow"):
-    boards: list[BoardItems] | None = Field(default_factory=lambda: [])
-
-
-class ItemsByBoardPageResponse(BaseModel, extra="allow"):
-    next_items_page: ItemsPage
-
-
-class ItemsByIdResponse(BaseModel, extra="allow"):
-    items: list[Item] | None = Field(default_factory=lambda: [])
-
-
-class Team(BaseDocument, extra="allow"):
-    pass
-
-
-class TeamsResponse(BaseModel, extra="allow"):
-    teams: list[Team]
-
-
-class User(BaseDocument, extra="allow"):
-    id: str
-    pass
-
-
-class UsersResponse(BaseModel, extra="allow"):
-    users: list[User]
-
-
-class TagsResponse(BaseModel, extra="allow"):
-    tags: list[Tag]
-
-
 FullRefreshResourceFetchFn = Callable[
-    [HTTPSession, Logger], AsyncGenerator[BaseDocument, None]
+    [HTTPSession, Logger, str, str], AsyncGenerator[BaseDocument, None]
 ]
 
 IncrementalResourceFetchChangesFn = Callable[
