@@ -11,6 +11,7 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -49,7 +50,7 @@ type binding struct {
 }
 
 type transactor struct {
-	cfg          *config
+	cfg          config
 	client       *client
 	bindings     []binding
 	isServerless bool
@@ -58,6 +59,9 @@ type transactor struct {
 	indexToBinding map[string]int
 }
 
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+	return nil, nil
+}
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 

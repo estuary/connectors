@@ -495,7 +495,7 @@ func (d *materialization) NewMaterializerTransactor(
 	return t, nil
 }
 
-func (d *materialization) Close(ctx context.Context) { return }
+func (d *materialization) Close(ctx context.Context) {}
 
 //go:embed python
 var pyFilesFS embed.FS

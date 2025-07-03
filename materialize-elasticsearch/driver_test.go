@@ -40,7 +40,7 @@ func TestValidateAndApply(t *testing.T) {
 		Index: "target",
 	}
 
-	client, err := cfg.toClient(false)
+	client, err := cfg.toClient(true)
 	require.NoError(t, err)
 
 	boilerplate.RunValidateAndApplyTestCases(

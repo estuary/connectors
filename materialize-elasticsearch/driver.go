@@ -13,7 +13,6 @@ import (
 	"time"
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
-	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
@@ -227,6 +226,10 @@ func (c config) Validate() error {
 	return c.Credentials.Validate()
 }
 
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 // toClient initializes a client for connecting to Elasticsearch, starting the network tunnel if
 // configured.
 func (c config) toClient(disableRetry bool) (*client, error) {
@@ -314,6 +317,19 @@ func (resource) GetFieldDocString(fieldName string) string {
 	}
 }
 
+func (r resource) WithDefaults(cfg config) resource {
+	return r
+}
+
+func (r resource) Parameters() ([]string, bool, error) {
+	indexName := normalizeIndexName(r.Index, maxByteLength)
+	if len(indexName) == 0 {
+		return nil, false, fmt.Errorf("index name '%s' is invalid: must contain at least 1 character that is not '.', '-', or '-'", r.Index)
+	}
+
+	return []string{indexName}, r.DeltaUpdates, nil
+}
+
 const (
 	maxByteLength = 255
 )
@@ -351,139 +367,207 @@ func normalizeIndexName(index string, truncateLimit int) string {
 	return b.String()
 }
 
-// driver implements the DriverServer interface.
 type driver struct{}
 
-func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	var endpointSchema = configSchema()
+var _ boilerplate.Connector = &driver{}
 
+func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	resourceSchema, err := schemagen.GenerateSchema("Elasticsearch Index", &resource{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.Response_Spec{
-		ConfigSchemaJson:         endpointSchema,
-		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:         "https://go.estuary.dev/materialize-elasticsearch",
-	}, nil
+	return boilerplate.RunSpec(ctx, req, "https://go.estuary.dev/materialize-elasticsearch", configSchema(), resourceSchema)
 }
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	return boilerplate.RunValidate(ctx, req, newMaterialization)
+}
+
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return boilerplate.RunApply(ctx, req, newMaterialization)
+}
+
+func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+}
+
+type materialization struct {
+	cfg        config
+	metaClient *client
+	dataClient *client
+}
+
+var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
+
+func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, property], error) {
+	metaClient, err := cfg.toClient(true)
+	if err != nil {
+		return nil, fmt.Errorf("creating metadata client: %w", err)
 	}
 
-	// Disable retries for connectivity checks to avoid getting hung in 5xx errors that actually
-	// indicate a configuration problem.
-	client, err := cfg.toClient(true)
+	dataClient, err := cfg.toClient(false)
 	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
+		return nil, fmt.Errorf("creating data client: %w", err)
 	}
+
+	return &materialization{
+		cfg:        cfg,
+		metaClient: metaClient,
+		dataClient: dataClient,
+	}, nil
+}
+
+func (d *materialization) Config() boilerplate.MaterializeCfg {
+	return boilerplate.MaterializeCfg{
+		Translate:          translateField,
+		ConcurrentApply:    true,
+		NoCreateNamespaces: true,
+	}
+}
+
+func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
+	return d.metaClient.populateInfoSchema(ctx, is)
+}
+
+func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
+	errs := &cerrors.PrereqErr{}
 
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	if p, err := client.es.Ping(client.es.Ping.WithContext(pingCtx)); err != nil {
+	if p, err := d.metaClient.es.Ping(d.metaClient.es.Ping.WithContext(pingCtx)); err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
-			return nil, cerrors.NewUserError(err, fmt.Sprintf("cannot connect to endpoint '%s': double check your configuration, and make sure Estuary's IP is allowed to connect to your cluster", cfg.Endpoint))
+			errs.Err(fmt.Errorf("cannot connect to endpoint '%s': double check your configuration, and make sure Estuary's IP is allowed to connect to your cluster", d.cfg.Endpoint))
+		} else {
+			errs.Err(fmt.Errorf("pinging Elasticsearch: %w", err))
 		}
-
-		return nil, fmt.Errorf("pinging Elasticsearch: %w", err)
 	} else if p.StatusCode == http.StatusUnauthorized {
-		return nil, cerrors.NewUserError(nil, "invalid credentials: received an unauthorized response (401) when trying to connect")
+		errs.Err(fmt.Errorf("invalid credentials: received an unauthorized response (401) when trying to connect"))
 	} else if p.StatusCode == http.StatusNotFound {
-		return nil, cerrors.NewUserError(nil, "could not connect to endpoint: endpoint URL not found")
+		errs.Err(fmt.Errorf("could not connect to endpoint: endpoint URL not found"))
 	} else if p.StatusCode == http.StatusForbidden {
-		return nil, cerrors.NewUserError(nil, "could not check cluster status: credentials must have 'monitor' privilege for cluster")
+		errs.Err(fmt.Errorf("could not check cluster status: credentials must have 'monitor' privilege for cluster"))
 	} else if p.StatusCode != http.StatusOK {
-		return nil, cerrors.NewUserError(nil, fmt.Sprintf("could not connect to endpoint: received status code %d", p.StatusCode))
+		errs.Err(fmt.Errorf("could not connect to endpoint: received status code %d", p.StatusCode))
 	}
 
-	is, err := client.infoSchema(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting infoSchema for validate: %w", err)
-	}
-
-	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-	if cfg.Advanced.FeatureFlags != "" {
-		log.WithField("flags", featureFlags).Info("parsed feature flags")
-	}
-
-	// ElasticSearch has no limits on mapping field names by default and they are case sensitive.
-	validator := boilerplate.NewValidator(constrainter{}, is, 0, false, featureFlags)
-
-	var out []*pm.Response_Validated_Binding
-	for _, binding := range req.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-
-		indexName := normalizeIndexName(res.Index, maxByteLength)
-		if len(indexName) == 0 {
-			return nil, fmt.Errorf("index name '%s' is invalid: must contain at least 1 character that is not '.', '-', or '-'", res.Index)
-		}
-
-		constraints, err := validator.ValidateBinding(
-			[]string{indexName},
-			res.DeltaUpdates,
-			binding.Backfill,
-			binding.Collection,
-			binding.FieldConfigJsonMap,
-			req.LastMaterialization,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("validating binding: %w", err)
-		}
-
-		out = append(out, &pm.Response_Validated_Binding{
-			Constraints:  constraints,
-			DeltaUpdates: res.DeltaUpdates,
-			ResourcePath: []string{indexName},
-		})
-	}
-
-	return &pm.Response_Validated{Bindings: out}, nil
+	return errs
 }
 
-func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(req.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+	_, isNumeric := boilerplate.AsFormattedNumeric(&p)
+
+	var constraint = pm.Response_Validated_Constraint{}
+	switch {
+	case p.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "All Locations that are part of the collections key are required"
+	case p.IsRootDocumentProjection() && deltaUpdates:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The root document should usually be materialized"
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case len(p.Inference.Types) == 0:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field with no types"
+	case p.Field == "_meta/op":
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The operation type should usually be materialized"
+	case strings.HasPrefix(p.Field, "_meta/"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Metadata fields are able to be materialized"
+	case p.Inference.IsSingleScalarType() || isNumeric:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The projection has a single scalar type"
+	case slices.Equal(p.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Object fields may be materialized"
+	default:
+		// Any other case is one where the field is an array or has multiple types.
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "This field is able to be materialized"
 	}
 
-	client, err := cfg.toClient(false)
-	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
-	}
-
-	is, err := client.infoSchema(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
-	}
-
-	return boilerplate.ApplyChanges(ctx, req, &elasticApplier{
-		client: client,
-		cfg:    cfg,
-	}, is, true)
+	return constraint
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, nil, fmt.Errorf("parsing endpoint config: %w", err)
+func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (property, boilerplate.ElementConverter) {
+	return propForProjection(&p.Projection, p.Inference.Types, fc), nil
+}
+
+func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, property]) (string, boilerplate.ActionApplyFn, error) {
+	indexName := res.ResourcePath[0]
+	props := buildIndexProperties(res.Keys, res.Values, res.Document)
+
+	return fmt.Sprintf("create index %q", indexName), func(ctx context.Context) error {
+		return d.metaClient.createIndex(ctx, indexName, res.Config.Shards, d.cfg.Advanced.Replicas, props)
+	}, nil
+}
+
+func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
+	indexName := resourcePath[0]
+
+	return fmt.Sprintf("delete index %q", indexName), func(ctx context.Context) error {
+		return d.metaClient.deleteIndex(ctx, indexName)
+	}, nil
+}
+
+func (d *materialization) UpdateResource(
+	ctx context.Context,
+	resourcePath []string,
+	existing boilerplate.ExistingResource,
+	update boilerplate.MaterializerBindingUpdate[config, resource, property],
+) (string, boilerplate.ActionApplyFn, error) {
+	// ElasticSearch only considers new projections, since index mappings are always nullable.
+	if len(update.NewProjections) == 0 {
+		return "", nil, nil
 	}
 
-	client, err := cfg.toClient(false)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating client: %w", err)
+	indexName := resourcePath[0]
+
+	var actions []string
+	for _, np := range update.NewProjections {
+		actions = append(actions, fmt.Sprintf(
+			"add mapping %q to index %q with type %q",
+			translateField(np.Field),
+			indexName,
+			np.Mapped.Type,
+		))
 	}
 
-	isServerless, err := client.isServerless(ctx)
+	return strings.Join(actions, "\n"), func(ctx context.Context) error {
+		for _, np := range update.NewProjections {
+			if err := d.metaClient.addMappingToIndex(ctx, indexName, translateField(np.Field), np.Mapped); err != nil {
+				return err
+			}
+		}
+		return nil
+	}, nil
+}
+
+func (d *materialization) NewMaterializerTransactor(
+	ctx context.Context,
+	req pm.Request_Open,
+	is boilerplate.InfoSchema,
+	mappedBindings []boilerplate.MappedBinding[config, resource, property],
+	be *boilerplate.BindingEvents,
+) (boilerplate.MaterializerTransactor, error) {
+	isServerless, err := d.dataClient.isServerless(ctx)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("getting serverless status: %w", err)
+		return nil, fmt.Errorf("getting serverless status: %w", err)
 	}
 	if isServerless {
 		log.Info("connected to a serverless elasticsearch cluster")
@@ -491,24 +575,17 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 
 	indexToBinding := make(map[string]int)
 	var bindings []binding
-	for idx, b := range open.Materialization.Bindings {
-		var res resource
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return nil, nil, nil, fmt.Errorf("parsing resource config: %w", err)
-		}
+	for idx, b := range mappedBindings {
+		ps := append(b.Keys, b.Values...)
+		fields := make([]string, 0, len(ps))
+		floatFields := make([]bool, len(ps))
+		wrapFields := make([]bool, len(ps))
 
-		allFields := append(b.FieldSelection.Keys, b.FieldSelection.Values...)
-		fields := make([]string, 0, len(allFields))
-		floatFields := make([]bool, len(allFields))
-		wrapFields := make([]bool, len(allFields))
-
-		for idx, field := range allFields {
-			fields = append(fields, translateField(field))
-			if prop, err := propForField(field, b); err != nil {
-				return nil, nil, nil, err
-			} else if prop.Type == elasticTypeDouble {
+		for idx, p := range ps {
+			fields = append(fields, translateField(p.Field))
+			if p.Mapped.Type == elasticTypeDouble {
 				floatFields[idx] = true
-			} else if mustWrapAndFlatten(b.Collection.GetProjection(field)) {
+			} else if mustWrapAndFlatten(&p.Projection.Projection) {
 				wrapFields[idx] = true
 			}
 		}
@@ -516,7 +593,7 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			index:        b.ResourcePath[0],
-			deltaUpdates: res.DeltaUpdates,
+			deltaUpdates: b.DeltaUpdates,
 			fields:       fields,
 			floatFields:  floatFields,
 			wrapFields:   wrapFields,
@@ -525,14 +602,17 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 	}
 
 	var transactor = &transactor{
-		cfg:            &cfg,
-		client:         client,
+		cfg:            d.cfg,
+		client:         d.dataClient,
 		bindings:       bindings,
 		isServerless:   isServerless,
 		indexToBinding: indexToBinding,
 	}
-	return transactor, &pm.Response_Opened{}, nil, nil
+	return transactor, nil
+
 }
+
+func (d *materialization) Close(ctx context.Context) {}
 
 var (
 	// ElasticSearch has a number of pre-defined "Metadata" fields (see
