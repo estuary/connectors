@@ -297,13 +297,13 @@ class SubtaskExecutor:
 
         if work_item.has_backfill_work():
             backfill_task = task.spawn_child(
-                f"{self.prefix}.backfill.{work_item.account_id}",
+                f"backfill.{work_item.account_id}",
                 lambda t: self._execute_backfill_subtask(work_item, t)
             )
             subtasks.append(backfill_task)
 
         incremental_task = task.spawn_child(
-            f"{self.prefix}.incremental.{work_item.account_id}",
+            f"incremental.{work_item.account_id}",
             lambda t: self._execute_incremental_subtask(work_item, t)
         )
         subtasks.append(incremental_task)
