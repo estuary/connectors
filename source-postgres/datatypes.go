@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"math"
 	"net"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -36,11 +35,20 @@ func registerDatatypeTweaks(ctx context.Context, conn *pgx.Conn, m *pgtype.Map) 
 	// in UTC and then Go's time.Unix() turns that into a local-time value. Thus without this
 	// customization backfills and replication will report the same instant in time in different
 	// time zones. The easiest way to make them consistent is to just ask for text here.
-	var tstz = &pgtype.Type{Name: "timestamptz", OID: pgtype.TimestamptzOID, Codec: &preferTextCodec{inner: &pgtype.TimestamptzCodec{}}}
-	m.RegisterType(tstz)
+	// Register custom codecs for 'timestamp' and 'timestamptz' column types. There are two
+	// reasons for this:
+	//   1. The timestamptz text format communicates a time zone while the binary format doesn't,
+	//      so for consistency with replication (which is always text format) we need to prefer
+	//      text format for backfills as well.
+	//   2. Both 'timestamp' and 'timestamptz' need to handle dates with years greater than 9999 or less than 0 AD,
+	var tsType = &pgtype.Type{Name: "timestamp", OID: pgtype.TimestampOID, Codec: &customTimestampCodec{}}
+	var tstzType = &pgtype.Type{Name: "timestamptz", OID: pgtype.TimestamptzOID, Codec: &customTimestamptzCodec{}}
+	m.RegisterType(tsType)
+	m.RegisterType(tstzType)
 
-	// Also prefer text format for the endpoints of 'tstzrange' values for the same reason.
-	m.RegisterType(&pgtype.Type{Name: "tstzrange", OID: pgtype.TstzrangeOID, Codec: &preferTextCodec{&pgtype.RangeCodec{ElementType: tstz}}})
+	// Also prefer text format for the endpoints of 'tsrange' and 'tstzrange' values for the same reason.
+	m.RegisterType(&pgtype.Type{Name: "tsrange", OID: pgtype.TstzrangeOID, Codec: &preferTextCodec{&pgtype.RangeCodec{ElementType: tsType}}})
+	m.RegisterType(&pgtype.Type{Name: "tstzrange", OID: pgtype.TstzrangeOID, Codec: &preferTextCodec{&pgtype.RangeCodec{ElementType: tstzType}}})
 
 	// Decode array column types into the dimensioned `pgtype.Array[any]` type rather than
 	// the default behavior of a flattened `[]any` list.
@@ -126,6 +134,60 @@ func registerDatatypeTweaks(ctx context.Context, conn *pgx.Conn, m *pgtype.Map) 
 	return nil
 }
 
+// The custom codec we register for timestamp columns.
+type customTimestampCodec struct{ inner pgtype.TimestampCodec }
+
+func (c *customTimestampCodec) FormatSupported(f int16) bool { return c.inner.FormatSupported(f) }
+func (c *customTimestampCodec) PreferredFormat() int16       { return c.inner.PreferredFormat() }
+func (c *customTimestampCodec) PlanEncode(m *pgtype.Map, oid uint32, format int16, value any) pgtype.EncodePlan {
+	return c.inner.PlanEncode(m, oid, format, value)
+}
+func (c *customTimestampCodec) PlanScan(m *pgtype.Map, oid uint32, format int16, target any) pgtype.ScanPlan {
+	return c.inner.PlanScan(m, oid, format, target)
+}
+func (c *customTimestampCodec) DecodeDatabaseSQLValue(m *pgtype.Map, oid uint32, format int16, src []byte) (driver.Value, error) {
+	return c.inner.DecodeDatabaseSQLValue(m, oid, format, src)
+}
+func (c *customTimestampCodec) DecodeValue(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error) {
+	var val, err = c.inner.DecodeValue(m, oid, format, src)
+	if _, ok := err.(*time.ParseError); ok {
+		// PostgreSQL supports dates/timestamps with years greater than 9999 or less than 0 AD,
+		// but Go time.Parse() doesn't and neither can they be represented as RFC3339 timestamps,
+		// so we detect a parse error and replace it with a sentinel value that can.
+		return negativeInfinityTimestamp, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
+// The custom codec we register for timestamptz columns.
+type customTimestamptzCodec struct{ inner pgtype.TimestamptzCodec }
+
+func (c *customTimestamptzCodec) FormatSupported(f int16) bool { return c.inner.FormatSupported(f) }
+func (c *customTimestamptzCodec) PreferredFormat() int16       { return pgtype.TextFormatCode }
+func (c *customTimestamptzCodec) PlanEncode(m *pgtype.Map, oid uint32, format int16, value any) pgtype.EncodePlan {
+	return c.inner.PlanEncode(m, oid, format, value)
+}
+func (c *customTimestamptzCodec) PlanScan(m *pgtype.Map, oid uint32, format int16, target any) pgtype.ScanPlan {
+	return c.inner.PlanScan(m, oid, format, target)
+}
+func (c *customTimestamptzCodec) DecodeDatabaseSQLValue(m *pgtype.Map, oid uint32, format int16, src []byte) (driver.Value, error) {
+	return c.inner.DecodeDatabaseSQLValue(m, oid, format, src)
+}
+func (c *customTimestamptzCodec) DecodeValue(m *pgtype.Map, oid uint32, format int16, src []byte) (any, error) {
+	var val, err = c.inner.DecodeValue(m, oid, format, src)
+	if _, ok := err.(*time.ParseError); ok {
+		// PostgreSQL supports dates/timestamps with years greater than 9999 or less than 0 AD,
+		// but Go time.Parse() doesn't and neither can they be represented as RFC3339 timestamps,
+		// so we detect a parse error and replace it with a sentinel value that can.
+		return negativeInfinityTimestamp, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return val, nil
+}
+
 // preferTextCodec wraps a PGX datatype codec to make it always report text as its preferred format if supported.
 type preferTextCodec struct{ inner pgtype.Codec }
 
@@ -201,29 +263,6 @@ func decodeRawJSONB(m *pgtype.Map, oid uint32, format int16, src []byte) (any, e
 		src = src[1:]
 	}
 	return json.RawMessage(src), nil
-}
-
-func (db *postgresDatabase) translateRecordFields(table *sqlcapture.DiscoveryInfo, f map[string]interface{}) error {
-	if f == nil {
-		return nil
-	}
-	for id, val := range f {
-		var columnInfo *sqlcapture.ColumnInfo
-		var isPrimaryKey bool
-		if table != nil {
-			if info, ok := table.Columns[id]; ok {
-				columnInfo = &info
-			}
-			isPrimaryKey = slices.Contains(table.PrimaryKey, id)
-		}
-
-		var translated, err = db.translateRecordField(columnInfo, isPrimaryKey, val)
-		if err != nil {
-			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
-		}
-		f[id] = translated
-	}
-	return nil
 }
 
 func oversizePlaceholderJSON(orig []byte) json.RawMessage {
@@ -345,9 +384,10 @@ func (db *postgresDatabase) translateRecordField(column *sqlcapture.ColumnInfo, 
 		// infinity and the largest possible for infinity. There is also a pgtype.None infinity
 		// modifier which is being left unhandled currently as I don't know that it has any meaning
 		// for a captured value.
-		if x == pgtype.Infinity {
+		switch x {
+		case pgtype.Infinity:
 			return infinityTimestamp, nil
-		} else if x == pgtype.NegativeInfinity {
+		case pgtype.NegativeInfinity:
 			return negativeInfinityTimestamp, nil
 		}
 	case time.Time:
@@ -512,7 +552,8 @@ func unflattenArray(elements []any, dims []int) (any, error) {
 	return elements, nil
 }
 
-func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
+func encodeKeyFDB(key, ktype any) (tuple.TupleElement, error) {
+	_ = ktype // ktype is not currently used, but may be in the future
 	switch key := key.(type) {
 	case [16]uint8:
 		var id, err = uuid.FromBytes(key[:])
