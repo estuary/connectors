@@ -79,9 +79,9 @@ type TableState struct {
 	Mode string `json:"mode"`
 	// KeyColumns is the "primary key" used for ordering/chunking the backfill scan.
 	KeyColumns []string `json:"key_columns"`
-	// Scanned is a FoundationDB-serialized tuple representing the KeyColumns
-	// values of the last row which has been backfilled. Replication events will
-	// only be emitted for rows <= this value while backfilling is in progress.
+	// Scanned represents the current position of the backfill. For precise backfills the
+	// byte serialization ordering must strictly match the database backfill ordering,
+	// because we will only emit replication events for rows <= this value.
 	Scanned []byte `json:"scanned"`
 	// Metadata is some arbitrary amount of database-specific metadata
 	// which needs to be tracked persistently on a per-table basis. The

@@ -391,7 +391,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			// also stop advancing the cursor position during offset overflow, so that part is
 			// handled elsewhere already.
 			if !binlogOffsetOverflow {
-				if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+				if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
 					Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 				}); err != nil {
 					return err
@@ -424,7 +424,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				// "COMMIT" query event as a transaction commit. This logic should match
 				// the XIDEvent handling.
 				if !binlogOffsetOverflow {
-					if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+					if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
 						Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 					}); err != nil {
 						return err
@@ -473,7 +473,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		// until a real commit event to flush the output) then report a new FlushEvent
 		// with the latest position.
 		if implicitFlush && rs.uncommittedChanges == 0 && !binlogOffsetOverflow {
-			if err := rs.emitEvent(ctx, &sqlcapture.FlushEvent{
+			if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
 				Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
 			}); err != nil {
 				return err
@@ -546,7 +546,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if rs.db.includeTxIDs[streamID] {
 				sourceInfo.TxID = rs.gtidString
 			}
-			if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
+			if err := rs.emitEvent(ctx, &sqlcapture.OldChangeEvent{
 				Operation: sqlcapture.InsertOp,
 				RowKey:    rowKey,
 				After:     after,
@@ -595,7 +595,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 				if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
 					// When the row key is changed by an update, translate it into a synthetic pair: a delete
 					// event of the old row-state, plus an insert event of the new row-state.
-					events = append(events, &sqlcapture.ChangeEvent{
+					events = append(events, &sqlcapture.OldChangeEvent{
 						Operation: sqlcapture.DeleteOp,
 						RowKey:    rowKeyBefore,
 						Before:    before,
@@ -608,7 +608,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 							EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx-1),
 							TxID:        eventTxID,
 						},
-					}, &sqlcapture.ChangeEvent{
+					}, &sqlcapture.OldChangeEvent{
 						Operation: sqlcapture.InsertOp,
 						RowKey:    rowKeyAfter,
 						After:     after,
@@ -619,7 +619,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 						},
 					})
 				} else {
-					events = append(events, &sqlcapture.ChangeEvent{
+					events = append(events, &sqlcapture.OldChangeEvent{
 						Operation: sqlcapture.UpdateOp,
 						RowKey:    rowKeyAfter,
 						Before:    before,
@@ -666,7 +666,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if rs.db.includeTxIDs[streamID] {
 				sourceInfo.TxID = rs.gtidString
 			}
-			if err := rs.emitEvent(ctx, &sqlcapture.ChangeEvent{
+			if err := rs.emitEvent(ctx, &sqlcapture.OldChangeEvent{
 				Operation: sqlcapture.DeleteOp,
 				RowKey:    rowKey,
 				Before:    before,
@@ -1286,7 +1286,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 					return err
 				}
 				timedEventsSinceFlush++
-				if event, ok := event.(*sqlcapture.FlushEvent); ok {
+				if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 					if str, err := unmarshalJSONString(event.Cursor); err != nil {
 						return fmt.Errorf("internal error: failed to unmarshal flush event cursor value %q: %w", event.Cursor, err)
 					} else {
@@ -1323,7 +1323,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{Cursor: marshalJSONString(latestFlushCursor)})
+		return callback(&sqlcapture.OldFlushEvent{Cursor: marshalJSONString(latestFlushCursor)})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -1350,7 +1350,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 
 			// The first flush event whose cursor position is equal to or after the fence
 			// position ends the stream-to-fence operation.
-			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// a bit of work to preserve the position as a typed struct.
