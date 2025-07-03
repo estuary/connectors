@@ -431,7 +431,7 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 
 			// Mark the fence as reached when we observe a change event on the watermarks stream
 			// with the expected value.
-			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+			if event, ok := event.(*sqlcapture.OldChangeEvent); ok {
 				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
 					var actual = event.After["watermark"]
 					if actual == nil {
@@ -445,7 +445,7 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 			}
 
 			// The flush event following the watermark change ends the stream-to-fence operation.
-			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
+			if _, ok := event.(*sqlcapture.OldFlushEvent); ok && fenceReached {
 				return nil
 			}
 		}
@@ -626,7 +626,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 		if cpJSON, err := json.Marshal(cp); err != nil {
 			return fmt.Errorf("marshalling checkpoint: %w", err)
 		} else {
-			s.events <- &sqlcapture.FlushEvent{Cursor: cpJSON}
+			s.events <- &sqlcapture.OldFlushEvent{Cursor: cpJSON}
 		}
 
 		if s.smartMode && s.dictionaryMode == DictionaryModeExtract && int64(s.lastDDLSCN) < endSCN {
