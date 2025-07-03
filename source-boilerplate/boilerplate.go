@@ -69,22 +69,7 @@ func RunMain(connector Connector) {
 		log.SetLevel(lvl)
 	}
 
-	// Log an 'Initializing' message as soon as logging is configured.
-	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
-
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	var stream streamCodec
-
-	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
-	case "proto":
-		log.Debug("using protobuf codec")
-		stream = newProtoCodec(ctx)
-	case "json":
-		log.Debug("using json codec")
-		stream = newJsonCodec(ctx)
-	default:
-		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
-	}
 
 	go func() {
 		log.WithField("port", 6060).Debug("starting pprof server")
@@ -93,18 +78,34 @@ func RunMain(connector Connector) {
 		}
 	}()
 
-	var server = ConnectorServer{connector}
-
-	var err = server.Capture(stream)
-
-	// Ensure we flush any buffered output before exiting. Since we use os.Exit() to
-	// terminate the process we can't rely on a defer for this.
-	stream.Flush()
-
+	var err = InnerMain(ctx, connector, os.Stdin, os.Stdout)
 	if err != nil {
 		cerrors.HandleFinalError(err)
 	}
 	os.Exit(0)
+}
+
+// InnerMain is the portion of the main() function that can be run in a test context.
+// It omits portions of setup which are only appropriate for a standalone binary.
+func InnerMain(ctx context.Context, connector Connector, r io.Reader, w io.Writer) error {
+	log.WithField("eventType", "connectorStatus").Info("Initializing connector")
+
+	var stream streamCodec
+	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
+	case "proto":
+		log.Debug("using protobuf codec")
+		stream = newProtoCodec(ctx, r, w)
+	case "json":
+		log.Debug("using json codec")
+		stream = newJsonCodec(ctx, r, w)
+	default:
+		log.WithField("codec", codec).Fatal("invalid FLOW_RUNTIME_CODEC (expected 'json', or 'proto')")
+	}
+
+	var server = ConnectorServer{connector}
+	var err = server.Capture(stream)
+	stream.Flush() // Ensure we flush any buffered output before exiting.
+	return err
 }
 
 func getEnvDefault(name, def string) string {
@@ -328,11 +329,11 @@ type streamCodec interface {
 	Flush() error
 }
 
-func newProtoCodec(ctx context.Context) streamCodec {
-	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
+func newProtoCodec(ctx context.Context, r io.Reader, w io.Writer) streamCodec {
+	var bw = bufio.NewWriterSize(w, outputWriteBuffer)
 	return &protoCodec{
 		ctx: ctx,
-		r:   bufio.NewReaderSize(os.Stdin, 1<<21),
+		r:   bufio.NewReaderSize(r, 1<<21),
 		bw:  bw,
 		pw:  protoio.NewUint32DelimitedWriter(bw, binary.LittleEndian),
 	}
@@ -445,8 +446,8 @@ func (c *protoCodec) peekMessage(size int) ([]byte, error) {
 	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
-func newJsonCodec(ctx context.Context) streamCodec {
-	var bw = bufio.NewWriterSize(os.Stdout, outputWriteBuffer)
+func newJsonCodec(ctx context.Context, r io.Reader, w io.Writer) streamCodec {
+	var bw = bufio.NewWriterSize(w, outputWriteBuffer)
 	return &jsonCodec{
 		ctx: ctx,
 		marshaler: jsonpb.Marshaler{
@@ -460,7 +461,7 @@ func newJsonCodec(ctx context.Context) streamCodec {
 			AllowUnknownFields: true,
 			AnyResolver:        nil,
 		},
-		decoder: json.NewDecoder(bufio.NewReaderSize(os.Stdin, 1<<21)),
+		decoder: json.NewDecoder(bufio.NewReaderSize(r, 1<<21)),
 		bw:      bw,
 	}
 }
