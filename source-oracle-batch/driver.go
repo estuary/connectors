@@ -539,7 +539,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			Index:  count,
 		}
 
-		serializedDocument, err = shape.Encode(serializedDocument, rowValues)
+		serializedDocument, err = shape.Encode(serializedDocument[:0], rowValues)
 		if err != nil {
 			return fmt.Errorf("error serializing document: %w", err)
 		} else if err := c.Output.Documents(binding.index, serializedDocument); err != nil {

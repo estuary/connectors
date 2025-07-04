@@ -2,6 +2,7 @@ package sqlcapture
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -12,7 +13,7 @@ import (
 // each field value so that complex database-specific types can be "lowered" into
 // FDB-serializable values.
 func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes map[string]T, translate func(key interface{}, ktype T) (tuple.TupleElement, error)) ([]byte, error) {
-	var xs = make([]interface{}, len(key))
+	var xs = make([]tuple.TupleElement, len(key))
 	var err error
 	for i, elem := range key {
 		var ktype = fieldTypes[elem]
@@ -20,7 +21,7 @@ func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes
 			return nil, fmt.Errorf("error encoding column %q: %w", elem, err)
 		}
 	}
-	return packTuple(xs)
+	return PackTuple(xs)
 }
 
 // We translate a list of column values (representing the primary key of a
@@ -31,26 +32,23 @@ func EncodeRowKey[T any](key []string, fields map[string]interface{}, fieldTypes
 //
 // Encoding primary keys like this also makes `state.json` round-tripping
 // across restarts trivial.
-func packTuple(xs []interface{}) (bs []byte, err error) {
-	var t []tuple.TupleElement
-	for _, x := range xs {
+func PackTuple(xs []tuple.TupleElement) (bs []byte, err error) {
+	for i := range xs {
 		// Values not natively supported by the FoundationDB tuple encoding code
 		// must be converted into ones that are.
-		switch x := x.(type) {
+		switch x := xs[i].(type) {
 		case uint8:
-			t = append(t, uint(x))
+			xs[i] = uint(x)
 		case uint16:
-			t = append(t, uint(x))
+			xs[i] = uint(x)
 		case uint32:
-			t = append(t, uint(x))
+			xs[i] = uint(x)
 		case int8:
-			t = append(t, int(x))
+			xs[i] = int(x)
 		case int16:
-			t = append(t, int(x))
+			xs[i] = int(x)
 		case int32:
-			t = append(t, int(x))
-		default:
-			t = append(t, x)
+			xs[i] = int(x)
 		}
 	}
 
@@ -66,7 +64,123 @@ func packTuple(xs []interface{}) (bs []byte, err error) {
 			}
 		}
 	}()
-	return tuple.Tuple(t).Pack(), nil
+	return tuple.Tuple(xs).Pack(), nil
+}
+
+// AppendFDB encodes a single value as a FoundationDB serialized tuple element and
+// appends it to the provided byte slice. Since the FDB tuple encoding concatenates
+// elements at the top level, repeated calls can be used to build up a tuple.
+func AppendFDB(buf []byte, v tuple.TupleElement) (bs []byte, err error) {
+	// Directly dispatch common values to an optimized encoding function.
+	switch x := v.(type) {
+	case uint8:
+		return AppendUintFDB(buf, uint64(x))
+	case uint16:
+		return AppendUintFDB(buf, uint64(x))
+	case uint32:
+		return AppendUintFDB(buf, uint64(x))
+	case uint64:
+		return AppendUintFDB(buf, x)
+	case int8:
+		return AppendIntFDB(buf, int64(x))
+	case int16:
+		return AppendIntFDB(buf, int64(x))
+	case int32:
+		return AppendIntFDB(buf, int64(x))
+	case int64:
+		return AppendIntFDB(buf, x)
+	case string:
+		return AppendBytesFDB(buf, FDBStringCode, []byte(x))
+	case []byte:
+		return AppendBytesFDB(buf, FDBBytesCode, x)
+	}
+
+	// Everything else uses the (slow) FoundationDB implementation with slice
+	// allocation and conversion to `any` and reflection and deferred recovers
+	// as a sort of exception handling mechanism.
+	//
+	// The `Pack()` function doesn't have an error return value, and instead
+	// will just panic with a string value if given an unsupported value type.
+	// This defer will catch and translate these panics into proper error returns.
+	defer func() {
+		if r := recover(); r != nil {
+			if errStr, ok := r.(string); ok {
+				err = fmt.Errorf("error serializing FDB value: %s", errStr)
+			} else {
+				panic(r)
+			}
+		}
+	}()
+	var packed = tuple.Tuple([]tuple.TupleElement{v}).Pack()
+	return append(buf, packed...), nil
+}
+
+const intZeroCode = 0x14
+
+var sizeLimits = []uint64{
+	1<<(0*8) - 1,
+	1<<(1*8) - 1,
+	1<<(2*8) - 1,
+	1<<(3*8) - 1,
+	1<<(4*8) - 1,
+	1<<(5*8) - 1,
+	1<<(6*8) - 1,
+	1<<(7*8) - 1,
+	1<<(8*8) - 1,
+}
+
+func bisectLeft(u uint64) int {
+	var n int
+	for sizeLimits[n] < u {
+		n++
+	}
+	return n
+}
+
+func AppendIntFDB(buf []byte, i int64) (bs []byte, err error) {
+	if i >= 0 {
+		return AppendUintFDB(buf, uint64(i))
+	}
+
+	n := bisectLeft(uint64(-i))
+	var scratch [8]byte
+
+	buf = append(buf, byte(intZeroCode-n))
+	offsetEncoded := int64(sizeLimits[n]) + i
+	binary.BigEndian.PutUint64(scratch[:], uint64(offsetEncoded))
+	return append(buf, scratch[8-n:]...), nil
+}
+
+func AppendUintFDB(buf []byte, i uint64) (bs []byte, err error) {
+	if i == 0 {
+		return append(buf, byte(intZeroCode)), nil
+	}
+
+	n := bisectLeft(i)
+	var scratch [8]byte
+
+	buf = append(buf, byte(intZeroCode+n))
+	binary.BigEndian.PutUint64(scratch[:], i)
+	return append(buf, scratch[8-n:]...), nil
+}
+
+const (
+	FDBBytesCode  = 0x01
+	FDBStringCode = 0x02
+)
+
+func AppendBytesFDB(buf []byte, code byte, b []byte) ([]byte, error) {
+	buf = append(buf, code)
+	if i := bytes.IndexByte(b, 0x00); i >= 0 {
+		for i >= 0 {
+			buf = append(buf, b[:i+1]...) // Append the bytes up to and including the 0x00 byte.
+			buf = append(buf, 0xFF)       // Append the 0xFF byte to indicate that we're not done yet.
+			b = b[i+1:]                   // Move past the 0x00 byte.
+			i = bytes.IndexByte(b, 0x00)  // Find the next 0x00 byte.
+		}
+	}
+	buf = append(buf, b...)
+	return append(buf, 0), nil
 }
 
 // UnpackTuple decodes a FoundationDB-serialized sequence of bytes into a list of

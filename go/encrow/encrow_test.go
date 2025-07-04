@@ -101,7 +101,7 @@ func checkEquivalence(t *testing.T, names []string, values [][]any) {
 		standardBytes, err := stdjson.Marshal(fields)
 		require.NoError(t, err)
 
-		shapeBytes, err = shape.Encode(shapeBytes, row)
+		shapeBytes, err = shape.Encode(shapeBytes[:0], row)
 		require.NoError(t, err)
 
 		require.Equal(t, string(standardBytes), string(shapeBytes))

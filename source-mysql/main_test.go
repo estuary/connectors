@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"testing"
 	"time"
@@ -55,6 +56,9 @@ func TestMain(m *testing.M) {
 	} else {
 		logrus.SetLevel(logrus.DebugLevel)
 	}
+
+	// Set a 900MiB memory limit, same as we use in production.
+	debug.SetMemoryLimit(900 * 1024 * 1024)
 
 	os.Exit(m.Run())
 }

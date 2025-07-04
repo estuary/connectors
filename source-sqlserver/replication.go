@@ -303,7 +303,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 					return err
 				}
 				timedEventsSinceFlush++
-				if event, ok := event.(*sqlcapture.FlushEvent); ok {
+				if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 					var eventCursor, err = unmarshalJSONString(event.Cursor)
 					if err != nil {
 						return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
@@ -346,7 +346,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{
+		return callback(&sqlcapture.OldFlushEvent{
 			Cursor: marshalJSONString(base64.StdEncoding.EncodeToString(latestFlushLSN)),
 		})
 	}
@@ -375,7 +375,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 
 			// Mark the fence as reached when we observe a commit event whose cursor value
 			// is greater than or equal to the fence LSN.
-			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// a bit more work to preserve the position as a typed struct.
@@ -466,7 +466,7 @@ loop:
 				return err
 			}
 			timedEventsSinceFlush++
-			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 				var eventCursor, err = unmarshalJSONString(event.Cursor)
 				if err != nil {
 					return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
@@ -500,7 +500,7 @@ loop:
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.FlushEvent{
+		return callback(&sqlcapture.OldFlushEvent{
 			Cursor: marshalJSONString(base64.StdEncoding.EncodeToString(latestFlushLSN)),
 		})
 	}
@@ -529,7 +529,7 @@ loop:
 
 			// Mark the fence as reached when we observe a commit event whose cursor value
 			// is greater than or equal to the fence LSN.
-			if event, ok := event.(*sqlcapture.FlushEvent); ok {
+			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
 				// It might be a bit inefficient to re-parse every flush cursor here, but
 				// realistically it's probably not a significant slowdown and it would be
 				// a bit more work to preserve the position as a typed struct.
@@ -692,7 +692,7 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 
 			// Mark the fence as reached when we observe a change event on the watermarks stream
 			// with the expected value.
-			if event, ok := event.(*sqlcapture.ChangeEvent); ok {
+			if event, ok := event.(*sqlcapture.OldChangeEvent); ok {
 				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
 					var actual = event.After["watermark"]
 					if actual == nil {
@@ -706,7 +706,7 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 			}
 
 			// The flush event following the watermark change ends the stream-to-fence operation.
-			if _, ok := event.(*sqlcapture.FlushEvent); ok && fenceReached {
+			if _, ok := event.(*sqlcapture.OldFlushEvent); ok && fenceReached {
 				return nil
 			}
 		}
@@ -792,7 +792,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		// get an opportunity to observe the latest position.
 		var cursor = base64.StdEncoding.EncodeToString(toLSN)
 		log.WithField("cursor", cursor).Trace("server lsn hasn't advanced, not polling any tables")
-		rs.events <- &sqlcapture.FlushEvent{Cursor: marshalJSONString(cursor)}
+		rs.events <- &sqlcapture.OldFlushEvent{Cursor: marshalJSONString(cursor)}
 		return nil
 	}
 
@@ -890,7 +890,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 
 	var cursor = base64.StdEncoding.EncodeToString(toLSN)
 	log.WithField("cursor", cursor).Debug("checkpoint at cursor")
-	rs.events <- &sqlcapture.FlushEvent{Cursor: marshalJSONString(cursor)}
+	rs.events <- &sqlcapture.OldFlushEvent{Cursor: marshalJSONString(cursor)}
 	rs.fromLSN = toLSN
 
 	return nil
@@ -1223,7 +1223,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 			before = fields
 		}
 
-		var event = &sqlcapture.ChangeEvent{
+		var event = &sqlcapture.OldChangeEvent{
 			Operation: operation,
 			RowKey:    rowKey,
 			Source: &sqlserverSourceInfo{
