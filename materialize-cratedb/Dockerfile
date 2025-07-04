@@ -17,11 +17,11 @@ RUN go mod download
 COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-cratedb    ./materialize-cratedb
-COPY materialize-sql         ./materialize-sql
+COPY materialize-sql-v2      ./materialize-sql-v2
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
-#RUN go test -tags nozstd -v      ./materialize-sql/...
+#RUN go test -tags nozstd -v      ./materialize-sql-v2/...
 #RUN go test -tags nozstd,nodb -v ./materialize-postgres/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-cratedb/...
 

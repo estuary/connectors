@@ -10,8 +10,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/jackc/pgx/v5/pgconn"
 	log "github.com/sirupsen/logrus"
 
@@ -22,27 +21,25 @@ var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
 	db  *stdsql.DB
-	cfg *config
+	cfg config
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
-
-	db, err := stdsql.Open("pgx", cfg.ToURI())
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	db, err := stdsql.Open("pgx", ep.Config.ToURI())
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
 		db:  db,
-		cfg: cfg,
+		cfg: ep.Config,
 	}, nil
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, conf config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	cfg := conf.(*config)
+	cfg := conf
 
 	db, err := stdsql.Open("pgx", cfg.ToURI())
 	if err != nil {
@@ -76,25 +73,23 @@ func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
 	return errs
 }
 
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	catalog := c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active
 		// database if that's the case.
 		if err := c.db.QueryRowContext(ctx, "select current_database();").Scan(&catalog); err != nil {
-			return nil, fmt.Errorf("querying for connected database: %w", err)
+			return fmt.Errorf("querying for connected database: %w", err)
 		}
 	}
 
-	return sql.StdFetchInfoSchema(ctx, c.db, pgDialect, catalog, resourcePaths)
+	return sql.StdPopulateInfoSchema(ctx, is, c.db, pgDialect, catalog, resourcePaths)
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	var res tableConfig
-	if tc.ResourceConfigJson != nil {
-		if err := pf.UnmarshalStrict(tc.ResourceConfigJson, &res); err != nil {
-			return fmt.Errorf("unmarshalling resource binding for bound collection %q: %w", tc.Source.String(), err)
-		}
+	if tc.Resource != nil {
+		res = tc.Resource.(tableConfig)
 	}
 
 	txn, err := c.db.BeginTx(ctx, nil)
@@ -170,7 +165,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	return sql.StdListSchemas(ctx, c.db)
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	return sql.StdCreateSchema(ctx, c.db, pgDialect, schemaName)
 }
 

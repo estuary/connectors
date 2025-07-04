@@ -13,7 +13,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/jmoiron/sqlx"
 	sf "github.com/snowflakedb/gosnowflake"
 	"golang.org/x/sync/errgroup"
@@ -33,14 +33,12 @@ var _ sql.SchemaManager = (*client)(nil)
 type client struct {
 	db  *stdsql.DB
 	xdb *sqlx.DB // used to easily read the results of SHOW queries
-	cfg *config
-	ep  *sql.Endpoint
+	cfg config
+	ep  *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
-	cfg := ep.Config.(*config)
-
-	dsn, err := cfg.toURI(ep.Tenant)
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	dsn, err := ep.Config.toURI(ep.Tenant)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +51,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 	return &client{
 		db:  db,
 		xdb: sqlx.NewDb(db, "snowflake").Unsafe(),
-		cfg: cfg,
+		cfg: ep.Config,
 		ep:  ep,
 	}, nil
 }
@@ -64,10 +62,10 @@ func newClient(ctx context.Context, ep *sql.Endpoint) (sql.Client, error) {
 // is used for a SHOW COLUMNS IN TABLE <table> - it may be more efficient to do
 // SHOW COLUMNS IN SCHEMA, but there is a documented limit of 10,000 results
 // from SHOW COLUMNS and it can't be paginated.
-func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boilerplate.InfoSchema, error) {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	existingSchemas, err := c.ListSchemas(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("listing schemas: %w", err)
+		return fmt.Errorf("listing schemas: %w", err)
 	}
 
 	// Filter down to just schemas that are relevant for the included resource
@@ -75,7 +73,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 	// are relevant.
 	relevantExistingSchemasAndTables := make(map[string][]string)
 	for _, rp := range resourcePaths {
-		loc := c.ep.TableLocator(rp)
+		loc := c.ep.Dialect.TableLocator(rp)
 		if _, ok := relevantExistingSchemasAndTables[loc.TableSchema]; ok {
 			continue // already populated the list of existing, relevant tables
 		} else if !slices.Contains(existingSchemas, loc.TableSchema) {
@@ -93,12 +91,12 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 			}
 		})
 		if err != nil {
-			return nil, fmt.Errorf("listing tables in schema %q: %w", loc.TableSchema, err)
+			return fmt.Errorf("listing tables in schema %q: %w", loc.TableSchema, err)
 		}
 
 		for _, table := range tables {
 			if slices.ContainsFunc(resourcePaths, func(rrp []string) bool {
-				thisLoc := c.ep.TableLocator(rrp)
+				thisLoc := c.ep.Dialect.TableLocator(rrp)
 				return thisLoc.TableSchema == loc.TableSchema && thisLoc.TableName == table
 			}) {
 				// This is a relevant table for the materialization, and its
@@ -107,11 +105,6 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 			}
 		}
 	}
-
-	is := boilerplate.NewInfoSchema(
-		sql.ToLocatePathFn(c.ep.TableLocator),
-		c.ep.ColumnLocator,
-	)
 
 	var mu sync.Mutex
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -168,7 +161,7 @@ func (c *client) InfoSchema(ctx context.Context, resourcePaths [][]string) (*boi
 		}
 	}
 
-	return is, group.Wait()
+	return group.Wait()
 }
 
 // The error message returned from Snowflake for the multi-statement table
@@ -237,14 +230,12 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	})
 }
 
-func (c *client) CreateSchema(ctx context.Context, schemaName string) error {
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
-func preReqs(ctx context.Context, conf any, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	cfg := conf.(*config)
 
 	dsn, err := cfg.toURI(tenant)
 	if err != nil {

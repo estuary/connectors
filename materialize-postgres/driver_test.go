@@ -10,19 +10,22 @@ import (
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-func testConfig() *config {
-	return &config{
+func testConfig() config {
+	return config{
 		Address:  "localhost:5432",
 		User:     "flow",
 		Password: "flow",
 		Database: "flow",
 		Schema:   "public",
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
 	}
 }
 
@@ -124,7 +127,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 
-	c, err := newClient(ctx, &sql.Endpoint{Config: testConfig()})
+	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig()})
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -151,35 +154,35 @@ func TestPrereqs(t *testing.T) {
 
 	tests := []struct {
 		name string
-		cfg  func(config) *config
+		cfg  func(config) config
 		want []error
 	}{
 		{
 			name: "valid",
-			cfg:  func(cfg config) *config { return &cfg },
+			cfg:  func(cfg config) config { return cfg },
 			want: nil,
 		},
 		{
 			name: "wrong username",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.User = "wrong" + cfg.User
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong password",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Password = "wrong" + cfg.Password
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("incorrect username or password")},
 		},
 		{
 			name: "wrong database",
-			cfg: func(cfg config) *config {
+			cfg: func(cfg config) config {
 				cfg.Database = "wrong" + cfg.Database
-				return &cfg
+				return cfg
 			},
 			want: []error{fmt.Errorf("database %q does not exist", "wrong"+cfg.Database)},
 		},
@@ -187,7 +190,7 @@ func TestPrereqs(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(*cfg), "testing").Unwrap())
+			require.Equal(t, tt.want, preReqs(context.Background(), tt.cfg(cfg), "testing").Unwrap())
 		})
 	}
 }

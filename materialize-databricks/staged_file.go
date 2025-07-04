@@ -79,7 +79,7 @@ type stagedFile struct {
 	// start() and `false` by flush().
 	started bool
 
-	cfg *config
+	cfg config
 
 	// References to the current file being written.
 	buf     *fileBuffer
@@ -95,7 +95,7 @@ type stagedFile struct {
 	groupCtx context.Context // Used to check for group cancellation upon the worker returning an error.
 }
 
-func newStagedFile(cfg *config, root string, fields []string) *stagedFile {
+func newStagedFile(cfg config, root string, fields []string) *stagedFile {
 	uuid := uuid.NewString()
 	var tempdir = os.TempDir()
 

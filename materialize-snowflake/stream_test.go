@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	"github.com/stretchr/testify/require"
 )
 

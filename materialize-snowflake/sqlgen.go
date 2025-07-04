@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/template"
 
-	sql "github.com/estuary/connectors/materialize-sql"
+	sql "github.com/estuary/connectors/materialize-sql-v2"
 	log "github.com/sirupsen/logrus"
 )
 
