@@ -1,327 +1,57 @@
-import json
 import asyncio
-import time
+import re
+from datetime import datetime, UTC
+from dataclasses import dataclass, field
 from logging import Logger
-from typing import Any, AsyncGenerator, Dict, Type
-
-from estuary_cdk.http import HTTPSession
-from source_monday.models import (
-    ActivityLogsResponse,
-    ActivityLog,
-    GraphQLResponse,
-    GraphQLError,
-    ResponseObject,
-    BoardsResponse,
-    Board,
-    ItemsByIdResponse,
-    ItemsByBoardPageResponse,
-    ItemsByBoardResponse,
-    Item,
+from typing import (
+    Any,
+    AsyncGenerator,
+    Dict,
+    Type,
+    TypeVar,
 )
 
+
+from pydantic import BaseModel
+
+from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
+
+from source_monday.models import (
+    ActivityLog,
+    Board,
+    BoardItems,
+    Item,
+    ItemsPage,
+    GraphQLResponseRemainder,
+    GraphQLError,
+)
+from source_monday.utils import merge_async_generators, parse_monday_timestamp
+
 API = "https://api.monday.com/v2"
-CURSOR_EXCEPTION_CODE = "CursorException"
 
 
-class CursorManager:
-    """
-    Manage cursor-based pagination with expiration tracking for board items.
-    Monday's API uses cursor-based pagination for items, and cursors can expire after 60 minutes.
-    The cursors are unique identifiers returned by the API when running a query for the first
-    page of items for a board as shown below:
-    ```
-    query {
-        boards(limit: 1, page: 1) {
-            items_page(limit: 100) {
-                cursor
-                items {
-                    id
-                    ...
-                }
-            }
-        }
-    }
-    ```
-    The API returns a unique cursor in the API response, which can be used to fetch the subspequent pages
-    of items using a separate query as shown below:
-    ```
-    query {
-        next_items_page(limit: 100, cursor: "unique_cursor_value_returned_from_previous_query") {
-            cursor
-            items {
-                id
-                ...
-            }
-        }
-    }
-    ```
-    """
-
-    def __init__(self, log: Logger):
-        self.log: Logger = log
-        self.cursors: Dict[
-            str, tuple[str, float]
-        ] = {}  # board_id -> (cursor, creation_time)
-
-    def add_cursor(self, board_id: str, cursor: str) -> None:
-        self.cursors[board_id] = (cursor, time.time())
-
-    def get_cursor(self, board_id: str) -> str | None:
-        if board_id in self.cursors:
-            return self.cursors[board_id][0]
-        return None
-
-    def update_cursor(self, board_id: str, new_cursor: str) -> None:
-        if board_id in self.cursors:
-            _, creation_time = self.cursors[board_id]
-            self.cursors[board_id] = (new_cursor, creation_time)
-
-    def remove_cursor(self, board_id: str) -> None:
-        self.cursors.pop(board_id, None)
-
-    def get_all_board_ids(self) -> list[str]:
-        return list(self.cursors.keys())
-
-    def check_expiration_warnings(self) -> None:
-        current_time = time.time()
-        for board_id, (_, creation_time) in self.cursors.items():
-            elapsed_minutes = (current_time - creation_time) / 60
-            if elapsed_minutes >= 55:
-                self.log.warning(
-                    f"Cursor for board {board_id} approaching expiration",
-                    {
-                        "board_id": board_id,
-                        "elapsed_minutes": round(elapsed_minutes, 1),
-                        "remaining_minutes": round(60 - elapsed_minutes, 1),
-                        "cursor_creation_time": creation_time,
-                    },
-                )
-
-    def is_empty(self) -> bool:
-        return len(self.cursors) == 0
+TGraphqlData = TypeVar("TGraphqlData", bound=BaseModel)
 
 
-async def _execute_board_query_with_fallback(
-    http: HTTPSession,
-    log: Logger,
-    variables: Dict[str, Any],
-    board_id: str | None = None,
-) -> AsyncGenerator[Board, None]:
-    """
-    Execute board query with fallback from 'kind' field to without 'kind' field.
-    This has been observed for boards that are set up as templates, which error
-    when the workspace 'kind' field is queried.
-    """
-    context = (
-        f"board {board_id}" if board_id else f"page {variables.get('page', 'unknown')}"
-    )
+@dataclass
+class QueryComplexityCache:
+    max_complexity_used = 0
+    next_query_delay = 0
+    query_complexity_map: Dict[str, int] = field(default_factory=dict)
 
-    try:
-        log.debug(f"Trying to fetch {context} with workspace 'kind' field")
-        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
-            yield board
-    except GraphQLQueryError as e:
-        log.debug(f"Trying to fetch {context} without workspace 'kind' field")
-        try:
-            async for board in _fetch_boards(http, log, BOARDS_WITHOUT_KIND, variables):
-                yield board
-        except GraphQLQueryError as e2:
-            if board_id:
-                log.error(
-                    f"Failed to fetch board {board_id} with or without workspace 'kind' field. "
-                    f"With kind error: {e.errors}, Without kind error: {e2.errors}. "
-                    f"This board will be skipped, which may cause data loss."
-                )
-                raise GraphQLQueryError(
-                    [
-                        GraphQLError(
-                            message=f"Failed to fetch board {board_id}. Template boards may need special handling. "
-                            f"Original errors: {e.errors}, {e2.errors}"
-                        )
-                    ]
-                )
-            else:
-                # Re-raise the original error for page-level failures
-                raise e
-
-
-async def _process_cursor_pagination(
-    cursor_manager: CursorManager,
-    http: HTTPSession,
-    log: Logger,
-    items_limit: int,
-    query: str,
-) -> AsyncGenerator[Item, None]:
-    """
-    Handle cursor-based pagination for items with expiration management.
-    """
-    cursor_loop_iteration = 0
-
-    while not cursor_manager.is_empty():
-        cursor_loop_iteration += 1
-
-        log.info(
-            f"Starting cursor processing iteration {cursor_loop_iteration}",
-            {
-                "iteration": cursor_loop_iteration,
-                "active_boards": cursor_manager.get_all_board_ids(),
-                "active_cursor_count": len(cursor_manager.cursors),
-            },
+    def set_complexity(self, query_name: str, complexity: int) -> None:
+        if complexity < 0:
+            raise ValueError("Complexity must be a non-negative integer.")
+        self.query_complexity_map[query_name] = max(
+            self.query_complexity_map.get(query_name, 0), complexity
+        )
+        self.max_complexity_used = max(
+            self.max_complexity_used, self.query_complexity_map[query_name]
         )
 
-        cursor_manager.check_expiration_warnings()
-
-        if cursor_manager.is_empty():
-            log.info("No more active cursors, exiting cursor processing loop")
-            break
-
-        for board_id in list(cursor_manager.get_all_board_ids()):
-            cursor = cursor_manager.get_cursor(board_id)
-            if not cursor:
-                continue
-
-            variables = {"cursor": cursor, "limit": items_limit}
-
-            attempts = 0
-            max_attempts = 2
-            cursor_processing_start = time.time()
-            response = None
-
-            while attempts <= max_attempts:
-                try:
-                    response = await execute_query(
-                        ItemsByBoardPageResponse,
-                        http,
-                        log,
-                        query,
-                        variables,
-                    )
-                    cursor_processing_time = time.time() - cursor_processing_start
-                    log.debug(
-                        f"Successfully fetched next items for board {board_id}",
-                        {
-                            "board_id": board_id,
-                            "cursor_retry_count": attempts,
-                            "processing_time_ms": round(
-                                cursor_processing_time * 1000, 2
-                            ),
-                        },
-                    )
-                    break
-                except GraphQLQueryError as e:
-                    attempts += 1
-                    processing_time = time.time() - cursor_processing_start
-
-                    is_cursor_error = False
-                    for err in e.errors:
-                        if (
-                            err.extensions
-                            and err.extensions.code == CURSOR_EXCEPTION_CODE
-                        ):
-                            is_cursor_error = True
-                            break
-
-                    if is_cursor_error:
-                        log.warning(
-                            f"Cursor expired/invalid for board {board_id}. Failing early to avoid missing data.",
-                            {
-                                "board_id": board_id,
-                                "cursor": cursor,
-                                "error_messages": [
-                                    str(err.message) for err in e.errors
-                                ],
-                                "processing_time_ms": round(processing_time * 1000, 2),
-                            },
-                        )
-                        raise
-                    elif attempts <= max_attempts:
-                        retry_delay = 5 + (2**attempts)
-                        log.warning(
-                            f"Server error for board {board_id} cursor query, will retry",
-                            {
-                                "board_id": board_id,
-                                "cursor": cursor,
-                                "attempt": attempts,
-                                "max_retries": max_attempts,
-                                "retry_delay_s": retry_delay,
-                                "error_messages": [
-                                    str(err.message) for err in e.errors
-                                ],
-                                "processing_time_ms": round(processing_time * 1000, 2),
-                            },
-                        )
-                        await asyncio.sleep(retry_delay)
-                    else:
-                        log.error(
-                            f"Unrecoverable error for board {board_id} cursor query",
-                            {
-                                "board_id": board_id,
-                                "cursor": cursor,
-                                "total_attempts": attempts,
-                                "error_messages": [
-                                    str(err.message) for err in e.errors
-                                ],
-                                "processing_time_ms": round(processing_time * 1000, 2),
-                            },
-                        )
-                        raise
-
-            if response is None:
-                log.error(
-                    f"Failed to fetch next items for board {board_id} after {max_attempts} retries."
-                )
-                raise GraphQLQueryError(
-                    [
-                        GraphQLError(
-                            message=f"Failed to fetch next items for board {board_id} after {max_attempts} retries."
-                        )
-                    ]
-                )
-
-            if not response.data or not response.data.next_items_page:
-                log.debug(f"Received empty response for board {board_id}")
-                cursor_manager.remove_cursor(board_id)
-                continue
-
-            items_page = response.data.next_items_page
-            if not items_page.items:
-                log.info(
-                    f"Board {board_id} cursor returned no items, removing from processing",
-                    {
-                        "board_id": board_id,
-                        "cursor": cursor,
-                        "reason": "no_items_in_page",
-                    },
-                )
-                cursor_manager.remove_cursor(board_id)
-                continue
-
-            items_yielded = 0
-            for item in items_page.items:
-                yield item
-                items_yielded += 1
-
-            next_cursor = response.data.next_items_page.cursor
-            if not next_cursor:
-                log.info(
-                    f"Board {board_id} cursor processing completed - no next cursor",
-                    {
-                        "board_id": board_id,
-                        "items_yielded": items_yielded,
-                        "reason": "no_next_cursor",
-                    },
-                )
-                cursor_manager.remove_cursor(board_id)
-            else:
-                log.debug(
-                    f"Board {board_id} cursor updated for next iteration",
-                    {
-                        "board_id": board_id,
-                        "items_yielded": items_yielded,
-                        "cursor_age_preserved": True,
-                    },
-                )
-                cursor_manager.update_cursor(board_id, next_cursor)
+    def get_complexity(self, query_name: str) -> int:
+        return self.query_complexity_map.get(query_name, 0)
 
 
 class GraphQLQueryError(RuntimeError):
@@ -330,63 +60,195 @@ class GraphQLQueryError(RuntimeError):
         self.errors = errors
 
 
+complexity_cache = QueryComplexityCache()
+
+
 async def execute_query(
-    cls: Type[ResponseObject],
+    cls: Type[TGraphqlData],
     http: HTTPSession,
     log: Logger,
+    json_path: str,
     query: str,
     variables: Dict[str, Any] | None = None,
-) -> GraphQLResponse[ResponseObject]:
+) -> AsyncGenerator[TGraphqlData, None]:
     attempt = 1
+
+    modified_query = query
+
+    normalized_query = " ".join(query.split())
+
+    # Pattern to match the opening brace of the query body
+    # This handles: query { ... } or query Name { ... } or query Name($var: Type) { ... }
+    pattern = r"(query(?:\s+\w+)?(?:\s*\([^)]*\))?\s*\{\s*)"
+    match = re.search(pattern, normalized_query, re.IGNORECASE)
+
+    if match:
+        insert_pos = match.end()
+        complexity_field = "complexity { query after reset_in_x_seconds } "
+        modified_query = (
+            normalized_query[:insert_pos]
+            + complexity_field
+            + normalized_query[insert_pos:]
+        )
+    else:
+        log.error(
+            "Failed to modify query to include complexity field",
+            {"original_query": normalized_query},
+        )
+        raise ValueError("Query modification failed. Cannot find query body.")
+
+    if complexity_cache.next_query_delay > 0:
+        log.info(
+            "Delaying query execution to respect Monday's complexity budget.",
+            {
+                "next_query_delay_seconds": complexity_cache.next_query_delay,
+                "max_complexity_used": complexity_cache.max_complexity_used,
+            },
+        )
+        await asyncio.sleep(complexity_cache.next_query_delay)
+        complexity_cache.next_query_delay = 0
 
     while True:
         try:
-            res: dict[str, Any] = json.loads(
-                await http.request(
-                    log,
-                    API,
-                    method="POST",
-                    json=(
-                        {"query": query, "variables": variables}
-                        if variables
-                        else {"query": query}
-                    ),
-                )
+            _, body = await http.request_stream(
+                log,
+                API,
+                method="POST",
+                json=(
+                    {"query": modified_query, "variables": variables}
+                    if variables
+                    else {"query": modified_query}
+                ),
             )
 
-            if "errors" in res:
-                error_details = [GraphQLError.model_validate(e) for e in res["errors"]]
-                raise GraphQLQueryError(error_details)
+            processor = IncrementalJsonProcessor(
+                body(),
+                json_path,
+                cls,
+                GraphQLResponseRemainder,
+            )
 
-            response = GraphQLResponse[cls].model_validate(res)
+            async for item in processor:
+                yield item
 
-            if response.errors:
-                raise GraphQLQueryError(response.errors)
+            # Process the remainder to check for errors and extract complexity
+            remainder = processor.get_remainder()
 
-            return response
+            if remainder.has_errors():
+                raise GraphQLQueryError(remainder.get_errors())
 
-        except Exception as e:
-            if attempt == 5:
+            if remainder.data and remainder.data.complexity:
+                # Using the json_path as the query name is a simplification
+                # and safer assumption for uniquely tracking queries complexity
+                # since the data structure of the query response is the same
+                complexity_cache.set_complexity(
+                    json_path, remainder.data.complexity.query
+                )
+
+                log.info(
+                    "GraphQL query executed successfully",
+                    {
+                        "complexity": remainder.data.complexity.query,
+                        "reset_in_seconds": remainder.data.complexity.reset_in_x_seconds,
+                        "after": remainder.data.complexity.after,
+                    },
+                )
+
+                # Update the next query delay based on whether the remaining complexity
+                # budget is within the maximum used complexity.
+                # TODO(justin): Assess whether this needs to be more sophisticated and distinquish between backfill and incremental queries.
+                if (
+                    remainder.data.complexity.after
+                    <= complexity_cache.max_complexity_used
+                ):
+                    log.debug(
+                        f"Remaining complexity budget is not sufficient for next query. Delaying next query by {remainder.data.complexity.reset_in_x_seconds} seconds to allow the budget to reset."
+                    )
+                    complexity_cache.next_query_delay = (
+                        remainder.data.complexity.reset_in_x_seconds
+                    )
+
+            return
+
+        except GraphQLQueryError as e:
+            # Check if this is a complexity-related error and handle it specially
+            # TODO: This is likely a query that is too complex for Monday's API and will never succeed.
+            complexity_error = False
+            for error in e.errors:
+                if (
+                    "ComplexityException" in str(error)
+                    or "complexity" in str(error).lower()
+                ):
+                    complexity_error = True
+                    log.warning(
+                        f"Hit complexity limit during query execution (attempt {attempt})",
+                        {
+                            "error": str(error),
+                            "will_retry_in_seconds": 60,
+                        },
+                    )
+
+                    # Delaying for 60 seconds to fully reset the complexity budget
+                    await asyncio.sleep(60)
+                    break
+
+            if not complexity_error and attempt == 5:
                 log.error(
-                    "GraphQL query failed permanently",
+                    "GraphQL streaming query failed permanently",
                     {
                         "total_attempts": attempt,
                         "final_error": str(e),
                         "variables": variables,
+                        "json_path": json_path,
+                        "response_model": cls.__name__,
+                    },
+                )
+                raise
+
+            if not complexity_error:
+                log.warning(
+                    "GraphQL streaming query failed, will retry",
+                    {
+                        "error": str(e),
+                        "attempt": attempt,
+                        "query": modified_query,
+                        "variables": variables,
+                        "json_path": json_path,
+                        "response_model": cls.__name__,
+                        "next_retry_delay_s": attempt * 2,
+                    },
+                )
+                await asyncio.sleep(attempt * 2)
+
+            attempt += 1
+
+        except Exception as e:
+            if attempt == 5:
+                log.error(
+                    "GraphQL streaming query failed permanently",
+                    {
+                        "total_attempts": attempt,
+                        "final_error": str(e),
+                        "variables": variables,
+                        "json_path": json_path,
+                        "response_model": cls.__name__,
                     },
                 )
                 raise
 
             log.warning(
-                "GraphQL query failed, will retry",
+                "GraphQL streaming query failed, will retry",
                 {
                     "error": str(e),
                     "attempt": attempt,
-                    "query": query,
+                    "query": modified_query,
                     "variables": variables,
+                    "json_path": json_path,
+                    "response_model": cls.__name__,
                     "next_retry_delay_s": attempt * 2,
                 },
             )
+
             await asyncio.sleep(attempt * 2)
             attempt += 1
 
@@ -395,257 +257,127 @@ async def fetch_activity_logs(
     http: HTTPSession,
     log: Logger,
     start: str,
+    end: str | None = None,
+) -> AsyncGenerator[ActivityLog, None]:
+    assert start != "", "Start must not be empty"
+
+    start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+    start = start_dt.isoformat().replace("+00:00", "Z")
+
+    if end is None:
+        end_dt = datetime.now(tz=UTC)
+        end = end_dt.isoformat().replace("+00:00", "Z")
+    else:
+        end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+
+    log.debug("Pre-fetching board IDs for activity log queries")
+    board_ids = [board.id async for board in fetch_boards_minimal(http, log)]
+    log.debug(f"Found {len(board_ids)} total boards to query for activity logs")
+
+    # Process boards in batches with high per-board activity log limits
+    # Monday.com's 10k limit log limit is a PER BOARD storage cap, not per request
+    # We can potentially get: boards_per_batch × activity_logs_per_board total logs
+    boards_per_batch = 5000
+    activity_logs_per_board = 100
+
+    total_logs_processed = 0
+
+    log.debug(
+        f"Processing activity logs from {start} to {end} with "
+        f"{boards_per_batch} boards per batch, {activity_logs_per_board} logs per board"
+    )
+
+    for i in range(0, len(board_ids), boards_per_batch):
+        batch_board_ids = board_ids[i : i + boards_per_batch]
+        batch_number = (i // boards_per_batch) + 1
+        total_batches = (len(board_ids) + boards_per_batch - 1) // boards_per_batch
+
+        log.debug(
+            f"Processing board batch {batch_number}/{total_batches} with {len(batch_board_ids)} boards"
+        )
+
+        batch_logs_count = 0
+        async for activity_log in _fetch_activity_logs_for_board_batch(
+            http, log, batch_board_ids, start, end, activity_logs_per_board
+        ):
+            yield activity_log
+            batch_logs_count += 1
+            total_logs_processed += 1
+
+        log.debug(
+            f"Batch {batch_number}/{total_batches}: retrieved {batch_logs_count} activity logs"
+        )
+
+    log.info(f"Total activity logs processed: {total_logs_processed}")
+
+
+async def _fetch_activity_logs_for_board_batch(
+    http: HTTPSession,
+    log: Logger,
+    board_ids: list[str],
+    start_time: str,
+    end_time: str,
+    activity_logs_per_board: int,
 ) -> AsyncGenerator[ActivityLog, None]:
     """
-    Fetch IDs of recently updated resources from activity logs.
+    Fetch activity logs for a batch of boards.
 
-    Note:
-    - Monday.com calls items a "pulse" in the Activity Logs API.
-    - For `pulse` resource, this function will return IDs of parent items affected by updates.
-    So, if a subitem is updated, the parent item ID will be returned. If a parent item is updated,
-    the parent item ID will be returned.
+    The key insight: limit argument is PER BOARD, not total across request.
+    So with 5000 boards and limit:100, we can potentially get 500,000 logs in one request.
+    This is why we use the IncrementalJsonProcessor to handle large responses efficiently.
     """
-    variables: dict[str, Any] = {
-        "start": start,
-        "limit": 5,
-        "page": 1,
-    }
-    total_logs_processed = 0
-    max_logs_limit = 10000  # Monday.com API total log limit
+    page = 1
 
     while True:
-        response = await execute_query(
-            ActivityLogsResponse,
+        variables: dict[str, Any] = {
+            "start": start_time,
+            "end": end_time,
+            "ids": board_ids,
+            "limit": len(board_ids),
+            "activity_limit": activity_logs_per_board,
+            "page": page,
+        }
+        logs_in_page = 0
+
+        async for activity_log in execute_query(
+            ActivityLog,
             http,
             log,
+            "data.boards.activity_logs.item",
             ACTIVITY_LOGS,
             variables,
-        )
+        ):
+            try:
+                log_time = parse_monday_timestamp(activity_log.created_at, log)
+                start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+                end_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
 
-        if not response.data or not response.data.boards:
-            break
+                # Double-check the log is within our time bounds
+                if start_dt <= log_time <= end_dt:
+                    yield activity_log
+                    logs_in_page += 1
 
-        variables["page"] += 1
-
-        logs_in_page = 0
-        for board in response.data.boards:
-            if not board.activity_logs:
+            except (ValueError, TypeError) as e:
+                if activity_log.created_at is not None:
+                    log.warning(
+                        f"Failed to parse activity log timestamp {activity_log.created_at}: {e}"
+                    )
                 continue
-            for activity_log in board.activity_logs:
-                yield activity_log
-                logs_in_page += 1
-                total_logs_processed += 1
 
         if logs_in_page == 0:
-            break
-
-    # If we processed 10,000 logs, there might be more that we can't fetch.
-    # Monday.com will only return the first 10,000 activity logs total with or without pagination.
-    # If we reach this limit, we raise an error to prevent data loss. The incremental sync
-    # interval should be reduced to potentially avoid this in the future.
-    if total_logs_processed >= max_logs_limit:
-        log.error(
-            f"Retrieved {total_logs_processed} activity logs, which meets or exceeds the Monday.com API limit of {max_logs_limit}. "
-            f"There may be additional changes that cannot be fetched."
-        )
-        raise RuntimeError(
-            f"Activity log limit of {max_logs_limit} reached. This indicates there are too many changes "
-            f"in the current sync interval. To avoid missing data, please reduce the sync interval "
-            f"(e.g., from 5 minutes to 1 minute) to ensure fewer than {max_logs_limit} changes occur between syncs."
-        )
-
-
-async def _fetch_single_board(
-    http: HTTPSession,
-    log: Logger,
-    page: int,
-) -> AsyncGenerator[Board, None]:
-    variables: Dict[str, Any] = {"limit": 1, "page": page}
-    async for board in _execute_board_query_with_fallback(
-        http, log, variables, str(page)
-    ):
-        yield board
-
-
-async def _fetch_boards(
-    http: HTTPSession,
-    log: Logger,
-    query: str,
-    variables: Dict[str, Any],
-) -> AsyncGenerator[Board, None]:
-    response = await execute_query(
-        BoardsResponse,
-        http,
-        log,
-        query,
-        variables,
-    )
-    if not response.data:
-        return
-
-    boards = response.data.boards
-    if not boards:
-        return
-
-    for board in boards:
-        yield board
-
-
-async def _fetch_items_chunk(
-    http: HTTPSession,
-    log: Logger,
-    chunk: list[str],
-) -> AsyncGenerator[Item, None]:
-    page = 1
-    page_limit = 100
-
-    while True:
-        variables = {"ids": chunk, "page": page, "limit": page_limit}
-        response = await execute_query(
-            ItemsByIdResponse, http, log, ITEMS_BY_IDS, variables
-        )
-
-        if not response.data or not response.data.items:
-            break
-
-        items_in_page = 0
-        for item in response.data.items:
-            yield item
-            items_in_page += 1
-
-        if items_in_page < page_limit:
+            log.debug(
+                f"No activity logs found for page {page} with start {start_time} and end {end_time}"
+            )
             break
 
         page += 1
-
-
-async def _fetch_boards_chunk(
-    http: HTTPSession,
-    log: Logger,
-    chunk: list[str],
-    limit: int | None = None,
-) -> AsyncGenerator[Board, None]:
-    try:
-        variables = {
-            "limit": limit,
-            "page": 1,
-            "ids": chunk,
-        }
-        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
-            yield board
-    except GraphQLQueryError:
-        log.info(
-            "Boards query with workspace 'kind' field failed, switching to querying one board at a time."
-        )
-        for board_id in chunk:
-            variables = {
-                "limit": 1,
-                "page": 1,
-                "ids": [board_id],
-            }
-            async for board in _execute_board_query_with_fallback(
-                http, log, variables, board_id
-            ):
-                yield board
-
-
-async def _fetch_boards_page_with_fallback(
-    http: HTTPSession,
-    log: Logger,
-    current_page: int,
-    limit: int,
-) -> AsyncGenerator[Board, None]:
-    """
-    Fetch a page of boards, with fallback to individual board queries if needed.
-    This function first attempts to query with the 'kind' field in the workspace section.
-    If that fails for a page, it switches to querying one board at a time for that page,
-    trying with 'kind' first and falling back to without 'kind' if necessary.
-    """
-    variables = {
-        "limit": limit,
-        "page": current_page,
-    }
-
-    try:
-        async for board in _fetch_boards(http, log, BOARDS_WITH_KIND, variables):
-            yield board
-    except GraphQLQueryError:
-        log.info(
-            f"Boards query with workspace 'kind' field failed for page {current_page}, "
-            f"switching to querying one board at a time."
-        )
-
-        # Calculate the starting item index based on the current page and limit
-        # For example, if we're on page 139 with limit 5, we start from item 691 (138*5 + 1)
-        start_item = ((current_page - 1) * limit) + 1
-
-        for i in range(int(limit)):
-            item_page = start_item + i
-            try:
-                async for board in _fetch_single_board(http, log, item_page):
-                    yield board
-            except GraphQLQueryError:
-                log.error(
-                    f"Failed to fetch board {item_page} with or without workspace 'kind' field"
-                )
-                raise GraphQLQueryError(
-                    [
-                        GraphQLError(
-                            message=f"Failed to fetch board {item_page} with or without workspace 'kind' field"
-                        )
-                    ]
-                )
-
-
-async def fetch_boards(
-    http: HTTPSession,
-    log: Logger,
-    page: int | None = None,
-    ids: list[str] | None = None,
-) -> AsyncGenerator[Board, None]:
-    """
-    Fetch boards, either by IDs (handling the API's 100-item limit) or paginated.
-
-    Note: If `page` is specified, `limit` is required.
-    If `ids` is not provided, all boards will be fetched.
-
-    This function first attempts to query with the 'kind' field in the workspace section.
-    If that fails for a page, it switches to querying one board at a time for that page,
-    trying with 'kind' first and falling back to without 'kind' if necessary. This is necessary for
-    boards that are set up as templates. Template boards error when the workspace 'kind' field is queried
-    and there is not a way to query them otherwise.
-    """
-    limit = 10
-
-    if ids:
-        # Process IDs in chunks of 100 (API limit)
-        for i in range(0, len(ids), 100):
-            chunk = ids[i : i + 100]
-            async for board in _fetch_boards_chunk(http, log, chunk, limit):
-                yield board
-        return
-
-    current_page = 1 if not page else page
-
-    while True:
-        boards_in_page = 0
-        async for board in _fetch_boards_page_with_fallback(
-            http, log, current_page, limit
-        ):
-            yield board
-            boards_in_page += 1
-
-        if page is not None or boards_in_page < limit:
-            break
-
-        current_page += 1
+        log.debug(f"Page {page - 1}: processed {logs_in_page} activity logs")
 
 
 async def fetch_boards_minimal(
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator[Board, None]:
-    limit = 10000
     query = """
     query ($limit: Int = 10000, $page: Int = 1, $state: State = all) {
         boards(limit: $limit, page: $page, state: $state) {
@@ -658,16 +390,24 @@ async def fetch_boards_minimal(
     """
 
     page = 1
+    limit = 10000
 
     while True:
-        variables = {"state": "all", "page": page, "limit": limit}
-        response = await execute_query(BoardsResponse, http, log, query, variables)
-
-        if not response.data or not response.data.boards:
-            break
-
+        variables = {
+            "state": "all",
+            "page": page,
+            "limit": limit,
+        }
         boards_in_page = 0
-        for board in response.data.boards:
+
+        async for board in execute_query(
+            Board,
+            http,
+            log,
+            "data.boards.item",
+            query,
+            variables,
+        ):
             yield board
             boards_in_page += 1
 
@@ -677,93 +417,129 @@ async def fetch_boards_minimal(
         page += 1
 
 
-async def fetch_items_minimal(
+async def fetch_boards_by_ids(
     http: HTTPSession,
     log: Logger,
-) -> AsyncGenerator[Item, None]:
-    items_limit = 500  # Maximum allowed by Monday.com API
-    board_page = 1
-    cursor_manager = CursorManager(log)
+    ids: list[str],
+) -> AsyncGenerator[Board, None]:
+    limit = 100
 
-    while True:
-        # Get one board per page to iterate through all boards
-        response = await execute_query(
-            ItemsByBoardResponse,
+    for i in range(0, len(ids), limit):  # API limit is 100 IDs per request
+        chunk = ids[i : i + limit]
+        variables = {
+            "limit": limit,
+            "page": 1,
+            "ids": chunk,
+        }
+
+        try:
+            async for board in execute_query(
+                Board,
+                http,
+                log,
+                "data.boards.item",
+                BOARDS_WITH_KIND,
+                variables,
+            ):
+                yield board
+        except GraphQLQueryError:
+            async for board in fetch_boards_with_retry(http, log, chunk):
+                yield board
+
+
+async def _try_fetch_boards(
+    http: HTTPSession,
+    log: Logger,
+    variables: dict[str, Any],
+) -> AsyncGenerator[Board, None]:
+    try:
+        async for board in execute_query(
+            Board,
             http,
             log,
-            """
-            query GetMinimalItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 500, $state: State = all) {
-                boards(limit: $boardsLimit, page: $boardsPage, state: $state) {
-                    id
-                    state
-                    items_page(limit: $itemsLimit, query_params: {
-                        order_by: [{
-                            column_id: "__last_updated__",
-                            direction: desc
-                        }]
-                    }) {
-                        cursor
-                        items {
-                            id
-                            state
-                            updated_at
-                        }
-                    }
-                }
-            }
-            """,
-            {
-                "boardsLimit": 1,
-                "boardsPage": board_page,
-                "itemsLimit": items_limit,
-            },
+            "data.boards.item",
+            BOARDS_WITH_KIND,
+            variables,
+        ):
+            yield board
+    except GraphQLQueryError:
+        async for board in execute_query(
+            Board,
+            http,
+            log,
+            "data.boards.item",
+            BOARDS_WITHOUT_KIND,
+            variables,
+        ):
+            yield board
+
+
+async def fetch_boards_with_retry(
+    http: HTTPSession,
+    log: Logger,
+    ids: list[str] | None = None,
+    page: int = 1,
+    limit: int = 1000,
+) -> AsyncGenerator[Board, None]:
+    if ids is None:
+        variables = {
+            "limit": limit,
+            "page": page,
+        }
+
+        async for board in _try_fetch_boards(http, log, variables):
+            yield board
+
+        return
+
+    # Maximum number of IDs Monday API allows in a single page request
+    if len(ids) > 100:
+        mid = len(ids) // 2
+        left_chunk = ids[:mid]
+        right_chunk = ids[mid:]
+
+        log.debug(
+            f"Dividing chunk of {len(ids)} boards into chunks of {len(left_chunk)} and {len(right_chunk)} due to API limits."
         )
 
-        if not response.data or not response.data.boards:
-            break
+        left_gen = fetch_boards_with_retry(http, log, left_chunk)
+        right_gen = fetch_boards_with_retry(http, log, right_chunk)
 
-        board = response.data.boards[0]
-        if board.state == "deleted":
-            board_page += 1
-            continue
+        async for board in merge_async_generators(left_gen, right_gen):
+            yield board
+        return
 
-        items_page = board.items_page
-        if not items_page or not items_page.items:
-            board_page += 1
-            continue
-
-        # Yield items from this board's first page
-        for item in items_page.items:
-            yield item
-
-        # Add cursor to manager if available
-        if items_page.cursor:
-            cursor_manager.add_cursor(board.id, items_page.cursor)
-
-        board_page += 1
-
-    # Process all cursors using the helper function
-    minimal_cursor_query = """
-    query GetNextMinimalItems($cursor: String!, $limit: Int = 500) {
-        next_items_page(limit: $limit, cursor: $cursor) {
-            cursor
-            items {
-                id
-                state
-                updated_at
-            }
+    try:
+        variables = {
+            "limit": len(ids),
+            "page": 1,
+            "ids": ids,
         }
-    }
-    """
+        async for board in _try_fetch_boards(http, log, variables):
+            yield board
 
-    async for item in _process_cursor_pagination(
-        cursor_manager,
-        http,
-        log,
-        items_limit,
-        minimal_cursor_query,
-    ):
-        yield item
+        return
+    except GraphQLQueryError:
+        if len(ids) == 1:
+            log.error(
+                f"Board {ids[0]} cannot be fetched with or without workspace kind field. This may be an issue with the board or Monday's API."
+            )
+            raise
+
+        # Divide and conquer: continuously split the list of IDs in half
+        mid = len(ids) // 2
+        left_chunk = ids[:mid]
+        right_chunk = ids[mid:]
+
+        log.debug(
+            f"Dividing chunk of {len(ids)} boards into chunks of {len(left_chunk)} and {len(right_chunk)}"
+        )
+
+        left_gen = fetch_boards_with_retry(http, log, left_chunk)
+        right_gen = fetch_boards_with_retry(http, log, right_chunk)
+
+        async for board in merge_async_generators(left_gen, right_gen):
+            yield board
 
 
 async def fetch_items_by_ids(
@@ -771,339 +547,430 @@ async def fetch_items_by_ids(
     log: Logger,
     item_ids: list[str],
 ) -> AsyncGenerator[Item, None]:
-    # Process IDs in chunks of 100 (API limit)
-    for i in range(0, len(item_ids), 100):
-        chunk = item_ids[i : i + 100]
-        async for item in _fetch_items_chunk(http, log, chunk):
-            yield item
+    # API accepts maximum 100 IDs per request
+    limit = 100
+    chunk_count = (len(item_ids) + limit - 1) // limit
+    log.debug(f"Fetching items by IDs in {chunk_count} chunks of {limit} each.")
 
-
-async def fetch_items_by_boards(
-    http: HTTPSession,
-    log: Logger,
-    page: int,
-) -> AsyncGenerator[Item | str, None]:
-    cursor_manager = CursorManager(log)
-    itemsLimit = 100
-
-    response = await execute_query(
-        ItemsByBoardResponse,
-        http,
-        log,
-        ITEMS,
-        {
-            "boardsPage": page,
-            "boardsLimit": 1,
-            "itemsLimit": itemsLimit,
-        },
-    )
-
-    if not response.data:
-        log.debug(
-            f"Received empty response for page {page} with itemsLimit {itemsLimit}"
-        )
-        return
-
-    boards = response.data.boards
-    if not boards:
-        log.debug(
-            f"Received response with no boards for page {page} with itemsLimit {itemsLimit}"
-        )
-        return
-
-    board = boards[0]
-    board_id = board.id
-
-    if board.state == "deleted":
-        log.debug(f"Skipping querying items for deleted board {board.id}")
-        yield board_id
-        return
-
-    items_page = board.items_page
-
-    if items_page.cursor:
-        cursor_manager.add_cursor(board.id, items_page.cursor)
-        log.info(
-            f"Initialized cursor for board {board.id}",
-            {
-                "board_id": board.id,
-                "cursor": items_page.cursor,
-                "initial_items_count": len(items_page.items),
-                "cursor_creation_time": time.time(),
-            },
-        )
-    else:
-        log.info(
-            f"Board {board.id} has no cursor - no further items to fetch",
-            {
-                "board_id": board.id,
-                "initial_items_count": len(items_page.items),
-            },
+    chunk_generators = []
+    for i in range(0, len(item_ids), limit):
+        chunk = item_ids[i : i + limit]
+        chunk_number = (i // limit) + 1
+        chunk_generators.append(
+            _fetch_items_chunk(http, log, chunk, chunk_number, chunk_count)
         )
 
-    for item in items_page.items:
-        log.debug(f"Yielding item {item.id} from board {board.id}")
+    async for item in merge_async_generators(*chunk_generators):
         yield item
 
-    async for item in _process_cursor_pagination(
-        cursor_manager,
+
+async def _fetch_items_chunk(
+    http: HTTPSession,
+    log: Logger,
+    chunk: list[str],
+    chunk_number: int,
+    total_chunks: int,
+) -> AsyncGenerator[Item, None]:
+    log.debug(f"Fetching items for IDs chunk {chunk_number}/{total_chunks}.")
+
+    variables = {"ids": chunk, "page": 1, "limit": len(chunk)}
+
+    async for item in execute_query(
+        Item,
         http,
         log,
-        itemsLimit,
-        NEXT_ITEMS,
+        "data.items.item",
+        ITEMS_BY_IDS,
+        variables,
     ):
         yield item
 
-    log.info(
-        f"Finished fetching items for board {board_id}",
-        {
-            "board_id": board_id,
-            "remaining_active_cursors": cursor_manager.get_all_board_ids(),
-        },
-    )
 
-    # Yield the board ID in case we did not have items to yield for this board.
-    # This ensures that the caller continues to the next page of boards.
-    yield board_id
+async def get_non_deleted_board_ids(
+    http: HTTPSession,
+    log: Logger,
+) -> list[int]:
+    board_ids = []
+
+    async for board in fetch_boards_minimal(http, log):
+        try:
+            # Skip boards that are deleted
+            # we cannot get items from them - API returns INTERNAL_SERVER_ERROR
+            if board.state == "deleted":
+                continue
+
+            board_ids.append(int(board.id))
+        except ValueError as e:
+            log.error(f"Failed to convert board ID {board.id} to integer: {e}.")
+            raise
+
+    return board_ids
+
+
+async def fetch_items_minimal(
+    http: HTTPSession,
+    log: Logger,
+) -> AsyncGenerator[Item, None]:
+    board_ids = await get_non_deleted_board_ids(http, log)
+
+    if not board_ids:
+        log.debug("No board IDs found, returning early")
+        return
+
+    batch_size = 100  # Monday API limit for board IDs per request
+
+    for i in range(0, len(board_ids), batch_size):
+        batch_ids = board_ids[i : i + batch_size]
+        log.debug(
+            f"Processing board batch {i // batch_size + 1} with {len(batch_ids)} boards"
+        )
+
+        variables = {
+            "boardIds": batch_ids,
+            "itemsLimit": 500,
+        }
+
+        minimal_items_query = """
+        query GetMinimalBoardItems($boardIds: [ID!]!, $itemsLimit: Int) {
+            boards(ids: $boardIds) {
+                id
+                state
+                items_page(limit: $itemsLimit, query_params: {
+                    order_by: [{
+                        column_id: "__last_updated__",
+                        direction: desc
+                    }]
+                }) {
+                    cursor
+                    items {
+                        id
+                        state
+                        updated_at
+                    }
+                }
+            }
+        }
+        """
+
+        next_page_query = """
+        query GetNextMinimalItemsInWindow($cursor: String!, $limit: Int = 500) {
+            next_items_page(limit: $limit, cursor: $cursor) {
+                cursor
+                items {
+                    id
+                    state
+                    updated_at
+                }
+            }
+        }
+        """
+
+        async for board in execute_query(
+            BoardItems,
+            http,
+            log,
+            "data.boards.item",
+            minimal_items_query,
+            variables,
+        ):
+            log.debug(
+                f"Processing board {board.id} with state {board.state}",
+                {"board": board},
+            )
+            # Skip deleted boards since we cannot fetch items from them
+            if board.state == "deleted":
+                log.debug(f"Skipping deleted board {board.id}")
+                continue
+
+            items_page = board.items_page
+            if not items_page or not items_page.items:
+                log.debug(f"No items found for board {board.id}.")
+                continue
+
+            for item in items_page.items:
+                yield item
+
+            cursor = items_page.cursor
+            while cursor:
+                cursor_variables = {"cursor": cursor, "limit": 500}
+
+                async for next_items in execute_query(
+                    ItemsPage,
+                    http,
+                    log,
+                    "data.next_items_page.items_page",
+                    next_page_query,
+                    cursor_variables,
+                ):
+                    cursor = next_items.cursor
+
+                    for item in next_items.items:
+                        yield item
 
 
 ACTIVITY_LOGS = """
-query GetActivityLogs($start: ISO8601DateTime!, $limit: Int = 5, $page: Int = 1, $state: State = all) {
-  boards(limit: $limit, page: $page, state: $state) {
-    id
-    state
-    activity_logs(from: $start) {
-      id
-      entity
-      event
-      data
-      created_at
+query ($start: ISO8601DateTime!, $end: ISO8601DateTime!, $ids: [ID!]!, $limit: Int!, $activity_limit: Int!, $page: Int = 1) {
+    boards(ids: $ids, limit: $limit, page: $page) {
+        activity_logs(from: $start, to: $end, limit: $activity_limit) {
+            account_id
+            created_at
+            data
+            entity
+            event
+            id
+            user_id
+        }
     }
-  }
 }
 """
 
-BOARDS_TEMPLATE = """
+BOARDS_WITH_KIND = """
 query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10, $ids: [ID!], $state: State = all) {
-  boards(order_by: $order_by, page: $page, limit: $limit, ids: $ids, state: $state) {
-    id
-    state
-    name
-    board_kind
-    type
-    columns {
-      archived
-      description
-      id
-      settings_str
-      title
-      type
-      width
+    boards(order_by: $order_by, page: $page, limit: $limit, ids: $ids, state: $state) {
+        id
+        state
+        name
+        board_kind
+        type
+        columns {
+            archived
+            description
+            id
+            settings_str
+            title
+            type
+            width
+        }
+        communication
+        description
+        groups {
+            archived
+            color
+            deleted
+            id
+            position
+            title
+        }
+        owners {
+            id
+        }
+        creator {
+            id
+        }
+        permissions
+        state
+        subscribers {
+            id
+        }
+        tags {
+            id
+            color
+            name
+        }
+        top_group {
+            id
+        }
+        updated_at
+        updates {
+            id
+        }
+        views {
+            id
+            name
+            settings_str
+            type
+            view_specific_data_str
+        }
+        workspace {
+            id
+            name
+            description
+            kind
+        }
     }
-    communication
-    description
-    groups {
-      archived
-      color
-      deleted
-      id
-      position
-      title
-    }
-    owners {
-      id
-    }
-    creator {
-      id
-    }
-    permissions
-    state
-    subscribers {
-      id
-    }
-    tags {
-      id
-      color
-      name
-    }
-    top_group {
-      id
-    }
-    updated_at
-    updates {
-      id
-    }
-    views {
-      id
-      name
-      settings_str
-      type
-      view_specific_data_str
-    }
-    workspace {
-      id
-      name
-      description
-      %s
-    }
-  }
 }
 """
 
-BOARDS_WITH_KIND = BOARDS_TEMPLATE % "kind"
-BOARDS_WITHOUT_KIND = BOARDS_TEMPLATE % ""
-
-
-TEAMS = """
-query {
-  teams {
-    id
-    name
-    picture_url
-    users {
-      id
+BOARDS_WITHOUT_KIND = """
+query ($order_by: BoardsOrderBy = created_at, $page: Int = 1, $limit: Int = 10, $ids: [ID!], $state: State = all) {
+    boards(order_by: $order_by, page: $page, limit: $limit, ids: $ids, state: $state) {
+        id
+        state
+        name
+        type
+        columns {
+            archived
+            description
+            id
+            settings_str
+            title
+            type
+            width
+        }
+        communication
+        description
+        groups {
+            archived
+            color
+            deleted
+            id
+            position
+            title
+        }
+        owners {
+            id
+        }
+        creator {
+            id
+        }
+        permissions
+        state
+        subscribers {
+            id
+        }
+        tags {
+            id
+            color
+            name
+        }
+        top_group {
+            id
+        }
+        updated_at
+        updates {
+            id
+        }
+        views {
+            id
+            name
+            settings_str
+            type
+            view_specific_data_str
+        }
+        workspace {
+            id
+            name
+            description
+        }
     }
-    owners {
-      id
-    }
-  }
 }
 """
 
-USERS = """
-query ($limit: Int = 10, $page: Int = 1) {
-  users(limit: $limit, page: $page) {
-    birthday
-    country_code
-    created_at
-    join_date
-    email
-    enabled
-    id
-    is_admin
-    is_guest
-    is_pending
-    is_view_only
-    is_verified
-    location
-    mobile_phone
-    name
-    phone
-    photo_original
-    photo_small
-    photo_thumb
-    photo_thumb_small
-    photo_tiny
-    time_zone_identifier
-    title
-    url
-    utc_hours_diff
-  }
+ITEMS_BY_IDS = """
+query ($ids: [ID!]!, $limit: Int = 10, $page: Int = 1) {
+    items(ids: $ids, limit: $limit, page: $page) {
+        id
+        name
+        state
+        created_at
+        updated_at
+        creator_id
+        board {
+            id
+        }
+        group {
+            id
+            title
+            color
+        }
+        column_values {
+            column {
+                id
+                title
+                type
+                settings_str
+            }
+            id
+            text
+            type
+            value
+        }
+        subitems {
+            id
+            name
+            state
+            created_at
+            updated_at
+            creator_id
+            board {
+                id
+            }
+            group {
+                id
+                title
+                color
+            }
+            column_values {
+                column {
+                    id
+                    title
+                    type
+                    settings_str
+                }
+                id
+                text
+                type
+                value
+            }
+        }
+    }
 }
 """
 
 TAGS = """
 query {
-  tags {
-    id
-    name
-    color
-  }
-}
-"""
-
-
-_ITEM_FIELDS = """
-fragment _ItemFields on Item {
-  id
-  name
-  assets {
-    created_at
-    file_extension
-    file_size
-    id
-    name
-    original_geometry
-    public_url
-    uploaded_by {
-      id
+    tags {
+        id
+        name
+        color
     }
-    url
-    url_thumbnail
-  }
-  board {
-    id
-    name
-  }
-  column_values {
-    id
-    text
-    type
-    value
-  }
-  created_at
-  creator_id
-  group {
-    id
-  }
-  parent_item {
-    id
-  }
-  state
-  subscribers {
-    id
-  }
-  updated_at
-  updates {
-    id
-  }
-}
-fragment ItemFields on Item {
-  ..._ItemFields
-  subitems {
-    ..._ItemFields
-  }
 }
 """
 
-ITEMS = f"""
-query GetBoardItems($boardsLimit: Int = 25, $boardsPage: Int = 1, $itemsLimit: Int = 50, $state: State = all) {{
-  boards(limit: $boardsLimit, page: $boardsPage, state: $state) {{
-    id
-    state
-    items_page(limit: $itemsLimit, query_params: {{
-      order_by: [{{
-        column_id: "__last_updated__",
-        direction: desc
-      }}]
-    }}) {{
-      cursor
-      items {{
-        ...ItemFields
-      }}
-    }}
-  }}
-}}
-{_ITEM_FIELDS}
+USERS = """
+query ($limit: Int = 10, $page: Int = 1) {
+    users(limit: $limit, page: $page) {
+        birthday
+        country_code
+        created_at
+        join_date
+        email
+        enabled
+        id
+        is_admin
+        is_guest
+        is_pending
+        is_view_only
+        is_verified
+        location
+        mobile_phone
+        name
+        phone
+        photo_original
+        photo_small
+        photo_thumb
+        photo_thumb_small
+        photo_tiny
+        time_zone_identifier
+        title
+        url
+        utc_hours_diff
+    }
+}
 """
 
-NEXT_ITEMS = f"""
-query GetNextItems($cursor: String!, $limit: Int = 200) {{
-  next_items_page(limit: $limit, cursor: $cursor) {{
-    cursor
-    items {{
-      ...ItemFields
-    }}
-  }}
-}}
-{_ITEM_FIELDS}
-"""
-
-ITEMS_BY_IDS = f"""
-query GetItemsByIds($ids: [ID!]!, $page: Int = 1, $limit: Int = 100) {{
-  items(ids: $ids, page: $page, limit: $limit, newest_first: true) {{
-    ...ItemFields
-  }}
-}}
-{_ITEM_FIELDS}
+TEAMS = """
+query {
+    teams {
+        id
+        name
+        picture_url
+        users {
+            id
+        }
+        owners {
+            id
+        }
+    }
+}
 """
