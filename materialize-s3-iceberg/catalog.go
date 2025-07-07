@@ -12,41 +12,32 @@ import (
 )
 
 type catalog struct {
-	cfg           *config
-	resourcePaths [][]string
+	cfg *config
 }
 
-func newCatalog(cfg config, resourcePaths [][]string) *catalog {
-	return &catalog{
-		cfg:           &cfg,
-		resourcePaths: resourcePaths,
-	}
+func newCatalog(cfg config) *catalog {
+	return &catalog{cfg: &cfg}
 }
 
-func (c *catalog) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		func(rp []string) []string { return rp },
-		func(f string) string { return f },
-	)
-
-	if len(c.resourcePaths) == 0 {
+func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+	if len(resourcePaths) == 0 {
 		// No bindings so there are no tables that we care about; nothing to do.
-		return is, nil
+		return nil
 	}
 
-	pathsJson, err := json.Marshal(c.resourcePaths)
+	pathsJson, err := json.Marshal(resourcePaths)
 	if err != nil {
-		return nil, fmt.Errorf("marshaling paths: %w", err)
+		return fmt.Errorf("marshaling paths: %w", err)
 	}
 
 	b, err := runIcebergctl(ctx, c.cfg, "info-schema", string(pathsJson))
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var got map[string][]existingIcebergColumn
 	if err := json.Unmarshal(b, &got); err != nil {
-		return nil, err
+		return err
 	}
 
 	for res, fields := range got {
@@ -63,7 +54,7 @@ func (c *catalog) infoSchema(ctx context.Context) (*boilerplate.InfoSchema, erro
 		}
 	}
 
-	return is, nil
+	return nil
 }
 
 // Table paths returns the registered storage path for each resource path in a
@@ -114,9 +105,7 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 	return err
 }
 
-func (c *catalog) CreateResource(ctx context.Context, spec *pf.MaterializationSpec, bindingIndex int) (string, boilerplate.ActionApplyFn, error) {
-	b := spec.Bindings[bindingIndex]
-
+func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding) (string, boilerplate.ActionApplyFn, error) {
 	tc := tableCreate{Location: tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1])}
 
 	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
@@ -160,14 +149,12 @@ func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, bo
 	}, nil
 }
 
-func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec, bindingIndex int, bindingUpdate boilerplate.BindingUpdate) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.MaterializerBindingUpdate[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
 	if len(bindingUpdate.NewProjections) == 0 && len(bindingUpdate.NewlyNullableFields) == 0 {
 		// Nothing to do, since only adding new columns or dropping nullability
 		// constraints is supported currently.
 		return "", nil, nil
 	}
-
-	b := spec.Bindings[bindingIndex]
 
 	ta := tableAlter{}
 
@@ -176,7 +163,7 @@ func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec
 	}
 
 	for _, p := range bindingUpdate.NewProjections {
-		s, err := projectionToParquetSchemaElement(p, b.FieldSelection.FieldConfigJsonMap[p.Field])
+		s, err := projectionToParquetSchemaElement(p.Projection.Projection, bindingUpdate.Binding.FieldSelection.FieldConfigJsonMap[p.Field])
 		if err != nil {
 			return "", nil, err
 		}
@@ -193,7 +180,7 @@ func (c *catalog) UpdateResource(_ context.Context, spec *pf.MaterializationSpec
 		return "", nil, err
 	}
 
-	fqn := pathToFQN(b.ResourcePath)
+	fqn := pathToFQN(bindingUpdate.Binding.ResourcePath)
 
 	return fmt.Sprintf("alter table %q", fqn), func(ctx context.Context) error {
 		if _, err := runIcebergctl(ctx, c.cfg, "alter-table", fqn, string(input)); err != nil {

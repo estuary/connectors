@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "create table \"iceberg-test.simple_delta\"\ncreate table \"iceberg-test.duplicate_keys_delta\"\ncreate table \"iceberg-test.multiple_types_delta\""
+  "create namespace \"iceberg-test\"\ncreate table \"iceberg-test.simple_delta\"\ncreate table \"iceberg-test.duplicate_keys_delta\"\ncreate table \"iceberg-test.multiple_types_delta\""
 ]
 [
   "connectorState",

@@ -65,11 +65,8 @@ func TestValidateAndApply(t *testing.T) {
 		Namespace: "test_namespace",
 		Table:     "test_table",
 	}
-
-	catalog := catalog{
-		cfg:           &cfg,
-		resourcePaths: [][]string{{"test_namespace", "test_table"}},
-	}
+	path := []string{"test_namespace", "test_table"}
+	catalog := catalog{cfg: &cfg}
 
 	boilerplate.RunValidateAndApplyTestCases(
 		t,
@@ -77,10 +74,13 @@ func TestValidateAndApply(t *testing.T) {
 		cfg,
 		resourceConfig,
 		func(t *testing.T) string {
-			is, err := catalog.infoSchema(ctx)
-			require.NoError(t, err)
+			is := boilerplate.NewInfoSchema(
+				func(rp []string) []string { return rp },
+				func(f string) string { return f },
+			)
+			require.NoError(t, catalog.populateInfoSchema(ctx, is, [][]string{path}))
 
-			fields := is.GetResource(resourceConfig.path()).AllFields()
+			fields := is.GetResource(path).AllFields()
 			slices.SortFunc(fields, func(a, b boilerplate.ExistingField) int {
 				return strings.Compare(a.Name, b.Name)
 			})
@@ -95,7 +95,7 @@ func TestValidateAndApply(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, do, _ := catalog.DeleteResource(ctx, resourceConfig.path())
+			_, do, _ := catalog.DeleteResource(ctx, path)
 			do(ctx)
 		},
 	)

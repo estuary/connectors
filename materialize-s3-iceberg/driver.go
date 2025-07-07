@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,7 +14,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	"github.com/estuary/connectors/filesink"
-	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -24,7 +22,6 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
 	iso8601 "github.com/senseyeio/duration"
-	log "github.com/sirupsen/logrus"
 )
 
 var featureFlagDefaults = map[string]bool{}
@@ -110,6 +107,10 @@ func (c config) Validate() error {
 	return nil
 }
 
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return c.Advanced.FeatureFlags, featureFlagDefaults
+}
+
 func parse8601(in string) (time.Duration, error) {
 	parsed, err := iso8601.ParseISO8601(in)
 	if err != nil {
@@ -134,18 +135,6 @@ type resource struct {
 	Delta     *bool  `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
 }
 
-func newResource(cfg config) resource {
-	return resource{
-		// Default to the endpoint Namespace. This will be over-written by a present `namespace`
-		// property within `raw` when unmarshalling into the returned resource.
-		Namespace: cfg.Namespace,
-	}
-}
-
-func (r resource) path() []string {
-	return []string{strings.ToLower(r.Namespace), strings.ToLower(r.Table)}
-}
-
 func pathToFQN(p []string) string {
 	return strings.Join(p, ".")
 }
@@ -153,7 +142,6 @@ func pathToFQN(p []string) string {
 func (r resource) Validate() error {
 	var requiredProperties = [][]string{
 		{"table", r.Table},
-		{"namespace", r.Namespace},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
@@ -172,7 +160,20 @@ func (r resource) Validate() error {
 	return nil
 }
 
+func (r resource) WithDefaults(cfg config) resource {
+	if r.Namespace == "" {
+		r.Namespace = cfg.Namespace
+	}
+	return r
+}
+
+func (r resource) Parameters() ([]string, bool, error) {
+	return []string{strings.ToLower(r.Namespace), strings.ToLower(r.Table)}, true, nil
+}
+
 type driver struct{}
+
+var _ boilerplate.Connector = &driver{}
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	endpointSchema, err := runIcebergctl(ctx, nil, "print-config-schema")
@@ -185,191 +186,214 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.Response_Spec{
-		ConfigSchemaJson:         json.RawMessage(endpointSchema),
-		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:         "https://go.estuary.dev/materialize-s3-iceberg",
-	}, nil
+	return boilerplate.RunSpec(ctx, req, "https://go.estuary.dev/materialize-s3-iceberg", endpointSchema, resourceSchema)
 }
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	return boilerplate.RunValidate(ctx, req, newMaterialization)
+}
+
+func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return boilerplate.RunApply(ctx, req, newMaterialization)
+}
+
+func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+}
+
+type materialization struct {
+	cfg     config
+	catalog *catalog
+}
+
+var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
+
+func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+	catalog := newCatalog(cfg)
+
+	return &materialization{
+		cfg:     cfg,
+		catalog: catalog,
+	}, nil
+}
+
+func (d *materialization) Config() boilerplate.MaterializeCfg {
+	interval, err := parse8601(d.cfg.UploadInterval)
+	if err != nil {
+		interval = time.Hour
 	}
 
-	var featureFlags = common.ParseFeatureFlags(cfg.Advanced.FeatureFlags, featureFlagDefaults)
-	if cfg.Advanced.FeatureFlags != "" {
-		log.WithField("flags", featureFlags).Info("parsed feature flags")
+	return boilerplate.MaterializeCfg{
+		MaxFieldLength:        255,
+		CaseInsensitiveFields: true,
+		ConcurrentApply:       true,
+		MaterializeOptions: boilerplate.MaterializeOptions{
+			AckSchedule: &boilerplate.AckScheduleOption{
+				Config: boilerplate.ScheduleConfig{
+					SyncFrequency: interval.String(),
+				},
+			},
+			ExtendedLogging: true,
+		},
+	}
+}
+
+func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
+	ns, err := d.catalog.listNamespaces(ctx)
+	if err != nil {
+		return fmt.Errorf("listing namespaces: %w", err)
+	}
+	for _, namespace := range ns {
+		is.PushNamespace(namespace)
 	}
 
-	// Test creating, reading, and deleting an object from the configured bucket and prefix.
+	return d.catalog.populateInfoSchema(ctx, is, resourcePaths)
+}
+
+func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	s3store, err := filesink.NewS3Store(ctx, filesink.S3StoreConfig{
-		Bucket:             cfg.Bucket,
-		AWSAccessKeyID:     cfg.AWSAccessKeyID,
-		AWSSecretAccessKey: cfg.AWSSecretAccessKey,
-		Region:             cfg.Region,
+		Bucket:             d.cfg.Bucket,
+		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
+		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
+		Region:             d.cfg.Region,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("creating s3 store: %w", err)
+		errs.Err(fmt.Errorf("creating s3 store: %w", err))
+		return errs
 	}
 
 	s3client := s3store.Client()
-
-	testKey := path.Join(cfg.Prefix, uuid.NewString())
+	testKey := path.Join(d.cfg.Prefix, uuid.NewString())
 
 	var awsErr *awsHttp.ResponseError
 	if _, err := s3client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(cfg.Bucket),
+		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 		Body:   strings.NewReader("testing"),
 	}); err != nil {
 		if errors.As(err, &awsErr) {
-			// Handling for the two most common cases: The bucket doesn't exist, or the bucket does
-			// exist but the configured credentials aren't authorized to write to it.
 			if awsErr.Response.Response.StatusCode == http.StatusNotFound {
-				err = fmt.Errorf("bucket %q does not exist", cfg.Bucket)
+				err = fmt.Errorf("bucket %q does not exist", d.cfg.Bucket)
 			} else if awsErr.Response.Response.StatusCode == http.StatusForbidden {
-				err = fmt.Errorf("not authorized to write to %q", path.Join(cfg.Bucket, cfg.Prefix))
+				err = fmt.Errorf("not authorized to write to %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
 			}
 		}
 		errs.Err(err)
 	} else if _, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(cfg.Bucket),
+		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to read from %q", path.Join(cfg.Bucket, cfg.Prefix))
+			err = fmt.Errorf("not authorized to read from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
 		}
 		errs.Err(err)
 	} else if _, err := s3client.DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(cfg.Bucket),
+		Bucket: aws.String(d.cfg.Bucket),
 		Key:    aws.String(testKey),
 	}); err != nil {
 		if errors.As(err, &awsErr) && awsErr.Response.Response.StatusCode == http.StatusForbidden {
-			err = fmt.Errorf("not authorized to delete from %q", path.Join(cfg.Bucket, cfg.Prefix))
+			err = fmt.Errorf("not authorized to delete from %q", path.Join(d.cfg.Bucket, d.cfg.Prefix))
 		}
 		errs.Err(err)
 	}
-	if errs.Len() != 0 {
-		return nil, cerrors.NewUserError(nil, errs.Error())
-	}
 
-	var resources []resource
-	var resourcePaths [][]string
-	for _, binding := range req.Bindings {
-		res := newResource(cfg)
-		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
-			return nil, fmt.Errorf("parsing resource config: %w", err)
-		}
-		resources = append(resources, res)
-		resourcePaths = append(resourcePaths, res.path())
-	}
-
-	catalog := newCatalog(cfg, resourcePaths)
-
-	is, err := catalog.infoSchema(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	// AWS Glue prohibits field names longer than 255 characters, and considers "thisColumn" to be
-	// in conflict with "ThisColumn" etc.
-	validator := boilerplate.NewValidator(icebergConstrainter{}, is, 255, true, featureFlags)
-
-	var out []*pm.Response_Validated_Binding
-	for idx, binding := range req.Bindings {
-		res := resources[idx]
-
-		deltaUpdates := true
-		if res.Delta != nil {
-			deltaUpdates = *res.Delta
-		}
-
-		constraints, err := validator.ValidateBinding(
-			res.path(),
-			deltaUpdates,
-			binding.Backfill,
-			binding.Collection,
-			binding.FieldConfigJsonMap,
-			req.LastMaterialization,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("validating binding: %w", err)
-		}
-
-		out = append(out, &pm.Response_Validated_Binding{
-			Constraints:  constraints,
-			DeltaUpdates: deltaUpdates,
-			ResourcePath: res.path(),
-		})
-	}
-
-	return &pm.Response_Validated{Bindings: out}, nil
+	return errs
 }
 
-func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(req.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+	_, isNumeric := boilerplate.AsFormattedNumeric(&p)
+
+	var constraint = pm.Response_Validated_Constraint{}
+	switch {
+	case p.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "All Locations that are part of the collections key are required"
+	case p.IsRootDocumentProjection() && deltaUpdates:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The root document should usually be materialized"
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case len(p.Inference.Types) == 0:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field with no types"
+	case p.Field == "_meta/op":
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The operation type should usually be materialized"
+	case strings.HasPrefix(p.Field, "_meta/"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Metadata fields are able to be materialized"
+	case p.Inference.IsSingleScalarType() || isNumeric:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "The projection has a single scalar type"
+	case slices.Equal(p.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Object fields may be materialized"
+	default:
+		// Any other case is one where the field is an array or has multiple types.
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "This field is able to be materialized"
 	}
 
-	var resourcePaths [][]string
-	for _, b := range req.Materialization.Bindings {
-		resourcePaths = append(resourcePaths, b.ResourcePath)
-	}
-
-	catalog := newCatalog(cfg, resourcePaths)
-
-	existingNamespaces, err := catalog.listNamespaces(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	requiredNamespaces := make(map[string]struct{})
-	for _, b := range req.Materialization.Bindings {
-		requiredNamespaces[b.ResourcePath[0]] = struct{}{}
-	}
-
-	for r := range requiredNamespaces {
-		if !slices.Contains(existingNamespaces, r) {
-			if err := catalog.createNamespace(ctx, r); err != nil {
-				return nil, fmt.Errorf("catalog creating namespace '%s': %w", r, err)
-			}
-			log.WithField("namespace", r).Info("created namespace")
-		}
-	}
-
-	is, err := catalog.infoSchema(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	return boilerplate.ApplyChanges(ctx, req, catalog, is, false)
+	return constraint
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
-	var cfg config
-	if err := pf.UnmarshalStrict(open.Materialization.ConfigJson, &cfg); err != nil {
-		return nil, nil, nil, fmt.Errorf("unmarshalling endpoint config: %w", err)
+func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
+	s, err := projectionToParquetSchemaElement(p.Projection, nil)
+	if err != nil {
+		return mappedType{}, nil
 	}
 
+	return mappedType{icebergType: parquetTypeToIcebergType(s.DataType)}, nil
+}
+
+func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
+	return fmt.Sprintf("create namespace %q", ns), d.catalog.createNamespace(ctx, ns)
+}
+
+func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+	return d.catalog.CreateResource(ctx, &res.MaterializationSpec_Binding)
+}
+
+func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
+	return d.catalog.DeleteResource(ctx, resourcePath)
+}
+
+func (d *materialization) UpdateResource(
+	ctx context.Context,
+	resourcePath []string,
+	existing boilerplate.ExistingResource,
+	update boilerplate.MaterializerBindingUpdate[config, resource, mappedType],
+) (string, boilerplate.ActionApplyFn, error) {
+	return d.catalog.UpdateResource(ctx, update)
+}
+
+func (d *materialization) NewMaterializerTransactor(
+	ctx context.Context,
+	req pm.Request_Open,
+	is boilerplate.InfoSchema,
+	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
+	be *boilerplate.BindingEvents,
+) (boilerplate.MaterializerTransactor, error) {
 	var resourcePaths [][]string
 	var bindings []binding
-	for _, b := range open.Materialization.Bindings {
-		res := newResource(cfg)
-		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
-			return nil, nil, nil, fmt.Errorf("unmarshalling resource config: %w", err)
-		}
 
+	for _, b := range mappedBindings {
 		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
 		if err != nil {
-			return nil, nil, nil, err
+			return nil, err
 		}
 
-		resourcePaths = append(resourcePaths, res.path())
+		resourcePaths = append(resourcePaths, b.ResourcePath)
 		bindings = append(bindings, binding{
 			path:       b.ResourcePath,
 			pqSchema:   pqSchema,
@@ -378,10 +402,9 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 		})
 	}
 
-	catalog := newCatalog(cfg, resourcePaths)
-	tablePaths, err := catalog.tablePaths(ctx, resourcePaths)
+	tablePaths, err := d.catalog.tablePaths(ctx, resourcePaths)
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("looking up table paths: %w", err)
+		return nil, fmt.Errorf("looking up table paths: %w", err)
 	}
 
 	for idx := range bindings {
@@ -389,37 +412,25 @@ func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boil
 	}
 
 	s3store, err := filesink.NewS3Store(ctx, filesink.S3StoreConfig{
-		Bucket:             cfg.Bucket,
-		AWSAccessKeyID:     cfg.AWSAccessKeyID,
-		AWSSecretAccessKey: cfg.AWSSecretAccessKey,
-		Region:             cfg.Region,
+		Bucket:             d.cfg.Bucket,
+		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
+		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
+		Region:             d.cfg.Region,
 	})
 	if err != nil {
-		return nil, nil, nil, fmt.Errorf("creating s3 store: %w", err)
-	}
-
-	interval, err := parse8601(cfg.UploadInterval)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	opts := &boilerplate.MaterializeOptions{
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: boilerplate.ScheduleConfig{
-				SyncFrequency: interval.String(),
-			},
-		},
-		ExtendedLogging: true,
+		return nil, fmt.Errorf("creating s3 store: %w", err)
 	}
 
 	return &transactor{
-		materialization: open.Materialization.Name.String(),
-		catalog:         catalog,
+		materialization: req.Materialization.Name.String(),
+		catalog:         d.catalog,
 		bindings:        bindings,
-		bucket:          cfg.Bucket,
-		prefix:          cfg.Prefix,
+		bucket:          d.cfg.Bucket,
+		prefix:          d.cfg.Prefix,
 		store:           s3store,
-	}, &pm.Response_Opened{}, opts, nil
+	}, nil
 }
 
-func main() { boilerplate.RunMain(new(driver)) }
+func (d *materialization) Close(ctx context.Context) {}
+
+func main() { boilerplate.RunMain(driver{}) }
