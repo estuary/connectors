@@ -48,6 +48,9 @@ func testConfig(t *testing.T) config {
 			Token:       "some_token",
 			Warehouse:   "test_warehouse",
 		},
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
 	}
 
 	return cfg
