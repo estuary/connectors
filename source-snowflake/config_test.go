@@ -24,6 +24,7 @@ func TestConfigURI(t *testing.T) {
 			Host:      "orgname-accountname.snowflakecomputing.com",
 			Database:  "mydb",
 			Warehouse: "mywarehouse",
+			Role:      "myrole",
 			Credentials: &snowflake_auth.CredentialConfig{
 				AuthType:   snowflake_auth.UserPass,
 				User:       "alex",
