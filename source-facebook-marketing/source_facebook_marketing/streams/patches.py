@@ -2,9 +2,13 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
+import logging
 from urllib.parse import parse_qsl, urlparse, urlunparse
 
-from facebook_business.api import Cursor
+from facebook_business.api import Cursor, FacebookResponse
+from facebook_business.exceptions import FacebookRequestError
+
+logger = logging.getLogger("airbyte")
 
 
 class CursorPatch(Cursor):
@@ -37,13 +41,27 @@ class CursorPatch(Cursor):
         if self._include_summary and "default_summary" not in self.params and "summary" not in self.params:
             self.params["summary"] = True
 
-        response_obj = self._api.call(
+        response_obj: FacebookResponse = self._api.call(
             "GET",
             self._path,
             params=self.params,
         )
         response = response_obj.json()
         self._headers = response_obj.headers()
+
+        # Despite its name, the `FacebookResponse`'s instance method `json` does not always return JSON.
+        # We have to validate the response format before processing.
+        if not isinstance(response, dict):
+            logger.warning(f"Expected dict response but got {type(response)}: {response}")
+            # Default to status 500 if the status code isn't available. The connector will retry a 500 error.
+            http_status = getattr(response_obj, 'status_code', 500)
+            raise FacebookRequestError(
+                message="Invalid response format from Facebook API",
+                request_context={"response_type": type(response).__name__, "response": str(response)[:500]},
+                http_status=http_status,
+                http_headers=self._headers,
+                body=str(response)
+            )
 
         if "paging" in response and "next" in response["paging"]:
             path = response["paging"]["next"]
