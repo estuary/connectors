@@ -102,10 +102,6 @@ func (c config) Validate() error {
 	return nil
 }
 
-func (c config) DefaultNamespace() string {
-	return sanitizePath(c.Namespace)[0]
-}
-
 func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
 	return c.Advanced.FeatureFlags, make(map[string]bool)
 }

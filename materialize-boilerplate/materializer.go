@@ -188,13 +188,6 @@ type MaterializerTransactor interface {
 type EndpointConfiger interface {
 	pb.Validator
 
-	// DefaultNamespace is the namespace used for bindings if no explicit
-	// namespace is configured for the binding. It may also contain metadata
-	// tables, and needs to exist even if no binding is actually created in it.
-	// This can return an empty string if namespaces do not apply to the
-	// materialization.
-	DefaultNamespace() string
-
 	// FeatureFlags returns the raw string of comma-separated feature flags, and
 	// the default feature flag values that should be applied.
 	FeatureFlags() (raw string, defaults map[string]bool)
@@ -432,10 +425,6 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		// include resource creation. Otherwise resources creation may fail due
 		// to namespaces not yet existing.
 		requiredNamespaces := make(map[string]struct{})
-		if ns := endpointCfg.DefaultNamespace(); ns != "" {
-			requiredNamespaces[ns] = struct{}{}
-		}
-
 		for _, b := range req.Materialization.Bindings {
 			path := is.locatePath(b.ResourcePath)
 			if len(path) < 2 {

@@ -31,10 +31,6 @@ func (c config) Validate() error {
 	return nil
 }
 
-func (c config) DefaultNamespace() string {
-	return ""
-}
-
 func (c config) FeatureFlags() (string, map[string]bool) {
 	return "", make(map[string]bool)
 }
