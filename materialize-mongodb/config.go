@@ -25,7 +25,7 @@ type config struct {
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
 
-func (c *config) Validate() error {
+func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
@@ -45,6 +45,10 @@ func (c *config) Validate() error {
 	}
 
 	return nil
+}
+
+func (c config) FeatureFlags() (string, map[string]bool) {
+	return "", make(map[string]bool)
 }
 
 // ToURI converts the Config to a DSN string.
@@ -77,6 +81,8 @@ func (c *config) ToURI() string {
 type resource struct {
 	Collection   string `json:"collection" jsonschema:"title=Collection name" jsonschema_extras:"x-collection-name=true"`
 	DeltaUpdates bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta updates,default=false" jsonschema_extras:"x-delta-updates=true"`
+
+	database string // Used for constructing the resource path
 }
 
 func (r resource) Validate() error {
@@ -84,4 +90,14 @@ func (r resource) Validate() error {
 		return fmt.Errorf("collection is required")
 	}
 	return nil
+}
+
+func (r resource) WithDefaults(cfg config) resource {
+	r.database = cfg.Database
+
+	return r
+}
+
+func (r resource) Parameters() ([]string, bool, error) {
+	return []string{r.database, r.Collection}, r.DeltaUpdates, nil
 }
