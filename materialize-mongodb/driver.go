@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
@@ -23,10 +22,11 @@ import (
 	mongoDriver "go.mongodb.org/mongo-driver/x/mongo/driver"
 )
 
-// driver implements the DriverServer interface.
 type driver struct{}
 
-func (d *driver) connect(ctx context.Context, cfg config) (*mongo.Client, error) {
+var _ boilerplate.Connector = &driver{}
+
+func connect(ctx context.Context, cfg config) (*mongo.Client, error) {
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections.
 	if cfg.NetworkTunnel != nil && cfg.NetworkTunnel.SSHForwarding != nil && cfg.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
 		uri, err := url.Parse(cfg.Address)
@@ -87,14 +87,9 @@ func (d *driver) connect(ctx context.Context, cfg config) (*mongo.Client, error)
 }
 
 func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	if err := req.Validate(); err != nil {
-		return nil, fmt.Errorf("validating request: %w", err)
-	}
-
-	es := schemagen.GenerateSchema("Materialize MongoDB Spec", &config{})
-	endpointSchema, err := es.MarshalJSON()
+	configSchema, err := schemagen.GenerateSchema("Materialize MongoDB Spec", &config{}).MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("generating endpoint schema: %w", err)
+		return nil, fmt.Errorf("generating config schema: %w", err)
 	}
 
 	resourceSchema, err := schemagen.GenerateSchema("MongoDB Collection", &resource{}).MarshalJSON()
@@ -102,153 +97,143 @@ func (d driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Sp
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return &pm.Response_Spec{
-		ConfigSchemaJson:         json.RawMessage(endpointSchema),
-		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
-		DocumentationUrl:         "https://go.estuary.dev/materialize-mongodb",
-		Oauth2:                   nil,
-	}, nil
+	return boilerplate.RunSpec(ctx, req, "https://go.estuary.dev/materialize-mongodb", configSchema, resourceSchema)
 }
 
 func (d driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
-	cfg, err := resolveEndpointConfig(req.ConfigJson)
-	if err != nil {
-		return nil, err
-	}
+	return boilerplate.RunValidate(ctx, req, newMaterialization)
+}
 
-	_, err = d.connect(ctx, cfg)
+func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
+	return boilerplate.RunApply(ctx, req, newMaterialization)
+}
+
+func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
+}
+
+type materialization struct {
+	cfg    config
+	client *mongo.Client
+}
+
+var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
+
+func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+	client, err := connect(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to database: %w", err)
 	}
 
-	// MongoDB always materializes the full root document.
-	var out []*pm.Response_Validated_Binding
-	for _, b := range req.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
-		if err != nil {
-			return nil, err
-		}
-
-		constraints := make(map[string]*pm.Response_Validated_Constraint)
-		for _, projection := range b.Collection.Projections {
-			var constraint = new(pm.Response_Validated_Constraint)
-			switch {
-			case projection.IsRootDocumentProjection():
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "The root document must be materialized"
-			case projection.IsPrimaryKey:
-				constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-				constraint.Reason = "Document keys must be included"
-			default:
-				constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-				constraint.Reason = "MongoDB only materializes the full document"
-			}
-			constraints[projection.Field] = constraint
-		}
-
-		resourcePath := []string{cfg.Database, res.Collection}
-
-		out = append(out, &pm.Response_Validated_Binding{
-			Constraints:  constraints,
-			DeltaUpdates: res.DeltaUpdates,
-			ResourcePath: resourcePath,
-		})
-	}
-
-	return &pm.Response_Validated{Bindings: out}, nil
-}
-
-func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Applied, error) {
-	cfg, err := resolveEndpointConfig(req.Materialization.ConfigJson)
-	if err != nil {
-		return nil, err
-	}
-
-	client, err := d.connect(ctx, cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	is, err := infoSchema(ctx, client.Database(cfg.Database))
-	if err != nil {
-		return nil, fmt.Errorf("getting infoSchema for apply: %w", err)
-	}
-
-	return boilerplate.ApplyChanges(ctx, req, &mongoApplier{
-		client: client,
+	return &materialization{
 		cfg:    cfg,
-	}, is, true)
+		client: client,
+	}, nil
 }
 
-func (d driver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
-	var cfg, err = resolveEndpointConfig(open.Materialization.ConfigJson)
+func (d *materialization) Config() boilerplate.MaterializeCfg {
+	return boilerplate.MaterializeCfg{
+		ConcurrentApply:    true,
+		NoCreateNamespaces: true,
+	}
+}
+
+func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
+	db := d.client.Database(d.cfg.Database)
+	collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
 	if err != nil {
-		return nil, nil, nil, err
+		return err
 	}
 
-	client, err := d.connect(ctx, cfg)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("connecting to database: %w", err)
+	for _, c := range collections {
+		is.PushResource(db.Name(), c.Name)
 	}
 
+	return nil
+}
+
+func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
+	return nil
+}
+
+func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
+	// MongoDB always materializes the full root document.
+	var constraint = pm.Response_Validated_Constraint{}
+	switch {
+	case p.IsRootDocumentProjection():
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "The root document must be materialized"
+	case p.IsPrimaryKey:
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "Document keys must be included"
+	default:
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "MongoDB only materializes the full document"
+	}
+
+	return constraint
+}
+
+func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
+	return mappedType{}, nil
+}
+
+func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
+	return "", nil
+}
+
+func (d *materialization) CreateNamespace(ctx context.Context, ns string) (string, error) {
+	// No-op since new databases and collections are automatically created when data is added to them.
+	return "", nil
+}
+
+func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+	// No-op since new databases and collections are automatically created when data is added to them.
+	return "", nil, nil
+}
+
+func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
+	dbName := resourcePath[0]
+	collectionName := resourcePath[1]
+
+	return fmt.Sprintf("drop collection %q", collectionName), func(ctx context.Context) error {
+		return d.client.Database(dbName).Collection(collectionName).Drop(ctx)
+	}, nil
+}
+
+func (d *materialization) UpdateResource(
+	ctx context.Context,
+	resourcePath []string,
+	existing boilerplate.ExistingResource,
+	update boilerplate.MaterializerBindingUpdate[config, resource, mappedType],
+) (string, boilerplate.ActionApplyFn, error) {
+	// No-op since nothing in particular is currently configured for a created collection.
+	return "", nil, nil
+}
+
+func (d *materialization) NewMaterializerTransactor(
+	ctx context.Context,
+	req pm.Request_Open,
+	is boilerplate.InfoSchema,
+	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
+	be *boilerplate.BindingEvents,
+) (boilerplate.MaterializerTransactor, error) {
 	var bindings []*binding
-	for _, b := range open.Materialization.Bindings {
-		res, err := resolveResourceConfig(b.ResourceConfigJson)
-		if err != nil {
-			return nil, nil, nil, err
-		}
-		var collection = client.Database(cfg.Database).Collection(res.Collection)
-
+	for _, b := range mappedBindings {
 		bindings = append(bindings, &binding{
-			collection:   collection,
+			collection:   d.client.Database(d.cfg.Database).Collection(b.ResourcePath[1]),
 			deltaUpdates: b.DeltaUpdates,
 		})
 	}
 
 	return &transactor{
-		cfg:      &cfg,
-		client:   client,
+		cfg:      &d.cfg,
+		client:   d.client,
 		bindings: bindings,
-	}, &pm.Response_Opened{}, nil, nil
+	}, nil
 }
 
-func resolveEndpointConfig(specJson json.RawMessage) (config, error) {
-	var cfg = config{}
-	if err := pf.UnmarshalStrict(specJson, &cfg); err != nil {
-		return cfg, fmt.Errorf("parsing MongoDB config: %w", err)
-	}
-
-	return cfg, nil
-}
-
-func resolveResourceConfig(specJson json.RawMessage) (resource, error) {
-	var res = resource{}
-	if err := pf.UnmarshalStrict(specJson, &res); err != nil {
-		return res, fmt.Errorf("parsing resource config: %w", err)
-	}
-
-	return res, nil
-}
-
-// infoSchema for MongoDB just includes an empty field for each collection in the configured
-// database.
-func infoSchema(ctx context.Context, db *mongo.Database) (*boilerplate.InfoSchema, error) {
-	is := boilerplate.NewInfoSchema(
-		func(rp []string) []string { return rp },
-		func(f string) string { return f },
-	)
-
-	collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
-	if err != nil {
-		return nil, err
-	}
-
-	for _, c := range collections {
-		is.PushResource(db.Name(), c.Name) // NB: ResourcePath includes the database name.
-	}
-
-	return is, nil
-}
+func (d *materialization) Close(ctx context.Context) {}
 
 func main() {
 	boilerplate.RunMain(driver{})

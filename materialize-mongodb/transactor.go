@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	m "github.com/estuary/connectors/go/protocols/materialize"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -43,6 +44,10 @@ type transactor struct {
 type binding struct {
 	collection   *mongo.Collection
 	deltaUpdates bool
+}
+
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+	return nil, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
