@@ -25,6 +25,9 @@
           "catalog_type": {
             "const": "AWS Glue",
             "default": "AWS Glue",
+            "enum": [
+              "AWS Glue"
+            ],
             "title": "Catalog Type",
             "type": "string"
           }
@@ -37,6 +40,9 @@
           "catalog_type": {
             "const": "Iceberg REST Server",
             "default": "Iceberg REST Server",
+            "enum": [
+              "Iceberg REST Server"
+            ],
             "order": 0,
             "title": "Catalog Type",
             "type": "string"
