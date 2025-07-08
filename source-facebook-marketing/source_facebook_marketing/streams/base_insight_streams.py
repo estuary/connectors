@@ -52,10 +52,15 @@ class AdsInsights(FBMarketingIncrementalStream):
     action_attribution_windows = ALL_ACTION_ATTRIBUTION_WINDOWS
     time_increment = 1
 
+    ACCOUNT_FIELDS = ["account_id", "account_name"]
+    CAMPAIGN_FIELDS = ["campaign_id", "campaign_name"]
+    ADSET_FIELDS = ["adset_id", "adset_name"]
+    AD_FIELDS = ["ad_id", "ad_name"]
+
     def __init__(
         self,
         name: str = None,
-        fields: List[str] = None,
+        fields: List[str] | None = None,
         breakdowns: List[str] = None,
         action_breakdowns: List[str] = None,
         action_breakdowns_allow_empty: bool = False,
@@ -63,12 +68,12 @@ class AdsInsights(FBMarketingIncrementalStream):
         time_increment: Optional[int] = None,
         insights_lookback_window: int = None,
         level: str = "ad",
+        is_custom_stream: bool = False,
         **kwargs,
     ):
         super().__init__(**kwargs)
         self._start_date = self._start_date.date()
         self._end_date = self._end_date.date()
-        self._custom_fields = fields
         if action_breakdowns_allow_empty:
             if action_breakdowns is not None:
                 self.action_breakdowns = action_breakdowns
@@ -82,6 +87,15 @@ class AdsInsights(FBMarketingIncrementalStream):
         self._insights_lookback_window = insights_lookback_window
         self.level = level
         self._insights_job_timeout = insights_job_timeout
+        self._is_custom_stream = is_custom_stream
+
+        if is_custom_stream and (fields is None or len(fields) == 0):
+            # If users did not specify any fields for a custom stream,
+            # default to including all possible fields.
+            self._custom_fields = self.default_custom_fields()
+        else:
+            self._custom_fields = fields
+
         # state
         self._cursor_values: Optional[Mapping[str, pendulum.Date]] = None
         self._next_cursor_values = self._get_start_date()
@@ -93,10 +107,68 @@ class AdsInsights(FBMarketingIncrementalStream):
         name = self._new_class_name or self.__class__.__name__
         return casing.camel_to_snake(name)
 
+
+    def default_custom_fields(self) -> list[str]:
+        schema = ResourceSchemaLoader(package_name_from_class(self.__class__)).get_schema("ads_insights")
+        all_fields = set(schema.get("properties", {}).keys())
+
+        required_fields = {"account_id", "date_start"}
+        level_fields = set(self.level_specific_fields())
+        required_fields.update(level_fields)
+
+        all_fields.update(required_fields)
+
+        # Remove fields that aren't returned by Facebook for the configured level.
+        if self.level != "ad":
+            all_fields = all_fields - set(self.AD_FIELDS)
+        if self.level not in ["ad", "adset"]:
+            all_fields = all_fields - set(self.ADSET_FIELDS)
+        if self.level not in ["ad", "adset", "campaign"]:
+            all_fields = all_fields - set(self.CAMPAIGN_FIELDS)
+
+        return list(all_fields)
+
     @property
-    def primary_key(self) -> Optional[Union[str, List[str], List[List[str]]]]:
+    def level_id_field(self) -> str:
+        if self.level == "ad":
+            return "ad_id"
+        elif self.level == "adset":
+            return "adset_id"
+        elif self.level == "campaign":
+            return "campaign_id"
+        elif self.level == "account":
+            return "account_id"
+        else:
+            raise RuntimeError(
+                f"Unexpected level {self.level} for AdsInsights stream. "
+                f"Expected one of: account, campaign, adset, ad. "
+                f"Please check your configuration."
+            )
+
+    def level_specific_fields(self) -> List[str]:
+        if self.level == "account":
+            return self.ACCOUNT_FIELDS
+        elif self.level == "campaign":
+            return self.ACCOUNT_FIELDS + self.CAMPAIGN_FIELDS
+        elif self.level == "adset":
+            return self.ACCOUNT_FIELDS + self.CAMPAIGN_FIELDS + self.ADSET_FIELDS
+        elif self.level == "ad":
+            return self.ACCOUNT_FIELDS + self.CAMPAIGN_FIELDS + self.ADSET_FIELDS + self.AD_FIELDS
+        else:
+            raise RuntimeError(
+                f"Unexpected level {self.level} for AdsInsights stream. "
+                f"Expected one of: account, campaign, adset, ad. "
+                f"Please check your configuration."
+            )
+
+    @property
+    def primary_key(self) -> List[str]:
         """Build complex PK based on slices and breakdowns"""
-        return ["date_start", "account_id", "ad_id"] + self.breakdowns
+        base_key = {"account_id", "date_start"}
+
+        base_key.add(self.level_id_field)
+
+        return sorted(list(base_key) + self.breakdowns)
 
     @property
     def insights_lookback_period(self):
@@ -335,16 +407,22 @@ class AdsInsights(FBMarketingIncrementalStream):
         loader = ResourceSchemaLoader(package_name_from_class(self.__class__))
         schema = loader.get_schema("ads_insights")
         if self._custom_fields:
-            custom_fields = set(self._custom_fields + [self.cursor_field, "date_stop", "account_id", "ad_id"])
+            custom_fields = set(self._custom_fields + [self.cursor_field, "date_stop", "account_id"])
+            custom_fields.update(set(self.level_specific_fields()))
             schema["properties"] = {k: v for k, v in schema["properties"].items() if k in custom_fields}
         if self.breakdowns:
             breakdowns_properties = loader.get_schema("ads_insights_breakdowns")["properties"]
             schema["properties"].update({prop: breakdowns_properties[prop] for prop in self.breakdowns})
 
+        required_fields = {"account_id", "date_start"}
+        required_fields.add(self.level_id_field)
+
+        schema["required"] = sorted(list(required_fields))
+
         for k in self.primary_key:
             if k not in schema["properties"]:
                 continue
-            
+
             typ = schema["properties"][k]["type"]
             if "string" in typ or typ == "string":
                 if "format" not in schema["properties"][k]:
@@ -355,7 +433,9 @@ class AdsInsights(FBMarketingIncrementalStream):
     def fields(self, **kwargs) -> List[str]:
         """List of fields that we want to query, for now just all properties from stream's schema"""
         if self._custom_fields:
-            return self._custom_fields
+            f = set(self._custom_fields)
+            f.update(set(self.level_specific_fields()))
+            return list(f)
 
         if self._fields:
             return self._fields
