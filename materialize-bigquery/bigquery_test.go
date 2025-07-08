@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 
@@ -191,92 +190,6 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 				"drop table %s;",
 				testDialect.Identifier(cfg.ProjectID, cfg.Dataset, resourceConfig.Table),
 			))
-		},
-	)
-}
-
-func TestFencingCases(t *testing.T) {
-	// Because of the number of round-trips to bigquery required for this test to run it is not run
-	// normally. Enable it via the RUN_FENCE_TESTS environment variable. It will take several
-	// minutes for this test to complete.
-	cfg := mustGetCfg(t)
-
-	var ctx = context.Background()
-	client, err := cfg.client(ctx, &sql.Endpoint[config]{Dialect: testDialect})
-	require.NoError(t, err)
-
-	var templates = renderTemplates(testDialect)
-
-	sql.RunFenceTestCases(t,
-		client,
-		[]string{cfg.ProjectID, cfg.Dataset, "temp_test_fencing_checkpoints"},
-		testDialect,
-		templates.createTargetTable,
-		func(table sql.Table, fence sql.Fence) error {
-			var fenceUpdate strings.Builder
-			if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			} else if _, err := client.query(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("executing fence update: %w", err)
-			}
-
-			return nil
-		},
-		func(table sql.Table) (out string, err error) {
-			job, err := client.query(ctx, fmt.Sprintf("SELECT * FROM %s;", table.Identifier))
-			if err != nil {
-				return "", err
-			}
-
-			it, err := job.Read(ctx)
-			if err != nil {
-				return "", err
-			}
-
-			rows := [][]bigquery.Value{}
-
-			for {
-				var values []bigquery.Value
-				err := it.Next(&values)
-				if err == iterator.Done {
-					break
-				}
-				if err != nil {
-					return "", err
-				}
-
-				rows = append(rows, values)
-			}
-
-			var b strings.Builder
-
-			// Sort the results by materialization name, then key_begin, then key_end.
-			sort.Slice(rows, func(i, j int) bool {
-				if rows[i][0].(string) != rows[j][0].(string) {
-					return rows[i][0].(string) < rows[j][0].(string)
-				}
-
-				if rows[i][1].(int64) != rows[j][1].(int64) {
-					return rows[i][1].(int64) < rows[j][1].(int64)
-				}
-
-				return rows[i][2].(int64) < rows[j][2].(int64)
-			})
-
-			b.WriteString("materialization, key_begin, key_end, fence, checkpoint\n")
-			for idx, r := range rows {
-				b.WriteString(fmt.Sprint(r[0]) + ", ") // materialization
-				b.WriteString(fmt.Sprint(r[1]) + ", ") // key_begin
-				b.WriteString(fmt.Sprint(r[2]) + ", ") // key_end
-				b.WriteString(fmt.Sprint(r[3]) + ", ") // fence
-				b.WriteString(fmt.Sprint(r[4]))        // checkpoint
-
-				if idx < len(rows)-1 {
-					b.WriteString("\n")
-				}
-			}
-
-			return b.String(), nil
 		},
 	)
 }

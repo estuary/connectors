@@ -35,7 +35,6 @@ type checkpointItem struct {
 type checkpoint = map[string]*checkpointItem
 
 type transactor struct {
-	fence     *sql.Fence
 	cfg       config
 	dialect   sql.Dialect
 	templates templates
@@ -49,7 +48,6 @@ type transactor struct {
 	cp       checkpoint
 
 	objAndArrayAsJson       bool
-	idempotentApply         bool
 	loggedStorageApiMessage bool
 }
 
@@ -80,11 +78,9 @@ func prepareNewTransactor(
 
 		t := &transactor{
 			cfg:               cfg,
-			fence:             &fence,
 			dialect:           ep.Dialect,
 			templates:         templates,
 			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
-			idempotentApply:   featureFlags["idempotent_apply"],
 			client:            client,
 			be:                be,
 			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
@@ -318,131 +314,47 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, it.Err()
 	}
 
-	if t.idempotentApply {
-		for idx, b := range t.bindings {
-			if !t.storeFiles.Started(idx) {
-				continue
-			}
-
-			var query string
-			if b.mustMerge {
-				mergeQuery, err := renderQueryTemplate(b.target, t.templates.storeUpdate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
-				if err != nil {
-					return nil, fmt.Errorf("rendering merge query template: %w", err)
-				}
-				query = mergeQuery
-			} else {
-				query = b.storeInsertSQL
-			}
-			b.mustMerge = false
-
-			uris, err := t.storeFiles.Flush(idx)
-			if err != nil {
-				return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
-			}
-
-			t.cp[b.target.StateKey] = &checkpointItem{
-				Query:         query,
-				SourceURIs:    uris,
-				JobPrefix:     uuid.NewString(),
-				TempTableName: b.tempTableName,
-			}
-		}
-
-		return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-			var checkpointJSON, err = json.Marshal(t.cp)
-			if err != nil {
-				return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
-			}
-
-			return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
-		}, nil
-	}
-
-	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var err error
-		if t.fence.Checkpoint, err = runtimeCheckpoint.Marshal(); err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("marshalling checkpoint: %w", err))
-		}
-
-		return nil, pf.RunAsyncOperation(func() error { return t.commit(ctx) })
-	}, nil
-}
-
-func (t *transactor) commit(ctx context.Context) error {
-	defer t.storeFiles.CleanupCurrentTransaction(ctx)
-
-	// Build the slice of transactions required for a commit.
-	var subqueries []string
-
-	subqueries = append(subqueries, `
-	BEGIN
-	BEGIN TRANSACTION;
-	`)
-
-	// First we must validate the fence has not been modified.
-	var fenceUpdate strings.Builder
-	if err := t.templates.updateFence.Execute(&fenceUpdate, t.fence); err != nil {
-		return fmt.Errorf("evaluating fence template: %w", err)
-	}
-	subqueries = append(subqueries, fenceUpdate.String())
-
-	// This is the map of external table references we will populate. Loop through the bindings and
-	// append the SQL for that table.
-	var edcTableDefs = make(map[string]bigquery.ExternalData)
 	for idx, b := range t.bindings {
 		if !t.storeFiles.Started(idx) {
 			continue
 		}
 
-		uris, err := t.storeFiles.Flush(idx)
-		if err != nil {
-			return fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
-		}
-
-		edcTableDefs[b.tempTableName] = edc(uris, b.storeSchema)
-
-		if !b.mustMerge {
-			subqueries = append(subqueries, b.storeInsertSQL)
-		} else {
+		var query string
+		if b.mustMerge {
 			mergeQuery, err := renderQueryTemplate(b.target, t.templates.storeUpdate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
 			if err != nil {
-				return fmt.Errorf("rendering merge query template: %w", err)
+				return nil, fmt.Errorf("rendering merge query template: %w", err)
 			}
-			subqueries = append(subqueries, mergeQuery)
+			query = mergeQuery
+		} else {
+			query = b.storeInsertSQL
+		}
+		b.mustMerge = false
+
+		uris, err := t.storeFiles.Flush(idx)
+		if err != nil {
+			return nil, fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
 		}
 
-		// Reset for the next round.
-		b.mustMerge = false
+		t.cp[b.target.StateKey] = &checkpointItem{
+			Query:         query,
+			SourceURIs:    uris,
+			JobPrefix:     uuid.NewString(),
+			TempTableName: b.tempTableName,
+		}
 	}
 
-	// Complete the transaction and return the appropriate error.
-	subqueries = append(subqueries, `
-	COMMIT TRANSACTION;
-    END;
-	`)
+	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
+		var checkpointJSON, err = json.Marshal(t.cp)
+		if err != nil {
+			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
+		}
 
-	// Build the bigquery query of the combined subqueries.
-	queryString := strings.Join(subqueries, "\n")
-	query := t.client.newQuery(queryString)
-	query.TableDefinitions = edcTableDefs // Tell the query where to get the external references in gcs.
-
-	// This returns a single row with the error status of the query.
-	if _, err := t.client.runQuery(ctx, query); err != nil {
-		log.WithField("query", queryString).Error("query failed")
-		return fmt.Errorf("commit query: %w", err)
-	} else if err := t.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
-		return fmt.Errorf("cleaning up store files: %w", err)
-	}
-
-	return nil
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
+	}, nil
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	if !t.idempotentApply {
-		return nil, nil
-	}
-
 	group, groupCtx := errgroup.WithContext(ctx)
 	// You can run up to 1,000 concurrent multi-statement queries, so we use a
 	// generous concurrency limit here, while not leaving it completely

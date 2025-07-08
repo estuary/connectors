@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"net/http"
@@ -232,47 +231,12 @@ func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr 
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
-	_, err := c.query(ctx, strings.Join(statements, "\n"))
-	return err
+	return errors.New("internal error: ExecStatements not implemented")
 }
 
 func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) (sql.Fence, error) {
-	var query strings.Builder
-	if err := renderTemplates(c.ep.Dialect).installFence.Execute(&query, fence); err != nil {
-		return fence, fmt.Errorf("evaluating fence template: %w", err)
-	}
+	return sql.Fence{}, errors.New("internal error: InstallFence not implemented")
 
-	log.Info("installing fence")
-	job, err := c.query(ctx, query.String())
-	if err != nil {
-		return fence, err
-	}
-	var bqFence struct {
-		Fence      int64  `bigquery:"fence"`
-		Checkpoint string `bigquery:"checkpoint"`
-	}
-	log.Info("reading installed fence")
-	if err = c.fetchOne(ctx, job, &bqFence); err != nil {
-		return fence, fmt.Errorf("read fence: %w", err)
-	}
-
-	checkpoint, err := base64.StdEncoding.DecodeString(bqFence.Checkpoint)
-	if err != nil {
-		return fence, fmt.Errorf("base64.Decode(checkpoint): %w", err)
-	}
-
-	fence.Fence = bqFence.Fence
-	fence.Checkpoint = checkpoint
-
-	log.WithFields(log.Fields{
-		"fence":            fence.Fence,
-		"keyBegin":         fence.KeyBegin,
-		"keyEnd":           fence.KeyEnd,
-		"materialization":  fence.Materialization.String(),
-		"checkpointsTable": fence.TablePath,
-	}).Info("fence installed successfully")
-
-	return fence, nil
 }
 
 func (c *client) Close() {

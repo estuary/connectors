@@ -12,7 +12,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/googleapi"
-	"google.golang.org/api/iterator"
 )
 
 var (
@@ -124,6 +123,9 @@ func (c client) queryIdempotent(
 }
 
 // query executes a query against BigQuery and returns the completed job.
+// TODO(whb): This is currently only used for executing metadata changes, ex.
+// creating tables, adding columns, etc. It would probably be more efficient to
+// use the HTTP metadata API for doing these operations instead.
 func (c client) query(ctx context.Context, queryString string, parameters ...interface{}) (*bigquery.Job, error) {
 	return c.runQuery(ctx, c.newQuery(queryString, parameters...))
 }
@@ -270,22 +272,4 @@ func maybeRetry(ctx context.Context, err error, attempt int, delay time.Duration
 
 	// Not a retryable error.
 	return err
-}
-
-// fetchOne will fetch one row of data from a job and scan it into dest.
-func (c client) fetchOne(ctx context.Context, job *bigquery.Job, dest interface{}) error {
-
-	it, err := job.Read(ctx)
-	if err != nil {
-		return fmt.Errorf("read: %w", err)
-	}
-
-	if err = it.Next(dest); err == iterator.Done {
-		return errNotFound
-	} else if err != nil {
-		return fmt.Errorf("next: %w", err)
-	}
-
-	return nil
-
 }
