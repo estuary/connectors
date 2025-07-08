@@ -650,7 +650,7 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 
 			// Mark the fence as reached when we observe a change event on the watermarks stream
 			// with the expected value.
-			if event, ok := event.(*sqlcapture.OldChangeEvent); ok {
+			if event, ok := event.(*sqlserverChangeEvent); ok {
 				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
 					var actual = event.After["watermark"]
 					if actual == nil {
@@ -1181,7 +1181,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 			before = fields
 		}
 
-		var event = &sqlcapture.OldChangeEvent{
+		var event = &sqlserverChangeEvent{
 			Operation: operation,
 			RowKey:    rowKey,
 			Source: &sqlserverSourceInfo{
