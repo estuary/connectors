@@ -37,6 +37,14 @@
               "description": "If selected, the /companies/list endpoint is used instead of the /companies/scroll endpoint. Typically, leave as the default unless the connector's logs indicate otherwise.",
               "title": "Use /companies/list endpoint",
               "type": "boolean"
+            },
+            "search_page_size": {
+              "default": 150,
+              "description": "Page size for streams that use Intercom's search endpoints. Typically, leave as the default unless streams using search endpoints encounter constant Intercom server timeouts.",
+              "exclusiveMinimum": 0,
+              "maximum": 150,
+              "title": "Search Streams' Page Size",
+              "type": "integer"
             }
           },
           "title": "Advanced",
