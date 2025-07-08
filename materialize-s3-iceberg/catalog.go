@@ -163,7 +163,16 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Ma
 	}
 
 	for _, p := range bindingUpdate.NewProjections {
-		s, err := projectionToParquetSchemaElement(p.Projection.Projection, bindingUpdate.Binding.FieldSelection.FieldConfigJsonMap[p.Field])
+		var fc fieldConfig
+		if rawFieldConfig, ok := bindingUpdate.Binding.FieldSelection.FieldConfigJsonMap[p.Field]; ok {
+			if err := json.Unmarshal(rawFieldConfig, &fc); err != nil {
+				return "", nil, fmt.Errorf("unmarshaling field config for %q: %w", p.Field, err)
+			} else if err := fc.Validate(); err != nil {
+				return "", nil, fmt.Errorf("validating field config for %q: %w", p.Field, err)
+			}
+		}
+
+		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc)
 		if err != nil {
 			return "", nil, err
 		}
