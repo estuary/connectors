@@ -344,7 +344,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, nil)
+	s, err := projectionToParquetSchemaElement(p.Projection, fc)
 	if err != nil {
 		return mappedType{}, nil
 	}

@@ -55,7 +55,16 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	out := []enc.ParquetSchemaElement{}
 
 	for _, f := range fields {
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fieldConfigJsonMap[f])
+		var fc fieldConfig
+		if rawFieldConfig, ok := fieldConfigJsonMap[f]; ok {
+			if err := json.Unmarshal(rawFieldConfig, &fc); err != nil {
+				return nil, fmt.Errorf("unmarshaling field config for %q: %w", f, err)
+			} else if err := fc.Validate(); err != nil {
+				return nil, fmt.Errorf("validating field config for %q: %w", f, err)
+			}
+		}
+
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc)
 		if err != nil {
 			return nil, err
 		}
@@ -65,19 +74,12 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, rawFieldConfig json.RawMessage) (enc.ParquetSchemaElement, error) {
-	if rawFieldConfig != nil {
-		var parsedFieldConfig fieldConfig
-		if err := json.Unmarshal(rawFieldConfig, &parsedFieldConfig); err != nil {
-			return enc.ParquetSchemaElement{}, err
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (enc.ParquetSchemaElement, error) {
+	if fc.IgnoreStringFormat {
+		if p.Inference.String_ == nil {
+			return enc.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
 		}
-
-		if parsedFieldConfig.IgnoreStringFormat {
-			if p.Inference.String_ == nil {
-				return enc.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
-			}
-			p.Inference.String_.Format = ""
-		}
+		p.Inference.String_.Format = ""
 	}
 
 	return enc.ProjectionToParquetSchemaElement(p, schemaOptions...), nil
