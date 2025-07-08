@@ -73,8 +73,7 @@
                 "enum": [
                   "ad",
                   "adset",
-                  "campaign",
-                  "account"
+                  "campaign"
                 ],
                 "type": "string"
               },
