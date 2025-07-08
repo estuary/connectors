@@ -232,7 +232,7 @@ class SourceFacebookMarketing(AbstractSource):
                 end_date=insight.end_date or config.end_date,
                 insights_lookback_window=insight.insights_lookback_window or config.insights_lookback_window,
                 level=insight.level,
-                source_defined_primary_key=["ad_id"]
+                is_custom_stream=True,
             )
             streams.append(stream)
         return streams
