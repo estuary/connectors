@@ -303,16 +303,8 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 					return err
 				}
 				timedEventsSinceFlush++
-				if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
-					var eventCursor, err = unmarshalJSONString(event.Cursor)
-					if err != nil {
-						return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
-					}
-					eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
-					if err != nil {
-						return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
-					}
-					latestFlushLSN = eventLSN
+				if event, ok := event.(*sqlserverCommitEvent); ok {
+					latestFlushLSN = event.CommitLSN
 					timedEventsSinceFlush = 0
 				}
 			}
@@ -346,9 +338,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.OldFlushEvent{
-			Cursor: marshalJSONString(base64.StdEncoding.EncodeToString(latestFlushLSN)),
-		})
+		return callback(&sqlserverCommitEvent{CommitLSN: latestFlushLSN})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -375,21 +365,10 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 
 			// Mark the fence as reached when we observe a commit event whose cursor value
 			// is greater than or equal to the fence LSN.
-			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
-				// It might be a bit inefficient to re-parse every flush cursor here, but
-				// realistically it's probably not a significant slowdown and it would be
-				// a bit more work to preserve the position as a typed struct.
-				var eventCursor, err = unmarshalJSONString(event.Cursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
-				}
-				eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
-				}
-				if bytes.Compare(eventLSN, nextFenceLSN) >= 0 {
-					log.WithField("eventLSN", fmt.Sprintf("%X", eventLSN)).Debug("finished fenced streaming phase")
-					rs.fenceLSN = bytes.Clone(eventLSN)
+			if event, ok := event.(*sqlserverCommitEvent); ok {
+				if bytes.Compare(event.CommitLSN, nextFenceLSN) >= 0 {
+					log.WithField("event", event).Debug("finished fenced streaming phase")
+					rs.fenceLSN = bytes.Clone(event.CommitLSN)
 					return nil
 				}
 			}
@@ -466,16 +445,8 @@ loop:
 				return err
 			}
 			timedEventsSinceFlush++
-			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
-				var eventCursor, err = unmarshalJSONString(event.Cursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
-				}
-				eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
-				}
-				latestFlushLSN = eventLSN
+			if event, ok := event.(*sqlserverCommitEvent); ok {
+				latestFlushLSN = event.CommitLSN
 				timedEventsSinceFlush = 0
 			}
 		}
@@ -500,9 +471,7 @@ loop:
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.OldFlushEvent{
-			Cursor: marshalJSONString(base64.StdEncoding.EncodeToString(latestFlushLSN)),
-		})
+		return callback(&sqlserverCommitEvent{CommitLSN: latestFlushLSN})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -529,21 +498,10 @@ loop:
 
 			// Mark the fence as reached when we observe a commit event whose cursor value
 			// is greater than or equal to the fence LSN.
-			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
-				// It might be a bit inefficient to re-parse every flush cursor here, but
-				// realistically it's probably not a significant slowdown and it would be
-				// a bit more work to preserve the position as a typed struct.
-				var eventCursor, err = unmarshalJSONString(event.Cursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to decode flush event cursor: %w", err)
-				}
-				eventLSN, err := base64.StdEncoding.DecodeString(eventCursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
-				}
-				if bytes.Compare(eventLSN, nextFenceLSN) >= 0 {
-					log.WithField("eventLSN", fmt.Sprintf("%X", eventLSN)).Debug("finished fenced streaming phase")
-					rs.fenceLSN = bytes.Clone(eventLSN)
+			if event, ok := event.(*sqlserverCommitEvent); ok {
+				if bytes.Compare(event.CommitLSN, nextFenceLSN) >= 0 {
+					log.WithField("event", event).Debug("finished fenced streaming phase")
+					rs.fenceLSN = bytes.Clone(event.CommitLSN)
 					return nil
 				}
 			}
@@ -706,7 +664,7 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 			}
 
 			// The flush event following the watermark change ends the stream-to-fence operation.
-			if _, ok := event.(*sqlcapture.OldFlushEvent); ok && fenceReached {
+			if _, ok := event.(*sqlserverCommitEvent); ok && fenceReached {
 				return nil
 			}
 		}
@@ -790,9 +748,9 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		// Emit a redundant checkpoint even if we've established that there are no new
 		// changes. This ensures that the positional stream-to-fence logic will always
 		// get an opportunity to observe the latest position.
-		var cursor = base64.StdEncoding.EncodeToString(toLSN)
-		log.WithField("cursor", cursor).Trace("server lsn hasn't advanced, not polling any tables")
-		rs.events <- &sqlcapture.OldFlushEvent{Cursor: marshalJSONString(cursor)}
+		var event = &sqlserverCommitEvent{CommitLSN: toLSN}
+		log.WithField("event", event).Trace("server lsn hasn't advanced, not polling any tables")
+		rs.events <- event
 		return nil
 	}
 
@@ -888,9 +846,9 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		return err
 	}
 
-	var cursor = base64.StdEncoding.EncodeToString(toLSN)
-	log.WithField("cursor", cursor).Debug("checkpoint at cursor")
-	rs.events <- &sqlcapture.OldFlushEvent{Cursor: marshalJSONString(cursor)}
+	var event = &sqlserverCommitEvent{CommitLSN: toLSN}
+	log.WithField("event", event).Debug("checkpoint after polling")
+	rs.events <- event
 	rs.fromLSN = toLSN
 
 	return nil
@@ -1580,17 +1538,6 @@ func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	query("SELECT * FROM msdb.dbo.cdc_jobs;")
 	query("EXEC sys.sp_cdc_help_change_data_capture;")
 	return nil
-}
-
-// marshalJSONString returns the serialized JSON representation of the provided string.
-//
-// A Go string can always be successfully serialized into JSON.
-func marshalJSONString(str string) json.RawMessage {
-	var bs, err = json.Marshal(str)
-	if err != nil {
-		panic(fmt.Errorf("internal error: failed to marshal string %q to JSON: %w", str, err))
-	}
-	return bs
 }
 
 func unmarshalJSONString(bs json.RawMessage) (string, error) {
