@@ -27,7 +27,6 @@ from .models import (
 
 
 API = "https://api.intercom.io"
-SEARCH_PAGE_SIZE = 150
 COMPANIES_LIST_LIMIT = 10_000
 
 COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API"
@@ -68,6 +67,7 @@ async def snapshot_resources(
 def _generate_contacts_search_body(
         lower_bound: int,
         upper_bound: int,
+        page_size: int,
         next_page_cursor: str | None = None
     ):
     # Intercom's search endpoints support complex queries within the request body. We filter and sort results
@@ -117,7 +117,7 @@ def _generate_contacts_search_body(
         }
 
     pagination: dict[str, str | int] = {
-        "per_page": SEARCH_PAGE_SIZE,
+        "per_page": page_size,
     }
 
     if next_page_cursor:
@@ -136,6 +136,7 @@ def _generate_contacts_search_body(
 def _generate_conversations_or_tickets_search_body(
         lower_bound: int,
         upper_bound: int,
+        page_size: int,
         next_page_cursor: str | None = None
     ):
     # Intercom's search endpoints support complex queries within the request body. We filter and sort results
@@ -159,7 +160,7 @@ def _generate_conversations_or_tickets_search_body(
         }
 
     pagination: dict[str, str | int] = {
-        "per_page": SEARCH_PAGE_SIZE,
+        "per_page": page_size,
     }
 
     if next_page_cursor:
@@ -219,6 +220,7 @@ async def _hydrate_contact(
 async def fetch_contacts(
     http: HTTPSession,
     window_size: int,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -231,7 +233,7 @@ async def fetch_contacts(
     last_seen_ts = start
 
     url = f"{API}/contacts/search"
-    body = _generate_contacts_search_body(start, end)
+    body = _generate_contacts_search_body(start, end, page_size)
 
     should_log_progress = _is_large_date_window(start, end)
     pagination_ended_early = False
@@ -273,7 +275,7 @@ async def fetch_contacts(
         if pagination_ended_early or response.pages.next is None:
             break
 
-        body = _generate_contacts_search_body(start, end, response.pages.next.starting_after)
+        body = _generate_contacts_search_body(start, end, page_size, response.pages.next.starting_after)
 
     # Results are returned in descending order, so we can't yield a cursor until pagination is complete.
     if end == max_end:
@@ -284,6 +286,7 @@ async def fetch_contacts(
 
 async def fetch_tickets(
     http: HTTPSession,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -295,7 +298,7 @@ async def fetch_tickets(
     last_seen_ts = start
 
     url = f"{API}/tickets/search"
-    body = _generate_conversations_or_tickets_search_body(start, end)
+    body = _generate_conversations_or_tickets_search_body(start, end, page_size)
 
     while True:
         response = TicketsSearchResponse.model_validate_json(
@@ -331,11 +334,12 @@ async def fetch_tickets(
             yield _s_to_dt(last_seen_ts)
             break
 
-        body = _generate_conversations_or_tickets_search_body(start, end, response.pages.next.starting_after)
+        body = _generate_conversations_or_tickets_search_body(start, end, page_size, response.pages.next.starting_after)
 
 
 async def fetch_conversations(
     http: HTTPSession,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -347,7 +351,7 @@ async def fetch_conversations(
     last_seen_ts = start
 
     url = f"{API}/conversations/search"
-    body = _generate_conversations_or_tickets_search_body(start, end)
+    body = _generate_conversations_or_tickets_search_body(start, end, page_size)
 
     count = 0
 
@@ -370,9 +374,9 @@ async def fetch_conversations(
         for conversation in response.conversations:
             # It's possible to update multiple conversations at the same time in Intercom, making it difficult to find
             # a safe spot to checkpoint between pages returned by the API. To checkpoint more frequently when processing these bulk updates,
-            # conversations looks for any safe spot to checkpoint after yielding SEARCH_PAGE_SIZE documents.
+            # conversations looks for any safe spot to checkpoint after yielding page_size documents.
             if conversation.updated_at > last_seen_ts:
-                if count >= SEARCH_PAGE_SIZE:
+                if count >= page_size:
                     yield _s_to_dt(last_seen_ts)
                     count = 0
 
@@ -386,17 +390,18 @@ async def fetch_conversations(
             yield _s_to_dt(last_seen_ts)
             break
 
-        body = _generate_conversations_or_tickets_search_body(start, end, response.pages.next.starting_after)
+        body = _generate_conversations_or_tickets_search_body(start, end, page_size, response.pages.next.starting_after)
 
 
 async def fetch_conversations_parts(
     http: HTTPSession,
+    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
     conversation_ids: list[str] = []
 
-    async for conversation_or_dt in fetch_conversations(http, log, log_cursor):
+    async for conversation_or_dt in fetch_conversations(http, page_size, log, log_cursor):
         if isinstance(conversation_or_dt, TimestampedResource):
             conversation_ids.append(conversation_or_dt.id)
         else:

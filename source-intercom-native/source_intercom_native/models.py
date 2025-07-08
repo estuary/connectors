@@ -52,6 +52,8 @@ if TYPE_CHECKING:
 else:
     OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
 
+MAX_SEARCH_PAGE_SIZE = 150
+
 
 def default_start_date():
     dt = datetime.now(tz=UTC) - timedelta(days=30)
@@ -80,6 +82,13 @@ class EndpointConfig(BaseModel):
             title="Use /companies/list endpoint",
             default=False,
         )
+        search_page_size: Annotated[int, Field(
+            description="Page size for streams that use Intercom's search endpoints. Typically, leave as the default unless streams using search endpoints encounter constant Intercom server timeouts.",
+            title="Search Streams' Page Size",
+            default=MAX_SEARCH_PAGE_SIZE,
+            gt=0,
+            le=MAX_SEARCH_PAGE_SIZE,
+        )]
 
     advanced: Advanced = Field(
         default_factory=Advanced, #type: ignore
@@ -212,7 +221,10 @@ ClientSideFilteringResourceFetchChangesFn = Callable[
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]
 
-IncrementalResourceFetchChangesFn = ClientSideFilteringResourceFetchChangesFn
+IncrementalResourceFetchChangesFn = Callable[
+    [HTTPSession, int, Logger, LogCursor],
+    AsyncGenerator[TimestampedResource | LogCursor, None],
+]
 
 CompanyResourceFetchChangesFn = Callable[
     [HTTPSession, bool, Logger, LogCursor],
@@ -220,6 +232,6 @@ CompanyResourceFetchChangesFn = Callable[
 ]
 
 IncrementalDateWindowResourceFetchChangesFn = Callable[
-    [HTTPSession, int, Logger, LogCursor],
+    [HTTPSession, int, int, Logger, LogCursor],
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]

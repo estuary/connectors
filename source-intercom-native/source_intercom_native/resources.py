@@ -156,6 +156,7 @@ def incremental_resources(
             fetch_changes=functools.partial(
                 fetch_fn,
                 http,
+                config.advanced.search_page_size,
             )
         )
 
@@ -200,6 +201,7 @@ def incremental_date_window_resources(
                 fetch_fn,
                 http,
                 config.advanced.window_size,
+                config.advanced.search_page_size,
             )
         )
 
