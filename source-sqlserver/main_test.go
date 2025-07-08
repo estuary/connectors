@@ -236,6 +236,13 @@ func uniqueTableID(t testing.TB, extra ...string) string {
 	return fmt.Sprintf("%d", (x%900000)+100000)
 }
 
+func setShutdownAfterCaughtUp(t testing.TB, setting bool) {
+	t.Helper()
+	var prevSetting = sqlcapture.TestShutdownAfterCaughtUp
+	sqlcapture.TestShutdownAfterCaughtUp = setting
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = prevSetting })
+}
+
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
 	var tb = sqlserverTestBackend(t)
