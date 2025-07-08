@@ -36,9 +36,9 @@ var benchmarkTableShapes = map[string]struct {
 			x INTEGER,
 			y INTEGER,
 			z INTEGER,
-			a NVARCHAR(MAX),
-			b NVARCHAR(MAX),
-			c NVARCHAR(MAX)
+			a NVARCHAR(64),
+			b NVARCHAR(64),
+			c NVARCHAR(64)
 		)`,
 		InsertQuery: `
 			WITH NumberSeries AS (
@@ -295,6 +295,7 @@ func benchReplicationN(b *testing.B, shape string, rowCount int) {
 		// Insert another batch of rows, excluding insert time from the benchmark timer
 		b.StopTimer()
 		insertBenchmarkRows(ctx, b, tb, shape, tableName, minID, minID+rowCount)
+		time.Sleep(1 * time.Second) // Ensure that the CDC worker has a chance to run
 		b.StartTimer()
 		minID += rowCount
 

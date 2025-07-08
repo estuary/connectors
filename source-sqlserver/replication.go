@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -52,19 +53,6 @@ const (
 
 // LSN is just a type alias for []byte to make the code that works with LSN values a bit clearer.
 type LSN = []byte
-
-// sqlserverSourceInfo is source metadata for data capture events.
-type sqlserverSourceInfo struct {
-	sqlcapture.SourceCommon
-
-	LSN        LSN    `json:"lsn" jsonschema:"description=The LSN at which a CDC event occurred. Only set for CDC events, not backfills."`
-	SeqVal     []byte `json:"seqval" jsonschema:"description=Sequence value used to order changes to a row within a transaction. Only set for CDC events, not backfills."`
-	UpdateMask any    `json:"updateMask,omitempty" jsonschema:"description=A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events, not backfills."`
-}
-
-func (si *sqlserverSourceInfo) Common() sqlcapture.SourceCommon {
-	return si.SourceCommon
-}
 
 // ReplicationStream constructs a new ReplicationStream object, from which
 // a neverending sequence of change events can be read.
@@ -651,11 +639,14 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 			// Mark the fence as reached when we observe a change event on the watermarks stream
 			// with the expected value.
 			if event, ok := event.(*sqlserverChangeEvent); ok {
-				if event.Operation != sqlcapture.DeleteOp && event.Source.Common().StreamID() == watermarkStreamID {
-					var actual = event.After["watermark"]
-					if actual == nil {
-						actual = event.After["WATERMARK"]
+				if event.Meta.Operation != sqlcapture.DeleteOp && event.Shared.StreamID == watermarkStreamID {
+					var watermarkIndex = slices.IndexFunc(event.Shared.Shape.Names, func(name string) bool {
+						return strings.EqualFold(name, "watermark")
+					})
+					if watermarkIndex < 0 {
+						return fmt.Errorf("watermark column not found in watermarks table %q", watermarkStreamID)
 					}
+					var actual = event.Values[watermarkIndex]
 					log.WithFields(log.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
 					if actual == fenceWatermark {
 						fenceReached = true
@@ -1059,55 +1050,101 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 	}
 	defer rows.Close()
 
+	// Set up slices for generic scanning over query result rows
 	cnames, err := rows.Columns()
 	if err != nil {
 		return err
 	}
-
-	var vals = make([]any, len(cnames))
-	var vptrs = make([]any, len(vals))
-	for idx := range vals {
-		vptrs[idx] = &vals[idx]
+	var scanVals = make([]any, len(cnames))
+	var scanPtrs = make([]any, len(scanVals))
+	for idx := range scanVals {
+		scanPtrs[idx] = &scanVals[idx]
 	}
 
+	// Preprocess result metadata for efficient row handling.
+	var outputColumnNames = make([]string, len(cnames))         // Names of all columns, with omitted columns set to ""
+	var outputColumnTypes = make([]any, len(cnames))            // Types of all columns, with omitted columns set to nil
+	var outputTranscoders = make([]jsonTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
+	var rowKeyTranscoders = make([]fdbTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
+	for idx, name := range cnames {
+		// Computed columns always have a value of null in the change table so we should never capture them.
+		// One wonders why they're present in the change table at all, but this is a documented fact about SQL Server CDC.
+		if slices.Contains(info.ComputedColumns, name) {
+			continue
+		}
+
+		outputColumnNames[idx] = name
+		outputColumnTypes[idx] = info.ColumnTypes[name]
+		outputTranscoders[idx] = rs.db.replicationJSONTranscoder(info.ColumnTypes[name])
+		if slices.Contains(info.KeyColumns, name) {
+			rowKeyTranscoders[idx] = rs.db.replicationFDBTranscoder(info.ColumnTypes[name])
+		}
+	}
+	outputColumnNames = append(outputColumnNames, "_meta") // Add '_meta' property to the row shape
+
+	// Mark the CDC metadata columns as omitted by clearing their names in the output shape,
+	// and save the relevant indices so we can look the values up while processing rows.
+	var startLSNIndex = slices.Index(cnames, "__$start_lsn")
+	var operationIndex = slices.Index(cnames, "__$operation")
+	var seqvalIndex = slices.Index(cnames, "__$seqval")
+	var updateMaskIndex = slices.Index(cnames, "__$update_mask")
+	if startLSNIndex < 0 {
+		return fmt.Errorf("CDC change table %q is missing required column: '__$start_lsn'", info.InstanceName)
+	} else if operationIndex < 0 {
+		return fmt.Errorf("CDC change table %q is missing required column: '__$operation'", info.InstanceName)
+	} else if seqvalIndex < 0 {
+		return fmt.Errorf("CDC change table %q is missing required column: '__$seqval'", info.InstanceName)
+	} else if updateMaskIndex < 0 {
+		return fmt.Errorf("CDC change table %q is missing required column: '__$update_mask'", info.InstanceName)
+	}
+	outputColumnNames[startLSNIndex] = ""
+	outputColumnNames[operationIndex] = ""
+	outputColumnNames[seqvalIndex] = ""
+	outputColumnNames[updateMaskIndex] = ""
+
+	var keyIndices []int // The indices of the key columns in the row values. Only set for keyed backfills.
+	if len(info.KeyColumns) > 0 {
+		keyIndices = make([]int, len(info.KeyColumns))
+		for idx, colName := range info.KeyColumns {
+			var resultIndex = slices.Index(cnames, colName)
+			if resultIndex < 0 {
+				return fmt.Errorf("key column %q not found in result columns for %q", colName, info.StreamID)
+			}
+			keyIndices[idx] = resultIndex
+		}
+	}
+	var replicationEventInfo = &sqlserverChangeSharedInfo{
+		StreamID:    info.StreamID,
+		Shape:       encrow.NewShape(outputColumnNames),
+		Transcoders: outputTranscoders,
+	}
+
+	var rowKey = make([]byte, 0, 64) // The row key of the most recent row processed
 	for rows.Next() {
-		if err := rows.Scan(vptrs...); err != nil {
+		if err := rows.Scan(scanPtrs...); err != nil {
 			return fmt.Errorf("error scanning result row: %w", err)
 		}
-		var fields = make(map[string]interface{})
-		for idx, name := range cnames {
-			fields[name] = vals[idx]
-		}
-		for _, name := range info.ComputedColumns {
-			// Computed columns always have a value of null in the change table so we should never capture them.
-			// One wonders why they're present in the change table at all, but this is a documented fact about SQL Server CDC.
-			delete(fields, name)
-		}
 
-		log.WithFields(log.Fields{"stream": info.StreamID, "data": fields}).Trace("got change")
+		// Make a unique copy of the values slice. Because change events are sent over a
+		// channel and might be processed concurrently with another row being scanned, we
+		// can't be too aggressive about memory reuse. In theory we could eliminate that
+		// bit of concurrency instead, but the MS SQL Server client library is already
+		// super wasteful with allocations so there's no point optimizing this further.
+		var vals = make([]any, len(scanVals))
+		copy(vals, scanVals)
 
-		// Extract the event's LSN and remove it from the record fields, since
-		// it will be included in the source metadata already.
-		var changeLSN, ok = fields["__$start_lsn"].(LSN)
+		// Extract the event's LSN so it can be put in the change metadata
+		var changeLSN, ok = vals[startLSNIndex].(LSN)
 		if !ok || changeLSN == nil {
 			return fmt.Errorf("invalid '__$start_lsn' value (capture user may not have correct permissions): %v", changeLSN)
 		}
 		if bytes.Compare(changeLSN, info.FromLSN) <= 0 {
-			log.WithFields(log.Fields{
-				"stream":    info.StreamID,
-				"changeLSN": changeLSN,
-				"fromLSN":   info.FromLSN,
-			}).Trace("filtered change <= fromLSN")
 			continue
 		}
-		delete(fields, "__$start_lsn")
 
-		// Extract the change type (Insert/Update/Delete) and remove it from the record data.
+		// Extract the change type (Insert/Update/Delete)
 		var operation sqlcapture.ChangeOp
-		opval, ok := fields["__$operation"]
-		if !ok {
-			return fmt.Errorf("internal error: cdc operation unspecified ('__$operation' unset)")
-		}
+		var opval = vals[operationIndex]
 		opcode, ok := opval.(int64)
 		if !ok {
 			return fmt.Errorf("internal error: cdc operation code %T(%#v) isn't an int64", opval, opval)
@@ -1122,79 +1159,70 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		default:
 			return fmt.Errorf("invalid change operation: %d", opcode)
 		}
-		delete(fields, "__$operation")
 
-		// Move the '__$seqval' and '__$update_mask' columns into metadata as well.
-		seqval, ok := fields["__$seqval"].(LSN)
+		// Extract the sequence value and update mask
+		seqval, ok := vals[seqvalIndex].(LSN)
 		if !ok || seqval == nil {
 			return fmt.Errorf("invalid '__$seqval' value: %v", seqval)
 		}
-		delete(fields, "__$seqval")
+		var updateMask = vals[updateMaskIndex]
 
-		var updateMask = fields["__$update_mask"]
-		delete(fields, "__$update_mask")
-
-		var rowKey, err = sqlcapture.EncodeRowKey(info.KeyColumns, fields, info.ColumnTypes, encodeKeyFDB)
-		if err != nil {
-			return fmt.Errorf("error encoding stream %q row key: %w", info.StreamID, err)
-		}
-		if err := rs.db.translateRecordFields(info.ColumnTypes, fields); err != nil {
-			return fmt.Errorf("error translating stream %q change event: %w", info.StreamID, err)
-		}
-
-		// For inserts and updates the change event records the state after the
-		// change, and for deletions the change event (partially) records the state
-		// before the change.
-		var before, after map[string]any
-		switch operation {
-		case sqlcapture.InsertOp, sqlcapture.UpdateOp:
-			after = fields
-		case sqlcapture.DeleteOp:
-			// Sometimes SQL Server column nullability is screwy for deletions. In generaly we should get values
-			// for all columns on deletes, with a few exceptions. Since SQL Server CDC stores change events in a
-			// table, missing values are represented as nulls in the change table, and since the corresponding
-			// source table might have a non-nullable column type we need to ensure that we don't emit those as
-			// a literal null value which would fail validation.
-			for colName, val := range fields {
-				// As an added safety check we also make sure this logic doesn't apply to key columns.
-				if val == nil && !slices.Contains(info.KeyColumns, colName) {
-					if colInfo, ok := info.Columns[colName]; ok {
-						if textType, ok := colInfo.DataType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
-							// According to MS documentation, text and ntext columns are always omitted (null) in delete events.
-							delete(fields, colName)
-						} else if colInfo.DataType == "image" {
-							// According to MS documentation, image columns are always omitted (null) in delete events.
-							delete(fields, colName)
-						} else if !colInfo.IsNullable {
-							// Sometimes, in direct violation of the documented behavior, we have seen null values on
-							// other columns which should definitely be non-nullable. For some reason it seems to mostly
-							// happen on a specific BIT NOT NULL column of tables with multiple, and we suspect this is
-							// a SQL Server bug (possibly related to how bit fields are packed in WAL events?)
-							//
-							// Regardless of the reasons, this is a catch-all case which should protect us from emitting
-							// null values for non-nullable source columns if it happens again.
-							delete(fields, colName)
-						}
-					}
-				}
+		rowKey = rowKey[:0]
+		for _, n := range keyIndices {
+			rowKey, err = rowKeyTranscoders[n].TranscodeFDB(rowKey, vals[n])
+			if err != nil {
+				return fmt.Errorf("error encoding column %q at index %d: %w", cnames[n], n, err)
 			}
-			before = fields
 		}
+
+		// TODO(wgd): Figure out how to translate column nullability handling to the new setup.
+		//if operation == sqlcapture.DeleteOp {
+		//	// Sometimes SQL Server column nullability is screwy for deletions. In generaly we should get values
+		//	// for all columns on deletes, with a few exceptions. Since SQL Server CDC stores change events in a
+		//	// table, missing values are represented as nulls in the change table, and since the corresponding
+		//	// source table might have a non-nullable column type we need to ensure that we don't emit those as
+		//	// a literal null value which would fail validation.
+		//	for colName, val := range fields {
+		//		// As an added safety check we also make sure this logic doesn't apply to key columns.
+		//		if val == nil && !slices.Contains(info.KeyColumns, colName) {
+		//			if colInfo, ok := info.Columns[colName]; ok {
+		//				if textType, ok := colInfo.DataType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
+		//					// According to MS documentation, text and ntext columns are always omitted (null) in delete events.
+		//					delete(fields, colName)
+		//				} else if colInfo.DataType == "image" {
+		//					// According to MS documentation, image columns are always omitted (null) in delete events.
+		//					delete(fields, colName)
+		//				} else if !colInfo.IsNullable {
+		//					// Sometimes, in direct violation of the documented behavior, we have seen null values on
+		//					// other columns which should definitely be non-nullable. For some reason it seems to mostly
+		//					// happen on a specific BIT NOT NULL column of tables with multiple, and we suspect this is
+		//					// a SQL Server bug (possibly related to how bit fields are packed in WAL events?)
+		//					//
+		//					// Regardless of the reasons, this is a catch-all case which should protect us from emitting
+		//					// null values for non-nullable source columns if it happens again.
+		//					delete(fields, colName)
+		//				}
+		//			}
+		//		}
+		//	}
+		//}
 
 		var event = &sqlserverChangeEvent{
-			Operation: operation,
-			RowKey:    rowKey,
-			Source: &sqlserverSourceInfo{
-				SourceCommon: sqlcapture.SourceCommon{
-					Schema: info.SchemaName,
-					Table:  info.TableName,
+			Shared: replicationEventInfo,
+			Meta: sqlserverChangeMetadata{
+				Operation: operation,
+				Source: sqlserverSourceInfo{
+					SourceCommon: sqlcapture.SourceCommon{
+						Schema: info.SchemaName,
+						Table:  info.TableName,
+					},
+					LSN:        changeLSN,
+					SeqVal:     seqval,
+					UpdateMask: updateMask,
 				},
-				LSN:        changeLSN,
-				SeqVal:     seqval,
-				UpdateMask: updateMask,
 			},
-			Before: before,
-			After:  after,
+			RowKey: rowKey,
+			Values: vals,
 		}
 		if err := rs.emitEvent(ctx, event); err != nil {
 			return err

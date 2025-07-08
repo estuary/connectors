@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
 )
@@ -103,59 +105,94 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		vptrs[idx] = &vals[idx]
 	}
 
-	// Iterate over the result set appending change events to the list
-	var resultRows int    // Count of rows received within the current backfill chunk
-	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
+	// Preprocess result metadata for efficient row handling.
+	var outputColumnNames = make([]string, len(cnames))         // Names of all columns, with omitted columns set to ""
+	var outputColumnTypes = make([]any, len(cnames))            // Types of all columns, with omitted columns set to nil
+	var outputTranscoders = make([]jsonTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
+	var rowKeyTranscoders = make([]fdbTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
+	for idx, name := range cnames {
+		// Computed column values cannot be captured via CDC, so we have to exclude them from
+		// backfills as well or we'd end up with incorrect/stale values. Better not to have a
+		// property at all in those circumstances.
+		if slices.Contains(computedColumns, name) {
+			continue
+		}
+
+		outputColumnNames[idx] = name
+		outputColumnTypes[idx] = columnTypes[name]
+		outputTranscoders[idx] = db.backfillJSONTranscoder(columnTypes[name])
+		if slices.Contains(keyColumns, name) {
+			rowKeyTranscoders[idx] = db.backfillFDBTranscoder(columnTypes[name])
+		}
+	}
+	outputColumnNames = append(outputColumnNames, "_meta") // Add '_meta' property to the row shape
+
+	var keyIndices []int // The indices of the key columns in the row values. Only set for keyed backfills.
+	if state.Mode != sqlcapture.TableStateKeylessBackfill {
+		keyIndices = make([]int, len(keyColumns))
+		for idx, colName := range keyColumns {
+			var resultIndex = slices.Index(cnames, colName)
+			if resultIndex < 0 {
+				return false, nil, fmt.Errorf("key column %q not found in result columns for %q", colName, streamID)
+			}
+			keyIndices[idx] = resultIndex
+		}
+	}
+	var backfillEventInfo = &sqlserverChangeSharedInfo{
+		StreamID:    streamID,
+		Shape:       encrow.NewShape(outputColumnNames),
+		Transcoders: outputTranscoders,
+	}
+
+	// Preallocate reusable buffers for change event processing
+	var reused struct {
+		lsn    []byte               // Reused buffer for the LSN, which is always the empty bytes for backfills
+		seqval []byte               // Reused buffer for the sequence value, which holds the row offset in a backfill
+		event  sqlserverChangeEvent // Reused event struct to avoid allocations in the hot path
+	}
+	reused.lsn = LSN{}
+	reused.seqval = make([]byte, 10) // Sequence values are always 10 bytes, though we only use the last 8 for backfills
+
+	// Iterate over the result set yielding each row as a change event.
+	var resultRows int               // Count of rows received within the current backfill chunk
+	var rowKey = make([]byte, 0, 64) // The row key of the most recent row processed
 	var rowOffset = state.BackfilledCount
 	for rows.Next() {
 		if err := rows.Scan(vptrs...); err != nil {
 			return false, nil, fmt.Errorf("error scanning result row: %w", err)
 		}
-		var fields = make(map[string]interface{})
-		for idx, name := range cnames {
-			fields[name] = vals[idx]
-		}
-		for _, name := range computedColumns {
-			// Computed column values cannot be captured via CDC, so we have to exclude them from
-			// backfills as well or we'd end up with incorrect/stale values. Better not to have a
-			// property at all in those circumstances.
-			delete(fields, name)
-		}
 
-		var rowKey []byte
 		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
 		} else {
-			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
-			if err != nil {
-				return false, nil, fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			rowKey = rowKey[:0]
+			for _, n := range keyIndices {
+				rowKey, err = rowKeyTranscoders[n].TranscodeFDB(rowKey, vals[n])
+				if err != nil {
+					return false, nil, fmt.Errorf("error encoding column %q at index %d: %w", cnames[n], n, err)
+				}
 			}
 		}
-		nextRowKey = rowKey
 
-		if err := db.translateRecordFields(columnTypes, fields); err != nil {
-			return false, nil, fmt.Errorf("error backfilling table %q: %w", table, err)
-		}
-
-		log.WithField("fields", fields).Trace("got row")
-		var seqval = make([]byte, 10)
-		binary.BigEndian.PutUint64(seqval[2:], uint64(rowOffset))
-		var event = &sqlserverChangeEvent{
-			Operation: sqlcapture.InsertOp,
-			RowKey:    rowKey,
-			Source: &sqlserverSourceInfo{
-				SourceCommon: sqlcapture.SourceCommon{
-					Schema:   schema,
-					Snapshot: true,
-					Table:    table,
+		binary.BigEndian.PutUint64(reused.seqval[2:], uint64(rowOffset))
+		reused.event = sqlserverChangeEvent{
+			Shared: backfillEventInfo,
+			Meta: sqlserverChangeMetadata{
+				Operation: sqlcapture.InsertOp,
+				Source: sqlserverSourceInfo{
+					SourceCommon: sqlcapture.SourceCommon{
+						Schema:   schema,
+						Snapshot: true,
+						Table:    table,
+					},
+					LSN:    reused.lsn,
+					SeqVal: reused.seqval,
 				},
-				LSN:    LSN{},
-				SeqVal: seqval,
 			},
-			Before: nil,
-			After:  fields,
+			RowKey: rowKey,
+			Values: vals,
 		}
-		if err := callback(event); err != nil {
+		if err := callback(&reused.event); err != nil {
 			return false, nil, fmt.Errorf("error processing change event: %w", err)
 		}
 		resultRows++
@@ -163,7 +200,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, nextRowKey, rows.Err()
+	return backfillComplete, rowKey, rows.Err()
 }
 
 func (db *sqlserverDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
