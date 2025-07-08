@@ -19,10 +19,6 @@ var featureFlagDefaults = map[string]bool{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
 	"objects_and_arrays_as_json": true,
-
-	// When set, an idempotent apply strategy will be used for commits, rather
-	// than committing transactional checkpoints.
-	"idempotent_apply": false,
 }
 
 type config struct {
@@ -177,16 +173,11 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				serPolicy = boilerplate.SerPolicyDisabled
 			}
 
-			metaCheckpoints := sql.FlowCheckpointsTable([]string{cfg.ProjectID, cfg.Dataset})
-			if featureFlags["idempotent_apply"] {
-				metaCheckpoints = nil
-			}
-
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
 				SerPolicy:           serPolicy,
-				MetaCheckpoints:     metaCheckpoints,
+				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       prepareNewTransactor(templates),
