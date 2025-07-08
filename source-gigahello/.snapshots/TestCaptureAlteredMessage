@@ -1,0 +1,13 @@
+# ================================
+# Collection "acmeCo/test-capture/messages": 5 Documents
+# ================================
+{"seq":0,"message":"Hello, altered world!"}
+{"seq":1,"message":"Hello, altered world!"}
+{"seq":2,"message":"Hello, altered world!"}
+{"seq":3,"message":"Hello, altered world!"}
+{"seq":4,"message":"Hello, altered world!"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"greetings":{"counter":5}}}
+
