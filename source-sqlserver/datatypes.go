@@ -105,24 +105,15 @@ func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
 	}
 }
 
-func (db *sqlserverDatabase) translateRecordFields(columnTypes map[string]interface{}, f map[string]interface{}) error {
-	if columnTypes == nil {
-		return fmt.Errorf("unknown column types")
-	}
-	if f == nil {
-		return nil
-	}
-	for id, val := range f {
-		var translated, err = db.translateRecordField(columnTypes[id], val)
-		if err != nil {
-			return fmt.Errorf("error translating field %q value %v: %w", id, val, err)
-		}
-		f[id] = translated
-	}
-	return nil
-}
-
 func (db *sqlserverDatabase) translateRecordField(columnType interface{}, val interface{}) (interface{}, error) {
+	// Fast path for strings which avoids an extra `any` allocation in the common case of no truncation.
+	if str, ok := val.(string); ok {
+		if len(str) > truncateColumnThreshold {
+			return str[:truncateColumnThreshold], nil
+		}
+		return val, nil
+	}
+
 	switch val := val.(type) {
 	case []byte:
 		switch columnType {
@@ -142,11 +133,6 @@ func (db *sqlserverDatabase) translateRecordField(columnType interface{}, val in
 			}
 			return u.String(), nil
 		}
-		if len(val) > truncateColumnThreshold {
-			val = val[:truncateColumnThreshold]
-		}
-		return val, nil
-	case string:
 		if len(val) > truncateColumnThreshold {
 			val = val[:truncateColumnThreshold]
 		}
