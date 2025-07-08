@@ -580,6 +580,7 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	var workerCtx, cancelWorkerCtx = context.WithCancel(ctx) // Context for the commit buffering worker goroutine
 	defer cancelWorkerCtx()                                  // Ensure that the worker goroutine always exits when we do
 	var workerGroup errgroup.Group
+	defer cancelWorkerCtx() // Ensure that the worker goroutine is cancelled when we return
 	workerGroup.Go(func() error {
 		var ticker = time.NewTicker(commitBufferingInterval)
 		defer ticker.Stop()
