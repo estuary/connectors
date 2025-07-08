@@ -140,7 +140,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		log.WithField("fields", fields).Trace("got row")
 		var seqval = make([]byte, 10)
 		binary.BigEndian.PutUint64(seqval[2:], uint64(rowOffset))
-		var event = &sqlcapture.OldChangeEvent{
+		var event = &sqlserverChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
 			Source: &sqlserverSourceInfo{
