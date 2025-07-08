@@ -12537,7 +12537,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -12579,7 +12578,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -15874,9 +15872,9 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/date_start"
     ]
   },
   {
@@ -16218,7 +16216,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -16260,7 +16257,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -19569,10 +19565,10 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
       "/ad_id",
       "/age",
+      "/date_start",
       "/gender"
     ]
   },
@@ -19915,7 +19911,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -19957,7 +19952,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -23259,10 +23253,10 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
       "/ad_id",
-      "/country"
+      "/country",
+      "/date_start"
     ]
   },
   {
@@ -23604,7 +23598,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -23646,7 +23639,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -26948,9 +26940,9 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
       "/ad_id",
+      "/date_start",
       "/region"
     ]
   },
@@ -27293,7 +27285,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -27335,7 +27326,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -30637,9 +30627,9 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
       "/ad_id",
+      "/date_start",
       "/dma"
     ]
   },
@@ -30982,7 +30972,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -31024,7 +31013,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -34340,12 +34328,12 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
       "/ad_id",
-      "/publisher_platform",
+      "/date_start",
+      "/impression_device",
       "/platform_position",
-      "/impression_device"
+      "/publisher_platform"
     ]
   },
   {
@@ -34687,7 +34675,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -34729,7 +34716,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38024,9 +38010,9 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
-      "/ad_id"
+      "/ad_id",
+      "/date_start"
     ]
   },
   {
@@ -38860,7 +38846,6 @@
         },
         "adset_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -38872,7 +38857,6 @@
         },
         "campaign_id": {
           "type": [
-            "null",
             "string"
           ]
         },
@@ -39022,9 +39006,9 @@
       ]
     },
     "key": [
-      "/date_start",
       "/account_id",
       "/ad_id",
+      "/date_start",
       "/publisher_platform"
     ]
   }
