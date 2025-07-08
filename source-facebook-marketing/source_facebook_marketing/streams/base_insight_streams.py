@@ -135,28 +135,25 @@ class AdsInsights(FBMarketingIncrementalStream):
             return "adset_id"
         elif self.level == "campaign":
             return "campaign_id"
-        elif self.level == "account":
-            return "account_id"
         else:
             raise RuntimeError(
                 f"Unexpected level {self.level} for AdsInsights stream. "
-                f"Expected one of: account, campaign, adset, ad. "
+                f"Expected one of: campaign, adset, ad. "
                 f"Please check your configuration."
             )
 
     def level_specific_fields(self) -> List[str]:
-        if self.level == "account":
-            return self.ACCOUNT_FIELDS
-        elif self.level == "campaign":
-            return self.ACCOUNT_FIELDS + self.CAMPAIGN_FIELDS
+        common_fields = self.ACCOUNT_FIELDS + self.CAMPAIGN_FIELDS
+        if self.level == "campaign":
+            return common_fields
         elif self.level == "adset":
-            return self.ACCOUNT_FIELDS + self.CAMPAIGN_FIELDS + self.ADSET_FIELDS
+            return common_fields + self.ADSET_FIELDS
         elif self.level == "ad":
-            return self.ACCOUNT_FIELDS + self.CAMPAIGN_FIELDS + self.ADSET_FIELDS + self.AD_FIELDS
+            return common_fields + self.ADSET_FIELDS + self.AD_FIELDS
         else:
             raise RuntimeError(
                 f"Unexpected level {self.level} for AdsInsights stream. "
-                f"Expected one of: account, campaign, adset, ad. "
+                f"Expected one of: campaign, adset, ad. "
                 f"Please check your configuration."
             )
 

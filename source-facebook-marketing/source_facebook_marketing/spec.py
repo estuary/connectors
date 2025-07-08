@@ -33,7 +33,7 @@ class InsightConfig(BaseModel):
         description="The name value of insight",
     )
 
-    level: str = Field(title="Level", description="Chosen level for API", default="ad", enum=["ad", "adset", "campaign", "account"])
+    level: str = Field(title="Level", description="Chosen level for API", default="ad", enum=["ad", "adset", "campaign"])
 
     fields: Optional[List[ValidFields]] = Field(
         title="Fields",
