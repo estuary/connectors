@@ -532,13 +532,12 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				// created with that source field type. This scenario would
 				// involve one invoked Apply RPC racing with another, which is
 				// not likely, but perhaps not totally impossible.
-				return nil, fmt.Errorf(
-					"existing field type mismatch for field %q of binding %q: existing %q vs %q is incompatible and cannot be migrated",
-					existingField.Name,
-					mb.ResourcePath,
-					existingField.Type,
-					p.Mapped.String(),
-				)
+				log.WithFields(log.Fields{
+					"resourcePath": mb.ResourcePath,
+					"field":        p.Field,
+					"existingType": existingField.Type,
+					"mappedType":   p.Mapped.String(),
+				}).Warn("existing field type mismatch without migration support")
 			}
 		}
 
