@@ -578,6 +578,7 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 		event       CommitEvent // When we have a buffered commit event which hasn't yet been processed or invalidated, this is it. Otherwise it's nil.
 	}
 	var workerCtx, cancelWorkerCtx = context.WithCancel(ctx) // Context for the commit buffering worker goroutine
+	defer cancelWorkerCtx()                                  // Ensure that the worker goroutine always exits when we do
 	var workerGroup errgroup.Group
 	workerGroup.Go(func() error {
 		var ticker = time.NewTicker(commitBufferingInterval)
