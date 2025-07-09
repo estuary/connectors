@@ -347,7 +347,6 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 	}
 
 	// Stream replication events until the fence is reached or the watchdog timeout hits.
-	//
 	var relayCtx, cancelRelayCtx = context.WithCancelCause(ctx)
 	defer cancelRelayCtx(nil)
 
@@ -845,7 +844,6 @@ func (s *replicationStream) decodeChangeEvent(
 		s.reused.rowKey = rowKey // Update in case of resizing
 	}
 
-	_ = beforeValues // TODO(wgd): Include the before tuple values so that updates with full REPLICA IDENTITY work correctly.
 	*s.reused.changeEvent = postgresChangeEvent{
 		Info: info.Shared,
 		Meta: postgresChangeMetadata{
