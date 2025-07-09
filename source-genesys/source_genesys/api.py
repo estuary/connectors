@@ -37,6 +37,7 @@ async def snapshot_users(
         "pageSize": 500,
         "pageNumber": 1,
         "sortOrder": "ASC",
+        "expand": "team",
     }
 
     lastPageNumber = 1
