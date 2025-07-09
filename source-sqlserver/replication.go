@@ -836,7 +836,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 	for _, item := range queue {
 		var item = item // Copy to avoid loop+closure issues
 		workers.Go(func() error {
-			if err := rs.pollTable(workerContext, item); err != nil {
+			if err := rs.pollTable(workerContext, item); err != nil && !errors.Is(err, context.Canceled) {
 				return fmt.Errorf("error polling changes for table %q: %w", item.StreamID, err)
 			}
 			return nil
@@ -1045,12 +1045,12 @@ type tablePollInfo struct {
 }
 
 func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *tablePollInfo) error {
-	log.WithFields(log.Fields{
-		"stream":   info.StreamID,
-		"instance": info.InstanceName,
-		"fromLSN":  info.FromLSN,
-		"toLSN":    info.ToLSN,
-	}).Trace("polling stream")
+	//log.WithFields(log.Fields{
+	//	"stream":   info.StreamID,
+	//	"instance": info.InstanceName,
+	//	"fromLSN":  info.FromLSN,
+	//	"toLSN":    info.ToLSN,
+	//}).Trace("polling stream")
 
 	var query = fmt.Sprintf(`SELECT * FROM cdc.fn_cdc_get_all_changes_%s(@p1, @p2, N'all');`, info.InstanceName)
 	rows, err := rs.conn.QueryContext(ctx, query, info.FromLSN, info.ToLSN)
