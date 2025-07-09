@@ -29,6 +29,12 @@ def validate_start_date(start_date: DateTime) -> DateTime:
         # 2023-03-31 - 37 month = 2020-02-29 which is incorrect, should be 2020-03-01
         # that's why we're adjusting the date to the 1st day of the next month
         retention_date = retention_date.replace(month=retention_date.month + 1, day=1)
+    else:
+        # Facebook does not use UTC for the insights API and instead uses the
+        # user's timezone. To avoid timezone related issues when a user has a
+        # positive timezone offset, we add a day to the retention date so we're
+        # always within the retention period.
+        retention_date = retention_date.add(days=1)
 
     if start_date > now:
         message = f"The start date cannot be in the future. Set start date to today's date - {today}."
