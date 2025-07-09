@@ -26,7 +26,7 @@ func TestInfoSchema(t *testing.T) {
 		return strings.TrimSuffix(in, "_transformed")
 	}
 
-	is := NewInfoSchema(transformPath, transform)
+	is := NewInfoSchema(transformPath, transform, true)
 
 	nullableField := ExistingField{
 		Name:               transform("nullableField"),
@@ -64,6 +64,10 @@ func TestInfoSchema(t *testing.T) {
 		got = res2.GetField(untransform(nonNullableField.Name))
 		require.Equal(t, nonNullableField, *got)
 
+		// Case insensitive match.
+		got = res1.GetField(strings.ToLower(untransform(nullableField.Name)))
+		require.Equal(t, nullableField, *got)
+
 		// Resource doesn't have the field.
 		got = res2.GetField(untransform(nullableField.Name))
 		require.Nil(t, got)
@@ -89,6 +93,14 @@ func TestInfoSchema(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, got)
 
+		// Case insensitive match.
+		fs = pf.FieldSelection{
+			Values: []string{strings.ToLower(untransform(nullableField.Name))},
+		}
+		got, err = is.inSelectedFields(nullableField.Name, fs)
+		require.NoError(t, err)
+		require.True(t, got)
+
 		// Ambiguous case.
 		fs = pf.FieldSelection{
 			Values: []string{untransform(nullableField.Name), untransform(nullableField.Name)},
@@ -112,6 +124,7 @@ func TestInfoSchema(t *testing.T) {
 				return out
 			},
 			translate,
+			false,
 		)
 
 		paths := [][]string{

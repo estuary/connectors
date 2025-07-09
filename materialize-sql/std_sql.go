@@ -328,6 +328,7 @@ func StdFetchInfoSchema(
 	is := boilerplate.NewInfoSchema(
 		ToLocatePathFn(dialect.TableLocator),
 		dialect.ColumnLocator,
+		dialect.CaseInsensitiveColumns,
 	)
 
 	if len(resourcePaths) == 0 {
