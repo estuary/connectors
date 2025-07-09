@@ -23,9 +23,10 @@ type ExistingField struct {
 // endpoint. The location is as-reported by the endpoint, and may not match the
 // corresponding resource path directly.
 type ExistingResource struct {
-	fields         []ExistingField
-	location       []string
-	translateField TranslateFieldFn
+	fields                []ExistingField
+	location              []string
+	translateField        TranslateFieldFn
+	caseInsensitiveFields bool
 
 	// Meta allows for storing additional information about a resource
 	// separately, so that it may be retrieved later with a type assertion. If
@@ -57,7 +58,10 @@ func (r *ExistingResource) PushField(field ExistingField) {
 // is not found.
 func (r *ExistingResource) GetField(name string) *ExistingField {
 	for _, f := range r.fields {
-		if f.Name == r.translateField(name) {
+		translated := r.translateField(name)
+		if r.caseInsensitiveFields && strings.EqualFold(f.Name, translated) {
+			return &f
+		} else if f.Name == translated {
 			return &f
 		}
 	}
@@ -65,6 +69,9 @@ func (r *ExistingResource) GetField(name string) *ExistingField {
 	return nil
 }
 
+// AllFields returns all the fields reported in the existing resource. To get a
+// specific existing field by Flow field name with correct consideration for
+// translations / case folding, use GetField instead.
 func (r *ExistingResource) AllFields() []ExistingField {
 	return r.fields
 }
@@ -84,18 +91,20 @@ type TranslateFieldFn func(string) string
 // InfoSchema contains the information about materialized collections and fields that exist within
 // the endpoint.
 type InfoSchema struct {
-	namespaces     []string
-	resources      []*ExistingResource
-	locatePath     LocatePathFn
-	translateField TranslateFieldFn
+	namespaces            []string
+	resources             []*ExistingResource
+	locatePath            LocatePathFn
+	translateField        TranslateFieldFn
+	caseInsensitiveFields bool
 }
 
 // NewInfoSchema creates a new InfoSchema that will use the `locate` and `translateField` functions
 // to look up EndpointFields for Flow resource paths and fields.
-func NewInfoSchema(locate LocatePathFn, translateField TranslateFieldFn) *InfoSchema {
+func NewInfoSchema(locate LocatePathFn, translateField TranslateFieldFn, caseInsensitiveFields bool) *InfoSchema {
 	return &InfoSchema{
-		locatePath:     locate,
-		translateField: translateField,
+		locatePath:            locate,
+		translateField:        translateField,
+		caseInsensitiveFields: caseInsensitiveFields,
 	}
 }
 
@@ -122,8 +131,9 @@ func (i *InfoSchema) PushResource(location ...string) *ExistingResource {
 	}
 
 	res := &ExistingResource{
-		location:       location,
-		translateField: i.translateField,
+		location:              location,
+		translateField:        i.translateField,
+		caseInsensitiveFields: i.caseInsensitiveFields,
 	}
 
 	i.resources = append(i.resources, res)
@@ -148,7 +158,14 @@ func (i *InfoSchema) inSelectedFields(endpointFieldName string, fs pf.FieldSelec
 	var found bool
 
 	for _, f := range fs.AllFields() {
-		matches := i.translateField(f) == endpointFieldName
+		var matches bool
+		translated := i.translateField(f)
+		if i.caseInsensitiveFields && strings.EqualFold(translated, endpointFieldName) {
+			matches = true
+		} else if translated == endpointFieldName {
+			matches = true
+		}
+
 		if found && matches {
 			// This should never happen since the standard constraints from `Validator` forbid it,
 			// but I'm leaving it here as a sanity check just in case.
