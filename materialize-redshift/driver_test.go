@@ -25,7 +25,11 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	out := config{}
+	out := config{
+		Advanced: advancedConfig{
+			FeatureFlags: "allow_existing_tables_for_new_bindings",
+		},
+	}
 
 	for _, prop := range []struct {
 		key  string
