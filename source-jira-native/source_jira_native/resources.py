@@ -26,6 +26,7 @@ from .models import (
     JiraResource,
     Labels,
     Permissions,
+    PermissionsResponse,
     MyPermissionsResponse,
     ProjectChildStream,
     Projects,
@@ -116,11 +117,19 @@ async def validate_credentials(
 async def remove_permission_blocked_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig, resources: list[common.Resource]
 ) -> list[common.Resource]:
-    url = f"{url_base(config.domain, JiraAPI.PLATFORM)}/mypermissions"
+    # Not all Jira instances support all possible permissions, so we
+    # have to check which permissions are actually available before checking
+    # which ones the user has with the /mypermissions endpoint.
+    url = f"{url_base(config.domain, JiraAPI.PLATFORM)}/permissions"
+    response = PermissionsResponse.model_validate_json(
+        await http.request(log, url)
+    )
 
-    params = {
-        "permissions": [p for p in StandardPermissions]
+    params: dict[str, list[str]] = {
+        "permissions": [p.value for p in StandardPermissions if p.value in response.permissions]
     }
+
+    url = f"{url_base(config.domain, JiraAPI.PLATFORM)}/mypermissions"
 
     response = MyPermissionsResponse.model_validate_json(
         await http.request(log, url, params=params)
