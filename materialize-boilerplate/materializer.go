@@ -450,7 +450,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		actionDescriptions = append(actionDescriptions, desc)
 	}
 
-	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
+	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is, mCfg.CaseInsensitiveFields)
 	if err != nil {
 		return nil, err
 	}
@@ -628,7 +628,7 @@ func initInfoSchema(cfg MaterializeCfg) *InfoSchema {
 		translateField = cfg.Translate
 	}
 
-	return NewInfoSchema(locatePath, translateField)
+	return NewInfoSchema(locatePath, translateField, cfg.CaseInsensitiveFields)
 }
 
 func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](

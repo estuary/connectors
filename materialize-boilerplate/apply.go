@@ -84,7 +84,7 @@ func ApplyChanges(ctx context.Context, req *pm.Request_Apply, applier Applier, i
 		}
 	}
 
-	computed, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
+	computed, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is, false)
 	if err != nil {
 		return nil, fmt.Errorf("computing common updates: %w", err)
 	}
@@ -156,7 +156,7 @@ type computedUpdates struct {
 	updatedBindings  map[int]BindingUpdate
 }
 
-func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*computedUpdates, error) {
+func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema, caseInsensitiveFields bool) (*computedUpdates, error) {
 	out := computedUpdates{
 		updatedBindings: make(map[int]BindingUpdate),
 	}
