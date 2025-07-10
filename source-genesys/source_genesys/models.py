@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+from enum import StrEnum
 from pydantic import AwareDatetime, BaseModel, Field
 from typing import ClassVar, Literal, Optional
 
@@ -75,15 +76,19 @@ class GenesysResource(FullRefreshResource):
     id: str
 
 
-class SnapshotResponse(BaseModel, extra="forbid"):
+class SnapshotListResponse(BaseModel, extra="allow"):
     entities: list[GenesysResource]
+    pageSize: int
+    pageNumber: int
+
+
+class SnapshotSearchResponse(BaseModel, extra="allow"):
+    results: list[GenesysResource] | None = None
     pageSize: int
     pageNumber: int
     total: int
     pageCount: int
-    lastUri: str
-    firstUri: str
-    selfUri: str
+
 
 
 class Conversation(BaseDocument, extra="allow"):
@@ -122,11 +127,23 @@ class JobResultsResponse(BaseModel, extra="forbid"):
     cursor: str | None = None # Included if response does not contain the last page of results.
 
 
+class SortOrderParam(StrEnum):
+    ASC = "ASC"
+    ASCENDING = "ascending"
+    DESC = "DESC"
+    DESCENDING = "descending"
+
+class EndpointType(StrEnum):
+    LIST = "list"
+    SEARCH = "search"
+
+
 class GenesysStream():
     name: ClassVar[str]
     path: ClassVar[str]
-    page_size: ClassVar[int] = 500
+    sort_order_param: ClassVar[SortOrderParam] = SortOrderParam.ASC
     extra_params: ClassVar[Optional[dict[str, str]]] = None
+    endpoint_type: ClassVar[EndpointType] = EndpointType.LIST
 
 
 class Users(GenesysStream):
@@ -137,6 +154,46 @@ class Users(GenesysStream):
     }
 
 
+class Teams(GenesysStream):
+    name: ClassVar[str] = "teams"
+    path: ClassVar[str] = "teams/search"
+    endpoint_type: ClassVar[EndpointType] = EndpointType.SEARCH
+
+
+class Queues(GenesysStream):
+    name: ClassVar[str] = "queues"
+    path: ClassVar[str] = "routing/queues"
+
+
+class Campaigns(GenesysStream):
+    name: ClassVar[str] = "campaigns"
+    path: ClassVar[str] = "outbound/campaigns/all"
+    sort_order_param: ClassVar[SortOrderParam] = SortOrderParam.ASCENDING
+
+
+class MessagingCampaigns(GenesysStream):
+    name: ClassVar[str] = "messaging_campaigns"
+    path: ClassVar[str] = "outbound/messagingcampaigns"
+    sort_order_param: ClassVar[SortOrderParam] = SortOrderParam.ASCENDING
+
+
+class GenesysChildStream(GenesysStream):
+    parent_stream: ClassVar[type[GenesysStream]]
+    parent_id_field: ClassVar[str]
+
+
+class QueueMembers(GenesysChildStream):
+    name: ClassVar[str] = "queue_members"
+    path: ClassVar[str] = "members"
+    parent_stream: ClassVar[type[GenesysStream]] = Queues
+    parent_id_field: ClassVar[str] = "queueId"
+
+
 FULL_REFRESH_STREAMS: list[type[GenesysStream]] = [
+    Campaigns,
+    MessagingCampaigns,
+    QueueMembers,
+    Queues,
+    Teams,
     Users,
 ]
