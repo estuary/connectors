@@ -3,7 +3,7 @@
     "recommendedName": "teams",
     "resourceConfig": {
       "name": "teams",
-      "interval": "PT15M"
+      "interval": "PT2H"
     },
     "documentSchema": {
       "$defs": {
@@ -54,7 +54,7 @@
     "recommendedName": "users",
     "resourceConfig": {
       "name": "users",
-      "interval": "PT15M"
+      "interval": "PT2H"
     },
     "documentSchema": {
       "$defs": {
@@ -105,7 +105,7 @@
     "recommendedName": "tags",
     "resourceConfig": {
       "name": "tags",
-      "interval": "PT15M"
+      "interval": "PT2H"
     },
     "documentSchema": {
       "$defs": {
@@ -156,7 +156,7 @@
     "recommendedName": "boards",
     "resourceConfig": {
       "name": "boards",
-      "interval": "PT5M"
+      "interval": "PT1H"
     },
     "documentSchema": {
       "$defs": {
@@ -220,7 +220,7 @@
     "recommendedName": "items",
     "resourceConfig": {
       "name": "items",
-      "interval": "PT5M"
+      "interval": "PT1H"
     },
     "documentSchema": {
       "$defs": {
