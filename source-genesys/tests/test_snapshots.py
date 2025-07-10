@@ -20,7 +20,10 @@ def test_discover(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    assert snapshot("capture.stdout.json") == lines
+    # Sort lines to keep a consistent ordering of discovered bindings.
+    sorted_lines = sorted(lines, key=lambda l: l["recommendedName"])
+
+    assert snapshot("capture.stdout.json") == sorted_lines
 
 
 def test_spec(request, snapshot):
