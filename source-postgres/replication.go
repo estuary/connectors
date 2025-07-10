@@ -348,6 +348,7 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 
 	// Stream replication events until the fence is reached or the watchdog timeout hits.
 	var relayCtx, cancelRelayCtx = context.WithCancelCause(ctx)
+	var fenceReached = errors.New("fenced reached")
 	defer cancelRelayCtx(nil)
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -387,12 +388,15 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 			if eventLSN >= fenceLSN {
 				logrus.WithField("cursor", eventLSN.String()).Debug("finished fenced streaming phase")
 				s.previousFenceLSN = eventLSN
-				cancelRelayCtx(nil) // Stop the relay loop so we can exit cleanly. A nil cause means no error.
+				cancelRelayCtx(fenceReached) // Stop the relay loop so we can exit cleanly.
 			}
 		}
 		return nil
 	}); errors.Is(err, context.Canceled) {
-		return context.Cause(ctx)
+		if cause := context.Cause(relayCtx); !errors.Is(cause, fenceReached) {
+			return cause
+		}
+		return nil
 	} else if err != nil {
 		return err
 	}
