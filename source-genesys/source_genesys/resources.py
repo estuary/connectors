@@ -11,14 +11,17 @@ from .models import (
     EndpointConfig,
     ResourceConfig,
     ResourceState,
-    User,
+    FullRefreshResource,
+    GenesysStream,
     Conversation,
     OAUTH2_SPEC,
+    Users,
+    FULL_REFRESH_STREAMS
 )
 from .api import (
-    snapshot_users,
+    base_url,
+    snapshot_resources,
     fetch_conversations,
-    COMMON_API,
 )
 
 
@@ -40,7 +43,7 @@ async def validate_credentials(
 
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     # The /users endpoint is used since no permissions are required to access it.
-    url = f"{COMMON_API}.{config.genesys_cloud_domain}/api/v2/users"
+    url = f"{base_url(config.genesys_cloud_domain)}/{Users.path}"
     params = {
         "pageSize": 1,
         "pageNumber": 1,
@@ -54,11 +57,12 @@ async def validate_credentials(
         raise ValidationError([msg, err.message])
 
 
-def users(
+def full_refresh_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> common.Resource:
+) -> list[common.Resource]:
 
     def open(
+            stream: type[GenesysStream],
             binding: CaptureBinding[ResourceConfig],
             binding_index: int,
             state: ResourceState,
@@ -71,25 +75,34 @@ def users(
             state,
             task,
             fetch_snapshot=functools.partial(
-                snapshot_users,
+                snapshot_resources,
                 http,
                 config.genesys_cloud_domain,
+                stream,
             ),
-            tombstone=User(_meta=User.Meta(op="d"))
+            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
-    return common.Resource(
-            name='users',
-            key=["/_meta/row_id"],
-            model=User,
-            open=open,
-            initial_state=ResourceState(),
-            initial_config=ResourceConfig(
-                name='users', interval=timedelta(minutes=5)
-            ),
-            schema_inference=True,
+
+    resources: list[common.Resource] = []
+
+    for stream in FULL_REFRESH_STREAMS:
+        resources.append(
+            common.Resource(
+                name=stream.name,
+                key=["/_meta/row_id"],
+                model=FullRefreshResource,
+                open=functools.partial(open, stream),
+                initial_state=ResourceState(),
+                initial_config=ResourceConfig(
+                    name=stream.name, interval=timedelta(minutes=30)
+                ),
+                schema_inference=True,
+            )
         )
-    
+
+    return resources
+
 
 def conversations(
         log: Logger, http: HTTPMixin, config: EndpointConfig
@@ -138,5 +151,5 @@ async def all_resources(
 
     return [
         conversations(log, http, config),
-        users(log, http, config),
+        *full_refresh_resources(log, http, config),
     ]

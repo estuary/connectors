@@ -7,8 +7,10 @@ from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession, RateLimiter
 
 from .models import (
-    User,
-    UserResponse,
+    GenesysStream,
+    GenesysResource,
+    Users,
+    SnapshotResponse,
     Conversation,
     CreateJobResponse,
     CheckJobStatusResponse,
@@ -23,33 +25,36 @@ def _dt_to_str(dt: datetime) -> str:
     return dt.strftime(DATETIME_STRING_FORMAT)
 
 
-async def snapshot_users(
-        http: HTTPSession,
-        domain: str,
-        log: Logger,
-) -> AsyncGenerator[User, None]:
-    """
-    API docs - https://developer.genesys.cloud/useragentman/users/#get-api-v2-users
-    """
-    url = f"{COMMON_API}.{domain}/api/v2/users"
+def base_url(domain: str) -> str:
+    return f"{COMMON_API}.{domain}/api/v2"
+
+
+async def snapshot_resources(
+    http: HTTPSession,
+    domain: str,
+    stream: type[GenesysStream],
+    log: Logger,
+) -> AsyncGenerator[GenesysResource, None]:
+    url = f"{base_url(domain)}/{stream.path}"
 
     params = {
-        "pageSize": 500,
+        "pageSize": stream.page_size,
         "pageNumber": 1,
         "sortOrder": "ASC",
-        "expand": "team",
     }
 
-    lastPageNumber = 1
+    if stream.extra_params:
+        params.update(stream.extra_params)
 
+    lastPageNumber = 1
     while params["pageNumber"] <= lastPageNumber:
-        response = UserResponse.model_validate_json(
+        response = SnapshotResponse.model_validate_json(
             await http.request(log, url, params=params)
         )
 
-        users = response.entities
-        for user in users:
-            yield user
+        resources = response.entities
+        for resource in resources:
+            yield resource
 
         params["pageNumber"] += 1
         lastPageNumber = response.pageCount

@@ -72,7 +72,7 @@
     "recommendedName": "users",
     "resourceConfig": {
       "name": "users",
-      "interval": "PT5M"
+      "interval": "PT30M"
     },
     "documentSchema": {
       "$defs": {
@@ -111,7 +111,7 @@
           "description": "Document metadata"
         }
       },
-      "title": "User",
+      "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
