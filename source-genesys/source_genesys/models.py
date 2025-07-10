@@ -1,6 +1,6 @@
 from datetime import datetime, timezone, timedelta
 from pydantic import AwareDatetime, BaseModel, Field
-from typing import Literal
+from typing import ClassVar, Literal, Optional
 
 
 from estuary_cdk.capture.common import (
@@ -67,12 +67,16 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class User(BaseDocument, extra="allow"):
+class FullRefreshResource(BaseDocument, extra="allow"):
     pass
 
 
-class UserResponse(BaseModel, extra="forbid"):
-    entities: list[User]
+class GenesysResource(FullRefreshResource):
+    id: str
+
+
+class SnapshotResponse(BaseModel, extra="forbid"):
+    entities: list[GenesysResource]
     pageSize: int
     pageNumber: int
     total: int
@@ -116,3 +120,23 @@ class JobResultsResponse(BaseModel, extra="forbid"):
     conversations: list[Conversation]
     dataAvailabilityDate: AwareDatetime
     cursor: str | None = None # Included if response does not contain the last page of results.
+
+
+class GenesysStream():
+    name: ClassVar[str]
+    path: ClassVar[str]
+    page_size: ClassVar[int] = 500
+    extra_params: ClassVar[Optional[dict[str, str]]] = None
+
+
+class Users(GenesysStream):
+    name: ClassVar[str] = "users"
+    path: ClassVar[str] = "users"
+    extra_params: ClassVar[Optional[dict[str, str]]] = {
+        "expand": "team",
+    }
+
+
+FULL_REFRESH_STREAMS: list[type[GenesysStream]] = [
+    Users,
+]
