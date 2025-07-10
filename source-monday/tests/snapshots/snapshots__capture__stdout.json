@@ -121,48 +121,13 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "assets": [],
       "board": {
-        "id": "9323816949",
-        "name": "jjjjj"
+        "id": "8431289505"
       },
-      "column_values": [
-        {
-          "id": "person",
-          "text": "",
-          "type": "people",
-          "value": null
-        },
-        {
-          "id": "status",
-          "text": "Working on it",
-          "type": "status",
-          "value": "{\"index\":0,\"post_id\":null,\"changed_at\":\"2019-03-01T17:24:57.321Z\"}"
-        },
-        {
-          "id": "date4",
-          "text": "2025-06-04",
-          "type": "date",
-          "value": "{\"date\":\"2025-06-04\",\"icon\":null,\"changed_at\":\"2025-06-06T20:38:20.505Z\"}"
-        }
-      ],
-      "created_at": "2025-06-06T20:38:19Z",
-      "creator_id": "71985416",
-      "group": {
-        "id": "topics"
-      },
-      "id": "9323816986",
-      "name": "Item 1",
-      "parent_item": null,
-      "state": "archived",
-      "subitems": [],
-      "subscribers": [
-        {
-          "id": "71985416"
-        }
-      ],
-      "updated_at": "redacted",
-      "updates": []
+      "id": "8531390039",
+      "name": "Parent Item",
+      "state": "active",
+      "updated_at": "redacted"
     }
   ],
   [

@@ -12,25 +12,22 @@ from source_monday.api import (
     fetch_boards_page,
     fetch_items_changes,
     fetch_items_page,
-    snapshot_tags,
-    snapshot_teams,
-    snapshot_users,
+    snapshot_resource,
 )
-from source_monday.graphql import API
+from source_monday.graphql import API, API_VERSION, TAGS, TEAMS, USERS
 from source_monday.models import (
     EndpointConfig,
-    FullRefreshResourceFetchFn,
+    FullRefreshResource,
+    IncrementalResource,
     IncrementalResourceFetchChangesFn,
     IncrementalResourceFetchPageFn,
     ResourceState,
-    FullRefreshResource,
-    IncrementalResource,
 )
 
-FULL_REFRESH_RESOURCES: list[tuple[str, FullRefreshResourceFetchFn]] = [
-    ("teams", snapshot_teams),
-    ("users", snapshot_users),
-    ("tags", snapshot_tags),
+FULL_REFRESH_RESOURCES: list[tuple[str, str]] = [
+    ("teams", TEAMS),
+    ("users", USERS),
+    ("tags", TAGS),
 ]
 
 
@@ -46,7 +43,13 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
     try:
-        await http.request(log, API, method="POST", json={"query": "query {me {id}}"})
+        await http.request(
+            log,
+            API,
+            method="POST",
+            headers={"API-Version": API_VERSION},
+            json={"query": "query {me {id}}"},
+        )
     except HTTPError as err:
         msg = "Unknown error occurred."
         if err.code == 401:
@@ -59,7 +62,8 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
 
 def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     def open(
-        fetch_snapshot_fn: FullRefreshResourceFetchFn,
+        name: str,
+        query: str,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -71,7 +75,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(fetch_snapshot_fn, http),
+            fetch_snapshot=functools.partial(snapshot_resource, http, name, query),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d")),
         )
 
@@ -80,12 +84,12 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             name=name,
             key=["/_meta/row_id"],
             model=FullRefreshResource,
-            open=functools.partial(open, fetch_snapshot_fn),
+            open=functools.partial(open, name, query),
             initial_state=ResourceState(),
-            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=15)),
+            initial_config=ResourceConfig(name=name, interval=timedelta(hours=2)),
             schema_inference=True,
         )
-        for name, fetch_snapshot_fn in FULL_REFRESH_RESOURCES
+        for name, query in FULL_REFRESH_RESOURCES
     ]
 
 
@@ -118,9 +122,9 @@ def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
             open=functools.partial(open, fetch_changes_fn, fetch_page_fn),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=1),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
             ),
-            initial_config=ResourceConfig(name=name, interval=timedelta(minutes=5)),
+            initial_config=ResourceConfig(name=name, interval=timedelta(hours=1)),
             schema_inference=True,
         )
         for name, fetch_changes_fn, fetch_page_fn in INCREMENTAL_RESOURCES

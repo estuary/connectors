@@ -1,5 +1,5 @@
 from logging import Logger
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Type
 
 from estuary_cdk.capture import (
     BaseCaptureConnector,
@@ -21,7 +21,7 @@ from source_monday.resources import all_resources, validate_credentials
 class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
 ):
-    def request_class(self):
+    def request_class(self):  # type: ignore[override]
         return Request[EndpointConfig, ResourceConfigWithSchedule, ConnectorState]
 
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
