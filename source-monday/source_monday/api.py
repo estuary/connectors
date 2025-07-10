@@ -11,7 +11,7 @@ from source_monday.graphql import (
     fetch_boards_by_ids,
     fetch_boards_minimal,
     fetch_items_by_ids,
-    fetch_items_minimal,
+    fetch_items,
     fetch_boards_with_retry,
     TEAMS,
     USERS,
@@ -22,8 +22,8 @@ from source_monday.models import (
     Board,
     Item,
 )
-from source_monday.item_cache import ItemIdCache
-from source_monday.utils import parse_monday_timestamp
+from source_monday.graphql.items.item_cache import ItemCacheSession
+from source_monday.utils import parse_monday_17_digit_timestamp
 
 
 MAX_WINDOW_SIZE = timedelta(hours=2)
@@ -32,9 +32,38 @@ FULL_REFRESH_RESOURCES: list[tuple[str, str]] = [
     ("users", USERS),
     ("teams", TEAMS),
 ]
+DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
-_item_id_cache = ItemIdCache()
+_boards_backfill_cache: list[str] = []
+_item_cache_session: ItemCacheSession | None = None
+
+
+def dt_to_str(dt: datetime) -> str:
+    return dt.strftime(DATETIME_STRING_FORMAT)
+
+
+def _str_to_dt(string: str) -> datetime:
+    return datetime.fromisoformat(string)
+
+
+async def _get_or_create_item_cache_session(
+    http: HTTPSession, log: Logger, cutoff: datetime
+) -> ItemCacheSession:
+    global _item_cache_session
+
+    if _item_cache_session is None or _item_cache_session.cutoff != cutoff:
+        log.debug(f"Creating new item cache session for cutoff: {cutoff}")
+        _item_cache_session = ItemCacheSession(
+            http=http,
+            log=log,
+            cutoff=cutoff,
+            boards_batch_size=100,
+            items_batch_size=500,
+        )
+        await _item_cache_session.initialize()
+
+    return _item_cache_session
 
 
 async def fetch_boards_changes(
@@ -47,9 +76,11 @@ async def fetch_boards_changes(
     max_updated_at = log_cursor
     has_updates = False
     board_ids_to_fetch: set[str] = set()
+    all_boards: set[str] = set()
 
     minimal_boards_checked = 0
     async for board in fetch_boards_minimal(http, log):
+        all_boards.add(board.id)
         minimal_boards_checked += 1
 
         if board.updated_at > log_cursor:
@@ -72,10 +103,11 @@ async def fetch_boards_changes(
     async for activity_log in fetch_activity_logs(
         http,
         log,
+        list(all_boards),
         log_cursor.replace(microsecond=0).isoformat(),
     ):
         activity_logs_processed += 1
-        created_at = parse_monday_timestamp(activity_log.created_at, log)
+        created_at = parse_monday_17_digit_timestamp(activity_log.created_at, log)
 
         if not activity_log.resource_id:
             log.debug(
@@ -144,39 +176,63 @@ async def fetch_boards_page(
     if not page:
         page = 1
 
-    limit = 256
-    should_yield_page = True
+    limit = 100
     docs_emitted = 0
 
+    if not _boards_backfill_cache:
+        log.debug("Fetching initial boards for backfill cache")
+
+        async for board in fetch_boards_minimal(http, log):
+            if board.updated_at <= cutoff:
+                _boards_backfill_cache.append(board.id)
+
+        log.debug(
+            f"Populated backfill cache with {len(_boards_backfill_cache)} boards for cutoff {cutoff}"
+        )
+
+    log.debug(
+        f"Processing page {page} with limit {limit} from cache of {len(_boards_backfill_cache)} boards"
+    )
+
+    boards_in_page = 0
     async for board in fetch_boards_with_retry(
         http,
         log,
+        ids=_boards_backfill_cache,
         page=page,
         limit=limit,
     ):
-        if board.updated_at <= cutoff and board.state != "deleted":
-            docs_emitted += 1
-            yield board
+        boards_in_page += 1
+        if board.updated_at <= cutoff:
+            if board.state != "deleted":
+                docs_emitted += 1
+                yield board
 
-        should_yield_page = True
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    has_more_pages = end_idx < len(_boards_backfill_cache)
 
-    if should_yield_page:
+    if has_more_pages:
         log.debug(
             f"Boards backfill completed for page {page}",
             {
                 "board_page": page,
                 "qualifying_boards": docs_emitted,
+                "boards_in_page": boards_in_page,
+                "total_cache_size": len(_boards_backfill_cache),
                 "next_page": page + 1,
             },
         )
         yield page + 1
     else:
         log.debug(
-            f"Boards backfill completed for page {page} - no more qualifying boards",
+            f"Boards backfill completed for page {page} - no more pages",
             {
                 "board_page": page,
                 "qualifying_boards": docs_emitted,
-                "reason": "no_more_boards",
+                "boards_in_page": boards_in_page,
+                "total_cache_size": len(_boards_backfill_cache),
+                "reason": "no_more_pages",
             },
         )
         return
@@ -193,37 +249,51 @@ async def fetch_items_changes(
     now = datetime.now(UTC)
     window_end = min(window_start + MAX_WINDOW_SIZE, now)
 
-    window_has_updates = False
     max_updated_at_in_window = window_start
     item_ids_to_fetch: set[str] = set()
+    docs_emitted = 0
 
-    minimal_items_checked = 0
-    async for item in fetch_items_minimal(http, log):
-        minimal_items_checked += 1
+    board_ids = []
+    async for board in fetch_boards_minimal(http, log):
+        if board.state != "deleted":
+            board_ids.append(board.id)
 
+    async for item in fetch_items(
+        http,
+        log,
+        board_ids=board_ids,
+        start=window_start.date().isoformat(),
+        # We need to add one day to the cutoff to ensure we include items updated on the cutoff date
+        # In testing via Postman, the API query_params rules do not filter items beyond daily granularity
+        # This is a workaround to ensure we include all items updated on the end cutoff date and then filter them
+        # client-side based on the start/end cutoffs
+        end=(window_end.date() + timedelta(days=1)).isoformat(),
+    ):
+        # sanity check to ensure item is within the window
+        # even though the query should filter for us
         if window_start <= item.updated_at <= window_end:
             if item.state == "deleted":
                 item.meta_ = Item.Meta(op="d")
-                window_has_updates = True
-                max_updated_at_in_window = max(
-                    max_updated_at_in_window, item.updated_at
-                )
-                yield item
-            else:
-                item_ids_to_fetch.add(item.id)
-                max_updated_at_in_window = max(
-                    max_updated_at_in_window, item.updated_at
-                )
+
+            max_updated_at_in_window = max(max_updated_at_in_window, item.updated_at)
+            docs_emitted += 1
+            yield item
+        else:
+            log.warning(
+                f"Item {item.id} updated_at {item.updated_at} is outside the sync window "
+                f"({window_start} to {window_end}). This should not happen with the query filter."
+            )
 
     activity_logs_processed = 0
     async for activity_log in fetch_activity_logs(
         http,
         log,
+        board_ids,
         window_start.replace(microsecond=0).isoformat(),
         window_end.replace(microsecond=0).isoformat(),
     ):
         activity_logs_processed += 1
-        created_at = parse_monday_timestamp(activity_log.created_at, log)
+        created_at = parse_monday_17_digit_timestamp(activity_log.created_at, log)
 
         if not activity_log.resource_id:
             log.debug(
@@ -241,13 +311,12 @@ async def fetch_items_changes(
                 state="deleted",
                 _meta=Item.Meta(op="d"),
             )
-            window_has_updates = True
             max_updated_at_in_window = max(max_updated_at_in_window, created_at)
+            docs_emitted += 1
             yield deleted_item
         else:
             item_ids_to_fetch.add(activity_log.resource_id)
 
-    items_yielded = 0
     if item_ids_to_fetch:
         async for item in fetch_items_by_ids(
             http,
@@ -258,16 +327,19 @@ async def fetch_items_changes(
                 if item.state == "deleted":
                     item.meta_ = Item.Meta(op="d")
 
-                window_has_updates = True
                 max_updated_at_in_window = max(
                     max_updated_at_in_window, item.updated_at
                 )
+                docs_emitted += 1
                 yield item
-                items_yielded += 1
 
-    if window_has_updates:
+    if docs_emitted > 0:
         yield max_updated_at_in_window + timedelta(seconds=1)
     else:
+        # Always move cursor forward to ensure progress, even without updates.
+        # Monday.com only retains 10,000 activity logs per board, so staying
+        # at the same cursor risks missing logs that get purged due to retention limits.
+        # Better to advance and catch any missed updates in the next sync cycle.
         yield window_end
 
 
@@ -280,49 +352,19 @@ async def fetch_items_page(
     assert page is None or isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    await _item_id_cache.populate_if_needed(http, log, page, cutoff)
+    cache_session = await _get_or_create_item_cache_session(http, log, cutoff)
+    items_generator, next_page_cursor = await cache_session.process_page(page)
 
-    cache_info = _item_id_cache.get_cache_info()
-    log.debug(
-        f"Items backfill: {cache_info['total_items']} items available",
-        {
-            "total_items": cache_info["total_items"],
-            "cutoff": cutoff,
-            "page_cursor": page,
-        },
-    )
+    async for item in items_generator:
+        yield item
 
-    batch_size = 1000
-    items_yielded = 0
-    max_updated_at = datetime.min.replace(tzinfo=UTC)
-
-    item_ids, cursor = _item_id_cache.get_next_batch(batch_size)
-
-    if item_ids and cursor:
-        async for item in fetch_items_by_ids(http, log, item_ids):
-            if item.updated_at <= cutoff:
-                items_yielded += 1
-                max_updated_at = max(max_updated_at, item.updated_at)
-                yield item
-
-        cursor_dt = datetime.fromisoformat(cursor)
-        if cursor_dt != max_updated_at:
-            raise ValueError(
-                f"Cursor {cursor} does not match max updated at {max_updated_at}."
-            )
-
-        log.debug(f"Yielding checkpoint cursor: {cursor}")
-        yield cursor
-
-    processed, total = _item_id_cache.get_progress()
-    log.debug(
-        f"Items page complete: {items_yielded} items yielded, {processed}/{total} processed from cache"
-    )
+    if next_page_cursor:
+        yield next_page_cursor
 
 
 async def snapshot_resource(
     http: HTTPSession,
-    json_path: str,
+    name: str,
     query: str,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
@@ -330,7 +372,7 @@ async def snapshot_resource(
         FullRefreshResource,
         http,
         log,
-        json_path,
+        f"data.{name}.item",
         query,
     ):
         yield resource_data

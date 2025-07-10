@@ -4,7 +4,9 @@ from typing import (
     Any,
     AsyncGenerator,
     Callable,
+    Generic,
     Literal,
+    TypeVar,
 )
 import json
 
@@ -76,6 +78,8 @@ class GraphQLError(BaseModel, extra="allow"):
         code: str = Field(
             default="INTERNAL_SERVER_ERROR"
         )  # Default code for errors if the API does not specify one.
+        complexity: int | None = None
+        maxComplexity: int | None = None
 
     message: str
     locations: list[GraphQLErrorLocation] | None = None
@@ -89,11 +93,15 @@ class ComplexityInfo(BaseModel, extra="allow"):
     reset_in_x_seconds: int
 
 
-class GraphQLResponseRemainder(BaseModel, extra="allow"):
-    class Data(BaseModel, extra="allow"):
-        complexity: ComplexityInfo | None = None
+class GraphQLResponseData(BaseModel, extra="allow"):
+    complexity: ComplexityInfo | None = None
 
-    data: Data | None = None
+
+TGraphQLResponseData = TypeVar("TGraphQLResponseData", bound=GraphQLResponseData)
+
+
+class GraphQLResponseRemainder(BaseModel, Generic[TGraphQLResponseData], extra="allow"):
+    data: TGraphQLResponseData | None = None
     errors: list[GraphQLError] | None = None
 
     def has_errors(self) -> bool:
@@ -103,7 +111,7 @@ class GraphQLResponseRemainder(BaseModel, extra="allow"):
         return self.errors or []
 
 
-class ActivityLog(BaseDocument, extra="allow"):
+class ActivityLog(BaseModel, extra="allow"):
     resource_id: str | None = None
     entity: Literal["board", "pulse"]
     event: str
@@ -163,7 +171,14 @@ class Board(IncrementalResource):
 
 
 class Item(IncrementalResource):
+    class Board(BaseModel, extra="allow"):
+        id: str
+
     state: Literal["all", "active", "archived", "deleted"]
+    board: Board | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
 
 
 class ItemsPage(BaseModel, extra="allow"):
