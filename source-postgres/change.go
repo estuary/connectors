@@ -51,7 +51,16 @@ func (f jsonTranscoderFunc) TranscodeJSON(buf []byte, v []byte) ([]byte, error) 
 
 type fdbTranscoderFunc func(buf []byte, v []byte) ([]byte, error)
 
-func (f fdbTranscoderFunc) TranscodeFDB(buf []byte, v []byte) ([]byte, error) { return f(buf, v) }
+func (f fdbTranscoderFunc) TranscodeFDB(buf []byte, v []byte) ([]byte, error) {
+	if v == nil {
+		// In general row keys don't contain nil values, but it is possible in
+		// certain corner cases (mainly involving overriding the row key selection
+		// to something other than the primary key). In that case, we should always
+		// translate a nil byte slice to the nil tuple element 0x00.
+		return append(buf, 0x00), nil
+	}
+	return f(buf, v)
+}
 
 // postgresChangeSharedInfo holds information which can be shared across many change events from a given source.
 type postgresChangeSharedInfo struct {
