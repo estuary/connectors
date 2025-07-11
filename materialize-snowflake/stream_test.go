@@ -86,7 +86,7 @@ func TestStreamManager(t *testing.T) {
 		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 
-		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table))
+		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
 
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key1", "hello1", "world1"}))
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key2", "hello2", "world2"}))
@@ -116,7 +116,7 @@ func TestStreamManager(t *testing.T) {
 		// A second invocation invalidates the first.
 		ssm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
-		require.NoError(t, ssm.addBinding(ctx, cfg.Schema, table))
+		require.NoError(t, ssm.addBinding(ctx, cfg.Schema, table.Identifier, table))
 
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key4", "hello4", "world4"}))
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key5", "hello5", "world5"}))
@@ -179,7 +179,7 @@ func TestStreamManager(t *testing.T) {
 		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 
-		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table))
+		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
 
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key1", "hello1", "world1"}))
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key2", "hello2", "world2"}))
@@ -251,7 +251,7 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, err)
 
 		for _, tbl := range tables {
-			require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl))
+			require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl.Identifier, tbl))
 		}
 
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key1", "hello1", "world1"}))
@@ -368,7 +368,7 @@ func TestStreamManager(t *testing.T) {
 
 		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
-		require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl))
+		require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl.Identifier, tbl))
 
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key1", "hello1", "goodbye1", "aloha1"}))
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key2", "hello2", "goodbye2", "aloha2"}))
@@ -486,7 +486,7 @@ func TestStreamDatatypes(t *testing.T) {
 			sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 			require.NoError(t, err)
 
-			require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl))
+			require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl.Identifier, tbl))
 
 			for i, val := range tt.vals {
 				require.NoError(t, sm.encodeRow(ctx, 0, []any{i, val}))

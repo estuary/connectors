@@ -92,8 +92,8 @@ func newStreamManager(cfg *config, materialization string, tenant string, accoun
 	}, nil
 }
 
-func (sm *streamManager) addBinding(ctx context.Context, schema string, table sql.Table) error {
-	channel, err := sm.c.openChannel(ctx, schema, table.Identifier, sm.channelName)
+func (sm *streamManager) addBinding(ctx context.Context, schema string, table string, target sql.Table) error {
+	channel, err := sm.c.openChannel(ctx, schema, table, sm.channelName)
 	if err != nil {
 		return fmt.Errorf("openChannel: %w", err)
 	}
@@ -105,8 +105,8 @@ func (sm *streamManager) addBinding(ctx context.Context, schema string, table sq
 		}
 	}
 
-	sm.tableStreams[table.Binding] = &tableStream{
-		mappedColumns: table.Columns(),
+	sm.tableStreams[target.Binding] = &tableStream{
+		mappedColumns: target.Columns(),
 		channel:       channel,
 	}
 
