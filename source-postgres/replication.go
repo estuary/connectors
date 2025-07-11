@@ -1216,7 +1216,7 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 		query("SELECT * FROM " + db.WatermarksTable().String() + ";")
 	}
 	query("SELECT * FROM pg_replication_slots;")
-	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
+	query("SELECT CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_flush_lsn() END;")
 	return nil
 }
 
