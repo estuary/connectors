@@ -10,6 +10,7 @@ import sys
 from typing import Any, AsyncGenerator
 
 from estuary_cdk.http import HTTPSession, HTTPError
+from estuary_cdk.incremental_csv_processor import CSVConfig, IncrementalCSVProcessor
 from .shared import build_query, VERSION
 from .models import (
     SoapTypes,
@@ -32,9 +33,12 @@ NOT_SUPPORTED_BY_BULK_API = r"is not supported by the Bulk API"
 DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED = r"Max bulk v2 query result size stored (1000000000) kb per 24 hrs has been exceeded"
 
 
-# Python's csv module has a default field size limit of 131,072 bytes, and it will raise an _csv.Error exception if a field value
-# is larger than that limit. Some users have fields larger than 131,072 bytes, so we max out the limit.
-csv.field_size_limit(sys.maxsize)
+CSV_CONFIG = CSVConfig(
+    delimiter=',',
+    quotechar='"',
+    lineterminator='\n',
+    encoding='utf-8'
+)
 
 
 class BulkJobError(RuntimeError):
@@ -116,30 +120,6 @@ class BulkJobManager:
         return response
 
 
-    async def _process_csv_lines(
-        self,
-        byte_generator: AsyncGenerator[bytes, None],
-    ) -> AsyncGenerator[dict[str, str], None]:
-        class AsyncByteReader(aiocsv.protocols.WithAsyncRead):
-            def __init__(self, byte_gen: AsyncGenerator[bytes, None]):
-                self.byte_gen = byte_gen
-                self.decoder = codecs.getincrementaldecoder("utf-8")()
-
-            async def read(self, size: int = -1) -> str:
-                try:
-                    chunk = await self.byte_gen.__anext__()
-                    return self.decoder.decode(chunk)
-                except StopAsyncIteration:
-                    # There should be no bytes left in the buffer after completely reading the CSV.
-                    if self.decoder.buffer != b"":
-                        raise BulkJobError("There were leftover bytes in the incremental decoder after reading the entire CSV.")
-                    raise
-
-        byte_reader = AsyncByteReader(byte_generator)
-        async for row in aiocsv.AsyncDictReader(byte_reader):
-            yield row
-
-
     async def _fetch_results(self, job_id: str) -> AsyncGenerator[dict[str, str], None]:
         url = f"{self.base_url}/{job_id}/results"
         request_headers = {"Accept-Encoding": "gzip"}
@@ -157,7 +137,7 @@ class BulkJobManager:
             expected = int(count)
             received = 0
 
-            async for record in self._process_csv_lines(body()):
+            async for record in IncrementalCSVProcessor(body(), CSV_CONFIG):
                 yield record
                 received += 1
 
