@@ -703,4 +703,27 @@ PERMISSION_BLOCKED_STREAMS: list[tuple[list[StandardPermissions], list[type[Stre
         [StandardPermissions.ADMINISTER, StandardPermissions.EDIT_WORKFLOW, StandardPermissions.SYSTEM_ADMIN],
         [IssueCustomFieldOptions, IssueCustomFieldContexts]
     ),
+    (
+        [StandardPermissions.ADMINISTER],
+        [
+            ApplicationRoles,
+            IssueFieldConfigurations,
+            IssueNavigatorSettings,
+            IssueSecuritySchemes,
+            IssueTypeSchemes,
+            IssueTypeScreenSchemes,
+            ProjectRoles,
+            RequestTypes,
+            ScreenSchemes,
+            ScreenTabFields,
+            ScreenTabs,
+            Screens,
+            ServiceDesks,
+            WorkflowSchemes,
+        ]
+    ),
+    (
+        [StandardPermissions.USER_PICKER],
+        [Users, Groups]
+    )
 ]
