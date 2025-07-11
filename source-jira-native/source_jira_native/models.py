@@ -87,6 +87,16 @@ ConnectorState = GenericConnectorState[ResourceState]
 APIRecord = dict[str, Any]
 
 
+class AbbreviatedProject(BaseModel):
+    model_config = {"extra": "ignore"}
+    
+    class ProjectPermissions(BaseModel):
+        canEdit: bool
+
+    id: str
+    permissions: ProjectPermissions
+
+
 class FullRefreshResource(BaseDocument, extra="allow"):
     pass
 

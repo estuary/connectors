@@ -9,6 +9,7 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import TypeAdapter
 
 from .models import (
+    AbbreviatedProject,
     APIRecord,
     BoardChildStream,
     Boards,
@@ -530,10 +531,15 @@ async def _fetch_project_avatars(
 async def _fetch_project_email(
     http: HTTPSession,
     domain: str,
-    project_id: str,
+    project: AbbreviatedProject,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{url_base(domain, ProjectEmails.api)}/project/{project_id}/email"
+    # If the user does not have permission to edit the project,
+    # attempting to fetch the project's email will fail with a 403.
+    if not project.permissions.canEdit:
+        return
+
+    url = f"{url_base(domain, ProjectEmails.api)}/project/{project.id}/email"
 
     yield FullRefreshResource.model_validate_json(
         await http.request(log, url)
@@ -543,17 +549,17 @@ async def _fetch_project_email(
 async def _fetch_project_child_resources(
     http: HTTPSession,
     domain: str,
-    project_id: str,
+    project: AbbreviatedProject,
     stream: type[ProjectChildStream],
     log: Logger
 ) -> AsyncGenerator[FullRefreshResource, None]:
     if issubclass(stream, ProjectAvatars):
-        gen = _fetch_project_avatars(http, domain, project_id, log)
+        gen = _fetch_project_avatars(http, domain, project.id, log)
     elif (issubclass(stream, ProjectComponents) or issubclass(stream, ProjectVersions)):
-        path = f"project/{project_id}/{stream.path}"
-        gen = _paginate_through_resources(http, domain, stream.api, path, stream. extra_headers, stream.extra_params, PaginatedResponse, log)
+        path = f"project/{project.id}/{stream.path}"
+        gen = _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log)
     elif issubclass(stream, ProjectEmails):
-        gen = _fetch_project_email(http, domain, project_id, log)
+        gen = _fetch_project_email(http, domain, project, log)
     else:
         raise RuntimeError(f"Unknown project child stream {stream.name}.")
 
@@ -562,7 +568,7 @@ async def _fetch_project_child_resources(
             doc = FullRefreshResource.model_validate(doc)
         if stream.add_parent_id_to_documents:
             record = doc.model_dump()
-            record["projectId"] = project_id
+            record["projectId"] = project.id
             doc = FullRefreshResource.model_validate(record)
 
         yield doc
@@ -574,21 +580,24 @@ async def snapshot_project_child_resources(
     stream: type[ProjectChildStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    # Trying to fetch child resources of an archived or deleted project fails, so we only use ids
-    # of live projects when snapshotting project child resources.
+
     extra_params = {
+        # Trying to fetch child resources of an archived or deleted project fails, so we only use ids
+        # of live projects when snapshotting project child resources.
         "status": "live",
+        # Some child resources cannot be accessed if the user does not have permission to edit the project.
+        # For those streams, we check the expanded permissions field before making an API request.
+        "expand": "permissions"
     }
 
-    project_ids: list[str] = []
-    async for record in _paginate_through_resources(http, domain, Projects.api, Projects.path, Projects.extra_headers, extra_params,Projects.response_model, log):
-        id = record.get("id", None)
-        if id:
-            assert isinstance(id, str)
-            project_ids.append(id)
+    projects: list[AbbreviatedProject] = []
+    async for record in _paginate_through_resources(http, domain, Projects.api, Projects.path, Projects.extra_headers, extra_params, Projects.response_model, log):
+        projects.append(
+            AbbreviatedProject.model_validate(record)
+        )
 
-    for id in project_ids:
-        async for doc in _fetch_project_child_resources(http, domain, id, stream, log):
+    for project in projects:
+        async for doc in _fetch_project_child_resources(http, domain, project, stream, log):
             yield doc
 
 
