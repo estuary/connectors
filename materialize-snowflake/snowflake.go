@@ -304,7 +304,7 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
 		loc := d.ep.Dialect.TableLocator(b.target.Path)
-		if err := d.streamManager.addBinding(ctx, loc.TableSchema, target); err != nil {
+		if err := d.streamManager.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
 			var apiError *streamingApiError
 			var colError *unhandledColError
 			if errors.As(err, &apiError) && apiError.Code == 55 {
