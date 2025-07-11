@@ -487,6 +487,13 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 			continue // Ignore and keep looking for something we care about.
 		case MessageTypeCopyData: // CopyData messages are all we care about during replication streaming
 			data = msg[5:]
+		case MessageTypeErrorResponse:
+			var resp pgproto3.ErrorResponse
+			if err := resp.Decode(msg[5:]); err != nil {
+				return fmt.Errorf("error decoding ErrorResponse: %w", err)
+			} else {
+				return pgconn.ErrorResponseToPgError(&resp)
+			}
 		default:
 			return fmt.Errorf("unexpected message type %q", msgType)
 		}
