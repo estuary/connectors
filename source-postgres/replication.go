@@ -1212,7 +1212,9 @@ func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
 		}
 	}
 
-	query("SELECT * FROM " + db.WatermarksTable().String() + ";")
+	if !db.config.Advanced.ReadOnlyCapture {
+		query("SELECT * FROM " + db.WatermarksTable().String() + ";")
+	}
 	query("SELECT * FROM pg_replication_slots;")
 	query("SELECT pg_current_wal_flush_lsn(), pg_current_wal_insert_lsn(), pg_current_wal_lsn();")
 	return nil
