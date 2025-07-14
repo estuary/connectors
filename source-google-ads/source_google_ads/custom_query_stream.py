@@ -8,6 +8,13 @@ from typing import Any, Dict, Mapping
 from .streams import GoogleAdsStream, IncrementalGoogleAdsStream
 from .utils import GAQL
 
+# Google Ads says these fields are DATE data types, but
+# they don't match the ISO 8601 date or datetime formats.
+# They actually look like "2025-07-05 09:33:58".
+NON_DATE_FORMATTED_FIELDS = [
+    "call_view.start_call_date_time",
+    "call_view.end_call_date_time",
+]
 
 class CustomQueryMixin:
     def __init__(self, config, **kwargs):
@@ -75,7 +82,7 @@ class CustomQueryMixin:
             else:
                 output_type = [google_datatype_mapping.get(google_data_type, "string"), "null"]
                 field_value = {"type": output_type}
-                if google_data_type == "DATE":
+                if google_data_type == "DATE" and field not in NON_DATE_FORMATTED_FIELDS:
                     field_value["format"] = "date"
 
             local_json_schema["properties"][field] = field_value
