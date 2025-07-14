@@ -89,6 +89,32 @@ async def fetch_boards_minimal(
         page += 1
 
 
+async def fetch_boards_paginated(
+    http: HTTPSession,
+    log: Logger,
+    page: int = 1,
+    limit: int = 100,
+) -> AsyncGenerator[Board, None]:
+    variables = {
+        "limit": limit,
+        "page": page,
+        "state": "all",
+    }
+    
+    log.debug(f"Fetching boards for page {page} with limit {limit}")
+    
+    boards_in_page = 0
+    try:
+        async for board in _try_fetch_boards(http, log, variables):
+            boards_in_page += 1
+            yield board
+    except GraphQLQueryError as e:
+        log.error(f"Failed to fetch boards for page {page}: {e}")
+        raise
+    
+    log.debug(f"Page {page} returned {boards_in_page} boards")
+
+
 async def fetch_boards_with_retry(
     http: HTTPSession,
     log: Logger,
