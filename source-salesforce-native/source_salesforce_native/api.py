@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
@@ -18,8 +18,7 @@ from .shared import dt_to_str, str_to_dt, now
 from .models import (
     FieldDetails,
     FieldDetailsDict,
-    FullRefreshResource,
-    SalesforceResource,
+    SalesforceRecord,
     CursorFields,
 )
 
@@ -73,30 +72,32 @@ async def snapshot_resources(
     instance_url: str,
     name: str,
     fields: FieldDetailsDict,
+    model_cls: type[SalesforceRecord],
     log: Logger,
-) -> AsyncGenerator[FullRefreshResource, None]:
+) -> AsyncGenerator[SalesforceRecord, None]:
 
     async for record in bulk_job_manager.execute(
         name,
         fields,
+        model_cls,
     ):
-        yield FullRefreshResource.model_validate(record)
+        yield record
 
 
 # _execution_wrapper centralizes the cursor management logic for incremental resources.
 async def _execution_wrapper(
-    record_generator: AsyncGenerator[dict[str, Any], None],
+    record_generator: AsyncGenerator[SalesforceRecord, None],
     cursor_field: CursorFields,
     start: datetime,
     end: datetime,
     max_window_size: timedelta,
     checkpoint_interval: int,
-) -> AsyncGenerator[dict[str, Any] | datetime, None]:
+) -> AsyncGenerator[SalesforceRecord | datetime, None]:
     last_seen_dt = start
     count = 0
 
     async for record in record_generator:
-        record_dt = str_to_dt(record[cursor_field])
+        record_dt = str_to_dt(getattr(record, cursor_field))
 
         # If we see a record updated more recently than the previous record we emitted,
         # checkpoint the previous records.
@@ -129,12 +130,13 @@ async def backfill_incremental_resources(
     instance_url: str,
     name: str,
     fields: FieldDetailsDict,
+    model_cls: type[SalesforceRecord],
     window_size: int,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
     is_connector_initiated: bool,
-) -> AsyncGenerator[SalesforceResource | PageCursor, None]:
+) -> AsyncGenerator[SalesforceRecord | PageCursor, None]:
     assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
@@ -159,10 +161,11 @@ async def backfill_incremental_resources(
     async def _execute(
         manager: BulkJobManager | RestQueryManager, 
         checkpoint_interval: int
-    ) -> AsyncGenerator[SalesforceResource | str, None]:
+    ) -> AsyncGenerator[SalesforceRecord | str, None]:
         gen = manager.execute(
             name,
             fields,
+            model_cls,
             cursor_field,
             start,
             end,
@@ -172,7 +175,7 @@ async def backfill_incremental_resources(
             if isinstance(record_or_dt, datetime):
                 yield dt_to_str(record_or_dt)
             else:
-                yield SalesforceResource.model_validate(record_or_dt)
+                yield record_or_dt
 
     try:
         gen = _execute(bulk_job_manager, BULK_CHECKPOINT_INTERVAL) if is_supported_by_bulk_api else _execute(rest_query_manager, REST_CHECKPOINT_INTERVAL)
@@ -204,10 +207,11 @@ async def fetch_incremental_resources(
     instance_url: str,
     name: str,
     fields: FieldDetailsDict,
+    model_cls: type[SalesforceRecord],
     window_size: int,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[SalesforceResource | LogCursor, None]:
+) -> AsyncGenerator[SalesforceRecord | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
     max_window_size = timedelta(days=window_size)
@@ -224,13 +228,11 @@ async def fetch_incremental_resources(
     gen = rest_query_manager.execute(
         name,
         fields,
+        model_cls,
         cursor_field,
         log_cursor,
         end,
     )
 
     async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, max_window_size, REST_CHECKPOINT_INTERVAL):
-        if isinstance(record_or_dt, datetime):
-            yield record_or_dt
-        else:
-            yield SalesforceResource.model_validate(record_or_dt)
+        yield record_or_dt

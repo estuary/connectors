@@ -1,10 +1,15 @@
-
-import abc
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, UTC
 from enum import StrEnum
-from typing import Any, TYPE_CHECKING, Iterator, Annotated
+from typing import Any, TYPE_CHECKING, Iterator, Annotated, ClassVar
 
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    Field,
+    ValidationInfo,
+    create_model,
+    model_validator,
+)
 from estuary_cdk.capture.common import (
     BaseDocument,
     BaseOAuth2Credentials,
@@ -19,6 +24,9 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.http import (
     TokenSource,
 )
+
+from .shared import dt_to_str, str_to_dt
+
 
 EARLIEST_VALID_DATE_IN_SALESFORCE = datetime(1700, 1, 1, tzinfo=UTC)
 # Salesforce was founded on 03FEB1999. As long as cursor values aren't backdated before this date (which only seems possible
@@ -290,98 +298,321 @@ class BulkJobCheckStatusResponse(BulkJobSubmitResponse):
     errorMessage: str | None = None
 
 
-# field_details_dict_to_schema builds a schema to be included in a SourcedSchema response to
-# the runtime. This ultimately tells Flow what each field's type is & causes resulting columns
-# to be included in materializations even when we haven't seen data for that field yet.
-# Since Salesforce is frequently incorrect about custom field types, custom fields are
-# always schematized as & cast to strings.
-def field_details_dict_to_schema(fields_dict: FieldDetailsDict) -> dict[str, Any]:
-    schema = {
-        "additionalProperties": False,
-        "type": "object",
-        "properties": {}
-    }
+class BulkJobError(RuntimeError):
+    """Exception raised for errors when executing a bulk query job."""
+    def __init__(self, message: str, query: str | None = None, error: str | None = None):
+        self.message = message
+        self.query = query
+        self.errors = error
 
-    for field, details in fields_dict.items():
-        field_schema: dict[str, Any] = {}
-        match details.soapType:
-            case SoapTypes.ID | SoapTypes.BASE64 | SoapTypes.STRING:
-                field_schema = {"type": "string"}
+        self.details: dict[str, Any] = {
+            "message": self.message
+        }
+
+        if self.errors:
+            self.details["errors"] = self.errors
+        if self.query:
+            self.details["query"] = self.query
+
+        super().__init__(self.details)
+
+    def __str__(self):
+        return f"BulkJobError: {self.message}"
+
+    def __repr__(self):
+        return (
+            f"BulkJobError: {self.message},"
+            f"query: {self.query},"
+            f"errors: {self.errors}"
+        )
+
+
+class SalesforceDataSource(StrEnum):
+    REST_API = "rest_api"
+    BULK_API = "bulk_api"
+
+
+class SalesforceRecord(BaseDocument, extra="allow"):
+    field_details: ClassVar[FieldDetailsDict]
+
+    # Since SalesforceRecord has extra="allow", cursor fields like SystemModstamp
+    # and other Salesforce fields are stored in __pydantic_extra__ rather than as
+    # regular model attributes. This override enables easy access to these
+    # extra fields with `getattr``.
+    def __getattr__(self, name: str) -> Any:
+        extra = getattr(self, '__pydantic_extra__', None)
+        if extra is not None and name in extra:
+            return extra[name]
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _transform_fields(cls, values: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
+        if not hasattr(cls, 'field_details'):
+            raise RuntimeError(
+                "field_details must be set on the SalesforceRecord subclass before validation."
+            )
+
+        context = info.context or {}
+        data_source: SalesforceDataSource | None = context.get('data_source', None)
+        if data_source is None:
+            raise ValueError("data_source must be provided in validation context")
+
+        transformed: dict[str, Any] = {}
+
+        # Iterate over the values to transform them based on field details
+        # and the data source/API.
+        for field_name, pre_value in values.items():
+            match data_source:
+                case SalesforceDataSource.BULK_API:
+                    transformed_value = cls._transform_bulk_value(
+                        field_name,
+                        cls.field_details[field_name],
+                        pre_value,
+                    )
+                case SalesforceDataSource.REST_API:
+                    # REST API query results have an extraneous "attributes" field with a small amount of metadata.
+                    # This metadata isn't present in the Bulk API response, so we remove it from records fetched
+                    # via the REST API.
+                    if field_name == "attributes":
+                            continue
+
+                    transformed_value = cls._transform_rest_value(
+                        cls.field_details[field_name],
+                        pre_value,
+                    )
+                case _:
+                    raise ValueError(f"Unsupported data source: {data_source}")
+
+            transformed[field_name] = transformed_value
+
+        return transformed
+
+    @classmethod
+    def _transform_bulk_value(
+        cls,
+        name: str,
+        field_details: FieldDetails,
+        value: str,
+    ) -> Any:
+        # Salesforce represents null values with empty strings in Bulk API responses.
+        if value == "":
+            return None
+
+        # Since Salesforce is often wrong about the types of custom fields, we
+        # leave them as a string to align with the sourced schemas the connector
+        # emits & the materialized columns types created based off of those
+        # sourced schemas.
+        if field_details.custom:
+            return value
+
+        # Transform standard fields to the correct type.
+        match field_details.soapType:
+            case SoapTypes.ID | SoapTypes.STRING | SoapTypes.DATE | SoapTypes.DATETIME | SoapTypes.TIME | SoapTypes.BASE64:
+                transformed_value = value
             case SoapTypes.BOOLEAN:
-                if details.custom:
-                    field_schema = {"type": "string"}
+                transformed_value = cls._bool_str_to_bool(value)
+            case SoapTypes.INTEGER | SoapTypes.LONG:
+                # Salesforce's Bulk API returns "0.0" for integer fields when their value is 0.
+                if value == "0.0":
+                    transformed_value = 0
                 else:
-                    field_schema = {"type": "boolean"}
-            case SoapTypes.DATE:
-                field_schema = {
-                    "type": "string",
-                    "format": "date"
-                }
-            case SoapTypes.DATETIME:
-                field_schema = {
-                    "type": "string",
-                    "format": "date-time",
-                }
-            case SoapTypes.TIME:
-                field_schema = {
-                    "type": "string",
-                    "format": "time",
-                }
-            case SoapTypes.INTEGER:
-                if details.custom:
-                    field_schema = {
-                        "type": "string",
-                        "format": "integer",
-                    }
-                else:
-                    field_schema = {"type": "integer"}
-            case SoapTypes.DOUBLE | SoapTypes.LONG:
-                if details.custom:
-                    field_schema = {
-                        "type": "string",
-                        "format": "number",
-                    }
-                else:
-                    field_schema = {"type": "number"}
-            case SoapTypes.ADDRESS:
-                field_schema = {
-                    "additionalProperties": False,
-                    "type": "object",
-                    "properties": {
-                        "city": {"type": "string"},
-                        "country": {"type": "string"},
-                        "geocodeAccuracy": {"type": "string"},
-                        "latitude": {"type": "number"},
-                        "longitude": {"type": "number"},
-                        "postalCode": {"type": "string"},
-                        "state": {"type": "string"},
-                        "street": {"type": "string"},
-                    }
-                }
-            case SoapTypes.LOCATION:
-                field_schema = {
-                    "additionalProperties": False,
-                    "type": "object",
-                    "properties": {
-                        "latitude": {"type": "number"},
-                        "longitude": {"type": "number"},
-                    }
-                }
+                    transformed_value = int(value)
+            case SoapTypes.DOUBLE:
+                transformed_value = float(value)
             case SoapTypes.ANY_TYPE:
-                field_schema = {
-                    "type": [
-                        "string",
-                        "number",
-                        "boolean",
-                    ],
-                }
+                transformed_value = cls._str_to_anytype(value)
             case _:
-                # Omit fields of all other types from the sourced schema.
-                # The remaining types are uncommon and haven't been observed yet in production. Once
-                # fields with these types are captured and Flow schematizes them, we can add those
-                # types to the emitted sourced schemas.
-                continue
+                raise BulkJobError(f"Unanticipated field type {field_details.soapType} for field {name}. Please reach out to Estuary support for help resolving this issue.")
 
-        schema["properties"][field] = field_schema
+        return transformed_value
 
-    return schema
+    @classmethod
+    def _transform_rest_value(
+        cls,
+        field_details: FieldDetails,
+        value: Any,
+    ) -> Any:
+        """Transform REST API specific value transformations for already-typed values."""
+        # The datetime field formats between REST and Bulk API are different, so we try
+        # to convert any cursor fields to the same format to keep values consistent between them.
+        if field_details.soapType == SoapTypes.DATETIME and isinstance(value, str):
+            try:
+                return dt_to_str(str_to_dt(value))
+            except ValueError:
+                pass
+
+        # Since Salesforce is often wrong about the types of custom fields, we
+        # cast them to strings to align with the sourced schemas the connector
+        # emits & the materialized columns types created based off of those
+        # sourced schemas.
+        if field_details.custom:
+            return cls._cast_custom_field_to_string(value)
+
+        return value
+
+    # _cast_custom_field_to_string does not use Salesforce's reported SOAP type because we've seen
+    # Salesforce be incorrect about types for custom fields. Instead, the field's value is inspected
+    # and then cast based off that inspection.
+    @classmethod
+    def _cast_custom_field_to_string(cls, value: Any | None) -> Any:
+        # If the value is already a string or None, don't cast it.
+        if value is None or isinstance(value, str):
+            return value
+
+        if isinstance(value, bool):
+            return "true" if value else "false"
+        elif isinstance(value, int) or isinstance(value, float):
+            return str(value)
+        else:
+            # All other types are left unchanged. Most of these are complex object types
+            # that can't be cast to strings, like urn:location or urn:address.
+            return value
+
+    @classmethod
+    def _bool_str_to_bool(cls, string: str) -> bool:
+        lowercase_string = string.lower()
+        if lowercase_string == "true":
+            return True
+        elif lowercase_string == "false":
+            return False
+        else:
+            raise ValueError(f"No boolean equivalent for {string}.")
+
+    @classmethod
+    def _str_to_number(cls, string: str) -> int | float:
+        try:
+            return int(string)
+        except ValueError:
+            return float(string)
+
+    @classmethod
+    def _str_to_anytype(cls, string: str) -> str | bool | int | float:
+        if string.lower() in ["true", "false"]:
+            return cls._bool_str_to_bool(string)
+
+        try:
+            return cls._str_to_number(string)
+        except ValueError:
+            return string
+
+    # sourced_schema builds a schema to be included in a SourcedSchema response to
+    # the runtime. This ultimately tells Flow what each field's type is & causes resulting columns
+    # to be included in materializations even when we haven't seen data for that field yet.
+    # Since Salesforce is frequently incorrect about custom field types, custom fields are
+    # always schematized as & cast to strings.
+    @classmethod
+    def sourced_schema(cls) -> dict[str, Any]:
+        if not hasattr(cls, 'field_details'):
+            raise RuntimeError(
+                "field_details must be set on the SalesforceRecord subclass before generating a sourced schema."
+            )
+
+        schema = {
+            "additionalProperties": False,
+            "type": "object",
+            "properties": {}
+        }
+
+        for field, details in cls.field_details.items():
+            field_schema: dict[str, Any] = {}
+            match details.soapType:
+                case SoapTypes.ID | SoapTypes.BASE64 | SoapTypes.STRING:
+                    field_schema = {"type": "string"}
+                case SoapTypes.BOOLEAN:
+                    if details.custom:
+                        field_schema = {"type": "string"}
+                    else:
+                        field_schema = {"type": "boolean"}
+                case SoapTypes.DATE:
+                    field_schema = {
+                        "type": "string",
+                        "format": "date"
+                    }
+                case SoapTypes.DATETIME:
+                    field_schema = {
+                        "type": "string",
+                        "format": "date-time",
+                    }
+                case SoapTypes.TIME:
+                    field_schema = {
+                        "type": "string",
+                        "format": "time",
+                    }
+                case SoapTypes.INTEGER:
+                    if details.custom:
+                        field_schema = {
+                            "type": "string",
+                            "format": "integer",
+                        }
+                    else:
+                        field_schema = {"type": "integer"}
+                case SoapTypes.DOUBLE | SoapTypes.LONG:
+                    if details.custom:
+                        field_schema = {
+                            "type": "string",
+                            "format": "number",
+                        }
+                    else:
+                        field_schema = {"type": "number"}
+                case SoapTypes.ADDRESS:
+                    field_schema = {
+                        "additionalProperties": False,
+                        "type": "object",
+                        "properties": {
+                            "city": {"type": "string"},
+                            "country": {"type": "string"},
+                            "geocodeAccuracy": {"type": "string"},
+                            "latitude": {"type": "number"},
+                            "longitude": {"type": "number"},
+                            "postalCode": {"type": "string"},
+                            "state": {"type": "string"},
+                            "street": {"type": "string"},
+                        }
+                    }
+                case SoapTypes.LOCATION:
+                    field_schema = {
+                        "additionalProperties": False,
+                        "type": "object",
+                        "properties": {
+                            "latitude": {"type": "number"},
+                            "longitude": {"type": "number"},
+                        }
+                    }
+                case SoapTypes.ANY_TYPE:
+                    field_schema = {
+                        "type": [
+                            "string",
+                            "number",
+                            "boolean",
+                        ],
+                    }
+                case _:
+                    # Omit fields of all other types from the sourced schema.
+                    # The remaining types are uncommon and haven't been observed yet in production. Once
+                    # fields with these types are captured and Flow schematizes them, we can add those
+                    # types to the emitted sourced schemas.
+                    continue
+
+            schema["properties"][field] = field_schema
+
+        return schema
+
+
+def create_salesforce_model(object_name: str, fields: FieldDetailsDict) -> type[SalesforceRecord]:
+    field_defs = {}
+
+    # No fields other than `Id` are included in the model by default since what fields should be included differ
+    # between normal incremental replication/backfills and formula field refreshes.
+    if "Id" in fields.keys():
+        field_defs["Id"] = (str, ...)
+
+    model = create_model(
+        object_name,
+        __base__=SalesforceRecord,
+        **field_defs,
+    )
+
+    model.field_details = fields
+
+    return model
