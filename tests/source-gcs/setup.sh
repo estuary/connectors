@@ -16,6 +16,7 @@ config_json_template='{
 export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
 
 gsutil mb "gs://${TEST_STREAM}"
+gsutil label ch -l "drataexclude:test-equipment" "gs://${TEST_STREAM}"
 
 root_dir="$(git rev-parse --show-toplevel)"
 
