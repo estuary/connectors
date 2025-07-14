@@ -140,7 +140,7 @@
         "conversion_window_days": {
           "title": "Conversion Window",
           "type": "integer",
-          "description": "A conversion window is the period of time after an ad interaction (such as an ad click or video view) during which a conversion, such as a purchase, is recorded in Google Ads. For more information, see Google's documentation at https://support.google.com/google-ads/answer/3123169?hl=en.",
+          "description": "Number of days to lookback from the present for updates. This is often used to capture late arriving conversions.",
           "minimum": 0,
           "maximum": 1095,
           "default": 14,
