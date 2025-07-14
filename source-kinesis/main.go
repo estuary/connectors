@@ -7,6 +7,7 @@ import (
 	"maps"
 	"slices"
 
+	awsHTTP "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -177,6 +178,8 @@ func (d *driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response
 }
 
 func main() {
+	awsHTTP.DefaultHTTPTransportMaxIdleConns = 100        // From 100.
+	awsHTTP.DefaultHTTPTransportMaxIdleConnsPerHost = 100 // From 10.
 	boilerplate.RunMain(new(driver))
 }
 
