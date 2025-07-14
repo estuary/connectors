@@ -1,5 +1,4 @@
 from datetime import datetime, UTC
-from typing import AsyncIterable, AsyncIterator, TypeVar
 
 VERSION = "62.0"
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%S"

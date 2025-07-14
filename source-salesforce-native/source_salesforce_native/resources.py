@@ -1,8 +1,7 @@
 import asyncio
-from datetime import datetime, timedelta, UTC
+from datetime import timedelta
 import functools
 from logging import Logger
-from typing import Any
 
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import common, Task
@@ -14,7 +13,6 @@ from .supported_standard_objects import (
     CUSTOM_OBJECT_WITH_CREATED_DATE_DETAILS,
     CUSTOM_OBJECT_WITH_LAST_MODIFIED_DATE_DETAILS,
     SUPPORTED_STANDARD_OBJECTS,
-
 )
 
 from .bulk_job_manager import BulkJobManager
@@ -35,7 +33,7 @@ from .models import (
     FullRefreshResource,
     SalesforceResource,
     update_oauth_spec,
-    field_details_dict_to_schema,
+    create_salesforce_model,
 )
 from .api import (
     snapshot_resources,
@@ -104,7 +102,9 @@ def full_refresh_resource(
         if fields is None:
             raise RuntimeError(f"Missing fields for {name}. Contact Estuary Support for help resolving this error.")
 
-        task.sourced_schema(binding_index, field_details_dict_to_schema(fields))
+        model_cls = create_salesforce_model(name, fields)
+
+        task.sourced_schema(binding_index, model_cls.sourced_schema())
         task.checkpoint(state=ConnectorState())
 
         common.open_binding(
@@ -119,6 +119,7 @@ def full_refresh_resource(
                 instance_url,
                 name,
                 fields,
+                model_cls,
             ),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
@@ -164,7 +165,9 @@ def incremental_resource(
         if fields is None:
             raise RuntimeError(f"Missing fields for {name}. Contact Estuary Support for help resolving this error.")
 
-        task.sourced_schema(binding_index, field_details_dict_to_schema(fields))
+        model_cls = create_salesforce_model(name, fields)
+
+        task.sourced_schema(binding_index, model_cls.sourced_schema())
         task.checkpoint(state=ConnectorState())
 
         common.open_binding(
@@ -181,6 +184,7 @@ def incremental_resource(
                 instance_url,
                 name,
                 fields,
+                model_cls,
                 config.advanced.window_size
             ),
             fetch_changes=functools.partial(
@@ -192,6 +196,7 @@ def incremental_resource(
                 instance_url,
                 name,
                 fields,
+                model_cls,
                 config.advanced.window_size,
             ),
         )
