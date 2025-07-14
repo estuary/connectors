@@ -3,12 +3,13 @@ from logging import Logger
 from typing import Any, AsyncGenerator, TypedDict
 
 from estuary_cdk.http import HTTPSession
-from .shared import build_query, dt_to_str, str_to_dt, VERSION
+from .shared import build_query, str_to_dt, VERSION
 from .models import (
     CursorFields,
-    SoapTypes,
     FieldDetailsDict,
     QueryResponse,
+    SalesforceDataSource,
+    SalesforceRecord,
 )
 
 
@@ -109,62 +110,16 @@ class RestQueryManager:
 
         return chunks
 
-    # _cast_custom_field_to_string does not use Salesforce's reported SOAP type because we've seen
-    # Salesforce be incorrect about types for custom fields. Instead, the field's value is inspected
-    # and then cast based off that inspection.
-    def _cast_custom_field_to_string(self, value: Any | None) -> Any:
-        # If the value is already a string or None, don't cast it.
-        if value is None or isinstance(value, str):
-            return value
-
-        if isinstance(value, bool):
-            return "true" if value else "false"
-        elif isinstance(value, int) or isinstance(value, float):
-            return str(value)
-        else:
-            # All other types are left unchanged. Most of these are complex object types
-            # that can't be cast to strings, like urn:location or urn:address.
-            return value
-
-
-    def _transform_fields(
-        self,
-        record: dict[str, Any],
-        fields: FieldDetailsDict,
-    ) -> dict[str, Any]:
-        for field, details in fields.items():
-            # The datetime field formats between REST and Bulk API are different, so we try
-            # to convert any cursor fields to the same format to keep values consistent between them.
-            if details.soapType == SoapTypes.DATETIME and isinstance(record[field], str):
-                try:
-                    record[field] = dt_to_str(str_to_dt(record[field]))
-                except ValueError:
-                    pass
-
-            # Since Salesforce is often wrong about the types of custom fields, we
-            # cast them to strings to align with the sourced schemas the connector
-            # emits & the materialized columns types created based off of those
-            # sourced schemas.
-            if details.custom:
-                record[field] = self._cast_custom_field_to_string(record[field])
-
-        # REST API query results have an extraneous "attributes" field with a small amount of metadata.
-        # This metadata isn't present in the Bulk API response, so we remove it from records fetched
-        # via the REST API.
-        if 'attributes' in record:
-            del record['attributes']
-
-        return record
-
 
     async def execute(
         self,
         object_name: str,
         fields: FieldDetailsDict,
+        model_cls: type[SalesforceRecord],
         cursor_field: CursorFields,
         start: datetime,
         end: datetime,
-    ) -> AsyncGenerator[dict[str, Any], None]:
+    ) -> AsyncGenerator[SalesforceRecord, None]:
         # All fields are chunked across separate queries to avoid Salesforce's URI length limits. Results from
         # each query are merged together before yielding the complete record.
         field_chunks = self._chunk_fields(fields, cursor_field)
@@ -221,7 +176,9 @@ class RestQueryManager:
                 # This means the connector ignores records that are updated between chunked queries since they may not reflect the
                 # current state of the record in Saleforce.
                 if str_to_dt(record[cursor_field]) <= end:
-                    yield self._transform_fields(record, fields)
+                    yield model_cls.model_validate(
+                        record, context={'data_source': SalesforceDataSource.REST_API}
+                    )
 
                 # Delete completed records to avoid keeping them in memory.
                 del records[id]

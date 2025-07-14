@@ -1,24 +1,20 @@
 import asyncio
-import aiocsv
-import aiocsv.protocols
-import codecs
-import csv
 from datetime import datetime
 from logging import Logger
-import re
-import sys
-from typing import Any, AsyncGenerator
+from typing import AsyncGenerator
 
 from estuary_cdk.http import HTTPSession, HTTPError
+from estuary_cdk.incremental_csv_processor import CSVConfig, IncrementalCSVProcessor
 from .shared import build_query, VERSION
 from .models import (
-    SoapTypes,
-    FieldDetails,
+    BulkJobError,
     FieldDetailsDict,
     CursorFields,
     BulkJobStates,
     BulkJobSubmitResponse,
     BulkJobCheckStatusResponse,
+    SalesforceDataSource,
+    SalesforceRecord,
 )
 
 INITIAL_SLEEP = 0.2
@@ -32,38 +28,12 @@ NOT_SUPPORTED_BY_BULK_API = r"is not supported by the Bulk API"
 DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED = r"Max bulk v2 query result size stored (1000000000) kb per 24 hrs has been exceeded"
 
 
-# Python's csv module has a default field size limit of 131,072 bytes, and it will raise an _csv.Error exception if a field value
-# is larger than that limit. Some users have fields larger than 131,072 bytes, so we max out the limit.
-csv.field_size_limit(sys.maxsize)
-
-
-class BulkJobError(RuntimeError):
-    """Exception raised for error when executing a bulk query job."""
-    def __init__(self, message: str, query: str | None = None, error: str | None = None):
-        self.message = message
-        self.query = query
-        self.errors = error
-
-        self.details: dict[str, Any] = {
-            "message": self.message
-        }
-
-        if self.errors:
-            self.details["errors"] = self.errors
-        if self.query:
-            self.details["query"] = self.query
-
-        super().__init__(self.details)
-
-    def __str__(self):
-        return f"BulkJobError: {self.message}"
-
-    def __repr__(self):
-        return (
-            f"BulkJobError: {self.message},"
-            f"query: {self.query},"
-            f"errors: {self.errors}"
-        )
+CSV_CONFIG = CSVConfig(
+    delimiter=',',
+    quotechar='"',
+    lineterminator='\n',
+    encoding='utf-8'
+)
 
 
 class BulkJobManager:
@@ -116,31 +86,7 @@ class BulkJobManager:
         return response
 
 
-    async def _process_csv_lines(
-        self,
-        byte_generator: AsyncGenerator[bytes, None],
-    ) -> AsyncGenerator[dict[str, str], None]:
-        class AsyncByteReader(aiocsv.protocols.WithAsyncRead):
-            def __init__(self, byte_gen: AsyncGenerator[bytes, None]):
-                self.byte_gen = byte_gen
-                self.decoder = codecs.getincrementaldecoder("utf-8")()
-
-            async def read(self, size: int = -1) -> str:
-                try:
-                    chunk = await self.byte_gen.__anext__()
-                    return self.decoder.decode(chunk)
-                except StopAsyncIteration:
-                    # There should be no bytes left in the buffer after completely reading the CSV.
-                    if self.decoder.buffer != b"":
-                        raise BulkJobError("There were leftover bytes in the incremental decoder after reading the entire CSV.")
-                    raise
-
-        byte_reader = AsyncByteReader(byte_generator)
-        async for row in aiocsv.AsyncDictReader(byte_reader):
-            yield row
-
-
-    async def _fetch_results(self, job_id: str) -> AsyncGenerator[dict[str, str], None]:
+    async def _fetch_results(self, job_id: str, model_cls: type[SalesforceRecord]) -> AsyncGenerator[SalesforceRecord, None]:
         url = f"{self.base_url}/{job_id}/results"
         request_headers = {"Accept-Encoding": "gzip"}
         params: dict[str, str | int] = {
@@ -157,7 +103,14 @@ class BulkJobManager:
             expected = int(count)
             received = 0
 
-            async for record in self._process_csv_lines(body()):
+            bulk_context = {'data_source': SalesforceDataSource.BULK_API}
+            processor = IncrementalCSVProcessor(
+                body(),
+                model_cls,
+                CSV_CONFIG,
+                validation_context=bulk_context,
+            )
+            async for record in processor:
                 yield record
                 received += 1
 
@@ -175,102 +128,15 @@ class BulkJobManager:
             params['locator'] = next_page
 
 
-    def _bool_str_to_bool(self, string: str) -> bool:
-        lowercase_string = string.lower()
-        if lowercase_string == "true":
-            return True
-        elif lowercase_string == "false":
-            return False
-        else:
-            raise ValueError(f"No boolean equivalent for {string}.")
-
-
-    def _str_to_number(self, string: str) -> int | float:
-        try:
-            return int(string)
-        except ValueError:
-            return float(string)
-
-
-    def _str_to_anytype(self, string: str) -> str | bool | int | float:
-        if string.lower() in ["true", "false"]:
-            return self._bool_str_to_bool(string)
-
-        try:
-            return self._str_to_number(string)
-        except ValueError:
-            return string
-
-
-    def _transform_value(
-        self,
-        name: str,
-        field_details: FieldDetails,
-        value: str,
-    ) -> Any:
-        # Since Salesforce is often wrong about the types of custom fields, we
-        # leave them as string to align with the sourced schemas the connector
-        # emits & the materialized columns types created based off of those
-        # sourced schemas.
-        if field_details.custom:
-            return value
-
-        # Transform standard fields to the correct type.
-        match field_details.soapType:
-            case SoapTypes.ID | SoapTypes.STRING | SoapTypes.DATE | SoapTypes.DATETIME | SoapTypes.TIME | SoapTypes.BASE64:
-                transformed_value = value
-            case SoapTypes.BOOLEAN:
-                transformed_value = self._bool_str_to_bool(value)
-            case SoapTypes.INTEGER | SoapTypes.LONG:
-                # Salesforce's Bulk API returns "0.0" for integer fields when their value is 0.
-                if value == "0.0":
-                    transformed_value = 0
-                else:
-                    transformed_value = int(value)
-            case SoapTypes.DOUBLE:
-                transformed_value = float(value)
-            case SoapTypes.ANY_TYPE:
-                transformed_value = self._str_to_anytype(value)
-            case _:
-                raise BulkJobError(f"Unanticipated field type {field_details.soapType} for field {name}. Please reach out to Estuary support for help resolving this issue.")
-
-        return transformed_value
-
-
-    # Field values are always strings since they're parsed from a CSV file. We use the field types from Salesforce's
-    # schemas to transform fields into the appropriate type before yielding a record.
-    def _transform_fields(
-        self,
-        record: dict[str, str],
-        fields: FieldDetailsDict,
-    ) -> dict[str, Any]:
-        transformed: dict[str, Any] = {}
-
-        for field in record:
-            name = field
-            pre_value = record[name]
-
-            transformed_value: Any = None
-
-            # Salesforce represents null values with empty strings in Bulk API responses.
-            if pre_value == "":
-                transformed_value = None
-            else:
-                transformed_value = self._transform_value(name, fields[name], pre_value)
-
-            transformed[name] = transformed_value
-
-        return transformed
-
-
     async def execute(
         self,
         object_name: str, 
         fields: FieldDetailsDict,
+        model_cls: type[SalesforceRecord],
         cursor_field: CursorFields | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
-    ) -> AsyncGenerator[dict[str, str], None]:
+    ) -> AsyncGenerator[SalesforceRecord, None]:
         job_id = await self._submit(object_name, list(fields.keys()), cursor_field, start, end)
 
         delay = INITIAL_SLEEP
@@ -305,8 +171,8 @@ class BulkJobManager:
         assert isinstance(job_details.numberRecordsProcessed, int)
         received = 0
 
-        async for result in self._fetch_results(job_id):
-            yield self._transform_fields(result, fields)
+        async for result in self._fetch_results(job_id, model_cls):
+            yield result
             received += 1
 
         if received != job_details.numberRecordsProcessed:
