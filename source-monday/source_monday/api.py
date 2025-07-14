@@ -10,12 +10,9 @@ from source_monday.graphql import (
     fetch_activity_logs,
     fetch_boards_by_ids,
     fetch_boards_minimal,
+    fetch_boards_paginated,
     fetch_items_by_ids,
     fetch_items,
-    fetch_boards_with_retry,
-    TEAMS,
-    USERS,
-    TAGS,
 )
 from source_monday.models import (
     FullRefreshResource,
@@ -30,14 +27,8 @@ from source_monday.utils import parse_monday_17_digit_timestamp
 # Smaller windows reduce memory usage and improve error recovery, while ensuring
 # we don't miss updates due to Monday.com's 10k activity log retention limit per board.
 MAX_WINDOW_SIZE = timedelta(hours=2)
-FULL_REFRESH_RESOURCES: list[tuple[str, str]] = [
-    ("tags", TAGS),
-    ("users", USERS),
-    ("teams", TEAMS),
-]
+DEFAULT_BOARDS_PAGE_SIZE = 100
 
-
-_boards_backfill_cache: list[str] = []
 
 
 async def fetch_boards_changes(
@@ -92,7 +83,7 @@ async def fetch_boards_changes(
             )
             continue
 
-        if "delete" in activity_log.event:
+        if "board_deleted" in activity_log.event:
             deleted_board = Board(
                 id=activity_log.resource_id,
                 updated_at=created_at,
@@ -150,50 +141,26 @@ async def fetch_boards_page(
     if not page:
         page = 1
 
-    limit = 100
+    limit = DEFAULT_BOARDS_PAGE_SIZE
     docs_emitted = 0
+    boards_fetched = 0
 
-    if not _boards_backfill_cache:
-        log.debug("Fetching initial boards for backfill cache")
+    log.debug(f"Processing page {page} with limit {limit}")
 
-        async for board in fetch_boards_minimal(http, log):
-            if board.updated_at <= cutoff:
-                _boards_backfill_cache.append(board.id)
+    async for board in fetch_boards_paginated(http, log, page, limit):
+        boards_fetched += 1
+        
+        if board.updated_at <= cutoff and board.state != "deleted":
+            docs_emitted += 1
+            yield board
 
-        log.debug(
-            f"Populated backfill cache with {len(_boards_backfill_cache)} boards for cutoff {cutoff}"
-        )
-
-    log.debug(
-        f"Processing page {page} with limit {limit} from cache of {len(_boards_backfill_cache)} boards"
-    )
-
-    boards_in_page = 0
-    async for board in fetch_boards_with_retry(
-        http,
-        log,
-        ids=_boards_backfill_cache,
-        page=page,
-        limit=limit,
-    ):
-        boards_in_page += 1
-        if board.updated_at <= cutoff:
-            if board.state != "deleted":
-                docs_emitted += 1
-                yield board
-
-    start_idx = (page - 1) * limit
-    end_idx = start_idx + limit
-    has_more_pages = end_idx < len(_boards_backfill_cache)
-
-    if has_more_pages:
+    if boards_fetched > 0:
         log.debug(
             f"Boards backfill completed for page {page}",
             {
                 "board_page": page,
                 "qualifying_boards": docs_emitted,
-                "boards_in_page": boards_in_page,
-                "total_cache_size": len(_boards_backfill_cache),
+                "boards_fetched": boards_fetched,
                 "next_page": page + 1,
             },
         )
@@ -204,9 +171,8 @@ async def fetch_boards_page(
             {
                 "board_page": page,
                 "qualifying_boards": docs_emitted,
-                "boards_in_page": boards_in_page,
-                "total_cache_size": len(_boards_backfill_cache),
-                "reason": "no_more_pages",
+                "boards_fetched": boards_fetched,
+                "reason": "no_more_boards",
             },
         )
         return
@@ -270,7 +236,7 @@ async def fetch_items_changes(
             )
             continue
 
-        if "delete" in activity_log.event:
+        if "delete_pulse" in activity_log.event:
             deleted_item = Item(
                 id=activity_log.resource_id,
                 updated_at=created_at,
