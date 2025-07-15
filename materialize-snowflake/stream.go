@@ -43,11 +43,12 @@ type closeBdec struct {
 // which mostly entails writing rows of data for bindings and registering the
 // resulting blobs to tables.
 type streamManager struct {
-	c            *streamClient
-	tableStreams map[int]*tableStream
-	tenant       string // used for the `ingestclientname` metadata
-	keyBegin     uint32
-	channelName  string
+	c                       *streamClient
+	tableStreams            map[int]*tableStream
+	tenant                  string // used for the `ingestclientname` metadata
+	keyBegin                uint32
+	channelName             string
+	enforceVariantMaxLength bool
 
 	// Returned from the "configure" API.
 	prefix       string
@@ -74,21 +75,22 @@ type streamManager struct {
 	blobStats   map[int][]*blobStatsTracker
 }
 
-func newStreamManager(cfg *config, materialization string, tenant string, account string, keyBegin uint32) (*streamManager, error) {
+func newStreamManager(cfg *config, materialization string, tenant string, account string, keyBegin uint32, enforceVariantMaxLength bool) (*streamManager, error) {
 	c, err := newStreamClient(cfg, account)
 	if err != nil {
 		return nil, fmt.Errorf("newStreamClient: %w", err)
 	}
 
 	return &streamManager{
-		c:            c,
-		tableStreams: make(map[int]*tableStream),
-		tenant:       tenant,
-		keyBegin:     keyBegin,
-		channelName:  channelName(materialization, keyBegin),
-		lastBinding:  -1,
-		blobStats:    make(map[int][]*blobStatsTracker),
-		counter:      0,
+		c:                       c,
+		tableStreams:            make(map[int]*tableStream),
+		tenant:                  tenant,
+		keyBegin:                keyBegin,
+		channelName:             channelName(materialization, keyBegin),
+		lastBinding:             -1,
+		blobStats:               make(map[int][]*blobStatsTracker),
+		counter:                 0,
+		enforceVariantMaxLength: enforceVariantMaxLength,
 	}, nil
 }
 
@@ -172,7 +174,7 @@ func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
 	w := sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(fName)), sm.objMetadata())
 
 	ts := sm.tableStreams[binding]
-	bdecWriter, err := newBdecWriter(w, ts.mappedColumns, ts.channel.TableColumns, ts.channel.EncryptionKey, fName)
+	bdecWriter, err := newBdecWriter(w, ts.mappedColumns, ts.channel.TableColumns, ts.channel.EncryptionKey, fName, sm.enforceVariantMaxLength)
 	if err != nil {
 		return fmt.Errorf("newBdecWriter: %w", err)
 	}

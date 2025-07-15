@@ -42,7 +42,7 @@ func TestBdecWriter(t *testing.T) {
 	key, err := deriveKey(encryptionKey, fileName)
 	require.NoError(t, err)
 
-	w, err := newBdecWriter(tmpFile, mappedColumns, existingColumns, encryptionKey, fileName)
+	w, err := newBdecWriter(tmpFile, mappedColumns, existingColumns, encryptionKey, fileName, false)
 	require.NoError(t, err)
 
 	require.NoError(t, w.encodeRow([]any{"hello1", "world1"}))
