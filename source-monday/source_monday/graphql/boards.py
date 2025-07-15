@@ -49,20 +49,21 @@ async def fetch_boards_by_ids(
 async def fetch_boards_minimal(
     http: HTTPSession,
     log: Logger,
+    limit: int = 500,
 ) -> AsyncGenerator[Board, None]:
     query = """
-    query ($limit: Int = 10000, $page: Int = 1, $state: State = all) {
+    query ($limit: Int = 500, $page: Int = 1, $state: State = all) {
         boards(limit: $limit, page: $page, state: $state, order_by: created_at) {
             id
             name
             state
             updated_at
+            items_count
         }
     }
     """
 
     page = 1
-    limit = 10000
 
     while True:
         variables = {
@@ -83,7 +84,7 @@ async def fetch_boards_minimal(
             yield board
             boards_in_page += 1
 
-        if boards_in_page < limit:
+        if boards_in_page == 0:
             break
 
         page += 1
@@ -100,9 +101,9 @@ async def fetch_boards_paginated(
         "page": page,
         "state": "all",
     }
-    
+
     log.debug(f"Fetching boards for page {page} with limit {limit}")
-    
+
     boards_in_page = 0
     try:
         async for board in _try_fetch_boards(http, log, variables):
@@ -111,7 +112,7 @@ async def fetch_boards_paginated(
     except GraphQLQueryError as e:
         log.error(f"Failed to fetch boards for page {page}: {e}")
         raise
-    
+
     log.debug(f"Page {page} returned {boards_in_page} boards")
 
 
@@ -157,9 +158,12 @@ async def fetch_boards_with_retry(
                         {
                             "board_id": current_chunk[0],
                             "error_details": str(e),
-                            "attempted_queries": ["with_workspace_kind", "without_workspace_kind"],
+                            "attempted_queries": [
+                                "with_workspace_kind",
+                                "without_workspace_kind",
+                            ],
                             "suggestion": "Board may be corrupted or have API access restrictions",
-                        }
+                        },
                     )
                     raise
 
@@ -173,8 +177,10 @@ async def fetch_boards_with_retry(
                         "original_chunk_size": len(current_chunk),
                         "left_chunk_size": len(left_chunk),
                         "right_chunk_size": len(right_chunk),
-                        "error_summary": str(e)[:100] + "..." if len(str(e)) > 100 else str(e),
-                    }
+                        "error_summary": str(e)[:100] + "..."
+                        if len(str(e)) > 100
+                        else str(e),
+                    },
                 )
 
                 chunks_to_process.extend([left_chunk, right_chunk])
