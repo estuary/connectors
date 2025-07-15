@@ -572,7 +572,8 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		return nil, nil, nil, err
 	}
 
-	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, parseFlags(epCfg))
+	featureFlags := parseFlags(epCfg)
+	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -615,7 +616,10 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		}
 	}
 
-	return transactor, &pm.Response_Opened{RuntimeCheckpoint: cp}, &mCfg.MaterializeOptions, nil
+	return transactor, &pm.Response_Opened{
+		RuntimeCheckpoint:       cp,
+		DisableLoadOptimization: featureFlags["allow_existing_tables_for_new_bindings"],
+	}, &mCfg.MaterializeOptions, nil
 }
 
 func initInfoSchema(cfg MaterializeCfg) *InfoSchema {

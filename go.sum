@@ -392,6 +392,8 @@ github.com/envoyproxy/protoc-gen-validate v1.2.1 h1:DEo3O99U8j4hBFwbJfrz9VtgcDfU
 github.com/envoyproxy/protoc-gen-validate v1.2.1/go.mod h1:d/C80l/jxXLdfEIhX1W2TmLfsJ31lvEjwamM4DxlWXU=
 github.com/estuary/flow v0.5.16-0.20250611214225-05aeefebe274 h1:yf4HVRqyegp1Fm/Xkuzz0ZEFxvdJ9pUc67MGHsxwYVM=
 github.com/estuary/flow v0.5.16-0.20250611214225-05aeefebe274/go.mod h1:JScLFw4Y8hTvxTsmKgfi7mKvmfcsb38YbU4ZDtRM8DY=
+github.com/estuary/flow v0.5.17-0.20250714163218-442c6b344220 h1:+djxvmIVIn6cdkBiNWaMQPtmNyJzS2A3AXPVrkVBeK8=
+github.com/estuary/flow v0.5.17-0.20250714163218-442c6b344220/go.mod h1:l14nHXt+HntQzedptk9/9ZOpO3VHcQgELELSmI6LE8c=
 github.com/estuary/vitess v0.15.10 h1:oXJgcG0HGZWuwjdvSp4pIFIAXtKLaR9Fl9VBynSszFA=
 github.com/estuary/vitess v0.15.10/go.mod h1:rSIE8UMfexjblBloleGw6BqQIKggGmU91TduCNIaJEA=
 github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0/FOJfg=
@@ -1036,6 +1038,8 @@ go.etcd.io/etcd/client/v3 v3.5.17 h1:o48sINNeWz5+pjy/Z0+HKpj/xSnBkuVhVvXkjEXbqZY
 go.etcd.io/etcd/client/v3 v3.5.17/go.mod h1:j2d4eXTHWkT2ClBgnnEPm/Wuu7jsqku41v9DZ3OtjQo=
 go.gazette.dev/core v0.100.1-0.20250509034818-0bfec5851754 h1:Lza9QSUrQtnaTldL0WEjkdT2uZfUgK3H8cCIS/eRfTM=
 go.gazette.dev/core v0.100.1-0.20250509034818-0bfec5851754/go.mod h1:WK/NPg8XSABEwrtlxcFx2t/jZYETIKjW0hywktRA5Z0=
+go.gazette.dev/core v0.100.1-0.20250710152319-eef8fff243b1 h1:QGGdd1BvpQX2W2cD7TGXgTfa/YMkOkNgepwXGNSYabs=
+go.gazette.dev/core v0.100.1-0.20250710152319-eef8fff243b1/go.mod h1:WK/NPg8XSABEwrtlxcFx2t/jZYETIKjW0hywktRA5Z0=
 go.mongodb.org/mongo-driver v1.16.1 h1:rIVLL3q0IHM39dvE+z2ulZLp9ENZKThVfuvN/IiN4l8=
 go.mongodb.org/mongo-driver v1.16.1/go.mod h1:oB6AhJQvFQL4LEHyXi6aJzQJtBiTQHiAd83l0GdFaiw=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
