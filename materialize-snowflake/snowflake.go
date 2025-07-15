@@ -226,10 +226,30 @@ func newTransactor(
 	var sm *streamManager
 	var pipeClient *PipeClient
 	if cfg.Credentials.AuthType == snowflake_auth.JWT {
+		// TODO(whb): Behavior change bundle 2025_03 allows for very large
+		// VARIANT columns. If that is enabled we don't need to enforce the
+		// maximum size limit for them. As of July 2025 it is enabled by
+		// default, so unless it is explicitly disabled it will be on
+		// everywhere. In August 2025 it is slated to be released, at which
+		// point there will be no way for it to ever be disabled and we can
+		// remove this check entirely and just never enforce a size limit on
+		// VARIANT columns.
+		enforceVariantMaxLength := true
+		var bcb2025_03 string
+		if err := db.QueryRow("SELECT SYSTEM$BEHAVIOR_CHANGE_BUNDLE_STATUS('2025_03')").Scan(&bcb2025_03); err != nil {
+			return nil, fmt.Errorf("fetching behavior change bundle 2025_03 status: %w", err)
+		}
+		if strings.EqualFold(bcb2025_03, "ENABLED") || strings.EqualFold(bcb2025_03, "RELEASED") {
+			enforceVariantMaxLength = false
+		}
+		if !enforceVariantMaxLength {
+			log.WithField("BEHAVIOR_CHANGE_BUNDLE_STATUS('2025_03')", bcb2025_03).Info("not enforcing maximum length for VARIANT columns when using Snowpipe streaming")
+		}
+
 		var accountName string
 		if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
 			return nil, fmt.Errorf("fetching current account name: %w", err)
-		} else if sm, err = newStreamManager(&cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin); err != nil {
+		} else if sm, err = newStreamManager(&cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin, enforceVariantMaxLength); err != nil {
 			return nil, fmt.Errorf("newStreamManager: %w", err)
 		} else if pipeClient, err = NewPipeClient(&cfg, accountName, ep.Tenant); err != nil {
 			return nil, fmt.Errorf("NewPipeClient: %w", err)

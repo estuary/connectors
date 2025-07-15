@@ -58,10 +58,11 @@ const (
 )
 
 type bdecWriter struct {
-	pq        *enc.ParquetEncoder
-	blobStats *blobStatsTracker
-	cols      []tableColumn
-	done      bool
+	pq                      *enc.ParquetEncoder
+	blobStats               *blobStatsTracker
+	cols                    []tableColumn
+	done                    bool
+	enforceVariantMaxLength bool
 }
 
 // bdecWriter writes bdec files, which are basically Parquet files with values
@@ -75,6 +76,7 @@ func newBdecWriter(
 	existingColumns []tableColumn,
 	encryptionKey string,
 	fileName blobFileName,
+	enforceVariantMaxLength bool,
 ) (*bdecWriter, error) {
 	orderedCols, err := orderExistingColumns(mappedColumns, existingColumns)
 	if err != nil {
@@ -140,9 +142,10 @@ func newBdecWriter(
 	)
 
 	return &bdecWriter{
-		pq:        pq,
-		blobStats: blobStats,
-		cols:      orderedCols,
+		pq:                      pq,
+		blobStats:               blobStats,
+		cols:                    orderedCols,
+		enforceVariantMaxLength: enforceVariantMaxLength,
 	}, nil
 }
 
@@ -181,7 +184,11 @@ func (bw *bdecWriter) encodeRow(row []any) error {
 			row[i] = v
 			stats.nextStr(v)
 		case "variant":
-			v, err := getStr(row[i], MAX_SEMI_STRUCTURED_LENGTH)
+			maxLength := MAX_SEMI_STRUCTURED_LENGTH
+			if !bw.enforceVariantMaxLength {
+				maxLength = math.MaxInt
+			}
+			v, err := getStr(row[i], maxLength)
 			if err != nil {
 				return fmt.Errorf("getStr for column %q: %w", col.Name, err)
 			}

@@ -10,11 +10,11 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql-v2"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
-	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 
 	_ "github.com/snowflakedb/gosnowflake"
 )
