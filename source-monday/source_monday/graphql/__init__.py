@@ -12,10 +12,7 @@ from .constants import (
     TEAMS,
     USERS,
 )
-from .items import (
-    fetch_items,
-    fetch_items_by_ids,
-)
+from .items import fetch_items_by_id, BoardItemIterator
 from .query_executor import execute_query
 
 __all__ = [
@@ -29,7 +26,7 @@ __all__ = [
     "fetch_boards_by_ids",
     "fetch_boards_minimal",
     "fetch_boards_paginated",
-    "fetch_items_by_ids",
-    "fetch_items",
     "fetch_boards_with_retry",
+    "fetch_items_by_id",
+    "BoardItemIterator",
 ]
