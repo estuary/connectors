@@ -1066,6 +1066,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 	var outputColumnTypes = make([]any, len(cnames))            // Types of all columns, with omitted columns set to nil
 	var outputTranscoders = make([]jsonTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
 	var rowKeyTranscoders = make([]fdbTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
+	var deleteNullability = make([]bool, len(cnames))           // Whether nil values of a particular column should be included in delete events.
 	for idx, name := range cnames {
 		// Computed columns always have a value of null in the change table so we should never capture them.
 		// One wonders why they're present in the change table at all, but this is a documented fact about SQL Server CDC.
@@ -1076,8 +1077,32 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		outputColumnNames[idx] = name
 		outputColumnTypes[idx] = info.ColumnTypes[name]
 		outputTranscoders[idx] = rs.db.replicationJSONTranscoder(info.ColumnTypes[name])
+		deleteNullability[idx] = true // By default we assume that all columns are nullable in delete events, and only override this for specific columns below.
 		if slices.Contains(info.KeyColumns, name) {
 			rowKeyTranscoders[idx] = rs.db.replicationFDBTranscoder(info.ColumnTypes[name])
+		}
+
+		// Key columns should be assumed to always be present. They should also never be nil so the
+		// value shouldn't matter, but excluding key columns is the maximally safe behavior here.
+		if !slices.Contains(info.KeyColumns, name) {
+			if colInfo, ok := info.Columns[name]; ok {
+				if textType, ok := colInfo.DataType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
+					// According to MS documentation, text and ntext columns are always omitted (null) in delete events.
+					deleteNullability[idx] = false
+				} else if colInfo.DataType == "image" {
+					// According to MS documentation, image columns are always omitted (null) in delete events.
+					deleteNullability[idx] = false
+				} else if !colInfo.IsNullable {
+					// Sometimes, in direct violation of the documented behavior, we have seen null values on
+					// other columns which should definitely be non-nullable. For some reason it seems to mostly
+					// happen on a specific BIT NOT NULL column of tables with multiple, and we suspect this is
+					// a SQL Server bug (possibly related to how bit fields are packed in WAL events?)
+					//
+					// Regardless of the reasons, this is a catch-all case which should protect us from emitting
+					// null values for non-nullable source columns if it happens again.
+					deleteNullability[idx] = false
+				}
+			}
 		}
 	}
 	outputColumnNames = append(outputColumnNames, "_meta") // Add '_meta' property to the row shape
@@ -1113,10 +1138,12 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 			keyIndices[idx] = resultIndex
 		}
 	}
+
 	var replicationEventInfo = &sqlserverChangeSharedInfo{
-		StreamID:    info.StreamID,
-		Shape:       encrow.NewShape(outputColumnNames),
-		Transcoders: outputTranscoders,
+		StreamID:          info.StreamID,
+		Shape:             encrow.NewShape(outputColumnNames),
+		Transcoders:       outputTranscoders,
+		DeleteNullability: deleteNullability,
 	}
 
 	var rowKey = make([]byte, 0, 64) // The row key of the most recent row processed
@@ -1174,38 +1201,6 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 				return fmt.Errorf("error encoding column %q at index %d: %w", cnames[n], n, err)
 			}
 		}
-
-		// TODO(wgd): Figure out how to translate column nullability handling to the new setup.
-		//if operation == sqlcapture.DeleteOp {
-		//	// Sometimes SQL Server column nullability is screwy for deletions. In generaly we should get values
-		//	// for all columns on deletes, with a few exceptions. Since SQL Server CDC stores change events in a
-		//	// table, missing values are represented as nulls in the change table, and since the corresponding
-		//	// source table might have a non-nullable column type we need to ensure that we don't emit those as
-		//	// a literal null value which would fail validation.
-		//	for colName, val := range fields {
-		//		// As an added safety check we also make sure this logic doesn't apply to key columns.
-		//		if val == nil && !slices.Contains(info.KeyColumns, colName) {
-		//			if colInfo, ok := info.Columns[colName]; ok {
-		//				if textType, ok := colInfo.DataType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
-		//					// According to MS documentation, text and ntext columns are always omitted (null) in delete events.
-		//					delete(fields, colName)
-		//				} else if colInfo.DataType == "image" {
-		//					// According to MS documentation, image columns are always omitted (null) in delete events.
-		//					delete(fields, colName)
-		//				} else if !colInfo.IsNullable {
-		//					// Sometimes, in direct violation of the documented behavior, we have seen null values on
-		//					// other columns which should definitely be non-nullable. For some reason it seems to mostly
-		//					// happen on a specific BIT NOT NULL column of tables with multiple, and we suspect this is
-		//					// a SQL Server bug (possibly related to how bit fields are packed in WAL events?)
-		//					//
-		//					// Regardless of the reasons, this is a catch-all case which should protect us from emitting
-		//					// null values for non-nullable source columns if it happens again.
-		//					delete(fields, colName)
-		//				}
-		//			}
-		//		}
-		//	}
-		//}
 
 		var event = &sqlserverChangeEvent{
 			Shared: replicationEventInfo,

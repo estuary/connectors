@@ -55,9 +55,10 @@ type sqlserverChangeEvent struct {
 }
 
 type sqlserverChangeSharedInfo struct {
-	StreamID    sqlcapture.StreamID // StreamID of the table this change event came from.
-	Shape       *encrow.Shape       // Shape of the document values, used to serialize them to JSON.
-	Transcoders []jsonTranscoder    // Transcoders for column values, in DB column order.
+	StreamID          sqlcapture.StreamID // StreamID of the table this change event came from.
+	Shape             *encrow.Shape       // Shape of the document values, used to serialize them to JSON.
+	Transcoders       []jsonTranscoder    // Transcoders for column values, in DB column order.
+	DeleteNullability []bool              // Whether nil values of a particular column should be included in delete events.
 }
 
 func (sqlserverChangeEvent) IsDatabaseEvent() {}
@@ -100,6 +101,17 @@ func (e *sqlserverChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
 		var val any
 		if vidx < len(e.Values) {
 			val = e.Values[vidx]
+			if e.Meta.Operation == sqlcapture.DeleteOp && val == nil && !e.Shared.DeleteNullability[vidx] {
+				// Sometimes SQL Server column nullability is screwy for deletions. In general we should get values
+				// for all columns on deletes, but there are a few exceptions -- some documented, others which seem
+				// to be bugs. Since SQL Server CDC stores change events in a table, missing values are represented
+				// as nulls in the change table, and since the corresponding source table might have a non-nullable
+				// column type we need to ensure that we don't emit those missing values as a literal null.
+				//
+				// So if we observe a nil value in a delete event, we have to go check whether nulls are allowed in
+				// this context. If they are not, we skip the field entirely.
+				continue
+			}
 		}
 		if subsequentField {
 			buf = append(buf, ',')
