@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from logging import Logger
+from aiohttp.client_exceptions import ConnectionTimeoutError
 from estuary_cdk.incremental_json_processor import Remainder
 from pydantic import BaseModel
 from typing import AsyncGenerator, Any, TypeVar, Union, Callable
@@ -78,20 +79,34 @@ class HTTPSession(abc.ABC):
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
-        chunks: list[bytes] = []
-        _, body_generator = await self._request_stream(
-            log, url, method, params, json, form, _with_token, headers
-        )
+        max_attempts = 3
+        attempt = 1
 
-        async for chunk in body_generator():
-            chunks.append(chunk)
+        while True:
+            try:
+                chunks: list[bytes] = []
+                _, body_generator = await self._request_stream(
+                    log, url, method, params, json, form, _with_token, headers
+                )
 
-        if len(chunks) == 0:
-            return b""
-        elif len(chunks) == 1:
-            return chunks[0]
-        else:
-            return b"".join(chunks)
+                async for chunk in body_generator():
+                    chunks.append(chunk)
+
+                if len(chunks) == 0:
+                    return b""
+                elif len(chunks) == 1:
+                    return chunks[0]
+                else:
+                    return b"".join(chunks)
+            except ConnectionTimeoutError as e:
+                if attempt <= max_attempts:
+                    log.warning(
+                        f"Connection timeout error (will retry)",
+                        {"url": url, "method": method, "attempt": attempt, "error": str(e)}
+                    )
+                    attempt += 1
+                else:
+                    raise
 
     async def request_lines(
         self,
