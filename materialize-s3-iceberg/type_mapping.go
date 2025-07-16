@@ -82,7 +82,7 @@ func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (enc.Parq
 		p.Inference.String_.Format = ""
 	}
 
-	return enc.ProjectionToParquetSchemaElement(p, schemaOptions...), nil
+	return enc.ProjectionToParquetSchemaElement(p, false, schemaOptions...), nil
 }
 
 func parquetTypeToIcebergType(pqt enc.ParquetDataType) icebergType {
