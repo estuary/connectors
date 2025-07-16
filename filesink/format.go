@@ -25,8 +25,20 @@ func (c ParquetConfig) Validate() error {
 	return nil
 }
 
-func NewParquetStreamEncoder(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) StreamEncoder {
-	sch := enc.FieldsToParquetSchema(b.FieldSelection.AllFields(), b.Collection)
+func NewParquetStreamEncoder(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamEncoder, error) {
+	sch := make(enc.ParquetSchema, 0, len(b.FieldSelection.AllFields()))
+	for _, f := range b.FieldSelection.AllFields() {
+		p := b.Collection.GetProjection(f)
+
+		var fc fieldConfig
+		if raw, ok := b.FieldSelection.FieldConfigJsonMap[f]; ok {
+			if err := pf.UnmarshalStrict(raw, &fc); err != nil {
+				return nil, fmt.Errorf("unmarshaling field config for field %q: %w", f, err)
+			}
+		}
+
+		sch = append(sch, enc.ProjectionToParquetSchemaElement(*p, fc.CastToString))
+	}
 
 	var opts []enc.ParquetOption
 
@@ -41,7 +53,7 @@ func NewParquetStreamEncoder(cfg ParquetConfig, b *pf.MaterializationSpec_Bindin
 	// compression.
 	opts = append(opts, enc.WithParquetCompression(enc.Snappy))
 
-	return enc.NewParquetEncoder(w, sch, opts...)
+	return enc.NewParquetEncoder(w, sch, opts...), nil
 }
 
 type CsvConfig struct {

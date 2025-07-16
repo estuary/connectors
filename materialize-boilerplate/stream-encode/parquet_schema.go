@@ -217,18 +217,7 @@ func WithParquetUUIDAsString() ParquetSchemaOption {
 	}
 }
 
-func FieldsToParquetSchema(fields []string, collection pf.CollectionSpec, opts ...ParquetSchemaOption) ParquetSchema {
-	out := make(ParquetSchema, 0, len(fields))
-
-	for _, f := range fields {
-		p := collection.GetProjection(f)
-		out = append(out, ProjectionToParquetSchemaElement(*p, opts...))
-	}
-
-	return out
-}
-
-func ProjectionToParquetSchemaElement(p pf.Projection, opts ...ParquetSchemaOption) ParquetSchemaElement {
+func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts ...ParquetSchemaOption) ParquetSchemaElement {
 	cfg := parquetSchemaConfig{}
 	for _, o := range opts {
 		o(&cfg)
@@ -239,15 +228,16 @@ func ProjectionToParquetSchemaElement(p pf.Projection, opts ...ParquetSchemaOpti
 		Required: !slices.Contains(p.Inference.Types, "null") && (p.Inference.Exists == pf.Inference_MUST || p.Inference.DefaultJson != nil),
 	}
 
+	if castToString {
+		out.DataType = LogicalTypeString
+		return out
+	}
+
 	if numFormat, ok := boilerplate.AsFormattedNumeric(&p); ok {
 		if numFormat == boilerplate.StringFormatInteger {
 			out.DataType = PrimitiveTypeInteger
 		} else {
 			out.DataType = PrimitiveTypeNumber
-		}
-
-		if slices.Contains(p.Inference.Types, "null") {
-			out.Required = false
 		}
 
 		return out
@@ -256,7 +246,6 @@ func ProjectionToParquetSchemaElement(p pf.Projection, opts ...ParquetSchemaOpti
 	hadType := false
 	for _, t := range p.Inference.Types {
 		if t == "null" {
-			out.Required = false
 			continue
 		}
 

@@ -55,13 +55,21 @@ func (r resource) Validate() error {
 	return nil
 }
 
+type fieldConfig struct {
+	CastToString bool `json:"castToString"`
+}
+
+func (fc fieldConfig) Validate() error {
+	return nil
+}
+
 var _ boilerplate.Connector = &FileDriver{}
 
 // FileDriver contains the behaviors particular to a destination system and file format.
 type FileDriver struct {
 	NewConfig        func(raw json.RawMessage) (Config, error)
 	NewStore         func(ctx context.Context, config Config) (Store, error)
-	NewEncoder       func(config Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) StreamEncoder
+	NewEncoder       func(config Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamEncoder, error)
 	NewConstraints   func(p *pf.Projection) *pm.Response_Validated_Constraint
 	DocumentationURL func() string
 	ConfigSchema     func() ([]byte, error)
@@ -131,8 +139,6 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *
 	bindings := make([]binding, 0, len(open.Materialization.Bindings))
 
 	for _, b := range open.Materialization.Bindings {
-		b := b // for the newEncoder closure
-
 		var res resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return nil, nil, nil, err
@@ -143,7 +149,7 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *
 			backfill:   b.Backfill,
 			path:       res.Path,
 			includeDoc: b.FieldSelection.Document != "",
-			newEncoder: func(w io.WriteCloser) StreamEncoder {
+			newEncoder: func(w io.WriteCloser) (StreamEncoder, error) {
 				// Partial application of the driverCfg and b arguments to the FileDriver's NewEncoder
 				// function, for convenience.
 				return d.NewEncoder(driverCfg, b, w)
@@ -184,7 +190,7 @@ type binding struct {
 	backfill   uint32
 	path       string
 	includeDoc bool
-	newEncoder func(w io.WriteCloser) StreamEncoder
+	newEncoder func(w io.WriteCloser) (StreamEncoder, error)
 }
 
 // File keys are the full "path" to a file, usually applied as a key for an object in an object
@@ -244,7 +250,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var encoder StreamEncoder
 	var group errgroup.Group
 
-	startFile := func(b binding) {
+	startFile := func(b binding) error {
 		// Start a new file upload. This may be called multiple times in a single transaction if
 		// there is more data than can fit in a single file.
 		r, w := io.Pipe()
@@ -261,7 +267,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil
 		})
 
-		encoder = b.newEncoder(w)
+		var err error
+		encoder, err = b.newEncoder(w)
+		return err
 	}
 
 	finishFile := func() error {
@@ -290,7 +298,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		lastBinding = it.Binding
 
 		if encoder == nil {
-			startFile(b)
+			if err := startFile(b); err != nil {
+				return nil, fmt.Errorf("startFile for binding %d: %w", it.Binding, err)
+			}
 		}
 
 		row := make([]any, 0, len(it.Key)+len(it.Values)+1)

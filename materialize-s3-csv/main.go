@@ -47,8 +47,8 @@ var driver = filesink.FileDriver{
 	NewStore: func(ctx context.Context, c filesink.Config) (filesink.Store, error) {
 		return filesink.NewS3Store(ctx, c.(config).S3StoreConfig)
 	},
-	NewEncoder: func(c filesink.Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) filesink.StreamEncoder {
-		return filesink.NewCsvStreamEncoder(c.(config).CsvConfig, b, w)
+	NewEncoder: func(c filesink.Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamEncoder, error) {
+		return filesink.NewCsvStreamEncoder(c.(config).CsvConfig, b, w), nil
 	},
 	NewConstraints: func(p *pf.Projection) *materialize.Response_Validated_Constraint {
 		return filesink.StdConstraints(p)

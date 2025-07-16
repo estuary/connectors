@@ -47,7 +47,7 @@ var driver = filesink.FileDriver{
 	NewStore: func(ctx context.Context, c filesink.Config) (filesink.Store, error) {
 		return filesink.NewGCSStore(ctx, c.(config).GCSStoreConfig)
 	},
-	NewEncoder: func(c filesink.Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) filesink.StreamEncoder {
+	NewEncoder: func(c filesink.Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamEncoder, error) {
 		return filesink.NewParquetStreamEncoder(c.(config).ParquetConfig, b, w)
 	},
 	NewConstraints: func(p *pf.Projection) *materialize.Response_Validated_Constraint {
