@@ -101,8 +101,6 @@ async def fetch_items_by_id(
     batch_generators: list[AsyncGenerator[Item, None]] = []
     for batch in itertools.batched(item_ids, limit):
         batch_list = list(batch)
-        if not batch_list:
-            continue
         batch_generators.append(
             _fetch_items(http, log, batch_list, len(batch_generators) + 1, chunk_count)
         )
@@ -144,7 +142,6 @@ class BoardItemIterator:
     ):
         self.http = http
         self.log = log
-        self._items_generator_started = False
 
     async def get_items_from_boards(
         self,

@@ -13,6 +13,7 @@ from source_monday.api import (
     fetch_items_changes,
     fetch_items_page,
     snapshot_resource,
+    snapshot_resource_paginated,
 )
 from source_monday.graphql import (
     API,
@@ -27,13 +28,14 @@ from source_monday.models import (
     IncrementalResource,
     IncrementalResourceFetchChangesFn,
     IncrementalResourceFetchPageFn,
+    FullRefreshResourceFetchChangesFn,
     ResourceState,
 )
 
-FULL_REFRESH_RESOURCES: list[tuple[str, str]] = [
-    ("teams", TEAMS),
-    ("users", USERS),
-    ("tags", TAGS),
+FULL_REFRESH_RESOURCES: list[tuple[str, str, FullRefreshResourceFetchChangesFn]] = [
+    ("teams", TEAMS, snapshot_resource),
+    ("users", USERS, snapshot_resource_paginated),
+    ("tags", TAGS, snapshot_resource),
 ]
 
 
@@ -70,6 +72,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
     def open(
         name: str,
         query: str,
+        snapshot_fn: FullRefreshResourceFetchChangesFn,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -81,7 +84,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(snapshot_resource, http, name, query),
+            fetch_snapshot=functools.partial(snapshot_fn, http, name, query),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d")),
         )
 
@@ -90,16 +93,16 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             name=name,
             key=["/_meta/row_id"],
             model=FullRefreshResource,
-            open=functools.partial(open, name, query),
+            open=functools.partial(open, name, query, snapshot_fn),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(name=name, interval=timedelta(hours=2)),
             schema_inference=True,
         )
-        for name, query in FULL_REFRESH_RESOURCES
+        for name, query, snapshot_fn in FULL_REFRESH_RESOURCES
     ]
 
 
-async def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
+def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     cutoff = datetime.now(tz=UTC).replace(microsecond=0)
 
     def open(
@@ -145,5 +148,5 @@ async def all_resources(
 
     return [
         *full_refresh_resources(log, http, config),
-        *await incremental_resources(log, http, config),
+        *incremental_resources(log, http, config),
     ]

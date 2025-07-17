@@ -49,7 +49,6 @@ async def fetch_boards_by_ids(
 async def fetch_boards_minimal(
     http: HTTPSession,
     log: Logger,
-    limit: int = 500,
 ) -> AsyncGenerator[Board, None]:
     query = """
     query ($limit: Int = 500, $page: Int = 1, $state: State = all) {
@@ -64,6 +63,7 @@ async def fetch_boards_minimal(
     """
 
     page = 1
+    limit = 500
 
     while True:
         variables = {

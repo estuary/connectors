@@ -370,7 +370,7 @@ async def fetch_items_page(
                 f"Board cursor {board_cursor} is after cutoff {cutoff} or page cutoff {page_cutoff}. "
                 "This may indicate a race condition or unexpected updated_at values in boards."
             )
-        
+
         # Note: we are subtracting since the board (page cursor) is moving backwards in time
         # to the oldest updated_at until we have no more boards to fetch items from
         next_board_cursor = (board_cursor - timedelta(milliseconds=1)).isoformat()
@@ -387,15 +387,44 @@ async def fetch_items_page(
         yield next_board_cursor
 
 
+async def snapshot_resource_paginated(
+    http: HTTPSession,
+    name: str,
+    query: str,
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    variables = {
+        "limit": 100,
+        "page": 1,
+    }
+
+    while True:
+        docs_count = 0
+
+        async for resource_data in execute_query(
+            FullRefreshResource,
+            http,
+            log,
+            f"data.{name}.item",
+            query,
+            variables,
+        ):
+            yield resource_data
+            docs_count += 1
+
+        if docs_count < variables["limit"]:
+            log.debug(f"Snapshot completed for {name} with {docs_count} documents")
+            break
+
+        variables["page"] += 1
+
+
 async def snapshot_resource(
     http: HTTPSession,
     name: str,
     query: str,
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    # The full refresh resources are small and can have inconsistent ordering,
-    # so we can fetch all and then sort them in memory before yielding.
-    docs = []
     async for resource_data in execute_query(
         FullRefreshResource,
         http,
@@ -403,16 +432,4 @@ async def snapshot_resource(
         f"data.{name}.item",
         query,
     ):
-        docs.append(resource_data)
-
-    # Users have a created_at field which is more reliable than
-    # the id since Monday does not document ID ordering
-    if name == "users":
-        sort_key = "created_at"
-    else:
-        sort_key = "id"
-
-    docs.sort(key=lambda r: getattr(r, sort_key))
-
-    for doc in docs:
-        yield doc
+        yield resource_data

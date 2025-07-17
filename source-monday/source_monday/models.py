@@ -192,3 +192,8 @@ IncrementalResourceFetchPageFn = Callable[
     [HTTPSession, Logger, PageCursor, LogCursor],
     AsyncGenerator[BaseDocument | PageCursor, None],
 ]
+
+FullRefreshResourceFetchChangesFn = Callable[
+    [HTTPSession, str, str, Logger],
+    AsyncGenerator[BaseDocument, None],
+]
