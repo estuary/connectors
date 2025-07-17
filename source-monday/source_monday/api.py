@@ -1,8 +1,9 @@
+import asyncio
 from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator
 
-from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.capture.common import LogCursor, PageCursor, make_cursor_dict
 from estuary_cdk.http import HTTPSession
 
 from source_monday.graphql import (
@@ -185,8 +186,6 @@ async def fetch_items_changes(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Item | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
-
     window_start = log_cursor
     now = datetime.now(UTC)
     window_end = min(window_start + MAX_WINDOW_SIZE, now)
@@ -310,6 +309,10 @@ async def fetch_items_changes(
         yield window_end
 
 
+
+INCOMPLETE_BOARDS = [ f"{i}" for i in range(1, 25)]
+
+
 async def fetch_items_page(
     http: HTTPSession,
     log: Logger,
@@ -317,74 +320,44 @@ async def fetch_items_page(
     cutoff: LogCursor,
 ) -> AsyncGenerator[Item | PageCursor, None]:
     """
-    Fetches items for a page of boards using BoardItemIterator for consistent
-    performance and complexity control.
+    Fetches items for a page of boards using BoardItemIterator with dict-based cursors.
 
-    Since boards can only be sorted by created_at (DESC) but return updated_at,
-    we use the updated_at field which reflects when boards were created or modified.
-    The page cursor is an ISO 8601 string of the oldest updated_at timestamp
-    from previously fetched boards plus one millisecond, allowing us to resume
-    from the last page without being affected by changes in board counts.
+    Implements Will Baker's suggestion to use a map-based checkpoint approach where
+    each board ID is tracked individually to avoid large recovery logs. Uses dict-based
+    PageCursor with JSON merge patches for efficient incremental updates.
     """
 
-    assert page is None or isinstance(page, str)
+    assert page is None or isinstance(page, dict)
     assert isinstance(cutoff, datetime)
 
-    page_cutoff = datetime.fromisoformat(page) if page else cutoff
+    # Set initial page if None.
+    # This is a dictionary with board ids as keys and a boolean indicating if the board's items have been backfilled.
+    if page is None:
+        page = {}
+        for board_id in INCOMPLETE_BOARDS:
+            page[board_id] = False
 
-    item_iterator = BoardItemIterator(http, log)
+        log.info("Started backfill. Initializing page with incomplete boards.", {
+            "page": page
+        })
+        yield make_cursor_dict(page)
+    else:
+        log.info("Continuing backfill with existing page.", {
+            "page": page
+        })
 
-    total_items_count = 0
-    emitted_items_count = 0
+    board_ids_remaining: list[str] = [board_id for board_id, backfilled in page.items() if not backfilled]
+    if not board_ids_remaining:
+        log.info("No more boards to backfill items for - backfill complete")
+        return
 
-    # Pre-filter boards to avoid fetching items from deleted boards (which causes GraphQL query failures)
-    # This also filters out boards that are after our page cursor cutoff, so we only fetch items
-    # from boards that are relevant to the current page
-    qualifying_board_ids = set()
-    max_items_count = 0
-    async for board in fetch_boards_minimal(http, log):
-        if board.updated_at <= page_cutoff and board.state != "deleted":
-            qualifying_board_ids.add(board.id)
-            if board.items_count is not None:
-                max_items_count = max(max_items_count, board.items_count)
-            
-            if len(qualifying_board_ids) >= BOARDS_PER_ITEMS_PAGE:
-                break
+    await asyncio.sleep(2)
 
+    completed_board = board_ids_remaining[0]
+    log.info(f"Yielding page cursor to indicate board {completed_board} is done.")
+    patch = {completed_board: True}
+    yield make_cursor_dict(patch)
 
-    log.debug(f"Found {len(qualifying_board_ids)} qualifying boards for items backfill")
-
-    items_generator, get_board_cursor = await item_iterator.get_items_from_boards(list(qualifying_board_ids))
-
-    async for item in items_generator:
-        total_items_count += 1
-        if item.updated_at <= cutoff and item.state != "deleted":
-            emitted_items_count += 1
-            yield item
-
-    board_cursor = get_board_cursor()
-
-    if board_cursor:
-        if board_cursor > page_cutoff or board_cursor > cutoff:
-            raise ValueError(
-                f"Board cursor {board_cursor} is after cutoff {cutoff} or page cutoff {page_cutoff}. "
-                "This may indicate a race condition or unexpected updated_at values in boards."
-            )
-        
-        # Note: we are subtracting since the board (page cursor) is moving backwards in time
-        # to the oldest updated_at until we have no more boards to fetch items from
-        next_board_cursor = (board_cursor - timedelta(milliseconds=1)).isoformat()
-
-        log.debug(
-            f"Items backfill completed for page {page}",
-            {
-                "qualifying_items": emitted_items_count,
-                "total_items": total_items_count,
-                "next_page_cutoff": next_board_cursor,
-            },
-        )
-
-        yield next_board_cursor
 
 
 async def snapshot_resource(

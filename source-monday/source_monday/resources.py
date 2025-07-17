@@ -117,7 +117,7 @@ async def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointCo
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes_fn, http),
+            # fetch_changes=functools.partial(fetch_changes_fn, http),
             fetch_page=functools.partial(fetch_page_fn, http),
         )
 
