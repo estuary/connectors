@@ -6,8 +6,8 @@ import (
 	"text/template"
 
 	"github.com/bradleyjkemp/cupaloy"
-	sql "github.com/estuary/connectors/materialize-sql-v2"
-	sqlDriver "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
+	sqlDriver "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
 

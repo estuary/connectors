@@ -14,7 +14,7 @@ import (
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 	mssqldb "github.com/microsoft/go-mssqldb"
 )
 

@@ -20,7 +20,7 @@ import (
 	awsHttp "github.com/aws/smithy-go/transport/http"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"

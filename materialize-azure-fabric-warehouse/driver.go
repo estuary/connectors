@@ -8,7 +8,7 @@ import (
 
 	"github.com/estuary/connectors/go/dbt"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/microsoft/go-mssqldb/azuread"
 )
 

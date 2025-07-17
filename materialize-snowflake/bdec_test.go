@@ -16,7 +16,7 @@ import (
 	"strings"
 	"testing"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/marcboeker/go-duckdb/v2"

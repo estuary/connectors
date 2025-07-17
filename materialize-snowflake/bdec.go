@@ -22,7 +22,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 )
 
 const (

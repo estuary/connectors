@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 )
 
 var sqliteDialect = func() sql.Dialect {

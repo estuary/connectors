@@ -18,7 +18,7 @@ import (
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
 
 	_ "github.com/databricks/databricks-sql-go"
