@@ -269,6 +269,40 @@ func (c *capture) readStream(
 	return group.Wait()
 }
 
+func (c *capture) getShardIterator(ctx context.Context, stream kinesisStream, shardId string, startingSequence *string) (*string, error) {
+	iteratorInput := &kinesis.GetShardIteratorInput{
+		StreamARN:         &stream.arn,
+		ShardId:           &shardId,
+		ShardIteratorType: types.ShardIteratorTypeTrimHorizon,
+	}
+
+	if startingSequence != nil {
+		iteratorInput.ShardIteratorType = types.ShardIteratorTypeAfterSequenceNumber
+		iteratorInput.StartingSequenceNumber = startingSequence
+	}
+
+	for {
+		iterInit, err := c.client.GetShardIterator(ctx, iteratorInput)
+		if err != nil {
+			var invalidArugmentErr *types.InvalidArgumentException
+			if errors.As(err, &invalidArugmentErr) && iteratorInput.ShardIteratorType == types.ShardIteratorTypeAfterSequenceNumber {
+				// This error occurs if a stream is deleted and re-created, or
+				// if the retention limit of a sequence number is exceeded. In
+				// either case the only thing to do is start reading the shard
+				// from the beginning, which is actually the "future" relative
+				// to an expired sequence.
+				iteratorInput.ShardIteratorType = types.ShardIteratorTypeTrimHorizon
+				iteratorInput.StartingSequenceNumber = nil
+				log.WithError(invalidArugmentErr).Warn("starting sequence was invalid; will attempt to read shard from TRIM_HORIZON")
+				continue
+			}
+			return nil, fmt.Errorf("getting shard iterator: %w", err)
+		}
+
+		return iterInit.ShardIterator, nil
+	}
+}
+
 func (c *capture) readShard(
 	ctx context.Context,
 	tracker *shardTracker,
@@ -311,39 +345,15 @@ func (c *capture) readShard(
 	}
 
 	readLog := ll
-	iteratorInput := &kinesis.GetShardIteratorInput{
-		StreamARN:         &stream.arn,
-		ShardId:           &shard.shardId,
-		ShardIteratorType: types.ShardIteratorTypeTrimHorizon,
-	}
-	if seq := state[shard.shardId]; seq != nil {
-		iteratorInput.ShardIteratorType = types.ShardIteratorTypeAfterSequenceNumber
-		iteratorInput.StartingSequenceNumber = seq
-		readLog = readLog.WithField("startingSequenceNumber", *seq)
+	var lastSequence *string
+	if lastSequence = state[shard.shardId]; lastSequence != nil {
+		readLog = readLog.WithField("startingSequenceNumber", *lastSequence)
 	}
 	readLog.Info("started reading kinesis shard")
 
-	var iterator *string
-	for {
-		iterInit, err := c.client.GetShardIterator(ctx, iteratorInput)
-		if err != nil {
-			var invalidArugmentErr *types.InvalidArgumentException
-			if errors.As(err, &invalidArugmentErr) && iteratorInput.ShardIteratorType == types.ShardIteratorTypeAfterSequenceNumber {
-				// This error occurs if a stream is deleted and re-created, or
-				// if the retention limit of a sequence number is exceeded. In
-				// either case the only thing to do is start reading the shard
-				// from the beginning, which is actually the "future" relative
-				// to an expired sequence.
-				iteratorInput.ShardIteratorType = types.ShardIteratorTypeTrimHorizon
-				iteratorInput.StartingSequenceNumber = nil
-				log.WithError(invalidArugmentErr).Warn("starting sequence was invalid; will attempt to read shard from TRIM_HORIZON")
-				continue
-			}
-			return fmt.Errorf("getting shard iterator: %w", err)
-		}
-
-		iterator = iterInit.ShardIterator
-		break
+	iterator, err := c.getShardIterator(ctx, stream, shard.shardId, lastSequence)
+	if err != nil {
+		return err
 	}
 
 	// Respect the kinesis 5 TPS rate limit.
@@ -358,7 +368,19 @@ func (c *capture) readShard(
 			StreamARN:     &stream.arn,
 		})
 		if err != nil {
+			var expiredIteratorErr *types.ExpiredIteratorException
+			if errors.As(err, &expiredIteratorErr) {
+				ll.Info("shard iterator expired, getting new iterator")
+				if iterator, err = c.getShardIterator(ctx, stream, shard.shardId, lastSequence); err != nil {
+					return err
+				}
+				continue
+			}
 			return fmt.Errorf("get records: %w", err)
+		}
+
+		if len(res.Records) > 0 {
+			lastSequence = res.Records[len(res.Records)-1].SequenceNumber
 		}
 
 		if err := c.processRecords(res.Records, stream, stateKey, bindingIndex, shard); err != nil {
