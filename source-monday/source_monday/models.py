@@ -25,9 +25,6 @@ from estuary_cdk.flow import (
 from estuary_cdk.http import HTTPSession
 from pydantic import AwareDatetime, BaseModel, Field, field_validator
 
-if TYPE_CHECKING:
-    from source_monday.graphql.items.item_cache import ItemCacheSession
-
 
 OAUTH2_SPEC = OAuth2Spec(
     provider="monday",
@@ -169,6 +166,10 @@ class Board(IncrementalResource):
         default=None,
         json_schema_extra=lambda x: x.pop("default"),  # type: ignore
     )
+    items_count: int | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
 
 
 class Item(IncrementalResource):
@@ -182,21 +183,6 @@ class Item(IncrementalResource):
     )
 
 
-class ItemsPage(BaseModel, extra="allow"):
-    cursor: str | None = None
-    items: list[Item]
-
-
-class BoardItems(BaseDocument, extra="allow"):
-    id: str
-    state: str | None = None
-    items_page: ItemsPage
-
-
-FullRefreshResourceFetchFn = Callable[
-    [HTTPSession, Logger, str, str], AsyncGenerator[BaseDocument, None]
-]
-
 IncrementalResourceFetchChangesFn = Callable[
     [HTTPSession, Logger, LogCursor],
     AsyncGenerator[BaseDocument | LogCursor, None],
@@ -207,9 +193,7 @@ IncrementalResourceFetchPageFn = Callable[
     AsyncGenerator[BaseDocument | PageCursor, None],
 ]
 
-ItemsFetchPageFn = Callable[
-    [HTTPSession, "ItemCacheSession", Logger, PageCursor, LogCursor],
-    AsyncGenerator[BaseDocument | PageCursor, None],
+FullRefreshResourceFetchSnapshotFn = Callable[
+    [HTTPSession, str, str, Logger],
+    AsyncGenerator[BaseDocument, None],
 ]
-
-AnyFetchPageFn = IncrementalResourceFetchPageFn | ItemsFetchPageFn
