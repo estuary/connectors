@@ -23,46 +23,355 @@
         "Version": ""
       },
       "duplicate%20keys%20%40%20with%20spaces": {
-        "Table": "\"duplicate keys @ with spaces\"",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_4_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS___WITH_SPACES_69560B841F9AAA81",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 247
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "\"duplicate keys @ with spaces\"",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "7a60ee931eb4057c:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "columnId": 5,
+                      "nullCount": 0,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2237623362383930302d316464612d",
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2237386439326630302d316464612d",
+                      "maxLength": 86,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 3610000000000,
+                      "minIntValue": 3606000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "7374722035",
+                      "minStrValue": "7374722031",
+                      "maxLength": 5,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_delta": {
-        "Table": "duplicate_keys_delta",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_004B23684AF8F596",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 247
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "7a60ee931eb4057c:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "columnId": 5,
+                      "nullCount": 0,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2237623362383930302d316464612d",
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2237386439326630302d316464612d",
+                      "maxLength": 86,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 3610000000000,
+                      "minIntValue": 3606000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "7374722035",
+                      "minStrValue": "7374722031",
+                      "maxLength": 5,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "Table": "duplicate_keys_delta_exclude_flow_doc",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_EXCLUDE_FLO_355992F22E69242D",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 124
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "7a60ee931eb4057c:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 3610000000000,
+                      "minIntValue": 3606000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "7374722035",
+                      "minStrValue": "7374722031",
+                      "maxLength": 5,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
@@ -145,46 +454,355 @@
         "Version": "ffffffffffffffff"
       },
       "duplicate%20keys%20%40%20with%20spaces": {
-        "Table": "\"duplicate keys @ with spaces\"",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_4_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS___WITH_SPACES_69560B841F9AAA81",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 245
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "\"duplicate keys @ with spaces\"",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "0c1aa08d9f287c74:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "columnId": 5,
+                      "nullCount": 0,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2264626365633430302d316465322d",
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2264393663366130302d316465322d",
+                      "maxLength": 88,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 7208000000000,
+                      "minIntValue": 7204000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10,
+                      "minIntValue": 6,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "7374722039",
+                      "minStrValue": "737472203130",
+                      "maxLength": 6,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_delta": {
-        "Table": "duplicate_keys_delta",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_004B23684AF8F596",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 245
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "0c1aa08d9f287c74:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "columnId": 5,
+                      "nullCount": 0,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2264626365633430302d316465322d",
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2264393663366130302d316465322d",
+                      "maxLength": 88,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 7208000000000,
+                      "minIntValue": 7204000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10,
+                      "minIntValue": 6,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "7374722039",
+                      "minStrValue": "737472203130",
+                      "maxLength": 6,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "Table": "duplicate_keys_delta_exclude_flow_doc",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_EXCLUDE_FLO_355992F22E69242D",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 122
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "0c1aa08d9f287c74:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 7208000000000,
+                      "minIntValue": 7204000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 5,
+                      "minIntValue": 1,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10,
+                      "minIntValue": 6,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "7374722039",
+                      "minStrValue": "737472203130",
+                      "maxLength": 6,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
@@ -240,46 +858,355 @@
   {
     "updated": {
       "duplicate%20keys%20%40%20with%20spaces": {
-        "Table": "\"duplicate keys @ with spaces\"",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_4_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS___WITH_SPACES_69560B841F9AAA81",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 243
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "\"duplicate keys @ with spaces\"",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "d075ceace3972e7f:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "columnId": 5,
+                      "nullCount": 0,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2233623330643230302d316465622d",
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2233386365373830302d316465622d",
+                      "maxLength": 89,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10804000000000,
+                      "minIntValue": 10800000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10,
+                      "minIntValue": 6,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 15,
+                      "minIntValue": 11,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "737472203135",
+                      "minStrValue": "737472203131",
+                      "maxLength": 6,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_delta": {
-        "Table": "duplicate_keys_delta",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_004B23684AF8F596",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 243
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "d075ceace3972e7f:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "columnId": 5,
+                      "nullCount": 0,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2233623330643230302d316465622d",
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2233386365373830302d316465622d",
+                      "maxLength": 89,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10804000000000,
+                      "minIntValue": 10800000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10,
+                      "minIntValue": 6,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 15,
+                      "minIntValue": 11,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "737472203135",
+                      "minStrValue": "737472203131",
+                      "maxLength": 6,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "Table": "duplicate_keys_delta_exclude_flow_doc",
+        "Table": "",
         "Query": "",
-        "StagedDir": "<uuid>",
-        "StreamBlobs": null,
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_EXCLUDE_FLO_355992F22E69242D",
-        "PipeFiles": [
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 121
+            "path": "<path>",
+            "md5": "<md5>",
+            "chunks": [
+              {
+                "database": "ESTUARY_DB",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
+                "chunk_start_offset": 0,
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "row_sequencer": 0,
+                    "offset_token": "d075ceace3972e7f:0"
+                  }
+                ],
+                "chunk_md5": "<chunk_md5>",
+                "eps": {
+                  "rows": 5,
+                  "columns": {
+                    "FLOW_PUBLISHED_AT": {
+                      "columnId": 2,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10804000000000,
+                      "minIntValue": 10800000000000,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "ID": {
+                      "columnId": 1,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 10,
+                      "minIntValue": 6,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "INT": {
+                      "columnId": 3,
+                      "nullCount": 0,
+                      "maxStrValue": null,
+                      "minStrValue": null,
+                      "maxLength": 0,
+                      "maxIntValue": 15,
+                      "minIntValue": 11,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    },
+                    "STR": {
+                      "columnId": 4,
+                      "nullCount": 0,
+                      "maxStrValue": "737472203135",
+                      "minStrValue": "737472203131",
+                      "maxLength": 6,
+                      "maxIntValue": 0,
+                      "minIntValue": 0,
+                      "maxRealValue": null,
+                      "minRealValue": null,
+                      "distinctValues": -1,
+                      "collation": null,
+                      "minStrNonCollated": null,
+                      "maxStrNonCollated": null
+                    }
+                  }
+                },
+                "encryption_key_id": "<encryption_key_id>",
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>"
+              }
+            ],
+            "bdec_version": 3,
+            "blob_stats": {
+              "flush_start_ms": "<flush_start_ms>",
+              "build_duration_ms": "<build_duration_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            }
           }
         ],
-        "Version": "ffffffffffffffff"
+        "PipeName": "",
+        "PipeFiles": null,
+        "Version": ""
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
@@ -299,43 +1226,352 @@
   {
     "updated": {
       "duplicate%20keys%20%40%20with%20spaces": {
-        "PipeFiles": [
+        "PipeName": "",
+        "Query": "",
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 243
+            "bdec_version": 3,
+            "blob_stats": {
+              "build_duration_ms": "<build_duration_ms>",
+              "flush_start_ms": "<flush_start_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            },
+            "chunks": [
+              {
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "offset_token": "d075ceace3972e7f:0",
+                    "row_sequencer": 0
+                  }
+                ],
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "chunk_md5": "<chunk_md5>",
+                "chunk_start_offset": 0,
+                "database": "ESTUARY_DB",
+                "encryption_key_id": "<encryption_key_id>",
+                "eps": {
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "collation": null,
+                      "columnId": 5,
+                      "distinctValues": -1,
+                      "maxIntValue": 0,
+                      "maxLength": 89,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2233623330643230302d316465622d",
+                      "minIntValue": 0,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2233386365373830302d316465622d",
+                      "nullCount": 0
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "collation": null,
+                      "columnId": 2,
+                      "distinctValues": -1,
+                      "maxIntValue": 10804000000000,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 10800000000000,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "ID": {
+                      "collation": null,
+                      "columnId": 1,
+                      "distinctValues": -1,
+                      "maxIntValue": 10,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 6,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "INT": {
+                      "collation": null,
+                      "columnId": 3,
+                      "distinctValues": -1,
+                      "maxIntValue": 15,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 11,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "STR": {
+                      "collation": null,
+                      "columnId": 4,
+                      "distinctValues": -1,
+                      "maxIntValue": 0,
+                      "maxLength": 6,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": "737472203135",
+                      "minIntValue": 0,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": "737472203131",
+                      "nullCount": 0
+                    }
+                  },
+                  "rows": 5
+                },
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "\"duplicate keys @ with spaces\""
+              }
+            ],
+            "md5": "<md5>",
+            "path": "<path>"
           }
         ],
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_4_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS___WITH_SPACES_69560B841F9AAA81",
-        "Query": "",
-        "StagedDir": "<uuid>",
-        "Table": "\"duplicate keys @ with spaces\"",
-        "Version": "ffffffffffffffff"
+        "Table": "",
+        "Version": ""
       },
       "duplicate_keys_delta": {
-        "PipeFiles": [
+        "PipeName": "",
+        "Query": "",
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 243
+            "bdec_version": 3,
+            "blob_stats": {
+              "build_duration_ms": "<build_duration_ms>",
+              "flush_start_ms": "<flush_start_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            },
+            "chunks": [
+              {
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "offset_token": "d075ceace3972e7f:0",
+                    "row_sequencer": 0
+                  }
+                ],
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "chunk_md5": "<chunk_md5>",
+                "chunk_start_offset": 0,
+                "database": "ESTUARY_DB",
+                "encryption_key_id": "<encryption_key_id>",
+                "eps": {
+                  "columns": {
+                    "FLOW_DOCUMENT": {
+                      "collation": null,
+                      "columnId": 5,
+                      "distinctValues": -1,
+                      "maxIntValue": 0,
+                      "maxLength": 89,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": "7b225f6d657461223a7b2275756964223a2233623330643230302d316465622d",
+                      "minIntValue": 0,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": "7b225f6d657461223a7b2275756964223a2233386365373830302d316465622d",
+                      "nullCount": 0
+                    },
+                    "FLOW_PUBLISHED_AT": {
+                      "collation": null,
+                      "columnId": 2,
+                      "distinctValues": -1,
+                      "maxIntValue": 10804000000000,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 10800000000000,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "ID": {
+                      "collation": null,
+                      "columnId": 1,
+                      "distinctValues": -1,
+                      "maxIntValue": 10,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 6,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "INT": {
+                      "collation": null,
+                      "columnId": 3,
+                      "distinctValues": -1,
+                      "maxIntValue": 15,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 11,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "STR": {
+                      "collation": null,
+                      "columnId": 4,
+                      "distinctValues": -1,
+                      "maxIntValue": 0,
+                      "maxLength": 6,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": "737472203135",
+                      "minIntValue": 0,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": "737472203131",
+                      "nullCount": 0
+                    }
+                  },
+                  "rows": 5
+                },
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA"
+              }
+            ],
+            "md5": "<md5>",
+            "path": "<path>"
           }
         ],
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_2_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_004B23684AF8F596",
-        "Query": "",
-        "StagedDir": "<uuid>",
-        "Table": "duplicate_keys_delta",
-        "Version": "ffffffffffffffff"
+        "Table": "",
+        "Version": ""
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "PipeFiles": [
+        "PipeName": "",
+        "Query": "",
+        "StagedDir": "",
+        "StreamBlobs": [
           {
-            "Path": "<uuid>",
-            "Size": 121
+            "bdec_version": 3,
+            "blob_stats": {
+              "build_duration_ms": "<build_duration_ms>",
+              "flush_start_ms": "<flush_start_ms>",
+              "upload_duration_ms": "<upload_duration_ms>"
+            },
+            "chunks": [
+              {
+                "channels": [
+                  {
+                    "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
+                    "client_sequencer": 0,
+                    "offset_token": "d075ceace3972e7f:0",
+                    "row_sequencer": 0
+                  }
+                ],
+                "chunk_length": "<chunk_length>",
+                "chunk_length_uncompressed": 0,
+                "chunk_md5": "<chunk_md5>",
+                "chunk_start_offset": 0,
+                "database": "ESTUARY_DB",
+                "encryption_key_id": "<encryption_key_id>",
+                "eps": {
+                  "columns": {
+                    "FLOW_PUBLISHED_AT": {
+                      "collation": null,
+                      "columnId": 2,
+                      "distinctValues": -1,
+                      "maxIntValue": 10804000000000,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 10800000000000,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "ID": {
+                      "collation": null,
+                      "columnId": 1,
+                      "distinctValues": -1,
+                      "maxIntValue": 10,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 6,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "INT": {
+                      "collation": null,
+                      "columnId": 3,
+                      "distinctValues": -1,
+                      "maxIntValue": 15,
+                      "maxLength": 0,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": null,
+                      "minIntValue": 11,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": null,
+                      "nullCount": 0
+                    },
+                    "STR": {
+                      "collation": null,
+                      "columnId": 4,
+                      "distinctValues": -1,
+                      "maxIntValue": 0,
+                      "maxLength": 6,
+                      "maxRealValue": null,
+                      "maxStrNonCollated": null,
+                      "maxStrValue": "737472203135",
+                      "minIntValue": 0,
+                      "minRealValue": null,
+                      "minStrNonCollated": null,
+                      "minStrValue": "737472203131",
+                      "nullCount": 0
+                    }
+                  },
+                  "rows": 5
+                },
+                "first_insert_time_in_ms": "<first_insert_time_in_ms>",
+                "last_insert_time_in_ms": "<last_insert_time_in_ms>",
+                "schema": "ESTUARY_SCHEMA",
+                "table": "DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC"
+              }
+            ],
+            "md5": "<md5>",
+            "path": "<path>"
           }
         ],
-        "PipeName": "ESTUARY_DB.ESTUARY_SCHEMA.FLOW_PIPE_3_00000000_FFFFFFFFFFFFFFFF_DUPLICATE_KEYS_DELTA_EXCLUDE_FLO_355992F22E69242D",
-        "Query": "",
-        "StagedDir": "<uuid>",
-        "Table": "duplicate_keys_delta_exclude_flow_doc",
-        "Version": "ffffffffffffffff"
+        "Table": "",
+        "Version": ""
       },
       "duplicate_keys_standard": {
         "PipeName": "",
