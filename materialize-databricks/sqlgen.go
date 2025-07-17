@@ -7,7 +7,7 @@ import (
 	"strings"
 	"text/template"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 )
 
 // Databricks does not allow column names to contain these characters. Attempting to create a column

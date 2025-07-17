@@ -9,7 +9,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
 )

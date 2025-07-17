@@ -7,7 +7,7 @@ import (
 	"text/template"
 	"time"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 )
 
 // MySQL does not allow identifiers to have trailing spaces or characters with code points greater
