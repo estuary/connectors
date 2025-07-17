@@ -3,10 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	sql "github.com/estuary/connectors/materialize-sql-v2"
-	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"slices"
 	"strings"
+
+	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
 var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{}, error) {

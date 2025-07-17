@@ -9,7 +9,7 @@ import (
 	"text/template"
 	"time"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/trinodb/trino-go-client/trino"
 )

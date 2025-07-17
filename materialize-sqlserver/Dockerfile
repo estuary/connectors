@@ -17,11 +17,11 @@ COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
 COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-sqlserver   ./materialize-sqlserver
-COPY materialize-sql-v2      ./materialize-sql-v2
+COPY materialize-sql         ./materialize-sql
 COPY testsupport             ./testsupport
 
 # Test and build the connector.
-RUN go test -tags nozstd -v      ./materialize-sql-v2/...
+RUN go test -tags nozstd -v      ./materialize-sql/...
 RUN go test -tags nozstd,nodb -v ./materialize-sqlserver/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-sqlserver/...
 

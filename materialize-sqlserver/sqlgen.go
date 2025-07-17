@@ -8,7 +8,7 @@ import (
 	"text/template"
 	"time"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 )
 
 // strToInt is used for sqlserver specific conversion from an integer-formatted string or integer to

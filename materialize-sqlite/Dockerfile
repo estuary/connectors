@@ -17,7 +17,7 @@ COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
 COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-sqlite      ./materialize-sqlite
-COPY materialize-sql-v2      ./materialize-sql-v2
+COPY materialize-sql         ./materialize-sql
 
 # Test and build the connector.
 RUN go test  -tags nozstd,nodb -v ./materialize-sqlite/...

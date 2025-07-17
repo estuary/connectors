@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	sql "github.com/estuary/connectors/materialize-sql-v2"
+	sql "github.com/estuary/connectors/materialize-sql"
 )
 
 // installFence is a modified version of StdInstallFence, adopted to SQLServer's
