@@ -5,7 +5,7 @@ from logging import Logger
 from estuary_cdk.capture import Task, common
 from estuary_cdk.capture.common import ResourceConfig
 from estuary_cdk.flow import CaptureBinding, ValidationError
-from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
+from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from source_monday.api import (
     fetch_boards_changes,
@@ -13,53 +13,38 @@ from source_monday.api import (
     fetch_items_changes,
     fetch_items_page,
     snapshot_resource,
+    snapshot_resource_paginated,
 )
-from source_monday.graphql import API, API_VERSION, TAGS, TEAMS, USERS
+from source_monday.graphql import (
+    API,
+    API_VERSION,
+    TAGS,
+    TEAMS,
+    USERS,
+)
 from source_monday.models import (
     EndpointConfig,
     FullRefreshResource,
     IncrementalResource,
     IncrementalResourceFetchChangesFn,
-    AnyFetchPageFn,
+    IncrementalResourceFetchPageFn,
+    FullRefreshResourceFetchSnapshotFn,
     ResourceState,
 )
-from source_monday.graphql.items.item_cache import ItemCacheSession
 
-FULL_REFRESH_RESOURCES: list[tuple[str, str]] = [
-    ("teams", TEAMS),
-    ("users", USERS),
-    ("tags", TAGS),
+FULL_REFRESH_RESOURCES: list[tuple[str, str, FullRefreshResourceFetchSnapshotFn]] = [
+    ("teams", TEAMS, snapshot_resource),
+    ("users", USERS, snapshot_resource_paginated),
+    ("tags", TAGS, snapshot_resource),
 ]
 
 
 INCREMENTAL_RESOURCES: list[
-    tuple[str, IncrementalResourceFetchChangesFn, AnyFetchPageFn]
+    tuple[str, IncrementalResourceFetchChangesFn, IncrementalResourceFetchPageFn]
 ] = [
     ("boards", fetch_boards_changes, fetch_boards_page),
     ("items", fetch_items_changes, fetch_items_page),
 ]
-
-_item_cache_session: ItemCacheSession | None = None
-
-
-
-async def _get_or_create_item_cache_session(
-    http: HTTPSession, log: Logger, cutoff: datetime
-) -> ItemCacheSession:
-    global _item_cache_session
-
-    if _item_cache_session is None or _item_cache_session.cutoff != cutoff:
-        log.debug(f"Creating new item cache session for cutoff: {cutoff}")
-        _item_cache_session = ItemCacheSession(
-            http=http,
-            log=log,
-            cutoff=cutoff,
-            boards_batch_size=100,
-            items_batch_size=500,
-        )
-        await _item_cache_session.initialize()
-
-    return _item_cache_session
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
@@ -87,6 +72,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
     def open(
         name: str,
         query: str,
+        snapshot_fn: FullRefreshResourceFetchSnapshotFn,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -98,7 +84,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(snapshot_resource, http, name, query),
+            fetch_snapshot=functools.partial(snapshot_fn, http, name, query),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d")),
         )
 
@@ -107,42 +93,35 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
             name=name,
             key=["/_meta/row_id"],
             model=FullRefreshResource,
-            open=functools.partial(open, name, query),
+            open=functools.partial(open, name, query, snapshot_fn),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(name=name, interval=timedelta(hours=2)),
             schema_inference=True,
         )
-        for name, query in FULL_REFRESH_RESOURCES
+        for name, query, snapshot_fn in FULL_REFRESH_RESOURCES
     ]
 
 
-async def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
+def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
     cutoff = datetime.now(tz=UTC).replace(microsecond=0)
-    cache_session = await _get_or_create_item_cache_session(http, log, cutoff)
 
     def open(
         name: str,
         fetch_changes_fn: IncrementalResourceFetchChangesFn,
-        fetch_page_fn: AnyFetchPageFn,
-        cache_session: ItemCacheSession,
+        fetch_page_fn: IncrementalResourceFetchPageFn,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
-        if name == "items":
-            fetch_page_partial = functools.partial(fetch_page_fn, http, cache_session)
-        else:
-            fetch_page_partial = functools.partial(fetch_page_fn, http)
-        
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
             fetch_changes=functools.partial(fetch_changes_fn, http),
-            fetch_page=fetch_page_partial,
+            fetch_page=functools.partial(fetch_page_fn, http),
         )
 
     return [
@@ -150,7 +129,7 @@ async def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointCo
             name=name,
             key=["/id"],
             model=IncrementalResource,
-            open=functools.partial(open, name, fetch_changes_fn, fetch_page_fn, cache_session),
+            open=functools.partial(open, name, fetch_changes_fn, fetch_page_fn),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None),
@@ -169,5 +148,5 @@ async def all_resources(
 
     return [
         *full_refresh_resources(log, http, config),
-        *await incremental_resources(log, http, config),
+        *incremental_resources(log, http, config),
     ]
