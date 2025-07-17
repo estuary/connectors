@@ -14,6 +14,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
 	"golang.org/x/sync/errgroup"
+	"golang.org/x/time/rate"
 )
 
 type capture struct {
@@ -345,8 +346,13 @@ func (c *capture) readShard(
 		break
 	}
 
+	// Respect the kinesis 5 TPS rate limit.
+	limiter := rate.NewLimiter(rate.Every(time.Second), 5)
 	var didLogNoData bool
 	for {
+		if err := limiter.Wait(ctx); err != nil {
+			return fmt.Errorf("waiting for rate limiter: %w", err)
+		}
 		res, err := c.client.GetRecords(ctx, &kinesis.GetRecordsInput{
 			ShardIterator: iterator,
 			StreamARN:     &stream.arn,
@@ -375,18 +381,10 @@ func (c *capture) readShard(
 		if *res.MillisBehindLatest != 0 && len(res.Records) == 0 {
 			ll.WithField("MillisBehindLatest", *res.MillisBehindLatest).Info("shard is not caught up but returned no new data")
 			didLogNoData = true
-		}
-
-		if *res.MillisBehindLatest == 0 && len(res.Records) == 0 {
+		} else if *res.MillisBehindLatest == 0 && len(res.Records) == 0 {
 			if didLogNoData {
 				ll.Info("shard is caught up")
 				didLogNoData = false
-			}
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-time.After(1 * time.Second):
-				// Small delay to avoid hot-looping on a shard with no new data.
 			}
 		}
 	}
