@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator
 
-from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.capture.common import LogCursor, PageCursor, make_cursor_dict
 from estuary_cdk.http import HTTPSession
 
 from source_monday.graphql import (
@@ -12,7 +12,7 @@ from source_monday.graphql import (
     fetch_boards_minimal,
     fetch_boards_paginated,
     fetch_items_by_id,
-    BoardItemIterator,
+    get_items_from_boards,
 )
 from source_monday.models import (
     FullRefreshResource,
@@ -273,12 +273,12 @@ async def fetch_items_changes(
             },
         )
 
-        item_iterator = BoardItemIterator(http, log)
-
         while True:
-            items_generator, get_board_cursor = await item_iterator.get_items_from_boards(list(board_ids_to_backfill))
-
-            async for item in items_generator:
+            async for item in get_items_from_boards(
+                http,
+                log,
+                list(board_ids_to_backfill),
+            ):
                 if window_start <= item.updated_at <= window_end:
                     if item.state == "deleted":
                         item.meta_ = Item.Meta(op="d")
@@ -288,18 +288,6 @@ async def fetch_items_changes(
                     )
                     docs_emitted += 1
                     yield item
-
-            board_cursor = get_board_cursor()
-
-            if not board_cursor:
-                log.debug(
-                    f"No more items to fetch for {len(board_ids_to_backfill)} boards",
-                    {
-                        "board_ids": list(board_ids_to_backfill),
-                        "board_cursor": board_cursor,
-                    },
-                )
-                break
 
     if docs_emitted > 0:
         yield max_updated_at_in_window + timedelta(seconds=1)
@@ -317,74 +305,98 @@ async def fetch_items_page(
     cutoff: LogCursor,
 ) -> AsyncGenerator[Item | PageCursor, None]:
     """
-    Fetches items for a page of boards using BoardItemIterator for consistent
-    performance and complexity control.
+    Fetches items for a page of boards using the `BoardItemIterator` for consistent performance
+    and complexity control. The `BoardItemIterator` abstracts away Monday's short-lived cursors
+    and multiple GraphQL queries necessary to get all items from a board.
 
-    Since boards can only be sorted by created_at (DESC) but return updated_at,
-    we use the updated_at field which reflects when boards were created or modified.
-    The page cursor is an ISO 8601 string of the oldest updated_at timestamp
-    from previously fetched boards plus one millisecond, allowing us to resume
-    from the last page without being affected by changes in board counts.
+    This function's `PageCursor` is a dictionary mapping board IDs to their metadata:
+    ```json
+    {
+        "123": false,
+        "789": false,
+        "456": false
+    }
+    ```
+
+    Boards are processed in created_at (DESC) order, so the most recently created boards
+    are processed first. This function fetches and streams items for up to `BOARDS_PER_ITEMS_PAGE`
+    boards per page (`fetch_page` call), then marks those boards as completed by yielding a JSON
+    merge patch that removes them from the cursor (e.g., `{"123": null, "789": null}`).
+
+    This dict-based approach provides:
+    - Efficient recovery logs through JSON merge patches (only completed boards are checkpointed)
+    - Granular progress tracking by board presence in the dict
+    - Resilient resumption that works regardless of board order changes
+    - Scalable performance independent of total board count
+    - Does not blow up the recovery log size with unnecessarily large page cursors
+
+    Monday's GraphQL API restricts the `boards` query so that boards can only be sorted by created_at (DESC),
+    but only the `updated_at` field is returned in the response. The dict-based cursor avoids timestamp
+    ordering issues that could cause missed boards during backfill resumption.
     """
 
-    assert page is None or isinstance(page, str)
+    assert page is None or isinstance(page, dict)
     assert isinstance(cutoff, datetime)
-
-    page_cutoff = datetime.fromisoformat(page) if page else cutoff
-
-    item_iterator = BoardItemIterator(http, log)
 
     total_items_count = 0
     emitted_items_count = 0
 
-    # Pre-filter boards to avoid fetching items from deleted boards (which causes GraphQL query failures)
-    # This also filters out boards that are after our page cursor cutoff, so we only fetch items
-    # from boards that are relevant to the current page
-    qualifying_board_ids = set()
-    max_items_count = 0
-    async for board in fetch_boards_minimal(http, log):
-        if board.updated_at <= page_cutoff and board.state != "deleted":
-            qualifying_board_ids.add(board.id)
-            if board.items_count is not None:
-                max_items_count = max(max_items_count, board.items_count)
-            
-            if len(qualifying_board_ids) >= BOARDS_PER_ITEMS_PAGE:
-                break
+    if page is None:
+        page = {}
 
+        async for board in fetch_boards_minimal(http, log):
+            # Cannot query items for deleted boards, so we skip them
+            # otherwise, the API returns ambiguous internal server errors.
+            if board.updated_at <= cutoff and board.state != "deleted":
+                # We just set a placeholder value to mark the board as needing backfill
+                page[board.id] = False
 
-    log.debug(f"Found {len(qualifying_board_ids)} qualifying boards for items backfill")
+        if not page:
+            log.debug("No boards found for items backfill")
+            return
 
-    items_generator, get_board_cursor = await item_iterator.get_items_from_boards(list(qualifying_board_ids))
+        # Emit the initial page cursor so the full dictionary is checkpointed
+        yield make_cursor_dict(page)
 
-    async for item in items_generator:
+    boards_to_backfill = list(page.keys())
+    board_ids = boards_to_backfill[:BOARDS_PER_ITEMS_PAGE]
+
+    if not board_ids:
+        log.debug("No boards to process for items backfill")
+        return
+
+    log.debug(
+        f"{len(boards_to_backfill)} boards to process for items backfill. Backfilling items for {len(board_ids)} boards.",
+        {
+            "cutoff": cutoff.isoformat(),
+            "board_ids_for_page": board_ids,
+        },
+    )
+
+    async for item in get_items_from_boards(http, log, board_ids):
         total_items_count += 1
         if item.updated_at <= cutoff and item.state != "deleted":
             emitted_items_count += 1
             yield item
 
-    board_cursor = get_board_cursor()
+    completed_boards = {}
+    for board_id in board_ids:
+        completed_boards[board_id] = None
 
-    if board_cursor:
-        if board_cursor > page_cutoff or board_cursor > cutoff:
-            raise ValueError(
-                f"Board cursor {board_cursor} is after cutoff {cutoff} or page cutoff {page_cutoff}. "
-                "This may indicate a race condition or unexpected updated_at values in boards."
-            )
+    log.debug(
+        f"Items backfill completed for {len(board_ids)} boards with {emitted_items_count} items out of {total_items_count} total items.",
+        {
+            "completed_boards": list(completed_boards.keys()),
+            "remaining_boards": len(boards_to_backfill) - BOARDS_PER_ITEMS_PAGE,
+            "emitted_items_count": emitted_items_count,
+            "total_items_count": total_items_count,
+        },
+    )
 
-        # Note: we are subtracting since the board (page cursor) is moving backwards in time
-        # to the oldest updated_at until we have no more boards to fetch items from
-        next_board_cursor = (board_cursor - timedelta(milliseconds=1)).isoformat()
+    yield make_cursor_dict(completed_boards)
 
-        log.debug(
-            f"Items backfill completed for page {page}",
-            {
-                "qualifying_items": emitted_items_count,
-                "total_items": total_items_count,
-                "next_page_cutoff": next_board_cursor,
-            },
-        )
-
-        yield next_board_cursor
+    if len(boards_to_backfill) <= BOARDS_PER_ITEMS_PAGE:
+        return
 
 
 async def snapshot_resource_paginated(
