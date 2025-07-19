@@ -58,7 +58,7 @@ var (
 	rxBufferInitialSize = 1 * 1024 * 1024
 
 	// rxBufferMaximumSize is the maximum size to which the receive buffer may grow, and thus also the maximum size of a single message we can handle.
-	rxBufferMaximumSize = 256 * 1024 * 1024
+	rxBufferMaximumSize = 400 * 1024 * 1024
 )
 
 // A replicationStream represents the process of receiving PostgreSQL
