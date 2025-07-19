@@ -851,3 +851,19 @@ func TestPartitionedCTIDBackfill(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestMessageOverflow tests the handling of a message exceeding the replication buffer overflow threshold.
+func TestMessageOverflow(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	setShutdownAfterCaughtUp(t, true)
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (0, 'zero')`, tableName))
+	cs.Capture(ctx, t, nil)
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (1, 'one')`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (2, repeat('x', 431*1024*1024))`, tableName))
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES (3, 'three')`, tableName))
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
