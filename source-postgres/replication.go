@@ -561,8 +561,10 @@ func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) 
 		//    We will eventually need to handle this more gracefully by growing the buffer or something.
 		if len(s.rxbuf) >= cap(s.rxbuf) {
 			if cap(s.rxbuf) >= rxBufferMaximumSize {
-				var msgType = s.rxbuf[0] // The relevant message type is always at index 0 when buffer overflow occurs.
-				return nil, fmt.Errorf("replication buffer overflow: capacity %d filled but cannot hold message %q of length %d", cap(s.rxbuf), msgType, msgLen+1)
+				// Attempt to generate a useful human-readable description of the offending message
+				var msgSize = float32(msgLen+1) / float32(1024*1024)
+				var msgDesc = s.describeOverflowMessage(s.rxbuf)
+				return nil, fmt.Errorf("replication buffer overflow: cannot process message of %.1fMiB: %s", msgSize, msgDesc)
 			}
 			// Resize rxbuf to twice its current capacity
 			var newbuf = make([]byte, len(s.rxbuf), cap(s.rxbuf)*2)
@@ -586,6 +588,62 @@ func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) 
 		}
 	}
 	return nil, ctx.Err() // If the context was canceled, return the error.
+}
+
+// describeOverflowMessage attempts to provide a useful human-readable description of a partial message.
+//
+// The intent is that when a message is too large for the connector to process,
+// this lets us decode enough of a message to identify the offending table to
+// the user.
+func (s *replicationStream) describeOverflowMessage(msgPrefix []byte) string {
+	// Structure of a change event message:
+	//
+	//   -- PostgreSQL Message (5)
+	//   [ 0] (1) MessageType = MessageTypeCopyData
+	//   [ 1] (4) MessageLength
+	//   -- XLogData Message (25)
+	//   [ 5] (1) CDMessageType = pglogrepl.XLogDataByteID
+	//   [ 6] (8) WALStart
+	//   [14] (8) ServerWALEnd
+	//   [22] (8) ServerTime
+	//   -- Replication Event (5+N)
+	//   [30] (1) ReplMessageType = 'I' or 'U' or 'D'
+	//   [31] (4) TableOID
+	//   <payload tuples>
+	//
+	// We verify the three message-type bytes are as expected for a replication insert/update/delete,
+	// look up the relation OID to get a human-readable table name, and return a human-readable description.
+	if len(msgPrefix) < 35 {
+		// This should never happen since we only call this function when len(s.rxbuf) >= rxBufferMaximumSize
+		// but it doesn't hurt to have a never-taken branch here just to guarantee this function never fails.
+		return fmt.Sprintf("message unexpectedly short (%d bytes) for overflow condition", len(msgPrefix))
+	}
+	if msgPrefix[0] != MessageTypeCopyData {
+		return fmt.Sprintf("message type %q", msgPrefix[0])
+	}
+	if msgPrefix[5] != pglogrepl.XLogDataByteID {
+		return fmt.Sprintf("CopyData message type %q", msgPrefix[5])
+	}
+
+	// Verify the replication event type and translate it into a human-readable string at the same time.
+	var changeType string
+	switch pglogrepl.MessageType(msgPrefix[30]) {
+	case pglogrepl.MessageTypeInsert:
+		changeType = "INSERT"
+	case pglogrepl.MessageTypeUpdate:
+		changeType = "UPDATE"
+	case pglogrepl.MessageTypeDelete:
+		changeType = "DELETE"
+	default:
+		return fmt.Sprintf("replication message type %q", msgPrefix[30])
+	}
+
+	var tableOID = binary.BigEndian.Uint32(msgPrefix[31:35])
+	var streamID, ok = s.streamIDFromRelationID(tableOID)
+	if !ok {
+		return fmt.Sprintf("change type %s on unknown relation OID %d", changeType, tableOID)
+	}
+	return fmt.Sprintf("change type %s on table %q", changeType, streamID)
 }
 
 func (s *replicationStream) decodeMessage(lsn pglogrepl.LSN, data []byte) (sqlcapture.DatabaseEvent, error) {
@@ -1150,8 +1208,8 @@ func (s *replicationStream) sendStandbyStatusUpdate() error {
 
 	// Construct message bytes (1 byte type, 4 byte length, 34 byte body)
 	var msg = make([]byte, 0, 39)
-	msg = append(msg, 'd')          // Message Type (CopyData = 'd')
-	msg = pgio.AppendInt32(msg, 38) // Length (message body plus this length field)
+	msg = append(msg, MessageTypeCopyData) // Message Type
+	msg = pgio.AppendInt32(msg, 38)        // Length (message body plus this length field)
 	msg = append(msg, pglogrepl.StandbyStatusUpdateByteID)
 	msg = pgio.AppendUint64(msg, uint64(walWritePosition))
 	msg = pgio.AppendUint64(msg, uint64(walFlushPosition))
