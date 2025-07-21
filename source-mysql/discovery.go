@@ -63,7 +63,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 
 	// Enumerate every column of every table, and then aggregate into a
 	// map from StreamID to TableInfo structs.
-	columns, err := db.getColumns(ctx, db.conn)
+	columns, err := db.getColumns(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering columns: %w", err)
 	}
@@ -86,7 +86,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 
 	// Enumerate the primary key of every table and add that information
 	// into the table map.
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn)
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
 	}
@@ -101,7 +101,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 
 	// Enumerate secondary indexes and use those as a fallback where present
 	// for tables whose primary key is unset.
-	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
 	}
@@ -466,13 +466,22 @@ func normalizeMySQLDate(str string) string {
 	return bits[0] + "-" + bits[1] + "-" + bits[2]
 }
 
-const queryDiscoverTables = `
-  SELECT table_schema, table_name, table_type, engine, table_collation
-  FROM information_schema.tables
-  WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys');`
-
 func getTables(_ context.Context, conn mysqlClient, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
-	var results, err = conn.Execute(queryDiscoverTables)
+	var query = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(query, `SELECT table_schema, table_name, table_type, engine, table_collation`)
+	fmt.Fprintf(query, `  FROM information_schema.tables`)
+	if len(selectedSchemas) > 0 {
+		fmt.Fprintf(query, `  WHERE table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
+		for _, schema := range selectedSchemas {
+			args = append(args, schema)
+		}
+	} else {
+		fmt.Fprintf(query, `  WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')`)
+	}
+	fmt.Fprintf(query, ";")
+
+	var results, err = conn.Execute(query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
@@ -483,19 +492,10 @@ func getTables(_ context.Context, conn mysqlClient, selectedSchemas []string) ([
 		var tableSchema = string(row[0].AsString())
 		var tableName = string(row[1].AsString())
 		var collation = string(row[4].AsString())
-		var omitBinding = false
-		if len(selectedSchemas) > 0 && !slices.Contains(selectedSchemas, tableSchema) {
-			logrus.WithFields(logrus.Fields{
-				"schema": tableSchema,
-				"table":  tableName,
-			}).Debug("table in filtered schema")
-			omitBinding = true
-		}
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
-			Schema:      tableSchema,
-			Name:        tableName,
-			BaseTable:   strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
-			OmitBinding: omitBinding,
+			Schema:    tableSchema,
+			Name:      tableName,
+			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
 			ExtraDetails: &mysqlTableDiscoveryDetails{
 				StorageEngine:  string(row[3].AsString()),
 				DefaultCharset: charsetFromCollation(collation),
@@ -535,14 +535,22 @@ type mysqlTableDiscoveryDetails struct {
 	DefaultCharset string
 }
 
-const queryDiscoverColumns = `
-  SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name, character_maximum_length
-  FROM information_schema.columns
-  WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
-  ORDER BY table_schema, table_name, ordinal_position;`
+func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient, selectedSchemas []string) ([]sqlcapture.ColumnInfo, error) {
+	var query = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(query, `SELECT table_schema, table_name, ordinal_position, column_name, is_nullable, data_type, column_type, character_set_name, character_maximum_length`)
+	fmt.Fprintf(query, `  FROM information_schema.columns`)
+	if len(selectedSchemas) > 0 {
+		fmt.Fprintf(query, `  WHERE table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
+		for _, schema := range selectedSchemas {
+			args = append(args, schema)
+		}
+	} else {
+		fmt.Fprintf(query, `  WHERE table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')`)
+	}
+	fmt.Fprintf(query, `  ORDER BY table_schema, table_name, ordinal_position;`)
 
-func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient) ([]sqlcapture.ColumnInfo, error) {
-	var results, err = conn.Execute(queryDiscoverColumns)
+	var results, err = conn.Execute(query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying columns: %w", err)
 	}
@@ -914,20 +922,27 @@ var mysqlStringEscapeReplacements = map[string]string{
 	`\_`: "_",
 }
 
-const queryDiscoverPrimaryKeys = `
-SELECT table_schema, table_name, column_name, seq_in_index
-  FROM information_schema.statistics
-  WHERE index_name = 'primary'
-    AND table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')
-  ORDER BY table_schema, table_name, seq_in_index;
-`
-
 // getPrimaryKeys queries the database to produce a map from table names to
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(_ context.Context, conn mysqlClient) (map[sqlcapture.StreamID][]string, error) {
-	var results, err = conn.Execute(queryDiscoverPrimaryKeys)
+func getPrimaryKeys(_ context.Context, conn mysqlClient, selectedSchemas []string) (map[sqlcapture.StreamID][]string, error) {
+	var query = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(query, `SELECT table_schema, table_name, column_name, seq_in_index`)
+	fmt.Fprintf(query, `  FROM information_schema.statistics`)
+	fmt.Fprintf(query, `  WHERE index_name = 'primary'`)
+	if len(selectedSchemas) > 0 {
+		fmt.Fprintf(query, `    AND table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
+		for _, schema := range selectedSchemas {
+			args = append(args, schema)
+		}
+	} else {
+		fmt.Fprintf(query, `    AND table_schema NOT IN ('information_schema', 'performance_schema', 'mysql', 'sys')`)
+	}
+	fmt.Fprintf(query, `  ORDER BY table_schema, table_name, seq_in_index;`)
+
+	var results, err = conn.Execute(query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying primary keys: %w", err)
 	}
@@ -950,17 +965,24 @@ func getPrimaryKeys(_ context.Context, conn mysqlClient) (map[sqlcapture.StreamI
 	return keys, nil
 }
 
-const queryDiscoverSecondaryIndices = `
-SELECT stat.table_schema, stat.table_name, stat.index_name, stat.column_name, stat.seq_in_index
-  FROM information_schema.statistics stat
-  WHERE stat.non_unique = 0
-    AND stat.index_name != 'PRIMARY'
-    AND stat.table_schema NOT IN ('information_schema', 'sys', 'performance_schema', 'mysql')
-  ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index
-`
+func getSecondaryIndexes(_ context.Context, conn mysqlClient, selectedSchemas []string) (map[sqlcapture.StreamID]map[string][]string, error) {
+	var query = new(strings.Builder)
+	var args []any
+	fmt.Fprintf(query, `SELECT stat.table_schema, stat.table_name, stat.index_name, stat.column_name, stat.seq_in_index`)
+	fmt.Fprintf(query, `  FROM information_schema.statistics stat`)
+	fmt.Fprintf(query, `  WHERE stat.non_unique = 0`)
+	fmt.Fprintf(query, `    AND stat.index_name != 'PRIMARY'`)
+	if len(selectedSchemas) > 0 {
+		fmt.Fprintf(query, `    AND stat.table_schema IN (%s)`, strings.Join(slices.Repeat([]string{"?"}, len(selectedSchemas)), ", "))
+		for _, schema := range selectedSchemas {
+			args = append(args, schema)
+		}
+	} else {
+		fmt.Fprintf(query, `    AND stat.table_schema NOT IN ('information_schema', 'sys', 'performance_schema', 'mysql')`)
+	}
+	fmt.Fprintf(query, `  ORDER BY stat.table_schema, stat.table_name, stat.index_name, stat.seq_in_index`)
 
-func getSecondaryIndexes(_ context.Context, conn mysqlClient) (map[sqlcapture.StreamID]map[string][]string, error) {
-	var results, err = conn.Execute(queryDiscoverSecondaryIndices)
+	var results, err = conn.Execute(query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying secondary indexes: %w", err)
 	}
