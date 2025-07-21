@@ -12,8 +12,9 @@ import (
 type AuthType string
 
 const (
-	AWSIAM AuthType = "AWSIAM"
-	GCPIAM AuthType = "GCPIAM"
+	AWSIAM   AuthType = "AWSIAM"
+	GCPIAM   AuthType = "GCPIAM"
+	AzureIAM AuthType = "AzureIAM"
 )
 
 type AWSConfig struct {
@@ -32,6 +33,14 @@ type GCPConfig struct {
 	GCPWorkloadAudience string `json:"gcp_workload_identity_pool_audience" jsonschema:"title=Workload Identity Pool Audience,description=GCP Workload Identity Pool Audience in the format //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"`
 }
 
+type AzureConfig struct {
+	// This user is only for JSONSchema purposes. The connector must handle parsing of user and passing it for authentication
+	AzureUser string `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
+
+	AzureClientID string `json:"azure_client_id" jsonschema:"title=Azure Client ID,description=Azure App Registration Client ID for Azure Active Directory authentication"`
+	AzureTenantID string `json:"azure_tenant_id" jsonschema:"title=Azure Tenant ID,description=Azure Tenant ID for Azure Active Directory authentication"`
+}
+
 type AWSTokens struct {
 	AWSAccessKeyID     string `json:"aws_access_key_id,omitempty"`
 	AWSSecretAccessKey string `json:"aws_secret_access_key,omitempty"`
@@ -42,9 +51,14 @@ type GCPTokens struct {
 	GCPAccessToken  string `json:"gcp_access_token,omitempty"`
 }
 
+type AzureTokens struct {
+	AzureAccessToken string `json:"azure_access_token,omitempty"`
+}
+
 type IAMTokens struct {
 	AWSTokens
 	GCPTokens
+	AzureTokens
 }
 
 type IAMConfig struct {
@@ -52,6 +66,7 @@ type IAMConfig struct {
 
 	AWSConfig
 	GCPConfig
+	AzureConfig
 
 	IAMTokens
 }
@@ -72,6 +87,13 @@ func (c *IAMConfig) ValidateIAM() error {
 		if c.GCPWorkloadAudience == "" {
 			return errors.New("missing 'gcp_workload_identity_pool_audience'")
 		}
+	case AzureIAM:
+		if c.AzureClientID == "" {
+			return errors.New("missing 'azure_client_id'")
+		}
+		if c.AzureTenantID == "" {
+			return errors.New("missing 'azure_tenant_id'")
+		}
 	}
 
 	return nil
@@ -82,6 +104,8 @@ func (c IAMTokens) Provider() string {
 		return "google"
 	} else if c.AWSAccessKeyID != "" {
 		return "aws"
+	} else if c.AzureAccessToken != "" {
+		return "azure"
 	} else {
 		return ""
 	}
@@ -102,10 +126,15 @@ func (c IAMTokens) GoogleToken() string {
 	return c.GCPAccessToken
 }
 
+func (c IAMTokens) AzureToken() string {
+	return c.AzureAccessToken
+}
+
 func (IAMConfig) OneOfSubSchemas() []schemagen.OneOfSubSchemaT {
 	return []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("AWS IAM", AWSConfig{}, string(AWSIAM)),
 		schemagen.OneOfSubSchema("Google Cloud IAM", GCPConfig{}, string(GCPIAM)),
+		schemagen.OneOfSubSchema("Azure IAM", AzureConfig{}, string(AzureIAM)),
 	}
 }
 

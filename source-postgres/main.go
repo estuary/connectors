@@ -131,6 +131,7 @@ const (
 	UserPassword authType = "UserPassword"
 	GCPIAM authType = "GCPIAM"
 	AWSIAM authType = "AWSIAM"
+	AzureIAM authType = "AzureIAM"
 )
 
 type userPassword struct {
@@ -354,6 +355,8 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 			}
 		case GCPIAM:
 			pass = c.Credentials.GoogleToken()
+		case AzureIAM:
+			pass = c.Credentials.AzureToken()
 		}
 	}
 
@@ -371,7 +374,7 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 	// Set SSL mode - user configuration takes precedence, then cloud IAM defaults
 	if c.Advanced.SSLMode != "" {
 		params.Set("sslmode", c.Advanced.SSLMode)
-	} else if c.Credentials != nil && c.Credentials.AuthType == GCPIAM {
+	} else if c.Credentials != nil && (c.Credentials.AuthType == GCPIAM || c.Credentials.AuthType == AzureIAM) {
 		// Enable SSL for cloud provider IAM connections by default when not explicitly set
 		params.Set("sslmode", "require")
 	}
