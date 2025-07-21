@@ -22,6 +22,7 @@ from typing import (
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..cron import next_fire
+from ..utils import json_merge_patch
 from ..flow import (
     AccessToken,
     BaseOAuth2Credentials,
@@ -50,9 +51,64 @@ Note that `str` cannot be added to this type union, as it makes parsing states a
 the tuple type allows for str or integer values to be used
 """
 
-PageCursor = str | int | None
+# Cursor marker for dict-based cursors.
+# This marker is necessary to distinguish between regular dictionaries (documents) 
+# and cursor dictionaries when yielded by fetch functions. Without this marker,
+# the runtime cannot determine whether a dict should be treated as a document to
+# capture or as a PageCursor for checkpointing progress.
+CURSOR_MARKER = "__flow_cursor__"
+
+
+def is_cursor_dict(item: dict) -> bool:
+    """Check if a dict is a cursor by looking for the cursor marker."""
+    return item.get(CURSOR_MARKER) is True
+
+
+def make_cursor_dict(data: dict) -> dict:
+    """Convert a regular dict to a cursor dict by adding the marker.
+    
+    The intended way of using this is to first call `make_cursor_dict` on a dictionary that
+    represents the full state of a resource's `PageCursor` and then subsequent calls representing changes
+    to that state. This allows JSON merge patches to be used for efficient incremental updates.
+    
+    IMPORTANT: When checkpointing, connectors should yield only the changes/patches that need to be
+    merged into the backfill state's next_page, not the entire dictionary. This approach:
+    - Keeps checkpoints relatively small 
+    - Reduces the impact checkpoints have on the recovery log size
+    - Enables efficient incremental state updates via JSON merge patches
+    
+    Example:
+    ```python
+    # Initial full state - use make_cursor_dict for the complete state
+    initial_full_page_cursor = make_cursor_dict({"board1": {"items": 10}, "board2": {"items": 20}})
+    yield initial_full_page_cursor
+
+    # do some processing for a single invocation of fetch_page
+
+    # yield a patch for processed boards - just the changes, not the full state
+    completed_boards = {"board1": None}  # marks board1 as completed
+    yield completed_boards
+    ```
+    
+    Args:
+        data: The dictionary data to mark as a cursor. For initial state, this should be
+              the complete cursor state. For subsequent calls, this should contain only
+              the changes to be merged.
+    """
+    return {CURSOR_MARKER: True, **data}
+
+
+def pop_cursor_marker(cursor: dict) -> dict:
+    """Remove the cursor marker from a cursor dict."""
+    cursor.pop(CURSOR_MARKER, None)
+    return cursor
+
+
+PageCursor = str | int | dict | None
 """PageCursor is a cursor into a paged result set.
 These cursors are predominantly an opaque string or an internal offset integer.
+When a dict is used, it represents a structured cursor that supports JSON merge patches
+for efficient incremental updates.
 
 None means "begin a new iteration" in a request context,
 and "no pages remain" in a response context.
@@ -843,16 +899,21 @@ async def _binding_backfill_task(
     task: Task,
     subtask_id: str | None = None,
 ):
-    if subtask_id is not None:
-        connector_state = ConnectorState(
-            bindingStateV1={
-                binding.stateKey: ResourceState(backfill={subtask_id: state})
-            }
-        )
-    else:
-        connector_state = ConnectorState(
-            bindingStateV1={binding.stateKey: ResourceState(backfill=state)}
-        )
+    def _initialize_connector_state(state: ResourceState.Backfill) -> ConnectorState:
+        if subtask_id is not None:
+            connector_state = ConnectorState(
+                bindingStateV1={
+                    binding.stateKey: ResourceState(backfill={subtask_id: state})
+                }
+            )
+        else:
+            connector_state = ConnectorState(
+                bindingStateV1={binding.stateKey: ResourceState(backfill=state)}
+            )
+
+        return connector_state
+
+    connector_state = _initialize_connector_state(state)
 
     if state.next_page is not None:
         task.log.info("resuming backfill", {"state": state, "subtask_id": subtask_id})
@@ -879,7 +940,9 @@ async def _binding_backfill_task(
             pages = fn(task.log, state.next_page, state.cutoff)
 
         async for item in pages:
-            if isinstance(item, BaseDocument) or isinstance(item, dict):
+            if isinstance(item, BaseDocument) or (
+                isinstance(item, dict) and not is_cursor_dict(item)
+            ):
                 task.captured(binding_index, item)
                 done = True
             elif isinstance(item, AssociatedDocument):
@@ -890,8 +953,34 @@ async def _binding_backfill_task(
                     "Implementation error: FetchPageFn yielded PageCursor None. To represent end-of-sequence, yield documents and return without a final PageCursor."
                 )
             else:
-                state.next_page = item
-                task.checkpoint(connector_state)
+                if isinstance(item, dict) and is_cursor_dict(item):
+                    # For dict-based cursors, create a separate state to checkpoint with just the item
+                    # This ensures the Flow runtime gets the merge patch, not the merged result.
+
+                    pop_cursor_marker(item)
+
+                    if state.next_page is None:
+                        state.next_page = item
+                        state_to_checkpoint = connector_state
+                    elif isinstance(state.next_page, dict):
+                        # Perform JSON merge patch on the in-memory state.
+                        json_merge_patch(state.next_page, item)
+                        # Only emit a checkpoint containing the patch.
+                        checkpoint_state = ResourceState.Backfill(
+                            cutoff=state.cutoff, next_page=item
+                        )
+                        state_to_checkpoint = _initialize_connector_state(
+                            checkpoint_state
+                        )
+                    else:
+                        raise RuntimeError(
+                            f"Implementation error: dictionary PageCursor was yielded but the previous PageCursor was a {type(state.next_page)}"
+                        )
+                else:
+                    state.next_page = item
+                    state_to_checkpoint = connector_state
+
+                task.checkpoint(state_to_checkpoint)
                 done = False
 
         if done:
