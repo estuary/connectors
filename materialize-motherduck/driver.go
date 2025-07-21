@@ -298,67 +298,69 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
-		return nil, m.RunAsyncOperation(func() error {
-			defer d.storeFiles.CleanupCurrentTransaction(ctx)
-
-			txn, err := d.conn.BeginTx(ctx, nil)
-			if err != nil {
-				return fmt.Errorf("store BeginTx: %w", err)
-			}
-			defer txn.Rollback()
-
-			for idx, b := range d.bindings {
-				if !d.storeFiles.Started(idx) {
-					continue
-				}
-
-				uris, err := d.storeFiles.Flush(idx)
-				if err != nil {
-					return fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
-				}
-
-				params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
-
-				d.be.StartedResourceCommit(b.target.Path)
-				if b.mustMerge {
-					// In-place updates are accomplished by deleting the
-					// existing row and inserting the updated row.
-					var storeDeleteQuery strings.Builder
-					if err := tplStoreDeleteQuery.Execute(&storeDeleteQuery, params); err != nil {
-						return err
-					} else if _, err := txn.ExecContext(ctx, storeDeleteQuery.String()); err != nil {
-						return fmt.Errorf("executing store delete query %s: %w", b.target.Path, err)
-					}
-
-				}
-
-				var storeQuery strings.Builder
-				if err := tplStoreQuery.Execute(&storeQuery, params); err != nil {
-					return err
-				} else if _, err := txn.ExecContext(ctx, storeQuery.String()); err != nil {
-					return fmt.Errorf("executing store query for %s: %w", b.target.Path, err)
-				}
-				d.be.FinishedResourceCommit(b.target.Path)
-
-				// Reset for next round.
-				b.mustMerge = false
-			}
-
-			if res, err := txn.ExecContext(ctx, fenceUpdate.String()); err != nil {
-				return fmt.Errorf("updating checkpoints: %w", err)
-			} else if rows, err := res.RowsAffected(); err != nil {
-				return fmt.Errorf("getting fence update rows affected: %w", err)
-			} else if rows != 1 {
-				return fmt.Errorf("this instance was fenced off by another")
-			} else if err := txn.Commit(); err != nil {
-				return fmt.Errorf("committing store transaction: %w", err)
-			} else if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
-				return fmt.Errorf("cleaning up store files: %w", err)
-			}
-
-			return nil
-		})
+		return nil, m.RunAsyncOperation(func() error { return d.commit(ctx, fenceUpdate.String()) })
 	}, nil
+}
+
+func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
+	defer d.storeFiles.CleanupCurrentTransaction(ctx)
+
+	txn, err := d.conn.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("store BeginTx: %w", err)
+	}
+	defer txn.Rollback()
+
+	for idx, b := range d.bindings {
+		if !d.storeFiles.Started(idx) {
+			continue
+		}
+
+		uris, err := d.storeFiles.Flush(idx)
+		if err != nil {
+			return fmt.Errorf("flushing store file for %s: %w", b.target.Path, err)
+		}
+
+		params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
+
+		d.be.StartedResourceCommit(b.target.Path)
+		if b.mustMerge {
+			// In-place updates are accomplished by deleting the
+			// existing row and inserting the updated row.
+			var storeDeleteQuery strings.Builder
+			if err := tplStoreDeleteQuery.Execute(&storeDeleteQuery, params); err != nil {
+				return err
+			} else if _, err := txn.ExecContext(ctx, storeDeleteQuery.String()); err != nil {
+				return fmt.Errorf("executing store delete query %s: %w", b.target.Path, err)
+			}
+
+		}
+
+		var storeQuery strings.Builder
+		if err := tplStoreQuery.Execute(&storeQuery, params); err != nil {
+			return err
+		} else if _, err := txn.ExecContext(ctx, storeQuery.String()); err != nil {
+			return fmt.Errorf("executing store query for %s: %w", b.target.Path, err)
+		}
+		d.be.FinishedResourceCommit(b.target.Path)
+
+		// Reset for next round.
+		b.mustMerge = false
+	}
+
+	if res, err := txn.ExecContext(ctx, fenceUpdate); err != nil {
+		return fmt.Errorf("updating checkpoints: %w", err)
+	} else if rows, err := res.RowsAffected(); err != nil {
+		return fmt.Errorf("getting fence update rows affected: %w", err)
+	} else if rows != 1 {
+		return fmt.Errorf("this instance was fenced off by another")
+	} else if err := txn.Commit(); err != nil {
+		return fmt.Errorf("committing store transaction: %w", err)
+	} else if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
+		return fmt.Errorf("cleaning up store files: %w", err)
+	}
+
+	return nil
 }
 
 func (d *transactor) Destroy() {}
