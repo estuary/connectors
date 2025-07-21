@@ -12,7 +12,7 @@ from source_monday.graphql import (
     fetch_boards_minimal,
     fetch_boards_paginated,
     fetch_items_by_id,
-    BoardItemIterator,
+    get_items_from_boards,
 )
 from source_monday.models import (
     FullRefreshResource,
@@ -273,12 +273,12 @@ async def fetch_items_changes(
             },
         )
 
-        item_iterator = BoardItemIterator(http, log)
-
         while True:
-            items_generator, get_board_cursor = await item_iterator.get_items_from_boards(list(board_ids_to_backfill))
-
-            async for item in items_generator:
+            async for item in get_items_from_boards(
+                http,
+                log,
+                list(board_ids_to_backfill),
+            ):
                 if window_start <= item.updated_at <= window_end:
                     if item.state == "deleted":
                         item.meta_ = Item.Meta(op="d")
@@ -288,18 +288,6 @@ async def fetch_items_changes(
                     )
                     docs_emitted += 1
                     yield item
-
-            board_cursor = get_board_cursor()
-
-            if not board_cursor:
-                log.debug(
-                    f"No more items to fetch for {len(board_ids_to_backfill)} boards",
-                    {
-                        "board_ids": list(board_ids_to_backfill),
-                        "board_cursor": board_cursor,
-                    },
-                )
-                break
 
     if docs_emitted > 0:
         yield max_updated_at_in_window + timedelta(seconds=1)

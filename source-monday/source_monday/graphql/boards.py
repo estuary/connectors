@@ -51,19 +51,18 @@ async def fetch_boards_minimal(
     log: Logger,
 ) -> AsyncGenerator[Board, None]:
     query = """
-    query ($limit: Int = 500, $page: Int = 1, $state: State = all) {
+    query ($limit: Int = 10000, $page: Int = 1, $state: State = all) {
         boards(limit: $limit, page: $page, state: $state, order_by: created_at) {
             id
             name
             state
             updated_at
-            items_count
         }
     }
     """
 
     page = 1
-    limit = 500
+    limit = 10000
 
     while True:
         variables = {

@@ -166,10 +166,6 @@ class Board(IncrementalResource):
         default=None,
         json_schema_extra=lambda x: x.pop("default"),  # type: ignore
     )
-    items_count: int | None = Field(
-        default=None,
-        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
-    )
 
 
 class Item(IncrementalResource):
