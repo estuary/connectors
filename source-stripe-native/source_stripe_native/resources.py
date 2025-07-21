@@ -1,3 +1,4 @@
+from copy import deepcopy
 from datetime import datetime, UTC, timedelta
 from logging import Logger
 import functools
@@ -127,8 +128,8 @@ def _reconcile_connector_state(
                 task.log.info(
                     f"Initializing new subtask state for account id {account_id}."
                 )
-                state.inc[account_id] = initial_state.inc[account_id]
-                state.backfill[account_id] = initial_state.backfill[account_id]
+                state.inc[account_id] = deepcopy(initial_state.inc[account_id])
+                state.backfill[account_id] = deepcopy(initial_state.backfill[account_id])
                 should_checkpoint = True
             elif not inc_state_exists and backfill_state_exists:
                 # Note: This case is to fix a legacy issue where the incremental state was not initialized
@@ -137,8 +138,8 @@ def _reconcile_connector_state(
                 task.log.info(
                     f"Backfilling subtask for account id {account_id} due to missing incremental state."
                 )
-                state.inc[account_id] = initial_state.inc[account_id]
-                state.backfill[account_id] = initial_state.backfill[account_id]
+                state.inc[account_id] = deepcopy(initial_state.inc[account_id])
+                state.backfill[account_id] = deepcopy(initial_state.backfill[account_id])
                 should_checkpoint = True
 
         if should_checkpoint:
@@ -179,6 +180,11 @@ async def all_resources(
             }
         )
 
+    all_account_ids = [platform_account_id, *connected_account_ids]
+    initial_state = _create_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
+
     for element in STREAMS:
         is_accessible_stream = True
         base_stream = element.get("stream")
@@ -197,6 +203,8 @@ async def all_resources(
                     config.start_date,
                     platform_account_id,
                     connected_account_ids,
+                    all_account_ids,
+                    initial_state,
                 )
                 if hasattr(base_stream, "EVENT_TYPES")
                 else no_events_object(
@@ -205,6 +213,8 @@ async def all_resources(
                     config.start_date,
                     platform_account_id,
                     connected_account_ids,
+                    all_account_ids,
+                    initial_state,
                 )
             )
             all_streams.append(resource)
@@ -229,6 +239,8 @@ async def all_resources(
                                     config.start_date,
                                     platform_account_id,
                                     connected_account_ids,
+                                    all_account_ids,
+                                    initial_state,
                                 )
                             )
                         case _ if child_stream.NAME in SPLIT_CHILD_STREAM_NAMES:
@@ -240,6 +252,8 @@ async def all_resources(
                                     config.start_date,
                                     platform_account_id,
                                     connected_account_ids,
+                                    all_account_ids,
+                                    initial_state,
                                 )
                             )
                         case _:
@@ -251,6 +265,8 @@ async def all_resources(
                                     config.start_date,
                                     platform_account_id,
                                     connected_account_ids,
+                                    all_account_ids,
+                                    initial_state,
                                 )
                             )
 
@@ -265,6 +281,8 @@ async def all_resources(
                 config.start_date,
                 platform_account_id,
                 connected_account_ids,
+                all_account_ids,
+                initial_state,
             )
             all_streams.append(resource)
 
@@ -300,14 +318,12 @@ def base_object(
     start_date: datetime,
     platform_account_id: str,
     connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
 ) -> Resource:
     """Base Object handles the default case from source-stripe-native
     It requires a single, parent stream with a valid Event API Type
     """
-    all_account_ids = [platform_account_id, *connected_account_ids]
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -392,16 +408,13 @@ def child_object(
     start_date: datetime,
     platform_account_id: str,
     connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
 ) -> Resource:
     """Child Object handles the default child case from source-stripe-native
     It requires both the parent and child stream, with the parent stream having
     a valid Event API Type
     """
-
-    all_account_ids = [platform_account_id, *connected_account_ids]
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -493,17 +506,14 @@ def split_child_object(
     start_date: datetime,
     platform_account_id: str,
     connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
 ) -> Resource:
     """
     split_child_object handles the case where a stream is a child stream when backfilling
     but incrementally replicates based off events that contain the child stream resource directly
     in the API response. Meaning, the stream behaves like a non-chid stream incrementally.
     """
-
-    all_account_ids = [platform_account_id, *connected_account_ids]
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -593,16 +603,13 @@ def usage_records(
     start_date: datetime,
     platform_account_id: str,
     connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
 ) -> Resource:
     """Usage Records handles a specific stream (UsageRecords).
     This is required since Usage Records is a child stream from SubscriptionItem
     and requires special processing.
     """
-
-    all_account_ids = [platform_account_id, *connected_account_ids]
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -692,17 +699,14 @@ def no_events_object(
     start_date: datetime,
     platform_account_id: str,
     connected_account_ids: list[str],
+    all_account_ids: list[str],
+    initial_state: ResourceState,
 ) -> Resource:
     """No Events Object handles a edge-case from source-stripe-native,
     where the given parent stream does not contain a valid Events API type.
     It requires a single, parent stream with a valid list all API endpoint.
     It works very similar to the base object, but without the use of the Events APi.
     """
-
-    all_account_ids = [platform_account_id, *connected_account_ids]
-    initial_state = _create_initial_state(
-        all_account_ids if connected_account_ids else platform_account_id
-    )
 
     def open(
         binding: CaptureBinding[ResourceConfig],
