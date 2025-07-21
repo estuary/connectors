@@ -10,12 +10,15 @@ from typing import (
     TypeVar,
 )
 
+from dataclasses import dataclass
+
 from estuary_cdk.capture.common import (
     BaseDocument,
     ConnectorState as GenericConnectorState,
     LogCursor,
     PageCursor,
     ResourceState,
+    make_cursor_dict,
 )
 from estuary_cdk.flow import (
     AccessToken,
@@ -177,6 +180,48 @@ class Item(IncrementalResource):
         default=None,
         json_schema_extra=lambda x: x.pop("default"),  # type: ignore
     )
+
+
+@dataclass
+class ItemsBackfillCursor:
+    """
+    Cursor structure for items backfill operations.
+
+    Tracks which boards need to be processed during backfill:
+    - Keys: Board IDs (strings) that need processing
+    - Values: Always False
+
+    When boards are completed, they're removed via JSON merge patch:
+    {"completed_board_id": null}
+    """
+
+    boards: dict[str, bool]
+
+    @classmethod
+    def from_cursor_dict(
+        cls, cursor_dict: dict[str, Literal[False] | None]
+    ) -> "ItemsBackfillCursor":
+        boards = {k: v for k, v in cursor_dict.items() if v is not None}
+        return cls(boards=boards)
+
+    @classmethod
+    def from_board_ids(cls, board_ids: list[str]) -> "ItemsBackfillCursor":
+        if not board_ids:
+            return cls(boards={})
+
+        boards = {board_id: False for board_id in board_ids}
+        return cls(boards=boards)
+
+    def get_next_boards(self, limit: int) -> list[str]:
+        return list(self.boards.keys())[:limit]
+
+    def create_initial_cursor(self) -> dict[str, Literal[False]]:
+        return make_cursor_dict(self.boards)
+
+    def create_completion_patch(
+        self, completed_board_ids: list[str]
+    ) -> dict[str, None]:
+        return make_cursor_dict({board_id: None for board_id in completed_board_ids})
 
 
 IncrementalResourceFetchChangesFn = Callable[
