@@ -131,7 +131,7 @@ async def get_items_from_boards(
     board_ids: list[str],
     items_limit: int = ITEMS_PER_BOARD,
 ) -> AsyncGenerator[Item, None]:
-    if not board_ids or len(board_ids) == 0:
+    if len(board_ids) == 0:
         log.error("get_items_from_boards requires a non-empty list of board IDs.")
         raise ValueError("get_items_from_boards requires a non-empty list of board IDs.")
 
