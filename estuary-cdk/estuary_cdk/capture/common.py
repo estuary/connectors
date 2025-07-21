@@ -629,14 +629,14 @@ def open(
                     ):
                         initialized_backfill_state = resource.initial_state.backfill
                         initialized_backfill_state.cutoff = state.inc.cursor
-                        state.backfill = initialized_backfill_state
+                        state.backfill = initialized_backfill_state.model_copy(deep=True)
                     # In all other cases, wipe the state back to the initial state.
                     else:
-                        state = resource.initial_state
+                        state = resource.initial_state.model_copy(deep=True)
 
                     state.is_connector_initiated = True
                 else:
-                    state = resource.initial_state
+                    state = resource.initial_state.model_copy(deep=True)
 
                 state.last_initialized = NOW
 
