@@ -12,8 +12,10 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
+	iam "github.com/estuary/connectors/go/auth/iam"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -61,13 +63,36 @@ type tunnelConfig struct {
 }
 
 // config represents the endpoint configuration for postgres.
+type authType string
+
+const (
+	UserPassword authType = "UserPassword"
+	GCPIAM       authType = "GCPIAM"
+	AWSIAM       authType = "AWSIAM"
+	AzureIAM     authType = "AzureIAM"
+)
+
+type userPassword struct {
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+}
+
+type credentialConfig struct {
+	AuthType authType `json:"auth_type"`
+	User     string   `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
+
+	userPassword
+	iam.IAMConfig
+}
+
 type config struct {
 	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	User       string `json:"user,omitempty" jsonschema:"-"`
+	Password   string `json:"password,omitempty" jsonschema:"-"`
 	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+
+	Credentials *credentialConfig `json:"credentials,omitempty" jsonschema_extras:"x-iam-auth=true"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -87,14 +112,31 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 
 // Validate the configuration.
 func (c config) Validate() error {
-	var requiredProperties = [][]string{
-		{"address", c.Address},
-		{"user", c.User},
-		{"password", c.Password},
+	if c.Address == "" {
+		return fmt.Errorf("missing 'address'")
 	}
-	for _, req := range requiredProperties {
-		if req[1] == "" {
-			return fmt.Errorf("missing '%s'", req[0])
+
+	if c.Credentials != nil {
+		switch c.Credentials.AuthType {
+		case UserPassword:
+			if c.Credentials.User == "" {
+				return errors.New("missing 'user'")
+			}
+			if c.Credentials.Password == "" {
+				return errors.New("missing 'password'")
+			}
+		default:
+			if err := c.Credentials.ValidateIAM(); err != nil {
+				return err
+			}
+		}
+	} else {
+		// Legacy validation for basic auth when credentials is not used
+		if c.User == "" {
+			return fmt.Errorf("missing 'user'")
+		}
+		if c.Password == "" {
+			return fmt.Errorf("missing 'password'")
 		}
 	}
 
@@ -119,7 +161,7 @@ func (c config) Validate() error {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c config) ToURI() string {
+func (c config) ToURI(ctx context.Context) (string, error) {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
 	// to address through the bastion server, so we use the tunnel's address
@@ -129,23 +171,54 @@ func (c config) ToURI() string {
 
 	address = ensurePort(address)
 
+	var user = c.User
+	var pass = c.Password
+	if c.Credentials != nil {
+		user = c.Credentials.User
+
+		switch c.Credentials.AuthType {
+		case UserPassword:
+			pass = c.Credentials.Password
+		case AWSIAM:
+			var err error
+			pass, err = auth.BuildAuthToken(
+				ctx,
+				ensurePort(c.Address),
+				c.Credentials.AWSRegion,
+				user,
+				c.Credentials.AWSCredentialsProvider(),
+			)
+			if err != nil {
+				return "", fmt.Errorf("building AWS auth token: %w", err)
+			}
+		case GCPIAM:
+			pass = c.Credentials.GoogleToken()
+		case AzureIAM:
+			pass = c.Credentials.AzureToken()
+		}
+	}
+
 	var uri = url.URL{
 		Scheme: "postgres",
 		Host:   address,
-		User:   url.UserPassword(c.User, c.Password),
+		User:   url.UserPassword(user, pass),
 	}
 	if c.Database != "" {
 		uri.Path = "/" + c.Database
 	}
 	var params = make(url.Values)
+	// Set SSL mode - user configuration takes precedence, then cloud IAM defaults
 	if c.Advanced.SSLMode != "" {
 		params.Set("sslmode", c.Advanced.SSLMode)
+	} else if c.Credentials != nil && (c.Credentials.AuthType == GCPIAM || c.Credentials.AuthType == AzureIAM) {
+		// Enable SSL for cloud provider IAM connections by default when not explicitly set
+		params.Set("sslmode", "require")
 	}
 	if len(params) > 0 {
 		uri.RawQuery = params.Encode()
 	}
 
-	return uri.String()
+	return uri.String(), nil
 }
 
 func ensurePort(addr string) string {
@@ -285,10 +358,14 @@ func newTransactor(
 
 	// Establish connections.
 	var err error
-	if d.load.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
+	var uri string
+	if uri, err = cfg.ToURI(ctx); err != nil {
+		return nil, fmt.Errorf("building connection URI: %w", err)
+	}
+	if d.load.conn, err = pgx.Connect(ctx, uri); err != nil {
 		return nil, fmt.Errorf("load pgx.Connect: %w", err)
 	}
-	if d.store.conn, err = pgx.Connect(ctx, cfg.ToURI()); err != nil {
+	if d.store.conn, err = pgx.Connect(ctx, uri); err != nil {
 		return nil, fmt.Errorf("store pgx.Connect: %w", err)
 	}
 
