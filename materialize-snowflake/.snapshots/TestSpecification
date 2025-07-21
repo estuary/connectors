@@ -268,7 +268,7 @@
       "delta_updates": {
         "type": "boolean",
         "title": "Delta Updates",
-        "description": "Use Private Key authentication to enable Snowpipe for Delta Update bindings",
+        "description": "Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings",
         "x-delta-updates": true
       }
     },
