@@ -25,7 +25,11 @@ type client struct {
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
-	db, err := stdsql.Open("pgx", ep.Config.ToURI())
+	uri, err := ep.Config.ToURI(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("building connection URI: %w", err)
+	}
+	db, err := stdsql.Open("pgx", uri)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +45,12 @@ func preReqs(ctx context.Context, conf config, tenant string) *cerrors.PrereqErr
 
 	cfg := conf
 
-	db, err := stdsql.Open("pgx", cfg.ToURI())
+	uri, err := cfg.ToURI(ctx)
+	if err != nil {
+		errs.Err(fmt.Errorf("building connection URI: %w", err))
+		return errs
+	}
+	db, err := stdsql.Open("pgx", uri)
 	if err != nil {
 		errs.Err(err)
 		return errs
