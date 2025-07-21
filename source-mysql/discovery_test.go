@@ -65,3 +65,23 @@ func TestTrickyEnumValues(t *testing.T) {
 	tb.CreateTable(ctx, t, uniqueID, `(id INTEGER PRIMARY KEY, category ENUM('A', 'B (Parentheses)', '', 'Internal''Quote', 'Internal,Comma', 'Internal\nNewline', 'Internal;Semicolon', '   Leading Spaces', 'Trailing Spaces   ', 'Z'))`)
 	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 }
+
+// TestSchemaWhitelist tests table discovery with an explicit whitelist of schema names
+func TestSchemaWhitelist(t *testing.T) {
+	var tb, ctx, uniqueID = mysqlTestBackend(t), context.Background(), uniqueTableID(t)
+	tb.CreateTable(ctx, t, uniqueID, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	t.Run("Default", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+	t.Run("Included", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"nonexistent_schema", testSchemaName, "another_nonexistent_schema"}
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+	t.Run("Excluded", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.EndpointSpec.(*Config).Advanced.DiscoverSchemas = []string{"nonexistent_schema", "another_nonexistent_schema"}
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+}
