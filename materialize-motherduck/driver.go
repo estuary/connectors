@@ -3,9 +3,11 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/estuary/connectors/go/blob"
@@ -21,7 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 
-	_ "github.com/marcboeker/go-duckdb/v2"
+	duckdb "github.com/marcboeker/go-duckdb/v2"
 )
 
 func newDuckDriver() *sql.Driver[config, tableConfig] {
@@ -302,6 +304,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
+var retryableDuckdbErrors = []duckdb.ErrorType{
+	// These both seem to be intermittent errors originating from the internals
+	// of MotherDuck / duckdb that resolve with a retry.
+	duckdb.ErrorTypeConnection,
+	duckdb.ErrorTypeTransaction,
+}
+
 type bindingCommit struct {
 	path    []string
 	queries []string
@@ -346,9 +355,22 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 		b.mustMerge = false
 	}
 
-	// TODO(whb): Retry certain kinds of errors here.
-	if err := d.commitBindings(ctx, commits, fenceUpdate); err != nil {
-		return err
+	for attempt := 1; ; attempt++ {
+		if err := d.commitBindings(ctx, commits, fenceUpdate); err != nil {
+			var duckdbErr *duckdb.Error
+			if attempt <= 3 && errors.As(err, &duckdbErr) && slices.Contains(retryableDuckdbErrors, duckdbErr.Type) {
+				log.WithError(err).WithField("attempt", attempt).Warn("retrying commit due to retryable duckdb error")
+				continue
+			}
+
+			// TODO(whb): This extra diagnostic logging can be removed once a
+			// complete list of retryable errors is established.
+			log.WithField("errorType", fmt.Sprintf("%T", err)).Info("commit failed with error of type")
+
+			return err
+		}
+
+		break
 	}
 
 	if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
