@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgproto3"
 	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 )
 
@@ -253,7 +254,9 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 	}
 
 	var typeMap = pgtype.NewMap()
-	if err := registerDatatypeTweaks(ctx, db.conn, typeMap); err != nil {
+	if err := db.conn.AcquireFunc(ctx, func(conn *pgxpool.Conn) error {
+		return registerDatatypeTweaks(ctx, conn.Conn(), typeMap)
+	}); err != nil {
 		return nil, err
 	}
 

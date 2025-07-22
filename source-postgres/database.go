@@ -8,6 +8,7 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,7 +26,7 @@ type replicationSlotInfo struct {
 // queryReplicationSlotInfo returns information about the named replication slot, if it exists.
 // If the slot doesn't exist then a nil pointer is returned, but without an error. An error is
 // only returned if the query itself fails.
-func queryReplicationSlotInfo(ctx context.Context, conn *pgx.Conn, slotName string) (*replicationSlotInfo, error) {
+func queryReplicationSlotInfo(ctx context.Context, conn *pgxpool.Pool, slotName string) (*replicationSlotInfo, error) {
 	var info replicationSlotInfo
 	// This query employs a somewhat ugly hack in which row_to_json(), JSON indexing, and the
 	// COALESCE() function are combined to implement a "select column if it exists" behavior.
@@ -43,7 +44,7 @@ func queryReplicationSlotInfo(ctx context.Context, conn *pgx.Conn, slotName stri
 }
 
 // listPublishedTables returns a map from stream IDs to whether they are present in the specified publication.
-func listPublishedTables(ctx context.Context, conn *pgx.Conn, publicationName string) (map[sqlcapture.StreamID]bool, error) {
+func listPublishedTables(ctx context.Context, conn *pgxpool.Pool, publicationName string) (map[sqlcapture.StreamID]bool, error) {
 	var rows, err = conn.Query(ctx, `SELECT schemaname, tablename FROM pg_catalog.pg_publication_tables WHERE pubname = $1`, publicationName)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables in publication %q: %w", publicationName, err)
@@ -62,7 +63,7 @@ func listPublishedTables(ctx context.Context, conn *pgx.Conn, publicationName st
 }
 
 // recreateReplicationSlot attempts to drop and then recreate a replication slot with the specified name.
-func recreateReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName string) error {
+func recreateReplicationSlot(ctx context.Context, conn *pgxpool.Pool, slotName string) error {
 	var logEntry = logrus.WithField("slot", slotName)
 	logEntry.Info("attempting to drop replication slot")
 	if _, err := conn.Exec(ctx, fmt.Sprintf(`SELECT pg_drop_replication_slot('%s');`, slotName)); err != nil {
@@ -79,7 +80,7 @@ func recreateReplicationSlot(ctx context.Context, conn *pgx.Conn, slotName strin
 }
 
 // queryLatestServerLSN returns the latest server WAL LSN.
-func queryLatestServerLSN(ctx context.Context, conn *pgx.Conn) (pglogrepl.LSN, error) {
+func queryLatestServerLSN(ctx context.Context, conn *pgxpool.Pool) (pglogrepl.LSN, error) {
 	// When querying a read-only standby server we use 'pg_last_wal_replay_lsn()'
 	// and otherwise for normal standalone servers we use 'pg_current_wal_flush_lsn()'.
 	var query = `
