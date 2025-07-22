@@ -1,6 +1,7 @@
 import asyncio
 import heapq
 from datetime import datetime, timedelta, UTC
+from enum import IntEnum
 from typing import Dict, cast, NamedTuple, List, Optional, Union, Protocol
 from dataclasses import dataclass, field
 
@@ -34,6 +35,11 @@ class FetchPageFnFactory(Protocol):
         ...
 
 
+class PriorityLevel(IntEnum):
+    BACKFILL = 0
+    INCREMENTAL = 1
+
+
 class WorkItemPriority(NamedTuple):
     """
     Represents priority information for a work item in a structured way.
@@ -45,7 +51,7 @@ class WorkItemPriority(NamedTuple):
     Work items that still need to backfill are prioritized over those that have completed their backfill already.
     Work items that have completed their backfill are prioritized based on their incremental cursor timestamp - the older the timestamp, the higher the priority.
     """
-    priority_level: int
+    level: PriorityLevel
     cursor_timestamp: datetime | None 
     account_id: str
 
@@ -54,8 +60,8 @@ class WorkItemPriority(NamedTuple):
         if not isinstance(other, WorkItemPriority):
             raise TypeError(f"Cannot compare WorkItemPriority with {type(other).__name__}")
 
-        if self.priority_level != other.priority_level:
-            return self.priority_level < other.priority_level
+        if self.level != other.level:
+            return self.level < other.level
 
         # For same priority level, compare by cursor timestamp.
         if self.cursor_timestamp is None and other.cursor_timestamp is None:
@@ -102,9 +108,9 @@ class WorkItem:
 
 @dataclass
 class PriorityQueueConfig:
-    priority_refresh_interval: timedelta = timedelta(minutes=1)
-    max_worker_count: int = 20
-    work_queue_size: int = 60
+    priority_refresh_interval: timedelta = timedelta(seconds=15)
+    max_subtask_count: int = 40
+    work_queue_size: int = 100
 
 
 DEFAULT_CONFIG = PriorityQueueConfig()
@@ -123,13 +129,13 @@ class PriorityCalculator:
         2. Accounts with incremental cursors, ordered by datetime (priority_level=1, older timestamp = higher priority)
         """
         if isinstance(self.resource_state.backfill, dict) and self.resource_state.backfill.get(account_id):
-            return WorkItemPriority(priority_level=0, cursor_timestamp=None, account_id=account_id)
+            return WorkItemPriority(level=PriorityLevel.BACKFILL, cursor_timestamp=None, account_id=account_id)
 
         if isinstance(self.resource_state.inc, dict):
             inc_state = self.resource_state.inc.get(account_id)
             if inc_state and isinstance(inc_state.cursor, datetime):
                 return WorkItemPriority(
-                    priority_level=1, 
+                    level=PriorityLevel.INCREMENTAL, 
                     cursor_timestamp=inc_state.cursor, 
                     account_id=account_id
                 )
@@ -139,16 +145,33 @@ class PriorityCalculator:
             "after state reconciliation. Check _reconcile_connector_state implementation and usage."
         )
 
-    def select_prioritized_accounts(self, all_account_ids: List[str], max_worker_count: int) -> set[str]:
+    def select_prioritized_accounts(self, all_account_ids: List[str], max_subtask_count: int) -> set[str]:
         account_priorities = [
             self.get_account_priority(account_id)
             for account_id in all_account_ids
         ]
 
         # Use heapq for efficient partial sorting - only sort as much as needed.
-        top_priority_accounts = heapq.nsmallest(max_worker_count, account_priorities)
+        top_priority_accounts = heapq.nsmallest(max_subtask_count, account_priorities)
 
-        return set([priority.account_id for priority in top_priority_accounts])
+        subtask_count = 0
+        selected_accounts: list[WorkItemPriority] = []
+
+        for account in top_priority_accounts:
+            match account.level:
+                case PriorityLevel.BACKFILL:
+                    subtask_count += 2
+                case PriorityLevel.INCREMENTAL:
+                    subtask_count += 1
+                case _:
+                    raise RuntimeError(f"Unknown priority level {account.level}")
+
+            selected_accounts.append(account)
+
+            if subtask_count >= max_subtask_count:
+                break
+
+        return {priority.account_id for priority in selected_accounts}
 
 
 class WorkItemManager:
@@ -159,14 +182,14 @@ class WorkItemManager:
     def generate_work_items(
         self,
         all_account_ids: List[str],
-        max_worker_count: int,
+        max_subtask_count: int,
         fetch_changes_factory: FetchChangesFnFactory,
         fetch_page_factory: FetchPageFnFactory,
         resource_state: ResourceState,
     ) -> tuple[list[WorkItem], set[str]]:
         work_items: list[WorkItem] = []
 
-        priority_account_ids: set[str] = self.priority_calculator.select_prioritized_accounts(all_account_ids, max_worker_count)
+        priority_account_ids: set[str] = self.priority_calculator.select_prioritized_accounts(all_account_ids, max_subtask_count)
 
         for account_id in priority_account_ids:
             # Do not create duplicate work items for accounts that already have active work.
@@ -360,7 +383,7 @@ class PriorityQueueManager:
         self._start_priority_evaluation()
 
     def _start_worker_pool(self):
-        for worker_id in range(self.config.max_worker_count):
+        for worker_id in range(self.config.max_subtask_count):
             worker_task = self.task.spawn_child(
                 f"{self.prefix}.worker.{worker_id}",
                 lambda t, wid=worker_id: self._worker_loop(t, wid)
@@ -394,10 +417,10 @@ class PriorityQueueManager:
                 # The timeout to wait for work was reached. Check the stopping event again then wait for more work.
                 continue
             except Exception as e:
-                task.log.error(f"Worker {worker_id} error: {e}", {"worker_id": worker_id})
+                task.log.error(f"Worker {worker_id} error: {e}")
                 raise
 
-        task.log.info(f"Worker {worker_id} shutting down", {"worker_id": worker_id})
+        task.log.debug(f"Worker {worker_id} shutting down")
 
     async def _priority_evaluation_loop(self, task: Task):
         while self.running and not task.stopping.event.is_set():
@@ -415,7 +438,7 @@ class PriorityQueueManager:
     async def _refresh_work_queue(self):
         new_work_items, prioritized_account_ids = self.work_item_manager.generate_work_items(
             self.all_account_ids,
-            self.config.max_worker_count,
+            self.config.max_subtask_count,
             self.fetch_changes_factory,
             self.fetch_page_factory,
             self.resource_state
@@ -442,16 +465,16 @@ class PriorityQueueManager:
                     " Please reach out to Estuary support for assistance debugging this error."
                 )
 
-        self.task.log.info(
-            "Updated work queue",
-            {
-                "prefix": self.prefix,
-                "work_items_added": work_items_queued,
-                "queue_size": self.work_queue.qsize(),
-                "active_workers": len(self.work_item_manager.active_work_by_account),
-                "work_items_stopped": len(accounts_to_cancel)
-            }
-        )
+        if work_items_queued > 0:
+            self.task.log.info(
+                f"Updated work queue",
+                {
+                    "prefix": self.prefix,
+                    "accounts added": [w.account_id for w in new_work_items],
+                    "accounts stopped": accounts_to_cancel,
+                    "queue_size": self.work_queue.qsize(),
+                }
+            )
 
 
 # Both _binding_incremental_task_with_work_item and _binding_backfill_task_with_work_item
