@@ -3,7 +3,6 @@ package boilerplate
 import (
 	"embed"
 	"encoding/json"
-	"fmt"
 	"path/filepath"
 	"reflect"
 	"strings"
@@ -391,24 +390,6 @@ func TestValidate(t *testing.T) {
 		)
 
 		require.ErrorContains(t, err, "field 'longKeyLongKeyLongKey' is required to be materialized but has a length of 21 which exceeds the maximum length allowable by the destination")
-	})
-
-	t.Run("can't decrement backfill counter", func(t *testing.T) {
-		existing := loadValidateSpec(t, "increment-backfill.flow.proto")
-		proposed := loadValidateSpec(t, "base.flow.proto")
-		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
-
-		_, err := validator.ValidateBinding(
-			[]string{"key_value"},
-			false,
-			proposed.Bindings[0].Backfill,
-			proposed.Bindings[0].Collection,
-			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
-			existing,
-		)
-
-		require.ErrorContains(t, err, fmt.Sprintf("backfill count 0 is less than previously applied count of 1 (%s)", proposed.Bindings[0].Collection.Name))
 	})
 
 	t.Run("can't switch from delta to standard updates", func(t *testing.T) {

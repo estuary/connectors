@@ -73,16 +73,6 @@ func (v Validator) ValidateBinding(
 	lastBinding := findLastBinding(path, lastSpec)
 	existingResource := v.is.GetResource(path)
 
-	if lastBinding != nil && lastBinding.Backfill > backfill {
-		// Sanity check: Don't allow backfill counters to decrease.
-		return nil, fmt.Errorf(
-			"backfill count %d is less than previously applied count of %d (%s)",
-			backfill,
-			lastBinding.Backfill,
-			lastBinding.Collection.Name,
-		)
-	}
-
 	for _, p := range boundCollection.Projections {
 		// Don't allow collection keys to be nullable unless they have a default value set. If a
 		// default value is set, there will always be a value provided for the field from the
