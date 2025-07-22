@@ -174,17 +174,6 @@ func parseCursor(cursor string) (mysql.Position, error) {
 	}, nil
 }
 
-// marshalJSONString returns the serialized JSON representation of the provided string.
-//
-// A Go string can always be successfully serialized into JSON.
-func marshalJSONString(str string) json.RawMessage {
-	var bs, err = json.Marshal(str)
-	if err != nil {
-		panic(fmt.Errorf("internal error: failed to marshal string %q to JSON: %w", str, err))
-	}
-	return bs
-}
-
 func unmarshalJSONString(bs json.RawMessage) (string, error) {
 	if bs == nil {
 		return "", nil
@@ -391,9 +380,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			// also stop advancing the cursor position during offset overflow, so that part is
 			// handled elsewhere already.
 			if !binlogOffsetOverflow {
-				if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
-					Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
-				}); err != nil {
+				if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 					return err
 				}
 				rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
@@ -424,9 +411,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				// "COMMIT" query event as a transaction commit. This logic should match
 				// the XIDEvent handling.
 				if !binlogOffsetOverflow {
-					if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
-						Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
-					}); err != nil {
+					if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 						return err
 					}
 					rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
@@ -473,9 +458,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		// until a real commit event to flush the output) then report a new FlushEvent
 		// with the latest position.
 		if implicitFlush && rs.uncommittedChanges == 0 && !binlogOffsetOverflow {
-			if err := rs.emitEvent(ctx, &sqlcapture.OldFlushEvent{
-				Cursor: marshalJSONString(fmt.Sprintf("%s:%d", cursor.Name, cursor.Pos)),
-			}); err != nil {
+			if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 				return err
 			}
 		}
@@ -1258,8 +1241,8 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 
 	// Time-based event streaming until the fenceAfter duration is reached.
 	var timedEventsSinceFlush int
-	var latestFlushCursor = fmt.Sprintf("%s:%d", rs.fencePosition.Name, rs.fencePosition.Pos)
-	logrus.WithField("cursor", latestFlushCursor).Debug("beginning timed streaming phase")
+	var latestFlushPosition = rs.fencePosition
+	logrus.WithField("cursor", latestFlushPosition).Debug("beginning timed streaming phase")
 	if fenceAfter > 0 {
 		var deadline = time.NewTimer(fenceAfter)
 		defer deadline.Stop()
@@ -1277,29 +1260,23 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 					return err
 				}
 				timedEventsSinceFlush++
-				if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
-					if str, err := unmarshalJSONString(event.Cursor); err != nil {
-						return fmt.Errorf("internal error: failed to unmarshal flush event cursor value %q: %w", event.Cursor, err)
-					} else {
-						latestFlushCursor = str
-					}
+				if event, ok := event.(*mysqlCommitEvent); ok {
+					latestFlushPosition = event.Position
 					timedEventsSinceFlush = 0
 				}
 			}
 		}
 	}
-	logrus.WithField("cursor", latestFlushCursor).Debug("finished timed streaming phase")
+	logrus.WithField("cursor", latestFlushPosition).Debug("finished timed streaming phase")
 
 	// Establish a binlog-position fence.
 	var fencePosition, err = rs.db.queryBinlogPosition()
 	if err != nil {
 		return fmt.Errorf("error establishing binlog fence position: %w", err)
 	}
-	logrus.WithField("cursor", latestFlushCursor).WithField("target", fencePosition.Pos).Debug("beginning fenced streaming phase")
+	logrus.WithField("cursor", latestFlushPosition).WithField("target", fencePosition.Pos).Debug("beginning fenced streaming phase")
 
-	if latestFlushPosition, err := parseCursor(latestFlushCursor); err != nil {
-		return fmt.Errorf("internal error: failed to parse flush cursor value %q", latestFlushCursor)
-	} else if fencePosition == latestFlushPosition {
+	if fencePosition == latestFlushPosition {
 		// As an internal sanity check, we assert that it should never be possible
 		// to hit this early exit unless the database has been idle since the last
 		// flush event we observed.
@@ -1314,7 +1291,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlcapture.OldFlushEvent{Cursor: marshalJSONString(latestFlushCursor)})
+		return callback(&mysqlCommitEvent{Position: latestFlushPosition})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -1329,8 +1306,7 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-fenceWatchdog.C:
-			var fenceCursor = fmt.Sprintf("%s:%d", fencePosition.Name, fencePosition.Pos)
-			return fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushCursor, fenceCursor)
+			return fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestFlushPosition, fencePosition)
 		case event, ok := <-rs.events:
 			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
 			if !ok {
@@ -1341,21 +1317,10 @@ func (rs *mysqlReplicationStream) StreamToFence(ctx context.Context, fenceAfter 
 
 			// The first flush event whose cursor position is equal to or after the fence
 			// position ends the stream-to-fence operation.
-			if event, ok := event.(*sqlcapture.OldFlushEvent); ok {
-				// It might be a bit inefficient to re-parse every flush cursor here, but
-				// realistically it's probably not a significant slowdown and it would be
-				// a bit of work to preserve the position as a typed struct.
-				var eventCursor, err = unmarshalJSONString(event.Cursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to unmarshal flush event cursor value %q: %w", event.Cursor, err)
-				}
-				eventPosition, err := parseCursor(eventCursor)
-				if err != nil {
-					return fmt.Errorf("internal error: failed to parse flush event cursor value %q", event.Cursor)
-				}
-				if eventPosition.Compare(fencePosition) >= 0 {
-					logrus.WithField("cursor", eventCursor).Debug("finished fenced streaming phase")
-					rs.fencePosition = eventPosition
+			if event, ok := event.(*mysqlCommitEvent); ok {
+				if event.Position.Compare(fencePosition) >= 0 {
+					logrus.WithField("cursor", event.Position).Debug("finished fenced streaming phase")
+					rs.fencePosition = event.Position
 					return nil
 				}
 			}
