@@ -567,7 +567,11 @@ func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) 
 				return nil, fmt.Errorf("replication buffer overflow: cannot process message of %.1fMiB: %s", msgSize, msgDesc)
 			}
 			// Resize rxbuf to twice its current capacity
-			var newbuf = make([]byte, len(s.rxbuf), cap(s.rxbuf)*2)
+			var newcap = cap(s.rxbuf) * 2
+			if newcap > rxBufferMaximumSize {
+				newcap = rxBufferMaximumSize
+			}
+			var newbuf = make([]byte, len(s.rxbuf), newcap)
 			copy(newbuf, s.rxbuf)
 			s.rxbuf = newbuf
 		}
