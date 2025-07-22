@@ -16,10 +16,12 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	iam "github.com/estuary/connectors/go/auth/iam"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	m "github.com/estuary/connectors/go/protocols/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/invopop/jsonschema"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jackc/pgx/v5"
@@ -78,21 +80,31 @@ type userPassword struct {
 
 type credentialConfig struct {
 	AuthType authType `json:"auth_type"`
-	User     string   `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
 
 	userPassword
 	iam.IAMConfig
 }
 
+func (credentialConfig) JSONSchema() *jsonschema.Schema {
+	subSchemas := []schemagen.OneOfSubSchemaT{
+		schemagen.OneOfSubSchema("Password", userPassword{}, string(UserPassword)),
+	}
+	subSchemas = append(subSchemas, (iam.IAMConfig{}).OneOfSubSchemas()...)
+	
+	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
+
+	return schema
+}
+
 type config struct {
 	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User       string `json:"user,omitempty" jsonschema:"-"`
+	User     string   `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password   string `json:"password,omitempty" jsonschema:"-"`
-	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
-	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=2"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=3"`
+	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
 
-	Credentials *credentialConfig `json:"credentials,omitempty" jsonschema_extras:"x-iam-auth=true"`
+	Credentials *credentialConfig `json:"credentials,omitempty" jsonschema_extras:"x-iam-auth=true,order=5"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -115,13 +127,13 @@ func (c config) Validate() error {
 	if c.Address == "" {
 		return fmt.Errorf("missing 'address'")
 	}
+	if c.User == "" {
+		return fmt.Errorf("missing 'user'")
+	}
 
 	if c.Credentials != nil {
 		switch c.Credentials.AuthType {
 		case UserPassword:
-			if c.Credentials.User == "" {
-				return errors.New("missing 'user'")
-			}
 			if c.Credentials.Password == "" {
 				return errors.New("missing 'password'")
 			}
@@ -132,9 +144,6 @@ func (c config) Validate() error {
 		}
 	} else {
 		// Legacy validation for basic auth when credentials is not used
-		if c.User == "" {
-			return fmt.Errorf("missing 'user'")
-		}
 		if c.Password == "" {
 			return fmt.Errorf("missing 'password'")
 		}
@@ -174,8 +183,6 @@ func (c config) ToURI(ctx context.Context) (string, error) {
 	var user = c.User
 	var pass = c.Password
 	if c.Credentials != nil {
-		user = c.Credentials.User
-
 		switch c.Credentials.AuthType {
 		case UserPassword:
 			pass = c.Credentials.Password

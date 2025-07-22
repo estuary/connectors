@@ -19,19 +19,22 @@ func TestPostgresConfig(t *testing.T) {
 		Database: "namegame",
 	}
 	require.NoError(t, validConfig.Validate())
-	var uri = validConfig.ToURI()
+	uri, err := validConfig.ToURI(context.Background())
+	require.NoError(t, err)
 	require.Equal(t, "postgres://youser:shmassword@post.toast:1234/namegame", uri)
 
 	var minimal = validConfig
 	minimal.Database = ""
 	require.NoError(t, minimal.Validate())
-	uri = minimal.ToURI()
+	uri, err = minimal.ToURI(context.Background())
+	require.NoError(t, err)
 	require.Equal(t, "postgres://youser:shmassword@post.toast:1234", uri)
 
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
-	uri = noPort.ToURI()
+	uri, err = noPort.ToURI(context.Background())
+	require.NoError(t, err)
 	require.Equal(t, "postgres://youser:shmassword@post.toast:5432/namegame", uri)
 
 	var noAddress = validConfig
@@ -90,7 +93,8 @@ func TestConfigURI(t *testing.T) {
 			if err := cfg.Validate(); err != nil {
 				valid = err.Error()
 			}
-			var uri = cfg.ToURI()
+			uri, err := cfg.ToURI(context.Background())
+			require.NoError(t, err)
 			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
 		})
 	}

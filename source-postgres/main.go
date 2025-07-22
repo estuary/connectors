@@ -114,11 +114,11 @@ func connectPostgres(ctx context.Context, name string, cfg json.RawMessage) (sql
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
 	Address     string            `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
-	User        string            `json:"user" jsonschema:"-"`
-	Password    string            `json:"password" jsonschema:"-"`
-	Database    string            `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=1"`
-	HistoryMode bool              `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=2"`
-	Credentials *credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=3,x-iam-auth=true"`
+	User        string            `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture" jsonschema_extras:"order=1"`
+	Password    string            `json:"password,omitempty" jsonschema:"-"`
+	Database    string            `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=2"`
+	HistoryMode bool              `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=3"`
+	Credentials *credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=4,x-iam-auth=true"`
 	Advanced    advancedConfig    `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
@@ -134,15 +134,11 @@ const (
 )
 
 type userPassword struct {
-	// This user is only here for JSONSchema generation purposes, the actual user field is defined on credentialConfig
-	UserForSchema string `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
-
 	Password string `json:"password" jsonschema:"title=Password,description=Database user's password" jsonschema_extras:"secret=true"`
 }
 
 type credentialConfig struct {
 	AuthType authType `json:"auth_type"`
-	User string `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
 
 	userPassword
 	iam.IAMConfig
@@ -150,7 +146,7 @@ type credentialConfig struct {
 
 func (credentialConfig) JSONSchema() *jsonschema.Schema {
 	subSchemas := []schemagen.OneOfSubSchemaT{
-		schemagen.OneOfSubSchema("User and Password", userPassword{}, string(UserPassword)),
+		schemagen.OneOfSubSchema("Password", userPassword{}, string(UserPassword)),
 	}
 	subSchemas = append(subSchemas, (iam.IAMConfig{}).OneOfSubSchemas()...)
 	
@@ -230,26 +226,13 @@ func (c *Config) Validate() error {
 	if c.Address == "" {
 		return errors.New("missing 'address'")
 	}
-
-	if c.User != "" || c.Password != "" {
-		var requiredProperties = [][]string{
-			{"user", c.User},
-			{"password", c.Password},
-		}
-		for _, req := range requiredProperties {
-			if req[1] == "" {
-				return fmt.Errorf("missing '%s'", req[0])
-			}
-		}
-
+	if c.User == "" {
+		return errors.New("missing 'user'")
 	}
 
 	if c.Credentials != nil {
 		switch c.Credentials.AuthType {
 		case UserPassword:
-			if c.Credentials.User == "" {
-				return errors.New("missing 'user'")
-			}
 			if c.Credentials.Password == "" {
 				return errors.New("missing 'password'")
 			}
@@ -335,8 +318,6 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 	var user = c.User
 	var pass = c.Password
 	if c.Credentials != nil {
-		user = c.Credentials.User
-
 		switch c.Credentials.AuthType {
 		case UserPassword:
 			pass = c.Credentials.Password
