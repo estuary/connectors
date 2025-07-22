@@ -106,7 +106,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			return fmt.Errorf("error backfilling table %q: %w", table, err)
 		}
 
-		var event = &sqlcapture.OldChangeEvent{
+		var event = &mysqlChangeEvent{
 			Operation: sqlcapture.InsertOp,
 			RowKey:    rowKey,
 			Source: &mysqlSourceInfo{
