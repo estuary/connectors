@@ -9,6 +9,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"syscall"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -387,9 +388,30 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	err = c.Run(ctx)
+	for isRetryableError(err) {
+		if err := db.Close(ctx); err != nil {
+			log.WithError(err).Warn("error closing old database connection")
+		}
+		db, err = d.Connect(ctx, string(open.Capture.Name), open.Capture.ConfigJson)
+		if err != nil {
+			return fmt.Errorf("error (re)connecting to database: %w", err)
+		}
+		c.Database = db
+		err = c.Run(ctx)
+	}
 	if errors.Is(err, ErrFenceNotReached) {
 		log.Warn("replication stream closed unexpectedly")
 		return nil
 	}
 	return err
+}
+
+func isRetryableError(err error) bool {
+	var networkErrors = []error{syscall.ECONNRESET, syscall.EPIPE, syscall.ETIMEDOUT, syscall.ENETUNREACH}
+	for _, netErr := range networkErrors {
+		if errors.Is(err, netErr) {
+			return true
+		}
+	}
+	return false
 }
