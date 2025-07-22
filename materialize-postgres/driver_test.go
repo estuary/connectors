@@ -39,7 +39,9 @@ func TestValidateAndApply(t *testing.T) {
 		Schema: "public",
 	}
 
-	db, err := stdsql.Open("pgx", cfg.ToURI())
+	uri, err := cfg.ToURI(ctx)
+	require.NoError(t, err)
+	db, err := stdsql.Open("pgx", uri)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -73,7 +75,9 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		Schema: "public",
 	}
 
-	db, err := stdsql.Open("pgx", cfg.ToURI()+"?default_query_exec_mode=exec")
+	uri, err := cfg.ToURI(ctx)
+	require.NoError(t, err)
+	db, err := stdsql.Open("pgx", uri+"?default_query_exec_mode=exec")
 	require.NoError(t, err)
 	defer db.Close()
 

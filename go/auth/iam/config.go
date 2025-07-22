@@ -18,25 +18,16 @@ const (
 )
 
 type AWSConfig struct {
-	// This user is only for JSONSchema purposes. The connector must handle parsing of user and passing it for authentication
-	AWSUser string `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
-
 	AWSRegion string `json:"aws_region" jsonschema:"title=AWS Region,description=AWS Region of your database"`
-	AWSRole   string `json:"aws_role_arn" jsonschema:"title=AWS Role ARN,description=AWS Role which has rds-db:connect access to be assumed by Flow"`
+	AWSRole   string `json:"aws_role_arn" jsonschema:"title=AWS Role ARN,description=AWS Role which has access to the resource which will be assumed by Flow"`
 }
 
 type GCPConfig struct {
-	// This user is only for JSONSchema purposes. The connector must handle parsing of user and passing it for authentication
-	GCPUser string `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
-
 	GCPServiceAccount   string `json:"gcp_service_account_to_impersonate" jsonschema:"title=Service Account,description=GCP Service Account email for Cloud SQL IAM authentication"`
 	GCPWorkloadAudience string `json:"gcp_workload_identity_pool_audience" jsonschema:"title=Workload Identity Pool Audience,description=GCP Workload Identity Pool Audience in the format //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"`
 }
 
 type AzureConfig struct {
-	// This user is only for JSONSchema purposes. The connector must handle parsing of user and passing it for authentication
-	AzureUser string `json:"user" jsonschema:"title=User,description=The database user to authenticate as.,default=flow_capture"`
-
 	AzureClientID string `json:"azure_client_id" jsonschema:"title=Azure Client ID,description=Azure App Registration Client ID for Azure Active Directory authentication"`
 	AzureTenantID string `json:"azure_tenant_id" jsonschema:"title=Azure Tenant ID,description=Azure Tenant ID for Azure Active Directory authentication"`
 }
