@@ -205,7 +205,7 @@ func (d *materialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,
 	existing boilerplate.ExistingResource,
-	update boilerplate.MaterializerBindingUpdate[config, resource, mappedType],
+	update boilerplate.BindingUpdate[config, resource, mappedType],
 ) (string, boilerplate.ActionApplyFn, error) {
 	// No-op since nothing in particular is currently configured for a created collection.
 	return "", nil, nil

@@ -529,7 +529,7 @@ func (d *materialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,
 	existing boilerplate.ExistingResource,
-	update boilerplate.MaterializerBindingUpdate[config, resource, property],
+	update boilerplate.BindingUpdate[config, resource, property],
 ) (string, boilerplate.ActionApplyFn, error) {
 	// ElasticSearch only considers new projections, since index mappings are always nullable.
 	if len(update.NewProjections) == 0 {

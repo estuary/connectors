@@ -152,7 +152,7 @@ func computeSchemaForNewTable(res boilerplate.MappedBinding[config, resource, ma
 func computeSchemaForUpdatedTable(
 	currentHighestID int,
 	current *iceberg.Schema,
-	update boilerplate.MaterializerBindingUpdate[config, resource, mapped],
+	update boilerplate.BindingUpdate[config, resource, mapped],
 ) *iceberg.Schema {
 	var nextFields []iceberg.NestedField
 	for _, f := range current.Fields() {

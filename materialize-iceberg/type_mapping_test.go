@@ -62,7 +62,7 @@ func TestComputeSchemas(t *testing.T) {
 		{ID: 10, Name: "dateToStr" + migrateFieldSuffix, Required: true, Type: &iceberg.Float64Type{}},
 	}
 
-	update := boilerplate.MaterializerBindingUpdate[config, resource, mapped]{
+	update := boilerplate.BindingUpdate[config, resource, mapped]{
 		NewProjections:      []boilerplate.MappedProjection[mapped]{mappedProjection("new", false, iceberg.StringType{})},
 		NewlyNullableFields: []boilerplate.ExistingField{{Name: "dateToStr"}, {Name: "dateToStr" + migrateFieldSuffix}},
 		FieldsToMigrate: []boilerplate.MigrateField[mapped]{

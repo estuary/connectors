@@ -372,7 +372,7 @@ func (d *materialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,
 	existing boilerplate.ExistingResource,
-	update boilerplate.MaterializerBindingUpdate[config, resource, mappedType],
+	update boilerplate.BindingUpdate[config, resource, mappedType],
 ) (string, boilerplate.ActionApplyFn, error) {
 	return d.catalog.UpdateResource(ctx, update)
 }
