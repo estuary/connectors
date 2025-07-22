@@ -10,17 +10,24 @@
         "description": "The host or host:port at which the database can be reached.",
         "order": 0
       },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "The database user to authenticate as.",
+        "default": "flow_capture",
+        "order": 1
+      },
       "database": {
         "type": "string",
         "description": "Logical database name to capture from.",
         "default": "postgres",
-        "order": 1
+        "order": 2
       },
       "historyMode": {
         "type": "boolean",
         "description": "Capture change events without reducing them to a final state.",
         "default": false,
-        "order": 2
+        "order": 3
       },
       "credentials": {
         "oneOf": [
@@ -34,12 +41,6 @@
                 "default": "UserPassword",
                 "order": 0
               },
-              "user": {
-                "type": "string",
-                "title": "User",
-                "description": "The database user to authenticate as.",
-                "default": "flow_capture"
-              },
               "password": {
                 "type": "string",
                 "title": "Password",
@@ -49,10 +50,9 @@
             },
             "type": "object",
             "required": [
-              "user",
               "password"
             ],
-            "title": "User and Password"
+            "title": "Password"
           },
           {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -64,12 +64,6 @@
                 "default": "AWSIAM",
                 "order": 0
               },
-              "user": {
-                "type": "string",
-                "title": "User",
-                "description": "The database user to authenticate as.",
-                "default": "flow_capture"
-              },
               "aws_region": {
                 "type": "string",
                 "title": "AWS Region",
@@ -78,12 +72,11 @@
               "aws_role_arn": {
                 "type": "string",
                 "title": "AWS Role ARN",
-                "description": "AWS Role which has rds-db:connect access to be assumed by Flow"
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
               }
             },
             "type": "object",
             "required": [
-              "user",
               "aws_region",
               "aws_role_arn"
             ],
@@ -99,12 +92,6 @@
                 "default": "GCPIAM",
                 "order": 0
               },
-              "user": {
-                "type": "string",
-                "title": "User",
-                "description": "The database user to authenticate as.",
-                "default": "flow_capture"
-              },
               "gcp_service_account_to_impersonate": {
                 "type": "string",
                 "title": "Service Account",
@@ -118,11 +105,38 @@
             },
             "type": "object",
             "required": [
-              "user",
               "gcp_service_account_to_impersonate",
               "gcp_workload_identity_pool_audience"
             ],
             "title": "Google Cloud IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/azure-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AzureIAM",
+                "default": "AzureIAM",
+                "order": 0
+              },
+              "azure_client_id": {
+                "type": "string",
+                "title": "Azure Client ID",
+                "description": "Azure App Registration Client ID for Azure Active Directory authentication"
+              },
+              "azure_tenant_id": {
+                "type": "string",
+                "title": "Azure Tenant ID",
+                "description": "Azure Tenant ID for Azure Active Directory authentication"
+              }
+            },
+            "type": "object",
+            "required": [
+              "azure_client_id",
+              "azure_tenant_id"
+            ],
+            "title": "Azure IAM"
           }
         ],
         "type": "object",
@@ -133,7 +147,7 @@
         "discriminator": {
           "propertyName": "auth_type"
         },
-        "order": 3,
+        "order": 4,
         "x-iam-auth": true
       },
       "advanced": {
@@ -248,6 +262,7 @@
     "type": "object",
     "required": [
       "address",
+      "user",
       "database",
       "historyMode",
       "credentials"
