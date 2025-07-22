@@ -10,8 +10,8 @@ import (
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 )
 
@@ -449,7 +449,7 @@ const queryDiscoverTables = `
     AND c.relpersistence = 'p'
     AND c.relkind IN ('r', 'p');` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
 
-func getTables(ctx context.Context, conn *pgx.Conn, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
 	logrus.Debug("listing all tables in the database")
 	var tables []*sqlcapture.DiscoveryInfo
 	var rows, err = conn.Query(ctx, queryDiscoverTables)
@@ -501,7 +501,7 @@ const queryDiscoverColumns = `
 	  AND (c.relkind = ANY (ARRAY['r'::"char", 'v'::"char", 'f'::"char", 'p'::"char"]))
 	ORDER BY nc.nspname, c.relname, a.attnum;`
 
-func getColumns(ctx context.Context, conn *pgx.Conn) ([]sqlcapture.ColumnInfo, error) {
+func getColumns(ctx context.Context, conn *pgxpool.Pool) ([]sqlcapture.ColumnInfo, error) {
 	logrus.Debug("listing all columns in the database")
 	var columns []sqlcapture.ColumnInfo
 	var rows, err = conn.Query(ctx, queryDiscoverColumns)
@@ -601,7 +601,7 @@ const queryDiscoverPrimaryKeys = `
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(ctx context.Context, conn *pgx.Conn) (map[sqlcapture.StreamID][]string, error) {
+func getPrimaryKeys(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID][]string, error) {
 	logrus.Debug("listing all primary-key columns in the database")
 	var keys = make(map[sqlcapture.StreamID][]string)
 	var rows, err = conn.Query(ctx, queryDiscoverPrimaryKeys)
@@ -646,7 +646,7 @@ WHERE r.column_number = (r.index_keys).x
 ORDER BY r.table_schema, r.table_name, r.index_name, (r.index_keys).n
 `
 
-func getSecondaryIndexes(ctx context.Context, conn *pgx.Conn) (map[sqlcapture.StreamID]map[string][]string, error) {
+func getSecondaryIndexes(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID]map[string][]string, error) {
 	logrus.Debug("listing secondary indexes")
 	// Run the 'list secondary indexes' query and aggregate results into
 	// a `map[StreamID]map[IndexName][]ColumnName`
@@ -688,7 +688,7 @@ const queryListGeneratedColumns = `
 	ORDER BY n.nspname, c.relname, a.attname;
 `
 
-func getGeneratedColumns(ctx context.Context, conn *pgx.Conn) (map[sqlcapture.StreamID][]string, error) {
+func getGeneratedColumns(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID][]string, error) {
 	logrus.Debug("listing generated columns")
 	var rows, err = conn.Query(ctx, queryListGeneratedColumns)
 	if err != nil {
@@ -727,7 +727,7 @@ type columnDescription struct {
 	Description string
 }
 
-func getColumnDescriptions(ctx context.Context, conn *pgx.Conn) ([]columnDescription, error) {
+func getColumnDescriptions(ctx context.Context, conn *pgxpool.Pool) ([]columnDescription, error) {
 	var descriptions []columnDescription
 	var rows, err = conn.Query(ctx, queryColumnDescriptions)
 	if err != nil {
@@ -744,7 +744,7 @@ func getColumnDescriptions(ctx context.Context, conn *pgx.Conn) ([]columnDescrip
 	return descriptions, rows.Err()
 }
 
-func queryAndLogCurrentXID(ctx context.Context, conn *pgx.Conn) {
+func queryAndLogCurrentXID(ctx context.Context, conn *pgxpool.Pool) {
 	var xid uint64
 	const query = "SELECT txid_snapshot_xmin(txid_current_snapshot())"
 	if err := conn.QueryRow(ctx, query).Scan(&xid); err == nil {

@@ -20,6 +20,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/sirupsen/logrus"
 )
 
@@ -300,7 +301,7 @@ func configSchema() json.RawMessage {
 
 type postgresDatabase struct {
 	config          *Config
-	conn            *pgx.Conn
+	conn            *pgxpool.Pool
 	explained       map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs    map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
 	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
@@ -324,15 +325,36 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		"slot":     db.config.Advanced.SlotName,
 	}).Info("initializing connector")
 
-	// Normal database connection used for table scanning
-	var config, err = pgx.ParseConfig(db.config.ToURI())
+	// Normal database connection used for query execution
+	var config, err = pgxpool.ParseConfig(db.config.ToURI())
 	if err != nil {
 		return fmt.Errorf("error parsing database uri: %w", err)
 	}
-	if config.ConnectTimeout == 0 {
-		config.ConnectTimeout = 20 * time.Second
+	if config.ConnConfig.ConnectTimeout == 0 {
+		config.ConnConfig.ConnectTimeout = 20 * time.Second
 	}
-	conn, err := pgx.ConnectConfig(ctx, config)
+	config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		// Register custom datatype handling details.
+		if err := registerDatatypeTweaks(ctx, conn, conn.TypeMap()); err != nil {
+			return err
+		}
+
+		// Attempt (non-fatal) to set the statement_timeout parameter to zero so backfill
+		// queries never get interrupted.
+		if _, err := conn.Exec(ctx, "SET statement_timeout = 0;"); err != nil {
+			logrus.WithField("err", err).Debug("failed to set statement_timeout = 0")
+		}
+
+		// Ask the database never to use parallel workers for our queries. In general they shouldn't
+		// be something we need, and sometimes the query planner makes really bad decisions when they
+		// are used, most notably when it sees a simple `WHERE ctid > $1 AND ctid <= $2` keyless backfill
+		// query and decides to use parallel workers scanning the entire table instead of a TID Range Scan.
+		if _, err := conn.Exec(ctx, "SET max_parallel_workers_per_gather TO 0"); err != nil {
+			logrus.WithField("err", err).Warn("error attempting to disable parallel workers")
+		}
+		return nil
+	}
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		var pgErr *pgconn.PgError
 
@@ -349,38 +371,22 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 
 		return fmt.Errorf("unable to connect to database: %w", err)
 	}
-	if err := registerDatatypeTweaks(ctx, conn, conn.TypeMap()); err != nil {
-		return err
-	}
 
-	// Attempt (non-fatal) to set the statement_timeout parameter to zero, then
-	// independently of that log a warning if it's nonzero.
-	if _, err := conn.Exec(ctx, "SET statement_timeout = 0;"); err != nil {
-		logrus.WithField("err", err).Debug("failed to set statement_timeout = 0")
-	}
+	// Since we attempted in the AfterConnect function to set statement_timeout = 0, we
+	// should log an informational message if it's now nonzero.
 	var statementTimeout string
-	if err := conn.QueryRow(ctx, "SHOW statement_timeout").Scan(&statementTimeout); err != nil {
+	if err := pool.QueryRow(ctx, "SHOW statement_timeout").Scan(&statementTimeout); err != nil {
 		logrus.WithField("err", err).Warn("failed to query statement_timeout")
 	} else if statementTimeout != "0" {
-		logrus.WithField("timeout", statementTimeout).Warn("nonzero statement_timeout")
+		logrus.WithField("timeout", statementTimeout).Info("nonzero statement_timeout")
 	}
 
-	// Ask the database never to use parallel workers for our queries. In general they shouldn't
-	// be something we need, and sometimes the query planner makes really bad decisions when they
-	// are used, most notably when it sees a simple `WHERE ctid > $1 AND ctid <= $2` keyless backfill
-	// query and decides to use parallel workers scanning the entire table instead of a TID Range Scan.
-	if _, err := conn.Exec(ctx, "SET max_parallel_workers_per_gather TO 0"); err != nil {
-		logrus.WithField("err", err).Warn("error attempting to disable parallel workers")
-	}
-
-	db.conn = conn
+	db.conn = pool
 	return nil
 }
 
 func (db *postgresDatabase) Close(ctx context.Context) error {
-	if err := db.conn.Close(ctx); err != nil {
-		return fmt.Errorf("error closing database connection: %w", err)
-	}
+	db.conn.Close()
 	return nil
 }
 
