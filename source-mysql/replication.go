@@ -1113,15 +1113,6 @@ func (rs *mysqlReplicationStream) isNonTransactional(streamID sqlcapture.StreamI
 	return rs.tables.nonTransactional[streamID]
 }
 
-// splitStreamID is the inverse of JoinStreamID and splits a stream name back into
-// separate schema and table name components. Its use is generally kind of a hack
-// and suggests that the surrounding plumbing is probably subtly wrong, because the
-// normalization from schema+table to stream IDs is supposed to go one way only.
-func splitStreamID(streamID string) (string, string) {
-	var bits = strings.SplitN(streamID, ".", 2)
-	return bits[0], bits[1]
-}
-
 func (rs *mysqlReplicationStream) keyColumns(streamID sqlcapture.StreamID) ([]string, bool) {
 	rs.tables.RLock()
 	defer rs.tables.RUnlock()
