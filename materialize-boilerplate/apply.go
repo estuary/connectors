@@ -100,8 +100,6 @@ func runActions(ctx context.Context, actions []ActionApplyFn, descriptions []str
 		group.SetLimit(maxConcurrentUpdateActions)
 
 		for i, a := range actions {
-			a := a
-			i := i
 			group.Go(func() error {
 				if err := a(groupCtx); err != nil {
 					if !errors.Is(err, context.Canceled) {
