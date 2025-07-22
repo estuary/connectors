@@ -531,8 +531,14 @@ async def _binding_incremental_task_with_work_item(
                 return_when=asyncio.FIRST_COMPLETED
             )
 
+            # Pending tasks must be cancelled _and_ cleaned up by awaiting them otherwise they'll
+            # accumulate in the event loop's internal state and cause a slow memory leak.
             for p in pending:
                 p.cancel()
+                try:
+                    await p
+                except asyncio.CancelledError:
+                    pass
 
             if done:
                 task.log.debug(
