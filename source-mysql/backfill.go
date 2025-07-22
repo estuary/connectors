@@ -107,19 +107,21 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		}
 
 		var event = &mysqlChangeEvent{
-			Operation: sqlcapture.InsertOp,
-			RowKey:    rowKey,
-			Source: &mysqlSourceInfo{
-				SourceCommon: sqlcapture.SourceCommon{
-					Millis:   0, // Not known.
-					Schema:   schema,
-					Snapshot: true,
-					Table:    table,
+			Info: &mysqlChangeSharedInfo{StreamID: streamID},
+			Meta: mysqlChangeMetadata{
+				Operation: sqlcapture.InsertOp,
+				Source: mysqlSourceInfo{
+					SourceCommon: sqlcapture.SourceCommon{
+						Millis:   0, // Not known.
+						Schema:   schema,
+						Snapshot: true,
+						Table:    table,
+					},
+					EventCursor: fmt.Sprintf("backfill:%d", rowOffset),
 				},
-				EventCursor: fmt.Sprintf("backfill:%d", rowOffset),
 			},
-			Before: nil,
-			After:  fields,
+			RowKey: rowKey,
+			Values: fields,
 		}
 		if err := callback(event); err != nil {
 			return fmt.Errorf("error processing change event: %w", err)
