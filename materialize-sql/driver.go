@@ -269,7 +269,7 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,
 	existingResource boilerplate.ExistingResource,
-	bindingUpdate boilerplate.MaterializerBindingUpdate[EC, RC, MappedType],
+	bindingUpdate boilerplate.BindingUpdate[EC, RC, MappedType],
 ) (string, boilerplate.ActionApplyFn, error) {
 	table, err := getTable(s.endpoint, s.materializationName, bindingUpdate.Binding)
 	if err != nil {

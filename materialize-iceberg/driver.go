@@ -343,7 +343,7 @@ func (d *materialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,
 	existing boilerplate.ExistingResource,
-	update boilerplate.MaterializerBindingUpdate[config, resource, mapped],
+	update boilerplate.BindingUpdate[config, resource, mapped],
 ) (string, boilerplate.ActionApplyFn, error) {
 	if len(update.NewProjections) == 0 && len(update.NewlyNullableFields) == 0 && len(update.FieldsToMigrate) == 0 {
 		return "", nil, nil

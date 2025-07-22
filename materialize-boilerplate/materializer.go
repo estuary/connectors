@@ -150,10 +150,10 @@ func (mb *MappedBinding[EC, RC, MT]) convertTuple(in tuple.Tuple, offset int, ou
 	return out, nil
 }
 
-// MaterializerBindingUpdate is a distilled representation of the typical kinds
+// BindingUpdate is a distilled representation of the typical kinds
 // of changes a destination system will care about in response to a new binding
 // or change to an existing binding.
-type MaterializerBindingUpdate[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
+type BindingUpdate[EC EndpointConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
 	Binding             MappedBinding[EC, RC, MT]
 	NewProjections      []MappedProjection[MT]
 	NewlyNullableFields []ExistingField
@@ -281,7 +281,7 @@ type Materializer[
 	// even if there are no pre-computed updates. This is to allow
 	// materializations to perform additional specific actions on binding
 	// changes that are not covered by the general cases.
-	UpdateResource(context.Context, []string, ExistingResource, MaterializerBindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
+	UpdateResource(context.Context, []string, ExistingResource, BindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
 
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
@@ -450,7 +450,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		actionDescriptions = append(actionDescriptions, desc)
 	}
 
-	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is, mCfg.CaseInsensitiveFields)
+	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
 	if err != nil {
 		return nil, err
 	}
@@ -497,14 +497,14 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			return nil, err
 		}
 
-		update := MaterializerBindingUpdate[EC, RC, MT]{
+		update := BindingUpdate[EC, RC, MT]{
 			Binding:             *mb,
-			NewlyNullableFields: commonUpdates.NewlyNullableFields,
-			NewlyDeltaUpdates:   commonUpdates.NewlyDeltaUpdates,
+			NewlyNullableFields: commonUpdates.newlyNullableFields,
+			NewlyDeltaUpdates:   commonUpdates.newlyDeltaUpdates,
 		}
 
 		ps := mb.SelectedProjections()
-		for _, p := range commonUpdates.NewProjections {
+		for _, p := range commonUpdates.newProjections {
 			i := slices.IndexFunc(ps, func(pp MappedProjection[MT]) bool {
 				return pp.Field == p.Field
 			})
