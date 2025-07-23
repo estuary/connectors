@@ -79,6 +79,7 @@ class GraphQLError(BaseModel, extra="allow"):
         code: str = Field(
             default="INTERNAL_SERVER_ERROR"
         )  # Default code for errors if the API does not specify one.
+        status_code: int | None = None
         complexity: int | None = None
         maxComplexity: int | None = None
 
