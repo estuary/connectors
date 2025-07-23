@@ -28,7 +28,7 @@ endpoint_url = "https://api.intacct.com/ia/xml/xmlgw.phtml"
 
 DATATYPE_MAP: dict[str, Any] = {
     "TEXT": str,
-    "INTEGER": int,
+    "INTEGER": int | float, # We have seen instances of string-encoded floats in "INTEGER" fields.
     "BOOLEAN": bool,
     "DATE": str,
     "TIMESTAMP": AwareDatetime,
@@ -321,10 +321,9 @@ class Sage:
             return self.deletion_model
 
         field_defs: dict[str, Any] = {
-            "OBJECTTYPE": (str, None),
-            "ACCESSMODE": (str, None),
             "OBJECTKEY": (str, None),
-            "ACCESSTIME": (str, None),
+            "ACCESSTIME": (AwareDatetime, None),
+            "ID": (str, None),
         }
         model = create_model(
             "DELETIONS",
@@ -332,8 +331,8 @@ class Sage:
             **field_defs,
         )
         model.tz_dt = self.tz_dt
-        model.field_names = ["OBJECTTYPE", "ACCESSMODE", "OBJECTKEY", "ACCESSTIME"]
-        model.field_datatypes = ["TEXT", "TEXT", "TEXT", "TIMESTAMP"]
+        model.field_names = ["OBJECTKEY", "ACCESSTIME", "ID"]
+        model.field_datatypes = ["TEXT", "TIMESTAMP", "TEXT"]
         self.deletion_model = model
 
         return model
