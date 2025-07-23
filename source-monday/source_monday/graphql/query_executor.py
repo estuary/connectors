@@ -32,6 +32,56 @@ COMPLEXITY_RESET_WAIT_SECONDS = 60
 # Maximum number of retry attempts for transient GraphQL query failures
 MAX_RETRY_ATTEMPTS = 5
 
+# Error codes for specific exceptions returned by the GraphQL API
+INTERNAL_SERVER_ERROR_CODE = "INTERNAL_SERVER_ERROR"
+CURSOR_EXCEPTION_CODE = "CursorException"
+USER_UNAUTHORIZED_CODE = "USER_UNAUTHORIZED"
+USER_NOT_AUTHENTICATED_CODE = "USER_NOT_AUTHENTICATED"
+GRAPHQL_VALIDATION_FAILED_CODE = "GRAPHQL_VALIDATION_FAILED"
+INVALID_GRAPHQL_REQUEST_CODE = "INVALID_GRAPHQL_REQUEST"
+PARSING_ERROR_CODE = "PARSING_ERROR"
+UNDEFINED_FIELD_CODE = "undefinedField"
+UNDEFINED_TYPE_CODE = "undefinedType"
+BAD_REQUEST_CODE = "BadRequest"
+ARGUMENT_LITERAL_IS_INCOMPATIBLE_CODE = "argumentLiteralsIncompatible"
+RATE_LIMIT_EXCEEDED_CODE = "RATE_LIMIT_EXCEEDED"
+COMPLEXITY_EXCEPTION_CODE = "ComplexityException"
+COLUMN_VALUE_EXCEPTION_CODE = "ColumnValueException"
+RESOURCE_NOT_FOUND_EXCEPTION_CODE = "ResourceNotFoundException"
+
+RETRIABLE_ERRORS = {
+    INTERNAL_SERVER_ERROR_CODE,  # 500 - Server errors are often transient
+    RATE_LIMIT_EXCEEDED_CODE,
+    COMPLEXITY_EXCEPTION_CODE,
+}
+
+NON_RETRIABLE_ERRORS = {
+    USER_UNAUTHORIZED_CODE,
+    USER_NOT_AUTHENTICATED_CODE,
+    GRAPHQL_VALIDATION_FAILED_CODE,
+    INVALID_GRAPHQL_REQUEST_CODE,
+    PARSING_ERROR_CODE,
+    UNDEFINED_FIELD_CODE,
+    UNDEFINED_TYPE_CODE,
+    BAD_REQUEST_CODE,
+    ARGUMENT_LITERAL_IS_INCOMPATIBLE_CODE,
+    RESOURCE_NOT_FOUND_EXCEPTION_CODE,
+    COLUMN_VALUE_EXCEPTION_CODE,
+    CURSOR_EXCEPTION_CODE,
+}
+
+STATUS_CODE_PRIORITY = {
+    401: 1,
+    403: 2,
+    404: 3,
+    400: 4,
+    429: 5,
+    500: 6,
+    502: 7,
+    503: 8,
+    200: 99,  # Success (shouldn't raise but included for completeness)
+}
+
 TGraphqlData = TypeVar("TGraphqlData", bound=BaseModel)
 TRemainder = TypeVar("TRemainder", bound=GraphQLResponseRemainder, contravariant=True)
 
@@ -80,6 +130,62 @@ def _add_query_complexity(log: Logger, query: str) -> str:
     return query
 
 
+def _get_primary_error_info(
+    errors: list[GraphQLError],
+) -> tuple[int, str | None, bool, int]:
+    """
+    Analyze multiple errors and determine the primary status code and whether to retry.
+
+    Returns: (status_code, error_code, should_retry, wait_seconds)
+    """
+    if not errors:
+        return 500, None, True, 2
+
+    error_details = []
+    for error in errors:
+        if error.extensions:
+            status_code = error.extensions.status_code
+            code = error.extensions.code
+            error_details.append(
+                {
+                    "status_code": status_code,
+                    "code": code,
+                    "error": error,
+                    "priority": STATUS_CODE_PRIORITY.get(status_code, 99)
+                    if status_code
+                    else 99,
+                }
+            )
+
+    if not error_details:
+        # No extensions found, treat as generic server error
+        return 500, None, True, 2
+
+    error_details.sort(key=lambda x: x["priority"])
+    primary_error = error_details[0]
+
+    code = primary_error["code"]
+    status_code = primary_error["status_code"]
+
+    if code in NON_RETRIABLE_ERRORS:
+        return status_code, code, False, 0
+    elif code == CURSOR_EXCEPTION_CODE:
+        return status_code, code, False, 0
+    elif code == RATE_LIMIT_EXCEEDED_CODE:
+        return status_code, code, True, 60
+    elif code == COMPLEXITY_EXCEPTION_CODE:
+        return status_code, code, True, 30
+    elif code in RETRIABLE_ERRORS:
+        return status_code, code, True, 2
+    else:
+        if status_code >= 500:
+            return status_code, code, True, 2
+        elif status_code >= 400:
+            return status_code, code, False, 0
+        else:
+            return status_code, code, True, 2
+
+
 async def execute_query(
     cls: type[TGraphqlData],
     http: HTTPSession,
@@ -107,6 +213,7 @@ async def execute_query(
 
     attempt = 1
     modified_query = _add_query_complexity(log, query)
+    reset_in_seconds = None
 
     while True:
         try:
@@ -134,6 +241,9 @@ async def execute_query(
 
             remainder = processor.get_remainder()
 
+            if remainder.data and remainder.data.complexity:
+                reset_in_seconds = remainder.data.complexity.reset_in_x_seconds
+
             if remainder.has_errors():
                 raise GraphQLQueryError(remainder.get_errors())
 
@@ -160,102 +270,95 @@ async def execute_query(
                             "threshold": LOW_COMPLEXITY_BUDGET,
                             "reset_wait_seconds": remainder.data.complexity.reset_in_x_seconds,
                             "query_complexity": remainder.data.complexity.query,
-                        }
+                        },
                     )
                     await asyncio.sleep(remainder.data.complexity.reset_in_x_seconds)
 
             return
 
         except GraphQLQueryError as e:
-            for error in e.errors:
-                if error.extensions:
-                    if error.extensions.complexity and error.extensions.maxComplexity:
-                        if error.extensions.complexity > error.extensions.maxComplexity:
-                            log.error(
-                                "GraphQL query permanently exceeds complexity limit - cannot be retried",
-                                {
-                                    "query_complexity": error.extensions.complexity,
-                                    "max_allowed_complexity": error.extensions.maxComplexity,
-                                    "complexity_ratio": round(error.extensions.complexity / error.extensions.maxComplexity, 2),
-                                    "query_preview": query[:200] + "..." if len(query) > 200 else query,
-                                    "variables": variables,
-                                    "json_path": json_path,
-                                    "response_model": cls.__name__,
-                                },
-                            )
-                            raise
+            status_code, error_code, should_retry, wait_seconds = (
+                _get_primary_error_info(e.errors)
+            )
+            if reset_in_seconds is not None:
+                wait_seconds = reset_in_seconds
 
-                if (
-                    "ComplexityException" in str(error)
-                    or "complexity" in str(error).lower()
-                ):
-                    log.warning(
-                        f"Hit complexity limit during query execution (attempt {attempt})",
-                        {
-                            "error": str(error),
-                            "will_retry_in_seconds": COMPLEXITY_RESET_WAIT_SECONDS,
-                        },
-                    )
-                    await asyncio.sleep(COMPLEXITY_RESET_WAIT_SECONDS)
-                    attempt += 1
-                    break
-
-            if attempt == MAX_RETRY_ATTEMPTS:
-                log.error(
-                    "GraphQL streaming query failed permanently",
+            log_context = {
+                "primary_status_code": status_code,
+                "primary_error_code": error_code,
+                "all_errors": [
                     {
-                        "total_attempts": attempt,
-                        "final_error": str(e),
-                        "variables": variables,
-                        "json_path": json_path,
-                        "response_model": cls.__name__,
-                    },
-                )
+                        "message": err.message,
+                        "code": err.extensions.code if err.extensions else None,
+                        "status_code": err.extensions.status_code
+                        if err.extensions
+                        else None,
+                    }
+                    for err in e.errors
+                ],
+                "attempt": attempt,
+                "max_attempts": MAX_RETRY_ATTEMPTS,
+                "will_retry": should_retry and attempt < MAX_RETRY_ATTEMPTS,
+            }
+
+            if not should_retry:
+                if error_code == CURSOR_EXCEPTION_CODE:
+                    log.error("Cursor expired - need new cursor", log_context)
+                    # TODO(jsmith): If this becomes a recurrent issue, consider
+                    # implementing a cursor refresh instead of failing
+                else:
+                    log.error(
+                        f"Non-retriable error with status {status_code}", log_context
+                    )
                 raise
 
-            retry_delay = attempt * 2
-            log.warning(
-                "GraphQL query failed - retrying with exponential backoff",
-                {
-                    "error": str(e),
-                    "attempt": attempt,
-                    "max_attempts": MAX_RETRY_ATTEMPTS,
-                    "query_preview": modified_query[:100] + "..." if len(modified_query) > 100 else modified_query,
-                    "variables": variables,
-                    "json_path": json_path,
-                    "response_model": cls.__name__,
-                    "retry_delay_seconds": retry_delay,
-                },
-            )
-            await asyncio.sleep(retry_delay)
+            if attempt >= MAX_RETRY_ATTEMPTS:
+                log.error("Max retries exhausted", log_context)
+                raise
+
+            if error_code == RATE_LIMIT_EXCEEDED_CODE:
+                log.warning(f"Rate limit hit, waiting {wait_seconds}s", log_context)
+            elif error_code == COMPLEXITY_EXCEPTION_CODE:
+                log.warning(
+                    f"Complexity limit hit, waiting {wait_seconds}s", log_context
+                )
+            else:
+                wait_seconds = min(wait_seconds * attempt, 60)
+                log.warning(f"Retriable error, waiting {wait_seconds}s", log_context)
+
+            await asyncio.sleep(wait_seconds)
             attempt += 1
 
+        except ValidationError as e:
+            log.error(
+                "Response validation failed",
+                {
+                    "error": str(e),
+                    "attempt": attempt,
+                },
+            )
+            raise
+
         except Exception as e:
-            if attempt == MAX_RETRY_ATTEMPTS or isinstance(e, ValidationError):
+            if attempt >= MAX_RETRY_ATTEMPTS:
                 log.error(
-                    "GraphQL streaming query failed permanently",
+                    "Unexpected error after max retries",
                     {
-                        "total_attempts": attempt,
-                        "final_error": str(e),
-                        "variables": variables,
-                        "json_path": json_path,
-                        "response_model": cls.__name__,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "attempt": attempt,
                     },
                 )
                 raise
 
+            wait_seconds = min(2 * attempt, 30)
             log.warning(
-                "GraphQL streaming query failed, will retry",
+                f"Unexpected error, retrying in {wait_seconds}s",
                 {
                     "error": str(e),
+                    "error_type": type(e).__name__,
                     "attempt": attempt,
-                    "query": modified_query,
-                    "variables": variables,
-                    "json_path": json_path,
-                    "response_model": cls.__name__,
-                    "next_retry_delay_s": attempt * 2,
                 },
             )
-
-            await asyncio.sleep(attempt * 2)
+            await asyncio.sleep(wait_seconds)
             attempt += 1
