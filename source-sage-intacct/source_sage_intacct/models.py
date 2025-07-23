@@ -174,8 +174,8 @@ class IncrementalResource(BaseDocument, extra="allow"):
 
 
 class DeletionRecord(BaseDocument, extra="forbid"):
-    RECORDNO: int = Field(alias="OBJECTKEY")
-    WHENMODIFIED: AwareDatetime = Field(alias="ACCESSTIME")
+    RECORDNO: int = Field(alias="OBJECTKEY", serialization_alias="RECORDNO")
+    WHENMODIFIED: AwareDatetime = Field(alias="ACCESSTIME", serialization_alias="WHENMODIFIED")
     ID: str = Field(exclude=True)
 
     meta_: "DeletionRecord.Meta" = Field(
@@ -187,6 +187,22 @@ class DeletionRecord(BaseDocument, extra="forbid"):
     def parse_object_key(cls, value: str) -> int:
         assert isinstance(value, str)
 
+        # Handle case where OBJECTKEY is just a stringified integer, as it is
+        # for TASK objects and perhaps others.
+        if "--" not in value:
+            try:
+                record_no = int(value)
+                if record_no <= 0:
+                    raise ValueError(
+                        f"RECORDNO in OBJECTKEY must be positive, got {record_no}"
+                    )
+                return record_no
+            except ValueError:
+                raise ValueError(
+                    f"OBJECTKEY must be an integer or in format 'RECORDNO--REC', got {value}"
+                )
+
+        # Handle case where OBJECTKEY is in format "RECORDNO--REC".
         parts = value.split("--")
         if len(parts) != 2:
             raise ValueError(

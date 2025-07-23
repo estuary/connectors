@@ -151,6 +151,9 @@ async def fetch_deletions(
         fetch_since=sage.fetch_deleted,
         fetch_at=sage.fetch_deleted_at,
     ):
+        if isinstance(item, DeletionRecord):
+            item.meta_ = item.Meta(op="d")
+
         yield item
 
 
