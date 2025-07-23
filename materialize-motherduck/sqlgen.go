@@ -169,6 +169,7 @@ SELECT * FROM read_json(
 	],
 	format='newline_delimited',
 	compression='gzip',
+	maximum_object_size=1073741824,
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
