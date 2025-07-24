@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
+	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/sirupsen/logrus"
@@ -78,9 +80,6 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	// Execute the backfill query to fetch rows from the database
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 
-	// Construct shared info struct
-	var sharedChangeInfo = &mysqlChangeSharedInfo{StreamID: streamID}
-
 	// Construct prototype change metadata which will be copied for all rows of this binlog event
 	var prototypeChangeMetadata = mysqlChangeMetadata{
 		Operation: sqlcapture.InsertOp,
@@ -101,12 +100,54 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
 
+	// Efficient indices and transcoder arrays for value processing. Constructed when we
+	// process the first result row.
+	var isFirstResult = true
+	var columnNames []string                    // Names of all columns, in table order.
+	var rowKeyIndices []int                     // Indices of key columns in the table, in key order.
+	var outputColumnNames []string              // Names of all columns with omitted columns set to "", in table order, plus _meta.
+	var outputTranscoders []jsonTranscoder      // Transcoders from DB values to JSON, with omitted columns set to nil.
+	var rowKeyTranscoders []fdbTranscoder       // Transcoders from DB values to FDB row keys, with non-key columns set to nil.
+	var sharedChangeInfo *mysqlChangeSharedInfo // Shared info struct reused across multiple change events from this table.
+	var values []any                            // Values of the current row, in table order.
+
 	var result mysql.Result
 	defer result.Close() // Ensure the resultset allocated during QueryStreaming is returned to the pool when done
 	if err := db.conn.WithTimeout(BackfillQueryTimeout).QueryStreaming(query, args, &result, func(row []mysql.FieldValue) error {
-		var fields = make(map[string]any)
-		for idx, val := range row {
-			fields[string(result.Fields[idx].Name)] = val.Value()
+		if isFirstResult {
+			isFirstResult = false
+			values = make([]any, len(result.Fields))
+			columnNames = make([]string, len(result.Fields))
+			rowKeyIndices = make([]int, len(keyColumns))
+			outputColumnNames = make([]string, len(result.Fields))
+			outputTranscoders = make([]jsonTranscoder, len(result.Fields))
+			rowKeyTranscoders = make([]fdbTranscoder, len(result.Fields))
+			for idx, field := range result.Fields {
+				var colName = string(field.Name)
+				columnNames[idx] = colName
+				outputColumnNames[idx] = colName
+				outputTranscoders[idx] = db.constructJSONTranscoder(true, columnTypes[colName])
+				if slices.Contains(keyColumns, colName) {
+					rowKeyTranscoders[idx] = db.constructFDBTranscoder(true, columnTypes[colName])
+				}
+			}
+			outputColumnNames = append(outputColumnNames, "_meta")
+			for keyIndex, keyColName := range keyColumns {
+				var columnIndex = slices.Index(columnNames, keyColName)
+				if columnIndex < 0 {
+					return fmt.Errorf("key column %q not found in relation %q", keyColName, streamID)
+				}
+				rowKeyIndices[keyIndex] = columnIndex
+			}
+			sharedChangeInfo = &mysqlChangeSharedInfo{
+				StreamID:    streamID,
+				Shape:       encrow.NewShape(outputColumnNames),
+				Transcoders: outputTranscoders,
+			}
+		}
+
+		for idx := range row {
+			values[idx] = row[idx].Value()
 		}
 
 		var rowKey []byte
@@ -114,22 +155,18 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		if state.Mode == sqlcapture.TableStateKeylessBackfill {
 			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
 		} else {
-			rowKey, err = sqlcapture.EncodeRowKey(keyColumns, fields, columnTypes, encodeKeyFDB)
+			rowKey, err = encodeRowKey(columnNames, rowKeyIndices, rowKeyTranscoders, values)
 			if err != nil {
 				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
 		}
 		nextRowKey = rowKey
 
-		if err := db.translateRecordFields(true, columnTypes, fields); err != nil {
-			return fmt.Errorf("error backfilling table %q: %w", table, err)
-		}
-
 		var event = &mysqlChangeEvent{
 			Info:   sharedChangeInfo,
 			Meta:   prototypeChangeMetadata,
 			RowKey: rowKey,
-			Values: fields,
+			Values: values,
 		}
 		event.Meta.Source.Cursor.RowIndex = rowOffset
 		if err := callback(event); err != nil {

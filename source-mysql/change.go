@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/invopop/jsonschema"
@@ -25,16 +26,51 @@ func (evt *mysqlCommitEvent) AppendJSON(buf []byte) ([]byte, error) {
 	return json.AppendEscape(buf, cursorString, 0), nil
 }
 
+// A jsonTranscoder is something which can transcode a MySQL value into JSON.
+type jsonTranscoder interface {
+	TranscodeJSON(buf []byte, v any) ([]byte, error)
+}
+
+// An fdbTranscoder is something which can transcode a MySQL value into an FDB tuple value.
+type fdbTranscoder interface {
+	TranscodeFDB(buf []byte, v any) ([]byte, error)
+}
+
+type jsonTranscoderFunc func(buf []byte, v any) ([]byte, error)
+
+func (f jsonTranscoderFunc) TranscodeJSON(buf []byte, v any) ([]byte, error) {
+	if v == nil {
+		// A nil byte slice should always be serialized as JSON null.
+		return append(buf, []byte("null")...), nil
+	}
+	return f(buf, v)
+}
+
+type fdbTranscoderFunc func(buf []byte, v any) ([]byte, error)
+
+func (f fdbTranscoderFunc) TranscodeFDB(buf []byte, v any) ([]byte, error) {
+	if v == nil {
+		// In general row keys don't contain nil values, but it is possible in
+		// certain corner cases (mainly involving overriding the row key selection
+		// to something other than the primary key). In that case, we should always
+		// translate a nil byte slice to the nil tuple element 0x00.
+		return append(buf, 0x00), nil
+	}
+	return f(buf, v)
+}
+
 type mysqlChangeEvent struct {
 	Info *mysqlChangeSharedInfo // Information about the source table structure which is shared across events.
 
 	Meta   mysqlChangeMetadata // Document metadata object representing the _meta property
 	RowKey []byte
-	Values map[string]any
+	Values []any
 }
 
 type mysqlChangeSharedInfo struct {
-	StreamID sqlcapture.StreamID // StreamID of the table this change event came from.
+	StreamID    sqlcapture.StreamID // StreamID of the table this change event came from.
+	Shape       *encrow.Shape       // Shape of the row values, used to serialize them to JSON.
+	Transcoders []jsonTranscoder    // Transcoders for column values, in DB column order.
 }
 
 type mysqlChangeMetadata struct {
@@ -42,7 +78,7 @@ type mysqlChangeMetadata struct {
 
 	Operation sqlcapture.ChangeOp `json:"op"`
 	Source    mysqlSourceInfo     `json:"source"`
-	Before    map[string]any      `json:"before,omitempty"`
+	Before    []any               `json:"before,omitempty"`
 }
 
 // mysqlSourceInfo is source metadata for data capture events.
@@ -101,7 +137,134 @@ func (e *mysqlChangeEvent) GetRowKey() []byte {
 // Note that this implementation is destructive, but that's okay because
 // emitting the serialized JSON is the last thing we ever do with a change.
 func (e *mysqlChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
-	var record = e.Values
-	record["_meta"] = &e.Meta
-	return json.Append(buf, record, json.EscapeHTML|json.SortMapKeys)
+	var shape = e.Info.Shape
+
+	// The number of column values should be one less than the shape's arity, because the last field of
+	// the shape is the metadata. Note that this also means there can never be an empty shape here.
+	if len(e.Values) != shape.Arity-1 {
+		return nil, fmt.Errorf("incorrect row arity: expected %d but got %d", shape.Arity, len(e.Values))
+	}
+
+	var err error
+	var subsequentField bool
+	buf = append(buf, '{')
+	for idx, vidx := range shape.Swizzle {
+		var val any
+		if vidx < len(e.Values) {
+			val = e.Values[vidx]
+			if val == rowValueOmitted {
+				// The `rowValueOmitted` value is a special sentinel used to indicate that a
+				// particular field should be omitted from the output document entirely.
+				continue
+			}
+		}
+		if subsequentField {
+			buf = append(buf, ',')
+		}
+		subsequentField = true
+		buf = append(buf, shape.Prefixes[idx]...)
+		if vidx < len(e.Values) {
+			buf, err = e.Info.Transcoders[vidx].TranscodeJSON(buf, val)
+		} else {
+			buf, err = e.Meta.AppendJSON(buf) // The last value index is the metadata
+		}
+		if err != nil {
+			return nil, fmt.Errorf("error encoding field %q: %w", shape.Names[idx], err)
+		}
+	}
+	return append(buf, '}'), nil
+}
+
+// AppendJSON appends the JSON representation of the change metadata to the provided buffer.
+//
+// In theory it should be equivalent to `json.Append(buf, meta, 0)`, but we're using a
+// hand-crafted sequence of appends to avoid any reflection overheads and dispatch the
+// encoding of the "before" values appropriately.
+func (meta *mysqlChangeMetadata) AppendJSON(buf []byte) ([]byte, error) {
+	var err error
+	buf = append(buf, []byte(`{"op":"`)...)
+	buf = append(buf, []byte(meta.Operation)...)
+	buf = append(buf, []byte(`","source":`)...)
+	buf, err = meta.Source.AppendJSON(buf)
+	if err != nil {
+		return nil, fmt.Errorf("error encoding source metadata: %w", err)
+	}
+	if meta.Before != nil {
+		buf = append(buf, []byte(`,"before":`)...)
+		buf, err = meta.AppendBeforeJSON(buf)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding before values: %w", err)
+		}
+	}
+	return append(buf, '}'), nil
+}
+
+// AppendBeforeJSON appends the JSON representation of the change event's before-state to
+// the provided buffer.
+//
+// In theory it should be roughly equivalent to `json.Append(buf, <before>, 0)` for some
+// appropriately constructed before-state values map, but we're using a modified version
+// of the `encrow.Shape` encoding method for maximum efficiency and to implement omitted
+// values correctly.
+func (meta *mysqlChangeMetadata) AppendBeforeJSON(buf []byte) ([]byte, error) {
+	var shape = meta.Info.Shape
+
+	// The number of row values should be one less than the shape's arity, because the last field of
+	// the shape is the metadata. However because this is the /_meta/before value we omit the metadata
+	// field when it's reached.
+	if len(meta.Before) != shape.Arity-1 {
+		return nil, fmt.Errorf("incorrect row arity: expected %d but got %d", shape.Arity, len(meta.Before))
+	}
+
+	var err error
+	var subsequentField bool
+	buf = append(buf, '{')
+	for idx, vidx := range shape.Swizzle {
+		if vidx >= len(meta.Before) {
+			// Skip the nonexistent "final" value index, which represents the metadata
+			// that we are already in the process of serializing.
+			continue
+		}
+		var val = meta.Before[vidx]
+		if val == rowValueOmitted {
+			// The `rowValueOmitted` value is a special sentinel used to indicate that a
+			// particular field should be omitted from the output document entirely.
+			continue
+		}
+		if subsequentField {
+			buf = append(buf, ',')
+		}
+		subsequentField = true
+		buf = append(buf, shape.Prefixes[idx]...)
+		buf, err = meta.Info.Transcoders[vidx].TranscodeJSON(buf, val)
+		if err != nil {
+			return nil, fmt.Errorf("error encoding field %q: %w", shape.Names[idx], err)
+		}
+	}
+	return append(buf, '}'), nil
+}
+
+func (source *mysqlSourceInfo) AppendJSON(buf []byte) ([]byte, error) {
+	return json.Append(buf, source, 0)
+}
+
+func (db *mysqlDatabase) constructJSONTranscoder(isBackfill bool, columnType any) jsonTranscoder {
+	return jsonTranscoderFunc(func(buf []byte, v any) ([]byte, error) {
+		if translated, err := db.translateRecordField(isBackfill, columnType, v); err != nil {
+			return nil, fmt.Errorf("error translating value %v for JSON serialization: %w", v, err)
+		} else {
+			return json.Append(buf, translated, json.EscapeHTML|json.SortMapKeys)
+		}
+	})
+}
+
+func (db *mysqlDatabase) constructFDBTranscoder(isBackfill bool, columnType any) fdbTranscoder {
+	_ = isBackfill // Currently unused
+	return fdbTranscoderFunc(func(buf []byte, v any) ([]byte, error) {
+		if translated, err := encodeKeyFDB(v, columnType); err != nil {
+			return nil, fmt.Errorf("error translating value %v for FDB serialization: %w", v, err)
+		} else {
+			return sqlcapture.AppendFDB(buf, translated)
+		}
+	})
 }
