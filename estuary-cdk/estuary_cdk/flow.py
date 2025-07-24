@@ -303,3 +303,20 @@ class RotatingOAuth2Credentials(BaseOAuth2Credentials):
             def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
         return _OAuth2Credentials
+
+
+class GoogleServiceAccountSpec(BaseModel):
+    scopes: list[str]
+
+
+class GoogleServiceAccount(BaseModel):
+    credentials_title: Literal["Google Service Account"] = Field(
+        default="Google Service Account",
+        json_schema_extra={"type": "string", "order": 0}
+    )
+    service_account: str = Field(
+        title="Google Service Account",
+        description="Service account JSON key",
+        json_schema_extra={"secret": True, "multiline": True, "order": 1},
+    )
+
