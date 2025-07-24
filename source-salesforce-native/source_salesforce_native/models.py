@@ -418,11 +418,9 @@ class SalesforceRecord(BaseDocument, extra="allow"):
             case SoapTypes.BOOLEAN:
                 transformed_value = cls._bool_str_to_bool(value)
             case SoapTypes.INTEGER | SoapTypes.LONG:
-                # Salesforce's Bulk API returns "0.0" for integer fields when their value is 0.
-                if value == "0.0":
-                    transformed_value = 0
-                else:
-                    transformed_value = int(value)
+                # Sometimes even standard Salesforce integer fields _actually_ contain floats. So
+                # we try to convert them to integers first and fallback to converting to floats.
+                transformed_value = cls._str_to_number(value)
             case SoapTypes.DOUBLE:
                 transformed_value = float(value)
             case SoapTypes.ANY_TYPE:
