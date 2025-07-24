@@ -283,6 +283,12 @@ type Materializer[
 	// changes that are not covered by the general cases.
 	UpdateResource(context.Context, []string, ExistingResource, BindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
 
+	// TruncateResource removes all existing data from an existing materialized
+	// resource, while leaving the schema intact. This is called when a resource
+	// is backfilled, but all existing materialized fields are still compatible
+	// with the materialized collection.
+	TruncateResource(context.Context, []string) (string, ActionApplyFn, error)
+
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
 	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *BindingEvents) (MaterializerTransactor, error)
@@ -394,7 +400,8 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parseFlags(endpointCfg))
+	parsedFlags := parseFlags(endpointCfg)
+	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -472,22 +479,52 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 	}
 
+	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
 	for _, bindingIdx := range common.backfillBindings {
-		if deleteDesc, deleteAction, err := materializer.DeleteResource(ctx, req.Materialization.Bindings[bindingIdx].ResourcePath); err != nil {
-			return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
-		} else if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
-			return nil, err
-		} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
-			return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
-		} else {
-			addAction(deleteDesc+"\n"+createDesc, func(ctx context.Context) error {
-				if err := deleteAction(ctx); err != nil {
-					return err
-				} else if err := createAction(ctx); err != nil {
-					return err
-				}
-				return nil
+		// If the existing resource is compatible with the proposed binding spec
+		// without incrementing the backfill counter, it only needs to be
+		// truncated rather than fully dropping and re-creating the table.
+		var doTruncate bool
+		thisBinding := req.Materialization.Bindings[bindingIdx]
+		lastBinding := findLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
+		if constraints, err := validator.ValidateBinding(
+			thisBinding.ResourcePath,
+			thisBinding.DeltaUpdates,
+			lastBinding.Backfill, // evaluate constraints against the last binding's backfill counter
+			thisBinding.Collection,
+			thisBinding.FieldSelection.FieldConfigJsonMap,
+			req.LastMaterialization,
+		); err == nil {
+			// No general errors with the new binding spec, so check if any
+			// selected fields would be unsatisfiable or forbidden.
+			doTruncate = !slices.ContainsFunc(thisBinding.FieldSelection.AllFields(), func(f string) bool {
+				return constraints[f].Type.IsForbidden()
 			})
+		}
+
+		if doTruncate {
+			if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
+				return nil, fmt.Errorf("getting TruncateResource action: %w", err)
+			} else {
+				addAction(desc, action)
+			}
+		} else {
+			if deleteDesc, deleteAction, err := materializer.DeleteResource(ctx, thisBinding.ResourcePath); err != nil {
+				return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
+			} else if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
+				return nil, err
+			} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
+				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
+			} else {
+				addAction(deleteDesc+"\n"+createDesc, func(ctx context.Context) error {
+					if err := deleteAction(ctx); err != nil {
+						return err
+					} else if err := createAction(ctx); err != nil {
+						return err
+					}
+					return nil
+				})
+			}
 		}
 	}
 
