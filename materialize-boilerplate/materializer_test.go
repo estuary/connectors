@@ -17,6 +17,8 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/base.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/updated.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/incompatible-changes.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/truncate.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/truncate-changes.flow.yaml
 
 //go:embed testdata/materializer/generated_specs
 var materializerFS embed.FS
@@ -74,6 +76,22 @@ func TestRunApply(t *testing.T) {
 				deleteResource: [][]string{{"key_value"}},
 			},
 		},
+		{
+			name:         "binding with only backfill change truncates existing resource",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "truncate.flow.proto"),
+			want: testCalls{
+				truncateResource: [][]string{{"key_value"}},
+			},
+		},
+		{
+			name:         "binding with backfill & compatible changes also truncates existing resource",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "truncate-changes.flow.proto"),
+			want: testCalls{
+				truncateResource: [][]string{{"key_value"}},
+			},
+		},
 	} {
 		req := &pm.Request_Apply{
 			Materialization:     tt.newSpec,
@@ -92,9 +110,10 @@ func TestRunApply(t *testing.T) {
 }
 
 type testCalls struct {
-	createResource [][]string
-	updateResource [][]string
-	deleteResource [][]string
+	createResource   [][]string
+	updateResource   [][]string
+	deleteResource   [][]string
+	truncateResource [][]string
 }
 
 var _ Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] = (*testMaterializer)(nil)
@@ -170,6 +189,11 @@ func (m *testMaterializer) DeleteResource(ctx context.Context, path []string) (s
 
 func (m *testMaterializer) UpdateResource(ctx context.Context, path []string, existing ExistingResource, update BindingUpdate[testEndpointConfiger, testResourcer, testMappedTyper]) (string, ActionApplyFn, error) {
 	m.calls.updateResource = append(m.calls.updateResource, path)
+	return "", func(context.Context) error { return nil }, nil
+}
+
+func (m *testMaterializer) TruncateResource(ctx context.Context, path []string) (string, ActionApplyFn, error) {
+	m.calls.truncateResource = append(m.calls.truncateResource, path)
 	return "", func(context.Context) error { return nil }, nil
 }
 

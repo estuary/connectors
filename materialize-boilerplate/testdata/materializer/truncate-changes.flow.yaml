@@ -1,0 +1,25 @@
+materializations:
+  test/sqlite:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: key/value
+        resource: { table: key_value }
+        fields:
+          recommended: true
+        backfill: 1 # increased backfill count
+
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        key: { type: string }
+        requiredVal1: { type: string }
+        optionalVal1: { type: integer }
+        requiredVal2: { type: string }
+        completelyNewField: { type: boolean } # Removed optionalVal2, added completelyNewField
+      required: [key, requiredVal1, requiredVal2]
+    key: [/key]
