@@ -6,7 +6,13 @@ import abc
 import aiohttp
 import asyncio
 import base64
+import json
 import time
+
+
+from google.auth.credentials import TokenState as GoogleTokenState
+from google.auth.transport.requests import Request as GoogleAuthRequest
+from google.oauth2.service_account import Credentials as GoogleServiceAccountCredentials
 
 from . import Mixin
 from .flow import (
@@ -21,6 +27,8 @@ from .flow import (
     RotatingOAuth2Credentials,
     OAuth2Spec,
     OAuth2RotatingTokenSpec,
+    GoogleServiceAccount,
+    GoogleServiceAccountSpec,
 )
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
@@ -205,9 +213,11 @@ class TokenSource:
         | LongLivedClientCredentialsOAuth2Credentials
         | AccessToken
         | BasicAuth
+        | GoogleServiceAccount
     )
     authorization_header: str = DEFAULT_AUTHORIZATION_HEADER
-    _access_token: AccessTokenResponse | None = None
+    google_spec: GoogleServiceAccountSpec | None = None
+    _access_token: AccessTokenResponse | GoogleServiceAccountCredentials | None = None
     _fetched_at: int = 0
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
@@ -230,6 +240,25 @@ class TokenSource:
                     f"{self.credentials.username}:{self.credentials.password}".encode()
                 ).decode(),
             )
+        elif isinstance(self.credentials, GoogleServiceAccount):
+            assert isinstance(self.google_spec, GoogleServiceAccountSpec)
+            if self._access_token is None:
+                self._access_token = GoogleServiceAccountCredentials.from_service_account_info(
+                    json.loads(self.credentials.service_account),
+                    scopes=self.google_spec.scopes,
+                )
+
+            assert isinstance(self._access_token, GoogleServiceAccountCredentials)
+
+            match self._access_token.token_state:
+                case GoogleTokenState.FRESH:
+                    pass
+                case GoogleTokenState.STALE | GoogleTokenState.INVALID:
+                    self._access_token.refresh(GoogleAuthRequest())
+                case _:
+                    raise RuntimeError(f"Unknown GoogleTokenState: {self._access_token.token_state}")
+
+            return ("Bearer", self._access_token.token)
 
         assert (
             isinstance(self.credentials, BaseOAuth2Credentials)
@@ -240,6 +269,7 @@ class TokenSource:
         current_time = time.time()
 
         if self._access_token is not None:
+            assert isinstance(self._access_token, self.AccessTokenResponse)
             horizon = self._fetched_at + self._access_token.expires_in * 0.75
 
             if current_time < horizon:
