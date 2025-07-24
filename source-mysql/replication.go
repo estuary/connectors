@@ -507,6 +507,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	// Construct efficient indices and transcoder arrays for value processing
 	//
 	// TODO(wgd): Hoist this to a higher level
+	var err error
 	var rowKeyIndices = make([]int, len(keyColumns))                 // Indices of key columns in the table, in key order.
 	var outputColumnNames = make([]string, len(columnNames))         // Names of all columns with omitted columns set to "", in table order, plus _meta.
 	var outputTranscoders = make([]jsonTranscoder, len(columnNames)) // Transcoders from DB values to JSON, with omitted columns set to nil.
@@ -521,9 +522,15 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			continue
 		}
 		outputColumnNames[idx] = colName
-		outputTranscoders[idx] = rs.db.constructJSONTranscoder(false, columnTypes[colName])
+		outputTranscoders[idx], err = rs.db.constructJSONTranscoder(false, columnTypes[colName])
+		if err != nil {
+			return fmt.Errorf("error constructing JSON transcoder for column %q of type %v: %w", colName, columnTypes[colName], err)
+		}
 		if slices.Contains(keyColumns, colName) {
-			rowKeyTranscoders[idx] = rs.db.constructFDBTranscoder(false, columnTypes[colName])
+			rowKeyTranscoders[idx], err = rs.db.constructFDBTranscoder(false, columnTypes[colName])
+			if err != nil {
+				return fmt.Errorf("error constructing FDB transcoder for column %q of type %v: %w", colName, columnTypes[colName], err)
+			}
 		}
 	}
 	outputColumnNames = append(outputColumnNames, "_meta")
