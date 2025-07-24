@@ -34,6 +34,12 @@ type Client interface {
 	// description of the action in the form of SQL statements, and a callback to do the action.
 	AlterTable(ctx context.Context, ta TableAlter) (string, boilerplate.ActionApplyFn, error)
 
+	// TruncateTable removes all existing data from an existing table, while
+	// leaving the schema intact. This is called when a binding is backfilled,
+	// but all existing materialized columns are still compatible with the
+	// materialized collection.
+	TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error)
+
 	// Close is called to free up any resources held by the Client.
 	Close()
 }
