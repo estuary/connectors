@@ -10,6 +10,7 @@ from .models import (
     QueryResponse,
     SalesforceDataSource,
     SalesforceRecord,
+    ValidationContext,
 )
 
 
@@ -18,6 +19,8 @@ from .models import (
 # https://developer.salesforce.com/docs/atlas.en-us.salesforce_app_limits_cheatsheet.meta/salesforce_app_limits_cheatsheet/salesforce_app_limits_platform_api.htm#:~:text=In%20each%20REST%20call%2C%20the%20maximum%20length%20for%20the%20combined%20URI%20and%20headers%20is%2016%2C384%20bytes.
 MAX_URI_LENGTH = 16_384
 MAX_FIELDS_LENGTH = MAX_URI_LENGTH - 2_500
+
+REST_VALIDATION_CONTEXT = ValidationContext(SalesforceDataSource.REST_API)
 
 class Query:
     def __init__(self, http: HTTPSession, log: Logger, base_url: str, query: str):
@@ -177,7 +180,7 @@ class RestQueryManager:
                 # current state of the record in Saleforce.
                 if str_to_dt(record[cursor_field]) <= end:
                     yield model_cls.model_validate(
-                        record, context={'data_source': SalesforceDataSource.REST_API}
+                        record, context=REST_VALIDATION_CONTEXT
                     )
 
                 # Delete completed records to avoid keeping them in memory.

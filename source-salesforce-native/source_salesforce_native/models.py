@@ -332,6 +332,11 @@ class SalesforceDataSource(StrEnum):
     BULK_API = "bulk_api"
 
 
+class ValidationContext:
+    def __init__(self, data_source: SalesforceDataSource):
+        self.data_source = data_source
+
+
 class SalesforceRecord(BaseDocument, extra="allow"):
     field_details: ClassVar[FieldDetailsDict]
 
@@ -353,10 +358,10 @@ class SalesforceRecord(BaseDocument, extra="allow"):
                 "field_details must be set on the SalesforceRecord subclass before validation."
             )
 
-        context = info.context or {}
-        data_source: SalesforceDataSource | None = context.get('data_source', None)
-        if data_source is None:
-            raise ValueError("data_source must be provided in validation context")
+        if not info.context or not isinstance(info.context, ValidationContext):
+            raise RuntimeError(f"Validation context must be of type ValidationContext: {info.context}")
+
+        data_source = info.context.data_source
 
         transformed: dict[str, Any] = {}
 
