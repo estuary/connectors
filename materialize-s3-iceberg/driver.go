@@ -227,6 +227,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 		MaxFieldLength:        255,
 		CaseInsensitiveFields: true,
 		ConcurrentApply:       true,
+		NoTruncateResources:   true,
 		MaterializeOptions: boilerplate.MaterializeOptions{
 			AckSchedule: &boilerplate.AckScheduleOption{
 				Config: boilerplate.ScheduleConfig{
@@ -366,6 +367,10 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
 	return d.catalog.DeleteResource(ctx, resourcePath)
+}
+
+func (d *materialization) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	panic("not supported")
 }
 
 func (d *materialization) UpdateResource(

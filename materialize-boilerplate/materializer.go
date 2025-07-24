@@ -69,6 +69,11 @@ type MaterializeCfg struct {
 	// the namespace.
 	NoCreateNamespaces bool
 
+	// NoTruncateResources indicates that this materialization does not support
+	// truncating materialized resources in-place, and any backfill must always
+	// result in a resource deletion + re-creation.
+	NoTruncateResources bool
+
 	// Serialization policy to use for all bindings of this materialization.
 	SerPolicy *pf.SerPolicy
 
@@ -502,7 +507,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			})
 		}
 
-		if doTruncate {
+		if !mCfg.NoTruncateResources && doTruncate {
 			if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
 				return nil, fmt.Errorf("getting TruncateResource action: %w", err)
 			} else {
