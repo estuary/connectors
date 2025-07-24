@@ -122,6 +122,10 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	return "", nil, nil
 }
 
+func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return "", nil, nil
+}
+
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
