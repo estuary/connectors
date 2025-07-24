@@ -1,0 +1,261 @@
+package boilerplate
+
+import (
+	"context"
+	"embed"
+	"encoding/json"
+	"path/filepath"
+	"testing"
+
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	m "github.com/estuary/connectors/go/protocols/materialize"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/stretchr/testify/require"
+)
+
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/base.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/updated.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/incompatible-changes.flow.yaml
+
+//go:embed testdata/materializer/generated_specs
+var materializerFS embed.FS
+
+func loadMaterializerSpec(t *testing.T, path string) *pf.MaterializationSpec {
+	t.Helper()
+
+	specBytes, err := materializerFS.ReadFile(filepath.Join("testdata/materializer/generated_specs", path))
+	require.NoError(t, err)
+	var spec pf.MaterializationSpec
+	require.NoError(t, spec.Unmarshal(specBytes))
+
+	return &spec
+}
+
+func TestRunApply(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tt := range []struct {
+		name         string
+		originalSpec *pf.MaterializationSpec
+		newSpec      *pf.MaterializationSpec
+		want         testCalls
+	}{
+		{
+			name:         "new materialization",
+			originalSpec: nil,
+			newSpec:      loadMaterializerSpec(t, "base.flow.proto"),
+			want: testCalls{
+				createResource: [][]string{{"key_value"}},
+			},
+		},
+		{
+			name:         "noop re-apply",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "base.flow.proto"),
+			want: testCalls{
+				updateResource: [][]string{{"key_value"}}, // called for every resource, even if no changes
+			},
+		},
+		{
+			name:         "update existing resource",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "updated.flow.proto"),
+			want: testCalls{
+				updateResource: [][]string{{"key_value"}},
+			},
+		},
+		{
+			name:         "backfill with incompatible changes",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "incompatible-changes.flow.proto"),
+			want: testCalls{
+				createResource: [][]string{{"key_value"}},
+				deleteResource: [][]string{{"key_value"}},
+			},
+		},
+	} {
+		req := &pm.Request_Apply{
+			Materialization:     tt.newSpec,
+			Version:             "thisone",
+			LastMaterialization: tt.originalSpec,
+			LastVersion:         "oldone",
+		}
+
+		is := testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
+		got := &testCalls{}
+
+		_, err := RunApply(ctx, req, makeTestMaterializerFn(got, is))
+		require.NoError(t, err)
+		require.Equal(t, tt.want, *got)
+	}
+}
+
+type testCalls struct {
+	createResource [][]string
+	updateResource [][]string
+	deleteResource [][]string
+}
+
+var _ Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] = (*testMaterializer)(nil)
+
+type testMaterializer struct {
+	calls *testCalls
+	is    *InfoSchema
+}
+
+func makeTestMaterializerFn(got *testCalls, is *InfoSchema) NewMaterializerFn[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] {
+	return func(
+		ctx context.Context,
+		materializationName string,
+		endpointConfig testEndpointConfiger,
+		featureFlags map[string]bool,
+	) (Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper], error) {
+		return &testMaterializer{
+			calls: got,
+			is:    is,
+		}, nil
+	}
+}
+
+var testMaterializerFn NewMaterializerFn[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper] = func(
+	_ context.Context,
+	_ string,
+	_ testEndpointConfiger,
+	_ map[string]bool,
+) (Materializer[testEndpointConfiger, testFieldConfiger, testResourcer, testMappedTyper], error) {
+	return &testMaterializer{}, nil
+}
+
+func (m *testMaterializer) Config() MaterializeCfg {
+	return MaterializeCfg{}
+}
+
+func (m *testMaterializer) PopulateInfoSchema(ctx context.Context, paths [][]string, is *InfoSchema) error {
+	*is = *m.is
+	return nil
+}
+
+func (m *testMaterializer) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
+	return nil
+}
+
+func (m *testMaterializer) NewConstraint(p pf.Projection, deltaUpdates bool, fieldConfig testFieldConfiger) pm.Response_Validated_Constraint {
+	return pm.Response_Validated_Constraint{}
+}
+
+func (m *testMaterializer) MapType(p Projection, fieldCfg testFieldConfiger) (testMappedTyper, ElementConverter) {
+	return testMappedTyper{
+		type_: p.Inference.Types[0],
+	}, nil
+}
+
+func (m *testMaterializer) Setup(ctx context.Context, is *InfoSchema) (string, error) {
+	return "", nil
+}
+
+func (m *testMaterializer) CreateNamespace(ctx context.Context, namespace string) (string, error) {
+	panic("unimplemented")
+}
+
+func (m *testMaterializer) CreateResource(ctx context.Context, binding MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper]) (string, ActionApplyFn, error) {
+	m.calls.createResource = append(m.calls.createResource, binding.ResourcePath)
+	return "", func(context.Context) error { return nil }, nil
+}
+
+func (m *testMaterializer) DeleteResource(ctx context.Context, path []string) (string, ActionApplyFn, error) {
+	m.calls.deleteResource = append(m.calls.createResource, path)
+	return "", func(context.Context) error { return nil }, nil
+}
+
+func (m *testMaterializer) UpdateResource(ctx context.Context, path []string, existing ExistingResource, update BindingUpdate[testEndpointConfiger, testResourcer, testMappedTyper]) (string, ActionApplyFn, error) {
+	m.calls.updateResource = append(m.calls.updateResource, path)
+	return "", func(context.Context) error { return nil }, nil
+}
+
+type testEndpointConfiger struct {
+	Image  string         `json:"image"`
+	Config map[string]any `json:"config"`
+}
+
+func (c testEndpointConfiger) Validate() error {
+	return nil
+}
+
+func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
+	return "", nil
+}
+
+type testFieldConfiger struct{}
+
+func (c testFieldConfiger) Validate() error {
+	return nil
+}
+
+func (c testFieldConfiger) CastToString() bool {
+	return false
+}
+
+type testResourcer struct {
+	Table string `json:"table"`
+}
+
+func (r testResourcer) Validate() error {
+	return nil
+}
+
+func (r testResourcer) WithDefaults(ec testEndpointConfiger) testResourcer {
+	return r
+}
+
+func (r testResourcer) Parameters() ([]string, bool, error) {
+	return []string{"test", "resource"}, false, nil
+}
+
+type testMappedTyper struct {
+	type_ string
+}
+
+func (t testMappedTyper) String() string {
+	return t.type_
+}
+
+func (t testMappedTyper) Compatible(e ExistingField) bool {
+	return t.type_ == e.Type
+}
+
+func (t testMappedTyper) CanMigrate(ExistingField) bool {
+	return false
+}
+
+func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *BindingEvents) (MaterializerTransactor, error) {
+	return &testMaterializerTransactor{}, nil
+}
+
+func (m *testMaterializer) Close(ctx context.Context) {}
+
+type testMaterializerTransactor struct{}
+
+func (t *testMaterializerTransactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (RuntimeCheckpoint, error) {
+	panic("unimplemented")
+}
+
+func (t *testMaterializerTransactor) UnmarshalState(state json.RawMessage) error {
+	panic("unimplemented")
+}
+
+func (t *testMaterializerTransactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
+	panic("unimplemented")
+}
+
+func (t *testMaterializerTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
+	panic("unimplemented")
+}
+
+func (t *testMaterializerTransactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	panic("unimplemented")
+}
+
+func (t *testMaterializerTransactor) Destroy() {
+	panic("unimplemented")
+}
