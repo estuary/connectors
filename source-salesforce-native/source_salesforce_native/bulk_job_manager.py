@@ -15,6 +15,7 @@ from .models import (
     BulkJobCheckStatusResponse,
     SalesforceDataSource,
     SalesforceRecord,
+    ValidationContext,
 )
 
 INITIAL_SLEEP = 0.2
@@ -34,6 +35,8 @@ CSV_CONFIG = CSVConfig(
     lineterminator='\n',
     encoding='utf-8'
 )
+
+BULK_VALIDATION_CONTEXT = ValidationContext(SalesforceDataSource.BULK_API)
 
 
 class BulkJobManager:
@@ -103,12 +106,11 @@ class BulkJobManager:
             expected = int(count)
             received = 0
 
-            bulk_context = {'data_source': SalesforceDataSource.BULK_API}
             processor = IncrementalCSVProcessor(
                 body(),
                 model_cls,
                 CSV_CONFIG,
-                validation_context=bulk_context,
+                validation_context=BULK_VALIDATION_CONTEXT,
             )
             async for record in processor:
                 yield record
