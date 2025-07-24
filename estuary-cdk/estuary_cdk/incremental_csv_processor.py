@@ -84,7 +84,7 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
             byte_iterator: AsyncGenerator[bytes, None],
             streamed_item_cls: type[StreamedItem],
             config: Optional[CSVConfig] = None,
-            validation_context: Optional[Dict[str, Any]] = None
+            validation_context: Optional[object] = None
         ):
         """
         Initialize the processor with byte iterator and optional CSV configuration or validation context.
@@ -93,7 +93,7 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
             byte_iterator: Async generator of CSV byte chunks
             streamed_item_cls: Pydantic model class for validation
             config: Optional CSV configuration options
-            validation_context: Optional context dict passed to pydantic model_validate
+            validation_context: Optional validation context object passed to pydantic model_validate
         """
         self.byte_iterator = byte_iterator
         self.config = config or CSVConfig()
