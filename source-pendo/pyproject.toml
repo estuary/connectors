@@ -8,7 +8,7 @@ authors = ["Alex Bair <alexb@estuary.dev>"]
 estuary-cdk = {path="../estuary-cdk", develop = true}
 pendulum = "^3"
 pydantic = "^2"
-python = "^3.11"
+python = ">=3.11,<3.13"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
