@@ -1,0 +1,20 @@
+---
+collections:
+  acmeCo/crashes:
+    schema: crashes.schema.yaml
+    key:
+      - /date
+      - /package_name
+      - /row_number
+  acmeCo/installs:
+    schema: installs.schema.yaml
+    key:
+      - /date
+      - /package_name
+      - /row_number
+  acmeCo/reviews:
+    schema: reviews.schema.yaml
+    key:
+      - /package_name
+      - /row_number
+      - /year_month

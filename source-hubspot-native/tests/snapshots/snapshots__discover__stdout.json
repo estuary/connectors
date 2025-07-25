@@ -94,11 +94,7 @@
       "additionalProperties": false,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -288,11 +284,7 @@
       "additionalProperties": false,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -474,11 +466,7 @@
       "additionalProperties": false,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -676,11 +664,7 @@
       "additionalProperties": false,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -966,11 +950,7 @@
       "additionalProperties": false,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1168,11 +1148,7 @@
       "additionalProperties": false,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1346,11 +1322,7 @@
       "additionalProperties": false,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1512,11 +1484,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1551,7 +1519,7 @@
     "recommendedName": "deal_pipelines",
     "resourceConfig": {
       "name": "deal_pipelines",
-      "interval": "PT300S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1582,11 +1550,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1634,7 +1598,7 @@
     "recommendedName": "owners",
     "resourceConfig": {
       "name": "owners",
-      "interval": "PT300S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -1665,11 +1629,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -1747,11 +1707,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1

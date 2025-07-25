@@ -8,7 +8,10 @@ authors = ["Alex Bair <alexb@estuary.dev>"]
 estuary-cdk = {path="../estuary-cdk", develop = true}
 pydantic = "^2"
 python = "^3.12"
-braintree = "^4.28.0"
+# Braintree removed the `business_details`, `funding_details`, and `individual_details` for `merchant_accounts` in version 4.35.0 of their
+# Python SDK, and I could not find any explanation for why they were removed. Customers still have these fields populated in the API responses,
+# so I've pinned the `braintree` package version we're using to version 4.34.0.
+braintree = "==4.34.0"
 aiohttp = ">=3.11.10"
 pycares = ">=4.9.0"
 requests = ">=2.32.4"

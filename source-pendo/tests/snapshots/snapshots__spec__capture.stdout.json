@@ -8,9 +8,6 @@
             "credentials_title": {
               "const": "Private App Credentials",
               "default": "Private App Credentials",
-              "enum": [
-                "Private App Credentials"
-              ],
               "title": "Credentials Title",
               "type": "string"
             },
@@ -39,11 +36,7 @@
           "type": "string"
         },
         "credentials": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/AccessToken"
-            }
-          ],
+          "$ref": "#/$defs/AccessToken",
           "title": "Authentication"
         }
       },
@@ -60,6 +53,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {

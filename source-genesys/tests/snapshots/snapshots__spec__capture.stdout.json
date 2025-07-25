@@ -8,9 +8,6 @@
             "credentials_title": {
               "const": "OAuth Credentials",
               "default": "OAuth Credentials",
-              "enum": [
-                "OAuth Credentials"
-              ],
               "title": "Credentials Title",
               "type": "string"
             },
@@ -90,6 +87,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {

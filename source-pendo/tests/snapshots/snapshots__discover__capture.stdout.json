@@ -34,11 +34,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -89,11 +85,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -144,11 +136,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -199,11 +187,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -254,11 +238,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -316,11 +296,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -378,11 +354,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -440,11 +412,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -495,11 +463,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -550,11 +514,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -631,11 +591,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -712,11 +668,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -798,11 +750,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
@@ -884,11 +832,7 @@
       "additionalProperties": true,
       "properties": {
         "_meta": {
-          "allOf": [
-            {
-              "$ref": "#/$defs/Meta"
-            }
-          ],
+          "$ref": "#/$defs/Meta",
           "default": {
             "op": "u",
             "row_id": -1
