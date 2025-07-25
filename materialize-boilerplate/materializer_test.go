@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -19,6 +20,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/incompatible-changes.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/truncate.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/truncate-changes.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/backfill-migratable.flow.yaml
 
 //go:embed testdata/materializer/generated_specs
 var materializerFS embed.FS
@@ -92,20 +94,31 @@ func TestRunApply(t *testing.T) {
 				truncateResource: [][]string{{"key_value"}},
 			},
 		},
+		{
+			name:         "binding with backfill & migratable changes does a backfill",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "backfill-migratable.flow.proto"),
+			want: testCalls{
+				createResource: [][]string{{"key_value"}},
+				deleteResource: [][]string{{"key_value"}},
+			},
+		},
 	} {
-		req := &pm.Request_Apply{
-			Materialization:     tt.newSpec,
-			Version:             "thisone",
-			LastMaterialization: tt.originalSpec,
-			LastVersion:         "oldone",
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			req := &pm.Request_Apply{
+				Materialization:     tt.newSpec,
+				Version:             "thisone",
+				LastMaterialization: tt.originalSpec,
+				LastVersion:         "oldone",
+			}
 
-		is := testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
-		got := &testCalls{}
+			is := testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
+			got := &testCalls{}
 
-		_, err := RunApply(ctx, req, makeTestMaterializerFn(got, is))
-		require.NoError(t, err)
-		require.Equal(t, tt.want, *got)
+			_, err := RunApply(ctx, req, makeTestMaterializerFn(got, is))
+			require.NoError(t, err)
+			require.Equal(t, tt.want, *got)
+		})
 	}
 }
 
@@ -165,7 +178,7 @@ func (m *testMaterializer) NewConstraint(p pf.Projection, deltaUpdates bool, fie
 
 func (m *testMaterializer) MapType(p Projection, fieldCfg testFieldConfiger) (testMappedTyper, ElementConverter) {
 	return testMappedTyper{
-		type_: p.Inference.Types[0],
+		jsonTypes: p.Inference.Types,
 	}, nil
 }
 
@@ -237,19 +250,23 @@ func (r testResourcer) Parameters() ([]string, bool, error) {
 }
 
 type testMappedTyper struct {
-	type_ string
+	jsonTypes []string
 }
 
 func (t testMappedTyper) String() string {
-	return t.type_
+	return strings.Join(t.jsonTypes, ", ")
 }
 
 func (t testMappedTyper) Compatible(e ExistingField) bool {
-	return t.type_ == e.Type
+	if len(t.jsonTypes) == 1 && t.jsonTypes[0] == e.Type {
+		return true
+	}
+
+	return false
 }
 
-func (t testMappedTyper) CanMigrate(ExistingField) bool {
-	return false
+func (t testMappedTyper) CanMigrate(e ExistingField) bool {
+	return len(t.jsonTypes) > 1
 }
 
 func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *BindingEvents) (MaterializerTransactor, error) {
