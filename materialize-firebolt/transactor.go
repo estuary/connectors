@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-firebolt/schemalate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"

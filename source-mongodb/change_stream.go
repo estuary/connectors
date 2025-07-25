@@ -7,7 +7,7 @@ import (
 	"slices"
 	"time"
 
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"

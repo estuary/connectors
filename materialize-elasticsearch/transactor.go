@@ -10,7 +10,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"

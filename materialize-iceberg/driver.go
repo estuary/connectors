@@ -18,7 +18,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"

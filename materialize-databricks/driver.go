@@ -14,7 +14,7 @@ import (
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"

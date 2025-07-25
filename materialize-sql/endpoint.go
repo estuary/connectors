@@ -4,7 +4,7 @@ import (
 	"context"
 	"text/template"
 
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/flow"
 	pf "github.com/estuary/flow/go/protocols/flow"

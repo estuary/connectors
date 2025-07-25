@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/materialize-pinecone/client"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/pinecone-io/go-pinecone/pinecone"
