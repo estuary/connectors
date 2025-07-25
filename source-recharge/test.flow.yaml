@@ -1,0 +1,71 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-recharge:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_recharge
+        config: config.yaml
+    bindings:
+      - resource:
+          stream: addresses
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/addresses
+      - resource:
+          stream: charges
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/charges
+      - resource:
+          stream: collections
+          syncMode: full_refresh
+        target: acmeCo/collections
+      - resource:
+          stream: customers
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/customers
+      - resource:
+          stream: discounts
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/discounts
+      - resource:
+          stream: metafields
+          syncMode: full_refresh
+        target: acmeCo/metafields
+      - resource:
+          stream: onetimes
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/onetimes
+      - resource:
+          stream: orders
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/orders
+      - resource:
+          stream: products
+          syncMode: full_refresh
+        target: acmeCo/products
+      - resource:
+          stream: shop
+          syncMode: full_refresh
+        target: acmeCo/shop
+      - resource:
+          stream: subscriptions
+          syncMode: incremental
+          cursorField:
+            - updated_at
+        target: acmeCo/subscriptions
