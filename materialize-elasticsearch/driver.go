@@ -420,9 +420,10 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
 	return boilerplate.MaterializeCfg{
-		Translate:          translateField,
-		ConcurrentApply:    true,
-		NoCreateNamespaces: true,
+		Translate:           translateField,
+		ConcurrentApply:     true,
+		NoCreateNamespaces:  true,
+		NoTruncateResources: true,
 	}
 }
 
@@ -523,6 +524,10 @@ func (d *materialization) DeleteResource(ctx context.Context, resourcePath []str
 	return fmt.Sprintf("delete index %q", indexName), func(ctx context.Context) error {
 		return d.metaClient.deleteIndex(ctx, indexName)
 	}, nil
+}
+
+func (d *materialization) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	panic("not supported")
 }
 
 func (d *materialization) UpdateResource(

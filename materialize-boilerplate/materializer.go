@@ -69,6 +69,11 @@ type MaterializeCfg struct {
 	// the namespace.
 	NoCreateNamespaces bool
 
+	// NoTruncateResources indicates that this materialization does not support
+	// truncating materialized resources in-place, and any backfill must always
+	// result in a resource deletion + re-creation.
+	NoTruncateResources bool
+
 	// Serialization policy to use for all bindings of this materialization.
 	SerPolicy *pf.SerPolicy
 
@@ -283,6 +288,12 @@ type Materializer[
 	// changes that are not covered by the general cases.
 	UpdateResource(context.Context, []string, ExistingResource, BindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
 
+	// TruncateResource removes all existing data from an existing materialized
+	// resource, while leaving the schema intact. This is called when a resource
+	// is backfilled, but all existing materialized fields are still compatible
+	// with the materialized collection.
+	TruncateResource(context.Context, []string) (string, ActionApplyFn, error)
+
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
 	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *BindingEvents) (MaterializerTransactor, error)
@@ -394,7 +405,8 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parseFlags(endpointCfg))
+	parsedFlags := parseFlags(endpointCfg)
+	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parsedFlags)
 	if err != nil {
 		return nil, err
 	}
@@ -417,8 +429,35 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
-	actionDescriptions := []string{}
-	actions := []ActionApplyFn{}
+	var (
+		// There are several categories of apply actions:
+		// * Namespace creation comes first, since creation of resources may
+		// require these namespaces to exist. Namespaces must actually be
+		// created before the `Setup` method of the Materializer is called, for
+		// example for cases like a materialization needing to create a metadata
+		// table.
+		// * A materialization-specific setup action may come next, e.g. the
+		// previously mentioned metadata table creation.
+		// * Any existing resources that require truncation have it done. This
+		// isn't done concurrent with the other resource-specific actions to
+		// prevent potential concurrency conflicts when operating on the same
+		// resource.
+		// * The more typical actions are last: Adding fields, dropping
+		// nullability constraints, migration column types, etc.
+		namespaceActionDesciptions   []string
+		setupActionDescriptions      []string // there will only be one entry here, but a slice is used for convenience in the rest of this code
+		truncationActionDescriptions []string
+		truncationActions            []ActionApplyFn // may run concurrently
+		resourceActionDescriptions   []string
+		resourceActions              []ActionApplyFn // also may be run concurrently, but not concurrent with truncations
+	)
+
+	addResourceAction := func(desc string, a ActionApplyFn) {
+		if a != nil { // Convenience for handling endpoints that return `nil` for a no-op action.
+			resourceActionDescriptions = append(resourceActionDescriptions, desc)
+			resourceActions = append(resourceActions, a)
+		}
+	}
 
 	if !mCfg.NoCreateNamespaces {
 		// Create any required namespaces before other actions, which may
@@ -439,7 +478,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			} else if desc, err := materializer.CreateNamespace(ctx, ns); err != nil {
 				return nil, err
 			} else {
-				actionDescriptions = append(actionDescriptions, desc)
+				namespaceActionDesciptions = append(namespaceActionDesciptions, desc)
 			}
 		}
 	}
@@ -447,19 +486,12 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	if desc, err := materializer.Setup(ctx, is); err != nil {
 		return nil, fmt.Errorf("running setup: %w", err)
 	} else if desc != "" {
-		actionDescriptions = append(actionDescriptions, desc)
+		setupActionDescriptions = append(setupActionDescriptions, desc)
 	}
 
 	common, err := computeCommonUpdates(req.LastMaterialization, req.Materialization, is)
 	if err != nil {
 		return nil, err
-	}
-
-	addAction := func(desc string, a ActionApplyFn) {
-		if a != nil { // Convenience for handling endpoints that return `nil` for a no-op action.
-			actionDescriptions = append(actionDescriptions, desc)
-			actions = append(actions, a)
-		}
 	}
 
 	for _, bindingIdx := range common.newBindings {
@@ -468,26 +500,71 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		} else if desc, action, err := materializer.CreateResource(ctx, *mapped); err != nil {
 			return nil, fmt.Errorf("getting CreateResource action: %w", err)
 		} else {
-			addAction(desc, action)
+			addResourceAction(desc, action)
 		}
 	}
 
+	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
 	for _, bindingIdx := range common.backfillBindings {
-		if deleteDesc, deleteAction, err := materializer.DeleteResource(ctx, req.Materialization.Bindings[bindingIdx].ResourcePath); err != nil {
-			return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
-		} else if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
+		mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
+		if err != nil {
 			return nil, err
-		} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
-			return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
-		} else {
-			addAction(deleteDesc+"\n"+createDesc, func(ctx context.Context) error {
-				if err := deleteAction(ctx); err != nil {
-					return err
-				} else if err := createAction(ctx); err != nil {
-					return err
+		}
+
+		// If the existing resource is compatible with the proposed binding spec
+		// without incrementing the backfill counter, it only needs to be
+		// truncated rather than fully dropping and re-creating the table.
+		var doTruncate bool
+		thisBinding := req.Materialization.Bindings[bindingIdx]
+		lastBinding := findLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
+		existing := is.GetResource(thisBinding.ResourcePath)
+		if _, err := validator.ValidateBinding(
+			thisBinding.ResourcePath,
+			thisBinding.DeltaUpdates,
+			lastBinding.Backfill, // validate against the last binding's backfill counter
+			thisBinding.Collection,
+			thisBinding.FieldSelection.FieldConfigJsonMap,
+			req.LastMaterialization,
+		); err == nil {
+			// No general errors with the new binding spec, so check if any
+			// selected fields are incompatible.
+			doTruncate = !slices.ContainsFunc(mapped.SelectedProjections(), func(m MappedProjection[MT]) bool {
+				if f := existing.GetField(m.Field); f != nil && !m.Mapped.Compatible(*f) && !m.Mapped.CanMigrate(*f) {
+					return true
 				}
-				return nil
+				return false
 			})
+		}
+
+		if !mCfg.NoTruncateResources && doTruncate {
+			if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
+				return nil, fmt.Errorf("getting TruncateResource action: %w", err)
+			} else {
+				truncationActionDescriptions = append(truncationActionDescriptions, desc)
+				truncationActions = append(truncationActions, action)
+			}
+
+			// A resource may be truncated, but require other updates as well.
+			upd, err := computeBindingUpdate(is, existing, lastBinding, thisBinding)
+			if err != nil {
+				return nil, err
+			}
+			common.updatedBindings[bindingIdx] = *upd
+		} else {
+			if deleteDesc, deleteAction, err := materializer.DeleteResource(ctx, thisBinding.ResourcePath); err != nil {
+				return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
+			} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
+				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
+			} else {
+				addResourceAction(deleteDesc+"\n"+createDesc, func(ctx context.Context) error {
+					if err := deleteAction(ctx); err != nil {
+						return err
+					} else if err := createAction(ctx); err != nil {
+						return err
+					}
+					return nil
+				})
+			}
 		}
 	}
 
@@ -544,15 +621,21 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		if desc, action, err := materializer.UpdateResource(ctx, mb.ResourcePath, *is.GetResource(mb.ResourcePath), update); err != nil {
 			return nil, err
 		} else {
-			addAction(desc, action)
+			addResourceAction(desc, action)
 		}
 	}
 
-	if err := runActions(ctx, actions, actionDescriptions, mCfg.ConcurrentApply); err != nil {
+	if err := runActions(ctx, truncationActions, truncationActionDescriptions, mCfg.ConcurrentApply); err != nil {
+		return nil, err
+	} else if err := runActions(ctx, resourceActions, resourceActionDescriptions, mCfg.ConcurrentApply); err != nil {
 		return nil, err
 	}
 
-	return &pm.Response_Applied{ActionDescription: strings.Join(actionDescriptions, "\n")}, nil
+	allActions := append(namespaceActionDesciptions, setupActionDescriptions...)
+	allActions = append(allActions, truncationActionDescriptions...)
+	allActions = append(allActions, resourceActionDescriptions...)
+
+	return &pm.Response_Applied{ActionDescription: strings.Join(allActions, "\n")}, nil
 }
 
 // RunNewTransactor builds a transactor and Opened response from an Open

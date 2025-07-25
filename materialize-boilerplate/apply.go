@@ -50,48 +50,56 @@ func computeCommonUpdates(last, next *pf.MaterializationSpec, is *InfoSchema) (*
 			out.backfillBindings = append(out.backfillBindings, bindingIdx)
 		} else {
 			// Resource does exist and may need updated for changes in the binding specification.
-			update := updateBinding{
-				newlyDeltaUpdates: lastBinding != nil && !lastBinding.DeltaUpdates && nextBinding.DeltaUpdates,
+			u, err := computeBindingUpdate(is, existingResource, lastBinding, nextBinding)
+			if err != nil {
+				return nil, err
 			}
-
-			for _, field := range nextBinding.FieldSelection.AllFields() {
-				projection := *nextBinding.Collection.GetProjection(field)
-
-				if existingField := existingResource.GetField(field); existingField != nil {
-					newRequired := projection.Inference.Exists == pf.Inference_MUST && !slices.Contains(projection.Inference.Types, pf.JsonTypeNull)
-					newlyNullable := !existingField.Nullable && !newRequired
-					projectionHasDefault := projection.Inference.DefaultJson != nil
-					if newlyNullable && !existingField.HasDefault && !projectionHasDefault {
-						// The field has newly been made nullable and neither the existing field nor
-						// the projection has a default value. The existing field will need to be
-						// modified to be made nullable since it may need to hold null values now.
-						update.newlyNullableFields = append(update.newlyNullableFields, *existingField)
-					}
-				} else {
-					// Field does not exist in the materialized resource, so this is a new
-					// projection to add to it.
-					update.newProjections = append(update.newProjections, projection)
-				}
-			}
-
-			// Fields that exist in the endpoint as non-nullable but aren't in the field selection
-			// need to be made nullable too.
-			for _, existingField := range existingResource.AllFields() {
-				inFieldSelection, err := is.inSelectedFields(existingField.Name, nextBinding.FieldSelection)
-				if err != nil {
-					return nil, fmt.Errorf("determining if existing field %q is in field selection for resource %q: %w", existingField.Name, nextBinding.ResourcePath, err)
-				}
-
-				if !inFieldSelection && !existingField.Nullable {
-					update.newlyNullableFields = append(update.newlyNullableFields, existingField)
-				}
-			}
-
-			out.updatedBindings[bindingIdx] = update
+			out.updatedBindings[bindingIdx] = *u
 		}
 	}
 
 	return &out, nil
+}
+
+func computeBindingUpdate(is *InfoSchema, existing *ExistingResource, last, next *pf.MaterializationSpec_Binding) (*updateBinding, error) {
+	update := updateBinding{
+		newlyDeltaUpdates: last != nil && !last.DeltaUpdates && next.DeltaUpdates,
+	}
+
+	for _, field := range next.FieldSelection.AllFields() {
+		projection := *next.Collection.GetProjection(field)
+
+		if existingField := existing.GetField(field); existingField != nil {
+			newRequired := projection.Inference.Exists == pf.Inference_MUST && !slices.Contains(projection.Inference.Types, pf.JsonTypeNull)
+			newlyNullable := !existingField.Nullable && !newRequired
+			projectionHasDefault := projection.Inference.DefaultJson != nil
+			if newlyNullable && !existingField.HasDefault && !projectionHasDefault {
+				// The field has newly been made nullable and neither the existing field nor
+				// the projection has a default value. The existing field will need to be
+				// modified to be made nullable since it may need to hold null values now.
+				update.newlyNullableFields = append(update.newlyNullableFields, *existingField)
+			}
+		} else {
+			// Field does not exist in the materialized resource, so this is a new
+			// projection to add to it.
+			update.newProjections = append(update.newProjections, projection)
+		}
+	}
+
+	// Fields that exist in the endpoint as non-nullable but aren't in the field selection
+	// need to be made nullable too.
+	for _, existingField := range existing.AllFields() {
+		inFieldSelection, err := is.inSelectedFields(existingField.Name, next.FieldSelection)
+		if err != nil {
+			return nil, fmt.Errorf("determining if existing field %q is in field selection for resource %q: %w", existingField.Name, next.ResourcePath, err)
+		}
+
+		if !inFieldSelection && !existingField.Nullable {
+			update.newlyNullableFields = append(update.newlyNullableFields, existingField)
+		}
+	}
+
+	return &update, nil
 }
 
 func runActions(ctx context.Context, actions []ActionApplyFn, descriptions []string, concurrent bool) error {

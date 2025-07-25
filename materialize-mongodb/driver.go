@@ -201,6 +201,10 @@ func (d *materialization) DeleteResource(ctx context.Context, resourcePath []str
 	}, nil
 }
 
+func (d *materialization) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	panic("not supported")
+}
+
 func (d *materialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,

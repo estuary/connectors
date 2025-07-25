@@ -312,8 +312,7 @@ func (v Validator) validateMatchesExistingResource(
 				}
 			}
 		} else if existingField := existingResource.GetField(p.Field); existingField != nil {
-			// All other fields that are already being materialized. Any error from GetField is
-			// because the field does not already exist.
+			// All other fields that are already being materialized.
 			if c, err = v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap); err != nil {
 				return nil, err
 			}

@@ -77,6 +77,15 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
+func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
+
+	return stmt, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, stmt)
+		return err
+	}, nil
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	// Redshift only allows a single column to be added per ALTER TABLE statement. Also, we will
 	// never need to drop nullability constraints, since Redshift does not allow dropping

@@ -141,6 +141,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 		ConcurrentApply:       true,
 		MaxFieldLength:        255,
 		CaseInsensitiveFields: true,
+		NoTruncateResources:   true,
 		MaterializeOptions: boilerplate.MaterializeOptions{
 			ExtendedLogging: true,
 			AckSchedule: &boilerplate.AckScheduleOption{
@@ -337,6 +338,10 @@ func (d *materialization) DeleteResource(ctx context.Context, resourcePath []str
 	return fmt.Sprintf("deleted table %q.%q", ns, name), func(ctx context.Context) error {
 		return d.catalog.DeleteTable(ctx, ns, name)
 	}, nil
+}
+
+func (d *materialization) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	panic("not supported")
 }
 
 func (d *materialization) UpdateResource(

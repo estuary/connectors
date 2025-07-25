@@ -129,6 +129,15 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	}, nil
 }
 
+func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", pgDialect.Identifier(path...))
+
+	return stmt, func(ctx context.Context) error {
+		_, err := c.db.ExecContext(ctx, stmt)
+		return err
+	}, nil
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 

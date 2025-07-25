@@ -176,6 +176,10 @@ func (s *sqlMaterialization[EC, RC]) DeleteResource(ctx context.Context, path []
 	return s.client.DeleteTable(ctx, path)
 }
 
+func (s *sqlMaterialization[EC, RC]) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	return s.client.TruncateTable(ctx, path)
+}
+
 func (s *sqlMaterialization[EC, RC]) MapType(p boilerplate.Projection, fc FieldConfig) (MappedType, boilerplate.ElementConverter) {
 	pp := buildProjection(&p.Projection)
 

@@ -219,9 +219,10 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
 	return boilerplate.MaterializeCfg{
-		Translate:          func(f string) string { return f },
-		ConcurrentApply:    true,
-		NoCreateNamespaces: true,
+		Translate:           func(f string) string { return f },
+		ConcurrentApply:     true,
+		NoCreateNamespaces:  true,
+		NoTruncateResources: true,
 	}
 }
 
@@ -307,6 +308,10 @@ func (d *materialization) DeleteResource(ctx context.Context, resourcePath []str
 	return fmt.Sprintf("delete table %q", resourcePath[0]), func(ctx context.Context) error {
 		return deleteTable(ctx, d.client, resourcePath[0])
 	}, nil
+}
+
+func (d *materialization) TruncateResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	panic("not supported")
 }
 
 func (d *materialization) UpdateResource(
