@@ -19,8 +19,10 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/updated.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/incompatible-changes.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/truncate.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/truncate-changes.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/field-addition.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/field-removal.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/backfill-migratable.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/backfill-nullable.flow.yaml
 
 //go:embed testdata/materializer/generated_specs
 var materializerFS embed.FS
@@ -70,7 +72,7 @@ func TestRunApply(t *testing.T) {
 			},
 		},
 		{
-			name:         "backfill with incompatible changes",
+			name:         "backfill with incompatible changes drops existing resource",
 			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
 			newSpec:      loadMaterializerSpec(t, "incompatible-changes.flow.proto"),
 			want: testCalls{
@@ -84,23 +86,43 @@ func TestRunApply(t *testing.T) {
 			newSpec:      loadMaterializerSpec(t, "truncate.flow.proto"),
 			want: testCalls{
 				truncateResource: [][]string{{"key_value"}},
+				updateResource:   [][]string{{"key_value"}},
 			},
 		},
 		{
-			name:         "binding with backfill & compatible changes also truncates existing resource",
+			name:         "binding with backfill & field addition truncates existing resource",
 			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
-			newSpec:      loadMaterializerSpec(t, "truncate-changes.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "field-addition.flow.proto"),
 			want: testCalls{
 				truncateResource: [][]string{{"key_value"}},
+				updateResource:   [][]string{{"key_value"}},
 			},
 		},
 		{
-			name:         "binding with backfill & migratable changes does a backfill",
+			name:         "binding with backfill & field removal truncates existing resource",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "field-removal.flow.proto"),
+			want: testCalls{
+				truncateResource: [][]string{{"key_value"}},
+				updateResource:   [][]string{{"key_value"}},
+			},
+		},
+		{
+			name:         "binding with backfill & migratable changes drops existing resource",
 			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
 			newSpec:      loadMaterializerSpec(t, "backfill-migratable.flow.proto"),
 			want: testCalls{
 				createResource: [][]string{{"key_value"}},
 				deleteResource: [][]string{{"key_value"}},
+			},
+		},
+		{
+			name:         "binding with backfill & nullability removal truncates & updates existing resource",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "backfill-nullable.flow.proto"),
+			want: testCalls{
+				truncateResource: [][]string{{"key_value"}},
+				updateResource:   [][]string{{"key_value"}},
 			},
 		},
 	} {

@@ -20,6 +20,7 @@ collections:
         requiredVal1: { type: string }
         optionalVal1: { type: integer }
         requiredVal2: { type: string }
-        completelyNewField: { type: boolean } # Removed optionalVal2, added completelyNewField
+        optionalVal2: { type: integer }
+        completelyNewField: { type: boolean }
       required: [key, requiredVal1, requiredVal2]
     key: [/key]
