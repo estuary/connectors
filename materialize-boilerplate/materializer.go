@@ -486,24 +486,33 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 
 	validator := NewValidator(&constrainterAdapter[EC, FC, RC, MT]{m: materializer}, is, mCfg.MaxFieldLength, mCfg.CaseInsensitiveFields, parsedFlags)
 	for _, bindingIdx := range common.backfillBindings {
+		mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx)
+		if err != nil {
+			return nil, err
+		}
+
 		// If the existing resource is compatible with the proposed binding spec
 		// without incrementing the backfill counter, it only needs to be
 		// truncated rather than fully dropping and re-creating the table.
 		var doTruncate bool
 		thisBinding := req.Materialization.Bindings[bindingIdx]
 		lastBinding := findLastBinding(thisBinding.ResourcePath, req.LastMaterialization)
-		if constraints, err := validator.ValidateBinding(
+		if _, err := validator.ValidateBinding(
 			thisBinding.ResourcePath,
 			thisBinding.DeltaUpdates,
-			lastBinding.Backfill, // evaluate constraints against the last binding's backfill counter
+			lastBinding.Backfill, // validate against the last binding's backfill counter
 			thisBinding.Collection,
 			thisBinding.FieldSelection.FieldConfigJsonMap,
 			req.LastMaterialization,
 		); err == nil {
 			// No general errors with the new binding spec, so check if any
 			// selected fields would be unsatisfiable or forbidden.
-			doTruncate = !slices.ContainsFunc(thisBinding.FieldSelection.AllFields(), func(f string) bool {
-				return constraints[f].Type.IsForbidden()
+			res := is.GetResource(thisBinding.ResourcePath)
+			doTruncate = !slices.ContainsFunc(mapped.SelectedProjections(), func(m MappedProjection[MT]) bool {
+				if f := res.GetField(m.Field); f != nil && !m.Mapped.Compatible(*f) {
+					return true
+				}
+				return false
 			})
 		}
 
@@ -516,8 +525,6 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		} else {
 			if deleteDesc, deleteAction, err := materializer.DeleteResource(ctx, thisBinding.ResourcePath); err != nil {
 				return nil, fmt.Errorf("getting DeleteResource action to replace resource: %w", err)
-			} else if mapped, err := buildMappedBinding(endpointCfg, materializer, *req.Materialization, bindingIdx); err != nil {
-				return nil, err
 			} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
 				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
 			} else {
