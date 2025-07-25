@@ -41,12 +41,8 @@
           "type": "string"
         },
         "advanced": {
+          "$ref": "#/$defs/Advanced",
           "advanced": true,
-          "allOf": [
-            {
-              "$ref": "#/$defs/Advanced"
-            }
-          ],
           "description": "Advanced settings for the connector.",
           "title": "Advanced Config"
         }
@@ -66,6 +62,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {
