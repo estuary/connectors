@@ -1,0 +1,75 @@
+---
+collections:
+  acmeCo/addresses:
+    schema: addresses.schema.yaml
+    key:
+      - /id
+  acmeCo/charges:
+    schema: charges.schema.yaml
+    key:
+      - /id
+  acmeCo/collections:
+    schema:
+      $schema: "http://json-schema.org/draft-07/schema#"
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type:
+            - integer
+        name:
+          type:
+            - "null"
+            - string
+        created_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        updated_at:
+          type:
+            - "null"
+            - string
+          format: date-time
+        _meta:
+          type: object
+          properties:
+            row_id:
+              type: integer
+          required:
+            - row_id
+    key:
+      - /id
+  acmeCo/customers:
+    schema: customers.schema.yaml
+    key:
+      - /id
+  acmeCo/discounts:
+    schema: discounts.schema.yaml
+    key:
+      - /id
+  acmeCo/metafields:
+    schema: metafields.schema.yaml
+    key:
+      - /id
+  acmeCo/onetimes:
+    schema: onetimes.schema.yaml
+    key:
+      - /id
+  acmeCo/orders:
+    schema: orders.schema.yaml
+    key:
+      - /id
+  acmeCo/products:
+    schema: products.schema.yaml
+    key:
+      - /id
+  acmeCo/shop:
+    schema: shop.schema.yaml
+    key:
+      - /store_id
+  acmeCo/subscriptions:
+    schema: subscriptions.schema.yaml
+    key:
+      - /id

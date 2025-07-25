@@ -1,0 +1,85 @@
+---
+$schema: "http://json-schema.org/draft-07/schema#"
+type: object
+required:
+  - store_id
+properties:
+  store_id:
+    type: integer
+  shop:
+    type:
+      - "null"
+      - object
+  store:
+    type:
+      - object
+    properties:
+      id:
+        type: integer
+      checkout_platform:
+        type:
+          - string
+          - "null"
+      created_at:
+        type:
+          - string
+          - "null"
+      currency:
+        type:
+          - string
+          - "null"
+      domain:
+        type:
+          - string
+          - "null"
+      email:
+        type:
+          - string
+          - "null"
+      enabled_presentment_currencies:
+        type:
+          - array
+          - "null"
+      enabled_presentment_currencies_symbols:
+        type:
+          - array
+          - "null"
+      disabled_currencies_historical:
+        type:
+          - array
+          - "null"
+      iana_timezone:
+        type:
+          - string
+          - "null"
+      my_shopify_domain:
+        type:
+          - string
+          - "null"
+      name:
+        type:
+          - string
+          - "null"
+      shop_email:
+        type:
+          - string
+          - "null"
+      shop_phone:
+        type:
+          - string
+          - "null"
+      timezone:
+        type:
+          - string
+          - "null"
+      updated_at:
+        type:
+          - string
+          - "null"
+  _meta:
+    type: object
+    properties:
+      row_id:
+        type: integer
+    required:
+      - row_id
