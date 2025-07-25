@@ -989,6 +989,18 @@
                 "boolean"
               ]
             },
+            "hs_research_agent_execution_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_research_agent_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_revenue_range": {
               "type": [
                 "null",
@@ -2386,6 +2398,12 @@
                 "number"
               ]
             },
+            "hs_inferred_language_codes": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_ip_timezone": {
               "type": [
                 "null",
@@ -2605,6 +2623,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_messaging_engagement_score": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_mobile_sdk_push_tokens": {
@@ -3865,6 +3889,12 @@
                 "number"
               ]
             },
+            "hs_average_call_duration": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_campaign": {
               "type": [
                 "null",
@@ -4024,7 +4054,49 @@
                 "number"
               ]
             },
+            "hs_latest_marketing_email_click_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_marketing_email_open_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_marketing_email_reply_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_latest_meeting_activity": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_sales_email_click_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_sales_email_open_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_sales_email_reply_date": {
               "format": "date-time",
               "type": [
                 "null",
@@ -4085,6 +4157,12 @@
                 "boolean"
               ]
             },
+            "hs_manual_campaign_ids": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_manual_forecast_category": {
               "type": [
                 "null",
@@ -4101,6 +4179,31 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_net_pipeline_impact": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_next_meeting_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_next_meeting_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_next_meeting_start_time": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_next_step": {
@@ -4141,6 +4244,36 @@
               ]
             },
             "hs_num_target_accounts": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_call_engagements": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_inbound_calls": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_outbound_calls": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_overdue_tasks": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_scheduled_meetings": {
               "type": [
                 "null",
                 "number"
@@ -4194,6 +4327,12 @@
                 "number"
               ]
             },
+            "hs_open_amount_in_home_currency": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_open_deal_create_date": {
               "type": [
                 "null",
@@ -4219,6 +4358,12 @@
               ]
             },
             "hs_predicted_amount_in_home_currency": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_primary_associated_company": {
               "type": [
                 "null",
                 "number"
@@ -4689,6 +4834,12 @@
                 "number"
               ]
             },
+            "hs_average_call_duration": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_campaign": {
               "type": [
                 "null",
@@ -4848,7 +4999,49 @@
                 "number"
               ]
             },
+            "hs_latest_marketing_email_click_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_marketing_email_open_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_marketing_email_reply_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_latest_meeting_activity": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_sales_email_click_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_sales_email_open_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_latest_sales_email_reply_date": {
               "format": "date-time",
               "type": [
                 "null",
@@ -4909,6 +5102,12 @@
                 "boolean"
               ]
             },
+            "hs_manual_campaign_ids": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_manual_forecast_category": {
               "type": [
                 "null",
@@ -4925,6 +5124,31 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_net_pipeline_impact": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_next_meeting_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_next_meeting_name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_next_meeting_start_time": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_next_step": {
@@ -4965,6 +5189,36 @@
               ]
             },
             "hs_num_target_accounts": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_call_engagements": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_inbound_calls": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_outbound_calls": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_overdue_tasks": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_number_of_scheduled_meetings": {
               "type": [
                 "null",
                 "number"
@@ -5018,6 +5272,12 @@
                 "number"
               ]
             },
+            "hs_open_amount_in_home_currency": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_open_deal_create_date": {
               "type": [
                 "null",
@@ -5043,6 +5303,12 @@
               ]
             },
             "hs_predicted_amount_in_home_currency": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_primary_associated_company": {
               "type": [
                 "null",
                 "number"
@@ -7914,6 +8180,12 @@
                 "string"
               ]
             },
+            "hs_associated_call_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_at_mentioned_owner_ids": {
               "type": [
                 "null",
@@ -8035,6 +8307,18 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_guest_emails": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_has_call_with_transcript": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_i_cal_uid": {
@@ -9110,6 +9394,12 @@
             },
             "hs_lastmodifieddate": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_marketing_studio_node_id": {
               "type": [
                 "null",
                 "string"
@@ -10527,6 +10817,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_external_tax_rate_id": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_images": {
@@ -12938,6 +13234,12 @@
                 "number"
               ]
             },
+            "hs_inferred_language_codes": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_ip_timezone": {
               "type": [
                 "null",
@@ -13157,6 +13459,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_messaging_engagement_score": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_mobile_sdk_push_tokens": {
@@ -14388,12 +14696,6 @@
                 "string"
               ]
             },
-            "hs_first_agent_message_sent_by": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_form_id": {
               "type": [
                 "null",
@@ -14458,6 +14760,12 @@
             },
             "hs_last_email_date": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_email_details": {
               "type": [
                 "null",
                 "string"
@@ -14857,6 +15165,19 @@
               ]
             },
             "hs_user_ids_of_all_owners": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_waitlist_routing_targets": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_waitlist_sort_value": {
+              "format": "date-time",
               "type": [
                 "null",
                 "string"
