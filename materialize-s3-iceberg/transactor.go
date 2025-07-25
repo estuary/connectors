@@ -12,7 +12,7 @@ import (
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/filesink"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	pf "github.com/estuary/flow/go/protocols/flow"

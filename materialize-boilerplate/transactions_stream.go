@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/dbt"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"

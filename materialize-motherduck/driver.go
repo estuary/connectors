@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/blob"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	sql "github.com/estuary/connectors/materialize-sql"

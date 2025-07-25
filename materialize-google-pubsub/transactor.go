@@ -7,7 +7,7 @@ import (
 	"fmt"
 
 	"cloud.google.com/go/pubsub"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/minio/highwayhash"
 	"golang.org/x/sync/errgroup"
