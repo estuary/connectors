@@ -9,7 +9,7 @@
       },
       "archived": false,
       "color": "dark-teal",
-      "created_at": "2023-10-31T15:29:13.337Z",
+      "created_at": "redacted-timestamp",
       "current_status": null,
       "custom_fields": [],
       "default_view": "list",
@@ -40,7 +40,7 @@
           "gid": "1205846172619387"
         }
       ],
-      "modified_at": "2023-10-31T15:29:14.059Z",
+      "modified_at": "redacted-timestamp",
       "name": "estuary",
       "notes": "",
       "owner": {
@@ -66,7 +66,7 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created_at": "2023-10-31T15:29:13.654Z",
+      "created_at": "redacted-timestamp",
       "gid": "1205846055668611",
       "name": "To do",
       "project": {
@@ -83,7 +83,7 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created_at": "2023-10-31T15:29:15.274Z",
+      "created_at": "redacted-timestamp",
       "created_by": {
         "gid": "1205846102972015"
       },
@@ -110,7 +110,7 @@
       "completed": false,
       "completed_at": null,
       "completed_by": null,
-      "created_at": "2023-10-31T15:29:15.067Z",
+      "created_at": "redacted-timestamp",
       "due_at": null,
       "due_on": "2023-11-02",
       "followers": [
@@ -135,7 +135,7 @@
           }
         }
       ],
-      "modified_at": "2023-11-02T04:46:16.928Z",
+      "modified_at": "redacted-timestamp",
       "name": "Draft project brief",
       "notes": "",
       "num_hearts": 0,
