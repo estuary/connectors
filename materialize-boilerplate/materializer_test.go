@@ -108,12 +108,12 @@ func TestRunApply(t *testing.T) {
 			},
 		},
 		{
-			name:         "binding with backfill & migratable changes drops existing resource",
+			name:         "binding with backfill & migratable changes truncates existing resource",
 			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
 			newSpec:      loadMaterializerSpec(t, "backfill-migratable.flow.proto"),
 			want: testCalls{
-				createResource: [][]string{{"key_value"}},
-				deleteResource: [][]string{{"key_value"}},
+				truncateResource: [][]string{{"key_value"}},
+				updateResource:   [][]string{{"key_value"}},
 			},
 		},
 		{

@@ -438,18 +438,18 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		// table.
 		// * A materialization-specific setup action may come next, e.g. the
 		// previously mentioned metadata table creation.
-		// * The more typical actions follow: Adding fields, dropping
-		// nullability constraints, etc.
-		// * Finally, any existing resources that require truncation have it
-		// done. This isn't done concurrent with the other resource-specific
-		// actions to prevent potential concurrency conflicts when operating on
-		// the same resource.
+		// * Any existing resources that require truncation have it done. This
+		// isn't done concurrent with the other resource-specific actions to
+		// prevent potential concurrency conflicts when operating on the same
+		// resource.
+		// * The more typical actions are last: Adding fields, dropping
+		// nullability constraints, migration column types, etc.
 		namespaceActionDesciptions   []string
 		setupActionDescriptions      []string // there will only be one entry here, but a slice is used for convenience in the rest of this code
-		resourceActionDescriptions   []string
-		resourceActions              []ActionApplyFn // may be run concurrently
 		truncationActionDescriptions []string
-		truncationActions            []ActionApplyFn // also may run concurrently
+		truncationActions            []ActionApplyFn // may run concurrently
+		resourceActionDescriptions   []string
+		resourceActions              []ActionApplyFn // also may be run concurrently, but not concurrent with truncations
 	)
 
 	addResourceAction := func(desc string, a ActionApplyFn) {
@@ -529,7 +529,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			// No general errors with the new binding spec, so check if any
 			// selected fields are incompatible.
 			doTruncate = !slices.ContainsFunc(mapped.SelectedProjections(), func(m MappedProjection[MT]) bool {
-				if f := existing.GetField(m.Field); f != nil && !m.Mapped.Compatible(*f) {
+				if f := existing.GetField(m.Field); f != nil && !m.Mapped.Compatible(*f) && !m.Mapped.CanMigrate(*f) {
 					return true
 				}
 				return false
@@ -632,8 +632,8 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	allActions := append(namespaceActionDesciptions, setupActionDescriptions...)
-	allActions = append(allActions, resourceActionDescriptions...)
 	allActions = append(allActions, truncationActionDescriptions...)
+	allActions = append(allActions, resourceActionDescriptions...)
 
 	return &pm.Response_Applied{ActionDescription: strings.Join(allActions, "\n")}, nil
 }
