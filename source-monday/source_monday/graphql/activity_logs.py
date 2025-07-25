@@ -4,8 +4,8 @@ from typing import Any, AsyncGenerator
 
 from estuary_cdk.http import HTTPSession
 
-from source_monday.graphql.query_executor import execute_query
-from source_monday.models import ActivityLog
+from source_monday.graphql.query_executor import execute_query, BoardNullTracker
+from source_monday.models import ActivityLog, Board
 from source_monday.utils import parse_monday_17_digit_timestamp
 
 # Monday.com allows up to 10,000 activity logs per board (retention limit).
@@ -90,7 +90,11 @@ async def _fetch_activity_logs_for_board_batch(
     activity_logs_per_board: int,
 ) -> AsyncGenerator[ActivityLog, None]:
     """
-    Fetch activity logs for a batch of boards.
+    Fetch activity logs for a batch of boards with null detection.
+    
+    This function uses a two-pass approach:
+    1. First pass: detect boards with null activity_logs (authorization issues)
+    2. Second pass: stream actual activity logs from accessible boards
     
     Note: Monday.com's limit is per-board, allowing efficient bulk requests.
     """
@@ -107,30 +111,39 @@ async def _fetch_activity_logs_for_board_batch(
         }
         logs_in_page = 0
 
-        async for activity_log in execute_query(
-            ActivityLog,
+        null_tracker = BoardNullTracker()
+
+        # Stream boards to capture board-level information and detect null activity_logs
+        # Then yield individual activity logs from accessible boards
+        async for board in execute_query(
+            Board,
             http,
             log,
-            "data.boards.activity_logs.item",
+            "data.boards.item",
             ACTIVITY_LOGS,
             variables,
+            null_tracker=null_tracker,
         ):
-            try:
-                log_time = parse_monday_17_digit_timestamp(activity_log.created_at, log)
-                start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-                end_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
+            if board.activity_logs is None:
+                null_tracker.track_board_with_null_field(board.id, "activity_logs")
+            elif board.activity_logs:
+                for activity_log in board.activity_logs:
+                    try:
+                        log_time = parse_monday_17_digit_timestamp(activity_log.created_at, log)
+                        start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
+                        end_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
 
-                # Double-check the log is within our time bounds
-                if start_dt <= log_time <= end_dt:
-                    yield activity_log
-                    logs_in_page += 1
+                        # Double-check the log is within our time bounds
+                        if start_dt <= log_time <= end_dt:
+                            yield activity_log
+                            logs_in_page += 1
 
-            except (ValueError, TypeError) as e:
-                if activity_log.created_at is not None:
-                    log.warning(
-                        f"Failed to parse activity log timestamp {activity_log.created_at}: {e}"
-                    )
-                continue
+                    except (ValueError, TypeError) as e:
+                        if activity_log.created_at is not None:
+                            log.warning(
+                                f"Failed to parse activity log timestamp {activity_log.created_at}: {e}"
+                            )
+                        continue
 
         if logs_in_page == 0:
             log.debug(
@@ -145,6 +158,9 @@ async def _fetch_activity_logs_for_board_batch(
 ACTIVITY_LOGS = """
 query ($start: ISO8601DateTime!, $end: ISO8601DateTime!, $ids: [ID!]!, $limit: Int!, $activity_limit: Int!, $page: Int = 1) {
     boards(ids: $ids, limit: $limit, page: $page, order_by: created_at) {
+        id
+        state
+        updated_at
         activity_logs(from: $start, to: $end, limit: $activity_limit) {
             account_id
             created_at

@@ -6,15 +6,18 @@ from aiostream.stream import merge
 from estuary_cdk.http import HTTPSession
 from pydantic import AwareDatetime, BaseModel
 
-from source_monday.graphql.query_executor import execute_query
+from source_monday.graphql.query_executor import execute_query, BoardNullTracker
 from source_monday.models import GraphQLResponseData, GraphQLResponseRemainder, Item
 
 
 class ItemsPage(BaseModel, extra="allow"):
     cursor: str | None = None
+    items: list[Item] | None = None
 
 
 class BoardItems(BaseModel, extra="allow"):
+    id: str
+    state: str
     updated_at: AwareDatetime
     items_page: ItemsPage | None = None
 
@@ -182,24 +185,41 @@ async def _stream_all_items_from_page(
     """
     Stream all items from boards on this page, handling cursor pagination internally.
 
+    Uses "up a level" streaming approach:
+    1. Stream boards to capture board-level information and detect null items_page
+    2. Track boards with null items_page for authorization correlation
+    3. Yield individual items from accessible boards
+
     The internal cursor handling is needed because Monday's API uses a cursor-based pagination
     for items within each board, where the cursor is specific to the board's items_page and
     expires after 60-minutes.
     """
 
     items_yielded = 0
-    async for item in execute_query(
-        Item,
+    
+    null_tracker = BoardNullTracker()
+
+    # Stream boards to capture board-level information and detect null items_page
+    # Then yield individual items from accessible boards
+    async for board in execute_query(
+        BoardItems,
         http,
         log,
-        "data.boards.item.items_page.items.item",
+        "data.boards.item",
         query,
         variables,
         remainder_cls=ItemsPageRemainder,
         remainder_processor=cursor_collector,
+        null_tracker=null_tracker,
     ):
-        items_yielded += 1
-        yield item
+        if board.items_page is None:
+            null_tracker.track_board_with_null_field(board.id, "items_page")
+        elif board.items_page.items is None:
+            null_tracker.track_board_with_null_field(board.id, "items")
+        elif board.items_page and board.items_page.items:
+            for item in board.items_page.items:
+                items_yielded += 1
+                yield item
 
     cursors = cursor_collector.get_result(log)
     while cursors:
