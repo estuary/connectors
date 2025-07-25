@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator
 
-from estuary_cdk.capture.common import LogCursor, PageCursor
+from estuary_cdk.capture.common import LogCursor, PageCursor, make_cursor_dict
 from estuary_cdk.http import HTTPSession
 
 from source_monday.graphql import (
@@ -10,7 +10,6 @@ from source_monday.graphql import (
     fetch_activity_logs,
     fetch_boards_by_ids,
     fetch_boards_minimal,
-    fetch_boards_paginated,
     fetch_items_by_id,
     get_items_from_boards,
 )
@@ -32,10 +31,12 @@ DEFAULT_BOARDS_PAGE_SIZE = 100
 # However, the underlying GraphQL query will fetch items in smaller batches to balance
 # complexity and other API limitations.
 BOARDS_PER_ITEMS_PAGE = 25
+BOARDS_PER_BOARD_PAGE = 100
 
 
 async def fetch_boards_changes(
     http: HTTPSession,
+    excluded_board_ids: list[str],
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Board | LogCursor, None]:
@@ -44,11 +45,15 @@ async def fetch_boards_changes(
     max_updated_at = log_cursor
     has_updates = False
     board_ids_to_fetch: set[str] = set()
-    all_boards: set[str] = set()
+    board_ids: set[str] = set()
 
     minimal_boards_checked = 0
     async for board in fetch_boards_minimal(http, log):
-        all_boards.add(board.id)
+        if board.id in excluded_board_ids:
+            log.debug(f"Skipping excluded board {board.id}")
+            continue
+
+        board_ids.add(board.id)
         minimal_boards_checked += 1
 
         if board.updated_at > log_cursor:
@@ -71,7 +76,7 @@ async def fetch_boards_changes(
     async for activity_log in fetch_activity_logs(
         http,
         log,
-        list(all_boards),
+        list(board_ids),
         log_cursor.replace(microsecond=0).isoformat(),
     ):
         activity_logs_processed += 1
@@ -110,6 +115,7 @@ async def fetch_boards_changes(
     log.debug(f"Total unique board IDs to fetch: {len(board_ids_to_fetch)}")
 
     boards_yielded = 0
+    board_ids_to_fetch = set(board_ids_to_fetch) - set(excluded_board_ids)
     if board_ids_to_fetch:
         async for board in fetch_boards_by_ids(http, log, ids=list(board_ids_to_fetch)):
             if board.updated_at > log_cursor:
@@ -134,55 +140,78 @@ async def fetch_boards_changes(
 
 async def fetch_boards_page(
     http: HTTPSession,
+    excluded_board_ids: list[str],
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[Board | PageCursor, None]:
-    assert page is None or isinstance(page, int)
+    assert page is None or isinstance(page, dict)
     assert isinstance(cutoff, datetime)
 
+    total_boards_count = 0
+    emitted_boards_count = 0
+
     if page is None:
-        page = 1
+        board_ids = []
+        async for board in fetch_boards_minimal(http, log):
+            if board.id in excluded_board_ids:
+                log.debug(f"Skipping excluded board {board.id}")
+                continue
 
-    limit = DEFAULT_BOARDS_PAGE_SIZE
-    docs_emitted = 0
-    boards_fetched = 0
+            if board.updated_at <= cutoff:
+                board_ids.append(board.id)
 
-    log.debug(f"Processing page {page} with limit {limit}")
+        if not board_ids:
+            log.debug("No boards found for boards backfill")
+            return
 
-    async for board in fetch_boards_paginated(http, log, page, limit):
-        boards_fetched += 1
+        # Emit a cursor to checkpoint the complete dictionary of boards
+        cursor_dict = make_cursor_dict({board_id: False for board_id in board_ids})
+        yield cursor_dict
+    else:
+        board_ids = [k for k, v in page.items() if v is not None]
+    
+    boards_to_process = board_ids[:BOARDS_PER_BOARD_PAGE]
 
+    if not boards_to_process:
+        log.debug("No boards to process for boards backfill")
+        return
+
+    log.debug(
+        f"{len(board_ids)} boards to process for boards backfill. Backfilling {len(boards_to_process)} boards.",
+        {
+            "cutoff": cutoff.isoformat(),
+            "board_ids_for_page": boards_to_process,
+        },
+    )
+
+    async for board in fetch_boards_by_ids(http, log, boards_to_process):
+        total_boards_count += 1
         if board.updated_at <= cutoff and board.state != "deleted":
-            docs_emitted += 1
+            emitted_boards_count += 1
             yield board
 
-    if boards_fetched > 0:
-        log.debug(
-            f"Boards backfill completed for page {page}",
-            {
-                "board_page": page,
-                "qualifying_boards": docs_emitted,
-                "boards_fetched": boards_fetched,
-                "next_page": page + 1,
-            },
-        )
-        yield page + 1
-    else:
-        log.debug(
-            f"Boards backfill completed for page {page} - no more pages",
-            {
-                "board_page": page,
-                "qualifying_boards": docs_emitted,
-                "boards_fetched": boards_fetched,
-                "reason": "no_more_boards",
-            },
-        )
+    log.debug(
+        f"Boards backfill completed for {len(board_ids)} boards with {emitted_boards_count} boards out of {total_boards_count} total boards.",
+        {
+            "completed_boards": boards_to_process,
+            "remaining_boards": len(board_ids) - len(boards_to_process),
+            "emitted_boards_count": emitted_boards_count,
+            "total_boards_count": total_boards_count,
+        },
+    )
+
+    # merge patch to remove processed boards
+    completion_patch = make_cursor_dict({board_id: None for board_id in boards_to_process})
+    yield completion_patch
+
+    if len(board_ids) <= len(boards_to_process):
         return
 
 
 async def fetch_items_changes(
     http: HTTPSession,
+    excluded_board_ids: list[str],
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Item | LogCursor, None]:
@@ -199,6 +228,10 @@ async def fetch_items_changes(
 
     board_ids = []
     async for board in fetch_boards_minimal(http, log):
+        if board.id in excluded_board_ids:
+            log.debug(f"Skipping excluded board {board.id}")
+            continue
+
         if board.state != "deleted":
             board_ids.append(board.id)
 
@@ -238,7 +271,12 @@ async def fetch_items_changes(
             # to active or archived state, so we need to backfill items from that board since the
             # activity log does not show item updates and the backfill might not backfill the items
             # if the board was already deleted before the capture started.
-            board_ids_to_backfill.add(activity_log.resource_id)
+            if activity_log.resource_id not in excluded_board_ids:
+                log.debug(
+                    f"Board state change activity log found for board {activity_log.resource_id} "
+                    f"(event created_at: {created_at})"
+                )
+                board_ids_to_backfill.add(activity_log.resource_id)
         else:
             item_ids_to_fetch.add(activity_log.resource_id)
 
@@ -301,6 +339,7 @@ async def fetch_items_changes(
 
 async def fetch_items_page(
     http: HTTPSession,
+    excluded_board_ids: list[str],
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -328,6 +367,10 @@ async def fetch_items_page(
     if page is None:
         board_ids = []
         async for board in fetch_boards_minimal(http, log):
+            if board.id in excluded_board_ids:
+                log.debug(f"Skipping excluded board {board.id}")
+                continue
+
             # Cannot query items for deleted boards, so we skip them
             # otherwise, the API returns ambiguous internal server errors.
             if board.updated_at <= cutoff and board.state != "deleted":

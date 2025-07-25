@@ -22,6 +22,20 @@
           ],
           "title": "AccessToken",
           "type": "object"
+        },
+        "Advanced": {
+          "properties": {
+            "excluded_board_ids": {
+              "description": "List of board IDs to exclude from processing. Useful for boards that are known to cause issues (e.g., unauthorized to query activity logs) or are not relevant.",
+              "items": {
+                "type": "string"
+              },
+              "title": "Excluded Board IDs",
+              "type": "array"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
         }
       },
       "properties": {
@@ -38,6 +52,12 @@
             }
           ],
           "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [

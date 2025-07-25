@@ -64,6 +64,20 @@ class EndpointConfig(BaseModel):
         title="Authentication",
         discriminator="credentials_title",
     )
+    
+    class Advanced(BaseModel):
+        excluded_board_ids: list[str] = Field(
+            default_factory=list,
+            title="Excluded Board IDs",
+            description="List of board IDs to exclude from processing. Useful for boards that are known to cause issues (e.g., unauthorized to query activity logs) or are not relevant.",
+        )
+
+    advanced: Advanced = Field(
+        default_factory=Advanced, #type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
+    )
 
 
 ConnectorState = GenericConnectorState[ResourceState]
@@ -226,12 +240,12 @@ class ItemsBackfillCursor:
 
 
 IncrementalResourceFetchChangesFn = Callable[
-    [HTTPSession, Logger, LogCursor],
+    [HTTPSession, list[str], Logger, LogCursor],
     AsyncGenerator[BaseDocument | LogCursor, None],
 ]
 
 IncrementalResourceFetchPageFn = Callable[
-    [HTTPSession, Logger, PageCursor, LogCursor],
+    [HTTPSession, list[str], Logger, PageCursor, LogCursor],
     AsyncGenerator[BaseDocument | PageCursor, None],
 ]
 

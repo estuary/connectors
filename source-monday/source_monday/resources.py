@@ -120,8 +120,8 @@ def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(fetch_changes_fn, http),
-            fetch_page=functools.partial(fetch_page_fn, http),
+            fetch_changes=functools.partial(fetch_changes_fn, http, config.advanced.excluded_board_ids),
+            fetch_page=functools.partial(fetch_page_fn, http, config.advanced.excluded_board_ids),
         )
 
     return [
