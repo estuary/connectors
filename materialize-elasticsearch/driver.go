@@ -14,8 +14,8 @@ import (
 
 	elasticsearch "github.com/elastic/go-elasticsearch/v8"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
-	m "github.com/estuary/connectors/go/protocols/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"

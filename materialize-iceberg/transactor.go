@@ -13,7 +13,7 @@ import (
 	"sync"
 
 	"github.com/estuary/connectors/go/blob"
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/python"
 	pf "github.com/estuary/flow/go/protocols/flow"

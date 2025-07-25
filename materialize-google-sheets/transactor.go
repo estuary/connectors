@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	m "github.com/estuary/connectors/go/protocols/materialize"
+	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"go.gazette.dev/core/consumer/protocol"
