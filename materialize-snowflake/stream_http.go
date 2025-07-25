@@ -189,7 +189,7 @@ func newStreamClient(cfg *config, account string) (*streamClient, error) {
 	}
 
 	return &streamClient{
-		r:        resty.New().SetBaseURL(fmt.Sprintf("https://") + path.Join(cfg.Host, "v1/streaming")),
+		r:        resty.New().SetBaseURL("https://" + path.Join(cfg.Host, "v1/streaming")),
 		key:      key,
 		user:     cfg.Credentials.User,
 		database: cfg.Database,
@@ -200,7 +200,7 @@ func newStreamClient(cfg *config, account string) (*streamClient, error) {
 
 func (s *streamClient) configure(ctx context.Context) (*streamConfig, error) {
 	type req struct {
-		Role *string `json:"role;omitempty"`
+		Role *string `json:"role,omitempty"`
 	}
 
 	res, err := post[streamConfig](ctx, s, "/client/configure", req{
@@ -235,10 +235,12 @@ func (s *streamClient) openChannel(ctx context.Context, schema, table, name stri
 		Channel:   name,
 		WriteMode: "CLOUD_STORAGE",
 	})
-	if err != nil {
+	if err != nil && res == nil {
 		return nil, err
-	} else if err := getErrorByCode(res.StatusCode); err != nil {
-		return nil, fmt.Errorf("request was not successful: %w", err)
+	} else if codeErr := getErrorByCode(res.StatusCode); codeErr != nil {
+		return nil, fmt.Errorf("request returned error code: %w", codeErr)
+	} else if err != nil {
+		return nil, fmt.Errorf("error opening channel with a non-error status code: %w", err)
 	} else if res.Message != "Success" {
 		return nil, fmt.Errorf("unexpected response message: %s", res.Message)
 	}
@@ -392,7 +394,7 @@ func post[T any](ctx context.Context, c *streamClient, path string, body any) (*
 		return nil, fmt.Errorf("failed to POST %s: %w", path, err)
 	}
 	if !got.IsSuccess() {
-		return nil, fmt.Errorf("failed to POST %s: %s: %w", got.Request.URL, got.Status(), got.Error().(error))
+		return &res, fmt.Errorf("failed to POST %s: %s: %w", got.Request.URL, got.Status(), got.Error().(error))
 	}
 
 	return &res, nil

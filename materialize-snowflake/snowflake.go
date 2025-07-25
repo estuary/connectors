@@ -327,9 +327,9 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 		if err := d.streamManager.addBinding(ctx, loc.TableSchema, d.ep.Identifier(loc.TableName), target); err != nil {
 			var apiError *streamingApiError
 			var colError *unhandledColError
-			if errors.As(err, &apiError) && apiError.Code == 55 {
-				// Streaming API errors with code 55 come from tables that don't
-				// support streaming at all, so we will fall back to a
+			if errors.As(err, &apiError) && (apiError.Code == 6 || apiError.Code == 55) {
+				// Streaming API errors with code 6 or 55  come from tables that
+				// don't support streaming at all, so we will fall back to a
 				// non-streaming strategy for them if they are encountered.
 			} else if errors.As(err, &colError) {
 				// This column type is something that we haven't yet implemented
