@@ -4,7 +4,7 @@ import itertools
 
 from estuary_cdk.http import HTTPSession
 
-from source_monday.graphql.query_executor import GraphQLQueryError, execute_query
+from source_monday.graphql.query_executor import GraphQLQueryError, execute_query, BoardNullTracker
 from source_monday.models import Board
 
 # Process boards in batches of 100 to balance GraphQL complexity with throughput.
@@ -190,6 +190,8 @@ async def _try_fetch_boards(
     log: Logger,
     variables: dict[str, Any],
 ) -> AsyncGenerator[Board, None]:
+    null_tracker = BoardNullTracker()
+    
     try:
         async for board in execute_query(
             Board,
@@ -198,10 +200,24 @@ async def _try_fetch_boards(
             "data.boards.item",
             BOARDS_WITH_KIND,
             variables,
+            null_tracker=null_tracker,
         ):
+            if board.columns is None:
+                null_tracker.track_board_with_null_field(board.id, "columns")
+            if board.groups is None:
+                null_tracker.track_board_with_null_field(board.id, "groups")
+            if board.owners is None:
+                null_tracker.track_board_with_null_field(board.id, "owners")
+            if board.subscribers is None:
+                null_tracker.track_board_with_null_field(board.id, "subscribers")
+            if board.views is None:
+                null_tracker.track_board_with_null_field(board.id, "views")
+            
             yield board
     except GraphQLQueryError as original_error:
         try:
+            null_tracker = BoardNullTracker()
+            
             async for board in execute_query(
                 Board,
                 http,
@@ -209,11 +225,23 @@ async def _try_fetch_boards(
                 "data.boards.item",
                 BOARDS_WITHOUT_KIND,
                 variables,
+                null_tracker=null_tracker,
             ):
+                if board.columns is None:
+                    null_tracker.track_board_with_null_field(board.id, "columns")
+                if board.groups is None:
+                    null_tracker.track_board_with_null_field(board.id, "groups")
+                if board.owners is None:
+                    null_tracker.track_board_with_null_field(board.id, "owners")
+                if board.subscribers is None:
+                    null_tracker.track_board_with_null_field(board.id, "subscribers")
+                if board.views is None:
+                    null_tracker.track_board_with_null_field(board.id, "views")
+                
                 yield board
         except Exception as e:
             log.error(
-                f"Failed to fetch boards with IDs {variables.get('ids', [])} using both queries. Original error: {original_error}"
+                f"Failed to fetch boards with IDs {variables.get('ids', [])} using both queries with null detection. Original error: {original_error}"
             )
             raise e from original_error
 

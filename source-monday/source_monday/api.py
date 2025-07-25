@@ -44,11 +44,11 @@ async def fetch_boards_changes(
     max_updated_at = log_cursor
     has_updates = False
     board_ids_to_fetch: set[str] = set()
-    all_boards: set[str] = set()
+    board_ids: set[str] = set()
 
     minimal_boards_checked = 0
     async for board in fetch_boards_minimal(http, log):
-        all_boards.add(board.id)
+        board_ids.add(board.id)
         minimal_boards_checked += 1
 
         if board.updated_at > log_cursor:
@@ -71,7 +71,7 @@ async def fetch_boards_changes(
     async for activity_log in fetch_activity_logs(
         http,
         log,
-        list(all_boards),
+        list(board_ids),
         log_cursor.replace(microsecond=0).isoformat(),
     ):
         activity_logs_processed += 1
@@ -238,6 +238,10 @@ async def fetch_items_changes(
             # to active or archived state, so we need to backfill items from that board since the
             # activity log does not show item updates and the backfill might not backfill the items
             # if the board was already deleted before the capture started.
+            log.debug(
+                f"Board state change activity log found for board {activity_log.resource_id} "
+                f"(event created_at: {created_at})"
+            )
             board_ids_to_backfill.add(activity_log.resource_id)
         else:
             item_ids_to_fetch.add(activity_log.resource_id)
