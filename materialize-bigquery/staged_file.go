@@ -5,8 +5,8 @@ import (
 	"path"
 
 	"cloud.google.com/go/bigquery"
+	enc "github.com/estuary/connectors/go/stream-encode"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 )
 
 type stagedFileClient struct{}

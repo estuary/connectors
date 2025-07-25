@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
+	enc "github.com/estuary/connectors/go/stream-encode"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
