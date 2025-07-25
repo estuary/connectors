@@ -29,6 +29,9 @@
           "info": true,
           "type": "workspace"
         },
+        "workspace_limits": {
+          "max_file_upload_size_in_bytes": 5242880
+        },
         "workspace_name": "WillB Estuary's Notion"
       },
       "id": "e1440030-aafa-458b-b03e-854a8e2fc629",
