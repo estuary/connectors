@@ -171,6 +171,44 @@ class Board(IncrementalResource):
         json_schema_extra=lambda x: x.pop("default"),  # type: ignore
     )
 
+    # Fields that can be null due to authorization restrictions
+    activity_logs: list[ActivityLog] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    columns: list[Any] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    groups: list[Any] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    owners: list[Any] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    subscribers: list[Any] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    views: list[Any] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    tags: list[Any] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    updates: list[Any] | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+    items_page: Any | None = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
+    )
+
 
 class Item(IncrementalResource):
     class Board(BaseModel, extra="allow"):
