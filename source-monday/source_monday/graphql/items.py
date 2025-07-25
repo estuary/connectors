@@ -261,6 +261,7 @@ _ITEM_FIELDS = """
 fragment _ItemFields on Item {
   id
   name
+  email
   created_at
   updated_at
   creator_id
@@ -288,6 +289,37 @@ fragment _ItemFields on Item {
     text
     type
     value
+    column {
+        id
+        title
+        description
+        type
+        width
+        archived
+    }
+    ... on StatusValue {
+        id
+        column {
+            id
+            title
+            description
+            type
+            width
+            archived
+        }
+        index
+        is_done
+        label
+        label_style {
+            border
+            color
+        }
+        text
+        type
+        update_id
+        updated_at
+        value
+    }
   }
   group {
     id
