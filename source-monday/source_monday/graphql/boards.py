@@ -4,7 +4,7 @@ import itertools
 
 from estuary_cdk.http import HTTPSession
 
-from source_monday.graphql.query_executor import GraphQLQueryError, execute_query
+from source_monday.graphql.query_executor import GraphQLQueryError, execute_query, BoardNullTracker
 from source_monday.models import Board
 
 # Process boards in batches of 100 to balance GraphQL complexity with throughput.
@@ -184,12 +184,28 @@ async def fetch_boards_with_retry(
 
                 chunks_to_process.extend([left_chunk, right_chunk])
 
+def create_board_validator(tracker: BoardNullTracker):
+    def validate_board(board: Board) -> None:
+        if board.columns is None:
+            tracker.track_board_with_null_field(board.id, "columns")
+        if board.groups is None:
+            tracker.track_board_with_null_field(board.id, "groups")
+        if board.owners is None:
+            tracker.track_board_with_null_field(board.id, "owners")
+        if board.subscribers is None:
+            tracker.track_board_with_null_field(board.id, "subscribers")
+        if board.views is None:
+            tracker.track_board_with_null_field(board.id, "views")
+    return validate_board
 
 async def _try_fetch_boards(
     http: HTTPSession,
     log: Logger,
     variables: dict[str, Any],
 ) -> AsyncGenerator[Board, None]:
+    null_tracker = BoardNullTracker()
+    validate_board = create_board_validator(null_tracker)
+    
     try:
         async for board in execute_query(
             Board,
@@ -198,10 +214,15 @@ async def _try_fetch_boards(
             "data.boards.item",
             BOARDS_WITH_KIND,
             variables,
+            null_tracker=null_tracker,
         ):
+            validate_board(board)
             yield board
     except GraphQLQueryError as original_error:
         try:
+            fallback_null_tracker = BoardNullTracker()
+            validate_board_fallback = create_board_validator(fallback_null_tracker)
+            
             async for board in execute_query(
                 Board,
                 http,
@@ -209,11 +230,13 @@ async def _try_fetch_boards(
                 "data.boards.item",
                 BOARDS_WITHOUT_KIND,
                 variables,
+                null_tracker=fallback_null_tracker,
             ):
+                validate_board_fallback(board)
                 yield board
         except Exception as e:
             log.error(
-                f"Failed to fetch boards with IDs {variables.get('ids', [])} using both queries. Original error: {original_error}"
+                f"Failed to fetch boards with IDs {variables.get('ids', [])} using both queries with null detection. Original error: {original_error}"
             )
             raise e from original_error
 

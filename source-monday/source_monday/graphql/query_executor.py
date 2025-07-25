@@ -1,5 +1,6 @@
 import asyncio
 import re
+from dataclasses import dataclass, field
 from logging import Logger
 from typing import (
     Any,
@@ -89,6 +90,64 @@ TGraphqlData = TypeVar("TGraphqlData", bound=BaseModel)
 TRemainder = TypeVar("TRemainder", bound=GraphQLResponseRemainder, contravariant=True)
 
 
+@dataclass
+class BoardNullTracker:
+    """
+    Track boards that have null values for restricted fields during streaming.
+
+    When boards have authorization restrictions, restricted fields will be null in the response.
+    This tracker helps correlate detected nulls with actual USER_UNAUTHORIZED errors received in
+    the remainder of the GraphQL response.
+    """
+
+    boards_with_nulls: dict[str, set[str]] = field(
+        default_factory=dict
+    )  # board_id -> {null_fields}
+
+    def track_board_with_null_field(self, board_id: str, field_name: str) -> None:
+        if board_id not in self.boards_with_nulls:
+            self.boards_with_nulls[board_id] = set()
+        self.boards_with_nulls[board_id].add(field_name)
+
+    def correlate_with_errors(
+        self, log: Logger, auth_errors: list[GraphQLError]
+    ) -> None:
+        """
+        Correlate detected nulls with actual authorization errors and log warnings.
+
+        For each error path like ['boards', N, 'activity_logs']:
+        1. Extract the field name ('activity_logs')
+        2. Check if we detected any boards with null values for that field
+        3. Log warnings for confirmed unauthorized boards
+        """
+        if not auth_errors or not self.boards_with_nulls:
+            return
+
+        error_fields = set()
+        for error in auth_errors:
+            if (
+                error.path
+                and len(error.path) >= 3
+                and error.path[0] == "boards"
+                and isinstance(error.path[2], str)
+            ):
+                # ['boards', N, 'activity_logs'] -> 'activity_logs'
+                field_name = error.path[2]
+                error_fields.add(field_name)
+
+        for board_id, null_fields in self.boards_with_nulls.items():
+            for field_name in null_fields:
+                if field_name in error_fields:
+                    log.warning(
+                        f"Board {board_id} unauthorized for {field_name} - data excluded from results",
+                        {
+                            "board_id": board_id,
+                            "restricted_field": field_name,
+                            "operation": "board_field_access",
+                        },
+                    )
+
+
 class RemainderProcessor(Protocol, Generic[TRemainder]):
     """
     A protocol for processing the remainder of a GraphQL response.
@@ -147,7 +206,7 @@ def _get_primary_error_info(
     error_details = []
     for error in errors:
         if error.extensions:
-            status_code = error.extensions.status_code
+            status_code = error.extensions.status_code if error.extensions.status_code else DEFAULT_ERROR_STATUS_CODE
             code = error.extensions.code
             error_details.append(
                 {
@@ -198,6 +257,7 @@ async def execute_query(
     variables: dict[str, Any] | None = None,
     remainder_cls: type[TRemainder] = GraphQLResponseRemainder,
     remainder_processor: RemainderProcessor | None = None,
+    null_tracker: BoardNullTracker | None = None,
 ) -> AsyncGenerator[TGraphqlData, None]:
     log.debug(
         f"Executing GraphQL query: {query}",
@@ -248,7 +308,35 @@ async def execute_query(
                 reset_in_seconds = remainder.data.complexity.reset_in_x_seconds
 
             if remainder.has_errors():
-                raise GraphQLQueryError(remainder.get_errors())
+                if null_tracker:
+                    auth_errors = [
+                        err
+                        for err in remainder.get_errors()
+                        if err.extensions
+                        and err.extensions.code == USER_UNAUTHORIZED_CODE
+                    ]
+                    other_errors = [
+                        err
+                        for err in remainder.get_errors()
+                        if not (
+                            err.extensions
+                            and err.extensions.code == USER_UNAUTHORIZED_CODE
+                        )
+                    ]
+
+                    if auth_errors:
+                        null_tracker.correlate_with_errors(log, auth_errors)
+                        if other_errors:
+                            raise GraphQLQueryError(other_errors)
+                        else:
+                            log.debug(
+                                "All GraphQL errors were USER_UNAUTHORIZED and handled via null tracking"
+                            )
+                            return
+                    else:
+                        raise GraphQLQueryError(remainder.get_errors())
+                else:
+                    raise GraphQLQueryError(remainder.get_errors())
 
             if remainder_processor is not None:
                 remainder_processor.process(log, remainder)

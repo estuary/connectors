@@ -128,30 +128,79 @@
       },
       "column_values": [
         {
+          "column": {
+            "archived": false,
+            "description": null,
+            "id": "subitems_mkn5v6ah",
+            "title": "Subitems",
+            "type": "subtasks",
+            "width": null
+          },
           "id": "subitems_mkn5v6ah",
           "text": null,
           "type": "subtasks",
           "value": null
         },
         {
+          "column": {
+            "archived": false,
+            "description": "",
+            "id": "project_owner",
+            "title": "Owner",
+            "type": "people",
+            "width": null
+          },
           "id": "project_owner",
           "text": "",
           "type": "people",
           "value": null
         },
         {
+          "column": {
+            "archived": false,
+            "description": null,
+            "id": "project_status",
+            "title": "Status",
+            "type": "status",
+            "width": 134
+          },
           "id": "project_status",
+          "index": null,
+          "is_done": false,
+          "label": "Not Started",
+          "label_style": {
+            "border": "#b0b0b0",
+            "color": "#c4c4c4"
+          },
           "text": "Not Started",
           "type": "status",
+          "update_id": null,
+          "updated_at": null,
           "value": null
         },
         {
+          "column": {
+            "archived": false,
+            "description": null,
+            "id": "date",
+            "title": "Due date",
+            "type": "date",
+            "width": null
+          },
           "id": "date",
           "text": "",
           "type": "date",
           "value": null
         },
         {
+          "column": {
+            "archived": false,
+            "description": null,
+            "id": "tags_mkmy3r3g",
+            "title": "Tags",
+            "type": "tags",
+            "width": null
+          },
           "id": "tags_mkmy3r3g",
           "text": "",
           "type": "tags",
@@ -160,6 +209,7 @@
       ],
       "created_at": "2025-02-20T18:52:56Z",
       "creator_id": "71985416",
+      "email": "estuarydev_pulse_8531390039_737a6074e14f030b7543__71985416@use1.mx.monday.com",
       "group": {
         "id": "new_group29179"
       },
@@ -176,18 +226,51 @@
           },
           "column_values": [
             {
+              "column": {
+                "archived": false,
+                "description": null,
+                "id": "person",
+                "title": "Owner",
+                "type": "people",
+                "width": 98
+              },
               "id": "person",
               "text": "",
               "type": "people",
               "value": null
             },
             {
+              "column": {
+                "archived": false,
+                "description": null,
+                "id": "status",
+                "title": "Status",
+                "type": "status",
+                "width": 136
+              },
               "id": "status",
+              "index": null,
+              "is_done": false,
+              "label": null,
+              "label_style": {
+                "border": "#b0b0b0",
+                "color": "#c4c4c4"
+              },
               "text": null,
               "type": "status",
+              "update_id": null,
+              "updated_at": null,
               "value": null
             },
             {
+              "column": {
+                "archived": false,
+                "description": null,
+                "id": "date0",
+                "title": "Date",
+                "type": "date",
+                "width": 140
+              },
               "id": "date0",
               "text": "",
               "type": "date",
@@ -196,6 +279,7 @@
           ],
           "created_at": "2025-02-20T19:03:22Z",
           "creator_id": "71985416",
+          "email": "estuarydev_pulse_8531539316_737a6074e14f030b7543__71985416@use1.mx.monday.com",
           "group": {
             "id": "topics"
           },
@@ -221,18 +305,51 @@
           },
           "column_values": [
             {
+              "column": {
+                "archived": false,
+                "description": null,
+                "id": "person",
+                "title": "Owner",
+                "type": "people",
+                "width": 98
+              },
               "id": "person",
               "text": "",
               "type": "people",
               "value": null
             },
             {
+              "column": {
+                "archived": false,
+                "description": null,
+                "id": "status",
+                "title": "Status",
+                "type": "status",
+                "width": 136
+              },
               "id": "status",
+              "index": null,
+              "is_done": false,
+              "label": null,
+              "label_style": {
+                "border": "#b0b0b0",
+                "color": "#c4c4c4"
+              },
               "text": null,
               "type": "status",
+              "update_id": null,
+              "updated_at": null,
               "value": null
             },
             {
+              "column": {
+                "archived": false,
+                "description": null,
+                "id": "date0",
+                "title": "Date",
+                "type": "date",
+                "width": 140
+              },
               "id": "date0",
               "text": "",
               "type": "date",
@@ -241,6 +358,7 @@
           ],
           "created_at": "2025-02-20T19:15:53Z",
           "creator_id": "71985416",
+          "email": "estuarydev_pulse_8531684828_737a6074e14f030b7543__71985416@use1.mx.monday.com",
           "group": {
             "id": "topics"
           },
