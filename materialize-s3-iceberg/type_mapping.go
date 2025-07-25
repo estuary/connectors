@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	enc "github.com/estuary/connectors/go/stream-encode"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 

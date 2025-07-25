@@ -5,8 +5,8 @@ import (
 	"path"
 	"strings"
 
+	enc "github.com/estuary/connectors/go/stream-encode"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 )
 
 const fileSizeLimit = 250 * 1024 * 1024

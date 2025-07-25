@@ -4,8 +4,8 @@ import (
 	"io"
 	"path"
 
+	enc "github.com/estuary/connectors/go/stream-encode"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
-	enc "github.com/estuary/connectors/materialize-boilerplate/stream-encode"
 )
 
 // Multiple files are loaded faster by COPY INTO than a single large file.
