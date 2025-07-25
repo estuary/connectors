@@ -1,6 +1,7 @@
 import json
 import subprocess
 
+TIMESTAMP_FIELDS = ["ts", "modified_at", "created_at"]
 
 def test_capture(request, snapshot):
     result = subprocess.run(
@@ -32,8 +33,10 @@ def test_capture(request, snapshot):
     for l in unique_stream_lines:
         stream, rec = l[0], l[1]
 
-        if "ts" in rec:
-            rec["ts"] = "redacted-timestamp"
+        for field in TIMESTAMP_FIELDS:
+            if field in rec:
+                rec[field] = "redacted-timestamp"
+
         if "text" in rec:
             rec["text"] = "redacted"
 
