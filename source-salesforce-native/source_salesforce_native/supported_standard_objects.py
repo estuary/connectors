@@ -2251,6 +2251,12 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "SurveyEngagementContextShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
+    "SurveyInvitation": {
+
+    },
+    "SurveyQuestionScore": {
+
+    },
     "TabDefinition": {},
     "Task": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
