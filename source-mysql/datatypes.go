@@ -138,29 +138,25 @@ func transcodeTimeValue(buf []byte, val any) ([]byte, error) {
 }
 
 func transcodeJSONValue(buf []byte, val any) ([]byte, error) {
+	var v json.RawMessage
 	if str, ok := val.(string); ok {
-		if len(str) == 0 {
-			return json.Append(buf, nil, 0) // Translate empty string as null
-		}
-		val = json.RawMessage(str)
+		// Unsafely casting the string to a json.RawMessage
+		v = unsafe.Slice(unsafe.StringData(str), len(str))
 	} else if bs, ok := val.([]byte); ok {
-		if len(bs) == 0 {
-			return json.Append(buf, nil, 0) // Translate empty string as null
-		}
-		val = json.RawMessage(bs)
+		v = json.RawMessage(bs)
 	}
-	if bs, ok := val.(json.RawMessage); ok {
-		if len(bs) > truncateColumnThreshold {
-			val = json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(bs)))
-		} else if !json.Valid(bs) {
-			// If the contents of a JSON column are malformed and non-empty we
-			// don't really have any option other than stringifying it. But we
-			// can wrap it in an object with an 'invalidJSON' property so that
-			// there's at least some hope of identifying such values later on.
-			val = map[string]any{"invalidJSON": string(bs)}
-		}
+	if len(v) == 0 {
+		return append(buf, `null`...), nil // Translate empty string JSON to null
+	} else if len(v) > truncateColumnThreshold {
+		buf = append(buf, `{"flow_truncated":true,"original_size":`...)
+		buf = strconv.AppendInt(buf, int64(len(v)), 10)
+		return append(buf, '}'), nil
+	} else if !json.Valid(v) {
+		buf = append(buf, `{"invalidJSON":`...)
+		buf = json.AppendEscape(buf, *(*string)(unsafe.Pointer(&v)), 0)
+		return append(buf, '}'), nil
 	}
-	return json.Append(buf, val, json.EscapeHTML|json.SortMapKeys)
+	return json.Append(buf, v, json.TrustRawMessage|json.EscapeHTML)
 }
 
 func transcodeTimestampValue(buf []byte, val any) ([]byte, error) {
