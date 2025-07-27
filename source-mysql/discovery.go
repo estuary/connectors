@@ -7,6 +7,7 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unsafe"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
@@ -484,7 +485,10 @@ var mysqlStringDecoders = map[string]func([]byte) (string, error){
 }
 
 func decodeUTF8(bs []byte) (string, error) {
-	return string(bs), nil
+	// We know that in our connector, string decoders are only ever applied to have
+	// their result immediately serialized into a JSON output document, so it's safe
+	// to directly cast []byte -> string here for efficiency.
+	return *(*string)(unsafe.Pointer(&bs)), nil
 }
 
 func decodeLatin1(bs []byte) (string, error) {
