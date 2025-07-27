@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unsafe"
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -364,7 +365,7 @@ func (t *mysqlSetTranscoder) TranscodeJSON(buf []byte, val any) ([]byte, error) 
 
 func transcodeBooleanValue(buf []byte, val any) ([]byte, error) {
 	if val == nil {
-		return json.Append(buf, nil, 0)
+		return append(buf, `null`...), nil
 	}
 	// This is an ugly hack, but it works without requiring a bunch of annoying type
 	// assertions to make sure we handle the possible value types coming from backfills
@@ -492,12 +493,14 @@ type mysqlTextTranscoderBackfill struct{}
 
 func (t *mysqlTextTranscoderBackfill) TranscodeJSON(buf []byte, val any) ([]byte, error) {
 	if str, ok := val.(string); ok {
-		return json.Append(buf, str, 0)
+		return json.AppendEscape(buf, str, 0), nil
 	} else if bs, ok := val.([]byte); ok {
-		// Backfills always return string results as UTF-8
-		return json.Append(buf, string(bs), 0)
+		// Backfills always return string results as UTF-8 so no decoding is required,
+		// however we can avoid an expensive []byte -> string conversion using unsafe.
+		var str = *(*string)(unsafe.Pointer(&bs))
+		return json.AppendEscape(buf, str, 0), nil
 	} else if val == nil {
-		return json.Append(buf, nil, 0)
+		return append(buf, `null`...), nil
 	}
 	return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
 }
@@ -508,15 +511,18 @@ type mysqlTextTranscoderReplication struct {
 
 func (t *mysqlTextTranscoderReplication) TranscodeJSON(buf []byte, val any) ([]byte, error) {
 	if str, ok := val.(string); ok {
-		return json.Append(buf, str, 0)
+		return json.AppendEscape(buf, str, 0), nil
 	} else if bs, ok := val.([]byte); ok {
+		// TODO(wgd): Figure out how exactly to optimize this. The UTF-8 case could
+		// be optimized the same as for backfills, but latin1 and UCS-2 would be more
+		// challenging to do without any intermediate allocations.
 		var str, err = decodeBytesToString(t.Charset, bs)
 		if err != nil {
 			return nil, err
 		}
-		return json.Append(buf, str, 0)
+		return json.AppendEscape(buf, str, 0), nil
 	} else if val == nil {
-		return json.Append(buf, nil, 0)
+		return append(buf, `null`...), nil
 	}
 	return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
 }
