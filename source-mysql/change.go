@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
@@ -99,10 +100,15 @@ func (c mysqlChangeEventCursor) JSONSchema() *jsonschema.Schema {
 }
 
 func (c mysqlChangeEventCursor) MarshalJSON() ([]byte, error) {
-	if c.BinlogFile == "backfill" && c.BinlogOffset == 0 {
-		return json.Marshal(fmt.Sprintf("%s:%d", c.BinlogFile, c.RowIndex))
+	var buf = make([]byte, 0, 64)
+	buf = json.AppendEscape(buf, c.BinlogFile, 0)
+	buf[len(buf)-1] = ':'   // Turn the closing quote into a colon separator
+	if c.BinlogOffset > 0 { // All valid offsets are >= 4, offset == 0 only occurs in backfills
+		buf = strconv.AppendInt(buf, int64(c.BinlogOffset), 10)
+		buf = append(buf, ':')
 	}
-	return json.Marshal(fmt.Sprintf("%s:%d:%d", c.BinlogFile, c.BinlogOffset, c.RowIndex))
+	buf = strconv.AppendInt(buf, int64(c.RowIndex), 10)
+	return append(buf, '"'), nil
 }
 
 func (s *mysqlSourceInfo) Common() sqlcapture.SourceCommon {
