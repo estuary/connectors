@@ -172,37 +172,49 @@ func (c *capture) streamChanges(
 
 	// Log progress while the change streams are running.
 	initialProcessed, initialEmitted, _ := c.changeStreamProgress()
+	logProgress := func() error {
+		nextProcessed, nextEmitted, clusterTimes := c.changeStreamProgress()
+		currentOpTime, err := getClusterOpTime(ctx, c.client)
+		if err != nil {
+			return fmt.Errorf("getting cluster op time: %w", err)
+		}
+
+		// "lag" is an estimate of how far behind we are on reading change
+		// streams event for each database change stream.
+		lag := make(map[string]string)
+		for db, latestEventTs := range clusterTimes {
+			lag[db] = (time.Duration(currentOpTime.T-latestEventTs.T) * time.Second).String()
+		}
+
+		if nextProcessed != initialProcessed {
+			log.WithFields(log.Fields{
+				"events":                nextProcessed - initialProcessed,
+				"docs":                  nextEmitted - initialEmitted,
+				"latestClusterOpTime":   currentOpTime,
+				"lastEventClusterTimes": clusterTimes,
+				"lag":                   lag,
+			}).Info("processed change stream events")
+		} else {
+			log.Info("change stream idle")
+		}
+
+		initialProcessed = nextProcessed
+		initialEmitted = nextEmitted
+		return nil
+	}
+
 	for {
 		select {
 		case <-time.After(streamLoggerInterval):
-			nextProcessed, nextEmitted, clusterTimes := c.changeStreamProgress()
-			currentOpTime, err := getClusterOpTime(ctx, c.client)
-			if err != nil {
-				return fmt.Errorf("getting cluster op time: %w", err)
+			if err := logProgress(); err != nil {
+				return err
 			}
-
-			// "lag" is an estimate of how far behind we are on reading change
-			// streams event for each database change stream.
-			lag := make(map[string]string)
-			for db, latestEventTs := range clusterTimes {
-				lag[db] = (time.Duration(currentOpTime.T-latestEventTs.T) * time.Second).String()
-			}
-
-			if nextProcessed != initialProcessed {
-				log.WithFields(log.Fields{
-					"events":                nextProcessed - initialProcessed,
-					"docs":                  nextEmitted - initialEmitted,
-					"latestClusterOpTime":   currentOpTime,
-					"lastEventClusterTimes": clusterTimes,
-					"lag":                   lag,
-				}).Info("processed change stream events")
-			} else {
-				log.Info("change stream idle")
-			}
-
-			initialProcessed = nextProcessed
-			initialEmitted = nextEmitted
 		case <-streamsDone.Done():
+			if err := logProgress(); err != nil {
+				// Avoid clobbering an error which is likely more causal if the
+				// change streams completed prematurely with an error.
+				log.WithError(err).Warn("error logging change stream progress")
+			}
 			return streamsDone.Err()
 		}
 	}
