@@ -233,8 +233,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else if err := b.loadFile.encodeRow(converted); err != nil {
-			return fmt.Errorf("encoding row for load: %w", err)
+		} else if err := b.loadFile.writeRow(converted); err != nil {
+			return fmt.Errorf("writing row for load: %w", err)
 		} else {
 			b.loadMergeBounds.NextKey(converted)
 		}
@@ -351,8 +351,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := b.storeFile.encodeRow(converted); err != nil {
-			return nil, fmt.Errorf("encoding row for store: %w", err)
+		} else if err := b.storeFile.writeRow(converted); err != nil {
+			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}

@@ -1,4 +1,4 @@
-package stream_encode
+package writer
 
 import (
 	"compress/flate"
@@ -43,7 +43,7 @@ func WithJsonSkipNulls() JsonOption {
 	}
 }
 
-type JsonEncoder struct {
+type JsonWriter struct {
 	w     io.Writer // will be set to `gz` for compressed writes or `cwc` if compression is disabled
 	cwc   *countingWriteCloser
 	gz    *pgzip.Writer
@@ -51,90 +51,90 @@ type JsonEncoder struct {
 	buf   []byte
 }
 
-// NewJsonEncoder creates a JsonEncoder from w. w is closed when JsonEncoder is closed. If `fields`
+// NewJsonWriter creates a JsonWriter from w. w is closed when JsonWriter is closed. If `fields`
 // is nil, values will be encoded as a JSON array rather than as an object.
-func NewJsonEncoder(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonEncoder {
+func NewJsonWriter(w io.WriteCloser, fields []string, opts ...JsonOption) *JsonWriter {
 	var cfg jsonConfig
 	for _, o := range opts {
 		o(&cfg)
 	}
 
-	enc := &JsonEncoder{
+	jw := &JsonWriter{
 		cwc: &countingWriteCloser{w: w},
 	}
 
 	if !cfg.disableCompression {
-		gz, err := pgzip.NewWriterLevel(enc.cwc, jsonCompressionlevel)
+		gz, err := pgzip.NewWriterLevel(jw.cwc, jsonCompressionlevel)
 		if err != nil {
 			// Only possible if compressionLevel is not valid.
 			panic("invalid compression level for gzip.NewWriterLevel")
 		}
-		enc.gz = gz
-		enc.w = gz
+		jw.gz = gz
+		jw.w = gz
 	} else {
-		enc.w = enc.cwc
+		jw.w = jw.cwc
 	}
 
 	if fields != nil {
-		enc.shape = encrow.NewShape(fields)
+		jw.shape = encrow.NewShape(fields)
 		// Setting TrustRawMessage here prevents unnecessary validation of pre-serialized JSON
 		// received from the runtime, which we can assume to be valid (flow_document for example).
 		// Note that we are also not setting SortMapKeys or EscapeHTML: Sorting keys is not needed
 		// because encrow.Shape already sorts the top-level keys and any object values are already
 		// serialized as JSON, and escaping HTML is not desired so as to avoid escaping values like
 		// <, >, &, etc. if they are present in the materialized collection's data.
-		enc.shape.SetFlags(json.TrustRawMessage)
-		enc.shape.SetSkipNulls(cfg.skipNulls)
+		jw.shape.SetFlags(json.TrustRawMessage)
+		jw.shape.SetSkipNulls(cfg.skipNulls)
 	}
 
-	return enc
+	return jw
 }
 
-func (e *JsonEncoder) Encode(vals []any) (err error) {
-	e.buf = e.buf[:0]
-	if e.shape == nil {
+func (w *JsonWriter) Write(vals []any) (err error) {
+	w.buf = w.buf[:0]
+	if w.shape == nil {
 		// Serialize as a JSON array of values.
-		e.buf = append(e.buf, '[')
+		w.buf = append(w.buf, '[')
 		for idx, v := range vals {
-			if e.buf, err = json.Append(e.buf, v, json.TrustRawMessage); err != nil {
+			if w.buf, err = json.Append(w.buf, v, json.TrustRawMessage); err != nil {
 				return fmt.Errorf("encoding JSON array value: %w", err)
 			}
 			if idx != len(vals)-1 {
-				e.buf = append(e.buf, ',')
+				w.buf = append(w.buf, ',')
 			}
 		}
-		e.buf = append(e.buf, ']')
+		w.buf = append(w.buf, ']')
 	} else {
 		// Serialize as a JSON object.
-		if e.buf, err = e.shape.Encode(e.buf, vals); err != nil {
+		if w.buf, err = w.shape.Encode(w.buf, vals); err != nil {
 			return fmt.Errorf("encoding shape: %w", err)
 		}
 	}
 
-	e.buf = append(e.buf, '\n')
+	w.buf = append(w.buf, '\n')
 
-	if _, err := e.w.Write(e.buf); err != nil {
+	if _, err := w.w.Write(w.buf); err != nil {
 		return fmt.Errorf("writing gzip bytes: %w", err)
 	}
 
 	return nil
 }
 
-func (e *JsonEncoder) Written() int {
-	return e.cwc.written
+func (w *JsonWriter) Written() int {
+	return w.cwc.written
 }
 
 // Close closes the underlying gzip writer if compression is enabled, flushing its data and writing
 // the GZIP footer. It also closes the underlying io.WriteCloser that was used to initialize the
-// counting encoder.
-func (e *JsonEncoder) Close() error {
-	if e.gz != nil {
-		if err := e.gz.Close(); err != nil {
+// counting writer.
+func (w *JsonWriter) Close() error {
+	if w.gz != nil {
+		if err := w.gz.Close(); err != nil {
 			return fmt.Errorf("closing gzip writer: %w", err)
 		}
 	}
 
-	if err := e.cwc.Close(); err != nil {
+	if err := w.cwc.Close(); err != nil {
 		return fmt.Errorf("closing counting writer: %w", err)
 	}
 	return nil

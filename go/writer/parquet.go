@@ -1,4 +1,4 @@
-package stream_encode
+package writer
 
 import (
 	"encoding/base64"
@@ -53,7 +53,7 @@ const (
 )
 
 // rowSize is used to get a rough estimate of how much memory a row of values will take up when
-// buffered in the ParquetEncoder's `buffer` slice. These estimates are used to bound how often a
+// buffered in the ParquetWriter's `buffer` slice. These estimates are used to bound how often a
 // buffer is written as a row group to the scratch file. The maximum allowed buffer size based on
 // these estimates should be << the connector limits since they are at best proportional wild
 // guesses.
@@ -135,7 +135,7 @@ type parquetConfig struct {
 	metadata                  map[string]string
 }
 
-type ParquetEncoder struct {
+type ParquetWriter struct {
 	cfg parquetConfig
 
 	schema     ParquetSchema
@@ -191,7 +191,7 @@ func WithParquetMetadata(meta map[string]string) ParquetOption {
 	}
 }
 
-func NewParquetEncoder(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) *ParquetEncoder {
+func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption) *ParquetWriter {
 	cfg := parquetConfig{
 		compression:       Uncompressed,
 		rowGroupRowLimit:  defaultRowGroupRowLimit,
@@ -210,7 +210,7 @@ func NewParquetEncoder(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOptio
 
 	cwc := &countingWriteCloser{w: w}
 
-	return &ParquetEncoder{
+	return &ParquetWriter{
 		cfg:        cfg,
 		schema:     sch,
 		schemaRoot: schemaRoot,
@@ -252,20 +252,20 @@ func writerOpts(cfg parquetConfig) []file.WriteOption {
 	return out
 }
 
-// Encode encodes a row of data by buffering it in the encoder's buffer, and if thresholds are
+// Write a row of data by buffering it in the writers's buffer, and if thresholds are
 // exceed writing the buffer as a row group to the scratch file, and potentially flushing the row
 // groups from the scratch file collectively as a single row group to the output.
-func (e *ParquetEncoder) Encode(row []any) error {
+func (w *ParquetWriter) Write(row []any) error {
 	var err error
 
-	if len(row) != len(e.schema) {
-		return fmt.Errorf("encode: row length (%d) does not match schema length (%d)", len(row), len(e.schema))
+	if len(row) != len(w.schema) {
+		return fmt.Errorf("write: row length (%d) does not match schema length (%d)", len(row), len(w.schema))
 	}
 
-	if e.scratch.writer == nil {
+	if w.scratch.writer == nil {
 		// Either the very first row, or the first one after flushing the scratch file.
-		if e.scratch.file, err = os.CreateTemp("", "parquet-scratch-*"); err != nil {
-			return fmt.Errorf("encode creating scratch file: %w", err)
+		if w.scratch.file, err = os.CreateTemp("", "parquet-scratch-*"); err != nil {
+			return fmt.Errorf("write creating scratch file: %w", err)
 		}
 
 		scratchOpts := []parquet.WriterProperty{
@@ -276,36 +276,36 @@ func (e *ParquetEncoder) Encode(row []any) error {
 			// Turning off stats calculations helps too, but just a tiny bit.
 			parquet.WithStats(false),
 		}
-		e.scratch.writer = file.NewParquetWriter(e.scratch.file, e.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
+		w.scratch.writer = file.NewParquetWriter(w.scratch.file, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
 
-	e.buffer = append(e.buffer, row)
-	e.bufferSizeBytes += e.rs.estSize(row)
-	e.scratch.rowCount += 1
+	w.buffer = append(w.buffer, row)
+	w.bufferSizeBytes += w.rs.estSize(row)
+	w.scratch.rowCount += 1
 
-	if e.bufferSizeBytes >= maxBufferSize {
+	if w.bufferSizeBytes >= maxBufferSize {
 		// Write out the buffer as a single row group to the scratch file.
-		if err := e.flushBuffer(); err != nil {
-			return fmt.Errorf("encode flushing buffer based on buffer size: %w", err)
+		if err := w.flushBuffer(); err != nil {
+			return fmt.Errorf("write flushing buffer based on buffer size: %w", err)
 		}
 	}
 
-	if e.scratch.sizeBytes >= e.cfg.rowGroupByteLimit ||
-		e.scratch.rowCount >= e.cfg.rowGroupRowLimit ||
-		e.scratch.columnChunkCount >= maxScratchColumnChunkCount {
-		if e.scratch.columnChunkCount >= maxScratchColumnChunkCount {
+	if w.scratch.sizeBytes >= w.cfg.rowGroupByteLimit ||
+		w.scratch.rowCount >= w.cfg.rowGroupRowLimit ||
+		w.scratch.columnChunkCount >= maxScratchColumnChunkCount {
+		if w.scratch.columnChunkCount >= maxScratchColumnChunkCount {
 			log.WithFields(log.Fields{
-				"scratchSizeBytes":        e.scratch.sizeBytes,
-				"scratchRowCount":         e.scratch.rowCount,
-				"scratchColumnChunkCount": e.scratch.columnChunkCount,
+				"scratchSizeBytes":        w.scratch.sizeBytes,
+				"scratchRowCount":         w.scratch.rowCount,
+				"scratchColumnChunkCount": w.scratch.columnChunkCount,
 			}).Debug("flushing scratch file based on column chunk count")
 		}
 
-		if err := e.flushBuffer(); err != nil {
+		if err := w.flushBuffer(); err != nil {
 			// Still might need to flush the buffer based on row count.
-			return fmt.Errorf("encode flushing buffer based on scratch file size: %w", err)
-		} else if err := e.flushScratchFile(); err != nil {
-			return fmt.Errorf("encode flushing scratch file based on scratch file size: %w", err)
+			return fmt.Errorf("write flushing buffer based on scratch file size: %w", err)
+		} else if err := w.flushScratchFile(); err != nil {
+			return fmt.Errorf("write flushing scratch file based on scratch file size: %w", err)
 		}
 	}
 
@@ -315,17 +315,17 @@ func (e *ParquetEncoder) Encode(row []any) error {
 // Written returns the number of bytes written to the output writer. This value increases only as
 // row groups from the scratch file are flushed to the output, which happens whenever there is
 // enough data (either by rows or bytes) in the scratch file to fill a complete row group.
-func (e *ParquetEncoder) Written() int {
-	return e.cwc.written
+func (w *ParquetWriter) Written() int {
+	return w.cwc.written
 }
 
 // Close flushes the buffered rows and scratch file, and closes the output writer.
-func (e *ParquetEncoder) Close() error {
-	if err := e.flushBuffer(); err != nil {
+func (w *ParquetWriter) Close() error {
+	if err := w.flushBuffer(); err != nil {
 		return fmt.Errorf("flushing buffer: %w", err)
-	} else if err := e.flushScratchFile(); err != nil {
+	} else if err := w.flushScratchFile(); err != nil {
 		return fmt.Errorf("flushing scratch file: %w", err)
-	} else if err := e.sinkWriter.Close(); err != nil { // also closes the underlying io.WriteCloser
+	} else if err := w.sinkWriter.Close(); err != nil { // also closes the underlying io.WriteCloser
 		return fmt.Errorf("closing sink: %w", err)
 	}
 	return nil
@@ -335,48 +335,48 @@ func (e *ParquetEncoder) Close() error {
 // data that has been written to the scratch file. If the current row group is
 // flushed, this is approximately how large the resulting output row group will
 // be on an uncompressed basis.
-func (e *ParquetEncoder) ScratchSize() int {
-	return e.scratch.sizeBytes
+func (w *ParquetWriter) ScratchSize() int {
+	return w.scratch.sizeBytes
 }
 
-func (e *ParquetEncoder) flushScratchFile() error {
-	if e.scratch.writer == nil {
+func (w *ParquetWriter) flushScratchFile() error {
+	if w.scratch.writer == nil {
 		return nil
 	}
 
-	if err := e.scratch.writer.Close(); err != nil { // also closes the underlying io.WriteCloser
+	if err := w.scratch.writer.Close(); err != nil { // also closes the underlying io.WriteCloser
 		return fmt.Errorf("closing scratch writer: %w", err)
-	} else if sr, err := os.Open(e.scratch.file.Name()); err != nil {
+	} else if sr, err := os.Open(w.scratch.file.Name()); err != nil {
 		return fmt.Errorf("opening scratch file to transfer values: %w", err)
 	} else if scratchReader, err := file.NewParquetReader(sr); err != nil {
 		return fmt.Errorf("creating scratch reader: %w", err)
-	} else if err := transferColumnValues(scratchReader, e.sinkWriter); err != nil {
+	} else if err := transferColumnValues(scratchReader, w.sinkWriter); err != nil {
 		return fmt.Errorf("transferring column values: %w", err)
 	} else if err := sr.Close(); err != nil {
 		return fmt.Errorf("closing scratch file after reading: %w", err)
-	} else if err := os.Remove(e.scratch.file.Name()); err != nil {
+	} else if err := os.Remove(w.scratch.file.Name()); err != nil {
 		return fmt.Errorf("removing scratch file: %w", err)
 	}
 
-	e.scratch.file = nil
-	e.scratch.writer = nil
-	e.scratch.sizeBytes = 0
-	e.scratch.columnChunkCount = 0
-	e.scratch.rowCount = 0
+	w.scratch.file = nil
+	w.scratch.writer = nil
+	w.scratch.sizeBytes = 0
+	w.scratch.columnChunkCount = 0
+	w.scratch.rowCount = 0
 
 	return nil
 }
 
 // flushBuffer writes the current buffered rows as a single row group to the scratch file.
-func (e *ParquetEncoder) flushBuffer() error {
-	if len(e.buffer) == 0 {
+func (w *ParquetWriter) flushBuffer() error {
+	if len(w.buffer) == 0 {
 		return nil
 	}
 
-	rgWriter := e.scratch.writer.AppendRowGroup()
+	rgWriter := w.scratch.writer.AppendRowGroup()
 
 	// Transpose the buffered rows into the scratch file row group by writing them column-by-column.
-	for colIdx, f := range e.schema {
+	for colIdx, f := range w.schema {
 		cw, err := rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column: %w", err)
@@ -384,55 +384,55 @@ func (e *ParquetEncoder) flushBuffer() error {
 
 		switch f.DataType {
 		case PrimitiveTypeInteger:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getIntVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getIntVal); err != nil {
 				return fmt.Errorf("writing integer column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeNumber:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Float64ColumnChunkWriter), getNumberVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Float64ColumnChunkWriter), getNumberVal); err != nil {
 				return fmt.Errorf("writing number column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBoolean:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.BooleanColumnChunkWriter), getBooleanVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.BooleanColumnChunkWriter), getBooleanVal); err != nil {
 				return fmt.Errorf("writing boolean column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBinary:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getBinaryVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getBinaryVal); err != nil {
 				return fmt.Errorf("writing byte array column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeJson:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getJsonVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getJsonVal); err != nil {
 				return fmt.Errorf("writing byte array (json) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeString:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.ByteArrayColumnChunkWriter), getStringVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getStringVal); err != nil {
 				return fmt.Errorf("writing byte array (string) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeUuid:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getUuidVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getUuidVal); err != nil {
 				return fmt.Errorf("writing uuid column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDate:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int32ColumnChunkWriter), getDateVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int32ColumnChunkWriter), getDateVal); err != nil {
 				return fmt.Errorf("writing date column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTime:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getTimeVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimeVal); err != nil {
 				return fmt.Errorf("writing time column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTimestamp:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDecimal:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
 				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeInterval:
-			if err := writeColumn(colIdx, e.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getIntervalVal); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getIntervalVal); err != nil {
 				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
 			}
 		default:
-			panic(fmt.Sprintf("attempted to encode unknown type of column '%s': %d", f.Name, f.DataType))
+			panic(fmt.Sprintf("attempted to write unknown type of column '%s': %d", f.Name, f.DataType))
 		}
 
 		if err := cw.Close(); err != nil {
@@ -444,10 +444,10 @@ func (e *ParquetEncoder) flushBuffer() error {
 		return fmt.Errorf("closing row group writer: %w", err)
 	}
 
-	e.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
-	e.scratch.columnChunkCount += len(e.schema)
-	e.buffer = e.buffer[:0]
-	e.bufferSizeBytes = 0
+	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
+	w.scratch.columnChunkCount += len(w.schema)
+	w.buffer = w.buffer[:0]
+	w.bufferSizeBytes = 0
 
 	return nil
 }

@@ -10,7 +10,7 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -83,8 +83,8 @@ func prepareNewTransactor(
 			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
 			client:            client,
 			be:                be,
-			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
-			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, enc.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
+			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
+			storeFiles:        boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), true, false),
 		}
 
 		for _, binding := range bindings {
@@ -205,7 +205,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting load key: %w", err)
-		} else if err = t.loadFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
+		} else if err = t.loadFiles.WriteRow(ctx, it.Binding, converted); err != nil {
 			return fmt.Errorf("writing normalized key to keyfile: %w", err)
 		} else {
 			b.loadMergeBounds.NextKey(converted)
@@ -304,8 +304,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err = t.storeFiles.EncodeRow(ctx, it.Binding, converted); err != nil {
-			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
+		} else if err = t.storeFiles.WriteRow(ctx, it.Binding, converted); err != nil {
+			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}

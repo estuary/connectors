@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
@@ -23,18 +23,18 @@ const (
 	icebergTypeBinary      icebergType = "binary"
 )
 
-var schemaOptions = []enc.ParquetSchemaOption{
+var schemaOptions = []writer.ParquetSchemaOption{
 	// Iceberg does not support column types corresponding to Parquet's JSON or INTERVAL types. Because
 	// of this, these fields will be materialized as strings.
-	enc.WithParquetSchemaArrayAsString(),
-	enc.WithParquetSchemaObjectAsString(),
-	enc.WithParquetSchemaDurationAsString(),
+	writer.WithParquetSchemaArrayAsString(),
+	writer.WithParquetSchemaObjectAsString(),
+	writer.WithParquetSchemaDurationAsString(),
 	// Spark can't read Iceberg tables with "time" column types, see
 	// https://github.com/apache/iceberg/issues/9006. Prioritizing support for Spark seems important
 	// enough to force materializing these as strings.
-	enc.WithParquetTimeAsString(),
+	writer.WithParquetTimeAsString(),
 	// Many commonly used versions of Spark also can't read Iceberg tables with "UUID" column types.
-	enc.WithParquetUUIDAsString(),
+	writer.WithParquetUUIDAsString(),
 }
 
 type fieldConfig struct {
@@ -51,8 +51,8 @@ func (fc fieldConfig) CastToString() bool {
 	return fc.IgnoreStringFormat
 }
 
-func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage) (enc.ParquetSchema, error) {
-	out := []enc.ParquetSchemaElement{}
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage) (writer.ParquetSchema, error) {
+	out := []writer.ParquetSchemaElement{}
 
 	for _, f := range fields {
 		var fc fieldConfig
@@ -74,34 +74,34 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (enc.ParquetSchemaElement, error) {
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.ParquetSchemaElement, error) {
 	if fc.IgnoreStringFormat {
 		if p.Inference.String_ == nil {
-			return enc.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
+			return writer.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
 		}
 		p.Inference.String_.Format = ""
 	}
 
-	return enc.ProjectionToParquetSchemaElement(p, false, schemaOptions...), nil
+	return writer.ProjectionToParquetSchemaElement(p, false, schemaOptions...), nil
 }
 
-func parquetTypeToIcebergType(pqt enc.ParquetDataType) icebergType {
+func parquetTypeToIcebergType(pqt writer.ParquetDataType) icebergType {
 	switch pqt {
-	case enc.PrimitiveTypeInteger:
+	case writer.PrimitiveTypeInteger:
 		return icebergTypeLong
-	case enc.PrimitiveTypeNumber:
+	case writer.PrimitiveTypeNumber:
 		return icebergTypeDouble
-	case enc.PrimitiveTypeBoolean:
+	case writer.PrimitiveTypeBoolean:
 		return icebergTypeBoolean
-	case enc.PrimitiveTypeBinary:
+	case writer.PrimitiveTypeBinary:
 		return icebergTypeBinary
-	case enc.LogicalTypeString:
+	case writer.LogicalTypeString:
 		return icebergTypeString
-	case enc.LogicalTypeDate:
+	case writer.LogicalTypeDate:
 		return icebergTypeDate
-	case enc.LogicalTypeTimestamp:
+	case writer.LogicalTypeTimestamp:
 		return icebergTypeTimestamptz
-	case enc.LogicalTypeUuid:
+	case writer.LogicalTypeUuid:
 		return icebergTypeUuid
 	default:
 		panic(fmt.Sprintf("unhandled parquet data type: %T (%#v)", pqt, pqt))

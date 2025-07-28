@@ -1,4 +1,4 @@
-package stream_encode
+package writer
 
 import (
 	"crypto/md5"

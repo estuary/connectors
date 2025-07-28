@@ -98,7 +98,7 @@ func (sm *streamManager) addBinding(ctx context.Context, schema string, table st
 	return nil
 }
 
-func (sm *streamManager) encodeRow(ctx context.Context, binding int, row []any) error {
+func (sm *streamManager) writeRow(ctx context.Context, binding int, row []any) error {
 	if sm.lastBinding != -1 && binding != sm.lastBinding {
 		if err := sm.finishBlob(); err != nil {
 			return fmt.Errorf("finishBlob: %w", err)
@@ -112,8 +112,8 @@ func (sm *streamManager) encodeRow(ctx context.Context, binding int, row []any) 
 		}
 	}
 
-	if err := sm.bdecWriter.encodeRow(row); err != nil {
-		return fmt.Errorf("bdecWriter encodeRow: %w", err)
+	if err := sm.bdecWriter.writeRow(row); err != nil {
+		return fmt.Errorf("bdecWriter writeRow: %w", err)
 	}
 
 	if sm.bdecWriter.done {

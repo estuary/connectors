@@ -5,14 +5,14 @@ import (
 	"path"
 
 	"cloud.google.com/go/bigquery"
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 )
 
 type stagedFileClient struct{}
 
-func (stagedFileClient) NewEncoder(w io.WriteCloser, fields []string) boilerplate.Encoder {
-	return enc.NewJsonEncoder(w, fields, enc.WithJsonSkipNulls())
+func (stagedFileClient) NewWriter(w io.WriteCloser, fields []string) boilerplate.Writer {
+	return writer.NewJsonWriter(w, fields, writer.WithJsonSkipNulls())
 }
 
 func (stagedFileClient) NewKey(keyParts []string) string {

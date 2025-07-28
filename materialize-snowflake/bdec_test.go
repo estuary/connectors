@@ -45,9 +45,9 @@ func TestBdecWriter(t *testing.T) {
 	w, err := newBdecWriter(tmpFile, mappedColumns, existingColumns, encryptionKey, fileName, false)
 	require.NoError(t, err)
 
-	require.NoError(t, w.encodeRow([]any{"hello1", "world1"}))
-	require.NoError(t, w.encodeRow([]any{"hello2", "world2"}))
-	require.NoError(t, w.encodeRow([]any{"hello3", "world3"}))
+	require.NoError(t, w.writeRow([]any{"hello1", "world1"}))
+	require.NoError(t, w.writeRow([]any{"hello2", "world2"}))
+	require.NoError(t, w.writeRow([]any{"hello3", "world3"}))
 	require.NoError(t, w.close())
 
 	got, err := os.ReadFile(tmpFile.Name())

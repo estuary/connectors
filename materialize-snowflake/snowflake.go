@@ -379,8 +379,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return err
 		} else if converted, err := b.target.ConvertKey(it.Key); err != nil {
 			return fmt.Errorf("converting Load key: %w", err)
-		} else if err = b.load.stage.encodeRow(converted); err != nil {
-			return fmt.Errorf("encoding Load key to scratch file: %w", err)
+		} else if err = b.load.stage.writeRow(converted); err != nil {
+			return fmt.Errorf("writing Load key to scratch file: %w", err)
 		} else {
 			b.load.mergeBounds.NextKey(converted)
 		}
@@ -516,11 +516,11 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if b.streaming {
-			if err := d.streamManager.encodeRow(ctx, it.Binding, converted); err != nil {
+			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream: %w", err)
 			}
-		} else if err = b.store.stage.encodeRow(converted); err != nil {
-			return nil, fmt.Errorf("encoding Store to scratch file: %w", err)
+		} else if err = b.store.stage.writeRow(converted); err != nil {
+			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}

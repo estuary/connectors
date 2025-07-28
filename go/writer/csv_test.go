@@ -1,4 +1,4 @@
-package stream_encode
+package writer
 
 import (
 	"bytes"
@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCsvEncoder(t *testing.T) {
+func TestCsvWriter(t *testing.T) {
 	tests := []struct {
 		name  string
 		nulls bool
@@ -33,22 +33,22 @@ func TestCsvEncoder(t *testing.T) {
 			sink, err := os.CreateTemp(dir, "*.csv.gz")
 			require.NoError(t, err)
 
-			enc := NewCsvEncoder(sink, makeTestFields(), tt.opts...)
-			for i := 0; i < 10; i++ {
+			w := NewCsvWriter(sink, makeTestFields(), tt.opts...)
+			for i := range 10 {
 				row := makeTestRow(t, i)
 				if tt.nulls {
 					row[i] = nil
 				}
-				require.NoError(t, enc.Encode(row))
+				require.NoError(t, w.Write(row))
 			}
-			require.NoError(t, enc.Close())
+			require.NoError(t, w.Close())
 
 			cupaloy.SnapshotT(t, duckdbReadFile(t, sink.Name(), "CSV"))
 		})
 	}
 }
 
-func TestCsvWriter(t *testing.T) {
+func TestCsvWriterIsolated(t *testing.T) {
 	for _, tt := range []struct {
 		name string
 		row  []any

@@ -1,4 +1,4 @@
-package stream_encode
+package writer
 
 import (
 	"bytes"
@@ -16,23 +16,23 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestJsonEncoder(t *testing.T) {
+func TestJsonWriter(t *testing.T) {
 	dir := t.TempDir()
 	sink, err := os.CreateTemp(dir, "*.json.gz")
 	require.NoError(t, err)
 
-	enc := NewJsonEncoder(sink, makeTestFields())
+	w := NewJsonWriter(sink, makeTestFields())
 
-	for i := 0; i < 10; i++ {
-		require.NoError(t, enc.Encode(makeTestRow(t, i)))
+	for i := range 10 {
+		require.NoError(t, w.Write(makeTestRow(t, i)))
 	}
 
-	require.NoError(t, enc.Close())
+	require.NoError(t, w.Close())
 
 	cupaloy.SnapshotT(t, duckdbReadFile(t, sink.Name(), "JSON"))
 }
 
-func TestJsonEncoderInputs(t *testing.T) {
+func TestJsonWriterInputs(t *testing.T) {
 	for _, tt := range []struct {
 		name      string
 		fields    []string
@@ -91,14 +91,14 @@ func TestJsonEncoderInputs(t *testing.T) {
 					w: &buf,
 				}
 
-				enc := NewJsonEncoder(tw, tt.fields)
+				w := NewJsonWriter(tw, tt.fields)
 				if !compress {
-					enc = NewJsonEncoder(tw, tt.fields, WithJsonDisableCompression())
+					w = NewJsonWriter(tw, tt.fields, WithJsonDisableCompression())
 				}
-				require.NoError(t, enc.Encode(tt.input))
-				require.NoError(t, enc.Close())
+				require.NoError(t, w.Write(tt.input))
+				require.NoError(t, w.Close())
 
-				// The provided writer is closed when enc is closed.
+				// The provided writer is closed when w is closed.
 				require.True(t, tw.closed)
 
 				if compress {
@@ -133,32 +133,30 @@ func (t *testWriter) Close() error {
 const benchmarkDatasetSize = 1000
 
 func BenchmarkEncodingObjects(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		b.StopTimer()
 		var names, values = benchmarkDataset(b, benchmarkDatasetSize)
 		b.StartTimer()
 
-		enc := NewJsonEncoder(&nopWriteCloser{w: io.Discard}, names)
+		w := NewJsonWriter(&nopWriteCloser{w: io.Discard}, names)
 		for _, row := range values {
-			require.NoError(b, enc.Encode(row))
+			require.NoError(b, w.Write(row))
 		}
-		require.NoError(b, enc.Close())
+		require.NoError(b, w.Close())
 	}
 }
 
 func BenchmarkEncodingArrays(b *testing.B) {
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		b.StopTimer()
 		var _, values = benchmarkDataset(b, benchmarkDatasetSize)
 		b.StartTimer()
 
-		enc := NewJsonEncoder(&nopWriteCloser{w: io.Discard}, nil)
+		w := NewJsonWriter(&nopWriteCloser{w: io.Discard}, nil)
 		for _, row := range values {
-			require.NoError(b, enc.Encode(row))
+			require.NoError(b, w.Write(row))
 		}
-		require.NoError(b, enc.Close())
+		require.NoError(b, w.Close())
 	}
 }
 
@@ -177,7 +175,7 @@ func (w *nopWriteCloser) Close() error {
 func benchmarkDataset(b *testing.B, size int) ([]string, [][]any) {
 	var names = []string{"id", "type", "ctime", "mtime", "name", "description", "sequenceNumber", "state", "version", "intParamA", "intParamB", "intParamC", "intParamD", "flow_document"}
 	var values [][]any
-	for i := 0; i < size; i++ {
+	for i := range size {
 		var row = []any{
 			uuid.New().String(),
 			[]string{"event", "action", "item", "unknown"}[rand.Intn(4)],

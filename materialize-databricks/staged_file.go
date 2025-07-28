@@ -10,7 +10,7 @@ import (
 	stdsql "database/sql"
 
 	driverctx "github.com/databricks/databricks-sql-go/driverctx"
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -60,7 +60,7 @@ func (f *fileBuffer) Close() error {
 // - start: Initializes the local directory for local disk files and starts a worker that will concurrently send files
 // to Databricks via FilesAPI.Upload RPC as local files are finished.
 //
-// - encodeRow: Encodes a slice of values as JSON and writes to the current local file. If the local
+// - writeRow: Writes a slice of values as JSON and writes to the current local file. If the local
 // file has reached a size threshold a new file will be started. Finished files are sent to the
 // worker for staging in Databricks.
 //
@@ -82,8 +82,8 @@ type stagedFile struct {
 	cfg config
 
 	// References to the current file being written.
-	buf     *fileBuffer
-	encoder *enc.JsonEncoder
+	buf    *fileBuffer
+	writer *writer.JsonWriter
 
 	// List of file names uploaded during the current transaction for transaction data, not
 	// including the manifest file name itself. These data file names randomly generated UUIDs.
@@ -137,24 +137,24 @@ func (f *stagedFile) start(ctx context.Context) error {
 	return nil
 }
 
-func (f *stagedFile) encodeRow(row []interface{}) error {
-	// May not have an encoder set yet if the previous encodeRow() resulted in flushing the current
-	// file, or for the very first call to encodeRow().
-	if f.encoder == nil {
+func (f *stagedFile) writeRow(row []interface{}) error {
+	// May not have a writer set yet if the previous writeRow() resulted in flushing the current
+	// file, or for the very first call to writeRow().
+	if f.writer == nil {
 		if err := f.newFile(); err != nil {
 			return err
 		}
 	}
 
-	if err := f.encoder.Encode(row); err != nil {
-		return fmt.Errorf("encoding row: %w", err)
+	if err := f.writer.Write(row); err != nil {
+		return fmt.Errorf("writing row: %w", err)
 	}
 
 	// Concurrently start the PUT process for this file if the current file has reached
 	// fileSizeLimit.
-	if f.encoder.Written() >= fileSizeLimit {
+	if f.writer.Written() >= fileSizeLimit {
 		if err := f.putFile(); err != nil {
-			return fmt.Errorf("encodeRow putFile: %w", err)
+			return fmt.Errorf("writeRow putFile: %w", err)
 		}
 	}
 
@@ -239,21 +239,21 @@ func (f *stagedFile) newFile() error {
 		buf:  bufio.NewWriter(file),
 		file: file,
 	}
-	f.encoder = enc.NewJsonEncoder(f.buf, f.fields, enc.WithJsonDisableCompression())
+	f.writer = writer.NewJsonWriter(f.buf, f.fields, writer.WithJsonDisableCompression())
 	f.uploaded = append(f.uploaded, fName)
 
 	return nil
 }
 
 func (f *stagedFile) putFile() error {
-	if f.encoder == nil {
+	if f.writer == nil {
 		return nil
 	}
 
-	if err := f.encoder.Close(); err != nil {
-		return fmt.Errorf("closing encoder: %w", err)
+	if err := f.writer.Close(); err != nil {
+		return fmt.Errorf("closing writer: %w", err)
 	}
-	f.encoder = nil
+	f.writer = nil
 
 	select {
 	case <-f.groupCtx.Done():

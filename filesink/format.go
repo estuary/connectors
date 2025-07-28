@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"io"
 
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
-// This file contains helpers for building StreamEncoder implementations for common file formats.
+// This file contains helpers for building StreamWriter implementations for common file formats.
 
 type ParquetConfig struct {
 	RowGroupRowLimit  int `json:"rowGroupRowLimit,omitempty" jsonschema:"title=Row Group Row Limit,description=Maximum number of rows in a row group. Defaults to 1000000 if blank." jsonschema_extras:"order=0"`
@@ -25,8 +25,8 @@ func (c ParquetConfig) Validate() error {
 	return nil
 }
 
-func NewParquetStreamEncoder(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamEncoder, error) {
-	sch := make(enc.ParquetSchema, 0, len(b.FieldSelection.AllFields()))
+func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error) {
+	sch := make(writer.ParquetSchema, 0, len(b.FieldSelection.AllFields()))
 	for _, f := range b.FieldSelection.AllFields() {
 		p := b.Collection.GetProjection(f)
 
@@ -37,23 +37,23 @@ func NewParquetStreamEncoder(cfg ParquetConfig, b *pf.MaterializationSpec_Bindin
 			}
 		}
 
-		sch = append(sch, enc.ProjectionToParquetSchemaElement(*p, fc.CastToString))
+		sch = append(sch, writer.ProjectionToParquetSchemaElement(*p, fc.CastToString))
 	}
 
-	var opts []enc.ParquetOption
+	var opts []writer.ParquetOption
 
 	if cfg.RowGroupRowLimit != 0 {
-		opts = append(opts, enc.WithParquetRowGroupRowLimit(cfg.RowGroupRowLimit))
+		opts = append(opts, writer.WithParquetRowGroupRowLimit(cfg.RowGroupRowLimit))
 	}
 	if cfg.RowGroupByteLimit != 0 {
-		opts = append(opts, enc.WithParquetRowGroupByteLimit(cfg.RowGroupByteLimit))
+		opts = append(opts, writer.WithParquetRowGroupByteLimit(cfg.RowGroupByteLimit))
 	}
 
 	// For now, we'll always use Snappy compression, as it is by far the most commonly recommended
 	// compression.
-	opts = append(opts, enc.WithParquetCompression(enc.Snappy))
+	opts = append(opts, writer.WithParquetCompression(writer.Snappy))
 
-	return enc.NewParquetEncoder(w, sch, opts...), nil
+	return writer.NewParquetWriter(w, sch, opts...), nil
 }
 
 type CsvConfig struct {
@@ -64,12 +64,12 @@ func (c CsvConfig) Validate() error {
 	return nil
 }
 
-func NewCsvStreamEncoder(cfg CsvConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) StreamEncoder {
-	var opts []enc.CsvOption
+func NewCsvStreamWriter(cfg CsvConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) StreamWriter {
+	var opts []writer.CsvOption
 
 	if cfg.SkipHeaders {
-		opts = append(opts, enc.WithCsvSkipHeaders())
+		opts = append(opts, writer.WithCsvSkipHeaders())
 	}
 
-	return enc.NewCsvEncoder(w, b.FieldSelection.AllFields(), opts...)
+	return writer.NewCsvWriter(w, b.FieldSelection.AllFields(), opts...)
 }
