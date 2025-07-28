@@ -17,6 +17,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// disableRetriesForTesting can be set `true` when running tests that require
+// timely operation.
+var disableRetriesForTesting bool
+
 // changeStream associates a *mongo.ChangeStream with which database it is for.
 type changeStream struct {
 	ms *mongo.ChangeStream
@@ -154,14 +158,20 @@ func (c *capture) streamChanges(
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for _, s := range streams {
-		s := s
 		group.Go(func() error {
 			defer s.ms.Close(groupCtx)
 
+			var catchUpAttempts int
 			for {
 				if opTime, err := c.pullStream(groupCtx, s); err != nil {
 					return fmt.Errorf("change stream for %q: %w", s.db, err)
-				} else if coordinator.gotCaughtUp(s.db, opTime) && stopWhenCaughtUp {
+				} else if catchUpAttempts++; stopWhenCaughtUp && opTime.IsZero() && catchUpAttempts < 10 && !disableRetriesForTesting {
+					log.WithFields(log.Fields{
+						"db":       s.db,
+						"attempts": catchUpAttempts,
+					}).Info("change stream returned no documents during catch-up, retrying")
+					time.Sleep(1 * time.Second)
+				} else if stopWhenCaughtUp && coordinator.gotCaughtUp(s.db, opTime) {
 					return nil
 				}
 			}
