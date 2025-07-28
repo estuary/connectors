@@ -34,6 +34,7 @@ from .models import (
     EmailEvent,
     EmailEventsResponse,
     Engagement,
+    Form,
     LineItem,
     Names,
     OldRecentCompanies,
@@ -93,6 +94,33 @@ async def fetch_owners(
             input["after"] = after
 
         result = PageResult[Owner].model_validate_json(
+            await http.request(log, url, method="GET", params=input)
+        )
+
+        for owner in result.results:
+            yield owner
+
+        if not result.paging:
+            break
+
+        after = result.paging.next.after
+
+
+async def fetch_forms(
+   http: HTTPSession, log: Logger, 
+) -> AsyncGenerator[Form, None]:
+    url = f"{HUB}/marketing/v3/forms"
+    after: str | None = None
+
+    input: dict[str, Any] = {
+        "limit": 500,
+    }
+
+    while True:
+        if after:
+            input["after"] = after
+
+        result = PageResult[Form].model_validate_json(
             await http.request(log, url, method="GET", params=input)
         )
 
