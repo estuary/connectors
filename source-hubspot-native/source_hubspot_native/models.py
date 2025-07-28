@@ -27,6 +27,7 @@ scopes = [
     "crm.schemas.contacts.read",
     "crm.schemas.deals.read",
     "e-commerce",
+    "forms",
     "tickets",
 ]
 
@@ -128,6 +129,7 @@ class Names(StrEnum):
     deals = auto()
     email_events = auto()
     engagements = auto()
+    forms = auto()
     invoices = auto()
     line_items = auto()
     owners = auto()
@@ -169,6 +171,12 @@ class DealPipelines(BaseDocument, extra="forbid"):
 
 
 class Owner(BaseDocument, extra="allow"):
+    createdAt: AwareDatetime | None
+    updatedAt: AwareDatetime | None
+
+
+class Form(BaseDocument, extra="allow"):
+    id: str
     createdAt: AwareDatetime | None
     updatedAt: AwareDatetime | None
 
