@@ -42,7 +42,7 @@ type jsonTranscoderFunc func(buf []byte, v any) ([]byte, error)
 func (f jsonTranscoderFunc) TranscodeJSON(buf []byte, v any) ([]byte, error) {
 	if v == nil {
 		// A nil byte slice should always be serialized as JSON null.
-		return append(buf, []byte("null")...), nil
+		return append(buf, `null`...), nil
 	}
 	return f(buf, v)
 }
@@ -188,15 +188,15 @@ func (e *mysqlChangeEvent) AppendJSON(buf []byte) ([]byte, error) {
 // encoding of the "before" values appropriately.
 func (meta *mysqlChangeMetadata) AppendJSON(buf []byte) ([]byte, error) {
 	var err error
-	buf = append(buf, []byte(`{"op":"`)...)
-	buf = append(buf, []byte(meta.Operation)...)
-	buf = append(buf, []byte(`","source":`)...)
+	buf = append(buf, `{"op":"`...)
+	buf = append(buf, meta.Operation...)
+	buf = append(buf, `","source":`...)
 	buf, err = meta.Source.AppendJSON(buf)
 	if err != nil {
 		return nil, fmt.Errorf("error encoding source metadata: %w", err)
 	}
 	if meta.Before != nil {
-		buf = append(buf, []byte(`,"before":`)...)
+		buf = append(buf, `,"before":`...)
 		buf, err = meta.AppendBeforeJSON(buf)
 		if err != nil {
 			return nil, fmt.Errorf("error encoding before values: %w", err)
@@ -251,5 +251,32 @@ func (meta *mysqlChangeMetadata) AppendBeforeJSON(buf []byte) ([]byte, error) {
 }
 
 func (source *mysqlSourceInfo) AppendJSON(buf []byte) ([]byte, error) {
-	return json.Append(buf, source, 0)
+	buf = append(buf, '{')
+	if source.Millis != 0 {
+		buf = append(buf, `"ts_ms":`...)
+		buf = strconv.AppendInt(buf, int64(source.Millis), 10)
+		buf = append(buf, ',')
+	}
+	buf = append(buf, `"schema":`...)
+	buf = json.AppendEscape(buf, source.Schema, 0)
+	if source.Snapshot {
+		buf = append(buf, `,"snapshot":true,"table":`...)
+	} else {
+		buf = append(buf, `,"table":`...)
+	}
+	buf = json.AppendEscape(buf, source.Table, 0)
+	buf = append(buf, `,"cursor":`...)
+	buf = json.AppendEscape(buf, source.Cursor.BinlogFile, 0)
+	buf[len(buf)-1] = ':'               // Turn the closing quote into a colon separator
+	if source.Cursor.BinlogOffset > 0 { // All valid offsets are >= 4, offset == 0 only occurs in backfills
+		buf = strconv.AppendInt(buf, int64(source.Cursor.BinlogOffset), 10)
+		buf = append(buf, ':')
+	}
+	buf = strconv.AppendInt(buf, int64(source.Cursor.RowIndex), 10)
+	buf = append(buf, '"')
+	if source.TxID != "" {
+		buf = append(buf, `,"txid":`...)
+		buf = json.AppendEscape(buf, source.TxID, 0)
+	}
+	return append(buf, '}'), nil
 }
