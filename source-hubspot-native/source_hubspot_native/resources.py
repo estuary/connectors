@@ -24,6 +24,7 @@ from .api import (
     fetch_delayed_products,
     fetch_delayed_tickets,
     fetch_email_events_page,
+    fetch_forms,
     fetch_owners,
     fetch_page_with_associations,
     fetch_properties,
@@ -50,6 +51,7 @@ from .models import (
     EmailEvent,
     EndpointConfig,
     Engagement,
+    Form,
     LineItem,
     Names,
     Owner,
@@ -90,6 +92,7 @@ async def _remove_permission_blocked_resources(
     # inaccessible, remove that resource from the list of discovered resources.
     PERMISSION_BLOCKED_RESOURCES: list[tuple[Names, AsyncGenerator]] = [
         (Names.email_events, fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None)),
+        (Names.forms, fetch_forms(http, log)),
     ]
 
     for resource, gen in PERMISSION_BLOCKED_RESOURCES:
@@ -150,6 +153,7 @@ async def all_resources(
         owners(http),
         *custom_object_resources,
         email_events(http),
+        forms(http),
     ]
 
     if should_check_permissions:
@@ -345,5 +349,34 @@ def email_events(http: HTTPSession) -> Resource:
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=Names.email_events),
+        schema_inference=True,
+    )
+
+def forms(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(fetch_forms, http),
+            tombstone=Form(_meta=Form.Meta(op="d"), createdAt=None, updatedAt=None),
+        )
+
+    return Resource(
+        name=Names.forms,
+        key=["/_meta/row_id"],
+        model=Form,
+        open=open,
+        initial_state=ResourceState(),
+        initial_config=ResourceConfig(
+            name=Names.forms, interval=timedelta(minutes=5)
+        ),
         schema_inference=True,
     )
