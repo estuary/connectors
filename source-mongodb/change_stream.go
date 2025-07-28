@@ -169,11 +169,22 @@ func (c *capture) streamChanges(
 					log.WithFields(log.Fields{
 						"db":       s.db,
 						"attempts": catchUpAttempts,
-					}).Info("change stream returned no documents during catch-up, retrying")
+					}).Debug("change stream returned no documents during catch-up, retrying")
 					time.Sleep(1 * time.Second)
+					continue
 				} else if stopWhenCaughtUp && coordinator.gotCaughtUp(s.db, opTime) {
 					return nil
 				}
+				// Require 10 consecutive empty result sets to be considered
+				// caught-up when there is no event timestamp available for
+				// positive confirmation.
+				if catchUpAttempts > 1 {
+					log.WithFields(log.Fields{
+						"db":       s.db,
+						"attempts": catchUpAttempts,
+					}).Info("change stream catch-up retried and fetched documents")
+				}
+				catchUpAttempts = 0
 			}
 		})
 	}
