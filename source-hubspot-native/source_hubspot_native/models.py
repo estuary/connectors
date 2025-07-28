@@ -1,8 +1,7 @@
 import urllib.parse
 from datetime import datetime
 from enum import StrEnum, auto
-from typing import TYPE_CHECKING, Annotated, ClassVar, Generic, Literal, Self, TypeVar
-from pydantic.json_schema import SkipJsonSchema
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -15,7 +14,7 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, model_validator, ValidationInfo
 
 scopes = [
     "crm.lists.read",
@@ -130,6 +129,7 @@ class Names(StrEnum):
     email_events = auto()
     engagements = auto()
     forms = auto()
+    form_submissions = auto()
     invoices = auto()
     line_items = auto()
     owners = auto()
@@ -178,6 +178,25 @@ class Owner(BaseDocument, extra="allow"):
 class Form(BaseDocument, extra="allow"):
     createdAt: AwareDatetime | None
     updatedAt: AwareDatetime | None
+
+
+class FormSubmissionContext:
+    def __init__(self, form_id: str):
+        self.form_id = form_id
+
+
+class FormSubmission(BaseDocument, extra="allow"):
+    submittedAt: int
+    formId: str
+
+    @model_validator(mode="before")
+    def set_form_id(cls, values: dict[str, Any], info: ValidationInfo):
+        if not info.context or not isinstance(info.context, FormSubmissionContext):
+            raise RuntimeError(f"Validation context is not set or is not of type FormSubmissionContext: {info.context}")
+
+        assert "formId" not in values
+        values["formId"] = info.context.form_id
+        return values
 
 
 # Base Struct for all CRM Objects within HubSpot.
