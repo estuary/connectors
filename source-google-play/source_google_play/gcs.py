@@ -13,9 +13,9 @@ _CSVRow = TypeVar('_CSVRow', bound=BaseModel)
 
 
 # Helpful docs around GCS endpoints.
-# https://cloud.google.com/storage/docs/json_api/v1/objects/get
-# https://cloud.google.com/storage/docs/json_api/v1/objects/list#list-object-glob
-# https://cloud.google.com/storage/docs/request-endpoints#encoding
+# Get metadata for one object - https://cloud.google.com/storage/docs/json_api/v1/objects/get
+# List metadata for objects - https://cloud.google.com/storage/docs/json_api/v1/objects/list#list-object-glob
+# Encoding URL path parts - https://cloud.google.com/storage/docs/request-endpoints#encoding
 
 
 class GCSFileMetadata(BaseModel):
