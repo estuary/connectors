@@ -24,6 +24,7 @@ from .api import (
     fetch_delayed_products,
     fetch_delayed_tickets,
     fetch_email_events_page,
+    fetch_form_submissions,
     fetch_forms,
     fetch_owners,
     fetch_page_with_associations,
@@ -52,6 +53,7 @@ from .models import (
     EndpointConfig,
     Engagement,
     Form,
+    FormSubmission,
     LineItem,
     Names,
     Owner,
@@ -93,6 +95,7 @@ async def _remove_permission_blocked_resources(
     PERMISSION_BLOCKED_RESOURCES: list[tuple[Names, AsyncGenerator]] = [
         (Names.email_events, fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None)),
         (Names.forms, fetch_forms(http, log)),
+        (Names.form_submissions, fetch_form_submissions(http, log, 0)),
     ]
 
     for resource, gen in PERMISSION_BLOCKED_RESOURCES:
@@ -154,6 +157,7 @@ async def all_resources(
         *custom_object_resources,
         email_events(http),
         forms(http),
+        form_submissions(http),
     ]
 
     if should_check_permissions:
@@ -377,6 +381,40 @@ def forms(http: HTTPSession) -> Resource:
         initial_state=ResourceState(),
         initial_config=ResourceConfig(
             name=Names.forms, interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+def form_submissions(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_form_submissions,
+                http,
+            ),
+        )
+
+    return Resource(
+        name=Names.form_submissions,
+        key=["/formId", "/submittedAt"],
+        model=FormSubmission,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=0),
+        ),
+        initial_config=ResourceConfig(
+            name=Names.form_submissions,
+            interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
