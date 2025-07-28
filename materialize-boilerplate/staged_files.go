@@ -9,9 +9,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// Encoder is any streaming encoder that can be used to write files.
-type Encoder interface {
-	Encode(row []any) error
+// Writer is any streaming writer that can be used to write rows to files.
+type Writer interface {
+	Write(row []any) error
 	Written() int
 	Close() error
 }
@@ -19,8 +19,8 @@ type Encoder interface {
 // StagedFileClient is a specific implementation of a client that interacts with
 // a staging file system, usually an object store of some kind.
 type StagedFileClient interface {
-	// NewEncoder creates a new Encoder that writes rows to a writer.
-	NewEncoder(w io.WriteCloser, fields []string) Encoder
+	// NewWriter creates a new Writer that writes rows to a writer.
+	NewWriter(w io.WriteCloser, fields []string) Writer
 
 	// NewKey creates a new file key from keyParts, which include the bucketPath
 	// (if set), a random UUID prefix if prefixFiles is true, and a random UUID
@@ -47,10 +47,10 @@ type StagedFiles struct {
 // multiple files with each one being approximately fileSizeLimit in size.
 //
 // flushOnNextBinding can be set to flush the file stream whenever a new binding
-// (by index) has a row encoded for it. Flushing the file stream will result in
-// the current streaming encoder being closed and flushed, which concludes the
+// (by index) has a row written for it. Flushing the file stream will result in
+// the current streaming writer being closed and flushed, which concludes the
 // current file being written. Any further writes to that same binding will
-// start a new file, so this should usually only be enabled for encoding rows
+// start a new file, so this should usually only be enabled for writing rows
 // received from Store requests, where the documents are always in monotonic
 // order with respect to their binding index.
 //
@@ -79,7 +79,7 @@ func NewStagedFiles(
 
 // AddBinding adds a binding. Bindings must be added in order of their binding
 // index, starting from 0. Fields may be `nil` if they are not needed, ex:
-// encoding CSV files without headers, or encoding JSONL as arrays of values
+// writing CSV files without headers, or writing JSONL as arrays of values
 // instead of objects.
 func (sf *StagedFiles) AddBinding(binding int, fields []string) {
 	if binding != len(sf.stagedFiles) {
@@ -96,8 +96,7 @@ func (sf *StagedFiles) AddBinding(binding int, fields []string) {
 	})
 }
 
-// EncodeRow encodes a row of data for the binding.
-func (sf *StagedFiles) EncodeRow(ctx context.Context, binding int, row []any) error {
+func (sf *StagedFiles) WriteRow(ctx context.Context, binding int, row []any) error {
 	if sf.flushOnNextBinding && sf.lastBinding != -1 && binding != sf.lastBinding {
 		if err := sf.stagedFiles[sf.lastBinding].flushFile(); err != nil {
 			return fmt.Errorf("flushing prior binding [%d]: %w", sf.lastBinding, err)
@@ -105,10 +104,10 @@ func (sf *StagedFiles) EncodeRow(ctx context.Context, binding int, row []any) er
 	}
 	sf.lastBinding = binding
 
-	return sf.stagedFiles[binding].encodeRow(ctx, row)
+	return sf.stagedFiles[binding].writeRow(ctx, row)
 }
 
-// Flush flushes the current encoder and closes the file.
+// Flush flushes the current writer and closes the file.
 func (sf *StagedFiles) Flush(binding int) ([]string, error) {
 	return sf.stagedFiles[binding].flush()
 }
@@ -146,7 +145,7 @@ func (sf *StagedFiles) CleanupCheckpoint(ctx context.Context, uris []string) err
 	return sf.bucket.Delete(ctx, uris)
 }
 
-// Started indicates if any rows were encoded for the binding during this
+// Started indicates if any rows were written for the binding during this
 // transaction.
 func (sf *StagedFiles) Started(binding int) bool {
 	return sf.stagedFiles[binding].started
@@ -160,27 +159,27 @@ type stagedFile struct {
 	prefixFiles   bool
 	uuidPrefix    string
 	fields        []string
-	encoder       Encoder
+	writer        Writer
 	started       bool
 	uploaded      []string
 }
 
-func (f *stagedFile) encodeRow(ctx context.Context, row []any) error {
+func (f *stagedFile) writeRow(ctx context.Context, row []any) error {
 	if !f.started {
 		f.uuidPrefix = uuid.NewString()
 		f.uploaded = nil
 		f.started = true
 	}
 
-	if f.encoder == nil {
+	if f.writer == nil {
 		f.newFile(ctx)
 	}
 
-	if err := f.encoder.Encode(row); err != nil {
-		return fmt.Errorf("encoding row: %w", err)
+	if err := f.writer.Write(row); err != nil {
+		return fmt.Errorf("writing row: %w", err)
 	}
 
-	if f.encoder.Written() >= f.fileSizeLimit {
+	if f.writer.Written() >= f.fileSizeLimit {
 		if err := f.flushFile(); err != nil {
 			return err
 		}
@@ -215,18 +214,18 @@ func (f *stagedFile) newFile(ctx context.Context) {
 
 	key := f.client.NewKey(nameParts)
 	f.uploaded = append(f.uploaded, key)
-	f.encoder = f.client.NewEncoder(f.bucket.NewWriter(ctx, key), f.fields)
+	f.writer = f.client.NewWriter(f.bucket.NewWriter(ctx, key), f.fields)
 }
 
 func (f *stagedFile) flushFile() error {
-	if f.encoder == nil {
+	if f.writer == nil {
 		return nil
 	}
 
-	if err := f.encoder.Close(); err != nil {
-		return fmt.Errorf("closing encoder: %w", err)
+	if err := f.writer.Close(); err != nil {
+		return fmt.Errorf("closing writer: %w", err)
 	}
-	f.encoder = nil
+	f.writer = nil
 
 	return nil
 }

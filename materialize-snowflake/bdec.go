@@ -21,7 +21,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
@@ -58,7 +58,7 @@ const (
 )
 
 type bdecWriter struct {
-	pq                      *enc.ParquetEncoder
+	pq                      *writer.ParquetWriter
 	blobStats               *blobStatsTracker
 	cols                    []tableColumn
 	done                    bool
@@ -84,7 +84,7 @@ func newBdecWriter(
 	}
 
 	metadata := map[string]string{"primaryFileId": path.Base(string(fileName))}
-	sch := make(enc.ParquetSchema, 0, len(orderedCols))
+	sch := make(writer.ParquetSchema, 0, len(orderedCols))
 	for _, col := range orderedCols {
 		e, err := makeSchemaElement(col)
 		if err != nil {
@@ -128,17 +128,17 @@ func newBdecWriter(
 		})
 	}
 
-	pq := enc.NewParquetEncoder(
+	pq := writer.NewParquetWriter(
 		blobStats,
 		sch,
-		enc.WithParquetCompression(enc.Snappy),
-		enc.WithDisableDictionaryEncoding(), // not only for performance, but also to support some column types (VARIANT)
-		enc.WithParquetMetadata(metadata),
+		writer.WithParquetCompression(writer.Snappy),
+		writer.WithDisableDictionaryEncoding(), // not only for performance, but also to support some column types (VARIANT)
+		writer.WithParquetMetadata(metadata),
 		// We are effectively disabling the new row group creation logic in the
 		// Parquet writer and handling when the file and its single row group
 		// should be closed here.
-		enc.WithParquetRowGroupRowLimit(math.MaxInt64),
-		enc.WithParquetRowGroupByteLimit(math.MaxInt64),
+		writer.WithParquetRowGroupRowLimit(math.MaxInt64),
+		writer.WithParquetRowGroupByteLimit(math.MaxInt64),
 	)
 
 	return &bdecWriter{
@@ -149,7 +149,7 @@ func newBdecWriter(
 	}, nil
 }
 
-func (bw *bdecWriter) encodeRow(row []any) error {
+func (bw *bdecWriter) writeRow(row []any) error {
 	for i, col := range bw.cols {
 		stats := bw.blobStats.columns[i]
 
@@ -234,8 +234,8 @@ func (bw *bdecWriter) encodeRow(row []any) error {
 		row = append(row, make([]any, len(bw.cols)-len(row))...)
 	}
 
-	if err := bw.pq.Encode(row); err != nil {
-		return fmt.Errorf("encoding row as parquet: %w", err)
+	if err := bw.pq.Write(row); err != nil {
+		return fmt.Errorf("writing row as parquet: %w", err)
 	}
 	if sz := bw.pq.ScratchSize(); sz >= MAX_CHUNK_SIZE_IN_BYTES_DEFAULT {
 		// Since only a single row group can be in a chunk and we only write one
@@ -532,9 +532,9 @@ func newUnhandledColError(format string, a ...any) error {
 
 // Loosely adapted from
 // https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/ParquetTypeGenerator.java#L77-L148
-func makeSchemaElement(col tableColumn) (enc.ParquetSchemaElement, error) {
+func makeSchemaElement(col tableColumn) (writer.ParquetSchemaElement, error) {
 	fieldId := int32(col.Ordinal)
-	e := enc.ParquetSchemaElement{
+	e := writer.ParquetSchemaElement{
 		Name:     col.Name,
 		Required: !col.Nullable,
 		FieldId:  &fieldId,
@@ -552,27 +552,27 @@ func makeSchemaElement(col tableColumn) (enc.ParquetSchemaElement, error) {
 		if col.PhysicalType == "SB16" && col.Scale == nil || *col.Scale == 0 {
 			// A decimal with 0 precision, like a DECIMAL(38,0) that we use for
 			// integer columns.
-			e.DataType = enc.LogicalTypeDecimal
+			e.DataType = writer.LogicalTypeDecimal
 			e.Scale = 0
 		} else {
 			return e, newUnhandledColError("fixed column with physical type %q and scale %s not supported", col.PhysicalType, nilOrScale(col.Scale))
 		}
 	case "text", "variant":
-		e.DataType = enc.LogicalTypeString
+		e.DataType = writer.LogicalTypeString
 	case "timestamp_ltz", "timestamp_ntz", "timestamp_tz":
 		if col.PhysicalType == "SB16" && col.Scale != nil && *col.Scale == 9 {
 			// A timestamp with nanosecond precision.
-			e.DataType = enc.LogicalTypeDecimal
+			e.DataType = writer.LogicalTypeDecimal
 			e.Scale = 9
 		} else {
 			return e, newUnhandledColError("%s column with physical type %q and scale %s not supported", col.LogicalType, col.PhysicalType, nilOrScale(col.Scale))
 		}
 	case "date":
-		e.DataType = enc.LogicalTypeDate
+		e.DataType = writer.LogicalTypeDate
 	case "boolean":
-		e.DataType = enc.PrimitiveTypeBoolean
+		e.DataType = writer.PrimitiveTypeBoolean
 	case "real":
-		e.DataType = enc.PrimitiveTypeNumber
+		e.DataType = writer.PrimitiveTypeNumber
 	default:
 		return e, newUnhandledColError("unhandled type %q", col.Type)
 	}

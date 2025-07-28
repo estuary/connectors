@@ -1,4 +1,4 @@
-package stream_encode
+package writer
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParquetEncoder(t *testing.T) {
+func TestParquetWriter(t *testing.T) {
 	tests := []struct {
 		name  string
 		nulls bool
@@ -42,15 +42,15 @@ func TestParquetEncoder(t *testing.T) {
 			sink, err := os.CreateTemp(dir, "*.parquet")
 			require.NoError(t, err)
 
-			enc := NewParquetEncoder(sink, makeTestParquetSchema(!tt.nulls), tt.opts...)
-			for i := 0; i < 10; i++ {
+			w := NewParquetWriter(sink, makeTestParquetSchema(!tt.nulls), tt.opts...)
+			for i := range 10 {
 				row := makeTestRow(t, i)
 				if tt.nulls {
 					row[i] = nil
 				}
-				require.NoError(t, enc.Encode(row))
+				require.NoError(t, w.Write(row))
 			}
-			require.NoError(t, enc.Close())
+			require.NoError(t, w.Close())
 
 			cupaloy.SnapshotT(t, duckdbReadFile(t, sink.Name(), "JSON"))
 		})

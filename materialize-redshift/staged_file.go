@@ -12,7 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -31,10 +31,10 @@ const (
 //
 // - start: Initializes values for a new transaction. Can be called repeatedly until flush.
 //
-// - encodeRow: Encodes a slice of values as JSON and outputs a JSON map with keys corresponding to
+// - writeRow: Writes a slice of values as JSON and outputs a JSON map with keys corresponding to
 // the columns the stagedFile was initialized with. If the current file size has exceeded
 // fileSizeLimit, the current file will be flushed to S3 and a new one started the next time
-// encodeRow is called.
+// writeRow is called.
 //
 // - flush: Closes out the last file that was started (if any) and writes a manifest file that can
 // be used by Redshift to load all of the files stored for the current transaction. Returns a
@@ -51,8 +51,8 @@ type stagedFile struct {
 	// configured, and the randomly generated UUID of this stagedFile for this connector invocation.
 	prefix string
 
-	encoder *enc.JsonEncoder
-	group   *errgroup.Group
+	writer *writer.JsonWriter
+	group  *errgroup.Group
 
 	// List of file names uploaded during the current transaction for transaction data, not
 	// including the manifest file name itself. These data file names randomly generated UUIDs.
@@ -101,7 +101,7 @@ func (f *stagedFile) start() {
 func (f *stagedFile) newFile(ctx context.Context) {
 	r, w := io.Pipe()
 
-	f.encoder = enc.NewJsonEncoder(w, f.fields)
+	f.writer = writer.NewJsonWriter(w, f.fields)
 
 	group, groupCtx := errgroup.WithContext(ctx)
 	f.group = group
@@ -126,32 +126,32 @@ func (f *stagedFile) newFile(ctx context.Context) {
 }
 
 func (f *stagedFile) flushFile() error {
-	if f.encoder == nil {
+	if f.writer == nil {
 		return nil
 	}
 
-	if err := f.encoder.Close(); err != nil {
-		return fmt.Errorf("closing encoder: %w", err)
+	if err := f.writer.Close(); err != nil {
+		return fmt.Errorf("closing writer: %w", err)
 	} else if err := f.group.Wait(); err != nil {
 		return err
 	}
 
-	f.encoder = nil
+	f.writer = nil
 	return nil
 }
 
-func (f *stagedFile) encodeRow(ctx context.Context, row []interface{}) error {
-	// May not have an encoder set yet if the previous encodeRow() resulted in flushing the current
-	// file, or for the very first call to encodeRow().
-	if f.encoder == nil {
+func (f *stagedFile) writeRow(ctx context.Context, row []interface{}) error {
+	// May not have a writer set yet if the previous writeRow() resulted in flushing the current
+	// file, or for the very first call to writeRow().
+	if f.writer == nil {
 		f.newFile(ctx)
 	}
 
-	if err := f.encoder.Encode(row); err != nil {
-		return fmt.Errorf("encoding row: %w", err)
+	if err := f.writer.Write(row); err != nil {
+		return fmt.Errorf("writing row: %w", err)
 	}
 
-	if f.encoder.Written() >= enc.DefaultJsonFileSizeLimit {
+	if f.writer.Written() >= writer.DefaultJsonFileSizeLimit {
 		if err := f.flushFile(); err != nil {
 			return err
 		}

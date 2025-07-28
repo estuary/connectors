@@ -36,9 +36,10 @@ type Store interface {
 	PutStream(ctx context.Context, r io.Reader, key string) error
 }
 
-// StreamEncoder encodes rows of data to a particular format, writing the result to a stream.
-type StreamEncoder interface {
-	Encode(row []any) error
+// StreamWriter serializes rows of data to a particular format, potentially
+// compressing and writing the result to a stream.
+type StreamWriter interface {
+	Write(row []any) error
 	Written() int
 	Close() error
 }
@@ -69,7 +70,7 @@ var _ boilerplate.Connector = &FileDriver{}
 type FileDriver struct {
 	NewConfig        func(raw json.RawMessage) (Config, error)
 	NewStore         func(ctx context.Context, config Config) (Store, error)
-	NewEncoder       func(config Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamEncoder, error)
+	NewWriter        func(config Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error)
 	NewConstraints   func(p *pf.Projection) *pm.Response_Validated_Constraint
 	DocumentationURL func() string
 	ConfigSchema     func() ([]byte, error)
@@ -149,10 +150,10 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *
 			backfill:   b.Backfill,
 			path:       res.Path,
 			includeDoc: b.FieldSelection.Document != "",
-			newEncoder: func(w io.WriteCloser) (StreamEncoder, error) {
-				// Partial application of the driverCfg and b arguments to the FileDriver's NewEncoder
+			newWriter: func(w io.WriteCloser) (StreamWriter, error) {
+				// Partial application of the driverCfg and b arguments to the FileDriver's NewWriter
 				// function, for convenience.
-				return d.NewEncoder(driverCfg, b, w)
+				return d.NewWriter(driverCfg, b, w)
 			},
 		})
 	}
@@ -190,7 +191,7 @@ type binding struct {
 	backfill   uint32
 	path       string
 	includeDoc bool
-	newEncoder func(w io.WriteCloser) (StreamEncoder, error)
+	newWriter  func(w io.WriteCloser) (StreamWriter, error)
 }
 
 // File keys are the full "path" to a file, usually applied as a key for an object in an object
@@ -247,7 +248,7 @@ func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
-	var encoder StreamEncoder
+	var writer StreamWriter
 	var group errgroup.Group
 
 	startFile := func(b binding) error {
@@ -268,21 +269,21 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		})
 
 		var err error
-		encoder, err = b.newEncoder(w)
+		writer, err = b.newWriter(w)
 		return err
 	}
 
 	finishFile := func() error {
 		// Close out the current file and wait for its upload to complete.
-		if encoder == nil {
+		if writer == nil {
 			return nil
-		} else if err := encoder.Close(); err != nil {
-			return fmt.Errorf("closing encoder: %w", err)
+		} else if err := writer.Close(); err != nil {
+			return fmt.Errorf("closing writer: %w", err)
 		} else if err := group.Wait(); err != nil {
 			return fmt.Errorf("group.Wait(): %w", err)
 		}
 
-		encoder = nil
+		writer = nil
 		return nil
 	}
 
@@ -297,7 +298,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		lastBinding = it.Binding
 
-		if encoder == nil {
+		if writer == nil {
 			if err := startFile(b); err != nil {
 				return nil, fmt.Errorf("startFile for binding %d: %w", it.Binding, err)
 			}
@@ -310,11 +311,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			row = append(row, it.RawJSON)
 		}
 
-		if err := encoder.Encode(row); err != nil {
-			return nil, fmt.Errorf("encoding row for resource %q: %w", b.path, err)
+		if err := writer.Write(row); err != nil {
+			return nil, fmt.Errorf("writing row for resource %q: %w", b.path, err)
 		}
 
-		if t.common.FileSizeLimit != 0 && encoder.Written() >= t.common.FileSizeLimit {
+		if t.common.FileSizeLimit != 0 && writer.Written() >= t.common.FileSizeLimit {
 			if err := finishFile(); err != nil {
 				return nil, fmt.Errorf("finishFile on file size limit: %w", err)
 			}

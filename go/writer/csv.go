@@ -1,4 +1,4 @@
-package stream_encode
+package writer
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ type csvConfig struct {
 	quoteChar   rune
 }
 
-type CsvEncoder struct {
+type CsvWriter struct {
 	cfg    csvConfig
 	fields []string
 	csv    *csvWriter
@@ -44,7 +44,7 @@ func WithCsvQuoteChar(char rune) CsvOption {
 	}
 }
 
-func NewCsvEncoder(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvEncoder {
+func NewCsvWriter(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvWriter {
 	var cfg csvConfig
 	for _, o := range opts {
 		o(&cfg)
@@ -62,7 +62,7 @@ func NewCsvEncoder(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvEnc
 		quoteChar = cfg.quoteChar
 	}
 
-	return &CsvEncoder{
+	return &CsvWriter{
 		cfg:    cfg,
 		csv:    newCsvWriter(gz, byte(quoteChar)),
 		cwc:    cwc,
@@ -71,29 +71,29 @@ func NewCsvEncoder(w io.WriteCloser, fields []string, opts ...CsvOption) *CsvEnc
 	}
 }
 
-func (e *CsvEncoder) Encode(row []any) error {
-	if !e.cfg.skipHeaders {
-		headerRow := make([]any, len(e.fields))
-		for i, f := range e.fields {
+func (w *CsvWriter) Write(row []any) error {
+	if !w.cfg.skipHeaders {
+		headerRow := make([]any, len(w.fields))
+		for i, f := range w.fields {
 			headerRow[i] = f
 		}
-		if err := e.csv.writeRow(headerRow); err != nil {
+		if err := w.csv.writeRow(headerRow); err != nil {
 			return fmt.Errorf("writing header: %w", err)
 		}
-		e.cfg.skipHeaders = true
+		w.cfg.skipHeaders = true
 	}
 
-	return e.csv.writeRow(row)
+	return w.csv.writeRow(row)
 }
 
-func (e *CsvEncoder) Written() int {
-	return e.cwc.written
+func (w *CsvWriter) Written() int {
+	return w.cwc.written
 }
 
-func (e *CsvEncoder) Close() error {
-	if err := e.gz.Close(); err != nil {
+func (w *CsvWriter) Close() error {
+	if err := w.gz.Close(); err != nil {
 		return fmt.Errorf("closing gzip writer: %w", err)
-	} else if err := e.cwc.Close(); err != nil {
+	} else if err := w.cwc.Close(); err != nil {
 		return fmt.Errorf("closing counting writer: %w", err)
 	}
 

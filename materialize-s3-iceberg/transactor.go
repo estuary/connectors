@@ -13,7 +13,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/filesink"
 	m "github.com/estuary/connectors/go/materialize"
-	enc "github.com/estuary/connectors/go/stream-encode"
+	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
@@ -67,7 +67,7 @@ func filePath(catalogTablePath string) (fileKey string, s3Path string) {
 
 type binding struct {
 	path             []string
-	pqSchema         enc.ParquetSchema
+	pqSchema         writer.ParquetSchema
 	includeDoc       bool
 	stateKey         string
 	catalogTablePath string
@@ -138,7 +138,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
-	var encoder *enc.ParquetEncoder
+	var pqw *writer.ParquetWriter
 	var group errgroup.Group
 	var states = t.state.BindingStates
 
@@ -166,19 +166,19 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil
 		})
 
-		encoder = enc.NewParquetEncoder(w, b.pqSchema, enc.WithParquetCompression(enc.Snappy))
+		pqw = writer.NewParquetWriter(w, b.pqSchema, writer.WithParquetCompression(writer.Snappy))
 	}
 
 	finishFile := func() error {
-		if encoder == nil {
+		if pqw == nil {
 			return nil
-		} else if err := encoder.Close(); err != nil {
-			return fmt.Errorf("closing encoder: %w", err)
+		} else if err := pqw.Close(); err != nil {
+			return fmt.Errorf("closing parquet writer: %w", err)
 		} else if err := group.Wait(); err != nil {
 			return fmt.Errorf("group.Wait(): %w", err)
 		}
 
-		encoder = nil
+		pqw = nil
 		return nil
 	}
 
@@ -193,7 +193,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 		lastBinding = it.Binding
 
-		if encoder == nil {
+		if pqw == nil {
 			startFile(b)
 		}
 
@@ -204,11 +204,11 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			row = append(row, it.RawJSON)
 		}
 
-		if err := encoder.Encode(row); err != nil {
-			return nil, fmt.Errorf("encoding row: %w", err)
+		if err := pqw.Write(row); err != nil {
+			return nil, fmt.Errorf("writing row: %w", err)
 		}
 
-		if encoder.Written() > fileSizeLimit {
+		if pqw.Written() > fileSizeLimit {
 			if err := finishFile(); err != nil {
 				return nil, fmt.Errorf("finishFile on file size limit: %w", err)
 			}

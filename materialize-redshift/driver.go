@@ -505,8 +505,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
-		if err := b.loadFile.encodeRow(ctx, converted); err != nil {
-			return fmt.Errorf("encoding row for load: %w", err)
+		if err := b.loadFile.writeRow(ctx, converted); err != nil {
+			return fmt.Errorf("writing row for load: %w", err)
 		}
 	}
 	if it.Err() != nil {
@@ -705,8 +705,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		if err := file.encodeRow(ctx, converted); err != nil {
-			return nil, fmt.Errorf("encoding row for store: %w", err)
+		if err := file.writeRow(ctx, converted); err != nil {
+			return nil, fmt.Errorf("writing row for store: %w", err)
 		}
 	}
 	if it.Err() != nil {
