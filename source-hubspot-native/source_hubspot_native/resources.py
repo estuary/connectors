@@ -64,8 +64,46 @@ from .models import (
 MISSING_SCOPE_REGEX = r"This app hasn't been granted all required scopes to make this call."
 
 
+async def _can_access_endpoint(
+    gen: AsyncGenerator,
+) -> bool:
+    try:
+        async for _ in gen:
+            break
+
+        return True
+    except HTTPError as err:
+        is_missing_scope = err.code == 403 and bool(re.search(MISSING_SCOPE_REGEX, err.message))
+
+        if is_missing_scope:
+            return False
+        else:
+            raise
+
+
+async def _remove_permission_blocked_resources(
+    log: Logger,
+    http: HTTPMixin,
+    resources: list[Resource]
+) -> list[Resource]:
+    # Attempt to access resources' endpoints. If a resource's endpoint is
+    # inaccessible, remove that resource from the list of discovered resources.
+    PERMISSION_BLOCKED_RESOURCES: list[tuple[Names, AsyncGenerator]] = [
+        (Names.email_events, fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None)),
+    ]
+
+    for resource, gen in PERMISSION_BLOCKED_RESOURCES:
+        if not await _can_access_endpoint(gen):
+            resources = [r for r in resources if r.name != resource.name]
+
+    return resources
+
+
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+    should_check_permissions: bool = False,
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
 
@@ -111,20 +149,13 @@ async def all_resources(
         deal_pipelines(http),
         owners(http),
         *custom_object_resources,
+        email_events(http),
     ]
 
-    try:
-        async for _ in fetch_recent_email_events(log, http, with_history, datetime.now(tz=UTC), None):
-            break
-
-        resources.append(email_events(http))
-    except HTTPError as err:
-        is_missing_scope = err.code == 403 and bool(re.search(MISSING_SCOPE_REGEX, err.message))
-
-        if not is_missing_scope:
-            raise
-
-    return resources
+    if should_check_permissions:
+        return await _remove_permission_blocked_resources(log, http, resources)
+    else:
+        return resources
 
 
 def crm_object_with_associations(
