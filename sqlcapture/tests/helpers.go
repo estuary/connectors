@@ -20,7 +20,6 @@ import (
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.gazette.dev/core/broker/protocol"
 )
@@ -70,7 +69,7 @@ func RestartingBackfillCapture(ctx context.Context, t testing.TB, cs *st.Capture
 			startKey = m[1]
 		}
 		if startKey == "" && len(checkpoints) > 1 {
-			log.Info("restarting backfill capture complete")
+			t.Logf("restarting backfill capture complete")
 			break
 		}
 
@@ -195,7 +194,7 @@ func BindingReplace(b *pf.CaptureSpec_Binding, old, new string) *pf.CaptureSpec_
 // so the source dataset needs to be clean. For test data this should be fine.
 func LoadCSV(ctx context.Context, t *testing.T, tb TestBackend, table string, filename string, limit int) {
 	t.Helper()
-	log.WithFields(log.Fields{"table": table, "file": filename}).Info("loading csv")
+	t.Logf("loading csv file: file=%q, table=%q", filename, table)
 	var file, err = os.Open("testdata/" + filename)
 	if err != nil {
 		t.Fatalf("unable to open CSV file: %q", "testdata/"+filename)

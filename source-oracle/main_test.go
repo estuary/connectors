@@ -30,8 +30,6 @@ func TestMain(m *testing.M) {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
 		log.SetLevel(level)
-	} else {
-		log.SetLevel(log.DebugLevel)
 	}
 
 	os.Exit(m.Run())
@@ -67,10 +65,7 @@ func oracleTestBackend(t testing.TB, configFile string) *testBackend {
 
 	// Open control connection
 	db, err := connectOracle(ctx, "test", cleanedConfig)
-	log.WithFields(log.Fields{
-		"user": config.User,
-		"addr": config.Address,
-	}).Info("opening control connection")
+	t.Logf("opening control connection: addr=%q, user=%q", config.Address, config.User)
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close(ctx) })
 

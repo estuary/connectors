@@ -23,7 +23,7 @@ ENV PATH="/builder/bin:$PATH"
 ARG TEST_DATABASE=no
 ENV TEST_DATABASE=$TEST_DATABASE
 ENV CI_BUILD=yes
-RUN go test -short -failfast -v ./source-oracle/...
+RUN go test -short -failfast ./source-oracle/...
 
 # Build the connector.
 RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \

@@ -37,10 +37,12 @@ var (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	if level, err := log.ParseLevel(os.Getenv("LOG_LEVEL")); err == nil {
+	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
+		level, err := log.ParseLevel(logLevel)
+		if err != nil {
+			log.WithField("level", logLevel).Fatal("invalid log level")
+		}
 		log.SetLevel(level)
-	} else {
-		log.SetLevel(log.InfoLevel)
 	}
 	// Some tested behaviors (TestDateAndTimeTypes) are timezone-sensitive. This
 	// is arguably a bug, but the goal of the current work is just to document
@@ -144,10 +146,7 @@ func testControlClient(t testing.TB) *sql.DB {
 
 	var setupConfig = parseConfig(t, *cfgSetup)
 	var controlURI = setupConfig.ToURI()
-	log.WithFields(log.Fields{
-		"host": setupConfig.Address,
-		"user": setupConfig.User,
-	}).Debug("opening database control connection")
+	t.Logf("opening control connection: addr=%q, user=%q", setupConfig.Address, setupConfig.User)
 	var conn, err = sql.Open("pgx", controlURI)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })

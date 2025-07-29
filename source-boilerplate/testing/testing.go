@@ -22,7 +22,6 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
 	jsonpatch "github.com/evanphx/json-patch/v5"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/metadata"
 )
@@ -53,9 +52,15 @@ type CaptureSpec struct {
 	CaptureDelay time.Duration
 }
 
+// Spec is just a simple wrapper around the driver Spec() method.
+func (cs *CaptureSpec) Spec(ctx context.Context) (*pc.Response_Spec, error) {
+	return cs.Driver.Spec(ctx, &pc.Request_Spec{})
+}
+
 // Validate performs validation against the target database.
 func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.Response_Validated_Binding, error) {
 	t.Helper()
+	RedirectTestLogs(t)
 
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
@@ -108,6 +113,7 @@ func (cs *CaptureSpec) Discover(ctx context.Context, t testing.TB, matchers ...*
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
+	RedirectTestLogs(t)
 
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
@@ -151,9 +157,8 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
-	log.WithFields(log.Fields{
-		"checkpoint": string(cs.Checkpoint),
-	}).Debug("running test capture")
+	t.Logf("running test capture with checkpoint: %s", string(cs.Checkpoint))
+	RedirectTestLogs(t)
 
 	endpointSpecJSON, err := json.Marshal(cs.EndpointSpec)
 	require.NoError(t, err)
@@ -188,15 +193,15 @@ func (cs *CaptureSpec) Capture(ctx context.Context, t testing.TB, callback func(
 	}
 
 	if cs.CaptureDelay > 0 {
-		log.WithField("delay", cs.CaptureDelay.String()).Debug("waiting for capture delay")
+		t.Logf("waiting for capture delay: time=%s", cs.CaptureDelay.String())
 		time.Sleep(cs.CaptureDelay)
 	}
 
 	if err := cs.Driver.Pull(open.Open, stream); err != nil {
 		if errors.Is(err, context.Canceled) {
-			log.Info("capture shut down")
+			t.Log("capture shut down")
 		} else {
-			log.WithField("err", err).Error("capture terminated with error")
+			t.Logf("capture terminated with error: %v", err)
 			cs.Errors = append(cs.Errors, err)
 		}
 	}
@@ -315,15 +320,6 @@ func (a *pullAdapter) Send(m *pc.Response) error {
 			return fmt.Errorf("test error normalizing checkpoint: %w", err)
 		} else {
 			a.checkpoint = normalized
-		}
-		if logLevel := log.TraceLevel; log.IsLevelEnabled(logLevel) {
-			if !bytes.Equal(m.Checkpoint.State.UpdatedJson, []byte("{}")) {
-				log.WithFields(log.Fields{
-					"checkpoint": m.Checkpoint.State.UpdatedJson,
-					"patch":      m.Checkpoint.State.MergePatch,
-					"result":     json.RawMessage(a.checkpoint),
-				}).Log(logLevel, "checkpoint")
-			}
 		}
 		a.pendingCheckpoints.Add(1)
 
