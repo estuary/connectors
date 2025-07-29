@@ -53,8 +53,6 @@ func TestMain(m *testing.M) {
 			logrus.WithField("level", logLevel).Fatal("invalid log level")
 		}
 		logrus.SetLevel(level)
-	} else {
-		logrus.SetLevel(logrus.DebugLevel)
 	}
 
 	// Set a 900MiB memory limit, same as we use in production.
@@ -76,10 +74,7 @@ func mysqlTestBackend(t testing.TB) *testBackend {
 	// During tests, the stream-to-fence watchdog timeout should be much lower.
 	streamToFenceWatchdogTimeout = 2 * time.Second
 
-	logrus.WithFields(logrus.Fields{
-		"user": *dbControlUser,
-		"addr": *dbControlAddress,
-	}).Info("opening control connection")
+	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
 	var conn, err = client.Connect(*dbControlAddress, *dbControlUser, *dbControlPass, *dbName)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })

@@ -15,9 +15,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
-	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/estuary/flow/go/protocols/flow"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
 
@@ -47,7 +45,7 @@ func Run(ctx context.Context, t *testing.T, tb TestBackend) {
 // testConfigSchema serializes the response to a SpecRequest RPC and verifies it
 // against a snapshot.
 func testConfigSchema(ctx context.Context, t *testing.T, tb TestBackend) {
-	response, err := tb.CaptureSpec(ctx, t).Driver.Spec(ctx, &pc.Request_Spec{})
+	response, err := tb.CaptureSpec(ctx, t).Spec(ctx)
 	require.NoError(t, err)
 	formatted, err := json.MarshalIndent(response, "", "  ")
 	require.NoError(t, err)
@@ -302,14 +300,14 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 	var loadgenDone atomic.Bool
 	var numTotalIDs atomic.Int64
 	go func() {
-		log.WithField("runtime", loadGenTime.String()).Info("load generator started")
+		t.Logf("load generator started: runtime=%s", loadGenTime.String())
 		var nextID int
 		var activeIDs = make(map[int]int) // Map from ID to counter value
 		for {
 			// There should always be N active IDs (until we reach the end of the test)
 			for len(activeIDs) < numActiveIDs && time.Now().Before(loadgenDeadline) {
 				if nextID%1000 == 0 {
-					log.WithField("id", nextID).Info("load generator progress")
+					t.Logf("load generator progress: id=%d", nextID)
 				}
 				activeIDs[nextID] = 1
 				nextID++
@@ -348,7 +346,7 @@ func testStressCorrectness(ctx context.Context, t *testing.T, tb TestBackend) {
 			}
 		}
 
-		log.WithField("count", nextID).Info("load generator finished")
+		t.Logf("load generator finished: count=%d", nextID)
 		numTotalIDs.Store(int64(nextID))
 		time.Sleep(1 * time.Second)
 		loadgenDone.Store(true)
@@ -461,7 +459,6 @@ func (v *correctnessInvariantsCaptureValidator) Output(collection string, data j
 	default:
 		change = fmt.Sprintf("UnknownOperation(%q)", event.Meta.Operation)
 	}
-	log.WithField("id", event.ID).WithField("change", change).Trace("change event")
 	if v.currentTransaction == nil {
 		v.currentTransaction = make(map[int]string)
 	}

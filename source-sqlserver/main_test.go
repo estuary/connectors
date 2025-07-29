@@ -70,10 +70,7 @@ func sqlserverTestBackend(t testing.TB) *testBackend {
 		Password: *dbControlPass,
 		Database: *dbName,
 	}).ToURI()
-	log.WithFields(log.Fields{
-		"user": *dbControlUser,
-		"addr": *dbControlAddress,
-	}).Info("opening control connection")
+	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
 	var conn, err = sql.Open("sqlserver", controlURI)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })

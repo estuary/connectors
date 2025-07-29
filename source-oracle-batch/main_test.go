@@ -28,10 +28,12 @@ import (
 
 func TestMain(m *testing.M) {
 	flag.Parse()
-	if level, err := log.ParseLevel(os.Getenv("LOG_LEVEL")); err == nil {
+	if logLevel := os.Getenv("LOG_LEVEL"); logLevel != "" {
+		level, err := log.ParseLevel(logLevel)
+		if err != nil {
+			log.WithField("level", logLevel).Fatal("invalid log level")
+		}
 		log.SetLevel(level)
-	} else {
-		log.SetLevel(log.InfoLevel)
 	}
 	os.Exit(m.Run())
 }
@@ -313,10 +315,7 @@ func testControlClient(ctx context.Context, t testing.TB) *sql.DB {
 
 	// Open control connection
 	db, err := connectOracle(ctx, config)
-	log.WithFields(log.Fields{
-		"user": config.User,
-		"addr": config.Address,
-	}).Info("opening control connection")
+	t.Logf("opening control connection: addr=%q, user=%q", config.Address, config.User)
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 

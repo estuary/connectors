@@ -43,8 +43,6 @@ func TestMain(m *testing.M) {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
 		log.SetLevel(level)
-	} else {
-		log.SetLevel(log.DebugLevel)
 	}
 
 	// Lower checkpoint spacing constant so tests can exercise this more easily
@@ -85,11 +83,7 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 		},
 	}).ToURI()
 	require.NoError(t, err)
-	log.WithFields(log.Fields{
-		"user":     controlUser,
-		"addr":     *dbHost,
-		"database": *dbName,
-	}).Info("opening control connection")
+	t.Logf("opening control connection: addr=%q, database=%q, user=%q", *dbHost, *dbName, controlUser)
 	conn, err := sql.Open("snowflake", controlURI)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
@@ -114,7 +108,6 @@ func snowflakeTestBackend(t *testing.T) *testBackend {
 	// set of staging tables around after each invocation, it's possible for a staging table
 	// to linger between consecutive runs of the same test and cause problems which can't
 	// easily occur in production.
-	log.WithField("schema", captureConfig.Advanced.FlowSchema).Info("dropping flow schema")
 	_, err = conn.Exec(fmt.Sprintf("DROP SCHEMA IF EXISTS %s;", quoteSnowflakeIdentifier(captureConfig.Advanced.FlowSchema)))
 	require.NoError(t, err, "dropping flow schema")
 

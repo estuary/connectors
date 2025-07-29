@@ -51,8 +51,6 @@ func TestMain(m *testing.M) {
 			log.WithField("level", logLevel).Fatal("invalid log level")
 		}
 		log.SetLevel(level)
-	} else {
-		log.SetLevel(log.DebugLevel)
 	}
 
 	// Set a 900MiB memory limit, same as we use in production.
@@ -71,10 +69,7 @@ func postgresTestBackend(t testing.TB) *testBackend {
 	// Open control connection
 	var ctx = context.Background()
 	var controlURI = fmt.Sprintf(`postgres://%s:%s@%s/%s`, *dbControlUser, *dbControlPass, *dbControlAddress, *dbName)
-	log.WithFields(log.Fields{
-		"user": *dbControlUser,
-		"addr": *dbControlAddress,
-	}).Info("opening control connection")
+	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
 	var pool, err = pgxpool.New(ctx, controlURI)
 	require.NoError(t, err)
 	t.Cleanup(pool.Close)
