@@ -1,0 +1,1 @@
+# Test package for Apple App Store Analytics connector
