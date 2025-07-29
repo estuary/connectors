@@ -6,10 +6,26 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
+)
+
+const (
+	// As a rule, if a single backfill query takes more than a few _minutes_ something is
+	// pretty wrong.
+	//
+	// However there are some cases where we might need to wait a while. The main ones are
+	// when a backfill requires a full-table sort, or when we want to try and consume the
+	// entire table in a single query. In the former case, if a sort takes >2h then it's
+	// probably never going to succeed. In the latter, there is data moving constantly so
+	// we just need to take that into account rather than using a fixed deadline.
+	//
+	// So if more than <backfillQueryTimeout> goes by _without any data returned_ we'll
+	// fail the capture so it can retry.
+	backfillQueryTimeout = 2 * time.Hour
 )
 
 // ShouldBackfill returns true if a given table's contents should be backfilled, given
@@ -88,7 +104,17 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
-	rows, err := db.conn.QueryContext(ctx, query, args...)
+
+	// Set up watchdog timer
+	var watchdogCtx, cancelWatchdog = context.WithCancel(ctx)
+	defer cancelWatchdog()
+	var watchdogTimer = time.AfterFunc(backfillQueryTimeout, func() {
+		log.Warn("backfill watchdog: no progress detected, canceling query")
+		cancelWatchdog()
+	})
+	defer watchdogTimer.Stop()
+
+	rows, err := db.conn.QueryContext(watchdogCtx, query, args...)
 	if err != nil {
 		return false, nil, fmt.Errorf("unable to execute query %q: %w", query, err)
 	}
@@ -158,6 +184,8 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	var rowKey = make([]byte, 0, 64) // The row key of the most recent row processed
 	var rowOffset = state.BackfilledCount
 	for rows.Next() {
+		watchdogTimer.Reset(backfillQueryTimeout) // Reset on data movement
+
 		if err := rows.Scan(vptrs...); err != nil {
 			return false, nil, fmt.Errorf("error scanning result row: %w", err)
 		}
@@ -198,9 +226,12 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		resultRows++
 		rowOffset++
 	}
-
 	var backfillComplete = resultRows < db.config.Advanced.BackfillChunkSize
-	return backfillComplete, rowKey, rows.Err()
+	err = rows.Err()
+	if err != nil && watchdogCtx.Err() == context.Canceled {
+		err = fmt.Errorf("backfill query canceled after %s due to lack of progress for table %q", backfillQueryTimeout.String(), streamID)
+	}
+	return backfillComplete, rowKey, err
 }
 
 func (db *sqlserverDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
