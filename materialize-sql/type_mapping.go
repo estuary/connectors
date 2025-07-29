@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
@@ -89,11 +90,11 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 
 	// Compatible numeric formatted strings can be materialized as either integers or numbers,
 	// depending on the format string.
-	if format, ok := boilerplate.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
+	if format, ok := m.AsFormattedNumeric(&p.Projection); ok && !p.IsPrimaryKey {
 		switch format {
-		case boilerplate.StringFormatInteger:
+		case m.StringFormatInteger:
 			return STRING_INTEGER, mustExist
-		case boilerplate.StringFormatNumber:
+		case m.StringFormatNumber:
 			return STRING_NUMBER, mustExist
 		}
 	}

@@ -457,7 +457,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 }
 
 func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc fieldConfig) pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(&p)
+	_, isNumeric := m.AsFormattedNumeric(&p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {

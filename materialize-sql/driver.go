@@ -191,7 +191,7 @@ func (s *sqlMaterialization[EC, RC]) MapType(p boilerplate.Projection, fc FieldC
 }
 
 func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates bool, fc FieldConfig) pm.Response_Validated_Constraint {
-	_, isNumeric := boilerplate.AsFormattedNumeric(&p)
+	_, isNumeric := m.AsFormattedNumeric(&p)
 
 	var constraint = pm.Response_Validated_Constraint{}
 	switch {

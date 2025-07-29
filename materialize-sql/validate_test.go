@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -91,7 +92,7 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 }
 
 func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
-	_, numericString := boilerplate.AsFormattedNumeric(p)
+	_, numericString := m.AsFormattedNumeric(p)
 
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {
