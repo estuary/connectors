@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
@@ -42,9 +43,9 @@ func (p property) CanMigrate(existing boilerplate.ExistingField) bool {
 	return false
 }
 
-var numericStringTypes = map[boilerplate.StringWithNumericFormat]elasticPropertyType{
-	boilerplate.StringFormatInteger: elasticTypeLong,
-	boilerplate.StringFormatNumber:  elasticTypeDouble,
+var numericStringTypes = map[m.StringWithNumericFormat]elasticPropertyType{
+	m.StringFormatInteger: elasticTypeLong,
+	m.StringFormatNumber:  elasticTypeDouble,
 }
 
 type fieldConfig struct {
@@ -65,7 +66,7 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 		return objProp()
 	}
 
-	if numericString, ok := boilerplate.AsFormattedNumeric(p); ok {
+	if numericString, ok := m.AsFormattedNumeric(p); ok {
 		return property{Type: numericStringTypes[numericString], Coerce: true}
 	}
 
@@ -154,7 +155,7 @@ func typesWithoutNull(ts []string) []string {
 }
 
 func mustWrapAndFlatten(p *pf.Projection) bool {
-	if _, isNumeric := boilerplate.AsFormattedNumeric(p); isNumeric {
+	if _, isNumeric := m.AsFormattedNumeric(p); isNumeric {
 		return false
 	}
 

@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -55,7 +56,7 @@ func mapType(p pf.Projection) mappedType {
 		field: p.Field,
 	}
 
-	if _, ok := boilerplate.AsFormattedNumeric(&p); ok {
+	if _, ok := m.AsFormattedNumeric(&p); ok {
 		// A string field formatted as an integer or number, with a possible additional
 		// corresponding integer or number type.
 		out.converter = convertNumeric

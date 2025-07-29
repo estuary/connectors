@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 
+	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
@@ -129,9 +130,9 @@ func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
 		return out
 	}
 
-	if format, ok := AsFormattedNumeric(&p); ok {
+	if format, ok := m.AsFormattedNumeric(&p); ok {
 		switch format {
-		case StringFormatInteger:
+		case m.StringFormatInteger:
 			flat := FlatTypeStringFormatInteger{}
 			if inf := p.Inference.String_; inf != nil {
 				flat.InferenceString = *inf
@@ -140,7 +141,7 @@ func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
 				flat.InferenceNumeric = *inf
 			}
 			out.FlatType = flat
-		case StringFormatNumber:
+		case m.StringFormatNumber:
 			flat := FlatTypeStringFormatNumber{}
 			if inf := p.Inference.String_; inf != nil {
 				flat.InferenceString = *inf

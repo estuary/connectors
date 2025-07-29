@@ -6,7 +6,7 @@ import (
 
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/schema"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
 )
 
@@ -233,8 +233,8 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 		return out
 	}
 
-	if numFormat, ok := boilerplate.AsFormattedNumeric(&p); ok {
-		if numFormat == boilerplate.StringFormatInteger {
+	if numFormat, ok := m.AsFormattedNumeric(&p); ok {
+		if numFormat == m.StringFormatInteger {
 			out.DataType = PrimitiveTypeInteger
 		} else {
 			out.DataType = PrimitiveTypeNumber
