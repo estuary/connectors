@@ -532,7 +532,7 @@ func (rs *sqlserverReplicationStream) tryToEstablishFencePosition(ctx context.Co
 			}).Debug("queried CDC job config")
 			rs.maxTransactionsPerScanSession = jobConfig.MaxTrans
 		} else {
-			log.WithField("err", err).Warn("failed to query CDC job config")
+			log.WithField("err", err).Debug("unable to query CDC job config, assuming default")
 			rs.maxTransactionsPerScanSession = 500 // Default is 500 transactions per log scan session
 		}
 	}
