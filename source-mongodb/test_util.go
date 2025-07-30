@@ -27,6 +27,7 @@ func testClient(t *testing.T) (*mongo.Client, config) {
 		return nil, config{}
 	}
 
+	disableRetriesForTesting = true
 	ctx := context.Background()
 
 	config := config{
