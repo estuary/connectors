@@ -196,12 +196,27 @@ func (c *capture) doBackfill(
 	additionalDocsCaptured := 0
 
 	collection := c.client.Database(binding.resource.Database).Collection(binding.resource.Collection)
-	// Not using the more precise `CountDocuments()` here since that requires a full collection
-	// scan. Getting an estimate from the collection's metadata is very fast and should be close
-	// enough for useful logging.
-	estimatedTotalDocs, err := collection.EstimatedDocumentCount(ctx)
-	if err != nil {
-		return fmt.Errorf("getting estimated document count: %w", err)
+
+	logEntry := log.WithFields(log.Fields{
+		"database":   binding.resource.Database,
+		"collection": binding.resource.Collection,
+	})
+
+	var err error
+	var estimatedTotalDocs int64
+	if !binding.isTimeseries {
+		// Not using the more precise `CountDocuments()` here since that
+		// requires a full collection scan. Getting an estimate from the
+		// collection's metadata is very fast and should be close enough for
+		// useful logging. Timeseries collections do not have an efficient way
+		// to get a quick estimate of document counts, since they will at a
+		// minimum need to have every bucket's metadata queried, and also seem
+		// to fall back to using the extremely inefficient `CountDocuments()`
+		// even if you ask for an estimate.
+		if estimatedTotalDocs, err = collection.EstimatedDocumentCount(ctx); err != nil {
+			return fmt.Errorf("getting estimated document count: %w", err)
+		}
+		logEntry = logEntry.WithField("estimatedTotalDocs", estimatedTotalDocs)
 	}
 
 	cursorField := binding.resource.getCursorField()
@@ -237,11 +252,6 @@ func (c *capture) doBackfill(
 	}
 	defer cursor.Close(ctx)
 
-	logEntry := log.WithFields(log.Fields{
-		"database":           binding.resource.Database,
-		"collection":         binding.resource.Collection,
-		"estimatedTotalDocs": estimatedTotalDocs,
-	})
 	logEntry.Info("starting backfill for collection")
 
 	for {
@@ -249,13 +259,16 @@ func (c *capture) doBackfill(
 		case <-stopBackfill:
 			if additionalDocsCaptured != 0 {
 				newTotal := initialDocsCaptured + additionalDocsCaptured
-				complete := fmt.Sprintf("%.0f", float64(newTotal)/float64(estimatedTotalDocs)*100)
 
-				logEntry.WithFields(log.Fields{
+				ll := logEntry.WithFields(log.Fields{
 					"docsCapturedThisRound": additionalDocsCaptured,
 					"totalDocsCaptured":     newTotal,
-					"percentComplete":       complete,
-				}).Info("progressed backfill for collection")
+				})
+				if !binding.isTimeseries {
+					complete := fmt.Sprintf("%.0f", float64(newTotal)/float64(estimatedTotalDocs)*100)
+					ll = ll.WithField("percentComplete", complete)
+				}
+				ll.Info("progressed backfill for collection")
 			}
 			return nil
 		case <-ctx.Done():
