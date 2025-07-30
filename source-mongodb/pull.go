@@ -68,6 +68,44 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return err
 	}
 
+	var ctx = stream.Context()
+
+	client, err := d.Connect(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("connecting to database: %w", err)
+	}
+
+	defer func() {
+		if err = client.Disconnect(ctx); err != nil {
+			panic(err)
+		}
+	}()
+
+	var databaseNames = make(map[string]bool)
+	for _, binding := range open.Capture.Bindings {
+		var res resource
+		if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
+			return fmt.Errorf("parsing resource config: %w", err)
+		}
+		databaseNames[res.Database] = true
+	}
+
+	var timeseriesCollections = make(map[string]bool)
+	for db := range databaseNames {
+		collections, err := client.Database(db).ListCollectionSpecifications(ctx, bson.D{})
+		if err != nil {
+			return fmt.Errorf("listing collections: %w", err)
+		}
+
+		for _, coll := range collections {
+			if collectionType := mongoCollectionType(coll.Type); err != nil {
+				return fmt.Errorf("unsupported collection type: %w", err)
+			} else if collectionType == mongoCollectionTypeTimeseries {
+				timeseriesCollections[resourceId(db, coll.Name)] = true
+			}
+		}
+	}
+
 	var changeStreamBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
 	var batchBindings = make([]bindingInfo, 0, len(open.Capture.Bindings))
 	var trackedChangeStreamBindings = make(map[string]bindingInfo)
@@ -78,9 +116,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 
 		info := bindingInfo{
-			resource: res,
-			index:    idx,
-			stateKey: boilerplate.StateKey(binding.StateKey),
+			resource:     res,
+			index:        idx,
+			stateKey:     boilerplate.StateKey(binding.StateKey),
+			isTimeseries: timeseriesCollections[resourceId(res.Database, res.Collection)],
 		}
 
 		if res.getMode() == captureModeChangeStream {
@@ -98,19 +137,6 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 	}
 	allBindings := append(changeStreamBindings, batchBindings...)
-
-	var ctx = stream.Context()
-
-	client, err := d.Connect(ctx, cfg)
-	if err != nil {
-		return fmt.Errorf("connecting to database: %w", err)
-	}
-
-	defer func() {
-		if err = client.Disconnect(ctx); err != nil {
-			panic(err)
-		}
-	}()
 
 	var prevState captureState
 	if err := pf.UnmarshalStrict(open.StateJson, &prevState); err != nil {
@@ -248,10 +274,11 @@ func getClusterOpTime(ctx context.Context, client *mongo.Client) (primitive.Time
 }
 
 type bindingInfo struct {
-	resource resource
-	index    int
-	stateKey boilerplate.StateKey
-	schedule schedule.Schedule
+	resource     resource
+	index        int
+	stateKey     boilerplate.StateKey
+	schedule     schedule.Schedule
+	isTimeseries bool
 }
 
 type captureState struct {
