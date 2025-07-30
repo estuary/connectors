@@ -548,7 +548,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		// convenient to make testing outputs consistent.
 		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
 			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
-		} else if streamBlobs, err = d.streamManager.flush(ctx, fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
+		} else if streamBlobs, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
 			return nil, fmt.Errorf("flushing stream manager: %w", err)
 		}
 	}

@@ -15,7 +15,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
 	"golang.org/x/oauth2"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/option"
 )
 
@@ -31,12 +30,6 @@ func channelName(materialization string, keyBegin uint32) string {
 type tableStream struct {
 	mappedColumns []*sql.Column
 	channel       *channel
-}
-
-// A bdecBlob file that is queued to be closed.
-type closeBdec struct {
-	bdecWriter *bdecWriter
-	binding    int
 }
 
 // streamManager is a high-level orchestrator for Snowpipe streaming operations,
@@ -62,17 +55,7 @@ type streamManager struct {
 	counter         int
 	lastBinding     int // bookkeeping for when to flush the writer when a new binding starts writing rows
 
-	// Synchronization for closing bdec blob writers. Closing the writer
-	// triggers reading of the uncompressed scratch file and streaming the
-	// compressed output bytes to cloud storage, which is an I/O intensive task.
-	// This can be done in the background while more Store requests are read and
-	// written to the next scratch file. `closeBdecCh` is an unbuffered channel
-	// and ensures there are no concurrent reads or writes to the `blobStats`
-	// map.
-	group       *errgroup.Group
-	groupCtx    context.Context
-	closeBdecCh chan *closeBdec
-	blobStats   map[int][]*blobStatsTracker
+	blobStats map[int][]*blobStatsTracker
 }
 
 func newStreamManager(cfg *config, materialization string, tenant string, account string, keyBegin uint32, enforceVariantMaxLength bool) (*streamManager, error) {
@@ -117,7 +100,7 @@ func (sm *streamManager) addBinding(ctx context.Context, schema string, table st
 
 func (sm *streamManager) encodeRow(ctx context.Context, binding int, row []any) error {
 	if sm.lastBinding != -1 && binding != sm.lastBinding {
-		if err := sm.finishBlob(ctx); err != nil {
+		if err := sm.finishBlob(); err != nil {
 			return fmt.Errorf("finishBlob: %w", err)
 		}
 	}
@@ -134,7 +117,7 @@ func (sm *streamManager) encodeRow(ctx context.Context, binding int, row []any) 
 	}
 
 	if sm.bdecWriter.done {
-		if err := sm.finishBlob(ctx); err != nil {
+		if err := sm.finishBlob(); err != nil {
 			return fmt.Errorf("finishBlob: %w", err)
 		}
 	}
@@ -142,27 +125,18 @@ func (sm *streamManager) encodeRow(ctx context.Context, binding int, row []any) 
 	return nil
 }
 
-func (sm *streamManager) finishBlob(ctx context.Context) error {
+func (sm *streamManager) finishBlob() error {
 	if sm.bdecWriter == nil {
-		// Edge case simplification: If a blob just happened to reach its
-		// maximum size and be closed out on the very last row of a binding,
-		// this prevents trying to close it twice at the start of the next
-		// binding.
 		return nil
 	}
 
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-sm.groupCtx.Done():
-		return sm.group.Wait()
-	case sm.closeBdecCh <- &closeBdec{
-		bdecWriter: sm.bdecWriter,
-		binding:    sm.lastBinding,
-	}:
-		sm.bdecWriter = nil
-		return nil
+	if err := sm.bdecWriter.close(); err != nil {
+		return fmt.Errorf("bdecWriter close: %w", err)
 	}
+	sm.blobStats[sm.lastBinding] = append(sm.blobStats[sm.lastBinding], sm.bdecWriter.blobStats)
+	sm.bdecWriter = nil
+
+	return nil
 }
 
 func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
@@ -180,33 +154,6 @@ func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
 	}
 	sm.bdecWriter = bdecWriter
 
-	if sm.closeBdecCh == nil {
-		sm.closeBdecCh = make(chan *closeBdec)
-		sm.group, sm.groupCtx = errgroup.WithContext(ctx)
-
-		// Start a worker to close out blobs in the background while more Store
-		// requests are read. It will be signalled to stop when `sm.closeBdecCh`
-		// is closed on flushing the stream manager's current transaction of
-		// blob metadata.
-		sm.group.Go(func() error {
-			for {
-				select {
-				case <-sm.groupCtx.Done():
-					return ctx.Err()
-				case cbdec, ok := <-sm.closeBdecCh:
-					if !ok {
-						return nil
-					}
-
-					if err := cbdec.bdecWriter.close(); err != nil {
-						return fmt.Errorf("bdecWriter close: %w", err)
-					}
-					sm.blobStats[cbdec.binding] = append(sm.blobStats[cbdec.binding], cbdec.bdecWriter.blobStats)
-				}
-			}
-		})
-	}
-
 	return nil
 }
 
@@ -217,23 +164,12 @@ func (sm *streamManager) objMetadata() blob.WriterOption {
 	})
 }
 
-func (sm *streamManager) flush(ctx context.Context, baseToken string) (map[int][]*blobMetadata, error) {
-	if sm.closeBdecCh == nil {
-		// No-op transaction; no blobs to write.
-		return nil, nil
-	}
-
+func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, error) {
 	if sm.bdecWriter != nil {
-		if err := sm.finishBlob(ctx); err != nil {
+		if err := sm.finishBlob(); err != nil {
 			return nil, fmt.Errorf("finishBlob: %w", err)
 		}
 	}
-
-	close(sm.closeBdecCh)
-	if err := sm.group.Wait(); err != nil {
-		return nil, fmt.Errorf("waiting for closeBdecCh: %w", err)
-	}
-	sm.closeBdecCh = nil // will be created anew when documents are received for the next transaction
 
 	out := make(map[int][]*blobMetadata)
 	for binding, trackedBlobs := range sm.blobStats {
