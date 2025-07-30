@@ -177,6 +177,12 @@ func TestBatchIncrementalResumption(t *testing.T) {
 		Bindings:     []*flow.CaptureSpec_Binding{defaultBinding, customBinding, timeseriesBinding},
 	}
 
+	// Create the timeseries collection with the appropriate options.
+	require.NoError(t, client.Database(database).CreateCollection(ctx, timeseriesCollection, options.CreateCollection().SetTimeSeriesOptions(options.TimeSeries().
+		SetTimeField("ts").
+		SetGranularity("seconds"))),
+	)
+
 	// Initially empty collection
 	advanceCapture(ctx, t, cs)
 
@@ -215,7 +221,8 @@ func TestBatchIncrementalResumption(t *testing.T) {
 	advanceCapture(ctx, t, cs)
 
 	// Deletions and updates "earlier" than the cursor are not captured.
-	for _, col := range []string{defaultCursorCollection, customCursorCollection, timeseriesCollection} {
+	// Timeseries collections do not support updates in the conventional sense, so that is not tested here.
+	for _, col := range []string{defaultCursorCollection, customCursorCollection} {
 		res, err := client.Database(database).Collection(col).DeleteOne(ctx, bson.M{"_id": 0})
 		require.NoError(t, err)
 		require.Equal(t, int64(1), res.DeletedCount)
