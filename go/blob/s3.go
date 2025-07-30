@@ -14,11 +14,12 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	awsHttp "github.com/aws/smithy-go/transport/http"
+	smithyhttp "github.com/aws/smithy-go/transport/http"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -69,11 +70,18 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 		config.WithCredentialsProvider(creds),
 	}
 
-	configOpts = append(configOpts, config.WithRetryer(func() aws.Retryer {
-		return &retryWrapper{Retryer: retry.NewStandard(func(o *retry.StandardOptions) {
-			o.MaxAttempts = 5
-		})}
-	}))
+	httpClient := awshttp.NewBuildableClient().WithTransportOptions(func(tr *http.Transport) {
+		tr.MaxIdleConnsPerHost = 100 // up from the default of 2
+	})
+
+	configOpts = append(configOpts,
+		config.WithRetryer(func() aws.Retryer {
+			return &retryWrapper{Retryer: retry.NewStandard(func(o *retry.StandardOptions) {
+				o.MaxAttempts = 5
+			})}
+		}),
+		config.WithHTTPClient(httpClient),
+	)
 
 	// Resolve the region of the bucket. If one is explicitly provided in a
 	// clientOpt, use that directly. If not it must be determined dynamically.
@@ -193,7 +201,7 @@ func (b *S3Bucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo, 
 
 func (b *S3Bucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsConfig) error {
 	checkReadOnlyFn := func(key string) error {
-		var awsErr *awsHttp.ResponseError
+		var awsErr *smithyhttp.ResponseError
 		if _, err := b.client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &b.bucket, Key: aws.String(key)}); err != nil {
 			if !errors.As(err, &awsErr) || awsErr.Response.Response.StatusCode != http.StatusNotFound {
 				return err
@@ -203,7 +211,7 @@ func (b *S3Bucket) CheckPermissions(ctx context.Context, cfg CheckPermissionsCon
 		return nil
 	}
 
-	handleErr := func(err *awsHttp.ResponseError) error {
+	handleErr := func(err *smithyhttp.ResponseError) error {
 		if err.Response.Response.StatusCode == http.StatusNotFound {
 			return permissionsErrorNoSuchBucket
 		} else if err.Response.Response.StatusCode == http.StatusForbidden {
