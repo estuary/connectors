@@ -146,9 +146,9 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		}
 
 		outputColumnNames[idx] = columnName
-		outputTranscoders[idx] = db.backfillJSONTranscoder(typeMap, &resultColumns[idx], columnInfo, isPrimaryKey)
+		outputTranscoders[idx] = db.constructJSONTranscoder(columnInfo.DataType, isPrimaryKey, typeMap, &resultColumns[idx])
 		if slices.Contains(keyColumns, columnName) {
-			rowKeyTranscoders[idx] = db.backfillFDBTranscoder(typeMap, &resultColumns[idx], columnInfo)
+			rowKeyTranscoders[idx] = db.constructFDBTranscoder(typeMap, &resultColumns[idx])
 		}
 	}
 	// Append the '_meta' column to the output column names list so event metadata can

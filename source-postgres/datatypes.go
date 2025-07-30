@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -274,13 +273,8 @@ func oversizePlaceholderJSON(orig []byte) json.RawMessage {
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
-func (db *postgresDatabase) translateRecordField(column *sqlcapture.ColumnInfo, isPrimaryKey bool, val any) (any, error) {
-	var dataType any
-	if column != nil {
-		dataType = column.DataType
-	}
-
-	switch dataType {
+func (db *postgresDatabase) translateRecordField(discoveredColumnType any, isPrimaryKey bool, val any) (any, error) {
+	switch discoveredColumnType {
 	case "timetz":
 		if x, ok := val.(string); ok {
 			var formats = []string{
@@ -305,7 +299,7 @@ func (db *postgresDatabase) translateRecordField(column *sqlcapture.ColumnInfo, 
 		} else if val == nil {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("unexpected value for column of type %q: %#v", dataType, val)
+		return nil, fmt.Errorf("unexpected value for column of type %q: %#v", discoveredColumnType, val)
 	case "date":
 		if t, ok := val.(time.Time); ok {
 			if db.featureFlags["date_as_date"] {
@@ -332,7 +326,7 @@ func (db *postgresDatabase) translateRecordField(column *sqlcapture.ColumnInfo, 
 		} else if val == nil {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("unexpected value for column of type %q: %#v", dataType, val)
+		return nil, fmt.Errorf("unexpected value for column of type %q: %#v", discoveredColumnType, val)
 	}
 	switch x := val.(type) {
 	case net.HardwareAddr: // column types 'macaddr' and 'macaddr8'
@@ -369,7 +363,7 @@ func (db *postgresDatabase) translateRecordField(column *sqlcapture.ColumnInfo, 
 		}
 		return x, nil
 	case pgtype.Array[any]:
-		return db.translateArray(column, isPrimaryKey, x)
+		return db.translateArray(discoveredColumnType, isPrimaryKey, x)
 	case pgtype.Range[any]:
 		return db.stringifyRange(x, isPrimaryKey)
 	case pgtype.Text:
@@ -474,21 +468,17 @@ func formatRFC3339(t time.Time) (any, error) {
 	return t.Format(time.RFC3339Nano), nil
 }
 
-func (db *postgresDatabase) translateArray(column *sqlcapture.ColumnInfo, isPrimaryKey bool, x pgtype.Array[any]) (any, error) {
-	// Construct a ColumnInfo representing a theoretical scalar version of the array column
-	var scalarColumn *sqlcapture.ColumnInfo
-	if column != nil {
-		var copyColumn = *column
-		scalarColumn = &copyColumn
-		if str, ok := scalarColumn.DataType.(string); ok {
-			scalarColumn.DataType = strings.TrimLeft(str, "_")
-		}
+func (db *postgresDatabase) translateArray(discoveredColumnType any, isPrimaryKey bool, x pgtype.Array[any]) (any, error) {
+	// Turn the array type into the element type by string manipulation
+	var scalarColumnType any
+	if str, ok := discoveredColumnType.(string); ok {
+		scalarColumnType = strings.TrimLeft(str, "_")
 	}
 
 	// Translate the values of x.Elements in place (since we're discarding the original
 	// pgtype.Array value after this).
 	for idx := range x.Elements {
-		var translated, err = db.translateRecordField(scalarColumn, isPrimaryKey, x.Elements[idx])
+		var translated, err = db.translateRecordField(scalarColumnType, isPrimaryKey, x.Elements[idx])
 		if err != nil {
 			return nil, err
 		}
@@ -552,8 +542,7 @@ func unflattenArray(elements []any, dims []int) (any, error) {
 	return elements, nil
 }
 
-func encodeKeyFDB(key, ktype any) (tuple.TupleElement, error) {
-	_ = ktype // ktype is not currently used, but may be in the future
+func encodeKeyFDB(key any) (tuple.TupleElement, error) {
 	switch key := key.(type) {
 	case [16]uint8:
 		var id, err = uuid.FromBytes(key[:])
