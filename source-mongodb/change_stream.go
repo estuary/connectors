@@ -17,6 +17,10 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// disableRetriesForTesting can be set `true` when running tests that require
+// timely operation.
+var disableRetriesForTesting bool
+
 // changeStream associates a *mongo.ChangeStream with which database it is for.
 type changeStream struct {
 	ms *mongo.ChangeStream
@@ -149,19 +153,36 @@ func (c *capture) streamChanges(
 	ctx context.Context,
 	coordinator *streamBackfillCoordinator,
 	streams []changeStream,
-	stopWhenCaughtUp bool,
+	catchup bool,
 ) error {
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for _, s := range streams {
-		s := s
 		group.Go(func() error {
 			defer s.ms.Close(groupCtx)
 
 			for {
-				if opTime, err := c.pullStream(groupCtx, s); err != nil {
-					return fmt.Errorf("change stream for %q: %w", s.db, err)
-				} else if coordinator.gotCaughtUp(s.db, opTime) && stopWhenCaughtUp {
+				var err error
+				var opTime primitive.Timestamp
+				for attempt := range 10 {
+					// For catching up streams, require 10 consecutive attempts
+					// yielding no documents before the stream is considered
+					// caught-up, in the absence of a specific event timestamp
+					// that can be used to positively confirm caught-up-ness.
+					ll := log.WithFields(log.Fields{"db": s.db, "attempt": attempt})
+					if opTime, err = c.pullStream(groupCtx, s); err != nil {
+						return fmt.Errorf("change stream for %q: %w", s.db, err)
+					} else if !opTime.IsZero() || !catchup || disableRetriesForTesting {
+						if attempt > 0 {
+							ll.Info("change stream catch-up was retried and fetched documents")
+						}
+						break
+					}
+					ll.Debug("change stream returned no documents during catch-up, retrying")
+					time.Sleep(1 * time.Second)
+				}
+
+				if coordinator.gotCaughtUp(s.db, opTime) && catchup {
 					return nil
 				}
 			}
