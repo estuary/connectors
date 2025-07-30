@@ -1117,14 +1117,19 @@ func (s *replicationStream) computeTableProcessingInfo(
 	for idx, col := range relationMessage.Columns {
 		columnNames[idx] = col.Name
 		outputColumnNames[idx] = col.Name
-		var columnInfo, ok = discovery.Columns[col.Name]
-		if !ok {
-			return nil, fmt.Errorf("column %q not found in discovery info for relation %q", col.Name, streamID)
+		var discoveredColumnType any
+		if discoveryInfo, ok := discovery.Columns[col.Name]; ok {
+			discoveredColumnType = discoveryInfo.DataType
 		}
 		var isPrimaryKey = slices.Contains(discovery.PrimaryKey, col.Name)
-		outputTranscoders[idx] = s.db.replicationJSONTranscoder(s.typeMap, col.DataType, &columnInfo, isPrimaryKey)
+		var fieldDescription = &pgconn.FieldDescription{
+			Name:        col.Name,
+			DataTypeOID: col.DataType,
+			Format:      pgtype.TextFormatCode, // Replication streams (protocol v1) always use text format
+		}
+		outputTranscoders[idx] = s.db.constructJSONTranscoder(discoveredColumnType, isPrimaryKey, s.typeMap, fieldDescription)
 		if slices.Contains(keyColumnNames, col.Name) {
-			rowKeyTranscoders[idx] = s.db.replicationFDBTranscoder(s.typeMap, col.DataType, &columnInfo)
+			rowKeyTranscoders[idx] = s.db.constructFDBTranscoder(s.typeMap, fieldDescription)
 		}
 	}
 

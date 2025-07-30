@@ -283,8 +283,8 @@ func (source *postgresSource) AppendJSON(buf []byte) ([]byte, error) {
 	return append(buf, '}'), nil
 }
 
-// backfillJSONTranscoder returns a jsonTranscoder for a specific column in a Postgres backfill.
-func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription, columnInfo *sqlcapture.ColumnInfo, isPrimaryKey bool) jsonTranscoder {
+// constructJSONTranscoder returns a jsonTranscoder for a specific column value.
+func (db *postgresDatabase) constructJSONTranscoder(discoveredColumnType any, isPrimaryKey bool, typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription) jsonTranscoder {
 	var codec pgtype.Codec
 	if pgType, ok := typeMap.TypeForOID(fieldDescription.DataTypeOID); ok {
 		codec = pgType.Codec
@@ -362,7 +362,7 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 		}
 		if err != nil {
 			return nil, fmt.Errorf("error decoding value: %w", err)
-		} else if translated, err := db.translateRecordField(columnInfo, isPrimaryKey, val); err != nil {
+		} else if translated, err := db.translateRecordField(discoveredColumnType, isPrimaryKey, val); err != nil {
 			return nil, fmt.Errorf("error translating value %v for JSON serialization: %w", val, err)
 		} else {
 			return json.Append(buf, translated, json.EscapeHTML|json.SortMapKeys) // Consider removing json.EscapeHTML, though it will change some outputs like the `circle` column type
@@ -370,8 +370,8 @@ func (db *postgresDatabase) backfillJSONTranscoder(typeMap *pgtype.Map, fieldDes
 	})
 }
 
-// backfillFDBTranscoder returns an fdbTranscoder for a specific column in a Postgres backfill.
-func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription, columnInfo *sqlcapture.ColumnInfo) fdbTranscoder {
+// constructFDBTranscoder returns an fdbTranscoder for a specific column value.
+func (db *postgresDatabase) constructFDBTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription) fdbTranscoder {
 	var codec pgtype.Codec
 	if pgType, ok := typeMap.TypeForOID(fieldDescription.DataTypeOID); ok {
 		codec = pgType.Codec
@@ -440,7 +440,6 @@ func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDesc
 		}
 	}
 
-	var columnType = columnInfo.DataType
 	return fdbTranscoderFunc(func(buf, v []byte) ([]byte, error) {
 		var val any
 		var err error
@@ -449,35 +448,10 @@ func (db *postgresDatabase) backfillFDBTranscoder(typeMap *pgtype.Map, fieldDesc
 		}
 		if err != nil {
 			return nil, fmt.Errorf("error decoding value: %w", err)
-		} else if translated, err := encodeKeyFDB(val, columnType); err != nil {
+		} else if translated, err := encodeKeyFDB(val); err != nil {
 			return nil, fmt.Errorf("error translating value %v for FDB serialization: %w", val, err)
 		} else {
 			return sqlcapture.AppendFDB(buf, translated)
 		}
 	})
-}
-
-// replicationJSONTranscoder returns a jsonTranscoder for a specific column of a specific table in
-// a Postgres replication stream. Since replication uses the same wire-protocol value encoding as
-// backfills but the format is always text (at least in logical replication protocol v1), we can
-// just reuse the backfill transcoder logic with an appropriate field description.
-func (db *postgresDatabase) replicationJSONTranscoder(typeMap *pgtype.Map, typeOID uint32, columnInfo *sqlcapture.ColumnInfo, isPrimaryKey bool) jsonTranscoder {
-	var fieldDescription = &pgconn.FieldDescription{
-		Name:        columnInfo.Name,
-		DataTypeOID: typeOID,
-		Format:      pgtype.TextFormatCode, // Replication streams use text format
-	}
-	return db.backfillJSONTranscoder(typeMap, fieldDescription, columnInfo, isPrimaryKey)
-}
-
-// replicationFDBTranscoder returns an fdbTranscoder for a specific column of a specific table in
-// a Postgres replication stream. As with replicationJSONTranscoder, this is really just the same
-// logic as for backfills once we construct an appropriate field description.
-func (db *postgresDatabase) replicationFDBTranscoder(typeMap *pgtype.Map, typeOID uint32, columnInfo *sqlcapture.ColumnInfo) fdbTranscoder {
-	var fieldDescription = &pgconn.FieldDescription{
-		Name:        columnInfo.Name,
-		DataTypeOID: typeOID,
-		Format:      pgtype.TextFormatCode, // Replication streams use text format
-	}
-	return db.backfillFDBTranscoder(typeMap, fieldDescription, columnInfo)
 }
