@@ -10,13 +10,16 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	awsHttp "github.com/aws/smithy-go/transport/http"
+	log "github.com/sirupsen/logrus"
 )
 
 var _ Bucket = (*S3Bucket)(nil)
@@ -25,6 +28,35 @@ type S3Bucket struct {
 	client   *s3.Client
 	bucket   string
 	uploader *manager.Uploader
+}
+
+type retryWrapper struct {
+	aws.Retryer
+}
+
+func (r *retryWrapper) IsErrorRetryable(err error) bool {
+	retryable := r.Retryer.IsErrorRetryable(err)
+	log.WithFields(log.Fields{
+		"retryable": retryable,
+		"error":     err,
+	}).Info("retryWrapper IsErrorRetryable")
+
+	return retryable
+}
+
+func (r *retryWrapper) RetryDelay(attempt int, err error) (time.Duration, error) {
+	delay, err := r.Retryer.RetryDelay(attempt, err)
+	if err != nil {
+		log.WithError(err).Info("retryWrapper RetryDelay failed")
+	} else {
+		log.WithFields(log.Fields{
+			"attempt": attempt,
+			"delay":   delay,
+			"error":   err,
+		}).Info("retryWrapper RetryDelay for retryable error")
+	}
+
+	return delay, err
 }
 
 // NewS3Bucket creates an S3 object storage bucket. clientOpts are optional, but
@@ -36,6 +68,12 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 	configOpts := []func(*config.LoadOptions) error{
 		config.WithCredentialsProvider(creds),
 	}
+
+	configOpts = append(configOpts, config.WithRetryer(func() aws.Retryer {
+		return &retryWrapper{Retryer: retry.NewStandard(func(o *retry.StandardOptions) {
+			o.MaxAttempts = 5
+		})}
+	}))
 
 	// Resolve the region of the bucket. If one is explicitly provided in a
 	// clientOpt, use that directly. If not it must be determined dynamically.
