@@ -581,11 +581,13 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		}
 	}
 
-	// After having completed a query, emit a final checkpoint with the last seen SCN
-	// Since the query is not paginated (i.e. we query all available results), the SCN
-	// should be the latest available SCN in that table. Any new updates to the table which may
-	// update the data will have a higher SCN
-	state.CursorValues = []any{lastSCN}
+	if scnCursor && lastSCN != nil {
+		// After having completed a query, emit a final checkpoint with the last seen SCN
+		// Since the query is not paginated (i.e. we query all available results), the SCN
+		// should be the latest available SCN in that table. Any new updates to the table which may
+		// update the data will have a higher SCN
+		state.CursorValues = []any{lastSCN}
+	}
 
 	log.WithFields(log.Fields{
 		"name":  res.Name,
