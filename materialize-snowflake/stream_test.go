@@ -430,7 +430,7 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
 		require.NoError(t, sm.encodeRow(ctx, 0, []any{"key1", json.RawMessage(data)}))
-		blobs, err := sm.flush(ctx, "the-token-1")
+		blobs, err := sm.flush("the-token-1")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
