@@ -47,6 +47,7 @@ on:
       - "source-google-play/**"
       - "source-apple-app-store/**"
       - "source-datadog/**"
+      - "source-klaviyo-native/**"
 
   pull_request:
     branches: [main]
@@ -95,6 +96,7 @@ on:
       - "source-google-play/**"
       - "source-apple-app-store/**"
       - "source-datadog/**"
+      - "source-klaviyo-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -275,6 +277,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-datadog
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-klaviyo-native
             type: capture
             version: v1
             usage_rate: "1.0"
