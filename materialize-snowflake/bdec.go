@@ -249,6 +249,13 @@ func (bw *bdecWriter) encodeRow(row []any) error {
 }
 
 func (bw *bdecWriter) close() error {
+	// TODO(whb): When calling Close() on the parquet writer, it will start
+	// furiously writing bytes of the output to its writer, which is a network
+	// pipe to object storage. This kind of spiky network traffic is probably
+	// not optimal for throughput, and it may be worth implementing a kind of
+	// async closing strategy here and/or in the parquet writer itself so that
+	// the completion of Close() can be awaited in the background while the next
+	// file is in progress.
 	if err := bw.pq.Close(); err != nil {
 		return fmt.Errorf("closing parquet writer: %w", err)
 	}
