@@ -211,8 +211,8 @@ type mysqlReplicationStream struct {
 	gtidTimestamp time.Time // The OriginalCommitTimestamp value of the last GTID Event
 	gtidString    string    // The GTID value of the last GTID event, formatted as a "<uuid>:<counter>" string.
 
-	uncommittedChanges      bool // True when there have been row changes since the last commit was processed.
-	nonTransactionalChanges bool // True when there have been row changes *on non-transactional tables* since the last commit was processed.
+	uncommittedChanges      int // A count of row changes since the last commit was processed.
+	nonTransactionalChanges int // A count of row changes *on non-transactional tables* since the last commit was processed.
 
 	// The active tables set and associated metadata, guarded by a
 	// mutex so it can be modified from the main goroutine while it's
@@ -386,8 +386,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 				if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 					return err
 				}
-				rs.uncommittedChanges = false      // Reset uncommitted changes
-				rs.nonTransactionalChanges = false // Reset uncommitted non-transactional changes
+				rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
+				rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 			}
 		case *replication.TableMapEvent:
 			logrus.WithField("data", data).Trace("Table Map Event")
@@ -409,7 +409,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("gtids", data.GTIDSets).Trace("PreviousGTIDs Event")
 		case *replication.QueryEvent:
-			if string(data.Query) == "COMMIT" && rs.nonTransactionalChanges {
+			if string(data.Query) == "COMMIT" && rs.nonTransactionalChanges > 0 {
 				// If there are uncommitted non-transactional changes, we should treat a
 				// "COMMIT" query event as a transaction commit. This logic should match
 				// the XIDEvent handling.
@@ -417,8 +417,8 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 					if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 						return err
 					}
-					rs.uncommittedChanges = false      // Reset all uncommitted changes
-					rs.nonTransactionalChanges = false // Reset uncommitted non-transactional changes
+					rs.uncommittedChanges = 0      // Reset count of all uncommitted changes
+					rs.nonTransactionalChanges = 0 // Reset count of uncommitted non-transactional changes
 				}
 			} else {
 				implicitFlush = true // Implicit FlushEvent conversion permitted
@@ -460,7 +460,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		// are no uncommitted changes currently pending (for which we would want to wait
 		// until a real commit event to flush the output) then report a new FlushEvent
 		// with the latest position.
-		if implicitFlush && !rs.uncommittedChanges && !binlogOffsetOverflow {
+		if implicitFlush && rs.uncommittedChanges == 0 && !binlogOffsetOverflow {
 			if err := rs.emitEvent(ctx, &mysqlCommitEvent{Position: cursor}); err != nil {
 				return err
 			}
@@ -484,6 +484,14 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		return rs.emitEvent(ctx, &sqlcapture.KeepaliveEvent{})
 	}
 
+	var sourceCommon = sqlcapture.SourceCommon{
+		Schema: schema,
+		Table:  table,
+	}
+	if !rs.gtidTimestamp.IsZero() {
+		sourceCommon.Millis = rs.gtidTimestamp.UnixMilli()
+	}
+
 	// Get column names and types from persistent metadata. If available, allow
 	// override the persistent column name tracking using binlog row metadata.
 	metadata, ok := rs.tableMetadata(streamID)
@@ -503,36 +511,6 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 
 	var nonTransactionalTable = rs.isNonTransactional(streamID)
 
-	// Construct shared info struct (TODO: hoist this out to a higher level)
-	var sharedChangeInfo = &mysqlChangeSharedInfo{
-		StreamID: streamID,
-	}
-
-	// Construct prototype change metadata which will be copied for all rows of this binlog event
-	var sourceMillis int64
-	if !rs.gtidTimestamp.IsZero() {
-		sourceMillis = rs.gtidTimestamp.UnixMilli()
-	}
-	var eventTxID string
-	if rs.db.includeTxIDs[streamID] {
-		eventTxID = rs.gtidString
-	}
-	var prototypeChangeMetadata = mysqlChangeMetadata{
-		Source: mysqlSourceInfo{
-			SourceCommon: sqlcapture.SourceCommon{
-				Schema: schema,
-				Table:  table,
-				Millis: sourceMillis,
-			},
-			Cursor: mysqlChangeEventCursor{
-				BinlogFile:   eventCursor.BinlogFile,
-				BinlogOffset: eventCursor.BinlogOffset,
-			},
-			TxID: eventTxID,
-		},
-	}
-
-	var events []sqlcapture.DatabaseEvent
 	switch event.Header.EventType {
 	case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 		for rowIdx, row := range data.Rows {
@@ -547,15 +525,33 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
 				return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 			}
-			var event = &mysqlChangeEvent{
-				Info:   sharedChangeInfo,
-				Meta:   prototypeChangeMetadata,
+			var eventTxID string
+			if rs.db.includeTxIDs[streamID] {
+				eventTxID = rs.gtidString
+			}
+			if err := rs.emitEvent(ctx, &mysqlChangeEvent{
+				Info: &mysqlChangeSharedInfo{StreamID: streamID},
+				Meta: mysqlChangeMetadata{
+					Operation: sqlcapture.InsertOp,
+					Source: mysqlSourceInfo{
+						SourceCommon: sourceCommon,
+						Cursor: mysqlChangeEventCursor{
+							BinlogFile:   eventCursor.BinlogFile,
+							BinlogOffset: eventCursor.BinlogOffset,
+							RowIndex:     rowIdx,
+						},
+						TxID: eventTxID,
+					},
+				},
 				RowKey: rowKey,
 				Values: values,
+			}); err != nil {
+				return err
 			}
-			event.Meta.Operation = sqlcapture.InsertOp
-			event.Meta.Source.Cursor.RowIndex = rowIdx
-			events = append(events, event)
+			rs.uncommittedChanges++ // Keep a count of all uncommitted changes
+			if nonTransactionalTable {
+				rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
+			}
 		}
 	case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
 		for rowIdx := range data.Rows {
@@ -584,43 +580,80 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 				if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
 					return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 				}
+
+				var events []sqlcapture.DatabaseEvent
+				var eventTxID string
+				if rs.db.includeTxIDs[streamID] {
+					eventTxID = rs.gtidString
+				}
 				if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
 					// When the row key is changed by an update, translate it into a synthetic pair: a delete
 					// event of the old row-state, plus an insert event of the new row-state.
-					//
-					// Since updates consist of paired row-states (before, then after) which we iterate
-					// over two-at-a-time, it is consistent to have the row-index portion of the event
-					// cursor be the before-state index for this deletion and the after-state index for
-					// the insert.
-					var deleteEvent = &mysqlChangeEvent{
-						Info:   sharedChangeInfo,
-						Meta:   prototypeChangeMetadata,
+					events = append(events, &mysqlChangeEvent{
+						Info: &mysqlChangeSharedInfo{StreamID: streamID},
+						Meta: mysqlChangeMetadata{
+							Operation: sqlcapture.DeleteOp,
+							Source: mysqlSourceInfo{
+								SourceCommon: sourceCommon,
+								Cursor: mysqlChangeEventCursor{
+									BinlogFile:   eventCursor.BinlogFile,
+									BinlogOffset: eventCursor.BinlogOffset,
+									// Since updates consist of paired row-states (before, then after) which we iterate
+									// over two-at-a-time, it is consistent to have the row-index portion of the event
+									// cursor be the before-state index for this deletion and the after-state index for
+									// the insert.
+									RowIndex: rowIdx - 1,
+								},
+								TxID: eventTxID,
+							},
+						},
 						RowKey: rowKeyBefore,
 						Values: before,
-					}
-					deleteEvent.Meta.Operation = sqlcapture.DeleteOp
-					deleteEvent.Meta.Source.Cursor.RowIndex = rowIdx - 1
-
-					var insertEvent = &mysqlChangeEvent{
-						Info:   sharedChangeInfo,
-						Meta:   prototypeChangeMetadata,
+					}, &mysqlChangeEvent{
+						Info: &mysqlChangeSharedInfo{StreamID: streamID},
+						Meta: mysqlChangeMetadata{
+							Operation: sqlcapture.InsertOp,
+							Source: mysqlSourceInfo{
+								SourceCommon: sourceCommon,
+								Cursor: mysqlChangeEventCursor{
+									BinlogFile:   eventCursor.BinlogFile,
+									BinlogOffset: eventCursor.BinlogOffset,
+									RowIndex:     rowIdx,
+								},
+								TxID: eventTxID,
+							},
+						},
 						RowKey: rowKeyAfter,
 						Values: after,
-					}
-					insertEvent.Meta.Operation = sqlcapture.InsertOp
-					insertEvent.Meta.Source.Cursor.RowIndex = rowIdx
-					events = append(events, deleteEvent, insertEvent)
+					})
 				} else {
-					var event = &mysqlChangeEvent{
-						Info:   sharedChangeInfo,
-						Meta:   prototypeChangeMetadata,
+					events = append(events, &mysqlChangeEvent{
+						Info: &mysqlChangeSharedInfo{StreamID: streamID},
+						Meta: mysqlChangeMetadata{
+							Operation: sqlcapture.UpdateOp,
+							Source: mysqlSourceInfo{
+								SourceCommon: sourceCommon,
+								Cursor: mysqlChangeEventCursor{
+									BinlogFile:   eventCursor.BinlogFile,
+									BinlogOffset: eventCursor.BinlogOffset,
+									RowIndex:     rowIdx,
+								},
+								TxID: eventTxID,
+							},
+							Before: before,
+						},
 						RowKey: rowKeyAfter,
 						Values: after,
+					})
+				}
+				for _, event := range events {
+					if err := rs.emitEvent(ctx, event); err != nil {
+						return err
 					}
-					event.Meta.Before = before
-					event.Meta.Operation = sqlcapture.UpdateOp
-					event.Meta.Source.Cursor.RowIndex = rowIdx
-					events = append(events, event)
+				}
+				rs.uncommittedChanges++ // Keep a count of all uncommitted changes
+				if nonTransactionalTable {
+					rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
 				}
 			}
 		}
@@ -637,29 +670,36 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
 				return fmt.Errorf("error translating 'values' of %q DeleteOp: %w", streamID, err)
 			}
-			var event = &mysqlChangeEvent{
-				Info:   sharedChangeInfo,
-				Meta:   prototypeChangeMetadata,
+			var eventTxID string
+			if rs.db.includeTxIDs[streamID] {
+				eventTxID = rs.gtidString
+			}
+			if err := rs.emitEvent(ctx, &mysqlChangeEvent{
+				Info: &mysqlChangeSharedInfo{StreamID: streamID},
+				Meta: mysqlChangeMetadata{
+					Operation: sqlcapture.DeleteOp,
+					Source: mysqlSourceInfo{
+						SourceCommon: sourceCommon,
+						Cursor: mysqlChangeEventCursor{
+							BinlogFile:   eventCursor.BinlogFile,
+							BinlogOffset: eventCursor.BinlogOffset,
+							RowIndex:     rowIdx,
+						},
+						TxID: eventTxID,
+					},
+				},
 				RowKey: rowKey,
 				Values: values,
+			}); err != nil {
+				return err
 			}
-			event.Meta.Operation = sqlcapture.DeleteOp
-			event.Meta.Source.Cursor.RowIndex = rowIdx
-			events = append(events, event)
+			rs.uncommittedChanges++ // Keep a count of all uncommitted changes
+			if nonTransactionalTable {
+				rs.nonTransactionalChanges++ // Keep a count of uncommitted non-transactional changes
+			}
 		}
 	default:
 		return fmt.Errorf("unknown row event type: %q", event.Header.EventType)
-	}
-	for _, event := range events {
-		if err := rs.emitEvent(ctx, event); err != nil {
-			return err
-		}
-	}
-	if len(events) > 0 {
-		rs.uncommittedChanges = true // Set uncommitted changes flag
-		if nonTransactionalTable {
-			rs.nonTransactionalChanges = true // Set uncommitted non-transactional changes flag
-		}
 	}
 	return nil
 }
