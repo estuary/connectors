@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -14,13 +15,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/google/uuid"
 	"github.com/mitchellh/mapstructure"
-	"github.com/segmentio/encoding/json"
 	"github.com/sirupsen/logrus"
 	"vitess.io/vitess/go/vt/sqlparser"
 )
@@ -485,8 +484,6 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		return rs.emitEvent(ctx, &sqlcapture.KeepaliveEvent{})
 	}
 
-	var nonTransactionalTable = rs.isNonTransactional(streamID)
-
 	// Get column names and types from persistent metadata. If available, allow
 	// override the persistent column name tracking using binlog row metadata.
 	metadata, ok := rs.tableMetadata(streamID)
@@ -504,40 +501,11 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		return fmt.Errorf("unknown key columns for stream %q", streamID)
 	}
 
-	// Construct efficient indices and transcoder arrays for value processing
-	//
-	// TODO(wgd): Hoist this to a higher level
-	var rowKeyIndices = make([]int, len(keyColumns))                 // Indices of key columns in the table, in key order.
-	var outputColumnNames = make([]string, len(columnNames))         // Names of all columns with omitted columns set to "", in table order, plus _meta.
-	var outputTranscoders = make([]jsonTranscoder, len(columnNames)) // Transcoders from DB values to JSON, with omitted columns set to nil.
-	var rowKeyTranscoders = make([]fdbTranscoder, len(columnNames))  // Transcoders from DB values to FDB row keys, with non-key columns set to nil.
-	for idx, colName := range columnNames {
-		if colName == "DB_ROW_HASH_1" && columnTypes[colName] == nil {
-			// MariaDB versions 10.4 and up include a synthetic `DB_ROW_HASH_1` column in the
-			// binlog row change events for certain tables with unique hash indices (see issue
-			// https://github.com/estuary/connectors/issues/1344). We don't want to capture
-			// this synthetic column.
-			outputColumnNames[idx] = ""
-			continue
-		}
-		outputColumnNames[idx] = colName
-		outputTranscoders[idx] = rs.db.constructJSONTranscoder(false, columnTypes[colName])
-		if slices.Contains(keyColumns, colName) {
-			rowKeyTranscoders[idx] = rs.db.constructFDBTranscoder(false, columnTypes[colName])
-		}
-	}
-	outputColumnNames = append(outputColumnNames, "_meta")
-	for keyIndex, keyColName := range keyColumns {
-		var columnIndex = slices.Index(columnNames, keyColName)
-		if columnIndex < 0 {
-			return fmt.Errorf("key column %q not found in relation %q", keyColName, streamID)
-		}
-		rowKeyIndices[keyIndex] = columnIndex
-	}
+	var nonTransactionalTable = rs.isNonTransactional(streamID)
+
+	// Construct shared info struct (TODO: hoist this out to a higher level)
 	var sharedChangeInfo = &mysqlChangeSharedInfo{
-		StreamID:    streamID,
-		Shape:       encrow.NewShape(outputColumnNames),
-		Transcoders: outputTranscoders,
+		StreamID: streamID,
 	}
 
 	// Construct prototype change metadata which will be copied for all rows of this binlog event
@@ -550,7 +518,6 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		eventTxID = rs.gtidString
 	}
 	var prototypeChangeMetadata = mysqlChangeMetadata{
-		Info: sharedChangeInfo,
 		Source: mysqlSourceInfo{
 			SourceCommon: sqlcapture.SourceCommon{
 				Schema: schema,
@@ -569,13 +536,16 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	switch event.Header.EventType {
 	case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 		for rowIdx, row := range data.Rows {
-			var values, err = decodeRow(streamID, len(columnNames), row, data.SkippedColumns[rowIdx], nil)
+			var values, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
 			if err != nil {
 				return fmt.Errorf("error decoding row values: %w", err)
 			}
-			rowKey, err := encodeRowKey(columnNames, rowKeyIndices, rowKeyTranscoders, values)
+			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, values, columnTypes, encodeKeyFDB)
 			if err != nil {
 				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
+			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
+				return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 			}
 			var event = &mysqlChangeEvent{
 				Info:   sharedChangeInfo,
@@ -591,21 +561,28 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		for rowIdx := range data.Rows {
 			// Update events contain alternating (before, after) pairs of rows
 			if rowIdx%2 == 1 {
-				before, err := decodeRow(streamID, len(columnNames), data.Rows[rowIdx-1], data.SkippedColumns[rowIdx-1], nil)
+				before, err := decodeRow(streamID, columnNames, data.Rows[rowIdx-1], data.SkippedColumns[rowIdx-1])
 				if err != nil {
-					return fmt.Errorf("error decoding 'before' row values: %w", err)
+					return fmt.Errorf("error decoding row values: %w", err)
 				}
-				after, err := decodeRow(streamID, len(columnNames), data.Rows[rowIdx], data.SkippedColumns[rowIdx], before)
+				after, err := decodeRow(streamID, columnNames, data.Rows[rowIdx], data.SkippedColumns[rowIdx])
 				if err != nil {
-					return fmt.Errorf("error decoding 'after' row values: %w", err)
+					return fmt.Errorf("error decoding row values: %w", err)
 				}
-				rowKeyBefore, err := encodeRowKey(columnNames, rowKeyIndices, rowKeyTranscoders, before)
+				after = mergePreimage(after, before)
+				rowKeyBefore, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
 				if err != nil {
 					return fmt.Errorf("error encoding 'before' row key for %q: %w", streamID, err)
 				}
-				rowKeyAfter, err := encodeRowKey(columnNames, rowKeyIndices, rowKeyTranscoders, after)
+				rowKeyAfter, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
 				if err != nil {
 					return fmt.Errorf("error encoding 'after' row key for %q: %w", streamID, err)
+				}
+				if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
+					return fmt.Errorf("error translating 'before' of %q UpdateOp: %w", streamID, err)
+				}
+				if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
+					return fmt.Errorf("error translating 'after' of %q UpdateOp: %w", streamID, err)
 				}
 				if !bytes.Equal(rowKeyBefore, rowKeyAfter) {
 					// When the row key is changed by an update, translate it into a synthetic pair: a delete
@@ -649,13 +626,16 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		}
 	case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 		for rowIdx, row := range data.Rows {
-			var values, err = decodeRow(streamID, len(columnNames), row, data.SkippedColumns[rowIdx], nil)
+			var values, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
 			if err != nil {
 				return fmt.Errorf("error decoding row values: %w", err)
 			}
-			rowKey, err := encodeRowKey(columnNames, rowKeyIndices, rowKeyTranscoders, values)
+			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, values, columnTypes, encodeKeyFDB)
 			if err != nil {
 				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
+			}
+			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
+				return fmt.Errorf("error translating 'values' of %q DeleteOp: %w", streamID, err)
 			}
 			var event = &mysqlChangeEvent{
 				Info:   sharedChangeInfo,
@@ -684,47 +664,41 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	return nil
 }
 
-// A special value used to indicate that a tuple value is omitted entirely.
-var rowValueOmitted any = &omittedRowValue{}
-
-type omittedRowValue struct{}
-
-func decodeRow(streamID sqlcapture.StreamID, expectedArity int, row []any, skips []int, before []any) ([]any, error) {
+// decodeRow takes a list of column names, a parallel list of column values, and a list of indices
+// of columns which should be omitted from the decoded row state, and returns a map from colum names
+// to the corresponding values.
+func decodeRow(streamID sqlcapture.StreamID, colNames []string, row []any, skips []int) (map[string]any, error) {
 	// If we have more or fewer values than expected, something has gone wrong
 	// with our metadata tracking and this should trigger an automatic re-backfill.
-	if len(row) != expectedArity {
-		if expectedArity == 0 {
+	if len(row) != len(colNames) {
+		if len(colNames) == 0 {
 			return nil, fmt.Errorf("metadata error (go.estuary.dev/eiKbOh): unknown column names for stream %q", streamID)
 		}
 		return nil, &InconsistentMetadataError{
 			StreamID: streamID,
-			Message:  fmt.Sprintf("%d columns found when %d are expected", len(row), expectedArity),
+			Message:  fmt.Sprintf("%d columns found when %d are expected", len(row), len(colNames)),
 		}
 	}
 
-	var fields = make([]any, expectedArity)
-	copy(fields, row)
-	for _, idx := range skips {
-		fields[idx] = rowValueOmitted
+	var fields = make(map[string]interface{})
+	for idx, val := range row {
+		fields[colNames[idx]] = val
 	}
-	for idx, val := range before {
-		if fields[idx] == rowValueOmitted {
-			fields[idx] = val
-		}
+	for _, omitColIdx := range skips {
+		delete(fields, colNames[omitColIdx])
 	}
 	return fields, nil
 }
 
-func encodeRowKey(columnNames []string, rowKeyIndices []int, rowKeyTranscoders []fdbTranscoder, values []any) ([]byte, error) {
-	var err error
-	var rowKey []byte
-	for _, n := range rowKeyIndices {
-		rowKey, err = rowKeyTranscoders[n].TranscodeFDB(rowKey, values[n])
-		if err != nil {
-			return nil, fmt.Errorf("error encoding row key column %q at index %d: %w", columnNames[n], n, err)
+// mergePreimage fills out any unspecified properties of the 'fields' map with the
+// corresponding values from the 'preimage' map.
+func mergePreimage(fields map[string]any, preimage map[string]any) map[string]any {
+	for key, val := range preimage {
+		if _, ok := fields[key]; !ok {
+			fields[key] = val
 		}
 	}
-	return rowKey, nil
+	return fields
 }
 
 // Query Events in the MySQL binlog are normalized enough that we can use
