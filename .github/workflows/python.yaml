@@ -45,6 +45,7 @@ on:
       - "source-looker/**"
       - "source-qualtrics/**"
       - "source-google-play/**"
+      - "source-apple-app-store/**"
 
   pull_request:
     branches: [main]
@@ -91,6 +92,7 @@ on:
       - "source-looker/**"
       - "source-qualtrics/**"
       - "source-google-play/**"
+      - "source-apple-app-store/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -263,6 +265,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-google-play
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-apple-app-store
             type: capture
             version: v1
             usage_rate: "1.0"
