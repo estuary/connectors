@@ -1,0 +1,568 @@
+[
+  {
+    "recommendedName": "app_crashes",
+    "resourceConfig": {
+      "name": "app_crashes",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-crashes",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "Date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "row_number": {
+          "description": "Row sequence number for deduplication",
+          "title": "Row Number",
+          "type": "integer"
+        },
+        "App Apple Identifier": {
+          "title": "App Apple Identifier",
+          "type": "string"
+        },
+        "App Version": {
+          "title": "App Version",
+          "type": "string"
+        },
+        "Device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "Platform Version": {
+          "title": "Platform Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "Date",
+        "row_number",
+        "App Apple Identifier",
+        "App Version",
+        "Device",
+        "Platform Version"
+      ],
+      "title": "AppCrashesReportRow",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/App Apple Identifier",
+      "/App Version",
+      "/Date",
+      "/Device",
+      "/Platform Version",
+      "/app_id",
+      "/row_number"
+    ]
+  },
+  {
+    "recommendedName": "app_downloads",
+    "resourceConfig": {
+      "name": "app_downloads",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-download",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "Date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "row_number": {
+          "description": "Row sequence number for deduplication",
+          "title": "Row Number",
+          "type": "integer"
+        },
+        "App Apple Identifier": {
+          "title": "App Apple Identifier",
+          "type": "string"
+        },
+        "App Version": {
+          "title": "App Version",
+          "type": "string"
+        },
+        "Device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "Platform Version": {
+          "title": "Platform Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "Date",
+        "row_number",
+        "App Apple Identifier",
+        "App Version",
+        "Device",
+        "Platform Version"
+      ],
+      "title": "AppDownloadsReportRow",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/App Apple Identifier",
+      "/App Version",
+      "/Date",
+      "/Device",
+      "/Platform Version",
+      "/app_id",
+      "/row_number"
+    ]
+  },
+  {
+    "recommendedName": "app_reviews",
+    "resourceConfig": {
+      "name": "app_reviews",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Attributes": {
+          "additionalProperties": true,
+          "properties": {
+            "createdDate": {
+              "format": "date-time",
+              "title": "Createddate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "createdDate"
+          ],
+          "title": "Attributes",
+          "type": "object"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/$defs/Attributes"
+        }
+      },
+      "required": [
+        "app_id",
+        "id",
+        "attributes"
+      ],
+      "title": "AppReview",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/app_id",
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "app_sessions",
+    "resourceConfig": {
+      "name": "app_sessions",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-sessions",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "Date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "row_number": {
+          "description": "Row sequence number for deduplication",
+          "title": "Row Number",
+          "type": "integer"
+        },
+        "App Apple Identifier": {
+          "title": "App Apple Identifier",
+          "type": "string"
+        },
+        "App Version": {
+          "title": "App Version",
+          "type": "string"
+        },
+        "Device": {
+          "title": "Device",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "Date",
+        "row_number",
+        "App Apple Identifier",
+        "App Version",
+        "Device"
+      ],
+      "title": "AppSessionsReportRow",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/App Apple Identifier",
+      "/App Version",
+      "/Date",
+      "/Device",
+      "/app_id",
+      "/row_number"
+    ]
+  },
+  {
+    "recommendedName": "app_store_discovery_and_engagement",
+    "resourceConfig": {
+      "name": "app_store_discovery_and_engagement",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-store-discovery-and-engagement",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "Date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "row_number": {
+          "description": "Row sequence number for deduplication",
+          "title": "Row Number",
+          "type": "integer"
+        },
+        "App Apple Identifier": {
+          "title": "App Apple Identifier",
+          "type": "string"
+        },
+        "Device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "Platform Version": {
+          "title": "Platform Version",
+          "type": "string"
+        },
+        "Event Type": {
+          "title": "Event Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "Date",
+        "row_number",
+        "App Apple Identifier",
+        "Device",
+        "Platform Version",
+        "Event Type"
+      ],
+      "title": "AppStoreDiscoveryAndEngagementReportRow",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/App Apple Identifier",
+      "/Date",
+      "/Event Type",
+      "/Platform Version",
+      "/app_id",
+      "/row_number"
+    ]
+  },
+  {
+    "recommendedName": "app_store_installs_and_deletions",
+    "resourceConfig": {
+      "name": "app_store_installs_and_deletions",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-installs",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "default": {
+            "op": "u",
+            "row_id": -1
+          },
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "Date": {
+          "format": "date",
+          "title": "Date",
+          "type": "string"
+        },
+        "row_number": {
+          "description": "Row sequence number for deduplication",
+          "title": "Row Number",
+          "type": "integer"
+        },
+        "App Apple Identifier": {
+          "title": "App Apple Identifier",
+          "type": "string"
+        },
+        "App Version": {
+          "title": "App Version",
+          "type": "string"
+        },
+        "Device": {
+          "title": "Device",
+          "type": "string"
+        },
+        "Platform Version": {
+          "title": "Platform Version",
+          "type": "string"
+        },
+        "Event Type": {
+          "title": "Event Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "Date",
+        "row_number",
+        "App Apple Identifier",
+        "App Version",
+        "Device",
+        "Platform Version",
+        "Event Type"
+      ],
+      "title": "AppStoreInstallsReportRow",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/App Apple Identifier",
+      "/App Version",
+      "/Date",
+      "/Event Type",
+      "/Platform Version",
+      "/app_id",
+      "/row_number"
+    ]
+  }
+]

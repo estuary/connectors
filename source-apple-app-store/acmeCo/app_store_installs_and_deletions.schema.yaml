@@ -1,0 +1,67 @@
+---
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: "Operation type (c: Create, u: Update, d: Delete)"
+        enum:
+          - c
+          - u
+          - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-installs"
+properties:
+  _meta:
+    $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
+    description: Document metadata
+  app_id:
+    title: App Id
+    type: string
+  Date:
+    format: date
+    title: Date
+    type: string
+  row_number:
+    description: Row sequence number for deduplication
+    title: Row Number
+    type: integer
+  App Apple Identifier:
+    title: App Apple Identifier
+    type: string
+  App Version:
+    title: App Version
+    type: string
+  Device:
+    title: Device
+    type: string
+  Platform Version:
+    title: Platform Version
+    type: string
+  Event Type:
+    title: Event Type
+    type: string
+required:
+  - app_id
+  - Date
+  - row_number
+  - App Apple Identifier
+  - App Version
+  - Device
+  - Platform Version
+  - Event Type
+title: AppStoreInstallsReportRow
+type: object
+x-infer-schema: true

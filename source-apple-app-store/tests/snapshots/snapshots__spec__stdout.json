@@ -1,0 +1,114 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AppleCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "default": "",
+              "hidden": true,
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            },
+            "private_key": {
+              "description": "The contents of the private key file (.p8) downloaded from App Store Connect. Include the entire contents including BEGIN and END markers.",
+              "multiline": true,
+              "secret": true,
+              "title": "Private Key",
+              "type": "string"
+            },
+            "key_id": {
+              "description": "The Key ID shown in App Store Connect when you created the API key.",
+              "secret": true,
+              "title": "Key ID",
+              "type": "string"
+            },
+            "issuer_id": {
+              "description": "The Issuer ID shown in App Store Connect (found in Users and Access > Keys).",
+              "secret": true,
+              "title": "Issuer ID",
+              "type": "string"
+            }
+          },
+          "required": [
+            "private_key",
+            "key_id",
+            "issuer_id"
+          ],
+          "title": "AppleCredentials",
+          "type": "object"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Main endpoint configuration for the Apple App Store Analytics connector.",
+      "properties": {
+        "credentials": {
+          "$ref": "#/$defs/AppleCredentials",
+          "description": "JWT authentication credentials for Apple's API",
+          "title": "Apple App Store Connect Credentials"
+        },
+        "app_ids": {
+          "description": "Specific App IDs to sync. If empty, discovers all accessible apps",
+          "items": {
+            "type": "string"
+          },
+          "title": "App IDs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-apple-app-store",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

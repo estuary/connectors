@@ -1,0 +1,55 @@
+---
+collections:
+  acmeCo/app_crashes:
+    schema: app_crashes.schema.yaml
+    key:
+      - /App Apple Identifier
+      - /App Version
+      - /Date
+      - /Device
+      - /Platform Version
+      - /app_id
+      - /row_number
+  acmeCo/app_downloads:
+    schema: app_downloads.schema.yaml
+    key:
+      - /App Apple Identifier
+      - /App Version
+      - /Date
+      - /Device
+      - /Platform Version
+      - /app_id
+      - /row_number
+  acmeCo/app_reviews:
+    schema: app_reviews.schema.yaml
+    key:
+      - /app_id
+      - /id
+  acmeCo/app_sessions:
+    schema: app_sessions.schema.yaml
+    key:
+      - /App Apple Identifier
+      - /App Version
+      - /Date
+      - /Device
+      - /app_id
+      - /row_number
+  acmeCo/app_store_discovery_and_engagement:
+    schema: app_store_discovery_and_engagement.schema.yaml
+    key:
+      - /App Apple Identifier
+      - /Date
+      - /Event Type
+      - /Platform Version
+      - /app_id
+      - /row_number
+  acmeCo/app_store_installs_and_deletions:
+    schema: app_store_installs_and_deletions.schema.yaml
+    key:
+      - /App Apple Identifier
+      - /App Version
+      - /Date
+      - /Event Type
+      - /Platform Version
+      - /app_id
+      - /row_number
