@@ -513,6 +513,9 @@ func (t *mysqlTextTranscoderReplication) TranscodeJSON(buf []byte, val any) ([]b
 	if str, ok := val.(string); ok {
 		return json.AppendEscape(buf, str, 0), nil
 	} else if bs, ok := val.([]byte); ok {
+		// TODO(wgd): Figure out how exactly to optimize this. The UTF-8 case could
+		// be optimized the same as for backfills, but latin1 and UCS-2 would be more
+		// challenging to do without any intermediate allocations.
 		var str, err = decodeBytesToString(t.Charset, bs)
 		if err != nil {
 			return nil, err

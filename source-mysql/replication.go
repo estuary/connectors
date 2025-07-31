@@ -506,10 +506,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 
 	// Construct efficient indices and transcoder arrays for value processing
 	//
-	// Note that we could probably squeeze out some additional performance by
-	// caching this across multiple RowsEvents the way we do for PostgreSQL
-	// replication processing info, but doing that for MySQL is a tricky cache
-	// invalidation problem that didn't seem worthwhile just yet.
+	// TODO(wgd): Hoist this to a higher level
 	var err error
 	var rowKeyIndices = make([]int, len(keyColumns))                 // Indices of key columns in the table, in key order.
 	var outputColumnNames = make([]string, len(columnNames))         // Names of all columns with omitted columns set to "", in table order, plus _meta.
