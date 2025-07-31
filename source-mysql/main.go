@@ -473,3 +473,14 @@ func (db *mysqlDatabase) RequestTxIDs(schema, table string) {
 	}
 	db.includeTxIDs[sqlcapture.JoinStreamID(schema, table)] = true
 }
+
+// mysqlSourceInfo is source metadata for data capture events.
+type mysqlSourceInfo struct {
+	sqlcapture.SourceCommon
+	EventCursor string `json:"cursor" jsonschema:"description=Cursor value representing the current position in the binlog."`
+	TxID        string `json:"txid,omitempty" jsonschema:"description=The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."`
+}
+
+func (s *mysqlSourceInfo) Common() sqlcapture.SourceCommon {
+	return s.SourceCommon
+}
