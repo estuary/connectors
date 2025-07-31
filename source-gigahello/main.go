@@ -75,7 +75,9 @@ type capture struct {
 }
 
 type state struct {
-	Streams map[boilerplate.StateKey]*bindingState `json:"bindingStateV1,omitempty"` // The last message (sequence number) generated for each binding.
+	Streams    map[boilerplate.StateKey]*bindingState `json:"bindingStateV1,omitempty"` // The last message (sequence number) generated for each binding.
+	StartTime  int64
+	LatestTime int64
 }
 
 type bindingState struct {
@@ -200,6 +202,9 @@ func (driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error 
 }
 
 func (c *capture) Run() error {
+	if c.State.StartTime == 0 {
+		c.State.StartTime = time.Now().UnixNano()
+	}
 	if err := c.Stream.Ready(false); err != nil {
 		return err
 	}
@@ -219,7 +224,7 @@ func (c *capture) Run() error {
 	}
 	reused.buf = make([]byte, 0, 1024)
 
-	const checkpointInterval = 100 * time.Millisecond
+	const checkpointInterval = 50 * time.Millisecond
 	var checkpointAfter = time.Now().Add(checkpointInterval)
 
 	// State pointers in binding index order, to skip a map lookup
@@ -282,6 +287,7 @@ func (c *capture) Run() error {
 
 		// Emit checkpoints periodically
 		if shouldCheckpoint || shuttingDown {
+			c.State.LatestTime = time.Now().UnixNano()
 			checkpointJsonBytes, err := json.Marshal(c.State)
 			if err != nil {
 				return fmt.Errorf("error serializing state: %w", err)
