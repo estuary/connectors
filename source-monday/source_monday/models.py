@@ -1,4 +1,3 @@
-import json
 from logging import Logger
 from typing import (
     TYPE_CHECKING,
@@ -26,7 +25,13 @@ from estuary_cdk.flow import (
     OAuth2Spec,
 )
 from estuary_cdk.http import HTTPSession
-from pydantic import AwareDatetime, BaseModel, Field, field_validator
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    Field,
+    field_validator,
+    ValidationError,
+)
 
 
 OAUTH2_SPEC = OAuth2Spec(
@@ -113,43 +118,37 @@ class GraphQLResponseRemainder(BaseModel, Generic[TGraphQLResponseData], extra="
         return self.errors or []
 
 
+class ActivityLogEventData(BaseModel, extra="allow"):
+    board_id: int | None = None
+    item_id: int | None = None
+    item_type: str | None = None
+    pulse_id: int | None = None
+    pulse_ids: list[int] | None = None
+
+
 class ActivityLog(BaseModel, extra="allow"):
-    resource_id: str | None = None
     entity: Literal["board", "pulse"]
     event: str
-    data: dict[str, Any] = Field(default_factory=dict)
+    data: ActivityLogEventData
     created_at: str
 
     @field_validator("data", mode="before")
     @classmethod
-    def parse_json_data(cls, v: Any) -> dict[str, Any]:
-        if isinstance(v, str):
-            return json.loads(v)
-        return v
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        self.resource_id = self._get_resource_id()
-
-    def _get_resource_id(self) -> str | None:
-        """
-        Extract the primary ID of the entity being acted upon from the data field.
-
-        Note: when an item (pulse) is created we do not receive a pulse_id. The incremental stream will
-        rely on querying for recently updated items to find updated items, which should capture these events.
-        Alternatively, we could extract the board_id and backfill the board items again.
-        """
-        if not self.data:
-            return None
-
-        if self.entity == "pulse":
-            pulse_id = self.data.get("pulse_id")
-            return str(pulse_id) if pulse_id else None
-        elif self.entity == "board":
-            board_id = self.data.get("board_id")
-            return str(board_id) if board_id else None
-
-        return None
+    def parse_json_data(cls, data: Any) -> ActivityLogEventData:
+        if isinstance(data, dict):
+            try:
+                return ActivityLogEventData.model_validate(data)
+            except ValidationError as e:
+                raise ValueError(f"Invalid data for ActivityLog: {e}") from e
+        elif isinstance(data, str):
+            try:
+                return ActivityLogEventData.model_validate_json(data)
+            except ValidationError as e:
+                raise ValueError(f"Invalid data for ActivityLog: {e}") from e
+        else:
+            raise ValueError(
+                f"Invalid data type for ActivityLog: {type(data).__name__}. Expected dict or str."
+            )
 
 
 class FullRefreshResource(BaseDocument, extra="allow"):

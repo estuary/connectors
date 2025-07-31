@@ -41,8 +41,7 @@ async def fetch_boards_changes(
 ) -> AsyncGenerator[Board | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    max_updated_at = log_cursor
-    has_updates = False
+    max_change_dt = log_cursor
     board_ids_to_fetch: set[str] = set()
     board_ids: set[str] = set()
 
@@ -54,15 +53,13 @@ async def fetch_boards_changes(
         if board.updated_at > log_cursor:
             if board.state == "deleted":
                 board.meta_ = Board.Meta(op="d")
-                has_updates = True
-                max_updated_at = max(max_updated_at, board.updated_at)
+                max_change_dt = max(max_change_dt, board.updated_at)
                 yield board
                 log.debug(
                     f"Board {board.id} marked as deleted (updated: {board.updated_at})"
                 )
             else:
                 board_ids_to_fetch.add(board.id)
-                max_updated_at = max(max_updated_at, board.updated_at)
                 log.debug(
                     f"Board {board.id} added to fetch list (updated: {board.updated_at})"
                 )
@@ -76,35 +73,46 @@ async def fetch_boards_changes(
     ):
         activity_logs_processed += 1
         created_at = parse_monday_17_digit_timestamp(activity_log.created_at, log)
+        max_change_dt = max(max_change_dt, created_at)
 
-        if not activity_log.resource_id:
+        # An activity log can have an entity of "pulse" and be a board related activity,
+        # if the item_type is "Board". So we need to check for that and not assume solely on
+        # entity.
+        if activity_log.entity == "pulse" and activity_log.data.item_type != "Board":
             log.debug(
-                f"Skipping activity log with no resource id (event: {activity_log.event})",
+                "Skipping activity log for non-board activity",
                 {
                     "activity_log": activity_log,
                 },
             )
             continue
 
-        if "board_deleted" in activity_log.event:
-            deleted_board = Board(
-                id=activity_log.resource_id,
-                updated_at=created_at,
-                state="deleted",
-                workspace=None,
-                _meta=Board.Meta(op="d"),
-            )
-            has_updates = True
-            max_updated_at = max(max_updated_at, created_at)
-            yield deleted_board
-            log.debug(
-                f"Board {activity_log.resource_id} marked as deleted in activity logs"
-            )
+        if activity_log.data.board_id:
+            # The `fetch_boards_minimal` will catch deleted boards, but a board could still
+            # be deleted after the fetch and before the activity log is processed. This
+            # will catch that case and mark the board as deleted.
+            if "board_deleted" in activity_log.event:
+                deleted_board = Board(
+                    id=str(activity_log.data.board_id),
+                    updated_at=created_at,
+                    state="deleted",
+                    workspace=None,
+                    _meta=Board.Meta(op="d"),
+                )
+                yield deleted_board
+            else:
+                log.debug(
+                    f"Activity log found for board {activity_log.data.board_id} "
+                    f"(event created_at: {created_at})",
+                    {
+                        "activity_log": activity_log,
+                    },
+                )
+                board_ids_to_fetch.add(str(activity_log.data.board_id))
         else:
-            board_ids_to_fetch.add(activity_log.resource_id)
-            log.debug(
-                f"Activity log found for board {activity_log.resource_id} "
-                f"(event created_at: {created_at})"
+            raise RuntimeError(
+                f"Activity log does not have a board ID field to incrementally sync a board. "
+                f"Details: {activity_log}"
             )
 
     log.debug(f"Total unique board IDs to fetch: {len(board_ids_to_fetch)}")
@@ -115,8 +123,7 @@ async def fetch_boards_changes(
             if board.updated_at > log_cursor:
                 if board.state == "deleted":
                     board.meta_ = Board.Meta(op="d")
-                has_updates = True
-                max_updated_at = max(max_updated_at, board.updated_at)
+                max_change_dt = max(max_change_dt, board.updated_at)
                 yield board
                 boards_yielded += 1
 
@@ -124,11 +131,14 @@ async def fetch_boards_changes(
         f"Board sync: {boards_yielded} yielded, {minimal_boards_checked} checked, {activity_logs_processed} activity logs"
     )
 
-    if has_updates:
-        new_cursor = max_updated_at + timedelta(seconds=1)
+    if max_change_dt > log_cursor:
+        new_cursor = max_change_dt + timedelta(seconds=1)
         log.debug(f"Incremental sync complete. New cursor: {new_cursor}")
         yield new_cursor
     else:
+        # Unlike the fetch_itmes_changes, we do not advance the cursor here
+        # because the fetch_boards_changes does not specify a window end and
+        # in practice there are less updates than items.
         log.debug("Incremental sync complete. No updates found.")
 
 
@@ -192,7 +202,7 @@ async def fetch_items_changes(
     now = datetime.now(UTC)
     window_end = min(window_start + MAX_WINDOW_SIZE, now)
 
-    max_updated_at_in_window = window_start
+    max_change_dt = window_start
     item_ids_to_fetch: set[str] = set()
     board_ids_to_backfill: set[str] = set()
     docs_emitted = 0
@@ -212,10 +222,18 @@ async def fetch_items_changes(
     ):
         activity_logs_processed += 1
         created_at = parse_monday_17_digit_timestamp(activity_log.created_at, log)
+        max_change_dt = max(max_change_dt, created_at)
 
-        if not activity_log.resource_id:
+        # We can skip activity logs that have `item_type` as "Board" since
+        # these are board-level changes and do not affect items from what I can tell.
+        # However, even if the `item_type` is "Board", we still need to handle a board state change
+        # since it can affect whether all items for a board are fetched or not.
+        if (
+            activity_log.data.item_type == "Board"
+            and "board_state_change" not in activity_log.event
+        ):
             log.debug(
-                f"Skipping activity log with no resource id (event: {activity_log.event})",
+                "Skipping activity log for non-item activity",
                 {
                     "activity_log": activity_log,
                 },
@@ -223,28 +241,78 @@ async def fetch_items_changes(
             continue
 
         if "delete_pulse" in activity_log.event:
+            item_id = activity_log.data.item_id or activity_log.data.pulse_id
+
+            if not item_id:
+                raise RuntimeError(
+                    f"Activity log for item deletion does not have an item id. "
+                    f"Details: {activity_log}"
+                )
+
             deleted_item = Item(
-                id=activity_log.resource_id,
+                id=str(item_id),
                 updated_at=created_at,
                 state="deleted",
                 _meta=Item.Meta(op="d"),
             )
-            max_updated_at_in_window = max(max_updated_at_in_window, created_at)
             docs_emitted += 1
             yield deleted_item
-        # TODO(justin): handle other events that might require fetching items (e.g., duplicating a board with items)
         elif "board_state_change" in activity_log.event:
             # When a board is changing state, it can potentially be moved from the trash (deleted)
             # to active or archived state, so we need to backfill items from that board since the
             # activity log does not show item updates and the backfill might not backfill the items
             # if the board was already deleted before the capture started.
+            if not activity_log.data.board_id:
+                raise RuntimeError(
+                    f"Activity log for board state change does not have a board id to fetch all items. "
+                    f"Details: {activity_log}"
+                )
+
             log.debug(
-                f"Board state change activity log found for board {activity_log.resource_id} "
-                f"(event created_at: {created_at})"
+                f"Board state change activity log found for board {activity_log.data.board_id} "
+                f"(event created_at: {created_at})",
+                {
+                    "activity_log": activity_log,
+                },
             )
-            board_ids_to_backfill.add(activity_log.resource_id)
+            board_ids_to_backfill.add(str(activity_log.data.board_id))
+        elif (
+            "create_group" in activity_log.event
+            or "create_column" in activity_log.event
+        ):
+            # These events typically coincide with a board being duplicated with items,
+            # otherwise they are normal create events. However, we don't want to miss syncing
+            # items if this was a board duplication event, so we add the board to backfill.
+            if not activity_log.data.board_id:
+                raise RuntimeError(
+                    f"Activity log for board-level creation event does not have a board id to fetch all items. "
+                    f"Details: {activity_log}"
+                )
+
+            log.debug(
+                f"Board creation activity log found for board {activity_log.data.board_id} "
+                f"(event created_at: {created_at})",
+                {
+                    "activity_log": activity_log,
+                },
+            )
+            board_ids_to_backfill.add(str(activity_log.data.board_id))
         else:
-            item_ids_to_fetch.add(activity_log.resource_id)
+            item_id = activity_log.data.item_id or activity_log.data.pulse_id
+            pulse_ids = activity_log.data.pulse_ids
+
+            if not item_id and not pulse_ids:
+                log.warning(
+                    "Activity log does not have item_id, pulse_id, or pulse_ids",
+                    {
+                        "activity_log": activity_log,
+                    },
+                )
+
+            if item_id:
+                item_ids_to_fetch.add(str(item_id))
+            if pulse_ids:
+                item_ids_to_fetch.update(str(pulse_id) for pulse_id in pulse_ids)
 
     if item_ids_to_fetch:
         async for item in fetch_items_by_id(
@@ -252,15 +320,27 @@ async def fetch_items_changes(
             log,
             list(item_ids_to_fetch),
         ):
-            if window_start <= item.updated_at <= window_end:
+            # Although we don't use the `updated_at` field to update the log_cursor,
+            # we still don't want to fetch an item that was updated after collecting it's
+            # ID from the activity log, so we check if the item is within the window.
+            if item.updated_at <= window_end:
                 if item.state == "deleted":
                     item.meta_ = Item.Meta(op="d")
 
-                max_updated_at_in_window = max(
-                    max_updated_at_in_window, item.updated_at
-                )
                 docs_emitted += 1
                 yield item
+            else:
+                log.debug(
+                    f"Item {item.id} updated_at {item.updated_at} is outside the window "
+                    f"({window_start} - {window_end}), skipping",
+                    {
+                        "item_id": item.id,
+                        "item_updated_at": item.updated_at.isoformat(),
+                        "window_start": window_start.isoformat(),
+                        "window_end": window_end.isoformat(),
+                        "item_ids_to_fetch": list(item_ids_to_fetch),
+                    },
+                )
 
     if board_ids_to_backfill:
         # We need to first get the boards and filter them to only those that are not deleted
@@ -284,19 +364,23 @@ async def fetch_items_changes(
                 log,
                 list(board_ids_to_backfill),
             ):
-                if window_start <= item.updated_at <= window_end:
-                    if item.state == "deleted":
-                        item.meta_ = Item.Meta(op="d")
+                # For board-level item refresh, the items' updated_at field is not guaranteed to change.
+                # We will emit all items in this case, but not update the max_updated_at_in_window
+                # For example, if a board and items is duplicated, the board's updated_at will be updated,
+                # but the items' updated_at could be some historical value (e.g., 2019-09-01T00:00:00Z).
+                if item.state == "deleted":
+                    item.meta_ = Item.Meta(op="d")
 
-                    max_updated_at_in_window = max(
-                        max_updated_at_in_window, item.updated_at
-                    )
-                    docs_emitted += 1
-                    yield item
+                docs_emitted += 1
+                yield item
 
-    if docs_emitted > 0:
-        yield max_updated_at_in_window + timedelta(seconds=1)
+    if max_change_dt > log_cursor:
+        log.debug(f"Emitting new cursor: {max_change_dt + timedelta(seconds=1)}")
+        yield max_change_dt + timedelta(seconds=1)
     else:
+        log.debug(
+            f"No updates found in the current window, advancing cursor to window end: {window_end}"
+        )
         # Advance cursor even without updates to prevent missing data due to Monday.com's
         # 10k activity log retention limit per board. Staying at the same cursor risks
         # missing logs that get purged between sync cycles.
@@ -342,7 +426,7 @@ async def fetch_items_page(
             return
 
         cursor = ItemsBackfillCursor.from_board_ids(board_ids)
-        # Emit a cursor to checkpoint the complete dicionary of boards
+        # Emit a cursor to checkpoint the complete dictionary of boards
         yield cursor.create_initial_cursor()
     else:
         # Create typed cursor from existing page data
