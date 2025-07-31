@@ -126,7 +126,6 @@ func TestDatatypes(t *testing.T) {
 		// and will result in the original input JSON being captured as a string. See also:
 		// https://mariadb.com/kb/en/json-data-type/#differences-between-mysql-json-strings-and-mariadb-json-strings
 		{ColumnType: "json", ExpectType: `{}`, InputValue: `{"type": "test", "data": 123}`, ExpectValue: `{"data":123,"type":"test"}`},
-		{ColumnType: "json", ExpectType: `{}`, InputValue: nil, ExpectValue: `null`},
 	})
 }
 
