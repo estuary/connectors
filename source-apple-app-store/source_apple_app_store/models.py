@@ -49,7 +49,7 @@ class AppleCredentials(AccessToken):
     )
     access_token: str = Field(
         default="",  # Set to empty string by default because it will be generated dynamically by the patched TokenSource
-        json_schema_extra={"secret": True, "hidden": True},
+        json_schema_extra={"secret": True, "x-hidden-field": True},
     )
     private_key: str = Field(
         title="Private Key",

@@ -13,10 +13,10 @@
             },
             "access_token": {
               "default": "",
-              "hidden": true,
               "secret": true,
               "title": "Access Token",
-              "type": "string"
+              "type": "string",
+              "x-hidden-field": true
             },
             "private_key": {
               "description": "The contents of the private key file (.p8) downloaded from App Store Connect. Include the entire contents including BEGIN and END markers.",
