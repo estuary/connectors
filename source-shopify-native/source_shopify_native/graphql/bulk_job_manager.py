@@ -21,7 +21,7 @@ BULK_QUERY_ALREADY_EXISTS_ERROR = (
     r"A bulk query operation for this app and shop is already in progress"
 )
 INITIAL_SLEEP = 1
-MAX_SLEEP = 150
+MAX_SLEEP = 2
 SIX_HOURS = 6 * 60 * 60
 
 bulk_job_lock = asyncio.Lock()
@@ -213,6 +213,8 @@ class BulkJobManager:
             delay = INITIAL_SLEEP
             total_sleep = 0
 
+            is_running = False
+
             while True:
                 details = await self._get_job(job_id)
                 match details.status:
@@ -223,11 +225,15 @@ class BulkJobManager:
                         })
                         return details.url
                     case BulkOperationStatuses.CREATED | BulkOperationStatuses.RUNNING:
-                        self.log.info(
-                            f"Job {job_id} is {details.status}. Sleeping {delay} seconds to await job completion.", {
-                                "stream": model.NAME,
-                            }
-                        )
+                        if not is_running:
+                            self.log.info(
+                                f"Job {job_id} is {details.status}. Sleeping to await job completion.", {
+                                    "stream": model.NAME,
+                                }
+                            )
+
+                            is_running = True
+
                         total_sleep += delay
 
                         if total_sleep > SIX_HOURS:
