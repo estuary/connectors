@@ -8,19 +8,15 @@ import (
 	"iter"
 	"net/http"
 	"path"
-	"slices"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/aws/retry"
 	awshttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
-	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 var _ Bucket = (*S3Bucket)(nil)
@@ -29,35 +25,6 @@ type S3Bucket struct {
 	client   *s3.Client
 	bucket   string
 	uploader *manager.Uploader
-}
-
-type retryWrapper struct {
-	aws.Retryer
-}
-
-func (r *retryWrapper) IsErrorRetryable(err error) bool {
-	retryable := r.Retryer.IsErrorRetryable(err)
-	log.WithFields(log.Fields{
-		"retryable": retryable,
-		"error":     err,
-	}).Info("retryWrapper IsErrorRetryable")
-
-	return retryable
-}
-
-func (r *retryWrapper) RetryDelay(attempt int, err error) (time.Duration, error) {
-	delay, err := r.Retryer.RetryDelay(attempt, err)
-	if err != nil {
-		log.WithError(err).Info("retryWrapper RetryDelay failed")
-	} else {
-		log.WithFields(log.Fields{
-			"attempt": attempt,
-			"delay":   delay,
-			"error":   err,
-		}).Info("retryWrapper RetryDelay for retryable error")
-	}
-
-	return delay, err
 }
 
 // NewS3Bucket creates an S3 object storage bucket. clientOpts are optional, but
@@ -74,14 +41,7 @@ func NewS3Bucket(ctx context.Context, bucket string, creds aws.CredentialsProvid
 		tr.MaxIdleConnsPerHost = 100 // up from the default of 2
 	})
 
-	configOpts = append(configOpts,
-		config.WithRetryer(func() aws.Retryer {
-			return &retryWrapper{Retryer: retry.NewStandard(func(o *retry.StandardOptions) {
-				o.MaxAttempts = 5
-			})}
-		}),
-		config.WithHTTPClient(httpClient),
-	)
+	configOpts = append(configOpts, config.WithHTTPClient(httpClient))
 
 	// Resolve the region of the bucket. If one is explicitly provided in a
 	// clientOpt, use that directly. If not it must be determined dynamically.
@@ -145,30 +105,28 @@ func (b *S3Bucket) URI(key string) string {
 }
 
 func (b *S3Bucket) Delete(ctx context.Context, uris []string) error {
-	for batch := range slices.Chunk(uris, 1000) {
-		toDelete := make([]types.ObjectIdentifier, 0, len(batch))
-		for _, uri := range batch {
-			trimmed := strings.TrimPrefix(uri, "s3://")
-			bucket, key, ok := strings.Cut(trimmed, "/")
-			if !ok {
-				return fmt.Errorf("invalid uri %q", uri)
-			} else if bucket != b.bucket {
-				return fmt.Errorf("bucket mismatch from %q: %q (got) vs %q (want)", uri, bucket, b.bucket)
-			}
-			toDelete = append(toDelete, types.ObjectIdentifier{Key: aws.String(key)})
-		}
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(5)
 
-		if _, err := b.client.DeleteObjects(ctx, &s3.DeleteObjectsInput{
-			Bucket: aws.String(b.bucket),
-			Delete: &types.Delete{
-				Objects: toDelete,
-			},
-		}); err != nil {
-			return fmt.Errorf("deleting blob batch: %w", err)
+	for _, uri := range uris {
+		trimmed := strings.TrimPrefix(uri, "s3://")
+		bucket, key, ok := strings.Cut(trimmed, "/")
+		if !ok {
+			return fmt.Errorf("invalid uri %q", uri)
 		}
+		group.Go(func() error {
+			if _, err := b.client.DeleteObject(groupCtx, &s3.DeleteObjectInput{
+				Bucket: aws.String(bucket),
+				Key:    aws.String(key),
+			}); err != nil {
+				return fmt.Errorf("deleting blob %q: %w", uri, err)
+			}
+
+			return nil
+		})
 	}
 
-	return nil
+	return group.Wait()
 }
 
 func (b *S3Bucket) List(ctx context.Context, query Query) iter.Seq2[ObjectInfo, error] {
