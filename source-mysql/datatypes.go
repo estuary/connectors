@@ -59,7 +59,10 @@ func (db *mysqlDatabase) constructJSONTranscoder(isBackfill bool, columnType any
 	case "uuid": // The 'UUID' column type is only in MariaDB
 		return jsonTranscoderFunc(transcodeUUIDValue), nil
 	default:
-		return nil, fmt.Errorf("unhandled column type %v", columnType)
+		return &mysqlDefaultTranscoder{
+			ShouldComplain: true,
+			ColumnType:     columnType,
+		}, nil
 	}
 }
 
@@ -240,6 +243,35 @@ func transcodeUUIDValue(buf []byte, val any) ([]byte, error) {
 		} else {
 			return nil, fmt.Errorf("error parsing UUID: %w", err)
 		}
+	}
+	return json.Append(buf, val, 0)
+}
+
+type mysqlDefaultTranscoder struct {
+	ShouldComplain bool // When true, the transcoder will log a complaint the first time it's used.
+	ColumnType     any
+}
+
+func (t *mysqlDefaultTranscoder) TranscodeJSON(buf []byte, val any) ([]byte, error) {
+	// Log once about each column which requires the fallback transcoder, so that
+	// we can implement the missing cases in the type switch and eventually we'll
+	// be confident we have an exhaustive list of column types up there.
+	if t.ShouldComplain {
+		t.ShouldComplain = false
+		logrus.WithFields(logrus.Fields{
+			"columnType": t.ColumnType,
+			"valueType":  fmt.Sprintf("%T", val),
+		}).Info("using fallback transcoder")
+	}
+
+	// The old translateRecordField logic was essentially that we had special cases
+	// for various combinations of value type and column type, with non-exhaustive
+	// cases so that for bytes we just returned the value as a string and for all
+	// other value types we just returned the value unmodified. Then that value
+	// would later be serialized to JSON. So this is more or less an exact
+	// translation of the old default behavior as a value transcoder.
+	if bs, ok := val.([]byte); ok {
+		return json.Append(buf, string(bs), 0)
 	}
 	return json.Append(buf, val, 0)
 }
