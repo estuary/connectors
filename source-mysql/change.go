@@ -5,7 +5,6 @@ import (
 
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
-	"github.com/invopop/jsonschema"
 	"github.com/segmentio/encoding/json"
 )
 
@@ -48,25 +47,8 @@ type mysqlChangeMetadata struct {
 // mysqlSourceInfo is source metadata for data capture events.
 type mysqlSourceInfo struct {
 	sqlcapture.SourceCommon
-	Cursor mysqlChangeEventCursor `json:"cursor" jsonschema:"description=Cursor value representing the current position in the binlog."`
-	TxID   string                 `json:"txid,omitempty" jsonschema:"description=The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."`
-}
-
-type mysqlChangeEventCursor struct {
-	BinlogFile   string // Cursor representing the binlog file containing this event
-	BinlogOffset uint64 // Cursor representing the estimated binlog offset of the rows change event
-	RowIndex     int    // Index of the current row within the binlog event
-}
-
-func (c mysqlChangeEventCursor) JSONSchema() *jsonschema.Schema {
-	return &jsonschema.Schema{Type: "string"}
-}
-
-func (c mysqlChangeEventCursor) MarshalJSON() ([]byte, error) {
-	if c.BinlogFile == "backfill" && c.BinlogOffset == 0 {
-		return json.Marshal(fmt.Sprintf("%s:%d", c.BinlogFile, c.RowIndex))
-	}
-	return json.Marshal(fmt.Sprintf("%s:%d:%d", c.BinlogFile, c.BinlogOffset, c.RowIndex))
+	EventCursor string `json:"cursor" jsonschema:"description=Cursor value representing the current position in the binlog."`
+	TxID        string `json:"txid,omitempty" jsonschema:"description=The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."`
 }
 
 func (s *mysqlSourceInfo) Common() sqlcapture.SourceCommon {

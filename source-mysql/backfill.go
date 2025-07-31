@@ -117,10 +117,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 						Snapshot: true,
 						Table:    table,
 					},
-					Cursor: mysqlChangeEventCursor{
-						BinlogFile: "backfill",
-						RowIndex:   rowOffset,
-					},
+					EventCursor: fmt.Sprintf("backfill:%d", rowOffset),
 				},
 			},
 			RowKey: rowKey,
