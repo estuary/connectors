@@ -1,0 +1,50 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-apple-app-store:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_apple_app_store
+        config:
+          credentials:
+            credentials_title: "Private App Credentials"
+            issuer_id: "PLACEHOLDER_TEAM_ID"
+            key_id: "PLACEHOLDER_KEY_ID"
+            private_key: |
+              -----BEGIN PRIVATE KEY-----
+              PLACEHOLDER_PRIVATE_KEY_CONTENT_GOES_HERE
+              REPLACE_WITH_ACTUAL_P8_FILE_CONTENTS
+              -----END PRIVATE KEY-----
+          app_ids:
+            - "123"
+            - "456"
+            - "789"
+    bindings:
+      - resource:
+          name: app_sessions
+          interval: PT1H
+        target: acmeCo/app_sessions
+      - resource:
+          name: app_crashes
+          interval: PT1H
+        target: acmeCo/app_crashes
+      - resource:
+          name: app_downloads
+          interval: PT1H
+        target: acmeCo/app_downloads
+      - resource:
+          name: app_store_installs_and_deletions
+          interval: PT1H
+        target: acmeCo/app_store_installs_and_deletions
+      - resource:
+          name: app_store_discovery_and_engagement
+          interval: PT1H
+        target: acmeCo/app_store_discovery_and_engagement
+      - resource:
+          name: app_reviews
+          interval: PT1H
+        target: acmeCo/app_reviews
