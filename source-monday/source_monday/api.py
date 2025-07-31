@@ -132,7 +132,7 @@ async def fetch_boards_changes(
     )
 
     if max_change_dt > log_cursor:
-        new_cursor = max_change_dt + timedelta(seconds=1)
+        new_cursor = (max_change_dt + timedelta(seconds=1)).replace(microsecond=0)
         log.debug(f"Incremental sync complete. New cursor: {new_cursor}")
         yield new_cursor
     else:
@@ -375,8 +375,9 @@ async def fetch_items_changes(
                 yield item
 
     if max_change_dt > log_cursor:
-        log.debug(f"Emitting new cursor: {max_change_dt + timedelta(seconds=1)}")
-        yield max_change_dt + timedelta(seconds=1)
+        new_cursor = (max_change_dt + timedelta(seconds=1)).replace(microsecond=0)
+        log.debug(f"Emitting new cursor: {new_cursor}")
+        yield new_cursor
     else:
         log.debug(
             f"No updates found in the current window, advancing cursor to window end: {window_end}"
