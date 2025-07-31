@@ -418,7 +418,7 @@ async def fetch_items_page(
         async for board in fetch_boards_minimal(http, log):
             # Cannot query items for deleted boards, so we skip them
             # otherwise, the API returns ambiguous internal server errors.
-            if board.updated_at <= cutoff and board.state != "deleted":
+            if board.state != "deleted":
                 board_ids.append(board.id)
 
         if not board_ids:
