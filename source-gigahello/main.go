@@ -78,6 +78,7 @@ type state struct {
 	Streams    map[boilerplate.StateKey]*bindingState `json:"bindingStateV1,omitempty"` // The last message (sequence number) generated for each binding.
 	StartTime  int64
 	LatestTime int64
+	TotalBytes uint64
 }
 
 type bindingState struct {
@@ -235,6 +236,7 @@ func (c *capture) Run() error {
 
 	var nextBinding = 0 // Index of the next binding to emit.
 	var messageCount int
+	var totalBytes = c.State.TotalBytes
 
 	log.WithField("eventType", "connectorStatus").Info("Sending messages")
 	var ctx = c.Stream.Context()
@@ -271,6 +273,7 @@ func (c *capture) Run() error {
 			return fmt.Errorf("error sending document: %w", err)
 		}
 		messageCount++
+		totalBytes += uint64(len(reused.buf))
 
 		// Check if we've hit the (test only) shutdown threshold
 		var shuttingDown = false
@@ -287,6 +290,7 @@ func (c *capture) Run() error {
 
 		// Emit checkpoints periodically
 		if shouldCheckpoint || shuttingDown {
+			c.State.TotalBytes = totalBytes
 			c.State.LatestTime = time.Now().UnixNano()
 			checkpointJsonBytes, err := json.Marshal(c.State)
 			if err != nil {
