@@ -77,7 +77,7 @@ func TestPullStream(t *testing.T) {
 				insertDoc(t, testColl3, 3) // not a captured collection
 			},
 			pullTimes:      1,
-			wantSent:       []string{cp, "1", cp, "2", cp, cp},
+			wantSent:       []string{cp, "1", cp, "2", cp},
 			wantEventCount: 3,
 		},
 		{
