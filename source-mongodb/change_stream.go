@@ -17,14 +17,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// disableRetriesForTesting can be set `true` when running tests that require
-// timely operation.
-var disableRetriesForTesting bool
+var (
+	// disableRetriesForTesting can be set `true` when running tests that require
+	// timely operation.
+	disableRetriesForTesting bool
 
-// changeStream associates a *mongo.ChangeStream with which database it is for.
+	// changeStream associates a *mongo.ChangeStream with which database it is for.
+	// Change stream checkpoints that are a post-batch-resume-token only with no
+	// documents are throttled slightly, to minimize spamming checkpoints constantly
+	// even for change streams with no new data.
+	pbrtCheckpointInterval = 1 * time.Minute
+)
+
 type changeStream struct {
-	ms *mongo.ChangeStream
-	db string
+	ms                 *mongo.ChangeStream
+	db                 string
+	lastPbrtCheckpoint time.Time
 }
 
 type docKey struct {
@@ -60,8 +68,8 @@ func (c *capture) initializeStreams(
 	requestPreImages bool,
 	exclusiveCollectionFilter bool,
 	excludeCollections map[string][]string,
-) ([]changeStream, error) {
-	var out []changeStream
+) ([]*changeStream, error) {
+	var out []*changeStream
 
 	// Used if exclusiveCollectionFilter is enabled.
 	var collsPerDb = make(map[string][]string)
@@ -131,7 +139,7 @@ func (c *capture) initializeStreams(
 
 		logEntry.Debug("intialized change stream")
 
-		out = append(out, changeStream{
+		out = append(out, &changeStream{
 			ms: ms,
 			db: db,
 		})
@@ -152,7 +160,7 @@ func (c *capture) initializeStreams(
 func (c *capture) streamChanges(
 	ctx context.Context,
 	coordinator *streamBackfillCoordinator,
-	streams []changeStream,
+	streams []*changeStream,
 	catchup bool,
 ) error {
 	group, groupCtx := errgroup.WithContext(ctx)
@@ -241,7 +249,7 @@ func (c *capture) streamChanges(
 	}
 }
 
-func getToken(s changeStream) bson.Raw {
+func getToken(s *changeStream) bson.Raw {
 	tok := s.ms.ResumeToken()
 	if tok == nil {
 		// This should never happen. But if it did it would be very
@@ -255,7 +263,7 @@ func getToken(s changeStream) bson.Raw {
 // them, returning the latest cluster time of any observed event. A zero-valued
 // returned timestamp indicates that no documents were available for the change
 // stream.
-func (c *capture) pullStream(ctx context.Context, s changeStream) (primitive.Timestamp, error) {
+func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Timestamp, error) {
 	var lastToken bson.Raw
 	var lastOpTime primitive.Timestamp
 	events := 0
@@ -309,7 +317,7 @@ func (c *capture) pullStream(ctx context.Context, s changeStream) (primitive.Tim
 	// be present even if TryNext returned no documents and allows us to keep the position of the
 	// change stream fresh even if we are watching a database that has infrequent events.
 	finalToken := getToken(s)
-	if !bytes.Equal(finalToken, lastToken) {
+	if !bytes.Equal(finalToken, lastToken) && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
 		stateUpdate := captureState{
 			DatabaseResumeTokens: map[string]bson.Raw{s.db: finalToken},
 		}
@@ -319,6 +327,7 @@ func (c *capture) pullStream(ctx context.Context, s changeStream) (primitive.Tim
 		} else if err := c.output.Checkpoint(cpJson, true); err != nil {
 			return primitive.Timestamp{}, fmt.Errorf("outputting pbrt stream checkpoint: %w", err)
 		}
+		s.lastPbrtCheckpoint = time.Now()
 	}
 
 	c.mu.Lock()
@@ -340,7 +349,7 @@ type splitEvent struct {
 
 func (c *capture) readEvent(
 	ctx context.Context,
-	s changeStream,
+	s *changeStream,
 	ev *changeEvent,
 ) (requestedAnotherBatch bool, err error) {
 	var binding bindingInfo
@@ -421,7 +430,7 @@ func (c *capture) readEvent(
 
 func readFragments(
 	ctx context.Context,
-	s changeStream,
+	s *changeStream,
 	ev *changeEvent,
 ) (numSplitEvents int, requestedAnotherBatch bool, _ error) {
 	// Fragments are repeatedly unmarshalled into a single change event since no
