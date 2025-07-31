@@ -342,10 +342,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 
 		switch data := event.Event.(type) {
 		case *replication.RowsEvent:
-			var eventCursor = mysqlChangeEventCursor{
-				BinlogFile:   cursor.Name,
-				BinlogOffset: binlogEstimatedOffset,
-			}
+			var eventCursor = fmt.Sprintf("%s:%d", cursor.Name, binlogEstimatedOffset)
 			if err := rs.handleRowsEvent(ctx, event, eventCursor); err != nil {
 				var metadataErr = &InconsistentMetadataError{}
 				if errors.As(err, &metadataErr) {
@@ -468,7 +465,7 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 	}
 }
 
-func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *replication.BinlogEvent, eventCursor mysqlChangeEventCursor) error {
+func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *replication.BinlogEvent, eventCursor string) error {
 	var data, ok = event.Event.(*replication.RowsEvent)
 	if !ok {
 		return fmt.Errorf("internal error: expected RowsEvent, got %T", event.Event)
@@ -525,23 +522,18 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
 				return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 			}
-			var eventTxID string
+			var sourceInfo = mysqlSourceInfo{
+				SourceCommon: sourceCommon,
+				EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+			}
 			if rs.db.includeTxIDs[streamID] {
-				eventTxID = rs.gtidString
+				sourceInfo.TxID = rs.gtidString
 			}
 			if err := rs.emitEvent(ctx, &mysqlChangeEvent{
 				Info: &mysqlChangeSharedInfo{StreamID: streamID},
 				Meta: mysqlChangeMetadata{
 					Operation: sqlcapture.InsertOp,
-					Source: mysqlSourceInfo{
-						SourceCommon: sourceCommon,
-						Cursor: mysqlChangeEventCursor{
-							BinlogFile:   eventCursor.BinlogFile,
-							BinlogOffset: eventCursor.BinlogOffset,
-							RowIndex:     rowIdx,
-						},
-						TxID: eventTxID,
-					},
+					Source:    sourceInfo,
 				},
 				RowKey: rowKey,
 				Values: values,
@@ -595,16 +587,12 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 							Operation: sqlcapture.DeleteOp,
 							Source: mysqlSourceInfo{
 								SourceCommon: sourceCommon,
-								Cursor: mysqlChangeEventCursor{
-									BinlogFile:   eventCursor.BinlogFile,
-									BinlogOffset: eventCursor.BinlogOffset,
-									// Since updates consist of paired row-states (before, then after) which we iterate
-									// over two-at-a-time, it is consistent to have the row-index portion of the event
-									// cursor be the before-state index for this deletion and the after-state index for
-									// the insert.
-									RowIndex: rowIdx - 1,
-								},
-								TxID: eventTxID,
+								// Since updates consist of paired row-states (before, then after) which we iterate
+								// over two-at-a-time, it is consistent to have the row-index portion of the event
+								// cursor be the before-state index for this deletion and the after-state index for
+								// the insert.
+								EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx-1),
+								TxID:        eventTxID,
 							},
 						},
 						RowKey: rowKeyBefore,
@@ -615,12 +603,8 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 							Operation: sqlcapture.InsertOp,
 							Source: mysqlSourceInfo{
 								SourceCommon: sourceCommon,
-								Cursor: mysqlChangeEventCursor{
-									BinlogFile:   eventCursor.BinlogFile,
-									BinlogOffset: eventCursor.BinlogOffset,
-									RowIndex:     rowIdx,
-								},
-								TxID: eventTxID,
+								EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+								TxID:         eventTxID,
 							},
 						},
 						RowKey: rowKeyAfter,
@@ -633,12 +617,11 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 							Operation: sqlcapture.UpdateOp,
 							Source: mysqlSourceInfo{
 								SourceCommon: sourceCommon,
-								Cursor: mysqlChangeEventCursor{
-									BinlogFile:   eventCursor.BinlogFile,
-									BinlogOffset: eventCursor.BinlogOffset,
-									RowIndex:     rowIdx,
-								},
-								TxID: eventTxID,
+								// For updates the row-index part of the event cursor has to increment by two here
+								// so that there's room for synthetic delete/insert pairs. Since this value really
+								// just needs to be unique and properly ordered this is fine.
+								EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+								TxID:        eventTxID,
 							},
 							Before: before,
 						},
@@ -670,23 +653,19 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
 				return fmt.Errorf("error translating 'values' of %q DeleteOp: %w", streamID, err)
 			}
-			var eventTxID string
+			var sourceInfo = mysqlSourceInfo{
+				SourceCommon: sourceCommon,
+				EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+				TxID:         rs.gtidString,
+			}
 			if rs.db.includeTxIDs[streamID] {
-				eventTxID = rs.gtidString
+				sourceInfo.TxID = rs.gtidString
 			}
 			if err := rs.emitEvent(ctx, &mysqlChangeEvent{
 				Info: &mysqlChangeSharedInfo{StreamID: streamID},
 				Meta: mysqlChangeMetadata{
 					Operation: sqlcapture.DeleteOp,
-					Source: mysqlSourceInfo{
-						SourceCommon: sourceCommon,
-						Cursor: mysqlChangeEventCursor{
-							BinlogFile:   eventCursor.BinlogFile,
-							BinlogOffset: eventCursor.BinlogOffset,
-							RowIndex:     rowIdx,
-						},
-						TxID: eventTxID,
-					},
+					Source:    sourceInfo,
 				},
 				RowKey: rowKey,
 				Values: values,
