@@ -78,25 +78,6 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 	// Execute the backfill query to fetch rows from the database
 	logrus.WithFields(logrus.Fields{"query": query, "args": args}).Debug("executing query")
 
-	// Construct shared info struct
-	var sharedChangeInfo = &mysqlChangeSharedInfo{StreamID: streamID}
-
-	// Construct prototype change metadata which will be copied for all rows of this binlog event
-	var prototypeChangeMetadata = mysqlChangeMetadata{
-		Operation: sqlcapture.InsertOp,
-		Source: mysqlSourceInfo{
-			SourceCommon: sqlcapture.SourceCommon{
-				Millis:   0, // Not known.
-				Schema:   schema,
-				Snapshot: true,
-				Table:    table,
-			},
-			Cursor: mysqlChangeEventCursor{
-				BinlogFile: "backfill",
-			},
-		},
-	}
-
 	var resultRows int    // Count of rows received within the current backfill chunk
 	var nextRowKey []byte // The row key from which a subsequent backfill chunk should resume
 	var rowOffset = state.BackfilledCount
@@ -126,12 +107,25 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 		}
 
 		var event = &mysqlChangeEvent{
-			Info:   sharedChangeInfo,
-			Meta:   prototypeChangeMetadata,
+			Info: &mysqlChangeSharedInfo{StreamID: streamID},
+			Meta: mysqlChangeMetadata{
+				Operation: sqlcapture.InsertOp,
+				Source: mysqlSourceInfo{
+					SourceCommon: sqlcapture.SourceCommon{
+						Millis:   0, // Not known.
+						Schema:   schema,
+						Snapshot: true,
+						Table:    table,
+					},
+					Cursor: mysqlChangeEventCursor{
+						BinlogFile: "backfill",
+						RowIndex:   rowOffset,
+					},
+				},
+			},
 			RowKey: rowKey,
 			Values: fields,
 		}
-		event.Meta.Source.Cursor.RowIndex = rowOffset
 		if err := callback(event); err != nil {
 			return fmt.Errorf("error processing change event: %w", err)
 		}
