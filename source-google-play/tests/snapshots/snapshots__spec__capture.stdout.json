@@ -30,8 +30,7 @@
       },
       "properties": {
         "bucket": {
-          "description": "The bucket containing your Google Play data. The bucket starts with pubsite_prod_rev. For example, pubsite_prod_rev_01234567890987654321.",
-          "pattern": "^pubsite_prod_rev.*$",
+          "description": "The bucket containing your Google Play data. The bucket starts with pubsite_prod. For example, pubsite_prod_<some_identifier>.",
           "title": "Bucket",
           "type": "string"
         },
