@@ -511,18 +511,18 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	switch event.Header.EventType {
 	case replication.WRITE_ROWS_EVENTv1, replication.WRITE_ROWS_EVENTv2:
 		for rowIdx, row := range data.Rows {
-			var values, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
+			var after, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
 			if err != nil {
 				return fmt.Errorf("error decoding row values: %w", err)
 			}
-			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, values, columnTypes, encodeKeyFDB)
+			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, after, columnTypes, encodeKeyFDB)
 			if err != nil {
 				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
-			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
+			if err := rs.db.translateRecordFields(false, columnTypes, after); err != nil {
 				return fmt.Errorf("error translating 'after' of %q InsertOp: %w", streamID, err)
 			}
-			var sourceInfo = mysqlSourceInfo{
+			var sourceInfo = &mysqlSourceInfo{
 				SourceCommon: sourceCommon,
 				EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
 			}
@@ -530,13 +530,10 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 				sourceInfo.TxID = rs.gtidString
 			}
 			if err := rs.emitEvent(ctx, &mysqlChangeEvent{
-				Info: &mysqlChangeSharedInfo{StreamID: streamID},
-				Meta: mysqlChangeMetadata{
-					Operation: sqlcapture.InsertOp,
-					Source:    sourceInfo,
-				},
-				RowKey: rowKey,
-				Values: values,
+				Operation: sqlcapture.InsertOp,
+				RowKey:    rowKey,
+				After:     after,
+				Source:    sourceInfo,
 			}); err != nil {
 				return err
 			}
@@ -582,51 +579,42 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 					// When the row key is changed by an update, translate it into a synthetic pair: a delete
 					// event of the old row-state, plus an insert event of the new row-state.
 					events = append(events, &mysqlChangeEvent{
-						Info: &mysqlChangeSharedInfo{StreamID: streamID},
-						Meta: mysqlChangeMetadata{
-							Operation: sqlcapture.DeleteOp,
-							Source: mysqlSourceInfo{
-								SourceCommon: sourceCommon,
-								// Since updates consist of paired row-states (before, then after) which we iterate
-								// over two-at-a-time, it is consistent to have the row-index portion of the event
-								// cursor be the before-state index for this deletion and the after-state index for
-								// the insert.
-								EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx-1),
-								TxID:        eventTxID,
-							},
+						Operation: sqlcapture.DeleteOp,
+						RowKey:    rowKeyBefore,
+						Before:    before,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							// Since updates consist of paired row-states (before, then after) which we iterate
+							// over two-at-a-time, it is consistent to have the row-index portion of the event
+							// cursor be the before-state index for this deletion and the after-state index for
+							// the insert.
+							EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx-1),
+							TxID:        eventTxID,
 						},
-						RowKey: rowKeyBefore,
-						Values: before,
 					}, &mysqlChangeEvent{
-						Info: &mysqlChangeSharedInfo{StreamID: streamID},
-						Meta: mysqlChangeMetadata{
-							Operation: sqlcapture.InsertOp,
-							Source: mysqlSourceInfo{
-								SourceCommon: sourceCommon,
-								EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
-								TxID:         eventTxID,
-							},
+						Operation: sqlcapture.InsertOp,
+						RowKey:    rowKeyAfter,
+						After:     after,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+							TxID:         eventTxID,
 						},
-						RowKey: rowKeyAfter,
-						Values: after,
 					})
 				} else {
 					events = append(events, &mysqlChangeEvent{
-						Info: &mysqlChangeSharedInfo{StreamID: streamID},
-						Meta: mysqlChangeMetadata{
-							Operation: sqlcapture.UpdateOp,
-							Source: mysqlSourceInfo{
-								SourceCommon: sourceCommon,
-								// For updates the row-index part of the event cursor has to increment by two here
-								// so that there's room for synthetic delete/insert pairs. Since this value really
-								// just needs to be unique and properly ordered this is fine.
-								EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx),
-								TxID:        eventTxID,
-							},
-							Before: before,
+						Operation: sqlcapture.UpdateOp,
+						RowKey:    rowKeyAfter,
+						Before:    before,
+						After:     after,
+						Source: &mysqlSourceInfo{
+							SourceCommon: sourceCommon,
+							// For updates the row-index part of the event cursor has to increment by two here
+							// so that there's room for synthetic delete/insert pairs. Since this value really
+							// just needs to be unique and properly ordered this is fine.
+							EventCursor: fmt.Sprintf("%s:%d", eventCursor, rowIdx),
+							TxID:        eventTxID,
 						},
-						RowKey: rowKeyAfter,
-						Values: after,
 					})
 				}
 				for _, event := range events {
@@ -642,18 +630,18 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 		}
 	case replication.DELETE_ROWS_EVENTv1, replication.DELETE_ROWS_EVENTv2:
 		for rowIdx, row := range data.Rows {
-			var values, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
+			var before, err = decodeRow(streamID, columnNames, row, data.SkippedColumns[rowIdx])
 			if err != nil {
 				return fmt.Errorf("error decoding row values: %w", err)
 			}
-			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, values, columnTypes, encodeKeyFDB)
+			rowKey, err := sqlcapture.EncodeRowKey(keyColumns, before, columnTypes, encodeKeyFDB)
 			if err != nil {
 				return fmt.Errorf("error encoding row key for %q: %w", streamID, err)
 			}
-			if err := rs.db.translateRecordFields(false, columnTypes, values); err != nil {
-				return fmt.Errorf("error translating 'values' of %q DeleteOp: %w", streamID, err)
+			if err := rs.db.translateRecordFields(false, columnTypes, before); err != nil {
+				return fmt.Errorf("error translating 'before' of %q DeleteOp: %w", streamID, err)
 			}
-			var sourceInfo = mysqlSourceInfo{
+			var sourceInfo = &mysqlSourceInfo{
 				SourceCommon: sourceCommon,
 				EventCursor:  fmt.Sprintf("%s:%d", eventCursor, rowIdx),
 				TxID:         rs.gtidString,
@@ -662,13 +650,10 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 				sourceInfo.TxID = rs.gtidString
 			}
 			if err := rs.emitEvent(ctx, &mysqlChangeEvent{
-				Info: &mysqlChangeSharedInfo{StreamID: streamID},
-				Meta: mysqlChangeMetadata{
-					Operation: sqlcapture.DeleteOp,
-					Source:    sourceInfo,
-				},
-				RowKey: rowKey,
-				Values: values,
+				Operation: sqlcapture.DeleteOp,
+				RowKey:    rowKey,
+				Before:    before,
+				Source:    sourceInfo,
 			}); err != nil {
 				return err
 			}
