@@ -103,9 +103,22 @@ type prerequisitesError struct {
 func (e *prerequisitesError) Error() string {
 	var b = new(strings.Builder)
 	fmt.Fprintf(b, "the capture cannot run due to the following error(s):")
-	for _, err := range e.errs {
+
+	// Limit the number of reported errors to keep things reasonable
+	const maxReportedErrors = 20
+	var reportedErrors = len(e.errs)
+	var omittedErrors = 0
+	if reportedErrors > maxReportedErrors {
+		reportedErrors = maxReportedErrors
+		omittedErrors = len(e.errs) - maxReportedErrors
+	}
+
+	for _, err := range e.errs[:reportedErrors] {
 		b.WriteString("\n - ")
 		b.WriteString(err.Error())
+	}
+	if omittedErrors > 0 {
+		fmt.Fprintf(b, "\n - additional %d errors omitted", omittedErrors)
 	}
 	return b.String()
 }
@@ -210,6 +223,9 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	}
 
 	var errs = db.SetupPrerequisites(ctx)
+	for _, err := range errs {
+		log.WithError(err).Debug("prerequisite error")
+	}
 	var out []*pc.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res Resource
@@ -222,17 +238,22 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		// When performing a keyed backfill, it's an error for the collection key to be the fallback key. It has to be one or more top-level properties.
 		if (res.Mode == BackfillModeAutomatic || res.Mode == BackfillModeNormal || res.Mode == BackfillModePrecise) && len(res.PrimaryKey) == 0 {
 			if slices.Equal(binding.Collection.Key, db.FallbackCollectionKey()) {
-				errs = append(errs, fmt.Errorf("output collection for stream %q has the fallback key, which can't be used for a backfill", streamID))
+				var err = fmt.Errorf("output collection for stream %q has the fallback key, which can't be used for a backfill", streamID)
+				log.WithError(err).Debug("prerequisite error")
+				errs = append(errs, err)
 			}
 		}
 
 		// If we have previous information about a resource and the backfill mode changes without
 		// a corresponding backfill counter increment, that's an error.
 		if prevBinding, ok := previousBindings[streamID]; ok && res.Mode != prevBinding.Resource.Mode && binding.Backfill <= prevBinding.Backfill {
-			errs = append(errs, fmt.Errorf("must re-backfill when changing backfill mode: table %q changed from %q to %q", streamID, prevBinding.Resource.Mode, res.Mode))
+			var err = fmt.Errorf("must re-backfill when changing backfill mode: table %q changed from %q to %q", streamID, prevBinding.Resource.Mode, res.Mode)
+			log.WithError(err).Debug("prerequisite error")
+			errs = append(errs, err)
 		}
 
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
+			log.WithError(err).Debug("prerequisite error")
 			errs = append(errs, err)
 			continue
 		}
@@ -242,6 +263,7 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		})
 	}
 	if len(errs) > 0 {
+		log.WithField("count", len(errs)).Debug("prerequisite validation encountered errors")
 		e := &prerequisitesError{errs}
 		return nil, cerrors.NewUserError(nil, e.Error())
 	}
@@ -336,6 +358,9 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	log.WithField("eventType", "connectorStatus").Info("Verifying capture requirements")
 	var errs = db.SetupPrerequisites(ctx)
+	for _, err := range errs {
+		log.WithError(err).Debug("prerequisite error")
+	}
 
 	// Build a mapping from stream IDs to capture binding information
 	var bindings = make(map[StreamID]*Binding)
@@ -346,6 +371,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		}
 		res.SetDefaults()
 		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
+			log.WithError(err).Debug("prerequisite error")
 			errs = append(errs, err)
 			continue
 		}
@@ -370,6 +396,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	if len(errs) > 0 {
+		log.WithField("count", len(errs)).Debug("prerequisite validation encountered errors")
 		e := &prerequisitesError{errs}
 		return cerrors.NewUserError(nil, e.Error())
 	}
