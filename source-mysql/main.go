@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 
@@ -19,6 +20,7 @@ import (
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -414,6 +416,30 @@ func (db *mysqlDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
 
 func (db *mysqlDatabase) FallbackCollectionKey() []string {
 	return []string{"/_meta/source/cursor"}
+}
+
+func encodeKeyFDB(key, ktype interface{}) (tuple.TupleElement, error) {
+	if columnType, ok := ktype.(*mysqlColumnType); ok {
+		return columnType.encodeKeyFDB(key)
+	} else if typeName, ok := ktype.(string); ok {
+		switch typeName {
+		case "decimal":
+			if val, ok := key.([]byte); ok {
+				// TODO(wgd): This should probably be done in a more principled way, but
+				// this is a viable placeholder solution.
+				return strconv.ParseFloat(string(val), 64)
+			}
+		}
+	}
+	return key, nil
+}
+
+func decodeKeyFDB(t tuple.TupleElement) (interface{}, error) {
+	switch v := t.(type) {
+	case []byte:
+		return string(v), nil
+	}
+	return t, nil
 }
 
 func (db *mysqlDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {

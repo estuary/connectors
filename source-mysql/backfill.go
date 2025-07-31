@@ -122,20 +122,13 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			outputColumnNames = make([]string, len(result.Fields))
 			outputTranscoders = make([]jsonTranscoder, len(result.Fields))
 			rowKeyTranscoders = make([]fdbTranscoder, len(result.Fields))
-			var err error
 			for idx, field := range result.Fields {
 				var colName = string(field.Name)
 				columnNames[idx] = colName
 				outputColumnNames[idx] = colName
-				outputTranscoders[idx], err = db.constructJSONTranscoder(true, columnTypes[colName])
-				if err != nil {
-					return fmt.Errorf("error constructing JSON transcoder for column %q of type %v: %w", colName, columnTypes[colName], err)
-				}
+				outputTranscoders[idx] = db.constructJSONTranscoder(true, columnTypes[colName])
 				if slices.Contains(keyColumns, colName) {
-					rowKeyTranscoders[idx], err = db.constructFDBTranscoder(true, columnTypes[colName])
-					if err != nil {
-						return fmt.Errorf("error constructing FDB transcoder for column %q of type %v: %w", colName, columnTypes[colName], err)
-					}
+					rowKeyTranscoders[idx] = db.constructFDBTranscoder(true, columnTypes[colName])
 				}
 			}
 			outputColumnNames = append(outputColumnNames, "_meta")

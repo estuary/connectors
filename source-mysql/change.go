@@ -247,3 +247,24 @@ func (meta *mysqlChangeMetadata) AppendBeforeJSON(buf []byte) ([]byte, error) {
 func (source *mysqlSourceInfo) AppendJSON(buf []byte) ([]byte, error) {
 	return json.Append(buf, source, 0)
 }
+
+func (db *mysqlDatabase) constructJSONTranscoder(isBackfill bool, columnType any) jsonTranscoder {
+	return jsonTranscoderFunc(func(buf []byte, v any) ([]byte, error) {
+		if translated, err := db.translateRecordField(isBackfill, columnType, v); err != nil {
+			return nil, fmt.Errorf("error translating value %v for JSON serialization: %w", v, err)
+		} else {
+			return json.Append(buf, translated, json.EscapeHTML|json.SortMapKeys)
+		}
+	})
+}
+
+func (db *mysqlDatabase) constructFDBTranscoder(isBackfill bool, columnType any) fdbTranscoder {
+	_ = isBackfill // Currently unused
+	return fdbTranscoderFunc(func(buf []byte, v any) ([]byte, error) {
+		if translated, err := encodeKeyFDB(v, columnType); err != nil {
+			return nil, fmt.Errorf("error translating value %v for FDB serialization: %w", v, err)
+		} else {
+			return sqlcapture.AppendFDB(buf, translated)
+		}
+	})
+}
