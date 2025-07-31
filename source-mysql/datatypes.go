@@ -26,166 +26,171 @@ func (db *mysqlDatabase) constructJSONTranscoder(isBackfill bool, columnType any
 	if columnType, ok := columnType.(*mysqlColumnType); ok {
 		return columnType.constructJSONTranscoder(isBackfill)
 	}
-	return jsonTranscoderFunc(func(buf []byte, val any) ([]byte, error) {
-		switch columnType {
-		case "float":
-			if n, ok := val.(float64); ok {
-				// Converting floats to strings requires accurate knowledge of the float
-				// precision to not be like `123.45600128173828` so a 'float' column must
-				// be truncated back down to float32 here. Note that MySQL translates a
-				// column type like FLOAT(53) where N>23 into a 'double' column type, so
-				// we can trust that the type name here reflects the desired precision.
-				return json.Append(buf, float32(n), 0)
-			} else {
-				return json.Append(buf, val, 0)
-			}
-		case "double":
-			return json.Append(buf, val, 0)
-		case "decimal":
-			if bs, ok := val.([]byte); ok {
-				return json.Append(buf, string(bs), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "bit":
-			if bs, ok := val.([]byte); ok {
-				var acc uint64
-				for _, x := range bs {
-					acc = (acc << 8) | uint64(x)
-				}
-				return json.Append(buf, acc, 0)
-			}
-			return json.Append(buf, val, 0)
-		case "binary", "varbinary":
-			if str, ok := val.(string); ok {
-				val = []byte(str)
-			}
-			if bs, ok := val.([]byte); ok {
-				if len(bs) == 0 {
-					return json.Append(buf, []byte{}, 0)
-				}
-				if len(bs) > truncateColumnThreshold {
-					return json.Append(buf, bs[:truncateColumnThreshold], 0)
-				}
-				return json.Append(buf, bs, 0)
-			}
-			return json.Append(buf, val, 0)
-		case "blob", "tinyblob", "mediumblob", "longblob":
-			if bs, ok := val.([]byte); ok {
-				if len(bs) > truncateColumnThreshold {
-					return json.Append(buf, bs[:truncateColumnThreshold], 0)
-				}
-				return json.Append(buf, bs, 0)
-			}
-			return json.Append(buf, val, 0)
-		case "time":
-			if bs, ok := val.([]byte); ok {
-				// The MySQL client library parsing logic for TIME columns is
-				// kind of dumb and inserts either '-' or '\x00' as the first
-				// byte of a time value. We want to strip off a leading null
-				// if present.
-				if len(bs) > 0 && bs[0] == 0 {
-					bs = bs[1:]
-				}
-				return json.Append(buf, string(bs), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "json":
-			if str, ok := val.(string); ok {
-				if len(str) == 0 {
-					return json.Append(buf, nil, 0) // Translate empty string as null
-				}
-				val = json.RawMessage(str)
-			} else if bs, ok := val.([]byte); ok {
-				if len(bs) == 0 {
-					return json.Append(buf, nil, 0) // Translate empty string as null
-				}
-				val = json.RawMessage(bs)
-			}
-			if bs, ok := val.(json.RawMessage); ok {
-				if len(bs) > truncateColumnThreshold {
-					val = json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(bs)))
-				} else if !json.Valid(bs) {
-					// If the contents of a JSON column are malformed and non-empty we
-					// don't really have any option other than stringifying it. But we
-					// can wrap it in an object with an 'invalidJSON' property so that
-					// there's at least some hope of identifying such values later on.
-					val = map[string]any{"invalidJSON": string(bs)}
-				}
-			}
-			return json.Append(buf, val, json.EscapeHTML|json.SortMapKeys)
-		case "timestamp":
-			if bs, ok := val.([]byte); ok {
-				val = string(bs)
-			}
-			if str, ok := val.(string); ok {
-				// Per the MySQL docs:
-				//
-				//  > Invalid DATE, DATETIME, or TIMESTAMP values are converted to the “zero” value
-				//  > of the appropriate type ('0000-00-00' or '0000-00-00 00:00:00')"
-				//
-				// But month 0 and day 0 don't exist so this can't be parsed and even if
-				// it could it wouldn't be a valid RFC3339 timestamp. Since this is the
-				// "your data is junk" sentinel value we replace it with a similar one
-				// that actually is a valid RFC3339 timestamp.
-				//
-				// MySQL doesn't allow timestamp values with a zero YYYY-MM-DD to have
-				// nonzero fractional seconds, so a simple prefix match can be used.
-				if strings.HasPrefix(str, "0000-00-00 00:00:00") {
-					return json.Append(buf, "0001-01-01T00:00:00Z", 0)
-				}
-				var inputTimestamp = normalizeMySQLTimestamp(str)
-				t, err := time.Parse(mysqlTimestampLayout, inputTimestamp)
-				if err != nil {
-					return nil, fmt.Errorf("error parsing timestamp %q: %w", inputTimestamp, err)
-				}
-				return json.Append(buf, t.Format(time.RFC3339Nano), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "datetime":
-			if bs, ok := val.([]byte); ok {
-				val = string(bs)
-			}
-			if str, ok := val.(string); ok {
-				// See note above in the "timestamp" case about replacing this default sentinel
-				// value with a valid RFC3339 timestamp sentinel value. The same reasoning applies
-				// here for "datetime".
-				if strings.HasPrefix(str, "0000-00-00 00:00:00") {
-					return json.Append(buf, "0001-01-01T00:00:00Z", 0)
-				}
-				if db.datetimeLocation == nil {
-					return nil, fmt.Errorf("unable to translate DATETIME values: %w", errDatabaseTimezoneUnknown)
-				}
-				var inputTimestamp = normalizeMySQLTimestamp(str)
-				t, err := time.ParseInLocation(mysqlTimestampLayout, inputTimestamp, db.datetimeLocation)
-				if err != nil {
-					return nil, fmt.Errorf("error parsing datetime %q: %w", inputTimestamp, err)
-				}
-				return json.Append(buf, t.UTC().Format(time.RFC3339Nano), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "date":
-			if str, ok := val.(string); ok {
-				return json.Append(buf, normalizeMySQLDate(str), 0)
-			} else if bs, ok := val.([]byte); ok {
-				return json.Append(buf, normalizeMySQLDate(string(bs)), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "year":
-			return json.Append(buf, val, 0)
-		case "uuid": // The 'UUID' column type is only in MariaDB
-			if bs, ok := val.([]byte); ok {
-				if parsed, err := uuid.Parse(string(bs)); err == nil {
-					return json.Append(buf, parsed.String(), 0)
-				} else if parsed, err := uuid.FromBytes(bs); err == nil {
-					return json.Append(buf, parsed.String(), 0)
-				} else {
-					return nil, fmt.Errorf("error parsing UUID: %w", err)
-				}
-			}
-			return json.Append(buf, val, 0)
+	return jsonTranscoderFunc(func(buf []byte, v any) ([]byte, error) {
+		if translated, err := db.translateRecordField(isBackfill, columnType, v); err != nil {
+			return nil, fmt.Errorf("error translating value %v for JSON serialization: %w", v, err)
+		} else {
+			return json.Append(buf, translated, json.EscapeHTML|json.SortMapKeys)
 		}
-		return nil, fmt.Errorf("unhandled column type %v with value %[2]v (%[2]T)", columnType, val)
 	}), nil
+}
+
+func (db *mysqlDatabase) translateRecordField(isBackfill bool, columnType any, val any) (any, error) {
+	_ = isBackfill // Currently unused
+
+	switch columnType {
+	case "float":
+		if n, ok := val.(float64); ok {
+			// Converting floats to strings requires accurate knowledge of the float
+			// precision to not be like `123.45600128173828` so a 'float' column must
+			// be truncated back down to float32 here. Note that MySQL translates a
+			// column type like FLOAT(53) where N>23 into a 'double' column type, so
+			// we can trust that the type name here reflects the desired precision.
+			return float32(n), nil
+		} else {
+			return val, nil
+		}
+
+	case "double":
+		return val, nil
+	case "decimal":
+		if bs, ok := val.([]byte); ok {
+			return string(bs), nil
+		}
+		return val, nil
+	case "bit":
+		if bs, ok := val.([]byte); ok {
+			var acc uint64
+			for _, x := range bs {
+				acc = (acc << 8) | uint64(x)
+			}
+			return acc, nil
+		}
+		return val, nil
+	case "binary", "varbinary":
+		if str, ok := val.(string); ok {
+			val = []byte(str)
+		}
+		if bs, ok := val.([]byte); ok && len(bs) > truncateColumnThreshold {
+			return bs[:truncateColumnThreshold], nil
+		}
+		return val, nil
+	case "blob", "tinyblob", "mediumblob", "longblob":
+		if bs, ok := val.([]byte); ok {
+			if len(bs) > truncateColumnThreshold {
+				return bs[:truncateColumnThreshold], nil
+			}
+			return bs, nil
+		}
+		return val, nil
+	case "time":
+		if bs, ok := val.([]byte); ok {
+			// The MySQL client library parsing logic for TIME columns is
+			// kind of dumb and inserts either '-' or '\x00' as the first
+			// byte of a time value. We want to strip off a leading null
+			// if present.
+			if len(bs) > 0 && bs[0] == 0 {
+				bs = bs[1:]
+			}
+			return string(bs), nil
+		}
+		return val, nil
+	case "json":
+		if str, ok := val.(string); ok {
+			if len(str) == 0 {
+				return nil, nil // Translate empty string as null
+			}
+			val = json.RawMessage(str)
+		} else if bs, ok := val.([]byte); ok {
+			if len(bs) == 0 {
+				return nil, nil // Translate empty string as null
+			}
+			val = json.RawMessage(bs)
+		}
+		if bs, ok := val.(json.RawMessage); ok {
+			if len(bs) > truncateColumnThreshold {
+				val = json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(bs)))
+			} else if !json.Valid(bs) {
+				// If the contents of a JSON column are malformed and non-empty we
+				// don't really have any option other than stringifying it. But we
+				// can wrap it in an object with an 'invalidJSON' property so that
+				// there's at least some hope of identifying such values later on.
+				val = map[string]any{"invalidJSON": string(bs)}
+			}
+		}
+		return val, nil
+	case "timestamp":
+		if bs, ok := val.([]byte); ok {
+			val = string(bs)
+		}
+		if str, ok := val.(string); ok {
+			// Per the MySQL docs:
+			//
+			//  > Invalid DATE, DATETIME, or TIMESTAMP values are converted to the “zero” value
+			//  > of the appropriate type ('0000-00-00' or '0000-00-00 00:00:00')"
+			//
+			// But month 0 and day 0 don't exist so this can't be parsed and even if
+			// it could it wouldn't be a valid RFC3339 timestamp. Since this is the
+			// "your data is junk" sentinel value we replace it with a similar one
+			// that actually is a valid RFC3339 timestamp.
+			//
+			// MySQL doesn't allow timestamp values with a zero YYYY-MM-DD to have
+			// nonzero fractional seconds, so a simple prefix match can be used.
+			if strings.HasPrefix(str, "0000-00-00 00:00:00") {
+				return "0001-01-01T00:00:00Z", nil
+			}
+			var inputTimestamp = normalizeMySQLTimestamp(str)
+			t, err := time.Parse(mysqlTimestampLayout, inputTimestamp)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing timestamp %q: %w", inputTimestamp, err)
+			}
+			return t.Format(time.RFC3339Nano), nil
+		}
+		return val, nil
+	case "datetime":
+		if bs, ok := val.([]byte); ok {
+			val = string(bs)
+		}
+		if str, ok := val.(string); ok {
+			// See note above in the "timestamp" case about replacing this default sentinel
+			// value with a valid RFC3339 timestamp sentinel value. The same reasoning applies
+			// here for "datetime".
+			if strings.HasPrefix(str, "0000-00-00 00:00:00") {
+				return "0001-01-01T00:00:00Z", nil
+			}
+			if db.datetimeLocation == nil {
+				return nil, fmt.Errorf("unable to translate DATETIME values: %w", errDatabaseTimezoneUnknown)
+			}
+			var inputTimestamp = normalizeMySQLTimestamp(str)
+			t, err := time.ParseInLocation(mysqlTimestampLayout, inputTimestamp, db.datetimeLocation)
+			if err != nil {
+				return nil, fmt.Errorf("error parsing datetime %q: %w", inputTimestamp, err)
+			}
+			return t.UTC().Format(time.RFC3339Nano), nil
+		}
+		return val, nil
+	case "date":
+		if str, ok := val.(string); ok {
+			return normalizeMySQLDate(str), nil
+		} else if bs, ok := val.([]byte); ok {
+			return normalizeMySQLDate(string(bs)), nil
+		}
+		return val, nil
+	case "year":
+		return val, nil
+	case "uuid": // The 'UUID' column type is only in MariaDB
+		if bs, ok := val.([]byte); ok {
+			if parsed, err := uuid.Parse(string(bs)); err == nil {
+				return parsed.String(), nil
+			} else if parsed, err := uuid.FromBytes(bs); err == nil {
+				return parsed.String(), nil
+			} else {
+				return nil, fmt.Errorf("error parsing UUID: %w", err)
+			}
+		}
+		return val, nil
+	}
+	return nil, fmt.Errorf("unhandled column type %v with value %[2]v (%[2]T)", columnType, val)
 }
 
 func normalizeMySQLTimestamp(ts string) string {
@@ -225,111 +230,115 @@ func normalizeMySQLDate(str string) string {
 }
 
 func (t *mysqlColumnType) constructJSONTranscoder(isBackfill bool) (jsonTranscoder, error) {
-	return jsonTranscoderFunc(func(buf []byte, val any) ([]byte, error) {
-		switch t.Type {
-		case "enum":
-			if index, ok := val.(int64); ok {
-				if 0 <= index && int(index) < len(t.EnumValues) {
-					return json.Append(buf, t.EnumValues[index], 0)
-				}
-				return nil, fmt.Errorf("enum value out of range: index %d does not match known options %q, backfill the table to reinitialize the inconsistent table metadata", index, t.EnumValues)
-			} else if bs, ok := val.([]byte); ok {
-				return json.Append(buf, string(bs), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "set":
-			if bitfield, ok := val.(int64); ok {
-				var acc strings.Builder
-				for idx := 0; idx < len(t.EnumValues); idx++ {
-					if bitfield&(1<<idx) != 0 {
-						if acc.Len() > 0 {
-							acc.WriteByte(',')
-						}
-						acc.WriteString(t.EnumValues[idx])
-					}
-				}
-				return json.Append(buf, acc.String(), 0)
-			} else if bs, ok := val.([]byte); ok {
-				return json.Append(buf, string(bs), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "boolean":
-			if val == nil {
-				return json.Append(buf, nil, 0)
-			}
-			// This is an ugly hack, but it works without requiring a bunch of annoying type
-			// assertions to make sure we handle the possible value types coming from backfills
-			// and from replication, and it's significantly less likely to break in the future.
-			return json.Append(buf, fmt.Sprintf("%d", val) != "0", 0)
-		case "tinyint":
-			if sval, ok := val.(int8); ok && t.Unsigned {
-				return json.Append(buf, uint8(sval), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "smallint":
-			if sval, ok := val.(int16); ok && t.Unsigned {
-				return json.Append(buf, uint16(sval), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "mediumint":
-			if sval, ok := val.(int32); ok && t.Unsigned {
-				// A MySQL 'MEDIUMINT' is a 24-bit integer value which is stored into an int32 by the client library,
-				// so we convert to a uint32 and mask off any sign-extended upper bits.
-				return json.Append(buf, uint32(sval)&0x00FFFFFF, 0)
-			}
-			return json.Append(buf, val, 0)
-		case "int":
-			if sval, ok := val.(int32); ok && t.Unsigned {
-				return json.Append(buf, uint32(sval), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "bigint":
-			if sval, ok := val.(int64); ok && t.Unsigned {
-				return json.Append(buf, uint64(sval), 0)
-			}
-			return json.Append(buf, val, 0)
-		case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
-			if str, ok := val.(string); ok {
-				return json.Append(buf, str, 0)
-			} else if bs, ok := val.([]byte); ok {
-				if isBackfill {
-					// Backfills always return string results as UTF-8
-					return json.Append(buf, string(bs), 0)
-				}
-				var str, err = decodeBytesToString(t.Charset, bs)
-				if err != nil {
-					return nil, err
-				}
-				return json.Append(buf, str, 0)
-			} else if val == nil {
-				return json.Append(buf, nil, 0)
-			}
-			return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
-		case "binary":
-			if str, ok := val.(string); ok {
-				// Binary column values arriving via replication are decoded into a string (which
-				// is not valid UTF-8, it's just an immutable sequence of bytes), so we cast that
-				// back to []byte so we can handle backfill / replication values consistently.
-				val = []byte(str)
-			}
-			if bs, ok := val.([]byte); ok {
-				if len(bs) < t.MaxLength {
-					// Binary column values are stored in the binlog with trailing nulls removed,
-					// and returned from backfill queries with the trailing nulls. We have to either
-					// strip or pad the values to make these match, and since BINARY(N) is a fixed-
-					// length column type the obvious most-correct answer is probably to zero-pad
-					// the replicated values back up to the column size.
-					bs = append(bs, make([]byte, t.MaxLength-len(bs))...)
-				}
-				if len(bs) > truncateColumnThreshold {
-					bs = bs[:truncateColumnThreshold]
-				}
-				return json.Append(buf, bs, 0)
-			}
-			return json.Append(buf, val, 0)
+	return jsonTranscoderFunc(func(buf []byte, v any) ([]byte, error) {
+		if translated, err := t.translateRecordField(isBackfill, v); err != nil {
+			return nil, fmt.Errorf("error translating value %v for JSON serialization: %w", v, err)
+		} else {
+			return json.Append(buf, translated, json.EscapeHTML|json.SortMapKeys)
 		}
-		return nil, fmt.Errorf("unhandled complex column type %v with value %[2]v (%[2]T)", t.Type, val)
 	}), nil
+}
+
+func (t *mysqlColumnType) translateRecordField(isBackfill bool, val any) (any, error) {
+	switch t.Type {
+	case "enum":
+		if index, ok := val.(int64); ok {
+			if 0 <= index && int(index) < len(t.EnumValues) {
+				return t.EnumValues[index], nil
+			}
+			return "", fmt.Errorf("enum value out of range: index %d does not match known options %q, backfill the table to reinitialize the inconsistent table metadata", index, t.EnumValues)
+		} else if bs, ok := val.([]byte); ok {
+			return string(bs), nil
+		}
+		return val, nil
+	case "set":
+		if bitfield, ok := val.(int64); ok {
+			var acc strings.Builder
+			for idx := 0; idx < len(t.EnumValues); idx++ {
+				if bitfield&(1<<idx) != 0 {
+					if acc.Len() > 0 {
+						acc.WriteByte(',')
+					}
+					acc.WriteString(t.EnumValues[idx])
+				}
+			}
+			return acc.String(), nil
+		} else if bs, ok := val.([]byte); ok {
+			return string(bs), nil
+		}
+		return val, nil
+	case "boolean":
+		if val == nil {
+			return nil, nil
+		}
+		// This is an ugly hack, but it works without requiring a bunch of annoying type
+		// assertions to make sure we handle the possible value types coming from backfills
+		// and from replication, and it's significantly less likely to break in the future.
+		return fmt.Sprintf("%d", val) != "0", nil
+	case "tinyint":
+		if sval, ok := val.(int8); ok && t.Unsigned {
+			return uint8(sval), nil
+		}
+		return val, nil
+	case "smallint":
+		if sval, ok := val.(int16); ok && t.Unsigned {
+			return uint16(sval), nil
+		}
+		return val, nil
+	case "mediumint":
+		if sval, ok := val.(int32); ok && t.Unsigned {
+			// A MySQL 'MEDIUMINT' is a 24-bit integer value which is stored into an int32 by the client library,
+			// so we convert to a uint32 and mask off any sign-extended upper bits.
+			return uint32(sval) & 0x00FFFFFF, nil
+		}
+		return val, nil
+	case "int":
+		if sval, ok := val.(int32); ok && t.Unsigned {
+			return uint32(sval), nil
+		}
+		return val, nil
+	case "bigint":
+		if sval, ok := val.(int64); ok && t.Unsigned {
+			return uint64(sval), nil
+		}
+		return val, nil
+	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
+		if str, ok := val.(string); ok {
+			return str, nil
+		} else if bs, ok := val.([]byte); ok {
+			if isBackfill {
+				// Backfills always return string results as UTF-8
+				return string(bs), nil
+			}
+			return decodeBytesToString(t.Charset, bs)
+		} else if val == nil {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("internal error: text column value must be bytes or nil: got %v", val)
+	case "binary":
+		if str, ok := val.(string); ok {
+			// Binary column values arriving via replication are decoded into a string (which
+			// is not valid UTF-8, it's just an immutable sequence of bytes), so we cast that
+			// back to []byte so we can handle backfill / replication values consistently.
+			val = []byte(str)
+		}
+		if bs, ok := val.([]byte); ok {
+			if len(bs) < t.MaxLength {
+				// Binary column values are stored in the binlog with trailing nulls removed,
+				// and returned from backfill queries with the trailing nulls. We have to either
+				// strip or pad the values to make these match, and since BINARY(N) is a fixed-
+				// length column type the obvious most-correct answer is probably to zero-pad
+				// the replicated values back up to the column size.
+				bs = append(bs, make([]byte, t.MaxLength-len(bs))...)
+			}
+			if len(bs) > truncateColumnThreshold {
+				bs = bs[:truncateColumnThreshold]
+			}
+			return bs, nil
+		}
+		return val, nil
+	}
+	return nil, fmt.Errorf("unhandled complex column type %v with value %[2]v (%[2]T)", t.Type, val)
 }
 
 func (db *mysqlDatabase) constructFDBTranscoder(isBackfill bool, columnType any) (fdbTranscoder, error) {
