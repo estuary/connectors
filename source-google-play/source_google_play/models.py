@@ -21,10 +21,6 @@ from pydantic import AwareDatetime, BaseModel, Field, model_validator, Validatio
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
-# Valid bucket names for Google Cloud Storage that contain Google Play data start with "pubsite_prod_rev".
-BUCKET_REGEX = r"^pubsite_prod_rev.*$"
-
-
 GOOGLE_SPEC = GoogleServiceAccountSpec(
     scopes=[
         "https://www.googleapis.com/auth/devstorage.read_only",
@@ -39,9 +35,8 @@ def default_start_date():
 
 class EndpointConfig(BaseModel):
     bucket: str = Field(
-        description="The bucket containing your Google Play data. The bucket starts with pubsite_prod_rev. For example, pubsite_prod_rev_01234567890987654321.",
+        description="The bucket containing your Google Play data. The bucket starts with pubsite_prod. For example, pubsite_prod_<some_identifier>.",
         title="Bucket",
-        pattern=BUCKET_REGEX,
     )
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
