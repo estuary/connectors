@@ -332,7 +332,7 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 		s.lastPbrtCheckpoint = time.Now()
 	}
 
-	// TODO(whb). Temporary logging for the experimental `extractTimestamp`
+	// TODO(whb): Temporary logging for the experimental `extractTimestamp`
 	// function. This is not intended to be permanent, and should be removed
 	// after sufficiently verifying that `extractTimestamp` works (or doesn't).
 	if log.GetLevel() == log.DebugLevel {
@@ -572,8 +572,8 @@ func resourceId(database string, collection string) string {
 // bytes of the resume take contain a 4-byte timestamp and a 4-byte increment,
 // which are used to create a primitive.Timestamp.
 //
-// MongoDB resume tokens are sortable by timestamp, so this structure is
-// expected to stay stable.
+// When sorted, MongoDB resume tokens are in timestamp order, so this structure
+// is expected to stay stable.
 func extractTimestamp(token bson.Raw) (primitive.Timestamp, error) {
 	dataValue, err := token.LookupErr("_data")
 	if err != nil {
@@ -594,7 +594,7 @@ func extractTimestamp(token bson.Raw) (primitive.Timestamp, error) {
 		return primitive.Timestamp{}, fmt.Errorf("token payload %d too short for timestamp extraction", l)
 	}
 
-	// Extract timestamp (bytes 1-4) and increment (bytes 5-8) manually
+	// Extract timestamp (bytes 1-4) and increment (bytes 5-8).
 	timestampSeconds := binary.BigEndian.Uint32(payloadBytes[1:5])
 	increment := binary.BigEndian.Uint32(payloadBytes[5:9])
 
