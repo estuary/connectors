@@ -197,7 +197,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
 		// backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections); err != nil {
+		if streams, err := c.initializeStreams(ctx, changeStreamBindings, serverInfo.supportsPreImages, cfg.MergeUpdates, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections); err != nil {
 			return err
 		} else if err := coordinator.startCatchingUp(ctx); err != nil {
 			return err
@@ -215,7 +215,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if len(changeStreamBindings) > 0 {
 		log.Info("streaming change events indefinitely")
-		streams, err := c.initializeStreams(groupCtx, changeStreamBindings, serverInfo.supportsPreImages, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections)
+		streams, err := c.initializeStreams(groupCtx, changeStreamBindings, serverInfo.supportsPreImages, cfg.MergeUpdates, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections)
 		if err != nil {
 			return err
 		}

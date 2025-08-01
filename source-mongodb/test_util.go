@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -22,15 +21,15 @@ var (
 
 func testClient(t *testing.T) (*mongo.Client, config) {
 	t.Helper()
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
-		return nil, config{}
-	}
+	// if os.Getenv("TEST_DATABASE") != "yes" {
+	// 	t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
+	// 	return nil, config{}
+	// }
 
 	ctx := context.Background()
 
 	config := config{
-		Address:  *address,
+		Address:  "mongodb://flow:flow@localhost:27017/?directConnection=true",
 		User:     *user,
 		Password: *password,
 		Database: *database,

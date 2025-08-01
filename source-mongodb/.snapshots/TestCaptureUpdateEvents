@@ -1,0 +1,16 @@
+# ================================
+# Collection "acmeCo/test/testCollection": 8 Documents
+# ================================
+{"_id":"1: update top-level field","_meta":{"op":"c","source":{"db":"testDb","collection":"testCollection","snapshot":true}},"field":"value","other":"value"}
+{"_id":"2: update nested","_meta":{"op":"c","source":{"db":"testDb","collection":"testCollection","snapshot":true}},"field":"value","top":{"nested":{"field":"value"}}}
+{"_id":"3: update top-level field with dots","_meta":{"op":"c","source":{"db":"testDb","collection":"testCollection","snapshot":true}},"field":"value","field.with.dots":"value.with.dots"}
+{"_id":"4: update nested field with dots","_meta":{"op":"c","source":{"db":"testDb","collection":"testCollection","snapshot":true}},"other":"value","top":{"nested.field":"nested.value.with.dots"}}
+{"_id":"1: update top-level field","_meta":{"op":"u","source":{"db":"testDb","collection":"testCollection"}},"field":"value_updated"}
+{"_id":"2: update nested","_meta":{"op":"u","source":{"db":"testDb","collection":"testCollection"}},"top":{"nested":{"field":"value_updated"}}}
+{"_id":"3: update top-level field with dots","_meta":{"op":"u","source":{"db":"testDb","collection":"testCollection"}},"field.with.dots":"value.with.dots_updated"}
+{"_id":"4: update nested field with dots","_meta":{"op":"u","source":{"db":"testDb","collection":"testCollection"}},"top":{"other.field":"nested.value.with.dots_updated"}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"testDb%2FtestCollection":{"backfill":{"backfilled_docs":4,"done":true,"last_id":{"Type":2,"Value":"<TOKEN>"},"last_poll_start":"<LAST_POLLED_TS>"}}},"databaseResumeTokens":{"testDb":"<TOKEN>"}}
+

@@ -356,6 +356,205 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
+func TestCaptureUpdateEvents(t *testing.T) {
+	database := "testDb"
+	col := "testCollection"
+
+	ctx := context.Background()
+	client, cfg := testClient(t)
+	cfg.MergeUpdates = true
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   []byte("{}"),
+		Validator:    &st.OrderedCaptureValidator{},
+		Sanitizers:   commonSanitizers(),
+		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col, captureModeChangeStream, "")},
+	}
+
+	collection := client.Database(database).Collection(col)
+
+	testCases := []struct {
+		name   string
+		base   bson.M
+		update any
+	}{
+		// // Updates.
+		// {
+		// 	name: "update top-level field",
+		// 	base: bson.M{
+		// 		"field": "value",
+		// 		"other": "value",
+		// 	},
+		// 	update: bson.M{"$set": bson.M{"field": "value_updated"}},
+		// },
+		// {
+		// 	name: "update nested",
+		// 	base: bson.M{
+		// 		"field": "value",
+		// 		"top": bson.M{
+		// 			"nested": bson.M{
+		// 				"field": "value",
+		// 			},
+		// 		},
+		// 	},
+		// 	update: bson.M{"$set": bson.M{"top.nested.field": "value_updated"}},
+		// },
+		// {
+		// 	name: "update top-level field with dots",
+		// 	base: bson.M{
+		// 		"field":           "value",
+		// 		"field.with.dots": "value.with.dots",
+		// 	},
+		// 	update: bson.A{bson.M{
+		// 		"$replaceWith": bson.M{
+		// 			"$setField": bson.M{
+		// 				"field": "field.with.dots",
+		// 				"input": "$$ROOT",
+		// 				"value": "value.with.dots_updated",
+		// 			},
+		// 		},
+		// 	}},
+		// },
+		// {
+		// 	name: "update nested field with dots",
+		// 	base: bson.M{
+		// 		"top": bson.M{
+		// 			"nested.field": "nested.value.with.dots",
+		// 		},
+		// 		"other": "value",
+		// 	},
+		// 	update: bson.A{bson.M{
+		// 		"$set": bson.M{
+		// 			"top": bson.M{
+		// 				"$setField": bson.M{
+		// 					"field": "other.field",
+		// 					"input": "$top",
+		// 					"value": "nested.value.with.dots_updated",
+		// 				},
+		// 			},
+		// 		},
+		// 	}},
+		// },
+
+		// // Deletes.
+		{
+			name: "delete top-level field",
+			base: bson.M{
+				"field": "value",
+				"other": "value",
+			},
+			update: bson.M{"$unset": bson.M{"field": ""}},
+		},
+		// {
+		// 	name: "delete nested",
+		// 	base: bson.M{
+		// 		"field": "value",
+		// 		"top": bson.M{
+		// 			"nested": bson.M{
+		// 				"field": "value",
+		// 			},
+		// 		},
+		// 	},
+		// 	update: bson.M{"$unset": bson.M{"top.nested.field": ""}},
+		// },
+		// {
+		// 	name: "delete top-level field with dots",
+		// 	base: bson.M{
+		// 		"field":           "value",
+		// 		"field.with.dots": "value.with.dots",
+		// 	},
+		// 	update: bson.A{bson.M{
+		// 		"$replaceWith": bson.M{
+		// 			"$unsetField": bson.M{
+		// 				"field": "field.with.dots",
+		// 				"input": "$$ROOT",
+		// 			},
+		// 		},
+		// 	}},
+		// },
+
+		// {
+		// 	name: "delete nested field with dots",
+		// 	base: bson.M{
+		// 		"top": bson.M{
+		// 			"nested.field": "nested.value.with.dots",
+		// 			"other":        "value",
+		// 		},
+		// 		"other": "value",
+		// 	},
+		// 	update: bson.A{bson.M{
+		// 		"$set": bson.M{
+		// 			"top": bson.M{
+		// 				"$unsetField": bson.M{
+		// 					"field": "nested.field",
+		// 					"input": "$top",
+		// 				},
+		// 			},
+		// 		},
+		// 	}},
+		// },
+
+		// {
+		// 	name: "delete nested field",
+		// 	base: bson.M{
+		// 		"top": bson.M{
+		// 			"nested": "a",
+		// 			"f":      "b",
+		// 		},
+		// 		"other": "value",
+		// 	},
+		// 	update: bson.M{"$unset": bson.M{"top.nested": ""}},
+		// },
+
+		// {
+		// 	name: "update nested",
+		// 	base: bson.M{
+		// 		"top": bson.M{
+		// 			"nested.field": "nested.value.with.dots",
+		// 			"other":        "value",
+		// 		},
+		// 		"other": "value",
+		// 	},
+		// 	update: bson.M{"$set": bson.M{"top.other": "value_updated"}},
+		// },
+	}
+
+	for idx, tc := range testCases {
+		tc.base["_id"] = fmt.Sprintf("%d: %s", idx+1, tc.name)
+		_, err := collection.InsertOne(ctx, tc.base)
+		require.NoError(t, err)
+	}
+
+	// Initial backfill of test data.
+	advanceCapture(ctx, t, cs)
+
+	// Perform updates and capture the resulting updated documents.
+	for _, tc := range testCases {
+		_, err := collection.UpdateOne(ctx, bson.M{"_id": tc.base["_id"]}, tc.update)
+		require.NoError(t, err)
+	}
+
+	captureCtx, cancel := context.WithCancel(ctx)
+	time.AfterFunc(5*time.Second, cancel)
+	count := 0
+	cs.Capture(captureCtx, t, func(msg json.RawMessage) {
+		count++
+		if count == len(testCases)*2 { // document + checkpoint for each one
+			cancel()
+		}
+	})
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
 func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 	database1 := "testDb1"
 	database2 := "testDb2"

@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
@@ -32,6 +33,13 @@ type namespace struct {
 	Collection string `bson:"coll"`
 }
 
+type updateDescription struct {
+	DisambiguatedPaths map[string][]string `bson:"disambiguatedPaths"`
+	RemovedFields      []string            `bson:"removedFields"`
+	TruncatedArrays    []string            `bson:"truncatedArrays"`
+	UpdatedFields      bson.M              `bson:"updatedFields"`
+}
+
 type bsonFields struct {
 	DocumentKey              docKey              `bson:"documentKey"`
 	OperationType            string              `bson:"operationType"`
@@ -39,6 +47,7 @@ type bsonFields struct {
 	FullDocumentBeforeChange bson.M              `bson:"fullDocumentBeforeChange"`
 	Ns                       namespace           `bson:"ns"`
 	ClusterTime              primitive.Timestamp `bson:"clusterTime"`
+	UpdateDescription        *updateDescription  `bson:"updateDescription"`
 }
 
 type changeEvent struct {
@@ -54,6 +63,7 @@ func (c *capture) initializeStreams(
 	ctx context.Context,
 	changeStreamBindings []bindingInfo,
 	requestPreImages bool,
+	mergeUpdates bool,
 	exclusiveCollectionFilter bool,
 	excludeCollections map[string][]string,
 ) ([]changeStream, error) {
@@ -68,21 +78,37 @@ func (c *capture) initializeStreams(
 	for _, db := range databasesForBindings(changeStreamBindings) {
 		logEntry := log.WithField("db", db)
 
-		// Use a pipeline to project the fields we need from the change stream. Importantly, this
-		// suppresses fields like `updateDescription`, which contain a list of fields in the document
-		// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
-		// `updateDescription`, which can cause the change stream total BSON document size to exceed the
-		// 16MB limit.
-		pl := mongo.Pipeline{
-			{{Key: "$project", Value: bson.M{
-				"documentKey":              1,
-				"operationType":            1,
-				"fullDocument":             1,
-				"ns":                       1,
-				"clusterTime":              1,
-				"fullDocumentBeforeChange": 1,
-				"splitEvent":               1,
-			}}},
+		var pl mongo.Pipeline
+		if !mergeUpdates {
+			// Use a pipeline to project the fields we need from the change stream. Importantly, this
+			// suppresses fields like `updateDescription`, which contain a list of fields in the document
+			// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
+			// `updateDescription`, which can cause the change stream total BSON document size to exceed the
+			// 16MB limit.
+			pl = mongo.Pipeline{
+				{{Key: "$project", Value: bson.M{
+					"documentKey":              1,
+					"operationType":            1,
+					"fullDocument":             1,
+					"ns":                       1,
+					"clusterTime":              1,
+					"fullDocumentBeforeChange": 1,
+					"splitEvent":               1,
+				}}},
+			}
+		} else {
+			pl = mongo.Pipeline{
+				{{Key: "$project", Value: bson.M{
+					"documentKey":              1,
+					"operationType":            1,
+					"fullDocument":             1, // Full document is still required for replacements
+					"updateDescription":        1, // Get the update description for updates
+					"ns":                       1,
+					"clusterTime":              1,
+					"fullDocumentBeforeChange": 1,
+					"splitEvent":               1,
+				}}},
+			}
 		}
 
 		if exclusiveCollectionFilter {
@@ -109,7 +135,13 @@ func (c *capture) initializeStreams(
 			}}}})
 		}
 
-		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
+		opts := options.ChangeStream()
+		if mergeUpdates {
+			opts = opts.SetShowExpandedEvents(true)
+		} else {
+			opts = opts.SetFullDocument(options.UpdateLookup)
+		}
+
 		if requestPreImages {
 			opts = opts.SetFullDocumentBeforeChange(options.WhenAvailable)
 			pl = append(pl, bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}) // must be the last stage in the pipeline
@@ -368,7 +400,7 @@ func (c *capture) readEvent(
 		// Event is not for a tracked operation type.
 		log.WithFields(logFields).Debug("discarding event with un-tracked operation")
 		return
-	} else if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil {
+	} else if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil && ev.fields.UpdateDescription == nil {
 		// FullDocument can be "null" for non-deletion events if another
 		// operation has deleted the document. This happens because update
 		// change events do not hold a copy of the full document, but rather
@@ -457,14 +489,23 @@ func makeEventDocument(ev changeEvent, database string, collection string) (json
 		} else if fields.OperationType == "insert" {
 			meta[opProperty] = "c"
 		}
-		doc = fields.FullDocument
+		if fields.FullDocument != nil {
+			doc = fields.FullDocument
+		} else {
+			var err error
+			if doc, err = documentFromUpdateDescription(fields.UpdateDescription); err != nil {
+				return nil, fmt.Errorf("constructing document from update description: %w", err)
+			}
+
+		}
 	case "delete":
 		meta[opProperty] = "d"
-		doc = map[string]any{idProperty: fields.DocumentKey.Id}
+		doc = map[string]any{}
 	default:
 		return nil, fmt.Errorf("unknown operation: %q", fields.OperationType)
 	}
 
+	doc[idProperty] = fields.DocumentKey.Id
 	doc[metaProperty] = meta
 
 	docBytes, err := json.Marshal(sanitizeDocument(doc))
@@ -473,6 +514,64 @@ func makeEventDocument(ev changeEvent, database string, collection string) (json
 	}
 
 	return docBytes, nil
+}
+
+func documentFromUpdateDescription(desc *updateDescription) (map[string]any, error) {
+	j, _ := json.MarshalIndent(desc, "", "  ")
+	fmt.Println(string(j))
+
+	out := make(map[string]any)
+
+	disambiguatedPaths := desc.DisambiguatedPaths
+	if disambiguatedPaths == nil {
+		disambiguatedPaths = make(map[string][]string)
+	}
+
+	for p, v := range desc.UpdatedFields {
+		c := out
+
+		var parts []string
+		if d, ok := disambiguatedPaths[p]; ok {
+			parts = d
+		} else {
+			parts = strings.Split(p, ".")
+		}
+
+		for idx, pp := range parts {
+			if idx == len(parts)-1 {
+				c[pp] = v
+				break
+			}
+			if _, ok := c[pp]; !ok {
+				c[pp] = make(map[string]any)
+			}
+			c = c[pp].(map[string]any)
+		}
+	}
+
+	for _, p := range desc.RemovedFields {
+		c := out
+
+		var parts []string
+		if d, ok := disambiguatedPaths[p]; ok {
+			parts = d
+		} else {
+			parts = strings.Split(p, ".")
+		}
+
+		for idx, pp := range parts {
+			if idx == len(parts)-1 {
+				c[pp] = nil
+				break
+			}
+			if _, ok := c[pp]; !ok {
+				c[pp] = make(map[string]any)
+			}
+			c = c[pp].(map[string]any)
+		}
+	}
+
+	return out, nil
 }
 
 func (c *capture) changeStreamProgress() (int, int, map[string]primitive.Timestamp) {
