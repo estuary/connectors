@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"time"
@@ -330,6 +332,44 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 		s.lastPbrtCheckpoint = time.Now()
 	}
 
+	// TODO(whb): Temporary logging for the experimental `extractTimestamp`
+	// function. This is not intended to be permanent, and should be removed
+	// after sufficiently verifying that `extractTimestamp` works (or doesn't).
+	if log.GetLevel() == log.DebugLevel {
+		if !lastOpTime.IsZero() {
+			if exTs, err := extractTimestamp(lastToken); err != nil {
+				log.WithFields(log.Fields{
+					"db":         s.db,
+					"lastToken":  lastToken,
+					"finalToken": finalToken,
+					"lastOpTime": lastOpTime,
+				}).WithError(err).Debug("failed to extract timestamp from resume token")
+			} else {
+				log.WithFields(log.Fields{
+					"db":         s.db,
+					"lastToken":  lastToken,
+					"finalToken": finalToken,
+					"lastOpTime": lastOpTime,
+					"exTs":       exTs,
+					"matches":    exTs.Equal(lastOpTime),
+				}).Debug("extracted timestamp from resume token")
+			}
+		} else {
+			if exTs, err := extractTimestamp(finalToken); err != nil {
+				log.WithFields(log.Fields{
+					"db":         s.db,
+					"finalToken": finalToken,
+				}).WithError(err).Debug("failed to extract timestamp from pbrt")
+			} else {
+				log.WithFields(log.Fields{
+					"db":         s.db,
+					"finalToken": finalToken,
+					"exTs":       exTs,
+				}).WithError(err).Debug("extracted timestamp from pbrt")
+			}
+		}
+	}
+
 	c.mu.Lock()
 	c.state.DatabaseResumeTokens[s.db] = finalToken
 	c.processedStreamEvents += events
@@ -526,4 +566,37 @@ func (c *capture) changeStreamProgress() (int, int, map[string]primitive.Timesta
 
 func resourceId(database string, collection string) string {
 	return fmt.Sprintf("%s.%s", database, collection)
+}
+
+// extractTimestamp extracts the timestamp from a resume token. The hex-encoded
+// bytes of the resume take contain a 4-byte timestamp and a 4-byte increment,
+// which are used to create a primitive.Timestamp.
+//
+// When sorted, MongoDB resume tokens are in timestamp order, so this structure
+// is expected to stay stable.
+func extractTimestamp(token bson.Raw) (primitive.Timestamp, error) {
+	dataValue, err := token.LookupErr("_data")
+	if err != nil {
+		return primitive.Timestamp{}, fmt.Errorf("_data field not found in resume token")
+	}
+
+	dataString, ok := dataValue.StringValueOK()
+	if !ok {
+		return primitive.Timestamp{}, fmt.Errorf("_data field of type %q was not a string", dataValue.Type.String())
+	}
+
+	payloadBytes, err := hex.DecodeString(dataString)
+	if err != nil {
+		return primitive.Timestamp{}, fmt.Errorf("failed to hex-decode token payload: %w", err)
+	}
+
+	if l := len(payloadBytes); l < 9 {
+		return primitive.Timestamp{}, fmt.Errorf("token payload %d too short for timestamp extraction", l)
+	}
+
+	// Extract timestamp (bytes 1-4) and increment (bytes 5-8).
+	timestampSeconds := binary.BigEndian.Uint32(payloadBytes[1:5])
+	increment := binary.BigEndian.Uint32(payloadBytes[5:9])
+
+	return primitive.Timestamp{T: timestampSeconds, I: increment}, nil
 }
