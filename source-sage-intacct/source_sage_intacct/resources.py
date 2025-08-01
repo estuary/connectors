@@ -37,13 +37,13 @@ INCREMENTAL_OBJECTS = {
     "VENDOR",
     "TRXCURRENCIES",
     "GLJOURNAL",
-    "PROJECT",
     "ITEM",
     "TASK",
 }
 
 SNAPSHOT_OBJECTS = {
     "COMPANYPREF",
+    "PROJECT",
 }
 
 # TODO: For "TAXSOLUTION", we don't have access to test this object, so we don't
