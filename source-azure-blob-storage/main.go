@@ -249,6 +249,7 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 
 	l.page = page
 	l.currentPageLength = len(page.Segment.BlobItems)
+	l.index = 0
 
 	return &page, nil
 }
