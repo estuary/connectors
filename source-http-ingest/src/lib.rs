@@ -158,41 +158,44 @@ fn schema_for<T: JsonSchema>() -> RootSchema {
 
 pub async fn run_connector(
     mut stdin: io::BufReader<io::Stdin>,
-    stdout: io::Stdout,
+    mut stdout: io::Stdout,
 ) -> Result<(), anyhow::Error> {
-    let req = read_capture_request(&mut stdin)
-        .await
-        .context("reading request")?;
-    let Request {
-        spec,
-        discover,
-        validate,
-        apply,
-        open,
-        ..
-    } = req;
-    if let Some(_) = spec {
-        return do_spec(stdout).await;
+    while let Some(req) = read_capture_request(&mut stdin).await? {
+        let Request {
+            spec,
+            discover,
+            validate,
+            apply,
+            open,
+            ..
+        } = &req;
+
+        if let Some(_) = spec {
+            () = do_spec(&mut stdout).await?;
+        } else if let Some(discover_req) = discover {
+            () = do_discover(&discover_req.config_json, &mut stdout).await?;
+        } else if let Some(validate_req) = validate {
+            () = do_validate(
+                &validate_req.config_json,
+                &validate_req.bindings,
+                &mut stdout,
+            )
+            .await?;
+        } else if let Some(_) = apply {
+            () = do_apply(&mut stdout).await?;
+        } else if let Some(open_req) = open {
+            return do_pull(open_req, stdin, stdout).await;
+        } else {
+            return Err(anyhow::anyhow!(
+                "expected spec|discover|validate|apply|open, but received {req:?}"
+            ));
+        }
     }
-    if let Some(discover_req) = discover {
-        return do_discover(&discover_req.config_json, stdout).await;
-    }
-    if let Some(validate_req) = validate {
-        return do_validate(&validate_req.config_json, &validate_req.bindings, stdout).await;
-    }
-    if let Some(_) = apply {
-        return do_apply(stdout).await;
-    }
-    if let Some(open_req) = open {
-        return do_pull(open_req, stdin, stdout).await;
-    }
-    Err(anyhow::anyhow!(
-        "invalid request, expected spec|discover|validate|apply|open"
-    ))
+    Ok(())
 }
 
 async fn do_pull(
-    Open { capture, .. }: Open,
+    Open { capture, .. }: &Open,
     stdin: io::BufReader<io::Stdin>,
     mut stdout: io::Stdout,
 ) -> anyhow::Result<()> {
@@ -236,7 +239,7 @@ async fn do_pull(
     server::run_server(config, typed_bindings, stdin, stdout).await
 }
 
-async fn do_apply(mut stdout: io::Stdout) -> anyhow::Result<()> {
+async fn do_apply(stdout: &mut io::Stdout) -> anyhow::Result<()> {
     // There's nothing to apply
     write_capture_response(
         Response {
@@ -245,12 +248,12 @@ async fn do_apply(mut stdout: io::Stdout) -> anyhow::Result<()> {
             }),
             ..Default::default()
         },
-        &mut stdout,
+        stdout,
     )
     .await
 }
 
-async fn do_spec(mut stdout: io::Stdout) -> anyhow::Result<()> {
+async fn do_spec(stdout: &mut io::Stdout) -> anyhow::Result<()> {
     let config_schema_json = serde_json::to_string(&schema_for::<EndpointConfig>())?;
     let resource_config_schema_json = serde_json::to_string(&schema_for::<ResourceConfig>())?;
     let response = Response {
@@ -264,10 +267,10 @@ async fn do_spec(mut stdout: io::Stdout) -> anyhow::Result<()> {
         }),
         ..Default::default()
     };
-    write_capture_response(response, &mut stdout).await
+    write_capture_response(response, stdout).await
 }
 
-async fn do_discover(config: &str, mut stdout: io::Stdout) -> anyhow::Result<()> {
+async fn do_discover(config: &str, stdout: &mut io::Stdout) -> anyhow::Result<()> {
     let config =
         serde_json::from_str::<EndpointConfig>(config).context("parsing endpoint config")?;
     let discovered = generate_discover_response(config)?;
@@ -275,7 +278,7 @@ async fn do_discover(config: &str, mut stdout: io::Stdout) -> anyhow::Result<()>
         discovered: Some(discovered),
         ..Default::default()
     };
-    write_capture_response(response, &mut stdout).await
+    write_capture_response(response, stdout).await
 }
 
 fn generate_discover_response(endpoint_config: EndpointConfig) -> anyhow::Result<Discovered> {
@@ -292,7 +295,7 @@ fn generate_discover_response(endpoint_config: EndpointConfig) -> anyhow::Result
 async fn do_validate(
     config: &str,
     bindings: &[ValidateBinding],
-    mut stdout: io::Stdout,
+    stdout: &mut io::Stdout,
 ) -> anyhow::Result<()> {
     let config =
         serde_json::from_str::<EndpointConfig>(config).context("deserializing endpoint config")?;
@@ -357,20 +360,22 @@ async fn do_validate(
         validated: Some(Validated { bindings: output }),
         ..Default::default()
     };
-    write_capture_response(response, &mut stdout).await
+    write_capture_response(response, stdout).await
 }
 
-pub async fn read_capture_request(stdin: &mut io::BufReader<io::Stdin>) -> anyhow::Result<Request> {
+pub async fn read_capture_request(
+    stdin: &mut io::BufReader<io::Stdin>,
+) -> anyhow::Result<Option<Request>> {
     let mut buf = String::with_capacity(4096);
     stdin
         .read_line(&mut buf)
         .await
         .context("reading next request line")?;
-    if buf.trim().is_empty() {
-        anyhow::bail!("unexpected EOF reading request from stdin");
+
+    match buf.is_empty() {
+        true => Ok(None),
+        false => Ok(serde_json::from_str(&buf).context("deserializing request")?),
     }
-    let deser = serde_json::from_str(&buf).context("deserializing request")?;
-    Ok(deser)
 }
 
 /// Writes the response to stdout, and waits to a flush to complete. The flush ensures that the complete

@@ -16,7 +16,7 @@ use tokio::{
 pub struct Acknowledgements(io::BufReader<io::Stdin>);
 impl Acknowledgements {
     pub async fn next_ack(&mut self) -> anyhow::Result<u32> {
-        let req = read_capture_request(&mut self.0).await?;
+        let req = read_capture_request(&mut self.0).await?.context("expected acknowledgement, not EOF")?;
         let Some(ack) = req.acknowledge else {
             anyhow::bail!("expected Acknowledge message, got: {:?}", req);
         };
