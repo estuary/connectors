@@ -3,9 +3,10 @@ import aiocsv.protocols
 import codecs
 import csv
 import sys
-from typing import Any, AsyncGenerator, Dict, Generic, Optional, TypeVar
+from typing import Any, AsyncGenerator, ClassVar, Generic, Optional, TypeVar
 from dataclasses import dataclass
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
+from estuary_cdk.capture.common import BaseDocument
 
 
 StreamedItem = TypeVar("StreamedItem", bound=BaseModel)
@@ -15,6 +16,30 @@ StreamedItem = TypeVar("StreamedItem", bound=BaseModel)
 # than that limit. Some users have CSVs with fields larger than 131,072
 # bytes, so we max out the limit.
 csv.field_size_limit(sys.maxsize)
+
+
+# BaseCSVRow is a convenience class that automatically handles
+# replacing null representations in CSVs with None.
+class BaseCSVRow(BaseDocument):
+    # NULL_VALUES contains the representation of null values
+    # by the source system. These values are replaced with None
+    # during validation. If a source system represent nulls
+    # differently than the default value, individual connectors
+    # can subclass and override NULL_VALUES as needed.
+    NULL_VALUES: ClassVar[set[str]] = {""}
+
+    class Config:
+        extra = "allow"
+
+    @model_validator(mode='before')
+    @classmethod
+    def handle_null_values(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            return {
+                key: None if isinstance(value, str) and value in cls.NULL_VALUES else value
+                for key, value in data.items()
+            }
+        return data
 
 
 @dataclass
