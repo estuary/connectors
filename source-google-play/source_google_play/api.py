@@ -6,6 +6,7 @@ from estuary_cdk.capture.common import LogCursor, PageCursor
 
 from .models import (
     GooglePlayRow,
+    Reviews,
 )
 
 from .gcs import GCSClient, GCSFileMetadata
@@ -20,14 +21,6 @@ async def fetch_resources(
 ) -> AsyncGenerator[GooglePlayRow | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    # The code below this return is a best-effort implementation based on the Google Play
-    # documentation about how the GCS bucket organizes data. It boils down to:
-    # - Find all files updated on or after the log_cursor.
-    # - Yield all rows from those files.
-    #
-    # Once we have valid credentials, development can continue and we can iterate on the code below.
-    return
-
     files: list[GCSFileMetadata] = []
     async for file in gcs_client.list_files(prefix=model.prefix, globPattern=model.get_glob_pattern()):
         if file.updated >= log_cursor:
@@ -39,7 +32,15 @@ async def fetch_resources(
             model,
             model.validation_context_model(filename=file.name),
         ):
-            yield row
+            # Reviews have a "Review Last Update Date And Time" field that we can use to
+            # only yield rows that have been updated since the last sweep.
+            if isinstance(row, Reviews):
+                if row.updated_at >= log_cursor:
+                    yield row
+            # All other resources do not have an "updated_at" type field, so we have to
+            # yield all rows for every file that's been updated since the last sweep.
+            else:
+                yield row
 
     if len(files) > 0:
         latest_file = max(files, key=lambda f: f.updated)
@@ -59,15 +60,6 @@ async def backfill_resources(
 
     if cursor_month >= cutoff:
         return
-
-    # The code below this return is a best-effort implementation based on the Google Play
-    # documentation about how the GCS bucket organizes data. It boils down to:
-    # - Find all files containing data for the same month as the page cursor.
-    # - Yield all rows from those files.
-    # - Stop when the page cursor reaches the cutoff.
-    #
-    # Once we have valid credentials, development can continue and we can iterate on the code below.
-    return
 
     files: list[GCSFileMetadata] = []
     async for file in gcs_client.list_files(prefix=model.prefix, globPattern=model.get_glob_pattern(cursor_month)):

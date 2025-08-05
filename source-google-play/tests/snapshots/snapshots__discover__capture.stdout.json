@@ -41,32 +41,26 @@
           },
           "description": "Document metadata"
         },
-        "package_name": {
+        "Package Name": {
           "title": "Package Name",
           "type": "string"
         },
-        "row_number": {
-          "title": "Row Number",
-          "type": "integer"
-        },
-        "date": {
+        "Date": {
           "title": "Date",
           "type": "string"
         }
       },
       "required": [
-        "package_name",
-        "row_number",
-        "date"
+        "Package Name",
+        "Date"
       ],
       "title": "Crashes",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/date",
-      "/package_name",
-      "/row_number"
+      "/Date",
+      "/Package Name"
     ]
   },
   {
@@ -111,32 +105,26 @@
           },
           "description": "Document metadata"
         },
-        "package_name": {
+        "Package Name": {
           "title": "Package Name",
           "type": "string"
         },
-        "row_number": {
-          "title": "Row Number",
-          "type": "integer"
-        },
-        "date": {
+        "Date": {
           "title": "Date",
           "type": "string"
         }
       },
       "required": [
-        "package_name",
-        "row_number",
-        "date"
+        "Package Name",
+        "Date"
       ],
       "title": "Installs",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/date",
-      "/package_name",
-      "/row_number"
+      "/Date",
+      "/Package Name"
     ]
   },
   {
@@ -181,32 +169,44 @@
           },
           "description": "Document metadata"
         },
-        "package_name": {
+        "Package Name": {
           "title": "Package Name",
           "type": "string"
         },
-        "row_number": {
+        "Row Number": {
           "title": "Row Number",
           "type": "integer"
         },
-        "year_month": {
-          "title": "Year Month",
+        "Year": {
+          "title": "Year",
+          "type": "string"
+        },
+        "Month": {
+          "title": "Month",
+          "type": "string"
+        },
+        "Review Last Update Date And Time": {
+          "format": "date-time",
+          "title": "Review Last Update Date And Time",
           "type": "string"
         }
       },
       "required": [
-        "package_name",
-        "row_number",
-        "year_month"
+        "Package Name",
+        "Row Number",
+        "Year",
+        "Month",
+        "Review Last Update Date And Time"
       ],
       "title": "Reviews",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/package_name",
-      "/row_number",
-      "/year_month"
+      "/Month",
+      "/Package Name",
+      "/Row Number",
+      "/Year"
     ]
   }
 ]
