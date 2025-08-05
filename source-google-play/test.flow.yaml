@@ -1,6 +1,4 @@
 ---
-import:
-  - acmeCo/flow.yaml
 captures:
   acmeCo/source-google-play:
     endpoint:
@@ -10,16 +8,4 @@ captures:
           - "-m"
           - source_google_play
         config: source-google-play.config.yaml
-    bindings:
-      - resource:
-          name: crashes
-          interval: PT1H
-        target: acmeCo/crashes
-      - resource:
-          name: installs
-          interval: PT1H
-        target: acmeCo/installs
-      - resource:
-          name: reviews
-          interval: PT1H
-        target: acmeCo/reviews
+    bindings: []
