@@ -796,6 +796,7 @@
       },
       "referrerUrl": null,
       "registeredSourceUrl": null,
+      "shippingAddress": null,
       "sourceIdentifier": null,
       "sourceName": "shopify_draft_order",
       "statusPageUrl": "https://estuary-alex-testing.myshopify.com/66340061229/orders/cec7ba12de8a68ac88469d6418753eb4/authenticate?key=7d63fdde023ada08f12771dfd7d82cdc",
