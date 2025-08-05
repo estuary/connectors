@@ -3,10 +3,7 @@ from typing import Any, ClassVar
 import re
 
 from estuary_cdk.capture.common import (
-    BaseDocument,
     ConnectorState as GenericConnectorState,
-    LogCursor,
-    Logger,
     ResourceConfig,
     ResourceState,
 )
@@ -14,10 +11,15 @@ from estuary_cdk.flow import (
     GoogleServiceAccount,
     GoogleServiceAccountSpec,
 )
-
+from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from pydantic import AwareDatetime, BaseModel, Field, model_validator, ValidationInfo
 
+
+PACKAGE_NAME_FIELD = "Package Name"
+ROW_NUMBER_FIELD = "Row Number"
+MONTH_FIELD = "Month"
+YEAR_FIELD = "Year"
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -60,9 +62,10 @@ class BaseValidationContext:
         self.count += 1
 
 
-class GooglePlayRow(BaseDocument, extra="allow"):
+class GooglePlayRow(BaseCSVRow, extra="allow"):
     name: ClassVar[str]
     prefix: ClassVar[str]
+    suffix: ClassVar[str | None] = None
     primary_keys: ClassVar[list[str]]
     validation_context_model: ClassVar[type[BaseValidationContext]] = BaseValidationContext
 
@@ -74,27 +77,36 @@ class GooglePlayRow(BaseDocument, extra="allow"):
         if date:
             year_month_pattern =  f"{date.year:04d}{date.month:02d}"
 
-        return f"**_{year_month_pattern}.csv"
+        pattern = f"**_{year_month_pattern}"
 
-    package_name: str
-    row_number: int
+        if cls.suffix:
+            pattern += f"_{cls.suffix}"
 
+        pattern += ".csv"
+
+        return pattern
+
+    package_name: str = Field(alias=PACKAGE_NAME_FIELD)
+
+    # The column naming convention across CSVs is not inherently consistent. ex: Sometimes a column
+    # is named "Package name" and other times it's "Package Name". We normalize the column names to
+    # be title case, which is the predominant casing convention for these columns before we do
+    # perform any transformation.
     @model_validator(mode="before")
     @classmethod
-    def _add_row_number(cls, data: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
+    def _normalize_field_names(cls, data: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
+        normalized_data: dict[str, Any] = {}
+        for key, value in data.items():
+            normalized_key = key.title()
+            normalized_data[normalized_key] = value
 
-        if not info.context or not isinstance(info.context, BaseValidationContext):
-            raise RuntimeError(f"Validation context is not set or is not of type BaseValidationContext: {info.context}")
-
-        assert "row_number" not in data, "Row number should not be set before validation."
-        data["row_number"] = info.context.count
-        info.context.increment()
-        return data
+        return normalized_data
 
 
 class Statistics(GooglePlayRow):
-    primary_keys: ClassVar[list[str]] = ["/date", "/package_name", "/row_number"]
-    date: str
+    suffix: ClassVar[str | None] = "overview"
+    primary_keys: ClassVar[list[str]] = ["/Date", f"/{PACKAGE_NAME_FIELD}"]
+    date: str = Field(alias="Date")
 
 
 class Crashes(Statistics):
@@ -110,9 +122,9 @@ class Installs(Statistics):
 class ReviewValidationContext(BaseValidationContext):
     def __init__(self, filename: str):
         super().__init__()
-        self.year_month = self._extract_year_month(filename)
+        self.year, self.month = self._extract_year_month(filename)
 
-    def _extract_year_month(self, filename: str) -> str:
+    def _extract_year_month(self, filename: str) -> tuple[str, str]:
         """
         Extract YYYYMM from review filenames in various formats:
         - /reviews/reviews_[package_name]_YYYYMM.csv
@@ -123,7 +135,7 @@ class ReviewValidationContext(BaseValidationContext):
             filename: The filename or path
 
         Returns:
-            The YYYYMM string.
+            A tuple containing the year and month as strings.
         """
         # Matches reviews_[anything]_YYYYMM[_optionalstuff].csv
         pattern = r'reviews_[^_]+_(\d{6})(?:_[^.]*)?\.csv$'
@@ -131,30 +143,39 @@ class ReviewValidationContext(BaseValidationContext):
 
         assert match, f"Filename does not match expected pattern: {filename}"
 
-        return match.group(1)
+        year_month = match.group(1) # YYYYMM
+        year = year_month[:4]
+        month = year_month[4:6]
+
+        return (year, month)
 
 
-# There _might_ be a "Review Last Update Date and Time" we could use to incrementally
-# capture updates within a specific file of Reviews. However, the documentation says it's optional
-# and we haven't see what this data actually looks like. Once we see real data, we can
-# evaluate whether or not the incremental replication strategy for Reviews can be improved.
 class Reviews(GooglePlayRow):
     name: ClassVar[str] = "reviews"
     prefix: ClassVar[str] = "reviews"
-    primary_keys: ClassVar[list[str]] = ["/year_month", "/package_name", "/row_number"]
+    primary_keys: ClassVar[list[str]] = [f"/{YEAR_FIELD}", f"/{MONTH_FIELD}", f"/{PACKAGE_NAME_FIELD}", f"/{ROW_NUMBER_FIELD}"]
     validation_context_model: ClassVar[type[BaseValidationContext]] = ReviewValidationContext
 
-    year_month: str 
+    row_number: int = Field(alias=ROW_NUMBER_FIELD)
+    year: str = Field(alias=YEAR_FIELD)
+    month: str = Field(alias=MONTH_FIELD)
+    updated_at: AwareDatetime = Field(alias="Review Last Update Date And Time")
 
     @model_validator(mode="before")
     @classmethod
-    def _add_year_month(cls, data: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
+    def _add_primary_key_components(cls, data: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
 
         if not info.context or not isinstance(info.context, ReviewValidationContext):
             raise RuntimeError(f"Validation context is not set or is not of type ReviewValidationContext: {info.context}")
 
-        assert "year_month" not in data, "year_month should not be set before validation."
-        data["year_month"] = info.context.year_month
+        assert YEAR_FIELD not in data, f"{YEAR_FIELD} should not be set before validation."
+        assert MONTH_FIELD not in data, f"{MONTH_FIELD} should not be set before validation."
+        data[YEAR_FIELD] = info.context.year
+        data[MONTH_FIELD] = info.context.month
+
+        assert ROW_NUMBER_FIELD not in data, f"{ROW_NUMBER_FIELD} should not be set before validation."
+        data[ROW_NUMBER_FIELD] = info.context.count
+        info.context.increment()
         return data
 
 

@@ -6,8 +6,12 @@ from urllib.parse import quote
 from pydantic import BaseModel, Field
 
 from estuary_cdk.http import HTTPSession
-from estuary_cdk.incremental_csv_processor import IncrementalCSVProcessor
+from estuary_cdk.incremental_csv_processor import CSVConfig, IncrementalCSVProcessor
 
+
+CSV_CONFIG = CSVConfig(
+    encoding="utf-16",
+)
 
 _CSVRow = TypeVar('_CSVRow', bound=BaseModel)
 
@@ -128,6 +132,7 @@ class GCSClient:
         processor = IncrementalCSVProcessor(
             body(),
             model,
+            config=CSV_CONFIG,
             validation_context=validation_context
         )
 
