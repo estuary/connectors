@@ -248,32 +248,17 @@ func (c *capture) Run() error {
 		var seq = state.Counter
 		state.Counter++
 
-		// Construct message
+		// Construct another message and append it to the batch
+		if len(reused.buf) > 0 {
+			reused.buf = append(reused.buf, '\n')
+		}
 		reused.msg.Sequence = seq
 		reused.msg.Message = binding.res.Message
-
-		// Serialize to JSON
-		reused.buf, err = reused.msg.AppendJSON(reused.buf[:0])
+		reused.buf, err = reused.msg.AppendJSON(reused.buf)
 		if err != nil {
 			return fmt.Errorf("error serializing message: %w", err)
 		}
-
-		// Wait for rate limiter
-		if limiter != nil {
-			if err = limiter.WaitN(c.Stream.Context(), len(reused.buf)); err != nil {
-				return fmt.Errorf("error waiting for rate limiter: %w", err)
-			}
-		}
-
-		// Emit document
-		reused.doc.Binding = uint32(nextBinding)
-		reused.doc.DocJson = reused.buf
-		reused.out.Captured = &reused.doc
-		if err = c.Stream.Send(&reused.out); err != nil {
-			return fmt.Errorf("error sending document: %w", err)
-		}
 		messageCount++
-		totalBytes += uint64(len(reused.buf))
 
 		// Check if we've hit the (test only) shutdown threshold
 		var shuttingDown = false
@@ -286,6 +271,29 @@ func (c *capture) Run() error {
 		var shouldCheckpoint bool
 		if messageCount%1000 == 0 {
 			shouldCheckpoint = time.Now().After(checkpointAfter)
+		}
+
+		// This is kind of hacky and won't work right if there are
+		// multiple bindings, but for a quick experiment it'll be fine.
+		if len(reused.buf) > 256*1024 || shuttingDown {
+			// Wait for rate limiter
+			if limiter != nil {
+				if err = limiter.WaitN(c.Stream.Context(), len(reused.buf)); err != nil {
+					return fmt.Errorf("error waiting for rate limiter: %w", err)
+				}
+			}
+
+			// Emit document
+			reused.doc.Binding = uint32(nextBinding)
+			reused.doc.DocJson = reused.buf
+			reused.out.Captured = &reused.doc
+			if err = c.Stream.Send(&reused.out); err != nil {
+				return fmt.Errorf("error sending document: %w", err)
+			}
+			totalBytes += uint64(len(reused.buf))
+
+			// Clear buffer for reuse
+			reused.buf = reused.buf[:0]
 		}
 
 		// Emit checkpoints periodically
