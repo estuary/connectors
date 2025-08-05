@@ -104,10 +104,15 @@ class BoardNullTracker:
         default_factory=dict
     )  # board_id -> {null_fields}
 
+    boards_with_auth_issues: set[str] = field(default_factory=set)
+
     def track_board_with_null_field(self, board_id: str, field_name: str) -> None:
         if board_id not in self.boards_with_nulls:
             self.boards_with_nulls[board_id] = set()
         self.boards_with_nulls[board_id].add(field_name)
+
+    def track_board_with_auth_error(self, board_id: str) -> None:
+        self.boards_with_auth_issues.add(board_id)
 
     def correlate_with_errors(
         self, log: Logger, auth_errors: list[GraphQLError]
@@ -119,25 +124,43 @@ class BoardNullTracker:
         1. Extract the field name ('activity_logs')
         2. Check if we detected any boards with null values for that field
         3. Log warnings for confirmed unauthorized boards
+        4. Also log warnings for boards we tracked as having auth issues
         """
-        if not auth_errors or not self.boards_with_nulls:
+        if not auth_errors:
             return
 
         error_fields = set()
+        error_board_indices = set()
+
         for error in auth_errors:
             if (
                 error.path
                 and len(error.path) >= 3
                 and error.path[0] == "boards"
+                and isinstance(error.path[1], int)
                 and isinstance(error.path[2], str)
             ):
                 # ['boards', N, 'activity_logs'] -> 'activity_logs'
                 field_name = error.path[2]
+                board_index = error.path[1]
                 error_fields.add(field_name)
+                error_board_indices.add(board_index)
 
         for board_id, null_fields in self.boards_with_nulls.items():
             for field_name in null_fields:
                 if field_name in error_fields:
+                    log.warning(
+                        f"Board {board_id} unauthorized for {field_name} - data excluded from results",
+                        {
+                            "board_id": board_id,
+                            "restricted_field": field_name,
+                            "operation": "board_field_access",
+                        },
+                    )
+
+        if self.boards_with_auth_issues and error_fields:
+            for board_id in self.boards_with_auth_issues:
+                for field_name in error_fields:
                     log.warning(
                         f"Board {board_id} unauthorized for {field_name} - data excluded from results",
                         {
@@ -307,6 +330,9 @@ async def execute_query(
             if remainder.data and remainder.data.complexity:
                 reset_in_seconds = remainder.data.complexity.reset_in_x_seconds
 
+            if remainder_processor is not None:
+                remainder_processor.process(log, remainder)
+
             if remainder.has_errors():
                 if null_tracker:
                     auth_errors = [
@@ -337,9 +363,6 @@ async def execute_query(
                         raise GraphQLQueryError(remainder.get_errors())
                 else:
                     raise GraphQLQueryError(remainder.get_errors())
-
-            if remainder_processor is not None:
-                remainder_processor.process(log, remainder)
 
             if remainder.data and remainder.data.complexity:
                 log.debug(
