@@ -154,6 +154,12 @@ async def backfill_incremental_resources(
     # merge reduction strategy to merge in partial documents containing updated formula fields.
     if is_connector_initiated:
         has_formula_fields, fields = _filter_to_only_formula_fields(fields, cursor_field)
+
+        # Formula fields can only contain scalar values. Even if the object contains complex
+        # fields that can't be quried via the Bulk API, formula fields should always be query-able
+        # via the Bulk API & we should default to using it for formula field refreshes.
+        is_supported_by_bulk_api = True
+
         # If there are no formula fields in this object, return early.
         if not has_formula_fields:
             return
