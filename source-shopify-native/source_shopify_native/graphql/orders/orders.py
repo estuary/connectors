@@ -31,6 +31,24 @@ class Orders(ShopifyGraphQLResource):
         provinceCode
         zip
     }
+    shippingAddress {
+        id
+        address1
+        address2
+        city
+        company
+        country
+        countryCodeV2
+        firstName
+        lastName
+        latitude
+        longitude
+        name
+        phone
+        province
+        provinceCode
+        zip
+    }
     clientIp
     customerAcceptsMarketing
     cancelReason
