@@ -497,6 +497,16 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 			} else {
 				return pgconn.ErrorResponseToPgError(&resp)
 			}
+		case MessageTypeNoticeResponse:
+			var resp pgproto3.NoticeResponse
+			if err := resp.Decode(msg[5:]); err != nil {
+				return fmt.Errorf("error decoding NoticeResponse: %w", err)
+			}
+			logrus.WithFields(logrus.Fields{
+				"level":   resp.Severity,
+				"message": resp.Message,
+			}).Info("received notice")
+			continue
 		default:
 			return fmt.Errorf("unexpected message type %q", msgType)
 		}
