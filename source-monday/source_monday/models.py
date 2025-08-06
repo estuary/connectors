@@ -8,6 +8,7 @@ from typing import (
     Literal,
     TypeVar,
 )
+from enum import StrEnum, auto
 
 from dataclasses import dataclass
 
@@ -118,19 +119,120 @@ class GraphQLResponseRemainder(BaseModel, Generic[TGraphQLResponseData], extra="
         return self.errors or []
 
 
+class ActivityLogProcessingError(RuntimeError):
+    """Exception raised for errors when processing new activity logs."""
+
+    def __init__(
+        self,
+        message: str,
+        query: str | None = None,
+        variables: dict[str, Any] | None = None,
+    ):
+        self.message = message
+        self.query = query
+        self.variables = variables
+
+        self.details: dict[str, Any] = {
+            "message": message,
+        }
+
+        if self.query:
+            self.details["query"] = query
+        if self.variables:
+            self.details["variables"] = variables
+
+        super().__init__(self.message)
+
+    def __str__(self) -> str:
+        return (
+            f"ActivityLogProcessingError(message={self.message!r}, "
+            f"query={self.query!r}, "
+            f"variables={self.variables!r})"
+        )
+
+    def __repr__(self) -> str:
+        return (
+            f"ActivityLogProcessingError(message={self.message!r}, "
+            f"query={self.query!r}, "
+            f"variables={self.variables!r})"
+        )
+
+
+class ActivityLogEvents(StrEnum):
+    """
+    List of activity log events that can be used to filter or process activity logs.
+
+    None of these are documented by Monday.com, but they are do exist from the
+    activity logs returned by the API.
+    """
+
+    ADD_OWNER = "add_owner"
+    ARCHIVE_GROUP_PULSE = "archive_group_pulse"
+    ARCHIVE_GROUP = "archive_group"
+    ARCHIVE_PULSE = "archive_pulse"
+    BATCH_CHANGE_PULSES_COLUMN_VALUE = "batch_change_pulses_column_value"
+    BOARD_DELETED = "board_deleted"
+    BATCH_CREATE_PULSES = "batch_create_pulses"
+    BATCH_DELETE_PULSES = "batch_delete_pulses"
+    BATCH_DUPLICATE_PULSES = "batch_duplicate_pulses"
+    BATCH_MOVE_PULSES_FROM_BOARD = "batch_move_pulses_from_board"
+    BATCH_MOVE_PULSES_FROM_GROUP = "batch_move_pulses_from_group"
+    BATCH_MOVE_PULSES_INTO_BOARD = "batch_move_pulses_into_board"
+    BATCH_MOVE_PULSES_INTO_GROUP = "batch_move_pulses_into_group"
+    BOARD_STATE_CHANGED = "board_state_changed"
+    BOARD_VIEW_ADDED = "board_view_added"
+    BOARD_VIEW_CHANGED = "board_view_changed"
+    BOARD_VIEW_ENABLED = "board_view_enabled"
+    BOARD_WORKSPACE_ID_CHANGED = "board_workspace_id_changed"
+    CHANGE_COLUMN_SETTINGS = "change_column_settings"
+    CREATE_COLUMN = "create_column"
+    CREATE_GROUP = "create_group"
+    CREATE_PULSE = "create_pulse"
+    DELETE_COLUMN = "delete_column"
+    DELETE_GROUP = "delete_group"
+    DELETE_PULSE = "delete_pulse"
+    MOVE_PULSE_FROM_BOARD = "move_pulse_from_board"
+    MOVE_PULSE_FROM_GROUP = "move_pulse_from_group"
+    MOVE_PULSE_INTO_BOARD = "move_pulse_into_board"
+    MOVE_PULSE_INTO_GROUP = "move_pulse_into_group"
+    MOVE_SUBITEM = "move_subitem"
+    REMOVE_OWNER = "remove_owner"
+    SUBSCRIBE = "subscribe"
+    UPDATE_BOARD_NAME = "update_board_name"
+    UPDATE_BOARD_NICKNAME = "update_board_nickname"
+    UPDATE_COLUMN_NAME = "update_column_name"
+    UPDATE_COLUMN_VALUE = "update_column_value"
+    UPDATE_GROUP_NAME = "update_group_name"
+    UPDATE_NAME = "update_name"
+    UNSUBSCRIBE = "unsubscribe"
+
+
+class ActivityLogEventType(StrEnum):
+    BOARD_CHANGED = auto()
+    BOARD_DELETED = auto()
+    ITEM_CHANGED = auto()
+    ITEM_DELETED = auto()
+    FULL_BOARD_ITEM_REFRESH = auto()
+
+
 class ActivityLogEventData(BaseModel, extra="allow"):
     board_id: int | None = None
     item_id: int | None = None
-    item_type: str | None = None
     pulse_id: int | None = None
     pulse_ids: list[int] | None = None
+    duplicated_pulse_ids: list[int] | None = None
+    subitem: int | None = None
 
 
 class ActivityLog(BaseModel, extra="allow"):
     entity: Literal["board", "pulse"]
-    event: str
+    event: ActivityLogEvents
     data: ActivityLogEventData
     created_at: str
+    # Set by the connector for logging purposes. These are only None
+    # when there are user unauthorized errors causing the response to be null.
+    query: str | None = None
+    query_variables: dict[str, Any] | None = None
 
     @field_validator("data", mode="before")
     @classmethod
@@ -149,6 +251,153 @@ class ActivityLog(BaseModel, extra="allow"):
             raise ValueError(
                 f"Invalid data type for ActivityLog: {type(data).__name__}. Expected dict or str."
             )
+
+    def get_event_result(
+        self,
+        log: Logger,
+        stream: Literal["boards", "items"],
+    ) -> tuple[ActivityLogEventType, list[str]]:
+        """
+        Determine the action to take based on the event and return the affected IDs.
+        """
+        log.debug(f"Processing activity log event: {self.event}", {"data": self.data})
+        match self.event:
+            case (
+                ActivityLogEvents.ARCHIVE_GROUP
+                | ActivityLogEvents.ADD_OWNER
+                | ActivityLogEvents.REMOVE_OWNER
+                | ActivityLogEvents.BOARD_VIEW_ADDED
+                | ActivityLogEvents.BOARD_VIEW_CHANGED
+                | ActivityLogEvents.BOARD_VIEW_ENABLED
+                | ActivityLogEvents.BOARD_WORKSPACE_ID_CHANGED
+                | ActivityLogEvents.CHANGE_COLUMN_SETTINGS
+                | ActivityLogEvents.UPDATE_BOARD_NICKNAME
+            ):
+                log.debug(f"Board change event: {self.event}")
+                ids = []
+                if self.data.board_id:
+                    ids.append(str(self.data.board_id))
+
+                if not ids:
+                    raise ActivityLogProcessingError(
+                        f"Activity log event {self.event} has no identifiable board IDs.",
+                        query=self.query,
+                        variables=self.query_variables,
+                    )
+
+                return ActivityLogEventType.BOARD_CHANGED, ids
+            case ActivityLogEvents.BOARD_DELETED:
+                log.debug(f"Board deleted event: {self.event}")
+                ids = []
+                if self.data.board_id:
+                    ids.append(str(self.data.board_id))
+
+                if not ids:
+                    raise ActivityLogProcessingError(
+                        f"Activity log event {self.event} has no identifiable board IDs.",
+                        query=self.query,
+                        variables=self.query_variables,
+                    )
+
+                return ActivityLogEventType.BOARD_DELETED, ids
+            case (
+                ActivityLogEvents.CREATE_PULSE
+                | ActivityLogEvents.ARCHIVE_PULSE
+                | ActivityLogEvents.ARCHIVE_GROUP_PULSE
+                | ActivityLogEvents.MOVE_PULSE_FROM_BOARD
+                | ActivityLogEvents.MOVE_PULSE_FROM_GROUP
+                | ActivityLogEvents.MOVE_PULSE_INTO_BOARD
+                | ActivityLogEvents.MOVE_PULSE_INTO_GROUP
+                | ActivityLogEvents.UPDATE_NAME
+                | ActivityLogEvents.UPDATE_COLUMN_VALUE
+                | ActivityLogEvents.BATCH_CHANGE_PULSES_COLUMN_VALUE
+                | ActivityLogEvents.BATCH_CREATE_PULSES
+                | ActivityLogEvents.BATCH_MOVE_PULSES_FROM_BOARD
+                | ActivityLogEvents.BATCH_MOVE_PULSES_FROM_GROUP
+                | ActivityLogEvents.BATCH_MOVE_PULSES_INTO_BOARD
+                | ActivityLogEvents.BATCH_MOVE_PULSES_INTO_GROUP
+                | ActivityLogEvents.BATCH_DUPLICATE_PULSES
+                | ActivityLogEvents.MOVE_SUBITEM
+            ):
+                log.debug(f"Item change event: {self.event}")
+                ids = []
+                if self.data.pulse_id:
+                    ids.append(str(self.data.pulse_id))
+                if self.data.item_id:
+                    ids.append(str(self.data.item_id))
+                if self.data.pulse_ids:
+                    ids.extend(str(pulse_id) for pulse_id in self.data.pulse_ids)
+                if self.data.duplicated_pulse_ids:
+                    ids.extend(
+                        str(duplicated_pulse_id)
+                        for duplicated_pulse_id in self.data.duplicated_pulse_ids
+                    )
+                if self.data.subitem:
+                    ids.append(str(self.data.subitem))
+
+                if not ids:
+                    raise ActivityLogProcessingError(
+                        f"Activity log event {self.event} has no identifiable item IDs.",
+                        query=self.query,
+                        variables=self.query_variables,
+                    )
+
+                return (ActivityLogEventType.ITEM_CHANGED, [str(self.data.pulse_id)])
+            case ActivityLogEvents.DELETE_PULSE | ActivityLogEvents.BATCH_DELETE_PULSES:
+                log.debug(f"Item deleted event: {self.event}")
+                ids = []
+                if self.data.pulse_id:
+                    ids.append(str(self.data.pulse_id))
+                if self.data.item_id:
+                    ids.append(str(self.data.item_id))
+                if self.data.pulse_ids:
+                    ids.extend(str(pulse_id) for pulse_id in self.data.pulse_ids)
+
+                if not ids:
+                    raise ActivityLogProcessingError(
+                        f"Activity log event {self.event} has no identifiable item IDs.",
+                        query=self.query,
+                        variables=self.query_variables,
+                    )
+
+                return ActivityLogEventType.ITEM_DELETED, ids
+            case (
+                ActivityLogEvents.BOARD_STATE_CHANGED
+                | ActivityLogEvents.CREATE_COLUMN
+                | ActivityLogEvents.DELETE_COLUMN
+                | ActivityLogEvents.CREATE_GROUP
+                | ActivityLogEvents.DELETE_GROUP
+                | ActivityLogEvents.SUBSCRIBE
+                | ActivityLogEvents.UNSUBSCRIBE
+                | ActivityLogEvents.UPDATE_GROUP_NAME
+                | ActivityLogEvents.UPDATE_COLUMN_NAME
+                | ActivityLogEvents.UPDATE_BOARD_NAME
+            ):
+                log.debug(f"Board or item change event: {self.event}")
+                ids = []
+                if self.data.board_id:
+                    ids.append(str(self.data.board_id))
+
+                if not ids:
+                    raise ActivityLogProcessingError(
+                        f"Activity log event {self.event} has no identifiable IDs.",
+                        query=self.query,
+                        variables=self.query_variables,
+                    )
+
+                event_type = (
+                    ActivityLogEventType.FULL_BOARD_ITEM_REFRESH
+                    if stream == "items"
+                    else ActivityLogEventType.BOARD_CHANGED
+                )
+
+                return event_type, ids
+            case _:
+                raise ActivityLogProcessingError(
+                    f"Unanticipated activity log event: {self.event}. Please reach out to Estuary support for help resolving this issue.",
+                    query=self.query,
+                    variables=self.query_variables,
+                )
 
 
 class FullRefreshResource(BaseDocument, extra="allow"):

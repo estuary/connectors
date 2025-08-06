@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import AsyncGenerator
 
@@ -15,13 +15,13 @@ from source_monday.graphql import (
     get_items_from_boards,
 )
 from source_monday.models import (
-    FullRefreshResource,
+    ActivityLogEventType,
     Board,
+    FullRefreshResource,
     Item,
     ItemsBackfillCursor,
 )
 from source_monday.utils import parse_monday_17_digit_timestamp
-
 
 # Limit incremental sync windows to 2 hours to balance completeness with performance.
 # Smaller windows reduce memory usage and improve error recovery, while ensuring
@@ -88,45 +88,34 @@ async def fetch_boards_changes(
         created_at = parse_monday_17_digit_timestamp(activity_log.created_at, log)
         max_change_dt = max(max_change_dt, created_at)
 
-        # An activity log can have an entity of "pulse" and be a board related activity,
-        # if the item_type is "Board". So we need to check for that and not assume solely on
-        # entity.
-        if activity_log.entity == "pulse" and activity_log.data.item_type != "Board":
-            log.debug(
-                "Skipping activity log for non-board activity",
-                {
-                    "activity_log": activity_log,
-                },
-            )
-            continue
+        event_type, ids = activity_log.get_event_result(log, "boards")
 
-        if activity_log.data.board_id:
-            # The `fetch_boards_minimal` will catch deleted boards, but a board could still
-            # be deleted after the fetch and before the activity log is processed. This
-            # will catch that case and mark the board as deleted.
-            if "board_deleted" in activity_log.event:
-                deleted_board = Board(
-                    id=str(activity_log.data.board_id),
-                    updated_at=created_at,
-                    state="deleted",
-                    workspace=None,
-                    _meta=Board.Meta(op="d"),
-                )
-                yield deleted_board
-            else:
+        match event_type:
+            case ActivityLogEventType.BOARD_CHANGED:
                 log.debug(
-                    f"Activity log found for board {activity_log.data.board_id} "
-                    f"(event created_at: {created_at})",
+                    f"Board change event found in activity log for boards {len(ids)} boards at {created_at}",
                     {
                         "activity_log": activity_log,
                     },
                 )
-                board_ids_to_fetch.add(str(activity_log.data.board_id))
-        else:
-            raise RuntimeError(
-                f"Activity log does not have a board ID field to incrementally sync a board. "
-                f"Details: {activity_log}"
-            )
+                board_ids_to_fetch.update(ids)
+            case ActivityLogEventType.BOARD_DELETED:
+                log.debug(
+                    f"Board deletion event found in activity log for boards {len(ids)} boards at {created_at}",
+                    {
+                        "activity_log": activity_log,
+                    },
+                )
+                for board_id in ids:
+                    deleted_board = Board(
+                        id=board_id,
+                        updated_at=created_at,
+                        state="deleted",
+                        _meta=Board.Meta(op="d"),
+                    )
+                    yield deleted_board
+            case _:
+                ...  # Ignore other event types
 
     log.debug(f"Total unique board IDs to fetch: {len(board_ids_to_fetch)}")
 
@@ -226,7 +215,6 @@ async def fetch_items_changes(
     max_change_dt = window_start
     item_ids_to_fetch: set[str] = set()
     board_ids_to_backfill: set[str] = set()
-    docs_emitted = 0
 
     board_ids = []
     async for board in fetch_boards_minimal(http, log):
@@ -245,95 +233,42 @@ async def fetch_items_changes(
         created_at = parse_monday_17_digit_timestamp(activity_log.created_at, log)
         max_change_dt = max(max_change_dt, created_at)
 
-        # We can skip activity logs that have `item_type` as "Board" since
-        # these are board-level changes and do not affect items from what I can tell.
-        # However, even if the `item_type` is "Board", we still need to handle a board state change
-        # since it can affect whether all items for a board are fetched or not.
-        if (
-            activity_log.data.item_type == "Board"
-            and "board_state_change" not in activity_log.event
-        ):
-            log.debug(
-                "Skipping activity log for non-item activity",
-                {
-                    "activity_log": activity_log,
-                },
-            )
-            continue
+        event_type, ids = activity_log.get_event_result(log, "items")
 
-        if "delete_pulse" in activity_log.event:
-            item_id = activity_log.data.item_id or activity_log.data.pulse_id
-
-            if not item_id:
-                raise RuntimeError(
-                    f"Activity log for item deletion does not have an item id. "
-                    f"Details: {activity_log}"
-                )
-
-            deleted_item = Item(
-                id=str(item_id),
-                updated_at=created_at,
-                state="deleted",
-                _meta=Item.Meta(op="d"),
-            )
-            docs_emitted += 1
-            yield deleted_item
-        elif "board_state_change" in activity_log.event:
-            # When a board is changing state, it can potentially be moved from the trash (deleted)
-            # to active or archived state, so we need to backfill items from that board since the
-            # activity log does not show item updates and the backfill might not backfill the items
-            # if the board was already deleted before the capture started.
-            if not activity_log.data.board_id:
-                raise RuntimeError(
-                    f"Activity log for board state change does not have a board id to fetch all items. "
-                    f"Details: {activity_log}"
-                )
-
-            log.debug(
-                f"Board state change activity log found for board {activity_log.data.board_id} "
-                f"(event created_at: {created_at})",
-                {
-                    "activity_log": activity_log,
-                },
-            )
-            board_ids_to_backfill.add(str(activity_log.data.board_id))
-        elif (
-            "create_group" in activity_log.event
-            or "create_column" in activity_log.event
-        ):
-            # These events typically coincide with a board being duplicated with items,
-            # otherwise they are normal create events. However, we don't want to miss syncing
-            # items if this was a board duplication event, so we add the board to backfill.
-            if not activity_log.data.board_id:
-                raise RuntimeError(
-                    f"Activity log for board-level creation event does not have a board id to fetch all items. "
-                    f"Details: {activity_log}"
-                )
-
-            log.debug(
-                f"Board creation activity log found for board {activity_log.data.board_id} "
-                f"(event created_at: {created_at})",
-                {
-                    "activity_log": activity_log,
-                },
-            )
-            board_ids_to_backfill.add(str(activity_log.data.board_id))
-        else:
-            item_id = activity_log.data.item_id or activity_log.data.pulse_id
-            pulse_ids = activity_log.data.pulse_ids
-
-            if not item_id and not pulse_ids:
-                log.warning(
-                    "Activity log does not have item_id, pulse_id, or pulse_ids",
+        match event_type:
+            case ActivityLogEventType.ITEM_CHANGED:
+                log.debug(
+                    f"Item change event found in activity log for items {len(ids)} items at {created_at}",
                     {
                         "activity_log": activity_log,
                     },
                 )
-
-            if item_id:
-                item_ids_to_fetch.add(str(item_id))
-            if pulse_ids:
-                item_ids_to_fetch.update(str(pulse_id) for pulse_id in pulse_ids)
+                item_ids_to_fetch.update(ids)
+            case ActivityLogEventType.ITEM_DELETED:
+                log.debug(
+                    f"Item deletion event found in activity log for items {len(ids)} items at {created_at}",
+                    {
+                        "activity_log": activity_log,
+                    },
+                )
+                for item_id in ids:
+                    deleted_item = Item(
+                        id=item_id,
+                        updated_at=created_at,
+                        state="deleted",
+                        _meta=Item.Meta(op="d"),
+                    )
+                    yield deleted_item
+            case ActivityLogEventType.FULL_BOARD_ITEM_REFRESH:
+                log.debug(
+                    f"Full board item refresh event found in activity log for boards {len(ids)} boards at {created_at}",
+                    {
+                        "activity_log": activity_log,
+                    },
+                )
+                board_ids_to_backfill.update(ids)
+            case _:
+                ...  # Ignore other event types
 
     if item_ids_to_fetch:
         async for item in fetch_items_by_id(
@@ -348,7 +283,6 @@ async def fetch_items_changes(
                 if item.state == "deleted":
                     item.meta_ = Item.Meta(op="d")
 
-                docs_emitted += 1
                 yield item
             else:
                 log.debug(
@@ -392,7 +326,6 @@ async def fetch_items_changes(
                 if item.state == "deleted":
                     item.meta_ = Item.Meta(op="d")
 
-                docs_emitted += 1
                 yield item
 
     if max_change_dt > log_cursor:
