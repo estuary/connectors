@@ -6,7 +6,6 @@ from estuary_cdk.http import HTTPSession
 
 from source_monday.graphql.query_executor import execute_query, BoardNullTracker
 from source_monday.models import ActivityLog, Board
-from source_monday.utils import parse_monday_17_digit_timestamp
 
 # Monday.com allows up to 10,000 activity logs per board (retention limit).
 # Process 500 boards per batch to balance memory usage with throughput.
@@ -129,14 +128,10 @@ async def _fetch_activity_logs_for_board_batch(
             elif board.activity_logs:
                 for activity_log in board.activity_logs:
                     try:
-                        log_time = parse_monday_17_digit_timestamp(activity_log.created_at, log)
-                        start_dt = datetime.fromisoformat(start_time.replace("Z", "+00:00"))
-                        end_dt = datetime.fromisoformat(end_time.replace("Z", "+00:00"))
-
-                        # Double-check the log is within our time bounds
-                        if start_dt <= log_time <= end_dt:
-                            yield activity_log
-                            logs_in_page += 1
+                        logs_in_page += 1
+                        activity_log.query = ACTIVITY_LOGS
+                        activity_log.query_variables = variables
+                        yield activity_log
 
                     except (ValueError, TypeError) as e:
                         if activity_log.created_at is not None:
