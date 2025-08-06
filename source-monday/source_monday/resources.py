@@ -14,6 +14,7 @@ from source_monday.api import (
     fetch_items_page,
     snapshot_resource,
     snapshot_resource_paginated,
+    INCREMENTAL_SYNC_DELAY,
 )
 from source_monday.graphql import (
     API,
@@ -103,7 +104,7 @@ def full_refresh_resources(log: Logger, http: HTTPMixin, config: EndpointConfig)
 
 
 def incremental_resources(log: Logger, http: HTTPMixin, config: EndpointConfig):
-    cutoff = datetime.now(tz=UTC).replace(microsecond=0)
+    cutoff = datetime.now(tz=UTC).replace(microsecond=0) - INCREMENTAL_SYNC_DELAY
 
     def open(
         name: str,

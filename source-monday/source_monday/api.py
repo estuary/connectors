@@ -32,6 +32,9 @@ DEFAULT_BOARDS_PAGE_SIZE = 100
 # However, the underlying GraphQL query will fetch items in smaller batches to balance
 # complexity and other API limitations.
 BOARDS_PER_ITEMS_PAGE = 25
+# Monday may be eventual consistency based on observed delays around 5-30 seconds seen in API responses
+# following batch updates. This is an estimated delay that hopefully covers the possible delay in updates.
+INCREMENTAL_SYNC_DELAY = timedelta(minutes=5)
 
 
 async def fetch_boards_changes(
@@ -40,6 +43,15 @@ async def fetch_boards_changes(
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Board | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
+
+    window_start = log_cursor
+    delayed_now = datetime.now(UTC) - INCREMENTAL_SYNC_DELAY
+    window_end = min(window_start + MAX_WINDOW_SIZE, delayed_now)
+
+    # Skip and wait for next invocation if the eventual consistency delay causes
+    # the window to be invalid
+    if window_end <= window_start:
+        return
 
     max_change_dt = log_cursor
     board_ids_to_fetch: set[str] = set()
@@ -50,7 +62,7 @@ async def fetch_boards_changes(
         board_ids.add(board.id)
         minimal_boards_checked += 1
 
-        if board.updated_at > log_cursor:
+        if board.updated_at > log_cursor and board.updated_at <= window_end:
             if board.state == "deleted":
                 board.meta_ = Board.Meta(op="d")
                 max_change_dt = max(max_change_dt, board.updated_at)
@@ -69,7 +81,8 @@ async def fetch_boards_changes(
         http,
         log,
         list(board_ids),
-        log_cursor.replace(microsecond=0).isoformat(),
+        window_start.replace(microsecond=0).isoformat(),
+        window_end.replace(microsecond=0).isoformat(),
     ):
         activity_logs_processed += 1
         created_at = parse_monday_17_digit_timestamp(activity_log.created_at, log)
@@ -136,10 +149,13 @@ async def fetch_boards_changes(
         log.debug(f"Incremental sync complete. New cursor: {new_cursor}")
         yield new_cursor
     else:
-        # Unlike the fetch_itmes_changes, we do not advance the cursor here
-        # because the fetch_boards_changes does not specify a window end and
-        # in practice there are less updates than items.
-        log.debug("Incremental sync complete. No updates found.")
+        log.debug(
+            f"No updates found in the current window, advancing cursor to window end: {window_end}"
+        )
+        # Advance cursor even without updates to prevent missing data due to Monday.com's
+        # 10k activity log retention limit per board. Staying at the same cursor risks
+        # missing logs that get purged between sync cycles.
+        yield window_end
 
 
 async def fetch_boards_page(
@@ -199,8 +215,13 @@ async def fetch_items_changes(
     assert isinstance(log_cursor, datetime)
 
     window_start = log_cursor
-    now = datetime.now(UTC)
-    window_end = min(window_start + MAX_WINDOW_SIZE, now)
+    delayed_now = datetime.now(UTC) - INCREMENTAL_SYNC_DELAY
+    window_end = min(window_start + MAX_WINDOW_SIZE, delayed_now)
+
+    # Skip and wait for next invocation if the eventual consistency delay causes
+    # the window to be invalid
+    if window_end <= window_start:
+        return
 
     max_change_dt = window_start
     item_ids_to_fetch: set[str] = set()
