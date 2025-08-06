@@ -2245,17 +2245,26 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "Survey": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "SurveyResponse": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "SurveyEngagementContext": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "SurveySubject": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "SurveyVersion": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "SurveyEngagementContextShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
     "SurveyInvitation": {
-
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "SurveyQuestionScore": {
-
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "TabDefinition": {},
     "Task": {
