@@ -43,6 +43,7 @@ func (c config) Validate() error {
 type resource struct {
 	Name    string `json:"name" jsonschema:"title=Stream Name,description=Stream name to include in generated documents,default=greetings"`
 	Message string `json:"message" jsonschema:"title=Message,description=A text payload to include in each document,default=Hello world!"`
+	RawJSON string `json:"raw,omitempty" jsonschema:"title=Raw JSON Payload,description=An optional JSON value to include in each document"`
 }
 
 func (r resource) Validate() error {
@@ -52,6 +53,8 @@ func (r resource) Validate() error {
 type message struct {
 	Sequence int64  `json:"seq" jsonschema:"title=Sequence Number,description=The sequence number of this message"`
 	Message  string `json:"message" jsonschema:"title=Message,description=A human-readable message"`
+
+	RawJSON string `json:"raw" jsonschema:"totle=Raw JSON Payload,description=A JSON payload"`
 
 	escaped json.RawMessage // Escaped JSON representation of the message.
 }
@@ -64,6 +67,10 @@ func (m *message) AppendJSON(buf []byte) ([]byte, error) {
 		m.escaped = json.Escape(m.Message)
 	}
 	buf = append(buf, m.escaped...)
+	if m.RawJSON != "" {
+		buf = append(buf, `,"raw":`...)
+		buf = append(buf, m.RawJSON...)
+	}
 	return append(buf, '}'), nil
 }
 
@@ -254,6 +261,7 @@ func (c *capture) Run() error {
 		}
 		reused.msg.Sequence = seq
 		reused.msg.Message = binding.res.Message
+		reused.msg.RawJSON = binding.res.RawJSON
 		reused.buf, err = reused.msg.AppendJSON(reused.buf)
 		if err != nil {
 			return fmt.Errorf("error serializing message: %w", err)

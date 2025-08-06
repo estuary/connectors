@@ -31,6 +31,11 @@
         "title": "Message",
         "description": "A text payload to include in each document",
         "default": "Hello world!"
+      },
+      "raw": {
+        "type": "string",
+        "title": "Raw JSON Payload",
+        "description": "An optional JSON value to include in each document"
       }
     },
     "type": "object",

@@ -19,12 +19,17 @@
             "type": "string",
             "title": "Message",
             "description": "A human-readable message"
+          },
+          "raw": {
+            "type": "string",
+            "description": "A JSON payload"
           }
         },
         "type": "object",
         "required": [
           "seq",
-          "message"
+          "message",
+          "raw"
         ],
         "title": "GigaHello Output Document"
       },
