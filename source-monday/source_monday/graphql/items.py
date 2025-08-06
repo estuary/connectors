@@ -23,7 +23,7 @@ class BoardItems(BaseModel, extra="allow"):
 
 
 class ItemsPageRemainderData(GraphQLResponseData, extra="allow"):
-    boards: list[BoardItems] | None = None
+    boards: list[BoardItems | None] | None = None
     next_items_page: ItemsPage | None = None
 
 
@@ -45,6 +45,7 @@ ITEMS_LIMIT_BY_ID = 100
 class CursorCollector:
     def __init__(self):
         self.cursors: list[str] = []
+        self.null_board_count: int = 0
 
     def process(self, log: Logger, remainder: ItemsPageRemainder) -> None:
         log.debug("Processing ItemsPageRemainder for cursors")
@@ -55,8 +56,13 @@ class CursorCollector:
         if remainder.data.boards is not None:
             log.debug("Processing boards structure for cursors")
             boards_data = remainder.data.boards
-            
+
             for board_data in boards_data:
+                if not board_data:
+                    log.debug("Skipping empty board_data")
+                    self.null_board_count += 1
+                    continue
+
                 if not board_data.items_page:
                     log.debug(
                         "No items_page in board_data, skipping",
@@ -73,14 +79,16 @@ class CursorCollector:
         if remainder.data.next_items_page is not None:
             log.debug("Processing next_items_page structure for cursors")
             cursor = remainder.data.next_items_page.cursor
-            
+
             if cursor:
                 log.debug(f"Found cursor in next_items_page: {cursor}")
                 self.cursors.append(cursor)
 
-    def get_result(self, log: Logger) -> list[str]:
-        log.debug(f"Returning collected cursors: {self.cursors}")
-        return self.cursors
+    def get_result(self, log: Logger) -> tuple[list[str], int]:
+        log.debug(
+            f"Returning collected cursors and null board count: {self.cursors}, {self.null_board_count}"
+        )
+        return self.cursors, self.null_board_count
 
 
 async def fetch_items_by_id(
@@ -136,13 +144,19 @@ async def get_items_from_boards(
 ) -> AsyncGenerator[Item, None]:
     if len(board_ids) == 0:
         log.error("get_items_from_boards requires a non-empty list of board IDs.")
-        raise ValueError("get_items_from_boards requires a non-empty list of board IDs.")
+        raise ValueError(
+            "get_items_from_boards requires a non-empty list of board IDs."
+        )
 
     log.debug(f"Fetching items for boards {board_ids}.")
 
     if items_limit is None or items_limit <= 0:
-        log.error("Invalid items_limit provided, must provide an integer greater than 0.")
-        raise ValueError("Invalid items_limit provided, must provide an integer greater than 0.")
+        log.error(
+            "Invalid items_limit provided, must provide an integer greater than 0."
+        )
+        raise ValueError(
+            "Invalid items_limit provided, must provide an integer greater than 0."
+        )
 
     elif items_limit > ITEMS_PER_BOARD:
         log.warning(
@@ -174,6 +188,7 @@ async def get_items_from_boards(
         ):
             yield item
 
+
 async def _stream_all_items_from_page(
     http: HTTPSession,
     log: Logger,
@@ -196,37 +211,41 @@ async def _stream_all_items_from_page(
     """
 
     items_yielded = 0
-    
+
     null_tracker = BoardNullTracker()
 
-    # Stream boards to capture board-level information and detect null items_page
-    # Then yield individual items from accessible boards
-    async for board in execute_query(
-        BoardItems,
+    async for item in execute_query(
+        Item,
         http,
         log,
-        "data.boards.item",
+        "data.boards.item.items_page.items.item",
         query,
         variables,
         remainder_cls=ItemsPageRemainder,
         remainder_processor=cursor_collector,
         null_tracker=null_tracker,
     ):
-        if board.items_page is None:
-            null_tracker.track_board_with_null_field(board.id, "items_page")
-        elif board.items_page.items is None:
-            null_tracker.track_board_with_null_field(board.id, "items")
-        elif board.items_page and board.items_page.items:
-            for item in board.items_page.items:
-                items_yielded += 1
-                yield item
+        items_yielded += 1
+        yield item
 
-    cursors = cursor_collector.get_result(log)
+    # When a board's items or fields on the items are not accessible to the user's
+    # API token, the response may contain a "null" entry in the `data.boards` list while other
+    # boards are present. While the API usually returns all other boards, it is safer to not
+    # try to assume or infer the board ID(s) from the response like we do elsewhere with the `BoardNullTracker`.
+    # Since the API response doesn't have the board ID with some fields "null", we can't infer the board ID
+    # reliably enough. Therefore, we just log a warning message with the list of the board IDs that were queried producing
+    # one or many USER_UNAUTHORIZED errors/"null" boards.
+    cursors, null_board_count = cursor_collector.get_result(log)
+
+    if null_board_count:
+        log.error(
+            f"Monday's API returned {null_board_count} 'null' boards when trying to retrieve items. "
+            f"However, there is not a reliable way to get the board IDs from the API response. The boards that were queried are: {variables['boardIds']}"
+        )
+
     while cursors:
         cursor = cursors.pop(0)
-        log.debug(
-            f"Processing cursor pagination, remaining cursors: {len(cursors)}"
-        )
+        log.debug(f"Processing cursor pagination, remaining cursors: {len(cursors)}")
 
         cursor_variables = {"cursor": cursor, "limit": ITEMS_LIMIT_BY_ID}
         cur_collector = CursorCollector()
@@ -244,7 +263,28 @@ async def _stream_all_items_from_page(
             items_yielded += 1
             yield item
 
-        next_cursors = cur_collector.get_result(log)
+        # Same comment as above, but for subsequent pages. However, if there are permission
+        # issues for a board, there won't be a second page to process for the board in question.
+        # This will handle the scenario where permissions change between querying the first page
+        # and the second page that could cause the board to not be accessible anymore.
+        next_cursors, null_board_count = cur_collector.get_result(log)
+
+        if null_board_count:
+            log.error(
+                f"Monday's API returned {null_board_count} 'null' boards when trying to retrieve the next page of items. "
+                f"However, there is not a reliable way to get the board IDs from the API response. The boards that were queried are: {variables['boardIds']}"
+            )
+            raise RuntimeError(
+                "Encountered 'null' boards while trying to fetch next items page. "
+                "This usually indicates a permissions issue with the API token. "
+                "Please check the API token's permissions and try again.",
+                {
+                    "query": NEXT_ITEMS,
+                    "variables": cursor_variables,
+                    "null_board_count": null_board_count,
+                },
+            )
+
         if next_cursors:
             cursors.extend(next_cursors)
 

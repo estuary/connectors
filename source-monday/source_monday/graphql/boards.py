@@ -184,19 +184,20 @@ async def fetch_boards_with_retry(
 
                 chunks_to_process.extend([left_chunk, right_chunk])
 
+
 def create_board_validator(tracker: BoardNullTracker):
     def validate_board(board: Board) -> None:
-        if board.columns is None:
-            tracker.track_board_with_null_field(board.id, "columns")
-        if board.groups is None:
-            tracker.track_board_with_null_field(board.id, "groups")
-        if board.owners is None:
-            tracker.track_board_with_null_field(board.id, "owners")
-        if board.subscribers is None:
-            tracker.track_board_with_null_field(board.id, "subscribers")
-        if board.views is None:
-            tracker.track_board_with_null_field(board.id, "views")
+        if (
+            board.columns is None
+            or board.groups is None
+            or board.owners is None
+            or board.subscribers is None
+            or board.views is None
+        ):
+            tracker.track_board_with_auth_error(board.id)
+
     return validate_board
+
 
 async def _try_fetch_boards(
     http: HTTPSession,
