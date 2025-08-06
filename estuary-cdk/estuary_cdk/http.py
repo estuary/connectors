@@ -32,6 +32,7 @@ from .flow import (
 )
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
+DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
 
 T = TypeVar("T")
 
@@ -216,6 +217,7 @@ class TokenSource:
         | GoogleServiceAccount
     )
     authorization_header: str = DEFAULT_AUTHORIZATION_HEADER
+    authorization_token_type: str = DEFAULT_AUTHORIZATION_TOKEN_TYPE
     google_spec: GoogleServiceAccountSpec | None = None
     _access_token: AccessTokenResponse | GoogleServiceAccountCredentials | None = None
     _fetched_at: int = 0
@@ -232,7 +234,7 @@ class TokenSource:
                 RotatingOAuth2Credentials,
             )
         ):
-            return ("Bearer", self.credentials.access_token)
+            return (self.authorization_token_type, self.credentials.access_token)
         elif isinstance(self.credentials, BasicAuth):
             return (
                 "Basic",
@@ -258,7 +260,7 @@ class TokenSource:
                 case _:
                     raise RuntimeError(f"Unknown GoogleTokenState: {self._access_token.token_state}")
 
-            return ("Bearer", self._access_token.token)
+            return (self.authorization_token_type, self._access_token.token)
 
         assert (
             isinstance(self.credentials, BaseOAuth2Credentials)
@@ -273,7 +275,7 @@ class TokenSource:
             horizon = self._fetched_at + self._access_token.expires_in * 0.75
 
             if current_time < horizon:
-                return ("Bearer", self._access_token.access_token)
+                return (self.authorization_token_type, self._access_token.access_token)
 
         self._fetched_at = int(current_time)
         self._access_token = await self._fetch_oauth2_token(
@@ -284,7 +286,7 @@ class TokenSource:
             "fetched OAuth2 access token",
             {"at": self._fetched_at, "expires_in": self._access_token.expires_in},
         )
-        return ("Bearer", self._access_token.access_token)
+        return (self.authorization_token_type, self._access_token.access_token)
 
     async def initialize_oauth2_tokens(
         self,
