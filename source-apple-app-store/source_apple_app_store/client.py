@@ -43,7 +43,7 @@ CSV_CONFIG = CSVConfig(
     encoding="utf-8",
 )
 
-TPaginatedResponse = TypeVar(name="TPaginatedResponse", bound=BaseModel)
+TPaginatedResponse = TypeVar(name="TPaginatedResponse")
 
 
 class App(BaseModel, extra="allow"):
