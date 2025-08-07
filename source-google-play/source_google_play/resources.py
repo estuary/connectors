@@ -13,9 +13,12 @@ from .models import (
     GOOGLE_SPEC,
     GooglePlayRow,
     RESOURCES,
+    Reviews,
+    Statistics,
 )
 from .api import (
-    fetch_resources,
+    fetch_statistics,
+    fetch_reviews,
     backfill_resources,
 )
 
@@ -57,16 +60,26 @@ def resources(
         task: Task,
         all_bindings,
     ):
+        if issubclass(model, Reviews):
+            fetch_changes = functools.partial(
+                fetch_reviews,
+                gcs_client,
+            )
+        elif issubclass(model, Statistics):
+            fetch_changes = functools.partial(
+                fetch_statistics,
+                gcs_client,
+                model,
+            )
+        else:
+            raise RuntimeError(f"Unexpected resource type {model.name}.")
+
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                fetch_resources,
-                gcs_client,
-                model,
-            ),
+            fetch_changes=fetch_changes,
             fetch_page=functools.partial(
                 backfill_resources,
                 gcs_client,

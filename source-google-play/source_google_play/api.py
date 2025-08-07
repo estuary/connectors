@@ -7,18 +7,19 @@ from estuary_cdk.capture.common import LogCursor, PageCursor
 from .models import (
     GooglePlayRow,
     Reviews,
+    Statistics,
 )
 
 from .gcs import GCSClient, GCSFileMetadata
 from .shared import next_month, dt_to_str, str_to_dt
 
 
-async def fetch_resources(
+async def fetch_statistics(
     gcs_client: GCSClient,
-    model: type[GooglePlayRow],
+    model: type[Statistics],
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[GooglePlayRow | LogCursor, None]:
+) -> AsyncGenerator[Statistics | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
     files: list[GCSFileMetadata] = []
@@ -32,19 +33,40 @@ async def fetch_resources(
             model,
             model.validation_context_model(filename=file.name),
         ):
-            # Reviews have a "Review Last Update Date And Time" field that we can use to
-            # only yield rows that have been updated since the last sweep.
-            if isinstance(row, Reviews):
-                if row.updated_at >= log_cursor:
-                    yield row
-            # All other resources do not have an "updated_at" type field, so we have to
-            # yield all rows for every file that's been updated since the last sweep.
-            else:
-                yield row
+            yield row
 
     if len(files) > 0:
         latest_file = max(files, key=lambda f: f.updated)
         yield latest_file.updated + timedelta(milliseconds=1)
+
+
+async def fetch_reviews(
+    gcs_client: GCSClient,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[Reviews | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    files: list[GCSFileMetadata] = []
+    async for file in gcs_client.list_files(prefix=Reviews.prefix, globPattern=Reviews.get_glob_pattern()):
+        if file.updated >= log_cursor:
+            files.append(file)
+
+    last_review_updated_at = log_cursor
+    count = 0
+    for file in files:
+        async for row in gcs_client.stream_csv(
+            file.name,
+            Reviews,
+            Reviews.validation_context_model(filename=file.name),
+        ):
+            if row.updated_at >= log_cursor:
+                count += 1
+                yield row
+                last_review_updated_at = max(last_review_updated_at, row.updated_at)
+
+    if count > 0:
+        yield last_review_updated_at + timedelta(seconds=1)
 
 
 async def backfill_resources(
