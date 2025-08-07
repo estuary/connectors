@@ -183,6 +183,7 @@ class ActivityLogEvents(StrEnum):
     BOARD_VIEW_ADDED = "board_view_added"
     BOARD_VIEW_CHANGED = "board_view_changed"
     BOARD_VIEW_ENABLED = "board_view_enabled"
+    BOARD_VIEW_DELETED = "board_view_deleted"
     BOARD_WORKSPACE_ID_CHANGED = "board_workspace_id_changed"
     CHANGE_COLUMN_SETTINGS = "change_column_settings"
     CREATE_COLUMN = "create_column"
@@ -226,7 +227,7 @@ class ActivityLogEventData(BaseModel, extra="allow"):
 
 class ActivityLog(BaseModel, extra="allow"):
     entity: Literal["board", "pulse"]
-    event: ActivityLogEvents
+    event: str
     data: ActivityLogEventData
     created_at: str
     # Set by the connector for logging purposes. These are only None
@@ -269,6 +270,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.BOARD_VIEW_ADDED
                 | ActivityLogEvents.BOARD_VIEW_CHANGED
                 | ActivityLogEvents.BOARD_VIEW_ENABLED
+                | ActivityLogEvents.BOARD_VIEW_DELETED
                 | ActivityLogEvents.BOARD_WORKSPACE_ID_CHANGED
                 | ActivityLogEvents.CHANGE_COLUMN_SETTINGS
                 | ActivityLogEvents.UPDATE_BOARD_NICKNAME
