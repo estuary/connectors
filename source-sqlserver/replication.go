@@ -741,7 +741,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		// get an opportunity to observe the latest position.
 		var event = &sqlserverCommitEvent{CommitLSN: toLSN}
 		log.WithField("event", event).Trace("server lsn hasn't advanced, not polling any tables")
-		rs.events <- event
+		rs.emitEvent(ctx, event)
 		return nil
 	}
 
@@ -839,7 +839,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 
 	var event = &sqlserverCommitEvent{CommitLSN: toLSN}
 	log.WithField("event", event).Debug("checkpoint after polling")
-	rs.events <- event
+	rs.emitEvent(ctx, event)
 	rs.fromLSN = toLSN
 
 	return nil
