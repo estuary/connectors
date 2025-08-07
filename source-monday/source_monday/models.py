@@ -369,8 +369,6 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.DELETE_COLUMN
                 | ActivityLogEvents.CREATE_GROUP
                 | ActivityLogEvents.DELETE_GROUP
-                | ActivityLogEvents.SUBSCRIBE
-                | ActivityLogEvents.UNSUBSCRIBE
                 | ActivityLogEvents.UPDATE_GROUP_NAME
                 | ActivityLogEvents.UPDATE_COLUMN_NAME
                 | ActivityLogEvents.UPDATE_BOARD_NAME
@@ -394,6 +392,38 @@ class ActivityLog(BaseModel, extra="allow"):
                 )
 
                 return event_type, ids
+            case (
+                ActivityLogEvents.SUBSCRIBE
+                | ActivityLogEvents.UNSUBSCRIBE
+            ):
+                log.debug(f"Subscription event: {self.event}")
+                board_ids = []
+                item_ids = []
+                if self.data.board_id:
+                    board_ids.append(str(self.data.board_id))
+                if self.data.pulse_id:
+                    item_ids.append(str(self.data.pulse_id))
+                if self.data.item_id:
+                    item_ids.append(str(self.data.item_id))
+                
+                if stream == "boards":
+                    if not board_ids:
+                        raise ActivityLogProcessingError(
+                            f"Activity log event {self.event} has no identifiable board IDs.",
+                            query=self.query,
+                            variables=self.query_variables,
+                        )
+                    
+                    return ActivityLogEventType.BOARD_CHANGED, board_ids
+                if stream == "items":
+                    if not item_ids:
+                        raise ActivityLogProcessingError(
+                            f"Activity log event {self.event} has no identifiable item IDs.",
+                            query=self.query,
+                            variables=self.query_variables,
+                        )
+                    
+                    return ActivityLogEventType.ITEM_CHANGED, item_ids
             case _:
                 raise ActivityLogProcessingError(
                     f"Unanticipated activity log event: {self.event}. Please reach out to Estuary support for help resolving this issue.",
