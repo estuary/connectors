@@ -80,21 +80,25 @@ fn constraint_for_projection(
         Constraint {
             r#type: constraint::Type::LocationRecommended.into(),
             reason: "Primary key locations should usually be materialized".to_string(),
+            ..Default::default()
         }
     } else if p.ptr.is_empty() {
         Constraint {
             r#type: constraint::Type::FieldOptional.into(),
             reason: "The root document may be materialized".to_string(),
+            ..Default::default()
         }
     } else if p.field == "flow_published_at" || !p.ptr.strip_prefix("/").unwrap().contains("/") {
         Constraint {
             r#type: constraint::Type::LocationRecommended.into(),
             reason: "Top-level locations should usually be materialized".to_string(),
+            ..Default::default()
         }
     } else {
         Constraint {
             r#type: constraint::Type::FieldOptional.into(),
             reason: "This field may be materialized".to_string(),
+            ..Default::default()
         }
     };
 
@@ -117,11 +121,13 @@ fn constraint_for_projection(
                     r#type: constraint::Type::LocationRecommended.into(),
                     reason: "This location is the document of the current materialization"
                         .to_string(),
+            ..Default::default()
                 }
             } else if last_field_selection.values.binary_search(&p.field).is_ok() {
                 constraint = Constraint {
                     r#type: constraint::Type::LocationRecommended.into(),
                     reason: "This location is part of the current materialization".to_string(),
+            ..Default::default()
                 }
             }
         };

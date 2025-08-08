@@ -5,10 +5,10 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 FROM golang:1.24-bullseye AS builder
 
 RUN apt-get update \
-    && apt-get install -y curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev \
+    && apt-get install -y curl ca-certificates pkg-config cmake g++ libssl-dev libsasl2-dev libclang-dev \
     && rm -rf /var/lib/apt/lists/*
 
-RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.80
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y --default-toolchain 1.89
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN rustup component add clippy
 
