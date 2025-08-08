@@ -20,7 +20,7 @@ use crate::{
     Input, Output,
 };
 
-pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) -> Result<()> {
+pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open) -> Result<()> {
     let spec = open
         .materialization
         .expect("must have a materialization spec");
@@ -32,6 +32,7 @@ pub async fn run_transactions(mut input: Input, mut output: Output, open: Open) 
     output.send(Response {
         opened: Some(Opened {
             runtime_checkpoint: None,
+            ..Default::default()
         }),
         ..Default::default()
     })?;

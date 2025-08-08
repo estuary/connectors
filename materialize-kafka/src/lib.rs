@@ -20,47 +20,44 @@ pub mod validate;
 const KAFKA_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(60);
 
 pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
-    let request = match input.read()? {
-        Some(req) => req,
-        None => return Ok(()),
-    };
+    while let Some(request) = input.read()? {
+        if request.spec.is_some() {
+            let res = Response {
+                spec: Some(Spec {
+                    protocol: 3032023,
+                    config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?,
+                    resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?,
+                    documentation_url: "https://go.estuary.dev/materialize-kafka".to_string(),
+                    oauth2: None,
+                }),
+                ..Default::default()
+            };
 
-    if request.spec.is_some() {
-        let res = Response {
-            spec: Some(Spec {
-                protocol: 3032023,
-                config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?,
-                resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?,
-                documentation_url: "https://go.estuary.dev/materialize-kafka".to_string(),
-                oauth2: None,
-            }),
-            ..Default::default()
-        };
+            output.send(res)?;
+        } else if let Some(validate) = request.validate {
+            let res = Response {
+                validated: Some(Validated {
+                    bindings: do_validate(validate).await?,
+                }),
+                ..Default::default()
+            };
 
-        output.send(res)?;
-    } else if let Some(validate) = request.validate {
-        let res = Response {
-            validated: Some(Validated {
-                bindings: do_validate(validate).await?,
-            }),
-            ..Default::default()
-        };
+            output.send(res)?;
+        } else if let Some(apply) = request.apply {
+            let res = Response {
+                applied: Some(Applied {
+                    action_description: do_apply(apply).await?,
+                    state: None,
+                }),
+                ..Default::default()
+            };
 
-        output.send(res)?;
-    } else if let Some(apply) = request.apply {
-        let res = Response {
-            applied: Some(Applied {
-                action_description: do_apply(apply).await?,
-                state: None,
-            }),
-            ..Default::default()
-        };
-
-        output.send(res)?;
-    } else if let Some(open) = request.open {
-        run_transactions(input, output, open).await?;
-    } else {
-        anyhow::bail!("invalid request, expected spec|validate|apply|open");
+            output.send(res)?;
+        } else if let Some(open) = request.open {
+            run_transactions(&mut input, &mut output, open).await?;
+        } else {
+            anyhow::bail!("invalid request, expected spec|validate|apply|open");
+        }
     }
 
     Ok(())

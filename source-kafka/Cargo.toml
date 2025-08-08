@@ -45,3 +45,9 @@ insta = { version = "1", features = ["json", "serde"] }
 schema_registry_converter = { version = "4.2.0", features = ["avro", "json"] }
 uuid = "1.11"
 async-trait = "0.1"
+
+[patch.'crates-io']
+# TODO: Remove patch after next apache-avro release (>0.19.0)
+# Using git commit to get fix for bigdecimal feature regression where apache-avro
+# incorrectly depended on "serde-json" instead of "serde" feature
+apache-avro = { git = "https://github.com/apache/avro-rs.git", rev = "0c38f3f" }

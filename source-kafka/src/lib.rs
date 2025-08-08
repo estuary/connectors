@@ -31,81 +31,84 @@ pub async fn run_connector(
 
     let mut line = String::new();
 
-    if stdin.read_line(&mut line).await? == 0 {
-        return Ok(()); // Clean EOF.
-    };
-    let request: Request = serde_json::from_str(&line)?;
+    while stdin.read_line(&mut line).await? != 0 {
+        let request: Request = serde_json::from_str(&line)?;
+        line.clear();
 
-    if request.spec.is_some() {
-        let res = Response {
-            spec: Some(Spec {
-                protocol: 3032023,
-                config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?,
-                resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?,
-                documentation_url: "https://go.estuary.dev/source-kafka".to_string(),
-                oauth2: None,
-                resource_path_pointers: vec!["/topic".to_string()],
-            }),
-            ..Default::default()
-        };
-
-        write_capture_response(res, &mut stdout)?;
-    } else if let Some(req) = request.discover {
-        let res = Response {
-            discovered: Some(Discovered {
-                bindings: do_discover(req).await?,
-            }),
-            ..Default::default()
-        };
-
-        write_capture_response(res, &mut stdout)?;
-    } else if let Some(req) = request.validate {
-        let res = Response {
-            validated: Some(Validated {
-                bindings: do_validate(req).await?,
-            }),
-            ..Default::default()
-        };
-
-        write_capture_response(res, &mut stdout)?;
-    } else if request.apply.is_some() {
-        let res = Response {
-            applied: Some(Applied {
-                action_description: String::new(),
-            }),
-            ..Default::default()
-        };
-
-        write_capture_response(res, &mut stdout)?;
-    } else if let Some(req) = request.open {
-        write_capture_response(
-            Response {
-                opened: Some(Opened {
-                    explicit_acknowledgements: false,
+        if request.spec.is_some() {
+            let res = Response {
+                spec: Some(Spec {
+                    protocol: 3032023,
+                    config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?,
+                    resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?,
+                    documentation_url: "https://go.estuary.dev/source-kafka".to_string(),
+                    oauth2: None,
+                    resource_path_pointers: vec!["/topic".to_string()],
                 }),
                 ..Default::default()
-            },
-            &mut stdout,
-        )?;
+            };
 
-        let eof = tokio::spawn(async move {
-            match stdin.read_line(&mut line).await? {
-                0 => Ok(()),
-                n => anyhow::bail!(
-                    "read {} bytes from stdin when explicit acknowledgements were not requested",
-                    n
-                ),
+            write_capture_response(res, &mut stdout)?;
+        } else if let Some(req) = request.discover {
+            let res = Response {
+                discovered: Some(Discovered {
+                    bindings: do_discover(req).await?,
+                }),
+                ..Default::default()
+            };
+
+            write_capture_response(res, &mut stdout)?;
+        } else if let Some(req) = request.validate {
+            let res = Response {
+                validated: Some(Validated {
+                    bindings: do_validate(req).await?,
+                }),
+                ..Default::default()
+            };
+
+            write_capture_response(res, &mut stdout)?;
+        } else if request.apply.is_some() {
+            let res = Response {
+                applied: Some(Applied {
+                    action_description: String::new(),
+                }),
+                ..Default::default()
+            };
+
+            write_capture_response(res, &mut stdout)?;
+        } else if let Some(req) = request.open {
+            write_capture_response(
+                Response {
+                    opened: Some(Opened {
+                        explicit_acknowledgements: false,
+                    }),
+                    ..Default::default()
+                },
+                &mut stdout,
+            )?;
+
+            let eof = tokio::spawn(async move {
+                let mut line_string = String::new();
+                match stdin.read_line(&mut line_string).await? {
+                    0 => Ok(()),
+                    n => anyhow::bail!(
+                        "read {} bytes from stdin when explicit acknowledgements were not requested",
+                        n
+                    ),
+                }
+            });
+
+            let pull = tokio::spawn(do_pull(req, stdout));
+
+            tokio::select! {
+                pull_res = pull => pull_res??,
+                eof_res = eof => eof_res??,
             }
-        });
 
-        let pull = tokio::spawn(do_pull(req, stdout));
-
-        tokio::select! {
-            pull_res = pull => pull_res??,
-            eof_res = eof => eof_res??,
+            return Ok(());
+        } else {
+            anyhow::bail!("invalid request, expected spec|discover|validate|apply|open");
         }
-    } else {
-        anyhow::bail!("invalid request, expected spec|discover|validate|apply|open");
     }
 
     Ok(())
