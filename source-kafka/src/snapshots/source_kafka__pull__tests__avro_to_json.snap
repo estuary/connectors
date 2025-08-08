@@ -9,9 +9,13 @@ expression: "avro_to_json(record.into(), &record_schema_parsed).unwrap()"
   ],
   "boolField": true,
   "bytesField": "aGVsbG8=",
-  "dateField": 123,
+  "dateField": {
+    "$serde_json::private::Number": "123"
+  },
   "decimalField": "-32.442",
-  "doubleField": 340282346638528860000000000000000000000.0,
+  "doubleField": {
+    "$serde_json::private::Number": "3.4028235e38"
+  },
   "doubleFieldNaN": "NaN",
   "doubleFieldNegInf": "-inf",
   "doubleFieldPosInf": "inf",
@@ -19,19 +23,27 @@ expression: "avro_to_json(record.into(), &record_schema_parsed).unwrap()"
   "enumField": "b",
   "fixedBytesField": "aGVsbG8=",
   "fixedDecimalField": "99.36",
-  "floatField": 340282346638528860000000000000000000000.0,
+  "floatField": {
+    "$serde_json::private::Number": "3.4028235e38"
+  },
   "floatFieldNaN": "NaN",
   "floatFieldNegInf": "-inf",
   "floatFieldPosInf": "inf",
-  "intField": 2147483647,
+  "intField": {
+    "$serde_json::private::Number": "2147483647"
+  },
   "localTimestampMicrosField": "2024-10-29T20:26:46Z",
   "localTimestampMillisField": "2024-10-29T20:26:46Z",
-  "longField": 9223372036854775807,
+  "longField": {
+    "$serde_json::private::Number": "9223372036854775807"
+  },
   "mapField": {
     "key": "value"
   },
   "nestedRecordField": {
-    "nestedLongField": 123,
+    "nestedLongField": {
+      "$serde_json::private::Number": "123"
+    },
     "nestedStringField": "nested string value"
   },
   "nullField": null,
