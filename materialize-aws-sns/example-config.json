@@ -1,0 +1,17 @@
+{
+  "aws_region": "us-east-1",
+  "topic_arn": "arn:aws:sns:us-east-1:123456789012:example-topic",
+  "topic_type": "standard",
+  "partition_key_field": "/_meta/partition_key",
+  "idempotency_key_template": "<source>:<ns>:<doc_id>:<ts_ms>",
+  "delivery_mode": "async",
+  "batch_size": 5,
+  "max_in_flight": 100,
+  "retry_base_interval": "100ms",
+  "retry_max_interval": "30s",
+  "retry_max_attempts": 3,
+  "retry_jitter": 0.1,
+  "log_level": "info",
+  "metrics_namespace": "materialize_aws_sns"
+}
+

@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "materialize-aws-sns",
+  "description": "Configuration for the AWS SNS materializer.",
+  "type": "object",
+  "required": [
+    "aws_region",
+    "topic_arn"
+  ],
+  "properties": {
+    "aws_region": {
+      "type": "string",
+      "description": "AWS Region (e.g., us-east-1)"
+    },
+    "access_key_id": {
+      "type": "string",
+      "description": "AWS Access Key ID (optional)"
+    },
+    "secret_access_key": {
+      "type": "string",
+      "description": "AWS Secret Access Key (optional)"
+    },
+    "topic_arn": {
+      "type": "string",
+      "description": "SNS Topic ARN"
+    },
+    "topic_type": {
+      "type": "string",
+      "description": "Topic Type: standard|fifo (default standard)",
+      "enum": ["standard", "fifo"],
+      "default": "standard"
+    },
+    "partition_key_field": {
+      "type": "string",
+      "description": "Partition Key Field: default /_meta/partition_key (fallback namespace)",
+      "default": "/_meta/partition_key"
+    },
+    "idempotency_key_template": {
+      "type": "string",
+      "description": "Idempotency Key Template: default <source>:<ns>:<doc_id>:<ts_ms>",
+      "default": "<source>:<ns>:<doc_id>:<ts_ms>"
+    },
+    "delivery_mode": {
+      "type": "string",
+      "description": "Delivery Mode: async|sync (default async)",
+      "enum": ["async", "sync"],
+      "default": "async"
+    },
+    "batch_size": {
+      "type": "integer",
+      "description": "Batch Size (use SNS PublishBatch up to 10)",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 1
+    },
+    "max_in_flight": {
+      "type": "integer",
+      "description": "Max In Flight",
+      "minimum": 1,
+      "default": 100
+    },
+    "retry": {
+      "type": "object",
+      "description": "Retry configuration",
+      "properties": {
+        "base": {
+          "type": "string",
+          "description": "Base retry interval (e.g., 100ms)"
+        },
+        "max": {
+          "type": "string",
+          "description": "Max retry interval (e.g., 30s)"
+        },
+        "max_attempts": {
+          "type": "integer",
+          "description": "Max number of retry attempts"
+        },
+        "jitter": {
+          "type": "number",
+          "description": "Jitter factor for retry intervals"
+        }
+      }
+    },
+    "dlq_sqs_arn": {
+      "type": "string",
+      "description": "DLQ SQS ARN (optional)"
+    },
+    "kms_key_arn": {
+      "type": "string",
+      "description": "KMS Key ARN (optional)"
+    },
+    "assume_role_arn": {
+      "type": "string",
+      "description": "Assume Role ARN (optional)"
+    },
+    "log_level": {
+      "type": "string",
+      "description": "Log Level",
+      "default": "info"
+    },
+    "metrics_namespace": {
+      "type": "string",
+      "description": "Metrics Namespace",
+      "default": "materialize_aws_sns"
+    }
+  }
+}
+
+
