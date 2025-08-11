@@ -313,20 +313,19 @@ async def fetch_items_changes(
             },
         )
 
-        while True:
-            async for item in get_items_from_boards(
-                http,
-                log,
-                list(board_ids_to_backfill),
-            ):
-                # For board-level item refresh, the items' updated_at field is not guaranteed to change.
-                # We will emit all items in this case, but not update the max_updated_at_in_window
-                # For example, if a board and items is duplicated, the board's updated_at will be updated,
-                # but the items' updated_at could be some historical value (e.g., 2019-09-01T00:00:00Z).
-                if item.state == "deleted":
-                    item.meta_ = Item.Meta(op="d")
+        async for item in get_items_from_boards(
+            http,
+            log,
+            list(board_ids_to_backfill),
+        ):
+            # For board-level item refresh, the items' updated_at field is not guaranteed to change.
+            # We will emit all items in this case, but not update the max_updated_at_in_window
+            # For example, if a board and items is duplicated, the board's updated_at will be updated,
+            # but the items' updated_at could be some historical value (e.g., 2019-09-01T00:00:00Z).
+            if item.state == "deleted":
+                item.meta_ = Item.Meta(op="d")
 
-                yield item
+            yield item
 
     if max_change_dt > log_cursor:
         new_cursor = (max_change_dt + timedelta(seconds=1)).replace(microsecond=0)
