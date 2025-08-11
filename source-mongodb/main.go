@@ -127,6 +127,8 @@ type config struct {
 }
 
 type advancedConfig struct {
+	MaxAwaitTime              string `json:"maxAwaitTime,omitempty" jsonschema:"title=Max Await Time,description=Maximum time to wait for new change stream events before returning an empty batch. Defaults to 1 second. Accepts a Go duration string like '10s'."`
+	DisablePreImages          bool   `json:"disablePreImages,omitempty" jsonschema:"title=Disable Pre-Images,description=Disable requesting pre-images even if the MongoDB deployment supports them and they are enabled for collections."`
 	ExclusiveCollectionFilter bool   `json:"exclusiveCollectionFilter,omitempty" jsonschema:"title=Change Stream Exclusive Collection Filter,description=Add a MongoDB pipeline filter to database change streams to exclusively match events having enabled capture bindings. Should only be used if a small number of bindings are enabled."`
 	ExcludeCollections        string `json:"excludeCollections,omitempty" jsonschema:"title=Exclude Collections,description=Comma-separated list of collections to exclude from database change streams. Each one should be formatted as 'database_name:collection'. Cannot be set if exclusiveCollectionFilter is enabled."`
 }
@@ -177,6 +179,14 @@ func (c *config) Validate() error {
 
 	if c.Advanced.ExcludeCollections != "" && c.Advanced.ExclusiveCollectionFilter {
 		return fmt.Errorf("cannot set both excludeCollections and exclusiveCollectionFilter")
+	}
+
+	if c.Advanced.MaxAwaitTime != "" {
+		if parsed, err := time.ParseDuration(c.Advanced.MaxAwaitTime); err != nil {
+			return fmt.Errorf("invalid maxAwaitTime: %w", err)
+		} else if parsed <= 0 {
+			return fmt.Errorf("maxAwaitTime must be greater than 0, got %s", parsed.String())
+		}
 	}
 
 	if _, err := parseExcludeCollections(c.Advanced.ExcludeCollections); err != nil {

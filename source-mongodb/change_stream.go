@@ -65,6 +65,7 @@ type changeEvent struct {
 func (c *capture) initializeStreams(
 	ctx context.Context,
 	changeStreamBindings []bindingInfo,
+	maxAwaitTime *time.Duration,
 	requestPreImages bool,
 	exclusiveCollectionFilter bool,
 	excludeCollections map[string][]string,
@@ -122,6 +123,9 @@ func (c *capture) initializeStreams(
 		}
 
 		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
+		if maxAwaitTime != nil {
+			opts = opts.SetMaxAwaitTime(*maxAwaitTime)
+		}
 		if requestPreImages {
 			opts = opts.SetFullDocumentBeforeChange(options.WhenAvailable)
 			pl = append(pl, bson.D{{Key: "$changeStreamSplitLargeEvent", Value: bson.D{}}}) // must be the last stage in the pipeline

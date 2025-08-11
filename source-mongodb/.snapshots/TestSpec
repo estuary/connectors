@@ -76,6 +76,16 @@
       },
       "advanced": {
         "properties": {
+          "maxAwaitTime": {
+            "type": "string",
+            "title": "Max Await Time",
+            "description": "Maximum time to wait for new change stream events before returning an empty batch. Defaults to 1 second. Accepts a Go duration string like '10s'."
+          },
+          "disablePreImages": {
+            "type": "boolean",
+            "title": "Disable Pre-Images",
+            "description": "Disable requesting pre-images even if the MongoDB deployment supports them and they are enabled for collections."
+          },
           "exclusiveCollectionFilter": {
             "type": "boolean",
             "title": "Change Stream Exclusive Collection Filter",
