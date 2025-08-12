@@ -172,6 +172,7 @@ class ActivityLogEvents(StrEnum):
     ARCHIVE_PULSE = "archive_pulse"
     BATCH_CHANGE_PULSES_COLUMN_VALUE = "batch_change_pulses_column_value"
     BOARD_DELETED = "board_deleted"
+    BOARD_DISCONNECT = "board_disconnect"
     BATCH_CREATE_PULSES = "batch_create_pulses"
     BATCH_DELETE_PULSES = "batch_delete_pulses"
     BATCH_DUPLICATE_PULSES = "batch_duplicate_pulses"
@@ -271,6 +272,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 ActivityLogEvents.ARCHIVE_GROUP
                 | ActivityLogEvents.ADD_OWNER
                 | ActivityLogEvents.REMOVE_OWNER
+                | ActivityLogEvents.BOARD_DISCONNECT
                 | ActivityLogEvents.BOARD_VIEW_ADDED
                 | ActivityLogEvents.BOARD_VIEW_CHANGED
                 | ActivityLogEvents.BOARD_VIEW_ENABLED
