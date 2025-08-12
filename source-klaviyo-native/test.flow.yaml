@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-klaviyo-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_klaviyo_native
+        config: config.yaml
+    bindings: []
