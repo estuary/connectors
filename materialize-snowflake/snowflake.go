@@ -445,7 +445,16 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			for rows.Next() {
 				if err = rows.Scan(&binding, &document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)
-				} else if err = loaded(binding, json.RawMessage(document)); err != nil {
+				}
+
+				if len(document) >= 64*1024*1024 {
+					log.WithFields(log.Fields{
+						"binding": binding,
+						"preview": string(document[:200]),
+					}).Warn("document exceeds 64MiB limit")
+				}
+
+				if err = loaded(binding, json.RawMessage(document)); err != nil {
 					return fmt.Errorf("sending loaded document for table %q: %w", d.bindings[binding].target.Identifier, err)
 				}
 			}
