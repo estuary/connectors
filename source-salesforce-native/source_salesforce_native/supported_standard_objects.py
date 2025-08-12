@@ -1253,6 +1253,12 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "InvoiceShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
+    "Knowledge__ka": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "Knowledge__kav": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "KnowledgeableUser": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
