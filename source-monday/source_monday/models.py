@@ -191,6 +191,7 @@ class ActivityLogEvents(StrEnum):
     CREATE_PULSE = "create_pulse"
     DELETE_COLUMN = "delete_column"
     DELETE_GROUP = "delete_group"
+    DELETE_GROUP_PULSE = "delete_group_pulse"
     DELETE_PULSE = "delete_pulse"
     MOVE_PULSE_FROM_BOARD = "move_pulse_from_board"
     MOVE_PULSE_FROM_GROUP = "move_pulse_from_group"
@@ -198,6 +199,9 @@ class ActivityLogEvents(StrEnum):
     MOVE_PULSE_INTO_GROUP = "move_pulse_into_group"
     MOVE_SUBITEM = "move_subitem"
     REMOVE_OWNER = "remove_owner"
+    RESTORE_COLUMN = "restore_column"
+    RESTORE_GROUP = "restore_group"
+    RESTORE_PULSE = "restore_pulse"
     SUBSCRIBE = "subscribe"
     UPDATE_BOARD_NAME = "update_board_name"
     UPDATE_BOARD_NICKNAME = "update_board_nickname"
@@ -274,6 +278,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.BOARD_WORKSPACE_ID_CHANGED
                 | ActivityLogEvents.CHANGE_COLUMN_SETTINGS
                 | ActivityLogEvents.UPDATE_BOARD_NICKNAME
+                | ActivityLogEvents.RESTORE_GROUP
             ):
                 log.debug(f"Board change event: {self.event}")
                 ids = []
@@ -320,6 +325,8 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.BATCH_MOVE_PULSES_INTO_GROUP
                 | ActivityLogEvents.BATCH_DUPLICATE_PULSES
                 | ActivityLogEvents.MOVE_SUBITEM
+                | ActivityLogEvents.RESTORE_PULSE
+                | ActivityLogEvents.DELETE_GROUP_PULSE
             ):
                 log.debug(f"Item change event: {self.event}")
                 ids = []
@@ -369,6 +376,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.DELETE_COLUMN
                 | ActivityLogEvents.CREATE_GROUP
                 | ActivityLogEvents.DELETE_GROUP
+                | ActivityLogEvents.RESTORE_COLUMN
                 | ActivityLogEvents.UPDATE_GROUP_NAME
                 | ActivityLogEvents.UPDATE_COLUMN_NAME
                 | ActivityLogEvents.UPDATE_BOARD_NAME
@@ -405,7 +413,7 @@ class ActivityLog(BaseModel, extra="allow"):
                     item_ids.append(str(self.data.pulse_id))
                 if self.data.item_id:
                     item_ids.append(str(self.data.item_id))
-                
+
                 if stream == "boards":
                     if not board_ids:
                         raise ActivityLogProcessingError(
@@ -413,7 +421,7 @@ class ActivityLog(BaseModel, extra="allow"):
                             query=self.query,
                             variables=self.query_variables,
                         )
-                    
+
                     return ActivityLogEventType.BOARD_CHANGED, board_ids
                 if stream == "items":
                     if not item_ids:
@@ -422,7 +430,7 @@ class ActivityLog(BaseModel, extra="allow"):
                             query=self.query,
                             variables=self.query_variables,
                         )
-                    
+
                     return ActivityLogEventType.ITEM_CHANGED, item_ids
             case _:
                 raise ActivityLogProcessingError(
