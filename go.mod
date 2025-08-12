@@ -72,7 +72,7 @@ require (
 	github.com/xitongsys/parquet-go v1.6.2
 	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
 	go.gazette.dev/core v0.100.1-0.20250710152319-eef8fff243b1
-	go.mongodb.org/mongo-driver v1.16.1
+	go.mongodb.org/mongo-driver v1.17.4
 	golang.org/x/crypto v0.37.0
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394
 	golang.org/x/oauth2 v0.28.0
@@ -253,7 +253,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 // indirect
-	github.com/youmark/pkcs8 v0.0.0-20181117223130-1be2e3e5546d // indirect
+	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opencensus.io v0.24.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.1.0 // indirect

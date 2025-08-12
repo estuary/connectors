@@ -295,12 +295,11 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 	// the behavior of change streams, which only represent data that has been majority committed.
 	// This read concern will overwrite any that is set in the connection string parameter
 	// "readConcernLevel".
-	// TODO(whb): "zstd" is the last option for compression, since it currently results in quite a
-	// bit of memory usage, see https://jira.mongodb.org/browse/GODRIVER-3132. It uses about 1.5x as
-	// much memory as "zlib" or "snappy", but generally shouldn't OOM the connector so it isn't
-	// being completely disabled. We could re-evaluate this priority after
-	// https://github.com/mongodb/mongo-go-driver/pull/1577 is merged and released.
-	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"zlib", "snappy", "zstd"}).SetReadConcern(readconcern.Majority()).SetPoolMonitor(poolMonitor)
+	//
+	// Snappy compression is used since it is widely supported and quite a bit faster than zlib.
+	// zstd would be even better, but as of right now it causes the connector to use an excessive
+	// amount of memory.
+	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"snappy"}).SetReadConcern(readconcern.Majority()).SetPoolMonitor(poolMonitor)
 	if isDocDB {
 		tlsConfig, err := documentDBTLSConfig()
 		if err != nil {
