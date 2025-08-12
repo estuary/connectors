@@ -241,6 +241,9 @@ func (c *capture) Run() error {
 		orderedStates[i] = c.State.Streams[binding.stateKey]
 	}
 
+	//const batchThreshold = 256*1024 // Size threshold that triggers emitting a batch
+	const batchThreshold = 0 // Disabling batching entirely for a test
+
 	var nextBinding = 0 // Index of the next binding to emit.
 	var messageCount int
 	var totalBytes = c.State.TotalBytes
@@ -283,7 +286,7 @@ func (c *capture) Run() error {
 
 		// This is kind of hacky and won't work right if there are
 		// multiple bindings, but for a quick experiment it'll be fine.
-		if len(reused.buf) > 256*1024 || shuttingDown {
+		if len(reused.buf) > batchThreshold || shuttingDown {
 			// Wait for rate limiter
 			if limiter != nil {
 				if err = limiter.WaitN(c.Stream.Context(), len(reused.buf)); err != nil {
