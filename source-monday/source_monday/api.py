@@ -383,34 +383,39 @@ async def fetch_items_page(
         # Emit a cursor to checkpoint the complete dictionary of boards
         yield cursor.create_initial_cursor()
     else:
-        # Identify deleted boards to exclude from processing since they can be deleted between
-        # invocation of the fetch_items_page and will cause continuous INTERNAL_SERVER_ERROR issues if not handled properly
-        deleted_board_ids = []
-        current_board_ids = set()
-        async for board in fetch_boards_minimal(http, log):
-            current_board_ids.add(board.id)
-            if board.state == "deleted":
-                deleted_board_ids.append(board.id)
+        temp_cursor = ItemsBackfillCursor.from_cursor_dict(page)
 
-        # Also check for boards that existed in cursor but no longer exist at all.
-        # This has not happened yet, but might happen in the future if a board is deleted before being processed
-        # and the capture is disabled for 30+ days and Monday removes the board from the "Recycle Bin" which might
-        # mean the ID is no longer returned in the API response.
-        for board_id in page.keys():
-            if board_id not in current_board_ids:
-                deleted_board_ids.append(board_id)
+        # Only emit deletion patches when we actually have boards left to process.
+        # Otherwise, we will never "complete" backfill and the UI will show 1 binding
+        # is still backfilling since the function will be yielding a cursor before returning.
+        if temp_cursor.get_next_boards(BOARDS_PER_ITEMS_PAGE):
+            # Identify deleted boards to exclude from processing since they can be deleted between
+            # invocation of the fetch_items_page and will cause continuous INTERNAL_SERVER_ERROR issues if not handled properly
+            deleted_board_ids = []
+            current_board_ids = set()
+            async for board in fetch_boards_minimal(http, log):
+                current_board_ids.add(board.id)
+                if board.state == "deleted":
+                    deleted_board_ids.append(board.id)
 
-        # Emit completion patch for deleted boards to mark them as done
-        if deleted_board_ids:
-            temp_cursor = ItemsBackfillCursor.from_cursor_dict(page)
-            deleted_completion_patch = temp_cursor.create_completion_patch(deleted_board_ids)
-            yield deleted_completion_patch
-            log.debug(f"Marked {len(deleted_board_ids)} deleted boards as completed", {
-                "deleted_board_ids": deleted_board_ids
-            })
+            # Also check for boards that existed in cursor but no longer exist at all.
+            # This has not happened yet, but might happen in the future if a board is deleted before being processed
+            # and the capture is disabled for 30+ days and Monday removes the board from the "Recycle Bin" which might
+            # mean the ID is no longer returned in the API response.
+            for board_id in page.keys():
+                if board_id not in current_board_ids:
+                    deleted_board_ids.append(board_id)
 
-            for board_id in deleted_board_ids:
-                page.pop(board_id, None)
+            # Emit completion patch for deleted boards to mark them as done
+            if deleted_board_ids:
+                deleted_completion_patch = temp_cursor.create_completion_patch(deleted_board_ids)
+                yield deleted_completion_patch
+                log.debug(f"Marked {len(deleted_board_ids)} deleted boards as completed", {
+                    "deleted_board_ids": deleted_board_ids
+                })
+
+                for board_id in deleted_board_ids:
+                    page.pop(board_id, None)
 
         cursor = ItemsBackfillCursor.from_cursor_dict(page)
 
