@@ -47,7 +47,7 @@ func TestBatchStreamCoordinator(t *testing.T) {
 	default:
 	}
 
-	require.True(t, coord.gotCaughtUp("second", primitive.Timestamp{}))
+	require.True(t, coord.gotCaughtUp("second", primitive.Timestamp{T: 1001}))
 	require.True(t, coord.gotCaughtUp("third", primitive.Timestamp{T: 1001}))
 
 	select {
