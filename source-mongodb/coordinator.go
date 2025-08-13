@@ -76,6 +76,15 @@ func (b *streamBackfillCoordinator) startCatchingUp(ctx context.Context) error {
 }
 
 func (b *streamBackfillCoordinator) gotCaughtUp(db string, latest primitive.Timestamp) bool {
+	// Op times are extracted from resume tokens, and should never be zero.
+	if latest.IsZero() {
+		panic("internal error: latest opTime is zero")
+	}
+
+	if b.opTimeWatermark.After(latest) {
+		return false
+	}
+
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -84,12 +93,6 @@ func (b *streamBackfillCoordinator) gotCaughtUp(db string, latest primitive.Time
 	}
 
 	if !b.streamsInCatchup[db] {
-		return false
-	}
-
-	// A zero value for the latest optime means that there were no events left
-	// in the change stream, which means it must be caught up.
-	if !latest.IsZero() && b.opTimeWatermark.After(latest) {
 		return false
 	}
 

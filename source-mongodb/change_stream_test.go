@@ -151,7 +151,7 @@ func TestPullStream(t *testing.T) {
 
 			ts, err := c.pullStream(ctx, stream)
 			require.NoError(t, err)
-			require.True(t, ts.IsZero())
+			require.False(t, ts.IsZero())
 
 			tt.setup(t)
 

@@ -20,10 +20,6 @@ import (
 )
 
 var (
-	// disableRetriesForTesting can be set `true` when running tests that require
-	// timely operation.
-	disableRetriesForTesting bool
-
 	// changeStream associates a *mongo.ChangeStream with which database it is for.
 	// Change stream checkpoints that are a post-batch-resume-token only with no
 	// documents are throttled slightly, to minimize spamming checkpoints constantly
@@ -176,27 +172,9 @@ func (c *capture) streamChanges(
 			defer s.ms.Close(groupCtx)
 
 			for {
-				var err error
-				var opTime primitive.Timestamp
-				for attempt := range 10 {
-					// For catching up streams, require 10 consecutive attempts
-					// yielding no documents before the stream is considered
-					// caught-up, in the absence of a specific event timestamp
-					// that can be used to positively confirm caught-up-ness.
-					ll := log.WithFields(log.Fields{"db": s.db, "attempt": attempt})
-					if opTime, err = c.pullStream(groupCtx, s); err != nil {
-						return fmt.Errorf("change stream for %q: %w", s.db, err)
-					} else if !opTime.IsZero() || !catchup || disableRetriesForTesting {
-						if attempt > 0 {
-							ll.Info("change stream catch-up was retried and fetched documents")
-						}
-						break
-					}
-					ll.Debug("change stream returned no documents during catch-up, retrying")
-					time.Sleep(1 * time.Second)
-				}
-
-				if coordinator.gotCaughtUp(s.db, opTime) && catchup {
+				if opTime, err := c.pullStream(groupCtx, s); err != nil {
+					return fmt.Errorf("change stream for %q: %w", s.db, err)
+				} else if coordinator.gotCaughtUp(s.db, opTime) && catchup {
 					return nil
 				}
 			}
@@ -271,7 +249,6 @@ func getToken(s *changeStream) bson.Raw {
 // stream.
 func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Timestamp, error) {
 	var lastToken bson.Raw
-	var lastOpTime primitive.Timestamp
 	events := 0
 	docs := 0
 	for s.ms.TryNext(ctx) {
@@ -280,7 +257,6 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 		if err != nil {
 			return primitive.Timestamp{}, fmt.Errorf("reading change stream event: %w", err)
 		}
-		lastOpTime = ev.fields.ClusterTime
 		events += ev.fragments
 
 		if ev.isDocument {
@@ -336,42 +312,9 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 		s.lastPbrtCheckpoint = time.Now()
 	}
 
-	// TODO(whb): Temporary logging for the experimental `extractTimestamp`
-	// function. This is not intended to be permanent, and should be removed
-	// after sufficiently verifying that `extractTimestamp` works (or doesn't).
-	if log.GetLevel() == log.DebugLevel {
-		if !lastOpTime.IsZero() {
-			if exTs, err := extractTimestamp(lastToken); err != nil {
-				log.WithFields(log.Fields{
-					"db":         s.db,
-					"lastToken":  lastToken,
-					"finalToken": finalToken,
-					"lastOpTime": lastOpTime,
-				}).WithError(err).Debug("failed to extract timestamp from resume token")
-			} else {
-				log.WithFields(log.Fields{
-					"db":         s.db,
-					"lastToken":  lastToken,
-					"finalToken": finalToken,
-					"lastOpTime": lastOpTime,
-					"exTs":       exTs,
-					"matches":    exTs.Equal(lastOpTime),
-				}).Debug("extracted timestamp from resume token")
-			}
-		} else {
-			if exTs, err := extractTimestamp(finalToken); err != nil {
-				log.WithFields(log.Fields{
-					"db":         s.db,
-					"finalToken": finalToken,
-				}).WithError(err).Debug("failed to extract timestamp from pbrt")
-			} else {
-				log.WithFields(log.Fields{
-					"db":         s.db,
-					"finalToken": finalToken,
-					"exTs":       exTs,
-				}).WithError(err).Debug("extracted timestamp from pbrt")
-			}
-		}
+	lastOpTime, err := extractTimestamp(finalToken)
+	if err != nil {
+		return primitive.Timestamp{}, fmt.Errorf("extracting timestamp from resume token: %w", err)
 	}
 
 	c.mu.Lock()
