@@ -1,6 +1,6 @@
 FROM --platform=linux/amd64 debian:stable-slim AS debian
 
-RUN apt-get update && apt-get install -y openssh-client ca-certificates curl tzdata
+RUN apt-get update && apt-get install -y openssh-client ca-certificates curl tzdata tzdata-legacy
 
 # Create a non-privileged "nonroot" user.
 RUN useradd nonroot --create-home --shell /usr/sbin/nologin
