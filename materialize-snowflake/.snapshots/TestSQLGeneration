@@ -95,7 +95,7 @@ ALTER TABLE "a-schema".key_value ALTER COLUMN
 --- End alter table drop not nulls ---
 
 --- Begin "a-schema".key_value loadQuery ---
-SELECT 0, "a-schema".key_value.flow_document
+SELECT 0, TO_JSON("a-schema".key_value.flow_document)
 	FROM "a-schema".key_value
 	JOIN (
 		SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary"

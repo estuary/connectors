@@ -216,7 +216,7 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }}
+SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }})
 	FROM {{ $.Table.Identifier }}
 	JOIN (
 		SELECT {{ range $ind, $bound := $.Bounds }}
