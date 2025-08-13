@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"time"
+	_ "time/tzdata" // Embed the IANA time zone database.
 )
 
 var timeZoneOffsetRegex = regexp.MustCompile(`^[-+][0-9]{1,2}:[0-9]{2}$`)
