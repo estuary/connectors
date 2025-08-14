@@ -92,7 +92,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			dsn, err := cfg.toURI(tenant)
+			dsn, err := cfg.toURI(tenant, false)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
 			}
@@ -213,7 +213,7 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	dsn, err := cfg.toURI(ep.Tenant)
+	dsn, err := cfg.toURI(ep.Tenant, true)
 	if err != nil {
 		return nil, fmt.Errorf("building snowflake dsn: %w", err)
 	}

@@ -31,28 +31,40 @@ const (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db  *stdsql.DB
-	xdb *sqlx.DB // used to easily read the results of SHOW queries
-	cfg config
-	ep  *sql.Endpoint[config]
+	db         *stdsql.DB
+	dbNoSchema *stdsql.DB // for metadata operations performed before the endpoint-level schema is created
+	xdb        *sqlx.DB   // used to easily read the results of SHOW queries
+	cfg        config
+	ep         *sql.Endpoint[config]
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
-	dsn, err := ep.Config.toURI(ep.Tenant)
+	dsnWithSchema, err := ep.Config.toURI(ep.Tenant, true)
 	if err != nil {
 		return nil, err
 	}
 
-	db, err := stdsql.Open("snowflake", dsn)
+	db, err := stdsql.Open("snowflake", dsnWithSchema)
+	if err != nil {
+		return nil, err
+	}
+
+	dsnNoSchema, err := ep.Config.toURI(ep.Tenant, false)
+	if err != nil {
+		return nil, err
+	}
+
+	dbNoSchema, err := stdsql.Open("snowflake", dsnNoSchema)
 	if err != nil {
 		return nil, err
 	}
 
 	return &client{
-		db:  db,
-		xdb: sqlx.NewDb(db, "snowflake").Unsafe(),
-		cfg: ep.Config,
-		ep:  ep,
+		db:         db,
+		dbNoSchema: dbNoSchema,
+		xdb:        sqlx.NewDb(dbNoSchema, "snowflake").Unsafe(),
+		cfg:        ep.Config,
+		ep:         ep,
 	}, nil
 }
 
@@ -240,13 +252,13 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
-	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
+	return sql.StdCreateSchema(ctx, c.dbNoSchema, c.ep.Dialect, schemaName)
 }
 
 func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	dsn, err := cfg.toURI(tenant)
+	dsn, err := cfg.toURI(tenant, false)
 	if err != nil {
 		errs.Err(err)
 		return errs
@@ -305,6 +317,7 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 func (c *client) Close() {
 	c.db.Close()
+	c.dbNoSchema.Close()
 }
 
 // runShowPaginated runs a SHOW query, handling pagination for extremely large
