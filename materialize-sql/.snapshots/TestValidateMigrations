@@ -46,7 +46,7 @@ same binding again - standard updates:
 
 binding update with migratable changes:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"boolWidenedToJson","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolWidenedToJson' is already being materialized as endpoint type 'BOOLEAN' but endpoint type 'BOOLEAN, STRING' is required by its schema '{ type: [boolean, string] }'"}
+{"Field":"boolWidenedToJson","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'boolWidenedToJson' is already being materialized as endpoint type 'BOOLEAN' but endpoint type 'BOOLEAN, STRING' is required by its schema '{ type: [boolean, string] }'"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
@@ -54,7 +54,7 @@ binding update with migratable changes:
 {"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"int64ToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"intToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"intWidenedToJson","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'intWidenedToJson' is already being materialized as endpoint type 'INTEGER' but endpoint type 'BOOLEAN, INTEGER, STRING' is required by its schema '{ type: [boolean, integer, string] }'"}
+{"Field":"intWidenedToJson","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'intWidenedToJson' is already being materialized as endpoint type 'INTEGER' but endpoint type 'BOOLEAN, INTEGER, STRING' is required by its schema '{ type: [boolean, integer, string] }'"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -64,7 +64,7 @@ binding update with migratable changes:
 {"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
-{"Field":"stringWidenedToJson","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringWidenedToJson' is already being materialized as endpoint type 'STRING' but endpoint type 'BOOLEAN, INTEGER, STRING' is required by its schema '{ type: [boolean, integer, string] }'"}
+{"Field":"stringWidenedToJson","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringWidenedToJson' is already being materialized as endpoint type 'STRING' but endpoint type 'BOOLEAN, INTEGER, STRING' is required by its schema '{ type: [boolean, integer, string] }'"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 

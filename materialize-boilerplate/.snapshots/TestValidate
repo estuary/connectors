@@ -56,7 +56,7 @@ binding update with incompatible changes:
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"nonScalarValue","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -83,7 +83,7 @@ change root document projection for standard updates:
 {"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"second_root","Type":6,"TypeString":"UNSATISFIABLE","Reason":"The root document must be materialized as field 'flow_document'"}
+{"Field":"second_root","Type":6,"TypeString":"INCOMPATIBLE","Reason":"The root document must be materialized as field 'flow_document'"}
 
 change root document projection for delta updates:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -142,7 +142,7 @@ table already exists with incompatible proposed spec:
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"nonScalarValue","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"nonScalarValue","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'nonScalarValue' is already being materialized as endpoint type 'OBJECT' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}
 {"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -214,7 +214,7 @@ update an existing materialization with ambiguous fields in an incompatbile way:
 {"Field":"SECONDBADFIELD","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Flow collection field 'SECONDBADFIELD' would be materialized as 'secondbadfield', which is ambiguous with fields [secondBadField,secondbadfield]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields"}
 {"Field":"THIRDBADFIELD","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Flow collection field 'THIRDBADFIELD' is ambiguous with fields already being materialized as 'thirdbadfield' in the destination. Consider using an alternate, unambiguous projection of this field to allow it to be materialized"}
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"firstBadField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'firstBadField' is already being materialized as endpoint type 'STRING' but endpoint type 'INTEGER' is required by its schema '{ type: [integer] }'"}
+{"Field":"firstBadField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'firstBadField' is already being materialized as endpoint type 'STRING' but endpoint type 'INTEGER' is required by its schema '{ type: [integer] }'"}
 {"Field":"firstbadfield","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Flow collection field 'firstbadfield' is ambiguous with fields already being materialized as 'firstbadfield' in the destination. Consider using an alternate, unambiguous projection of this field to allow it to be materialized"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}

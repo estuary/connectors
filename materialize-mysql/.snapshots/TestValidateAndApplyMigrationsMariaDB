@@ -49,7 +49,7 @@ key (VARCHAR), _meta/flow_truncated (TINYINT), boolWidenedToJson (TINYINT), date
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"boolWidenedToJson","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolWidenedToJson' is already being materialized as endpoint type 'TINYINT' but endpoint type 'LONGTEXT' is required by its schema '{ type: [boolean, string] }'"}
+{"Field":"boolWidenedToJson","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'boolWidenedToJson' is already being materialized as endpoint type 'TINYINT' but endpoint type 'LONGTEXT' is required by its schema '{ type: [boolean, string] }'"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
