@@ -125,6 +125,7 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 				}
 			}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return identifierTransform(schema) }),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
 			return identifierTransform(field)
 		}),

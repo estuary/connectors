@@ -116,6 +116,10 @@ func validHost(h string) error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string {
+	return c.Schema
+}
+
 func (c config) FeatureFlags() (string, map[string]bool) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }

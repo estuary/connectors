@@ -77,6 +77,7 @@ func TestValidateAndApply(t *testing.T) {
 			is := boilerplate.NewInfoSchema(
 				func(rp []string) []string { return rp },
 				func(f string) string { return f },
+				func(f string) string { return f },
 				true,
 			)
 			require.NoError(t, catalog.populateInfoSchema(ctx, is, [][]string{path}))

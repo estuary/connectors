@@ -241,6 +241,10 @@ func (c testEndpointConfiger) Validate() error {
 	return nil
 }
 
+func (c testEndpointConfiger) DefaultNamespace() string {
+	return ""
+}
+
 func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
 	return "", nil
 }

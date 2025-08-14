@@ -226,6 +226,10 @@ func (c config) Validate() error {
 	return c.Credentials.Validate()
 }
 
+func (c config) DefaultNamespace() string {
+	return ""
+}
+
 func (c config) FeatureFlags() (string, map[string]bool) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
@@ -420,7 +424,7 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
 	return boilerplate.MaterializeCfg{
-		Translate:           translateField,
+		TranslateField:      translateField,
 		ConcurrentApply:     true,
 		NoCreateNamespaces:  true,
 		NoTruncateResources: true,

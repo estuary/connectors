@@ -112,9 +112,8 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 				}
 			}
 		}),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
-			return translateIdentifier(field)
-		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return translateIdentifier(schema) }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return translateIdentifier(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				isSimpleIdentifier,

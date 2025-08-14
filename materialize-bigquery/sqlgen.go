@@ -123,6 +123,7 @@ func bqDialect(objAndArrayAsJson bool) sql.Dialect {
 				TableName:   translateFlowIdentifier(path[2]),
 			}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return schema }),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return translateFlowIdentifier(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			identifierSanitizer(sql.PassThroughTransform(

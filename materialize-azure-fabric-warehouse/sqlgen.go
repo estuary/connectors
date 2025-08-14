@@ -84,6 +84,7 @@ var dialect = func() sql.Dialect {
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return schema }),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(

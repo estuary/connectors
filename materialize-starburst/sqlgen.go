@@ -100,9 +100,8 @@ var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.M
 				}
 			}
 		}),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
-			return strings.ToLower(field)
-		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return strings.ToLower(schema) }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return strings.ToLower(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
 				isSimpleIdentifier,

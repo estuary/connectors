@@ -137,7 +137,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 	}
 
 	return boilerplate.MaterializeCfg{
-		Translate:             translate,
+		TranslateField:        translate,
 		ConcurrentApply:       true,
 		MaxFieldLength:        255,
 		CaseInsensitiveFields: true,

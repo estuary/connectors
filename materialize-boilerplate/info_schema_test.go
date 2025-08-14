@@ -26,7 +26,7 @@ func TestInfoSchema(t *testing.T) {
 		return strings.TrimSuffix(in, "_transformed")
 	}
 
-	is := NewInfoSchema(transformPath, transform, true)
+	is := NewInfoSchema(transformPath, transform, transform, true)
 
 	nullableField := ExistingField{
 		Name:               transform("nullableField"),
@@ -124,6 +124,7 @@ func TestInfoSchema(t *testing.T) {
 				return out
 			},
 			translate,
+			translate,
 			false,
 		)
 
@@ -147,5 +148,35 @@ func TestInfoSchema(t *testing.T) {
 		}
 
 		require.Equal(t, want, is.AmbiguousResourcePaths(paths))
+	})
+
+	t.Run("namespaces", func(t *testing.T) {
+		translate := func(in string) string {
+			return strings.ToLower(in)
+		}
+
+		is := NewInfoSchema(
+			func(in []string) []string {
+				out := make([]string, 0, len(in))
+				for _, i := range in {
+					out = append(out, translate(i))
+				}
+				return out
+			},
+			translate,
+			translate,
+			false,
+		)
+
+		is.PushNamespace("hello")
+		require.Len(t, is.namespaces, 1)
+		require.True(t, is.HasNamespace("hello"))
+		require.True(t, is.HasNamespace("Hello"))
+		require.False(t, is.HasNamespace("Hello_Other"))
+		is.PushNamespace("hello")
+		require.Len(t, is.namespaces, 1)
+		is.PushNamespace("hello_other")
+		require.Len(t, is.namespaces, 2)
+		require.True(t, is.HasNamespace("Hello_Other"))
 	})
 }
