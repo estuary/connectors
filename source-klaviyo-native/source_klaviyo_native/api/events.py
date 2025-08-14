@@ -77,13 +77,6 @@ async def _fetch_events_updated_between(
         yield doc
 
 
-class WorkerDoneSentinel:
-    def __repr__(self):
-        return "WORKER_DONE"
-
-WORKER_DONE = WorkerDoneSentinel()
-
-
 class QueueManager:
     def __init__(self, work_queue_size: int, subdivision_queue_size: int):
         self.work_queue = Queue(maxsize=work_queue_size)
@@ -112,16 +105,17 @@ class QueueManager:
     async def put_document(self, document: IncrementalStream) -> None:
         await self.document_queue.put(document)
 
-    async def put_sentinel(self) -> None:
-        await self.document_queue.put(WORKER_DONE)
-    
-    async def get_document(self) -> IncrementalStream | WorkerDoneSentinel:
-        return await self.document_queue.get()
+    async def get_document(self, timeout: float = 1.0) -> Optional[IncrementalStream]:
+        try:
+            return await asyncio.wait_for(self.document_queue.get(), timeout=timeout)
+        except asyncio.TimeoutError:
+            return None
 
-    def are_work_queues_empty(self) -> bool:
+    def are_all_queues_empty(self) -> bool:
         return (
             self.work_queue.empty() and
-            self.subdivision_request_queue.empty()
+            self.subdivision_request_queue.empty() and
+            self.document_queue.empty()
         )
 
 
@@ -147,10 +141,14 @@ class WorkManager:
         self._active_worker_count = 0
 
     def mark_worker_active(self) -> None:
+        if self._active_worker_count >= DEFAULT_BACKFILL_CONFIG.num_event_workers:
+            raise Exception(f"A worker attempted to mark itself active when the active worker count is {self._active_worker_count}.")
         self._active_worker_count += 1
 
     def mark_worker_inactive(self) -> None:
-        self._active_worker_count = max(0, self._active_worker_count - 1)
+        if self._active_worker_count <= 0:
+            raise Exception(f"A worker attempted to mark itself inactive when the active worker count is {self._active_worker_count}.")
+        self._active_worker_count -= 1
 
     def are_active_workers(self) -> bool:
         return self._active_worker_count > 0
@@ -163,24 +161,45 @@ class WorkManager:
         initial_chunks = self._create_initial_chunks(start, end)
         await self.queue_manager.put_work_chunks(initial_chunks)
 
-        await self._start_workers()
+        async with asyncio.TaskGroup() as tg:
+            self.worker_tasks = [
+                tg.create_task(
+                    chunk_worker(
+                        worker_id=i,
+                        queue_manager=self.queue_manager,
+                        work_manager=self,
+                        http=self.http,
+                        log=self.log,
+                        shutdown_event=self.shutdown_event,
+                    ),
+                    name=f"chunk_worker_{i + 1}"
+                )
+                for i in range(DEFAULT_BACKFILL_CONFIG.num_event_workers)
+            ]
 
-        try:
-            sentinels_received = 0
-            expected_sentinels = DEFAULT_BACKFILL_CONFIG.num_event_workers
+            self.subdivision_task = tg.create_task(
+                subdivision_worker(
+                    queue_manager=self.queue_manager,
+                    log=self.log,
+                    shutdown_event=self.shutdown_event,
+                ),
+                name="subdivision_worker"
+            )
 
-            while sentinels_received < expected_sentinels:
-                document = await self.queue_manager.get_document()
+            self.shutdown_monitor_task = tg.create_task(
+                self._shutdown_monitor(),
+                name="shutdown_monitor"
+            )
 
-                if document is WORKER_DONE:
-                    sentinels_received += 1
-                    continue
-                else:
-                    assert isinstance(document, IncrementalStream)
-                    yield document
-        finally:
-            await self._cleanup_tasks()
-
+            # Document processing happens within the TaskGroup to ensure task failures immediately interrupt
+            # document processing & prevent partial checkpoints. _get_documents_from_queue checks the same shutdown_event
+            # as the tasks, so it will cleanly exit alongside tasks.
+            #
+            # Note: We don't run _get_documents_from_queue as a separate task in the TaskGroup since
+            # we need to stream documents directly - running as a separate task would require caching
+            # all documents in memory and returning them all as the task's result.
+            async for document in self._get_documents_from_queue():
+                yield document
 
     def _create_initial_chunks(self, start: datetime, end: datetime) -> list[DateChunk]:
         return [
@@ -188,54 +207,20 @@ class WorkManager:
             for chunk_start, chunk_end in split_date_window(start, end, DEFAULT_BACKFILL_CONFIG.initial_chunks)
         ]
 
-    async def _start_workers(self) -> None:
-        self.worker_tasks = [
-            asyncio.create_task(
-                chunk_worker(
-                    worker_id=i,
-                    queue_manager=self.queue_manager,
-                    work_manager=self,
-                    http=self.http,
-                    log=self.log,
-                    shutdown_event=self.shutdown_event,
-                ),
-                name=f"chunk_worker_{i}"
-            )
-            for i in range(DEFAULT_BACKFILL_CONFIG.num_event_workers)
-        ]
-
-        self.subdivision_task = asyncio.create_task(
-            subdivision_worker(
-                queue_manager=self.queue_manager,
-                log=self.log,
-                shutdown_event=self.shutdown_event,
-            ),
-            name="subdivision_worker"
-        )
-
-        self.shutdown_monitor_task = asyncio.create_task(
-            self._shutdown_monitor(),
-            name="shutdown_monitor"
-        )
+    async def _get_documents_from_queue(self) -> AsyncGenerator[IncrementalStream, None]:
+        while not self.shutdown_event.is_set():
+            document = await self.queue_manager.get_document()
+            if document is not None:
+                yield document
 
     async def _shutdown_monitor(self) -> None:
         while not self.shutdown_event.is_set():
-            if not self.are_active_workers() and self.queue_manager.are_work_queues_empty():
+            if not self.are_active_workers() and self.queue_manager.are_all_queues_empty():
                 self.log.debug("All work complete - shutdown monitor initiating shutdown")
                 self.shutdown_event.set()
                 break
 
             await asyncio.sleep(1)
-
-    async def _cleanup_tasks(self) -> None:
-        if self.shutdown_monitor_task:
-            await self.shutdown_monitor_task
-
-        if self.subdivision_task:
-            await self.subdivision_task
-
-        if self.worker_tasks:
-            await asyncio.gather(*self.worker_tasks)
 
 
 # chunk_worker pulls a date chunk from the queue and fetches events created in
@@ -315,9 +300,6 @@ async def chunk_worker(
 
         work_manager.mark_worker_inactive()
 
-    # Send sentinel & signal this worker is done before shutting down.
-    log.debug(f"Event worker {worker_id} is sending sentinel.")
-    await queue_manager.put_sentinel()
     log.debug(f"Event worker {worker_id} exited.")
 
 
