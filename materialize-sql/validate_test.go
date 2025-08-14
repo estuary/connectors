@@ -139,7 +139,7 @@ func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec, transform f
 		return out
 	}
 
-	is := boilerplate.NewInfoSchema(transformPath, transform, false)
+	is := boilerplate.NewInfoSchema(transformPath, transform, transform, false)
 
 	if s == nil || len(s.Bindings) == 0 {
 		return is

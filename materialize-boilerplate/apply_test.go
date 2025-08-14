@@ -158,7 +158,7 @@ func testInfoSchemaFromSpec(t *testing.T, s *pf.MaterializationSpec, transform f
 		return out
 	}
 
-	is := NewInfoSchema(transformPath, transform, false)
+	is := NewInfoSchema(transformPath, transform, transform, false)
 
 	if s == nil || len(s.Bindings)+len(s.InactiveBindings) == 0 {
 		return is

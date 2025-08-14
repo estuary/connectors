@@ -72,6 +72,7 @@ var pgDialect = func() sql.Dialect {
 				return sql.InfoTableLocation{TableSchema: truncatedIdentifier(path[0]), TableName: truncatedIdentifier(path[1])}
 			}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return truncatedIdentifier(schema) }),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return truncatedIdentifier(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(

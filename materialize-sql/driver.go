@@ -125,7 +125,8 @@ func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
 
 	return boilerplate.MaterializeCfg{
 		Locate:                ToLocatePathFn(s.endpoint.Dialect.TableLocator),
-		Translate:             s.endpoint.ColumnLocator,
+		TranslateNamespace:    s.endpoint.SchemaLocator,
+		TranslateField:        s.endpoint.ColumnLocator,
 		MaxFieldLength:        s.endpoint.Dialect.MaxColumnCharLength,
 		CaseInsensitiveFields: s.endpoint.Dialect.CaseInsensitiveColumns,
 		ConcurrentApply:       s.endpoint.ConcurrentApply,

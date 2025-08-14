@@ -50,6 +50,10 @@ func (c config) Validate() error {
 	return nil
 }
 
+func (c config) DefaultNamespace() string {
+	return ""
+}
+
 func (c config) FeatureFlags() (string, map[string]bool) {
 	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
@@ -219,7 +223,7 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
 	return boilerplate.MaterializeCfg{
-		Translate:           func(f string) string { return f },
+		TranslateField:      func(f string) string { return f },
 		ConcurrentApply:     true,
 		NoCreateNamespaces:  true,
 		NoTruncateResources: true,

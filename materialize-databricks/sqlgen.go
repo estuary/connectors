@@ -75,6 +75,7 @@ var databricksDialect = func() sql.Dialect {
 				TableName:   strings.ToLower(path[1]),
 			}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return strings.ToLower(schema) }),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return translateFlowField(field) }),
 		Identifierer: sql.IdentifierFn(func(path ...string) string {
 			// Sanitize column names per Databricks' restrictions. Table names do not have to be

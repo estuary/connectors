@@ -84,6 +84,11 @@ func (r *ExistingResource) AllFields() []ExistingField {
 // endpoint, for example.
 type LocatePathFn func([]string) []string
 
+// TranslateNamespaceFn takes a configured namespace and outputs a translated string that can be
+// used to find the namespace in the InfoSchema, with translations applied in a similar way as
+// LocatePathFn.
+type TranslateNamespaceFn func(string) string
+
 // TranslateFieldFn takes a Flow field name and outputs a translated string that can be used to find
 // the field in the InfoSchema, with translations applied in a similar way as LocatePathFn.
 type TranslateFieldFn func(string) string
@@ -94,15 +99,22 @@ type InfoSchema struct {
 	namespaces            []string
 	resources             []*ExistingResource
 	locatePath            LocatePathFn
+	translateNamespace    TranslateNamespaceFn
 	translateField        TranslateFieldFn
 	caseInsensitiveFields bool
 }
 
 // NewInfoSchema creates a new InfoSchema that will use the `locate` and `translateField` functions
 // to look up EndpointFields for Flow resource paths and fields.
-func NewInfoSchema(locate LocatePathFn, translateField TranslateFieldFn, caseInsensitiveFields bool) *InfoSchema {
+func NewInfoSchema(
+	locate LocatePathFn,
+	translateNamespace TranslateNamespaceFn,
+	translateField TranslateFieldFn,
+	caseInsensitiveFields bool,
+) *InfoSchema {
 	return &InfoSchema{
 		locatePath:            locate,
+		translateNamespace:    translateNamespace,
 		translateField:        translateField,
 		caseInsensitiveFields: caseInsensitiveFields,
 	}
@@ -117,6 +129,15 @@ func (i *InfoSchema) PushNamespace(namespace string) {
 	}
 
 	i.namespaces = append(i.namespaces, namespace)
+}
+
+// HasNamespace reports if the desired namespace is contained in the InfoSchema.
+// The "desired namespace" is as-configured from the Flow spec, and does not
+// necessarily include any translations such as casing, sanitization, etc. that
+// are used when creating the namespace. The TranslateNamespaceFn is used to
+// account for this.
+func (i *InfoSchema) HasNamespace(ns string) bool {
+	return slices.Contains(i.namespaces, i.translateNamespace(ns))
 }
 
 // PushResource adds a resource with no fields to the InfoSchema. The returned

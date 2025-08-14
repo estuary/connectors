@@ -85,6 +85,7 @@ var crateDialect = func() sql.Dialect {
 				return sql.InfoTableLocation{TableSchema: path[0], TableName: normalizeColumn(path[1])}
 			}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return schema }),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return normalizeColumn(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			identifierSanitizer(sql.PassThroughTransform(

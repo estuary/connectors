@@ -118,6 +118,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 			// name of the database.
 			return sql.InfoTableLocation{TableSchema: database, TableName: path[0]}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return schema }),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return translateFlowIdentifier(field) }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			identifierSanitizer(sql.PassThroughTransform(

@@ -10,6 +10,7 @@ import (
 // Dialect encapsulates many specifics of an Endpoint's interpretation of SQL.
 type Dialect struct {
 	TableLocatorer
+	SchemaLocatorer
 	ColumnLocatorer
 	Identifierer
 	Literaler
@@ -48,6 +49,12 @@ type InfoTableLocation struct {
 	TableName   string
 }
 
+// SchemaLocatorer translates a schema name from a Flow configuration into the value used to locate
+// that schema in the INFORMATION_SCHEMA view for the endpoint.
+type SchemaLocatorer interface {
+	SchemaLocator(field string) string
+}
+
 // ColumnLocatorer translates a field name from a Flow collection spec into the value used to locate
 // that field in the INFORMATION_SCHEMA view for the endpoint. This is similar to how an
 // InfoTableLocation must apply connector-specific transforms for the TableSchema and TableName.
@@ -83,6 +90,11 @@ type TypeMapper interface {
 type TableLocatorFn func(path []string) InfoTableLocation
 
 func (f TableLocatorFn) TableLocator(path []string) InfoTableLocation { return f(path) }
+
+// SchemaLocatorFn is a function that implements SchemaLocatorer.
+type SchemaLocatorFn func(field string) string
+
+func (f SchemaLocatorFn) SchemaLocator(field string) string { return f(field) }
 
 // ColumnLocatorFn is a function that implements ColumnLocatorer.
 type ColumnLocatorFn func(field string) string

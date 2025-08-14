@@ -34,13 +34,17 @@ type MaterializeCfg struct {
 	// sanitized paths in Validate.
 	Locate LocatePathFn
 
-	// TranslateFieldFn takes a Flow field name and outputs a translated string
+	// TranslateNamespace takes a configured namespace and outputs a translated
+	// string that can be used to find the namespace in the InfoSchema.
+	TranslateNamespace TranslateNamespaceFn
+
+	// TranslateField takes a Flow field name and outputs a translated string
 	// that can be used to find the field in the InfoSchema, with translations
 	// applied in a similar way as LocatePathFn. It is relatively common for
 	// some kind of translation to need to be done if the destination does not
 	// support special characters vs. those supported by Flow field names, or if
 	// the destination lowercases all column identifiers, for example.
-	Translate TranslateFieldFn
+	TranslateField TranslateFieldFn
 
 	// MaxFieldLength is used to produce "forbidden" constraints on field names
 	// that are too long. If maxFieldLength is 0, no constraints are enforced.
@@ -192,6 +196,13 @@ type MaterializerTransactor interface {
 // EndpointConfiger represents a parsed endpoint config.
 type EndpointConfiger interface {
 	pb.Validator
+
+	// DefaultNamespace is the namespace used for bindings if no explicit
+	// namespace is configured for the binding. It may also contain metadata
+	// tables, and needs to exist even if no binding is actually created in it.
+	// This can return an empty string if namespaces do not apply to the
+	// materialization.
+	DefaultNamespace() string
 
 	// FeatureFlags returns the raw string of comma-separated feature flags, and
 	// the default feature flag values that should be applied.
@@ -464,16 +475,20 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		// include resource creation. Otherwise resources creation may fail due
 		// to namespaces not yet existing.
 		requiredNamespaces := make(map[string]struct{})
+		if ns := endpointCfg.DefaultNamespace(); ns != "" {
+			requiredNamespaces[ns] = struct{}{}
+		}
+
 		for _, b := range req.Materialization.Bindings {
-			path := is.locatePath(b.ResourcePath)
-			if len(path) < 2 {
+			if p := b.ResourcePath; len(p) < 2 {
 				continue
+			} else {
+				requiredNamespaces[(p[len(p)-2])] = struct{}{}
 			}
-			requiredNamespaces[path[len(path)-2]] = struct{}{}
 		}
 
 		for ns := range requiredNamespaces {
-			if slices.Contains(is.namespaces, ns) {
+			if is.HasNamespace(ns) {
 				continue
 			} else if desc, err := materializer.CreateNamespace(ctx, ns); err != nil {
 				return nil, err
@@ -707,15 +722,19 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 
 func initInfoSchema(cfg MaterializeCfg) *InfoSchema {
 	locatePath := func(rp []string) []string { return rp }
+	translateNamespace := func(f string) string { return f }
 	translateField := func(f string) string { return f }
 	if cfg.Locate != nil {
 		locatePath = cfg.Locate
 	}
-	if cfg.Translate != nil {
-		translateField = cfg.Translate
+	if cfg.TranslateNamespace != nil {
+		translateNamespace = cfg.TranslateNamespace
+	}
+	if cfg.TranslateField != nil {
+		translateField = cfg.TranslateField
 	}
 
-	return NewInfoSchema(locatePath, translateField, cfg.CaseInsensitiveFields)
+	return NewInfoSchema(locatePath, translateNamespace, translateField, cfg.CaseInsensitiveFields)
 }
 
 func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
