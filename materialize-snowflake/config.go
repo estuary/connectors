@@ -39,18 +39,24 @@ type advancedConfig struct {
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
-// toURI manually builds the DSN connection string.
-func (c config) toURI(tenant string) (string, error) {
+// toURI manually builds the DSN connection string. Most uses should set
+// `includeSchema`, to preserve legacy behavior where having the schema set on
+// the connection level is necessary for queries involving tables that don't
+// have the schema as part of their resource path.
+func (c config) toURI(tenant string, includeSchema bool) (string, error) {
 	var uri = url.URL{
 		Host: c.Host + ":443",
 	}
 
 	queryParams := make(url.Values)
 
+	if includeSchema {
+		queryParams.Add("schema", c.Schema)
+	}
+
 	// Required params
 	queryParams.Add("application", fmt.Sprintf("%s_EstuaryFlow", tenant))
 	queryParams.Add("database", c.Database)
-	queryParams.Add("schema", c.Schema)
 	// GO_QUERY_RESULT_FORMAT is json in order to enable stream downloading of load results.
 	queryParams.Add("GO_QUERY_RESULT_FORMAT", "json")
 	// By default Snowflake expects the number of statements to be provided
