@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/http"
 	"slices"
 	"strings"
 	"sync"
@@ -16,7 +15,6 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -208,27 +206,6 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 
 func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	c, err := cfg.client(ctx, nil)
-	if err != nil {
-		errs.Err(fmt.Errorf("creating client: %w", err))
-		return errs
-	}
-
-	var googleErr *googleapi.Error
-
-	if meta, err := c.bigqueryClient.DatasetInProject(c.cfg.ProjectID, c.cfg.Dataset).Metadata(ctx); err != nil {
-		if errors.As(err, &googleErr) {
-			// The raw error message returned if the dataset or project can't be found can be pretty
-			// vague, but a 404 code always means that one of those two things couldn't be found.
-			if googleErr.Code == http.StatusNotFound {
-				err = fmt.Errorf("the ProjectID %q or BigQuery Dataset %q could not be found: %s (code %v)", c.cfg.ProjectID, c.cfg.Dataset, googleErr.Message, googleErr.Code)
-			}
-		}
-		errs.Err(err)
-	} else if meta.Location != c.cfg.Region {
-		errs.Err(fmt.Errorf("dataset %q is actually in region %q, which is different than the configured region %q", c.cfg.Dataset, meta.Location, c.cfg.Region))
-	}
 
 	if bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))); err != nil {
 		errs.Err(fmt.Errorf("creating GCS bucket: %w", err))
