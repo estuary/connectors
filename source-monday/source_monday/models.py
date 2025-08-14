@@ -182,9 +182,10 @@ class ActivityLogEvents(StrEnum):
     BATCH_MOVE_PULSES_INTO_GROUP = "batch_move_pulses_into_group"
     BOARD_STATE_CHANGED = "board_state_changed"
     BOARD_VIEW_ADDED = "board_view_added"
+    BOARD_VIEW_DELETED = "board_view_deleted"
     BOARD_VIEW_CHANGED = "board_view_changed"
     BOARD_VIEW_ENABLED = "board_view_enabled"
-    BOARD_VIEW_DELETED = "board_view_deleted"
+    BOARD_VIEW_DISABLED = "board_view_disabled"
     BOARD_WORKSPACE_ID_CHANGED = "board_workspace_id_changed"
     CHANGE_COLUMN_SETTINGS = "change_column_settings"
     CREATE_COLUMN = "create_column"
@@ -206,8 +207,10 @@ class ActivityLogEvents(StrEnum):
     SUBSCRIBE = "subscribe"
     UPDATE_BOARD_NAME = "update_board_name"
     UPDATE_BOARD_NICKNAME = "update_board_nickname"
+    UPDATE_BOARD_PERMISSIONS = "update_board_permissions"
     UPDATE_COLUMN_NAME = "update_column_name"
     UPDATE_COLUMN_VALUE = "update_column_value"
+    UPDATE_GROUP_COLOR = "update_group_color"
     UPDATE_GROUP_NAME = "update_group_name"
     UPDATE_NAME = "update_name"
     UNSUBSCRIBE = "unsubscribe"
@@ -276,10 +279,12 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.BOARD_VIEW_ADDED
                 | ActivityLogEvents.BOARD_VIEW_CHANGED
                 | ActivityLogEvents.BOARD_VIEW_ENABLED
+                | ActivityLogEvents.BOARD_VIEW_DISABLED
                 | ActivityLogEvents.BOARD_VIEW_DELETED
                 | ActivityLogEvents.BOARD_WORKSPACE_ID_CHANGED
                 | ActivityLogEvents.CHANGE_COLUMN_SETTINGS
                 | ActivityLogEvents.UPDATE_BOARD_NICKNAME
+                | ActivityLogEvents.UPDATE_BOARD_PERMISSIONS
                 | ActivityLogEvents.RESTORE_GROUP
             ):
                 log.debug(f"Board change event: {self.event}")
@@ -379,6 +384,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.CREATE_GROUP
                 | ActivityLogEvents.DELETE_GROUP
                 | ActivityLogEvents.RESTORE_COLUMN
+                | ActivityLogEvents.UPDATE_GROUP_COLOR
                 | ActivityLogEvents.UPDATE_GROUP_NAME
                 | ActivityLogEvents.UPDATE_COLUMN_NAME
                 | ActivityLogEvents.UPDATE_BOARD_NAME
