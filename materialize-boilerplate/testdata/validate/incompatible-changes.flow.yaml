@@ -6,7 +6,7 @@ collections:
         key: { type: string }
         scalarValue: { type: "null" } # Changed to a "forbidden"
         numericString: { type: [integer, string], format: integer }
-        nonScalarValue: { type: string } # Changed to an "unsatisfiable"
+        nonScalarValue: { type: string } # Changed to an "incompatible"
         multiple: { type: [integer, string, boolean] }
         nullValue: { type: "null" }
         optional: { type: object }
