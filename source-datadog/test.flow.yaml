@@ -1,0 +1,19 @@
+---
+captures:
+  acmeCo/source-datadog:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_datadog
+        config:
+          credentials:
+            credentials_title: Private App Credentials
+            access_token: secret_api_key
+            application_key: secret_application_key
+          site: us5.datadoghq.com
+          start_date: "2021-01-01T00:00:00Z"
+          advanced:
+            window_size: 30
+    bindings: []
