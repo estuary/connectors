@@ -136,7 +136,8 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
-			Constraints: constraints,
+			CaseInsensitiveFields: false,
+			Constraints:           constraints,
 			// Only delta updates are supported by webhooks.
 			DeltaUpdates: true,
 			ResourcePath: []string{resolved.String()},
