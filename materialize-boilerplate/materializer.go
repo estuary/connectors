@@ -390,10 +390,11 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 			return nil, fmt.Errorf("validating binding: %w", err)
 		} else {
 			out = append(out, &pm.Response_Validated_Binding{
-				Constraints:  constraints,
-				DeltaUpdates: delta,
-				ResourcePath: path,
-				SerPolicy:    mCfg.SerPolicy,
+				CaseInsensitiveFields: materializer.Config().CaseInsensitiveFields,
+				Constraints:           constraints,
+				DeltaUpdates:          delta,
+				ResourcePath:          path,
+				SerPolicy:             mCfg.SerPolicy,
 			})
 		}
 	}

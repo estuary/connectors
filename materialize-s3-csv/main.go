@@ -40,10 +40,11 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 
 func (c config) CommonConfig() filesink.CommonConfig {
 	return filesink.CommonConfig{
-		Prefix:         c.Prefix,
-		Extension:      ".csv.gz",
-		UploadInterval: c.UploadInterval,
-		FileSizeLimit:  c.FileSizeLimit,
+		Prefix:                c.Prefix,
+		Extension:             ".csv.gz",
+		UploadInterval:        c.UploadInterval,
+		FileSizeLimit:         c.FileSizeLimit,
+		CaseInsensitiveFields: false,
 	}
 }
 

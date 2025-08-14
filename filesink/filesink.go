@@ -29,10 +29,11 @@ type Config interface {
 }
 
 type CommonConfig struct {
-	Prefix         string
-	Extension      string
-	UploadInterval string
-	FileSizeLimit  int
+	Prefix                string
+	Extension             string
+	UploadInterval        string
+	FileSizeLimit         int
+	CaseInsensitiveFields bool
 }
 
 // Store represents a file/object storage system capable of put'ing a stream of data to a binary
@@ -110,6 +111,11 @@ func (d FileDriver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Respons
 func (d FileDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var out []*pm.Response_Validated_Binding
 
+	var config, err = d.NewConfig(req.ConfigJson)
+	if err != nil {
+		return nil, fmt.Errorf("parsing endpoint config: %w", err)
+	}
+
 	for _, b := range req.Bindings {
 		var res resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
@@ -122,9 +128,10 @@ func (d FileDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
-			Constraints:  constraints,
-			DeltaUpdates: true,
-			ResourcePath: []string{res.Path},
+			CaseInsensitiveFields: config.CommonConfig().CaseInsensitiveFields,
+			Constraints:           constraints,
+			DeltaUpdates:          true,
+			ResourcePath:          []string{res.Path},
 		})
 	}
 

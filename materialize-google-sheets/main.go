@@ -178,9 +178,10 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 		}
 
 		out = append(out, &pm.Response_Validated_Binding{
-			Constraints:  constraints,
-			DeltaUpdates: false,
-			ResourcePath: []string{res.Sheet},
+			CaseInsensitiveFields: false,
+			Constraints:           constraints,
+			DeltaUpdates:          false,
+			ResourcePath:          []string{res.Sheet},
 		})
 	}
 
