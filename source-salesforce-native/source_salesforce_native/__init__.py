@@ -17,9 +17,9 @@ from .resources import all_resources, enabled_resources
 from .models import (
     ConnectorState,
     EndpointConfig,
-    OAUTH2_SPEC,
     SalesforceResourceConfigWithSchedule,
 )
+from .auth import OAUTH2_SPEC
 
 
 class Connector(

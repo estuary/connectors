@@ -24,15 +24,12 @@ from .models import (
     SalesforceResourceConfigWithSchedule,
     ResourceState,
     ConnectorState,
-    SalesforceTokenSource,
     GlobalDescribeObjectsResponse,
     SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API,
     FieldDetailsDict,
     SObject,
-    OAUTH2_SPEC,
     FullRefreshResource,
     SalesforceResource,
-    update_oauth_spec,
     create_salesforce_model,
 )
 from .api import (
@@ -40,7 +37,11 @@ from .api import (
     backfill_incremental_resources,
     fetch_incremental_resources,
 )
-
+from .auth import (
+    SalesforceTokenSource,
+    OAUTH2_SPEC,
+    update_oauth_spec,
+)
 
 CUSTOM_OBJECT_SUFFIX = '__c'
 CUSTOM_OBJECT_FEED_SUFFIX = '__Feed'
