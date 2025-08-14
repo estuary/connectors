@@ -270,6 +270,7 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 				}
 
 				if err := sm.c.write(ctx, blob); err != nil {
+					log.WithField("blob", blob).Warn("blob metadata")
 					return fmt.Errorf("failed to write renamed blob: %w", err)
 				}
 				ll.Info("successfully registered renamed blob")
