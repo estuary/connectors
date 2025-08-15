@@ -153,7 +153,7 @@ type MappedType struct {
 	Converter ElementConverter `json:"-"`
 	// The list of compatible column types for this mapping. The
 	// DDL used to create the column is included by default. Any columns with
-	// types not in this list or the migratable list will produce an "unsatisfiable" constraint.
+	// types not in this list or the migratable list will produce an "incompatible" constraint.
 	CompatibleColumnTypes CompatibleColumnTypes
 	// If the column is using user-defined DDL or not. The selected field will
 	// always pass validation if this is true.

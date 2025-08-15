@@ -79,20 +79,20 @@ Big Schema Re-validated Constraints:
 Big Schema Changed Types Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"boolField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BIT' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
+{"Field":"boolField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BIT' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
-{"Field":"numField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'numField' is already being materialized as endpoint type 'FLOAT' but endpoint type 'BIT' is required by its schema '{ type: [boolean] }'"}
+{"Field":"numField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'numField' is already being materialized as endpoint type 'FLOAT' but endpoint type 'BIT' is required by its schema '{ type: [boolean] }'"}
 {"Field":"objField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringField","Type":6,"TypeString":"UNSATISFIABLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'VARCHAR' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
+{"Field":"stringField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'VARCHAR' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}

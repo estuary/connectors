@@ -29,10 +29,11 @@ func (c config) Validate() error {
 
 func (c config) CommonConfig() filesink.CommonConfig {
 	return filesink.CommonConfig{
-		Prefix:         c.Prefix,
-		Extension:      ".csv.gz",
-		UploadInterval: c.UploadInterval,
-		FileSizeLimit:  c.FileSizeLimit,
+		Prefix:                c.Prefix,
+		Extension:             ".csv.gz",
+		UploadInterval:        c.UploadInterval,
+		FileSizeLimit:         c.FileSizeLimit,
+		CaseInsensitiveFields: false,
 	}
 }
 

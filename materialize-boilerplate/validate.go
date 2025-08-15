@@ -218,7 +218,7 @@ func (v Validator) validateMatchesExistingResource(
 
 		if c.Type == pm.Response_Validated_Constraint_FIELD_FORBIDDEN {
 			// Is the proposed type completely disallowed by the materialization? This differs from
-			// being UNSATISFIABLE, which implies that re-creating the materialization could resolve
+			// being INCOMPATIBLE, which implies that re-creating the materialization could resolve
 			// the difference.
 		} else if !deltaUpdates && p.IsRootDocumentProjection() {
 			docFields = append(docFields, p.Field)
@@ -340,7 +340,7 @@ func (v Validator) validateMatchesExistingResource(
 		// from a prior specification, if that's known. If it doesn't, make sure to fail the build
 		// with a constraint on a root document projection that it does have.
 		constraints[docFields[0]] = &pm.Response_Validated_Constraint{
-			Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
+			Type: pm.Response_Validated_Constraint_INCOMPATIBLE,
 			Reason: fmt.Sprintf(
 				"The root document must be materialized as field '%s'",
 				lastBinding.FieldSelection.Document,
@@ -384,7 +384,7 @@ func (v Validator) constraintForExistingField(
 		}
 
 		out = &pm.Response_Validated_Constraint{
-			Type: pm.Response_Validated_Constraint_UNSATISFIABLE,
+			Type: pm.Response_Validated_Constraint_INCOMPATIBLE,
 			Reason: fmt.Sprintf(
 				"Field '%s' is already being materialized as endpoint type '%s' but endpoint type '%s' is required by its schema '%s'",
 				p.Field,
