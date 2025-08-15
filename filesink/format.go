@@ -25,7 +25,12 @@ func (c ParquetConfig) Validate() error {
 	return nil
 }
 
-func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error) {
+func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io.WriteCloser, uuidLogicalType bool) (StreamWriter, error) {
+	var schemaOpts []writer.ParquetSchemaOption
+	if !uuidLogicalType {
+		schemaOpts = append(schemaOpts, writer.WithParquetUUIDAsString())
+	}
+
 	sch := make(writer.ParquetSchema, 0, len(b.FieldSelection.AllFields()))
 	for _, f := range b.FieldSelection.AllFields() {
 		p := b.Collection.GetProjection(f)
@@ -37,7 +42,7 @@ func NewParquetWriter(cfg ParquetConfig, b *pf.MaterializationSpec_Binding, w io
 			}
 		}
 
-		sch = append(sch, writer.ProjectionToParquetSchemaElement(*p, fc.CastToString))
+		sch = append(sch, writer.ProjectionToParquetSchemaElement(*p, fc.CastToString, schemaOpts...))
 	}
 
 	var opts []writer.ParquetOption
