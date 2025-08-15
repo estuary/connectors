@@ -83,7 +83,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
 		require.NoError(t, err)
 
-		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, false)
+		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
@@ -114,7 +114,7 @@ func TestStreamManager(t *testing.T) {
 		})
 
 		// A second invocation invalidates the first.
-		ssm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, false)
+		ssm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 		require.NoError(t, ssm.addBinding(ctx, cfg.Schema, table.Identifier, table))
 
@@ -176,7 +176,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
 		require.NoError(t, err)
 
-		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, false)
+		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
@@ -247,7 +247,7 @@ func TestStreamManager(t *testing.T) {
 			require.NoError(t, err)
 		}
 
-		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, false)
+		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 
 		for _, tbl := range tables {
@@ -366,7 +366,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, createQuery)
 		require.NoError(t, err)
 
-		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, false)
+		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl.Identifier, tbl))
 
@@ -416,17 +416,7 @@ func TestStreamManager(t *testing.T) {
 		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol VARIANT);`)
 		require.NoError(t, err)
 
-		{
-			// With enforceVariantMaxLength set to true, a large VARIANT value
-			// can't be written.
-			sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, true)
-			require.NoError(t, err)
-			require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
-			require.Error(t, sm.writeRow(ctx, 0, []any{"key1", json.RawMessage(data)}))
-		}
-
-		// But it can be written and read when enforceVariantMaxLength is false.
-		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, false)
+		sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 		require.NoError(t, err)
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key1", json.RawMessage(data)}))
@@ -542,7 +532,7 @@ func TestStreamDatatypes(t *testing.T) {
 			_, err = db.ExecContext(ctx, createQuery.String())
 			require.NoError(t, err)
 
-			sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0, false)
+			sm, err := newStreamManager(&cfg, "testing", "testing", accountName, 0)
 			require.NoError(t, err)
 
 			require.NoError(t, sm.addBinding(ctx, cfg.Schema, tbl.Identifier, tbl))

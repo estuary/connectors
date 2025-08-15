@@ -30,11 +30,6 @@ const (
 	// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/DataValidationUtil.java#L73
 	BYTES_16_MB = 16 * 1024 * 1024
 
-	// MAX_SEMI_STRUCTURED_LENGTH is the same as maxStrLen, but includes room
-	// for a little bit of overhead, apparently.
-	// Ref: https://github.com/snowflakedb/snowflake-ingest-java/blob/3cbaebfe26f59dc3a8b8e973649e3f1a1014438c/src/main/java/net/snowflake/ingest/streaming/internal/DataValidationUtil.java#L77
-	MAX_SEMI_STRUCTURED_LENGTH = BYTES_16_MB - 64
-
 	// MAX_LOB_LENGTH is the maximum length allowed for the "longest string"
 	// value of blob metadata. Values longer than this are truncated by
 	// `truncateBytesAsHex`.
@@ -58,11 +53,10 @@ const (
 )
 
 type bdecWriter struct {
-	pq                      *writer.ParquetWriter
-	blobStats               *blobStatsTracker
-	cols                    []tableColumn
-	done                    bool
-	enforceVariantMaxLength bool
+	pq        *writer.ParquetWriter
+	blobStats *blobStatsTracker
+	cols      []tableColumn
+	done      bool
 }
 
 // bdecWriter writes bdec files, which are basically Parquet files with values
@@ -76,7 +70,6 @@ func newBdecWriter(
 	existingColumns []tableColumn,
 	encryptionKey string,
 	fileName blobFileName,
-	enforceVariantMaxLength bool,
 ) (*bdecWriter, error) {
 	orderedCols, err := orderExistingColumns(mappedColumns, existingColumns)
 	if err != nil {
@@ -142,10 +135,9 @@ func newBdecWriter(
 	)
 
 	return &bdecWriter{
-		pq:                      pq,
-		blobStats:               blobStats,
-		cols:                    orderedCols,
-		enforceVariantMaxLength: enforceVariantMaxLength,
+		pq:        pq,
+		blobStats: blobStats,
+		cols:      orderedCols,
 	}, nil
 }
 
@@ -184,11 +176,7 @@ func (bw *bdecWriter) writeRow(row []any) error {
 			row[i] = v
 			stats.nextStr(v)
 		case "variant":
-			maxLength := MAX_SEMI_STRUCTURED_LENGTH
-			if !bw.enforceVariantMaxLength {
-				maxLength = math.MaxInt
-			}
-			v, err := getStr(row[i], maxLength)
+			v, err := getStr(row[i], math.MaxInt)
 			if err != nil {
 				return fmt.Errorf("getStr for column %q: %w", col.Name, err)
 			}
