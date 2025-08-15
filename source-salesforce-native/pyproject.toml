@@ -9,6 +9,7 @@ estuary-cdk = {path="../estuary-cdk", develop = true}
 pydantic = "^2"
 python = "^3.11"
 aiohttp = "^3.11.15"
+simple-salesforce = "^1.12.6"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
