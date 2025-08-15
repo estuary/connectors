@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -21,6 +22,10 @@ import (
 
 type Config interface {
 	CommonConfig() CommonConfig
+
+	// FeatureFlags returns the raw string of comma-separated feature flags, and
+	// the default feature flag values that should be applied.
+	FeatureFlags() (raw string, defaults map[string]bool)
 }
 
 type CommonConfig struct {
@@ -69,8 +74,8 @@ var _ boilerplate.Connector = &FileDriver{}
 // FileDriver contains the behaviors particular to a destination system and file format.
 type FileDriver struct {
 	NewConfig        func(raw json.RawMessage) (Config, error)
-	NewStore         func(ctx context.Context, config Config) (Store, error)
-	NewWriter        func(config Config, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error)
+	NewStore         func(ctx context.Context, config Config, featureFlags map[string]bool) (Store, error)
+	NewWriter        func(config Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error)
 	NewConstraints   func(p *pf.Projection) *pm.Response_Validated_Constraint
 	DocumentationURL func() string
 	ConfigSchema     func() ([]byte, error)
@@ -132,7 +137,13 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *
 		return nil, nil, nil, err
 	}
 
-	store, err := d.NewStore(ctx, driverCfg)
+	rawFlags, defaultFlags := driverCfg.FeatureFlags()
+	parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+	if rawFlags != "" {
+		log.WithField("flags", parsedFlags).Info("parsed feature flags")
+	}
+
+	store, err := d.NewStore(ctx, driverCfg, parsedFlags)
 	if err != nil {
 		return nil, nil, nil, err
 	}
@@ -151,9 +162,9 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *
 			path:       res.Path,
 			includeDoc: b.FieldSelection.Document != "",
 			newWriter: func(w io.WriteCloser) (StreamWriter, error) {
-				// Partial application of the driverCfg and b arguments to the FileDriver's NewWriter
+				// Partial application of the driver's arguments to the FileDriver's NewWriter
 				// function, for convenience.
-				return d.NewWriter(driverCfg, b, w)
+				return d.NewWriter(driverCfg, parsedFlags, b, w)
 			},
 		})
 	}
