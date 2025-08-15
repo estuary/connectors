@@ -309,7 +309,7 @@ async def enabled_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig, bindings: list[common._ResolvableBinding]
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
 
     enabled_binding_names: list[str] = []
 
@@ -349,7 +349,7 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
 
     queryable_object_names = await _fetch_queryable_objects(log, http, config.credentials.instance_url)
 

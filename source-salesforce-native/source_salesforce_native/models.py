@@ -20,7 +20,7 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 
-from .auth import OAuth2Credentials
+from .auth import OAuth2Credentials, UserPass
 from .shared import dt_to_str, str_to_dt
 
 
@@ -54,7 +54,7 @@ class EndpointConfig(BaseModel):
         description="Toggle if you're using a Salesforce Sandbox.",
         default=False,
     )
-    credentials: OAuth2Credentials = Field(
+    credentials: OAuth2Credentials | UserPass = Field(
         discriminator="credentials_title",
         title="Authentication",
     )

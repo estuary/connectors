@@ -16,6 +16,47 @@
           "title": "Advanced",
           "type": "object"
         },
+        "UserPass": {
+          "properties": {
+            "credentials_title": {
+              "const": "Username, Password, & Security Token",
+              "default": "Username, Password, & Security Token",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "username": {
+              "order": 1,
+              "title": "Username",
+              "type": "string"
+            },
+            "password": {
+              "order": 2,
+              "secret": true,
+              "title": "Password",
+              "type": "string"
+            },
+            "security_token": {
+              "order": 3,
+              "secret": true,
+              "title": "Security Token",
+              "type": "string"
+            },
+            "instance_url": {
+              "default": "",
+              "title": "Instance URL",
+              "type": "string",
+              "x-hidden-field": true
+            }
+          },
+          "required": [
+            "username",
+            "password",
+            "security_token"
+          ],
+          "title": "UserPass",
+          "type": "object"
+        },
         "_OAuth2Credentials": {
           "properties": {
             "credentials_title": {
@@ -71,13 +112,17 @@
         "credentials": {
           "discriminator": {
             "mapping": {
-              "OAuth Credentials": "#/$defs/_OAuth2Credentials"
+              "OAuth Credentials": "#/$defs/_OAuth2Credentials",
+              "Username, Password, & Security Token": "#/$defs/UserPass"
             },
             "propertyName": "credentials_title"
           },
           "oneOf": [
             {
               "$ref": "#/$defs/_OAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/UserPass"
             }
           ],
           "title": "Authentication"
