@@ -41,6 +41,7 @@ from .auth import (
     SalesforceTokenSource,
     OAUTH2_SPEC,
     update_oauth_spec,
+    UserPass,
 )
 
 CUSTOM_OBJECT_SUFFIX = '__c'
@@ -304,12 +305,22 @@ async def _object_to_resource(
         )
 
 
+def _fetch_instance_url(log: Logger, config: EndpointConfig) -> str:
+    if isinstance(config.credentials, UserPass):
+        _, instance_url = config.credentials.fetch_access_token_and_instance_url(config.is_sandbox)
+    else:
+        instance_url = config.credentials.instance_url
+
+    return instance_url
+
+
 # enabled_resources returns resources for only enabled bindings.
 async def enabled_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig, bindings: list[common._ResolvableBinding]
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
+    instance_url = _fetch_instance_url(log, config)
 
     enabled_binding_names: list[str] = []
 
@@ -317,8 +328,8 @@ async def enabled_resources(
         path: list[str] = binding.resourceConfig.path()
         enabled_binding_names.append(path[0])
 
-    bulk_job_manager = BulkJobManager(http, log, config.credentials.instance_url)
-    rest_query_manager = RestQueryManager(http, log, config.credentials.instance_url)
+    bulk_job_manager = BulkJobManager(http, log, instance_url)
+    rest_query_manager = RestQueryManager(http, log, instance_url)
 
     # If we concurrently send multiple requests that exchange the same refresh token for an access token,
     # some of those requests intermittently fail. 
@@ -326,13 +337,13 @@ async def enabled_resources(
     # To avoid this, we make a noop request to set the token_source's access token before using the scatter-gather
     # technique to make multiple requests concurrently. This prevents the first BUILD_RESOURCE_SEMAPHORE_LIMIT
     # requests from all exchanging the same access token and encountering that intermittent error.
-    await _fetch_queryable_objects(log, http, config.credentials.instance_url)
+    await _fetch_queryable_objects(log, http, instance_url)
 
     semaphore = asyncio.Semaphore(BUILD_RESOURCE_SEMAPHORE_LIMIT)
     async def build_resource(name: str) -> common.Resource | None:
         async with semaphore:
             return await _object_to_resource(
-                log, http, config, bulk_job_manager, rest_query_manager, config.credentials.instance_url, name, True
+                log, http, config, bulk_job_manager, rest_query_manager, instance_url, name, True
             )
 
     task_results = await asyncio.gather(
@@ -349,16 +360,17 @@ async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
+    instance_url = _fetch_instance_url(log, config)
 
-    queryable_object_names = await _fetch_queryable_objects(log, http, config.credentials.instance_url)
+    queryable_object_names = await _fetch_queryable_objects(log, http, instance_url)
 
-    bulk_job_manager = BulkJobManager(http, log, config.credentials.instance_url)
-    rest_query_manager = RestQueryManager(http, log, config.credentials.instance_url)
+    bulk_job_manager = BulkJobManager(http, log, instance_url)
+    rest_query_manager = RestQueryManager(http, log, instance_url)
     resources: list[common.Resource] = []
 
     for name in queryable_object_names:
-        r = await _object_to_resource(log, http, config, bulk_job_manager, rest_query_manager, config.credentials.instance_url, name)
+        r = await _object_to_resource(log, http, config, bulk_job_manager, rest_query_manager, instance_url, name)
         if r:
             resources.append(r)
 
