@@ -14,6 +14,7 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/dbt"
+	iam "github.com/estuary/connectors/go/auth/iam"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
@@ -65,7 +66,7 @@ func (c config) Validate() error {
 
 	if ca == "" {
 		return fmt.Errorf("catalog authentication type is required")
-	} else if ca != catalogAuthTypeClientCredential && ca != catalogAuthTypeSigV4 {
+	} else if ca != catalogAuthTypeClientCredential && ca != catalogAuthTypeSigV4 && ca != catalogAuthTypeAWSIAM {
 		return fmt.Errorf("invalid catalog authentication type %q", ca)
 	} else if ca == catalogAuthTypeClientCredential {
 		if err := c.CatalogAuthentication.catalogAuthClientCredentialConfig.Validate(); err != nil {
@@ -73,6 +74,10 @@ func (c config) Validate() error {
 		}
 	} else if ca == catalogAuthTypeSigV4 {
 		if err := c.CatalogAuthentication.catalogAuthSigV4Config.Validate(); err != nil {
+			return err
+		}
+	} else if ca == catalogAuthTypeAWSIAM {
+		if err := c.CatalogAuthentication.catalogAuthAWSIAMConfig.Validate(); err != nil {
 			return err
 		}
 	}
@@ -87,9 +92,9 @@ func (c config) Validate() error {
 		}
 	}
 
-	if ct == computeTypeEmrServerless && ca == catalogAuthTypeClientCredential {
+	if ct == computeTypeEmrServerless && (ca == catalogAuthTypeClientCredential || ca == catalogAuthTypeAWSIAM) {
 		if c.Compute.emrConfig.SystemsManagerPrefix == "" {
-			return fmt.Errorf("must specify Systems Manager Prefix for AWS EMR Serverless compute with Client Credentials catalog authentication")
+			return fmt.Errorf("must specify Systems Manager Prefix for AWS EMR Serverless compute with Client Credentials or AWS IAM catalog authentication")
 		}
 	}
 
@@ -111,6 +116,7 @@ type catalogAuthType string
 const (
 	catalogAuthTypeClientCredential catalogAuthType = "OAuth 2.0 Client Credentials"
 	catalogAuthTypeSigV4            catalogAuthType = "AWS SigV4"
+	catalogAuthTypeAWSIAM          catalogAuthType = "AWS IAM"
 )
 
 type catalogAuthConfig struct {
@@ -118,12 +124,21 @@ type catalogAuthConfig struct {
 
 	catalogAuthClientCredentialConfig
 	catalogAuthSigV4Config
+	catalogAuthAWSIAMConfig
+}
+
+type catalogAuthAWSIAMConfig struct {
+	SigningName string `json:"signing_name" jsonschema:"title=Signing Name,description=Signing Name for SigV4 authentication.,enum=glue,enum=s3tables,default=glue" jsonschema_extras:"order=1"`
+	
+	iam.AWSConfig
+	iam.AWSTokens
 }
 
 func (catalogAuthConfig) JSONSchema() *jsonschema.Schema {
 	return schemagen.OneOfSchema("Catalog Authentication", "Iceberg Catalog Authentication Configuration", "catalog_auth_type", string(catalogAuthTypeClientCredential),
 		schemagen.OneOfSubSchema("OAuth 2.0 Client Credentials", catalogAuthClientCredentialConfig{}, string(catalogAuthTypeClientCredential)),
 		schemagen.OneOfSubSchema("AWS SigV4 Authentication", catalogAuthSigV4Config{}, string(catalogAuthTypeSigV4)),
+		schemagen.OneOfSubSchema("AWS IAM Authentication", catalogAuthAWSIAMConfig{}, string(catalogAuthTypeAWSIAM)),
 	)
 }
 
@@ -169,6 +184,25 @@ func (c catalogAuthSigV4Config) Validate() error {
 
 	if c.SigningName != "glue" && c.SigningName != "s3tables" {
 		return fmt.Errorf("signing_name must be 'glue' or 's3tables'")
+	}
+
+	return nil
+}
+
+func (c catalogAuthAWSIAMConfig) Validate() error {
+	if c.SigningName == "" {
+		return fmt.Errorf("missing 'signing_name'")
+	}
+
+	if c.SigningName != "glue" && c.SigningName != "s3tables" {
+		return fmt.Errorf("signing_name must be 'glue' or 's3tables'")
+	}
+
+	if c.AWSRegion == "" {
+		return fmt.Errorf("missing 'aws_region'")
+	}
+	if c.AWSRole == "" {
+		return fmt.Errorf("missing 'aws_role_arn'")
 	}
 
 	return nil
@@ -247,6 +281,9 @@ func (c config) toCatalog(ctx context.Context) (*catalog.Catalog, error) {
 	} else if c.CatalogAuthentication.CatalogAuthType == catalogAuthTypeSigV4 {
 		cfg := c.CatalogAuthentication.catalogAuthSigV4Config
 		opts = append(opts, catalog.WithSigV4(cfg.SigningName, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.Region))
+	} else if c.CatalogAuthentication.CatalogAuthType == catalogAuthTypeAWSIAM {
+		cfg := c.CatalogAuthentication.catalogAuthAWSIAMConfig
+		opts = append(opts, catalog.WithSigV4WithSessionToken(cfg.SigningName, cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSSessionToken, cfg.AWSRegion))
 	}
 
 	return catalog.New(ctx, c.URL, c.Warehouse, opts...)
