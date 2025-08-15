@@ -51,7 +51,7 @@ require (
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/klauspost/compress v1.18.0
 	github.com/klauspost/pgzip v1.2.6
-	github.com/marcboeker/go-duckdb/v2 v2.3.2
+	github.com/marcboeker/go-duckdb/v2 v2.3.3
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/microsoft/go-mssqldb v1.8.0
 	github.com/minio/highwayhash v1.0.2
@@ -154,12 +154,12 @@ require (
 	github.com/danieljoos/wincred v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dnephin/pflag v1.0.7 // indirect
-	github.com/duckdb/duckdb-go-bindings v0.1.16 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.11 // indirect
-	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.11 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.11 // indirect
-	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.11 // indirect
-	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.11 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.17 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.12 // indirect
+	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.12 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.12 // indirect
+	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.12 // indirect
+	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.12 // indirect
 	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.32.4 // indirect
@@ -210,8 +210,8 @@ require (
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lithammer/fuzzysearch v1.1.8 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
-	github.com/marcboeker/go-duckdb/arrowmapping v0.0.9 // indirect
-	github.com/marcboeker/go-duckdb/mapping v0.0.10 // indirect
+	github.com/marcboeker/go-duckdb/arrowmapping v0.0.10 // indirect
+	github.com/marcboeker/go-duckdb/mapping v0.0.11 // indirect
 	github.com/matishsiao/goInfo v0.0.0-20210923090445-da2e3fa8d45f // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
