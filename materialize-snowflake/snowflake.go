@@ -111,7 +111,16 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 			var dialect = snowflakeDialect(cfg.Schema, timestampTypeMapping)
 			var templates = renderTemplates(dialect)
 
-			serPolicy := boilerplate.SerPolicyStd
+			// Snowflake allows for 128 MiB VARIANT columns so we don't need to
+			// truncate objects or arrays. The default maximum size of a VARCHAR
+			// column is 16 MiB, so those technically do need to be truncated to
+			// guarantee they always fit.
+			serPolicy := &pf.SerPolicy{
+				StrTruncateAfter:       16 * 1024 * 1024, // 16 MiB
+				NestedObjTruncateAfter: 0,
+				ArrayTruncateAfter:     0,
+			}
+
 			if cfg.Advanced.DisableFieldTruncation {
 				serPolicy = boilerplate.SerPolicyDisabled
 			}
