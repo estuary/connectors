@@ -30,13 +30,9 @@ from .api import (
     snapshot_metadata,
     _dt_to_ms,
     API,
+    API_EVENT_LAG,
 )
 
-# Event data for a given hour isn't available via the API until ~4-6 hours afterwards.
-# This isn't mentioned in Pendo's docs but has been observed empirically. We shift the
-# cutoff between backfills & incremental replication back multiple hours to ensure we're
-# only backfilling date windows where event data should be available in the API.
-API_EVENT_LAG = 12
 
 AUTHORIZATION_HEADER = "x-pendo-integration-key"
 
@@ -138,7 +134,7 @@ def incremental_resources(
         )
 
     backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
-    cutoff = datetime.now(tz=UTC) - timedelta(hours=API_EVENT_LAG) 
+    cutoff = datetime.now(tz=UTC) - API_EVENT_LAG
 
     resources = [
         common.Resource(
@@ -239,7 +235,7 @@ def events(
         )
 
     backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
-    cutoff = datetime.now(tz=UTC) - timedelta(hours=API_EVENT_LAG)
+    cutoff = datetime.now(tz=UTC) - API_EVENT_LAG
 
     events = [
         common.Resource(
@@ -297,7 +293,7 @@ def aggregated_events(
         )
 
     backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
-    cutoff = datetime.now(tz=UTC) - timedelta(hours=API_EVENT_LAG) 
+    cutoff = datetime.now(tz=UTC) - API_EVENT_LAG 
 
     events = [
         common.Resource(

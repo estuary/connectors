@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, UTC
 from logging import Logger
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 import pendulum
 from pydantic import TypeAdapter
 from estuary_cdk.capture.common import BaseDocument, LogCursor, PageCursor
@@ -11,6 +11,11 @@ from .models import PageEvent, FeatureEvent, TrackEvent, GuideEvent, PollEvent, 
 
 API = "https://app.pendo.io/api/v1"
 RESPONSE_LIMIT = 50000
+# Event data for a given hour isn't available via the API until ~4-6 hours afterwards.
+# This isn't mentioned in Pendo's docs but has been observed empirically. We shift the
+# cutoff between backfills & incremental replication back multiple hours to ensure we're
+# only backfilling date windows where event data should be available in the API.
+API_EVENT_LAG = timedelta(hours=8)
 # Use a date window size of 1 day for event backfills since there can be a huge
 # number of events in a small timespan.
 EVENT_DATE_WINDOW_SIZE_IN_DAYS = 1
@@ -30,7 +35,7 @@ def generate_events_body(
         lower_bound: int,
         upper_bound: int | None = None,
         last_seen_id: str | None = None,
-):
+) -> dict[str, Any]:
     """
     Builds the request body to retrieve events from the Pendo API.
 
@@ -52,6 +57,8 @@ def generate_events_body(
         filter_condition = f"guideTimestamp == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
     else:
         filter_condition = f"guideTimestamp >= {lower_bound}"
+        if upper_bound:
+            filter_condition += f" && guideTimestamp <= {upper_bound}"
 
     body = {
         "response": {
@@ -97,7 +104,7 @@ def generate_event_aggregates_body(
         lower_bound: int,
         upper_bound: int | None = None,
         last_seen_id: str | None = None,
-):
+) -> dict[str, Any]:
     """
     Builds the request body to retrieve event aggregates from the Pendo API.
 
@@ -126,6 +133,8 @@ def generate_event_aggregates_body(
         filter_condition = f"lastTime == {lower_bound} && {identifying_field} >= \"{last_seen_id}\" && hour < {current_hour}"
     else:
         filter_condition = f"lastTime >= {lower_bound} && hour < {current_hour}"
+        if upper_bound:
+            filter_condition += f" && lastTime <= {upper_bound}"
 
     body = {
         "response": {
@@ -172,7 +181,7 @@ def generate_resources_body(
         lower_bound: int,
         upper_bound: int | None = None,
         last_seen_id: str | None = None,
-):
+) -> dict[str, Any]:
     """
     Builds the request body to retrieve resources from the Pendo API.
 
@@ -273,9 +282,19 @@ async def fetch_events(
     assert isinstance(log_cursor, datetime)
     url = f"{API}/aggregation"
     last_dt = log_cursor
-    last_ts = _dt_to_ms(last_dt)
+    horizon = datetime.now(tz=UTC) - API_EVENT_LAG
 
-    body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts)
+    # Avoid requesting data when the current cursor is beyond the eventual consistency horizon.
+    # This should only be possible on invocations shortly after the horizon is implemented. Afterwards,
+    # the cursor should never go beyond horizon naturally since Pendo shouldn't return data generated
+    # after the horizon.
+    if last_dt >= horizon:
+        return
+
+    last_ts = _dt_to_ms(last_dt)
+    upper_bound_ts = _dt_to_ms(horizon)
+
+    body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
 
     response = EventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
     events = response.results
@@ -288,6 +307,11 @@ async def fetch_events(
         if event.guideTimestamp < last_dt:
             raise RuntimeError(
                 f"Received events out of time order: Current event date is {event.guideTimestamp} vs. prior date {last_dt}"
+            )
+
+        if event.guideTimestamp > horizon:
+            raise RuntimeError(
+                f"Received events beyond the eventual consistency horizon: Current event timestamp is {event.guideTimestamp} vs. horizon {horizon}"
             )
 
         doc_count += 1
@@ -421,9 +445,19 @@ async def fetch_aggregated_events(
     assert isinstance(log_cursor, datetime)
     url = f"{API}/aggregation"
     last_dt = log_cursor
-    last_ts = _dt_to_ms(last_dt)
+    horizon = datetime.now(tz=UTC) - API_EVENT_LAG
 
-    body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts)
+    # Avoid requesting data when the current cursor is beyond the eventual consistency horizon.
+    # This should only be possible on invocations shortly after the horizon is implemented. Afterwards,
+    # the cursor should never go beyond horizon naturally since Pendo shouldn't return data generated
+    # after the horizon.
+    if last_dt >= horizon:
+        return
+
+    last_ts = _dt_to_ms(last_dt)
+    upper_bound_ts = _dt_to_ms(horizon)
+
+    body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
 
     response = AggregatedEventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
     aggregates = response.results
@@ -436,6 +470,11 @@ async def fetch_aggregated_events(
         if aggregate.lastTime < last_dt:
             raise RuntimeError(
                 f"Received events out of time order: Current event timestamp is {aggregate.lastTime} vs. prior timestamp {last_dt}"
+            )
+
+        if aggregate.lastTime > horizon:
+            raise RuntimeError(
+                f"Received events beyond the eventual consistency horizon: Current event timestamp is {aggregate.lastTime} vs. horizon {horizon}"
             )
 
         doc_count += 1
