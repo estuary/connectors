@@ -59,7 +59,7 @@ var driver = filesink.FileDriver{
 		return filesink.NewAzureBlob(ctx, c.(config).AzureBlobConfig)
 	},
 	NewWriter: func(c filesink.Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamWriter, error) {
-		return filesink.NewParquetWriter(c.(config).ParquetConfig, b, w)
+		return filesink.NewParquetWriter(c.(config).ParquetConfig, b, w, true)
 	},
 	NewConstraints: func(p *pf.Projection) *materialize.Response_Validated_Constraint {
 		return filesink.StdConstraints(p)
