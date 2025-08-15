@@ -272,7 +272,7 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 		for _, chunk := range blob.Chunks {
 			for _, channel := range chunk.Channels {
 				if err := getErrorByCode(channel.StatusCode); err != nil {
-					return fmt.Errorf("failed to write chunk (schema: %s, table %s): %w", chunk.Database, chunk.Table, err)
+					return fmt.Errorf("failed to write chunk (schema: %s, table %s): %w", chunk.Schema, chunk.Table, err)
 				}
 			}
 		}
