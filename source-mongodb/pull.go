@@ -181,6 +181,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		"version":               serverInfo.version,
 		"supportsChangeStreams": serverInfo.supportsChangeStreams,
 		"supportsPreImages":     serverInfo.supportsPreImages,
+		"supportsStartAfter":    serverInfo.supportsStartAfter,
 	}).Info("connected to database")
 
 	coordinator := newBatchStreamCoordinator(changeStreamBindings, func(ctx context.Context) (primitive.Timestamp, error) {
@@ -198,6 +199,19 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	requestPreImages := serverInfo.supportsPreImages && !cfg.Advanced.DisablePreImages
 
+	// Helper for (re-)initializing change streams with their various options.
+	initStreamsFn := func(ctx context.Context) ([]*changeStream, error) {
+		return c.initializeStreams(
+			ctx,
+			changeStreamBindings,
+			maxAwaitTime,
+			requestPreImages,
+			serverInfo.supportsStartAfter,
+			cfg.Advanced.ExclusiveCollectionFilter,
+			excludeCollections,
+		)
+	}
+
 	didBackfill := false
 	for !prevState.isChangeStreamBackfillComplete(changeStreamBindings) {
 		if !didBackfill {
@@ -208,7 +222,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		// Repeatedly catch-up reading change streams and backfilling tables for the specified
 		// period of time. This allows resume tokens to be kept reasonably up to date while the
 		// backfill is in progress.
-		if streams, err := c.initializeStreams(ctx, changeStreamBindings, maxAwaitTime, requestPreImages, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections); err != nil {
+		if streams, err := initStreamsFn(ctx); err != nil {
 			return err
 		} else if err := coordinator.startCatchingUp(ctx); err != nil {
 			return err
@@ -226,7 +240,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 
 	if len(changeStreamBindings) > 0 {
 		log.Info("streaming change events indefinitely")
-		streams, err := c.initializeStreams(groupCtx, changeStreamBindings, maxAwaitTime, requestPreImages, cfg.Advanced.ExclusiveCollectionFilter, excludeCollections)
+		streams, err := initStreamsFn(groupCtx)
 		if err != nil {
 			return err
 		}
@@ -450,6 +464,7 @@ type serverInfo struct {
 	version               string
 	supportsPreImages     bool
 	supportsChangeStreams bool
+	supportsStartAfter    bool
 }
 
 type buildInfo struct {
@@ -480,6 +495,7 @@ func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, databa
 			version:               buildInfo.Version,
 			supportsPreImages:     false,
 			supportsChangeStreams: false,
+			supportsStartAfter:    false,
 		}, nil
 	}
 
@@ -495,10 +511,18 @@ func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, databa
 		}
 	}
 
+	var startAfter bool
+	if len(buildInfo.VersionArray) >= 3 && (buildInfo.VersionArray[0] > 4 || buildInfo.VersionArray[0] == 4 && buildInfo.VersionArray[1] >= 2) {
+		// The startAfter parameter is supported by MongoDB versions 4.2 and
+		// later.
+		startAfter = true
+	}
+
 	return &serverInfo{
 		version:               buildInfo.Version,
 		supportsPreImages:     preImages,
 		supportsChangeStreams: changeStreams,
+		supportsStartAfter:    startAfter,
 	}, nil
 }
 
