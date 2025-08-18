@@ -6,7 +6,6 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
-	"slices"
 	"time"
 
 	m "github.com/estuary/connectors/go/materialize"
@@ -382,31 +381,35 @@ func (c *capture) readEvent(
 		}
 	}
 
-	var logFields log.Fields
-	if log.GetLevel() == log.DebugLevel {
-		logFields = log.Fields{
-			"_id":                   idToString(ev.fields.DocumentKey.Id),
-			"changeStreamDatabase":  s.db,
-			"operationType":         ev.fields.OperationType,
-			"fragments":             ev.fragments,
-			"requestedAnotherBatch": requestedAnotherBatch,
-		}
-	}
-
-	if !slices.Contains([]string{"insert", "update", "replace", "delete"}, ev.fields.OperationType) {
-		// Event is not for a tracked operation type.
-		log.WithFields(logFields).Debug("discarding event with un-tracked operation")
+	switch ev.fields.OperationType {
+	case "drop":
+		log.WithFields(log.Fields{"database": s.db, "collection": ev.fields.Ns.Collection}).Warn("received drop event for tracked collection")
 		return
-	} else if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil {
-		// FullDocument can be "null" for non-deletion events if another
-		// operation has deleted the document. This happens because update
-		// change events do not hold a copy of the full document, but rather
-		// it is at query time that the full document is looked up, and in
-		// these cases, the FullDocument can end up being null (if deleted)
-		// or different from the deltas in the update event. We ignore
-		// events where FullDocument is null. Another change event of type
-		// delete will eventually come and delete the document.
-		log.WithFields(logFields).Debug("discarding event with no FullDocument")
+	case "rename":
+		log.WithFields(log.Fields{"database": s.db, "collection": ev.fields.Ns.Collection}).Warn("received rename event for tracked collection")
+		return
+	case "dropDatabase":
+		log.WithFields(log.Fields{"database": s.db}).Warn("received dropDatabase event for tracked database")
+		return
+	case "insert", "update", "replace", "delete":
+		if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil {
+			// FullDocument can be "null" for non-deletion events if another
+			// operation has deleted the document. This happens because update
+			// change events do not hold a copy of the full document, but rather
+			// it is at query time that the full document is looked up, and in
+			// these cases, the FullDocument can end up being null (if deleted)
+			// or different from the deltas in the update event. We ignore
+			// events where FullDocument is null. Another change event of type
+			// delete will eventually come and delete the document.
+			log.WithFields(log.Fields{"database": s.db, "collection": ev.fields.Ns.Collection}).Debug("discarding event with no FullDocument")
+			return
+		}
+	default:
+		log.WithFields(log.Fields{
+			"database":      s.db,
+			"collection":    ev.fields.Ns.Collection,
+			"operationType": ev.fields.OperationType,
+		}).Debug("discarding event with un-tracked operation")
 		return
 	}
 
