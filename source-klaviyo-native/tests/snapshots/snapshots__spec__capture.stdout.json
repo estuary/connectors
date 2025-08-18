@@ -6,12 +6,11 @@
         "Advanced": {
           "properties": {
             "window_size": {
-              "default": 30,
-              "description": "Date window size for the events backfill in days.",
-              "exclusiveMinimum": 0,
-              "maximum": 365,
+              "default": "P30D",
+              "description": "Date window size for the events backfill in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
+              "format": "duration",
               "title": "Window size",
-              "type": "integer"
+              "type": "string"
             }
           },
           "title": "Advanced",

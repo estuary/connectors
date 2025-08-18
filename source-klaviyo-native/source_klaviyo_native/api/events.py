@@ -337,7 +337,7 @@ async def subdivision_worker(
 
 async def backfill_events(
     http: HTTPSession,
-    window_size: int,
+    window_size: timedelta,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
@@ -349,7 +349,7 @@ async def backfill_events(
     if start >= cutoff:
         return
 
-    end = min(start + timedelta(days=window_size), cutoff)
+    end = min(start + window_size, cutoff)
 
     work_manager = WorkManager(
         http=http,
