@@ -11,6 +11,8 @@ from .models import (
     EndpointConfig,
     ResourceConfig,
     ResourceState,
+    Event,
+    EventAggregate,
     Resource,
     Metadata,
     FULL_REFRESH_RESOURCE_TYPES,
@@ -205,7 +207,7 @@ def events(
 ) -> list[common.Resource]:
     def open(
         entity: str,
-        model: type[common.BaseDocument],
+        model: type[Event],
         identifying_field: str,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -263,7 +265,7 @@ def aggregated_events(
 ) -> list[common.Resource]:
     def open(
         entity: str,
-        model: type[common.BaseDocument],
+        model: type[EventAggregate],
         identifying_field: str,
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,

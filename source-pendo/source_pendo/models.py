@@ -42,42 +42,36 @@ class Metadata(BaseDocument, extra="allow"):
     pass
 
 
-# Event streams have slightly different required fields, so we have models for each event type.
-class PageEvent(BaseDocument, extra="allow"):
+class EventAggregate(BaseDocument, extra="allow"):
     appId: int
     hour: int
     remoteIp: str
     lastTime: AwareDatetime
+
+
+class PageEvent(EventAggregate):
     pageId: str
 
 
-class FeatureEvent(BaseDocument, extra="allow"):
-    appId: int
-    hour: int
-    remoteIp: str
-    lastTime: AwareDatetime
+class FeatureEvent(EventAggregate):
     featureId: str
 
 
-class TrackEvent(BaseDocument, extra="allow"):
-    appId: int
-    hour: int
-    remoteIp: str
-    lastTime: AwareDatetime
+class TrackEvent(EventAggregate):
     trackTypeId: str
 
 
-class GuideEvent(BaseDocument, extra="allow"):
+class Event(BaseDocument, extra="allow"):
     appId: int
     remoteIp: str
     guideTimestamp: AwareDatetime
+
+
+class GuideEvent(Event):
     guideId: str
 
 
-class PollEvent(BaseDocument, extra="allow"):
-    appId: int
-    remoteIp: str
-    guideTimestamp: AwareDatetime
+class PollEvent(Event):
     pollId: str
 
 
@@ -95,19 +89,18 @@ class TrackType(BaseDocument, extra="allow"):
 
 class EventResponse(BaseDocument, extra="forbid"):
     startTime: int
-    results: list[GuideEvent | PollEvent]
+    results: list[Event]
 
 
 class AggregatedEventResponse(BaseDocument, extra="forbid"):
     startTime: int
-    results: list[PageEvent | FeatureEvent | TrackEvent]
+    results: list[EventAggregate]
 
 
 _ResourceType = TypeVar('_ResourceType', bound=BaseDocument)
 
 class ResourceResponse(BaseModel, Generic[_ResourceType]):
     results: list[_ResourceType]
-
 
 
 # Supported snapshot resource types and their corresponding name.
@@ -133,14 +126,14 @@ METADATA_TYPES: list[tuple[str, str]] = [
 
 
 # Supported event types, their corresponding name, their keys, and their model.
-EVENT_TYPES: list[tuple[str, str, str, type[BaseDocument]]] = [
+EVENT_TYPES: list[tuple[str, str, str, type[Event]]] = [
     ("guideEvents", "GuideEvents", "guideId", GuideEvent),
     ("pollEvents", "PollEvents", "pollId", PollEvent),
 ]
 
 
 # Supported aggregated event types, their corresponding resource name, their keys, and their model.
-AGGREGATED_EVENT_TYPES: list[tuple[str, str, str, type[BaseDocument]]] = [
+AGGREGATED_EVENT_TYPES: list[tuple[str, str, str, type[EventAggregate]]] = [
     ("pageEvents", "PageEvents", "pageId", PageEvent),
     ("featureEvents", "FeatureEvents", "featureId", FeatureEvent),
     ("trackEvents", "TrackEvents", "trackTypeId", TrackEvent),
