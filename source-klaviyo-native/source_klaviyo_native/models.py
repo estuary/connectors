@@ -44,12 +44,12 @@ class EndpointConfig(BaseModel):
         title="Authentication",
     )
     class Advanced(BaseModel):
-        window_size: Annotated[int, Field(
-            description="Date window size for the events backfill in days.",
+        window_size: Annotated[timedelta, Field(
+            description="Date window size for the events backfill in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
             title="Window size",
-            default=30,
-            gt=0,
-            le=365,
+            default=timedelta(days=30),
+            ge=timedelta(seconds=30),
+            le=timedelta(days=365),
         )]
 
     advanced: Advanced = Field(
