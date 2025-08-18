@@ -6,16 +6,14 @@ from pydantic import TypeAdapter
 from estuary_cdk.capture.common import BaseDocument, LogCursor, PageCursor
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
-    AggregatedEventResponse,
     Event,
     EventAggregate,
-    EventResponse,
     Metadata,
     FullRefreshResource,
     IncrementalResource,
-    ResourceResponse,
 )
 
 API = "https://app.pendo.io/api/v1"
@@ -296,12 +294,16 @@ async def _fetch_events_between(
 
     body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
 
-    response = EventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-    events = response.results
+    _, response_body = await http.request_stream(log, url, method="POST", json=body)
+    processor = IncrementalJsonProcessor(
+        response_body(),
+        "results.item",
+        model,
+    )
 
     doc_count = 0
     last_seen_id = ""
-    for event in events:
+    async for event in processor:
         # Due to how we're querying the API with the "sort" and "filter" operators, 
         # we don't expect to receive documents out of order.
         if event.guideTimestamp < last_dt:
@@ -327,11 +329,15 @@ async def _fetch_events_between(
         while True:
             body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
 
-            response = EventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-            events = response.results
+            _, response_body = await http.request_stream(log, url, method="POST", json=body)
+            processor = IncrementalJsonProcessor(
+                response_body(),
+                "results.item",
+                model,
+            )
 
             doc_count = 0
-            for event in events:
+            async for event in processor:
                 if event.guideTimestamp < last_dt:
                     raise RuntimeError(
                         f"Received events out of time order: Current event date is {event.guideTimestamp} vs. prior date {last_dt}"
@@ -454,12 +460,16 @@ async def _fetch_aggregated_events_between(
 
     body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
 
-    response = AggregatedEventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-    aggregates = response.results
+    _, response_body = await http.request_stream(log, url, method="POST", json=body)
+    processor = IncrementalJsonProcessor(
+        response_body(),
+        "results.item",
+        model,
+    )
 
     doc_count = 0
     last_seen_id = ""
-    for aggregate in aggregates:
+    async for aggregate in processor:
         # Due to how we're querying the API with the "sort" and "filter" operators, 
         # we don't expect to receive documents out of order.
         if aggregate.lastTime < last_dt:
@@ -485,11 +495,15 @@ async def _fetch_aggregated_events_between(
         while True:
             body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
 
-            response = AggregatedEventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-            aggregates = response.results
+            _, response_body = await http.request_stream(log, url, method="POST", json=body)
+            processor = IncrementalJsonProcessor(
+                response_body(),
+                "results.item",
+                model,
+            )
 
             doc_count = 0
-            for aggregate in aggregates:
+            async for aggregate in processor:
                 if aggregate.lastTime < last_dt:
                     raise RuntimeError(
                         f"Received events out of time order: Current event date is {aggregate.lastTime} vs. prior date {last_dt}"
@@ -632,12 +646,16 @@ async def _fetch_resources_between(
 
     body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
 
-    response_model = TypeAdapter(ResourceResponse[model])
-    response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
+    _, response_body = await http.request_stream(log, url, method="POST", json=body)
+    processor = IncrementalJsonProcessor(
+        response_body(),
+        "results.item",
+        model,
+    )
 
     doc_count = 0
     last_seen_id = ""
-    for resource in response.results:
+    async for resource in processor:
         updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
         # Due to how we're querying the API with the "sort" and "filter" operators, 
         # we don't expect to receive documents out of order.
@@ -663,10 +681,15 @@ async def _fetch_resources_between(
         while True:
             body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
 
-            response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
+            _, response_body = await http.request_stream(log, url, method="POST", json=body)
+            processor = IncrementalJsonProcessor(
+                response_body(),
+                "results.item",
+                model,
+            )
 
             doc_count = 0
-            for resource in response.results:
+            async for resource in processor:
                 updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
                 if updated_at_dt < last_dt:
                     raise RuntimeError(

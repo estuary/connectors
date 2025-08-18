@@ -163,22 +163,6 @@ class PollEvent(Event):
     pollId: str
 
 
-class EventResponse(BaseDocument, extra="forbid"):
-    startTime: int
-    results: list[Event]
-
-
-class AggregatedEventResponse(BaseDocument, extra="forbid"):
-    startTime: int
-    results: list[EventAggregate]
-
-
-_ResourceType = TypeVar('_ResourceType', bound=BaseDocument)
-
-class ResourceResponse(BaseModel, Generic[_ResourceType]):
-    results: list[_ResourceType]
-
-
 # Supported snapshot resource types.
 # Most, if not all, of these snapshot resources could be moved over
 # to be incremental resources listed in INCREMENTAL_RESOURCE_TYPES.
