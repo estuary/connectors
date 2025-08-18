@@ -12,7 +12,11 @@ import (
 	"github.com/estuary/flow/go/protocols/materialize"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// Starting on 18-Aug-2025 newly created parquet materializations will use
+	// STRING logical type for UUID fields, rather than a UUID logical type.
+	"uuid_logical_type": false,
+}
 
 type config struct {
 	filesink.S3StoreConfig
@@ -59,7 +63,7 @@ var driver = filesink.FileDriver{
 		return filesink.NewS3Store(ctx, c.(config).S3StoreConfig)
 	},
 	NewWriter: func(c filesink.Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamWriter, error) {
-		return filesink.NewParquetWriter(c.(config).ParquetConfig, b, w, true)
+		return filesink.NewParquetWriter(c.(config).ParquetConfig, b, w, featureFlags["uuid_logical_type"])
 	},
 	NewConstraints: func(p *pf.Projection) *materialize.Response_Validated_Constraint {
 		return filesink.StdConstraints(p)
